@@ -10768,13 +10768,18 @@ var scanCode = (scan, closer) => {
   let words = [];
   let word;
   let depth = 0;
+  let target = false;
   const endWord = () => {
-    if (word !== undefined)
-      words.push(word);
+    if (word !== undefined) {
+      if (!target)
+        words.push(word);
+      target = false;
+    }
     word = undefined;
   };
   const endCommand = () => {
     endWord();
+    target = false;
     if (words.length > 0)
       scan.commands.push(words);
     words = [];
@@ -10828,6 +10833,8 @@ var scanCode = (scan, closer) => {
       if ((char === "<" || char === ">") && /^\d+$/.test(word ?? ""))
         word = undefined;
       endWord();
+      if (char === "<" || char === ">")
+        target = true;
       scan.index += 1;
     } else {
       word = (word ?? "") + char;
@@ -10952,7 +10959,15 @@ var workflowFolders = (call) => {
     ...call.env.CLAUDE_CONFIG_DIR === undefined ? [] : [join6(call.env.CLAUDE_CONFIG_DIR, "workflows")]
   ];
 };
-var shadowed = (call) => forEach2(workflowFolders(call), (folder) => io(folder, () => readdir(folder)).pipe(map4((names) => names.some((name) => name.toLowerCase().startsWith(PLUGIN_NAMESPACE))), catchIf2((error) => hasCode(error.cause, "ENOENT") || hasCode(error.cause, "ENOTDIR"), () => succeed6(false)), orElseSucceed2(() => true))).pipe(map4((found) => found.includes(true)));
+var declaresOurName = (script) => {
+  const start = script.search(/export\s+const\s+meta\b/);
+  if (start === -1)
+    return false;
+  const end = script.indexOf(`
+}`, start);
+  return script.slice(start, end === -1 ? start + 4000 : end).toLowerCase().includes(PLUGIN_NAMESPACE);
+};
+var shadowed = (call) => forEach2(workflowFolders(call), (folder) => io(folder, () => readdir(folder)).pipe(flatMap2((names) => names.some((name) => name.toLowerCase().startsWith(PLUGIN_NAMESPACE)) ? succeed6(true) : forEach2(names.filter((name) => name.endsWith(".js")), (name) => io(join6(folder, name), () => Bun.file(join6(folder, name)).text()).pipe(map4(declaresOurName))).pipe(map4((found) => found.includes(true)))), catchIf2((error) => hasCode(error.cause, "ENOENT") || hasCode(error.cause, "ENOTDIR"), () => succeed6(false)), orElseSucceed2(() => true))).pipe(map4((found) => found.includes(true)));
 var HOOK_COMMANDS = [
   hook("session-start", "SessionStart: add the status of the open Intents as context (and the core root rules when the root agent is not the main thread); nothing without a .holyagent folder", (payload, call) => gen2(function* () {
     if (!(yield* hasStateFolder(call.directory)))

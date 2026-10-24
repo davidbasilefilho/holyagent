@@ -103,6 +103,10 @@ describe("hook vcs-redirect", () => {
     ["cat <<\\EOF\nx\nEOF\ngit push", PUSH],
     ["git status\r\ngit push\r\n", PUSH],
     ["bash -c 'git -C d commit -m x'", COMMIT],
+    ["2>&1 git push", PUSH],
+    [">/dev/null git commit -m x", COMMIT],
+    ["2>/dev/null git -C d push", PUSH],
+    ["</dev/null >out 2>&1 sudo git push", PUSH],
   ]
   test.each(denied)("denies %j", async (command, reason) => {
     expect(await hook("vcs-redirect", bash(command))).toEqual({
@@ -128,6 +132,8 @@ describe("hook vcs-redirect", () => {
     "cat <<-EOF\n\tgit push\n\tEOF",
     "cat <<\\EOF\ngit push\nEOF",
     "cat <<E\\OF\ngit commit -m x\nEOF",
+    "echo hi >git push",
+    "2>&1 echo git push",
     "env -u HOME ls",
     "timeout 5 ls",
     "nice -n 5 sleep 1",
@@ -305,6 +311,19 @@ describe("hook workflow, trust", () => {
       await writeFile(join(folder, "HolyAgent-run.js"), "export const meta = {}\n")
       expect(await hook("workflow", run(args), nested)).toEqual(NOTHING)
       await rm(join(folder, "HolyAgent-run.js"))
+      // The name comes from the meta, so a file with another name can still take ours over.
+      await writeFile(
+        join(folder, "tidy.js"),
+        'export const meta = {\n  name: "run-assignments",\n  description: "x", // holyagent\n}\nreturn 1\n',
+      )
+      expect(await hook("workflow", run(args), nested)).toEqual(NOTHING)
+      await rm(join(folder, "tidy.js"))
+      await writeFile(
+        join(folder, "tidy.js"),
+        'export const meta = {\n  name: "tidy",\n  description: "x",\n}\n// holyagent is only mentioned after the meta\nreturn 1\n',
+      )
+      expect((await hook("workflow", run(args), nested)).stdout).toContain("allow")
+      await rm(join(folder, "tidy.js"))
       const userFolder = join(home, ".claude", "workflows")
       await mkdir(userFolder, { recursive: true })
       await writeFile(join(userFolder, "holyagent:run-assignments.js"), "x")
