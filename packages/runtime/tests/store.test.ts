@@ -10,7 +10,7 @@ import { DEFAULT_CONFIG } from "../src/domain/directive.ts"
 import { closeIntent, createIntent } from "../src/domain/intent.ts"
 import { dispatch, record } from "../src/domain/lifecycle.ts"
 import { stateDirectory } from "../src/state/layout.ts"
-import { readState, updateState } from "../src/state/store.ts"
+import { loadOpenProject, readState, updateState } from "../src/state/store.ts"
 import { NOW } from "./fixtures.ts"
 
 let root: string
@@ -323,6 +323,45 @@ describe("loading validates and names the file", () => {
     await Bun.write(to, await Bun.file(from).text())
     await rm(from)
     const error = await Effect.runPromise(Effect.flip(readState(directory)))
+    expect(error).toMatchObject({ _tag: "CorruptRecord", path: to })
+  })
+})
+
+describe("loading the open Intents only", () => {
+  test("loads open Intents with their Assignments and leaves closed ones and their files alone", async () => {
+    await Effect.runPromise(seed())
+    await Effect.runPromise(
+      updateState(directory, ({ project }) =>
+        createIntent(project, { id: "intent-ccc", objective: "Old work", now: NOW }).pipe(
+          Effect.flatMap((created) =>
+            closeIntent(
+              { ...project, intents: [...project.intents, ...created.intents] },
+              [],
+              "intent-ccc",
+              { reason: "done" },
+              NOW,
+            ),
+          ),
+        ),
+      ),
+    )
+    const closedAssignments = join(directory, "intents/old-work-intent-ccc/assignments")
+    await mkdir(closedAssignments, { recursive: true })
+    await Bun.write(join(closedAssignments, "broken.json"), "{")
+
+    const open = await Effect.runPromise(loadOpenProject(directory))
+    expect(open.intents.map((intent) => intent.id)).toEqual(["intent-aaa"])
+    expect(open.assignments.map((row) => row.id)).toEqual(["assignment-bbb"])
+    expect((await Effect.runPromise(Effect.flip(readState(directory))))._tag).toBe("CorruptRecord")
+  })
+
+  test("checks what it reads as strictly as a full load", async () => {
+    await Effect.runPromise(seed())
+    const from = join(directory, assignmentPathOf)
+    const to = join(directory, "intents/parse-everything-intent-aaa/assignments/renamed.json")
+    await Bun.write(to, await Bun.file(from).text())
+    await rm(from)
+    const error = await Effect.runPromise(Effect.flip(loadOpenProject(directory)))
     expect(error).toMatchObject({ _tag: "CorruptRecord", path: to })
   })
 })
