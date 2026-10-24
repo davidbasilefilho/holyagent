@@ -74,6 +74,8 @@ const directiveView = (directive: Directive) =>
         reason: directive.reason,
       }
 
+const ExistingRef = Schema.Struct({ id: AssignmentId })
+
 const OutcomeFlag = Schema.Literals(["success", "failure", "errored", "interrupted", "stopped"])
 
 const OUTCOMES: Readonly<Record<typeof OutcomeFlag.Type, Outcome>> = {
@@ -85,7 +87,9 @@ const OUTCOMES: Readonly<Record<typeof OutcomeFlag.Type, Outcome>> = {
 }
 
 const RECORD_USAGE = "assignment record <id> (--agent <agentId> | --failed)"
-const CLOSE_USAGE = "assignment close <id> --outcome success|failure|errored|interrupted|stopped"
+const CLOSE_USAGE =
+  "assignment close <id> --outcome success|failure|errored|interrupted|stopped [--accept <rationale>]"
+const LIST_USAGE = "assignment list [--state <state>] [--all] [--full]"
 
 const idArgument = (positionals: ReadonlyArray<string>): string => positionals[0] ?? ""
 
@@ -121,10 +125,10 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
       "TOON fields (id, state, agent/model/effort or continue, reason), then a line `prompt:` alone, then the specialist prompt verbatim to the end; pass that text to the Agent tool or SendMessage as it is",
     flags: {},
     positionals: 0,
-    run: ({ directory, config, input }) =>
+    run: ({ directory, config, inputBy }) =>
       Effect.gen(function* () {
-        const request = yield* input(
-          Schema.Union([Schema.Struct({ id: AssignmentId }), AssignmentInput]),
+        const request = yield* inputBy((raw) =>
+          typeof raw === "object" && raw !== null && "id" in raw ? ExistingRef : AssignmentInput,
         )
         const settings = yield* config
         const newAssignmentId = yield* newId("assignment")
@@ -190,32 +194,34 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
   },
   {
     path: ["assignment", "close"],
-    usage: `${CLOSE_USAGE} [--accept <rationale>]`,
+    usage: CLOSE_USAGE,
     summary:
       "Finish an Assignment with the specialist's report on stdin; --accept also accepts it from the report's evidence block",
     input:
-      "the specialist's report as raw text; with --accept it ends with `evidence:` and one `<criterion or evidence label>: <support>` line per blocking criterion and required label",
+      "the specialist's report as raw text. Required for success; optional for the other outcomes, which store the outcome name when it is empty. With --accept it ends with `evidence:` and one `<criterion or evidence label>: <support>` line per blocking criterion and required label",
     flags: { outcome: "string", accept: "string" },
     positionals: 1,
     run: ({ directory, args, text }) =>
       Effect.gen(function* () {
         const id = idArgument(args.positionals)
-        const outcome =
-          OUTCOMES[
-            yield* choiceFlag(
-              OutcomeFlag,
-              "outcome",
-              yield* requiredFlag(args, "outcome", CLOSE_USAGE),
-              CLOSE_USAGE,
-            )
-          ]
+        const flag = yield* choiceFlag(
+          OutcomeFlag,
+          "outcome",
+          yield* requiredFlag(args, "outcome", CLOSE_USAGE),
+          CLOSE_USAGE,
+        )
+        const outcome = OUTCOMES[flag]
         const rationale = stringFlag(args, "accept")
         if (rationale !== undefined && outcome !== "Succeeded")
           return yield* new Usage({
             message: "--accept applies only to --outcome success",
-            hint: `Usage: holyagent ${CLOSE_USAGE} [--accept <rationale>]`,
+            hint: `Usage: holyagent ${CLOSE_USAGE}`,
           })
-        const result = yield* text
+        // Only success has to say what was done; a lost or stopped specialist often has no report.
+        const report =
+          outcome === "Succeeded" ? yield* text : yield* text.pipe(Effect.orElseSucceed(() => ""))
+        const result =
+          outcome === "Succeeded" ? report : report.trim() === "" ? flag : `${flag}: ${report}`
         const now = yield* nowIso
         const { assignment } = yield* updateState(directory, (snapshot) =>
           Effect.gen(function* () {
@@ -294,20 +300,19 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
   },
   {
     path: ["assignment", "list"],
-    usage: "assignment list [--state <state>] [--all] [--full]",
+    usage: LIST_USAGE,
     summary:
       "List the Assignments of the Intent in use, a line each; --all lists every Intent's, --full shows everything",
     flags: { state: "string", all: "boolean", full: "boolean" },
     positionals: 0,
     run: ({ directory, args }) =>
       Effect.gen(function* () {
-        const usage = "assignment list [--state <state>] [--all] [--full]"
         const snapshot = yield* readState(directory)
         const stateFlag = stringFlag(args, "state")
         const state =
           stateFlag === undefined
             ? undefined
-            : yield* choiceFlag(AssignmentState, "state", stateFlag, usage)
+            : yield* choiceFlag(AssignmentState, "state", stateFlag, LIST_USAGE)
         const intentId = booleanFlag(args, "all") ? undefined : (yield* resolveIntent(snapshot)).id
         const chosen = byId(
           snapshot.project.assignments.filter(

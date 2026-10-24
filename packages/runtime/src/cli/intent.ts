@@ -16,7 +16,7 @@ import { booleanFlag, requiredFlag, stringFlag } from "./args.ts"
 import { nowIso } from "./context.ts"
 import { NoActiveIntent, Usage } from "./errors.ts"
 import type { Command } from "./types.ts"
-import { byId, intentRow, intentView, present } from "./views.ts"
+import { byId, intentRow, intentView, oneLine, present } from "./views.ts"
 
 const openIntents = (snapshot: Snapshot) =>
   byId(snapshot.project.intents.filter((intent) => intent.state === "Open"))
@@ -39,7 +39,7 @@ export const resolveIntent = (snapshot: Snapshot): Effect.Effect<Intent, NoActiv
         new NoActiveIntent({
           open: open.map(({ id, objective }) => ({
             id,
-            objective: objective.replace(/\s+/g, " "),
+            objective: oneLine(objective),
           })),
         }),
       )

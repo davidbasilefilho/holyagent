@@ -5,9 +5,7 @@ import { readOpenState } from "../state/store.ts"
 import { nowIso } from "./context.ts"
 import { intentInUse, resolveIntent } from "./intent.ts"
 import type { Command } from "./types.ts"
-import { assignmentRow, byId, present } from "./views.ts"
-
-const oneLine = (text: string) => text.replace(/\s+/g, " ").trim()
+import { assignmentRow, byId, oneLine, present } from "./views.ts"
 
 /** The `plan`, `status` and `reconcile` commands. */
 export const OVERVIEW_COMMANDS: ReadonlyArray<Command> = [

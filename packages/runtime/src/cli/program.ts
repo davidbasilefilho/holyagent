@@ -9,7 +9,7 @@ import { vcsLive } from "../vcs/live.ts"
 import { parseArgs } from "./args.ts"
 import { COMMANDS } from "./commands.ts"
 import { loadConfig } from "./config.ts"
-import { readInput, readReport, stateRoot } from "./context.ts"
+import { readInput, readInputBy, readReport, stateRoot } from "./context.ts"
 import { describeFailure, Usage } from "./errors.ts"
 import { type Call, type Command, type Host, Streamed, WithTrailer } from "./types.ts"
 
@@ -46,6 +46,7 @@ const callFor = (args: Call["args"], host: Host, emit: Call["emit"]) =>
       emit,
       vcs: host.vcs ?? vcsLive(root, host.env),
       input: (schema) => readInput(host, schema),
+      inputBy: (pick) => readInputBy(host, pick),
     } satisfies Call
   })
 
@@ -58,11 +59,18 @@ const execute = (argv: ReadonlyArray<string>, host: Host) =>
     const command = COMMANDS.find((candidate) =>
       candidate.path.every((word, index) => argv[index] === word),
     )
-    if (command === undefined)
+    if (command === undefined) {
+      const group = COMMANDS.filter((candidate) => candidate.path[0] === first)
+      if (group.length > 0 && (argv.length === 1 || argv.includes("--help") || argv.includes("-h")))
+        return { stdout: `${group.map(help).join("\n")}\n`, stderr: "", code: 0 }
       return yield* new Usage({
         message: `Unknown command ${argv.slice(0, 2).join(" ")}`,
-        hint: "Run `holyagent --help` for the commands.",
+        hint:
+          group.length > 0
+            ? `Run \`holyagent ${first} --help\` for its commands.`
+            : "Run `holyagent --help` for the commands.",
       })
+    }
     const rest = argv.slice(command.path.length)
     if (rest.includes("--help") || rest.includes("-h"))
       return { stdout: `${help(command)}\n`, stderr: "", code: 0 }

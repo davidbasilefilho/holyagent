@@ -8,13 +8,13 @@ export class Usage extends Data.TaggedError("Usage")<{
   readonly hint: string
 }> {}
 
-/** A command that reads JSON from stdin found a terminal or nothing. */
+/** A command that reads stdin found a terminal or nothing. */
 export class StdinMissing extends Data.TaggedError("StdinMissing")<{
   readonly reason: string
 }> {
   /** The description shown to the user. */
   override get message() {
-    return `This command reads JSON from stdin: ${this.reason}`
+    return `This command needs input on stdin: ${this.reason}`
   }
 }
 
@@ -60,7 +60,7 @@ const REFUSED_ERRORS = new Set([
 ])
 
 const HINTS: Readonly<Record<string, string>> = {
-  StdinMissing: "Pipe the JSON in, for example: echo '{...}' | holyagent <command>; see --help.",
+  StdinMissing: "Pipe the input in, for example: echo '...' | holyagent <command>; see --help.",
   NoActiveIntent:
     "Pick one with `holyagent intent use <id>`, or start one with `holyagent intent create`.",
   InvalidDraft:
