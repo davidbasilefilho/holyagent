@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "The holyagent runtime: instructions and the shared command surface.",
   "bin": {
-    "holyagent": "./src/cli/main.ts"
+    "holyagent-runtime": "./src/cli/main.ts"
   },
   "type": "module",
   "exports": {
