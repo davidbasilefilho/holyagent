@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "The holyagent runtime: instructions and the shared command surface.",
   "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "dependencies": {
     "effect": "^4.0.0"
   }
