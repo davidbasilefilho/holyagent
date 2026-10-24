@@ -17,10 +17,14 @@ while [ -L "$self" ]; do
       ;;
   esac
 done
-# The directory stays relative to the working directory, which this script never changes.
+# The directory stays relative to the working directory, which this script never changes. A name
+# without a slash (found on PATH) would put the directory at the project's, whose files are not ours.
 case $self in
   */*) here=${self%/*} ;;
-  *) here=. ;;
+  *)
+    printf 'error: WrapperPath: the wrapper was started by a bare name.\nhint: Run it by its path, such as "${CLAUDE_PLUGIN_ROOT}/scripts/holyagent".\n' >&2
+    exit 127
+    ;;
 esac
 # `exec` looks `bun` up on PATH itself, so the test below only checks that it is there.
 bun=

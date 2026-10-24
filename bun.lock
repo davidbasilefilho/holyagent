@@ -20,10 +20,16 @@
     "packages/integrations/claude": {
       "name": "@holyagent/claude",
       "version": "0.1.0",
+      "dependencies": {
+        "@holyagent/runtime": "workspace:*",
+      },
     },
     "packages/runtime": {
       "name": "@holyagent/runtime",
       "version": "0.1.0",
+      "bin": {
+        "holyagent-runtime": "./src/cli/main.ts",
+      },
       "dependencies": {
         "@toon-format/toon": "^4.0.0",
         "effect": "^4.0.0",

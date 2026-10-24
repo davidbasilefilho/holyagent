@@ -231,14 +231,25 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
             message: "--accept applies only to --outcome success",
             hint: `Usage: holyagent ${CLOSE_USAGE}`,
           })
-        const source = booleanFlag(args, "report-json")
-          ? input(JsonReport).pipe(Effect.map(renderJsonReport))
-          : text
         // Only success has to say what was done; a lost or stopped specialist often has no report.
-        const report =
-          outcome === "Succeeded"
-            ? yield* source
-            : yield* source.pipe(Effect.orElseSucceed(() => ""))
+        const read = input(JsonReport)
+        const json = !booleanFlag(args, "report-json")
+          ? undefined
+          : outcome === "Succeeded"
+            ? yield* read
+            : yield* read.pipe(Effect.orElseSucceed(() => undefined))
+        if (rationale !== undefined && json !== undefined && json.status !== "done")
+          return yield* new Usage({
+            message: `--accept needs a report with status done, but the report says ${json.status}`,
+            hint: "Close it without --accept, or send the work back with a follow-up.",
+          })
+        const report = booleanFlag(args, "report-json")
+          ? json === undefined
+            ? ""
+            : renderJsonReport(json)
+          : outcome === "Succeeded"
+            ? yield* text
+            : yield* text.pipe(Effect.orElseSucceed(() => ""))
         const result =
           outcome === "Succeeded" ? report : report.trim() === "" ? flag : `${flag}: ${report}`
         const now = yield* nowIso

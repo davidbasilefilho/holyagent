@@ -81,6 +81,18 @@ const hookCommand = (name: string, extra: Readonly<Record<string, unknown>> = {}
 })
 
 /**
+ * The rules that start the redirect hook: a Bash command with `git` and then `commit` (or `push`)
+ * anywhere in it. Probed against Claude Code 2.1.310, these match `git -C d commit`, `sudo git
+ * push`, `env X=1 git commit`, `bash -c 'git push'`, `timeout 5 git push`, `xargs git commit` and
+ * the same inside `&&` lists, subshells and substitutions, and they match no command without both
+ * words, so `npm test` or `git status` spawn nothing. Narrower rules such as `git commit*` miss the
+ * wrapped and option forms. What still escapes is a command that hides the words: a variable
+ * (`g=git; $g commit`), a git alias, or a script that runs git inside.
+ */
+const GIT_COMMIT = "Bash(*git*commit*)"
+const GIT_PUSH = "Bash(*git*push*)"
+
+/**
  * The three hooks. The session hook adds the state of the project; the two PreToolUse hooks run
  * `onFailure: block`, because a failure there would let a raw git write or an unvetted workflow
  * through unexamined.
@@ -99,8 +111,8 @@ const hooks = (): GeneratedFile => ({
         {
           matcher: "Bash",
           hooks: [
-            hookCommand("vcs-redirect", { if: "Bash(git commit*)", onFailure: "block" }),
-            hookCommand("vcs-redirect", { if: "Bash(git push*)", onFailure: "block" }),
+            hookCommand("vcs-redirect", { if: GIT_COMMIT, onFailure: "block" }),
+            hookCommand("vcs-redirect", { if: GIT_PUSH, onFailure: "block" }),
           ],
         },
         { matcher: "Workflow", hooks: [hookCommand("workflow", { onFailure: "block" })] },
@@ -161,7 +173,9 @@ const bundle = async (): Promise<string> => {
     throw new Error(result.logs.map((log) => log.message).join("\n"))
   const lines = (await output.text()).replace(BUNDLE_MARKER, "").split("\n")
   // Keep the shebang and Bun's `// @bun` pragma first.
-  const at = lines.indexOf("// @bun") + 1
+  const pragma = lines.indexOf("// @bun")
+  if (pragma === -1) throw new Error("The bundle has no // @bun pragma line to put the note after")
+  const at = pragma + 1
   lines.splice(at, 0, `// ${generatedNote("packages/runtime/src/cli/main.ts")}`)
   return lines.join("\n")
 }

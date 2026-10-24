@@ -36,10 +36,11 @@ const REPORT = {
 const REPORT_REQUEST =
   "\n\nReturn your report as the structured output, not as text. Give each evidence line as an evidence entry: key is the criterion text or evidence label exactly as written, support is what shows it. List every check you ran in checks, and anything left undone in blockers."
 
-// An entry is {id, agent, model, effort, prompt} as `assignment dispatch` prints it.
+// An entry is {id, agent, model, effort, prompt} as `assignment dispatch` prints it. Whatever
+// namespace the agent carries is dropped: these workflows run holyagent specialists and no others.
 const runEntry = (entry, phase, addition = "") =>
   agent(entry.prompt + addition + REPORT_REQUEST, {
-    agentType: entry.agent.includes(":") ? entry.agent : "holyagent:" + entry.agent,
+    agentType: "holyagent:" + entry.agent.slice(entry.agent.lastIndexOf(":") + 1),
     model: entry.model,
     effort: entry.effort,
     schema: REPORT,
@@ -47,6 +48,8 @@ const runEntry = (entry, phase, addition = "") =>
     phase,
   })
 
+if (args.change === undefined || args.change === null || args.change === "")
+  throw new Error("review-diff needs args.change: what the reviewers are to review")
 const change = typeof args.change === "string" ? args.change : JSON.stringify(args.change)
 // A barrier is right here: the blockers are merged across all the reviewers.
 const results = await parallel(

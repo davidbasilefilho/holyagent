@@ -14,7 +14,7 @@ interface Scan {
   readonly heredocs: Array<Heredoc>
 }
 
-const SPACE = /[ \t]/
+const SPACE = /[ \t\r]/
 const STOPS = /[\s;&|()<>]/
 
 /** Skips the bodies of the heredocs the line just ended opened. */
@@ -43,6 +43,10 @@ const readHeredoc = (scan: Scan) => {
       const stop = end === -1 ? scan.text.length : end
       delimiter += scan.text.slice(scan.index + 1, stop)
       scan.index = stop + 1
+    } else if (char === "\\") {
+      // `<<\EOF` and `<<E\OF` name the delimiter EOF: the backslash only quotes.
+      delimiter += scan.text[scan.index + 1] ?? ""
+      scan.index += 2
     } else if (STOPS.test(char)) break
     else {
       delimiter += char
@@ -125,12 +129,20 @@ const scanCode = (scan: Scan, closer?: ")" | "`") => {
       endCommand()
       scan.index += 1
       skipHeredocs(scan)
+    } else if (
+      char === "&" &&
+      (next === ">" || scan.text[scan.index - 1] === ">" || scan.text[scan.index - 1] === "<")
+    ) {
+      // `2>&1`, `>&2` and `&>` redirect; they do not end the command.
+      scan.index += 1
     } else if (";&|()".includes(char)) {
       endCommand()
       if (char === "(") depth += 1
       if (char === ")") depth -= 1
       scan.index += 1
     } else if (SPACE.test(char) || char === "<" || char === ">") {
+      // A number right before a redirection is its file descriptor, not a word.
+      if ((char === "<" || char === ">") && /^\d+$/.test(word ?? "")) word = undefined
       endWord()
       scan.index += 1
     } else {
@@ -154,8 +166,23 @@ export const simpleCommands = (line: string): ReadonlyArray<ReadonlyArray<string
 
 const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/
 const KEYWORDS = new Set(["!", "{", "if", "then", "else", "elif", "do", "while", "until", "time"])
-const WRAPPERS = new Set(["sudo", "doas", "env", "command", "exec", "nohup", "nice", "builtin"])
 const SHELLS = new Set(["sh", "bash", "zsh", "dash", "ksh"])
+/**
+ * Commands that run the command that follows them, with the options of their own that take the next
+ * word as a value. Any other option starting with a dash counts as a flag without a value.
+ */
+const WRAPPERS: Readonly<Record<string, ReadonlySet<string>>> = {
+  sudo: new Set(["-u", "-g", "-h", "-p", "-C", "-D", "-R", "-T", "-U", "--user", "--group"]),
+  doas: new Set(["-u", "-C"]),
+  env: new Set(["-u", "-C", "-S", "--unset", "--chdir"]),
+  nice: new Set(["-n", "--adjustment"]),
+  timeout: new Set(["-s", "-k", "--signal", "--kill-after"]),
+  xargs: new Set(["-I", "-n", "-P", "-d", "-L", "-s", "-E", "-a", "--max-args", "--max-procs"]),
+  command: new Set(),
+  exec: new Set(["-a"]),
+  nohup: new Set(),
+  builtin: new Set(),
+}
 /** Global git options that take their value as the next word. */
 const VALUE_OPTIONS = new Set([
   "-C",
@@ -168,15 +195,22 @@ const VALUE_OPTIONS = new Set([
 
 const programName = (word: string | undefined): string => word?.split("/").at(-1) ?? ""
 
+/** The index of the first word after a wrapper's own options (and the duration `timeout` takes). */
+const afterWrapper = (words: ReadonlyArray<string>, at: number, program: string): number => {
+  const valued = WRAPPERS[program] ?? new Set<string>()
+  let index = at + 1
+  while (words[index]?.startsWith("-")) index += valued.has(words[index] ?? "") ? 2 : 1
+  return program === "timeout" && /^\d/.test(words[index] ?? "") ? index + 1 : index
+}
+
 const writesOf = (words: ReadonlyArray<string>): ReadonlyArray<GitWrite> => {
   let start = 0
   while (start < words.length) {
     const word = words[start] ?? ""
+    const program = programName(word)
     if (ASSIGNMENT.test(word) || KEYWORDS.has(word)) start += 1
-    else if (WRAPPERS.has(programName(word))) {
-      start += 1
-      while (words[start]?.startsWith("-")) start += 1
-    } else break
+    else if (Object.hasOwn(WRAPPERS, program)) start = afterWrapper(words, start, program)
+    else break
   }
   const program = programName(words[start])
   if (SHELLS.has(program)) {

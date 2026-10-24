@@ -1,16 +1,18 @@
-import { stat } from "node:fs/promises"
+import { readdir, stat } from "node:fs/promises"
+import { dirname, join } from "node:path"
 
-import { encode } from "@toon-format/toon"
 import { Effect, Schema } from "effect"
 
 import { WORKFLOW_NAMES } from "../domain/plan.ts"
+import { ROUTES } from "../domain/route.ts"
 import root from "../instructions/claude-5.5/root.md" with { type: "text" }
 import { hasCode, io } from "../state/files.ts"
 import { PLUGIN_NAMESPACE } from "./assignment.ts"
 import { describeFailure } from "./errors.ts"
 import { statusOf } from "./overview.ts"
+import { rootCore, sessionContext } from "./sessioncontext.ts"
 import { type GitWrite, gitWrites } from "./shell.ts"
-import { type Command, Verbatim } from "./types.ts"
+import { type Call, type Command, Verbatim } from "./types.ts"
 
 // The host reads a hook's stdout as JSON and treats exit 2 as a block, while any other failure
 // lets the call through unless the hook asks to block on failure. So every failure here is exit 1
@@ -31,11 +33,15 @@ const output = (hookSpecificOutput: Readonly<Record<string, unknown>>) =>
 const decision = (permissionDecision: "allow" | "deny", permissionDecisionReason: string) =>
   output({ hookEventName: "PreToolUse", permissionDecision, permissionDecisionReason })
 
-/** Runs a hook: a failure becomes one stderr line and exit 1, a notice that authorizes nothing. */
+/**
+ * Runs a hook: a failure becomes one stderr line and exit 1, a notice that authorizes nothing. A
+ * `stateless` hook never looks for the state root, so a git failure cannot stop it.
+ */
 const hook = (
   name: string,
   summary: string,
-  run: (payload: typeof Payload.Type, directory: string) => Effect.Effect<Verbatim, unknown>,
+  run: (payload: typeof Payload.Type, call: Call) => Effect.Effect<Verbatim, unknown>,
+  stateless?: true,
 ): Command => ({
   path: ["hook", name],
   usage: `hook ${name}`,
@@ -44,10 +50,11 @@ const hook = (
   output: "the JSON the host reads, or nothing; exit 1 with a stderr line on failure",
   flags: {},
   positionals: 0,
-  run: ({ directory, text }) =>
-    text.pipe(
+  ...(stateless === undefined ? {} : { stateless }),
+  run: (call) =>
+    call.text.pipe(
       Effect.flatMap(Schema.decodeUnknownEffect(Schema.fromJsonString(Payload))),
-      Effect.flatMap((payload) => run(payload, directory)),
+      Effect.flatMap((payload) => run(payload, call)),
       Effect.catch((error) =>
         Effect.succeed(
           new Verbatim("", `holyagent hook ${name}: ${describeFailure(error).message}\n`, 1),
@@ -80,20 +87,87 @@ const OUR_WORKFLOWS: ReadonlySet<unknown> = new Set(
 /** The Workflow inputs a named run may carry; a script, script path or resume would run other code. */
 const NAMED_RUN_INPUTS: ReadonlySet<string> = new Set(["name", "args", "description", "title"])
 
+const SPECIALISTS: ReadonlySet<string> = new Set(ROUTES.map((route) => route.agent))
+
+/**
+ * True for `holyagent:<agent>` or a bare `<agent>` of the route table; any other namespace is not
+ * ours.
+ */
+const isOurAgent = (agent: unknown): boolean =>
+  typeof agent === "string" &&
+  SPECIALISTS.has(
+    agent.startsWith(`${PLUGIN_NAMESPACE}:`) ? agent.slice(PLUGIN_NAMESPACE.length + 1) : agent,
+  )
+
+/** True when every `agent` anywhere in the arguments is one of ours; the arguments name who runs. */
+const agentsAreOurs = (value: unknown, depth = 0): boolean => {
+  if (depth > 8) return false
+  if (Array.isArray(value)) return value.every((item: unknown) => agentsAreOurs(item, depth + 1))
+  if (typeof value !== "object" || value === null) return true
+  return Object.entries(value).every(([key, item]) =>
+    key === "agent" ? isOurAgent(item) : agentsAreOurs(item, depth + 1),
+  )
+}
+
+/**
+ * The folders a project or user workflow could be loaded from under the same name:
+ * `.claude/workflows` of the working directory and each parent, of the home directory and of
+ * CLAUDE_CONFIG_DIR.
+ */
+const workflowFolders = (call: Call): ReadonlyArray<string> => {
+  const parents: Array<string> = []
+  for (let at = call.cwd; !parents.includes(at); at = dirname(at)) parents.push(at)
+  return [
+    ...parents.map((parent) => join(parent, ".claude", "workflows")),
+    ...(call.env.HOME === undefined ? [] : [join(call.env.HOME, ".claude", "workflows")]),
+    ...(call.env.CLAUDE_CONFIG_DIR === undefined
+      ? []
+      : [join(call.env.CLAUDE_CONFIG_DIR, "workflows")]),
+  ]
+}
+
+/**
+ * True when a workflow file that could take over one of our names may exist: any file named
+ * `holyagent…` in those folders, or a folder that cannot be read, since then nobody can say.
+ */
+const shadowed = (call: Call) =>
+  Effect.forEach(workflowFolders(call), (folder) =>
+    io(folder, () => readdir(folder)).pipe(
+      Effect.map((names) => names.some((name) => name.toLowerCase().startsWith(PLUGIN_NAMESPACE))),
+      Effect.catchIf(
+        (error) => hasCode(error.cause, "ENOENT") || hasCode(error.cause, "ENOTDIR"),
+        () => Effect.succeed(false),
+      ),
+      Effect.orElseSucceed(() => true),
+    ),
+  ).pipe(Effect.map((found) => found.includes(true)))
+
+// The vcs-redirect hook only sees what the `if` rules of hooks.json let through, and those match
+// the command text: `git` followed by `commit` or `push` anywhere in it. A command that hides the
+// words escapes it: a variable (`g=git; $g commit`), a git alias (`git ci`), or a script, make
+// target or package script that runs git inside. Wrappers, `sh -c`, `xargs`, subshells and
+// substitutions that show the words reach the scanner and are denied.
+
 /** The `hook` commands the plugin's hooks call. */
 export const HOOK_COMMANDS: ReadonlyArray<Command> = [
   hook(
     "session-start",
-    "SessionStart: add the status of the open Intents as context (and the root rules when the root agent is not the main thread); nothing without a .holyagent folder",
-    (payload, directory) =>
+    "SessionStart: add the status of the open Intents as context (and the core root rules when the root agent is not the main thread); nothing without a .holyagent folder",
+    (payload, call) =>
       Effect.gen(function* () {
-        if (!(yield* hasStateFolder(directory))) return NOTHING
-        const status = `holyagent status:\n${encode(yield* statusOf(directory))}`
+        if (!(yield* hasStateFolder(call.directory))) return NOTHING
+        const pluginRoot = call.env.CLAUDE_PLUGIN_ROOT
+        // The host fills in ${CLAUDE_PLUGIN_ROOT} in agent text only, and this text is context.
+        const core = rootCore(root).replaceAll(
+          "${CLAUDE_PLUGIN_ROOT}",
+          pluginRoot ?? "${CLAUDE_PLUGIN_ROOT}",
+        )
         return output({
           hookEventName: "SessionStart",
-          additionalContext: ROOT_AGENTS.has(payload.agent_type)
-            ? status
-            : `${root.trim()}\n\n${status}`,
+          additionalContext: sessionContext(
+            yield* statusOf(call.directory),
+            ROOT_AGENTS.has(payload.agent_type) ? undefined : core,
+          ),
         })
       }),
   ),
@@ -109,19 +183,23 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
           : decision("deny", writes.map((write) => REDIRECTS[write]).join(" ")),
       )
     },
+    true,
   ),
   hook(
     "workflow",
-    "PreToolUse for Workflow: allow a run of one of this plugin's prebuilt workflows by name; say nothing otherwise",
-    (payload) => {
-      const input = payload.tool_input ?? {}
-      return Effect.succeed(
-        payload.tool_name === "Workflow" &&
+    "PreToolUse for Workflow: allow a run of one of this plugin's prebuilt workflows by name, with only our specialists in its arguments and no file that could shadow it; say nothing otherwise",
+    (payload, call) =>
+      Effect.gen(function* () {
+        const input = payload.tool_input ?? {}
+        const prebuilt =
+          payload.tool_name === "Workflow" &&
           OUR_WORKFLOWS.has(input.name) &&
-          Object.keys(input).every((key) => NAMED_RUN_INPUTS.has(key))
+          Object.keys(input).every((key) => NAMED_RUN_INPUTS.has(key)) &&
+          agentsAreOurs(input.args)
+        return prebuilt && !(yield* shadowed(call))
           ? decision("allow", `Prebuilt workflow ${String(input.name)} of the holyagent plugin.`)
-          : NOTHING,
-      )
-    },
+          : NOTHING
+      }),
+    true,
   ),
 ]

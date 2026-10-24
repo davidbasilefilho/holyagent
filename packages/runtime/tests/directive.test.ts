@@ -242,6 +242,7 @@ describe("workflow recommendation", () => {
     expect(plan([writer("w1"), follow], [warmFor()])).toMatchObject({
       action: "subagent",
       assignmentIds: ["w1", "w2"],
+      reason: "no workflow fits the ready set",
     })
     expect(plan([writer("w1"), follow, writer("w3")], [warmFor()])).toMatchObject({
       name: "run-assignments",
@@ -276,6 +277,7 @@ describe("workflow recommendation", () => {
     expect(plan([review("r1"), review("r2")], [], DEFAULT_CONFIG)).toMatchObject({
       action: "subagent",
       assignmentIds: ["r1", "r2"],
+      reason: "workflows are not available",
     })
   })
 

@@ -273,6 +273,38 @@ describe("workflow runs", () => {
     )
   })
 
+  test("refuses --accept for a report whose status is not done, and closes nothing", async () => {
+    await createIntent()
+    const id = await dispatchWriter()
+    data(await cli(["assignment", "record", id, "--agent", `workflow:run-1/${id}`]))
+    const partial = {
+      status: "partial",
+      changed_paths: [],
+      checks: [],
+      blockers: ["no access"],
+      notes: [],
+      evidence: [
+        { key: "parses", support: "ran the parser" },
+        { key: "tests", support: "bun test passed" },
+      ],
+    }
+    const refused = await cli(
+      ["assignment", "close", id, "--outcome", "success", "--accept", "ok", "--report-json"],
+      partial,
+    )
+    expect(refused.code).toBe(2)
+    expect(refused.stderr).toContain("status done")
+    expect(data(await cli(["assignment", "show", id, "--full"]))).toMatchObject({
+      state: "Running",
+    })
+    // Without --accept the root still records the partial report.
+    expect(
+      data(
+        await cli(["assignment", "close", id, "--outcome", "success", "--report-json"], partial),
+      ),
+    ).toMatchObject({ state: "Succeeded", accepted: false })
+  })
+
   test("refuses a JSON report that is not one, and closes nothing", async () => {
     await createIntent()
     const id = await dispatchWriter()

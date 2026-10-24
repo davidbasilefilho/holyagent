@@ -177,7 +177,9 @@ export const recommend = (
     return {
       action: "subagent",
       assignmentIds,
-      reason: "workflows are not available",
+      reason: config.workflowsAvailable
+        ? "no workflow fits the ready set"
+        : "workflows are not available",
     }
   const directive = directiveFor(first, registry, now, config)
   return directive.action === "continue"

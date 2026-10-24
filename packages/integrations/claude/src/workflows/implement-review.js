@@ -20,11 +20,18 @@ const results = await pipeline(
   args.pairs,
   (pair) => runEntry(pair.writer, "Implement"),
   async (writer, pair) =>
-    writer === null || writer.status === "blocked"
+    writer === null
       ? { writer, reviewer: null }
-      : { writer, reviewer: await runEntry(pair.reviewer, "Review", handoff(writer)) },
+      : writer.status === "blocked"
+        ? { writer, reviewer: { skipped: "writer blocked" } }
+        : { writer, reviewer: await runEntry(pair.reviewer, "Review", handoff(writer)) },
 )
 return args.pairs.map((pair, index) => ({
   writer: { id: pair.writer.id, report: results[index]?.writer ?? null },
-  reviewer: { id: pair.reviewer.id, report: results[index]?.reviewer ?? null },
+  reviewer: {
+    id: pair.reviewer.id,
+    ...(results[index]?.reviewer?.skipped
+      ? { skipped: results[index].reviewer.skipped }
+      : { report: results[index]?.reviewer ?? null }),
+  },
 }))

@@ -246,7 +246,7 @@ describe("implement-review", () => {
     ])
   })
 
-  test("a writer that fails or is blocked is not reviewed, and other pairs carry on", async () => {
+  test("a writer that fails or is blocked is not reviewed (a blocked one says so), and other pairs carry on", async () => {
     const { calls, result } = await execute(
       "implement-review",
       { pairs: [pair("1"), pair("2"), pair("3")] },
@@ -267,9 +267,33 @@ describe("implement-review", () => {
       { writer: { id: "w-1", report: null }, reviewer: { id: "r-1", report: null } },
       {
         writer: { id: "w-2", report: report({ status: "blocked", blockers: ["no access"] }) },
-        reviewer: { id: "r-2", report: null },
+        reviewer: { id: "r-2", skipped: "writer blocked" },
       },
       { writer: { id: "w-3", report: report() }, reviewer: { id: "r-3", report: report() } },
     ])
+  })
+})
+
+describe("agent namespaces and arguments", () => {
+  test("every agent runs as holyagent:<name>, whatever namespace the entry carries", async () => {
+    const entries = [
+      "worker-visual",
+      "holyagent:worker-visual",
+      "other:worker-visual",
+      "a:b:worker-visual",
+    ]
+    const { calls } = await execute("run-assignments", {
+      assignments: entries.map((agent, index) => entry(`e-${index}`, { agent })),
+    })
+    expect(calls.map((call) => call.options.agentType)).toEqual(
+      entries.map(() => "holyagent:worker-visual"),
+    )
+  })
+
+  test("review-diff refuses to run without a change to review", async () => {
+    for (const change of [undefined, null, ""])
+      await expect(execute("review-diff", { change, reviewers: [entry("a")] })).rejects.toThrow(
+        "args.change",
+      )
   })
 })

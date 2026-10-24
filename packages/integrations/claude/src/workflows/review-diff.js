@@ -6,6 +6,8 @@ export const meta = {
 }
 // @include shared.js
 
+if (args.change === undefined || args.change === null || args.change === "")
+  throw new Error("review-diff needs args.change: what the reviewers are to review")
 const change = typeof args.change === "string" ? args.change : JSON.stringify(args.change)
 // A barrier is right here: the blockers are merged across all the reviewers.
 const results = await parallel(

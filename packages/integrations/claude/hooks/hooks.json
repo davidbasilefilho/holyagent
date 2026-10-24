@@ -28,7 +28,7 @@
               "vcs-redirect"
             ],
             "timeout": 10,
-            "if": "Bash(git commit*)",
+            "if": "Bash(*git*commit*)",
             "onFailure": "block"
           },
           {
@@ -39,7 +39,7 @@
               "vcs-redirect"
             ],
             "timeout": 10,
-            "if": "Bash(git push*)",
+            "if": "Bash(*git*push*)",
             "onFailure": "block"
           }
         ]

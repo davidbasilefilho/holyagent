@@ -39,10 +39,11 @@ const REPORT = {
 const REPORT_REQUEST =
   "\n\nReturn your report as the structured output, not as text. Give each evidence line as an evidence entry: key is the criterion text or evidence label exactly as written, support is what shows it. List every check you ran in checks, and anything left undone in blockers."
 
-// An entry is {id, agent, model, effort, prompt} as `assignment dispatch` prints it.
+// An entry is {id, agent, model, effort, prompt} as `assignment dispatch` prints it. Whatever
+// namespace the agent carries is dropped: these workflows run holyagent specialists and no others.
 const runEntry = (entry, phase, addition = "") =>
   agent(entry.prompt + addition + REPORT_REQUEST, {
-    agentType: entry.agent.includes(":") ? entry.agent : "holyagent:" + entry.agent,
+    agentType: "holyagent:" + entry.agent.slice(entry.agent.lastIndexOf(":") + 1),
     model: entry.model,
     effort: entry.effort,
     schema: REPORT,
@@ -61,11 +62,18 @@ const results = await pipeline(
   args.pairs,
   (pair) => runEntry(pair.writer, "Implement"),
   async (writer, pair) =>
-    writer === null || writer.status === "blocked"
+    writer === null
       ? { writer, reviewer: null }
-      : { writer, reviewer: await runEntry(pair.reviewer, "Review", handoff(writer)) },
+      : writer.status === "blocked"
+        ? { writer, reviewer: { skipped: "writer blocked" } }
+        : { writer, reviewer: await runEntry(pair.reviewer, "Review", handoff(writer)) },
 )
 return args.pairs.map((pair, index) => ({
   writer: { id: pair.writer.id, report: results[index]?.writer ?? null },
-  reviewer: { id: pair.reviewer.id, report: results[index]?.reviewer ?? null },
+  reviewer: {
+    id: pair.reviewer.id,
+    ...(results[index]?.reviewer?.skipped
+      ? { skipped: results[index].reviewer.skipped }
+      : { report: results[index]?.reviewer ?? null }),
+  },
 }))

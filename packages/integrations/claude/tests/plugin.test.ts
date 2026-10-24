@@ -129,6 +129,56 @@ describe("manifests", () => {
   })
 })
 
+describe("hooks", () => {
+  const { hooks } = JSON.parse(read("packages/integrations/claude/hooks/hooks.json")) as {
+    hooks: Record<string, Array<{ matcher: string; hooks: Array<Record<string, unknown>> }>>
+  }
+  const command = (name: string, extra: Record<string, unknown> = {}) => ({
+    type: "command",
+    command: "${CLAUDE_PLUGIN_ROOT}/scripts/holyagent",
+    args: ["hook", name],
+    timeout: 10,
+    ...extra,
+  })
+
+  test("are exactly the session, redirect and workflow hooks, in exec form through the wrapper", () => {
+    expect(hooks).toEqual({
+      SessionStart: [
+        { matcher: "startup|resume|clear|compact", hooks: [command("session-start")] },
+      ],
+      PreToolUse: [
+        {
+          matcher: "Bash",
+          hooks: [
+            command("vcs-redirect", { if: "Bash(*git*commit*)", onFailure: "block" }),
+            command("vcs-redirect", { if: "Bash(*git*push*)", onFailure: "block" }),
+          ],
+        },
+        { matcher: "Workflow", hooks: [command("workflow", { onFailure: "block" })] },
+      ],
+    })
+  })
+
+  test("the redirect rules start on git with commit or push anywhere after it, and on nothing else", () => {
+    const glob = (rule: string) => {
+      const inner = rule.slice("Bash(".length, -1)
+      return new RegExp(`^${inner.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`)
+    }
+    const [commit, push] = (hooks.PreToolUse?.[0]?.hooks ?? []).map((hook) => glob(String(hook.if)))
+    for (const text of [
+      "git commit -m x",
+      "git -C d commit",
+      "sudo git push",
+      "env X=1 git commit -m x",
+      "bash -c 'git push origin main'",
+      "timeout 5 git push",
+    ])
+      expect(commit?.test(text) || push?.test(text)).toBe(true)
+    for (const text of ["npm test", "git status", "bun check", "ls -la", "git log --oneline"])
+      expect(commit?.test(text) || push?.test(text)).toBe(false)
+  })
+})
+
 describe("agents", () => {
   test("have one agent for each route plus the root, named in kebab case like the route", () => {
     const names = generated
@@ -213,7 +263,7 @@ describe("agents", () => {
       "",
     )
     expect(tools).toBe(
-      "SendMessage, AskUserQuestion, Skill, Monitor, Workflow, Read, Grep, Glob, Bash, mcp__t3-code__html_render, mcp__t3-code__html_preview, mcp__t3-code__watch_pull_request",
+      "SendMessage, AskUserQuestion, Skill, Monitor, Workflow, TaskCreate, TaskUpdate, TaskList, TaskGet, Read, Grep, Glob, Bash, mcp__t3-code__html_render, mcp__t3-code__html_preview, mcp__t3-code__watch_pull_request",
     )
     expect(field(agent("holyagent")?.content ?? "", "model")).toBe("opus")
   })
