@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mvmvfvmi-pov9",
+  "intentId": "intent-0mvmvfl5a-25a6",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "document-which-holyagent-claude-rules",
+  "objective": "Document which HolyAgent Claude rules become Pi rules",
+  "state": "Ready",
+  "scope": [
+    "docs/pi/claude-parity.md on branch release/0.1.0/docs/pi-research (PR #1), linked from docs/pi/README.md"
+  ],
+  "constraints": [
+    "English; cite Pi sources already used in docs/pi; label inference",
+    "Every Claude rule that Pi can carry by instruction, an existing extension or a custom extension must be listed as a Pi rule with how it is carried"
+  ],
+  "criteria": [
+    {
+      "text": "The page states the parity requirement and covers every rule and mechanism of the Claude integration",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Each Pi mapping cites a Pi source or is labelled as inference",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "docs/pi"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-10-24T20:48:47.323Z"
+}

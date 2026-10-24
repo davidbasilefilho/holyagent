@@ -1,0 +1,16 @@
+{
+  "id": "intent-0mvmvfl5a-25a6",
+  "slug": "ship-holyagent-0-1-0-with-the-claude",
+  "objective": "Ship HolyAgent 0.1.0 with the Claude Code integration",
+  "requirements": [
+    "Scope and policies: the original task brief (audit of the Instruções session, Pi research in docs/pi, HolyAgent 0.1.0 initial scope) plus the maintainer's later rules: no write guard hook (VCS/state boundary is instruction-only); no autoCompactWindow (Billion Context owns compression); root instructions must survive Billion Context compression (they live in the agent system prompt); plugin agent names use role-task kebab case, never Role.task; the root may run specialists in workflows (prebuilt first, custom when none fits, with user opt-in and a subagent fallback); the root keeps state and progress in the task list and writes to the user only for decisions, blockers, questions, new PRs, new instructions and the final report; every Claude rule that Pi can carry (instruction, existing or custom extension) must become a Pi rule.",
+    "Done on main: 37a9c9f chore: initialize repository; 9481459 chore: scaffold the Bun workspace and toolchain; 548c81c chore(claude): add the repository's Claude Code settings and rules. Commits are authored as davidbasilefilho, unsigned (Claude Code cloud blocks GraphQL and REST contents writes).",
+    "Open PRs, all reviewed and green locally: #1 docs/pi research (base main); #2 WSL installer (base main); #3 runtime domain and state (base main); #4 runtime CLI (base #3); #7 vcs commands (base #4); #5 Claude 5.5 instructions (base #7); #8 Claude integration plugin (base #5); #6 public CLI (base main). Merging is the maintainer's call.",
+    "Pushed without PR: release/0.1.0/docs/usage (docs/**, reviewed; open its PR against main); release/0.1.0/ci/checks-and-versions (CI workflow and bump tasks, stacked on #8; independent review was interrupted, rerun it, then open the PR against release/0.1.0/feat/claude-integration).",
+    "Pending maintainer decisions: a repository license (none declared; plugin.json omits it); whether to harden the Workflow hook further (stop auto-allow whenever any other workflow file exists) since the shadow check is heuristic; vcs residuals (compare dev/ino after reading a body file; reject backslashes in remote URLs); a live test of the vcs api path (createCommitOnBranch, empty-repo bootstrap, read-back) on a machine where GraphQL is reachable; a root README and plugin README/icon for the directory profile.",
+    "Audit addendum: the Instruções session export covered pages 1-938 (2026-10-19 22:00 to 2026-10-21 15:42); the period 2026-10-15 to 2026-10-19 is not exported. The parsed data lived only in the session scratchpad, which does not survive the container, so a resumed session must re-export (list_events from the oldest point) before analyzing that period."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-10-24T20:48:33.743Z"
+}

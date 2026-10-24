@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mvmvfvgt-iuwk",
+  "intentId": "intent-0mvmvfl5a-25a6",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-ci-workflow-and-version-bump",
+  "objective": "Review the CI workflow and version bump change before its PR",
+  "state": "Ready",
+  "scope": [
+    "Branch release/0.1.0/ci/checks-and-versions vs release/0.1.0/feat/claude-integration: .github/workflows/ci.yml, scripts/bump-version.ts and its test, mise.toml, package.json, tsconfig.json"
+  ],
+  "constraints": [
+    "Read-only; run mise run verify and the pinned claude plugin validate --strict on the plugin and the marketplace"
+  ],
+  "criteria": [
+    {
+      "text": "The workflow would pass on GitHub ubuntu runners, including the switch to canary Bun and the pinned Claude Code validate",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No workflow security issue (permissions, triggers, injection, pinned actions)",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Bump tasks keep one version across packages and refuse mismatches without writing",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-10-24T20:48:47.118Z"
+}
