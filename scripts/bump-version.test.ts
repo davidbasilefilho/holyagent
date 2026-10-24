@@ -148,8 +148,8 @@ describe("bumpVersions", () => {
       cpSync(join(repository, file), join(root, file))
     }
     const before = state()
-    const { from } = await Effect.runPromise(bumpVersions(root, "hotfix"))
-    const to = `${from}-1`
+    const { from, to } = await Effect.runPromise(bumpVersions(root, "hotfix"))
+    expect(to).toBe(bump(from, "hotfix"))
     const after = state()
     before.forEach((text, index) => {
       expect(after[index]).toBe(
