@@ -9,15 +9,16 @@ bun = "1.4.4"
 
 [hooks]
 # Runs after `mise install` (also on `mise use` and the automatic install before `mise run`), with
-# the mise-installed Bun first on PATH. Idempotent: a canary Bun is left alone.
-postinstall = "bun --revision | grep -q canary || bun upgrade --canary"
+# the mise-installed Bun first on PATH. Idempotent: a canary Bun is left alone. BUN_OPTIONS is unset
+# for the upgrade because Bun reads its flags (e.g. --smol) as package names and refuses.
+postinstall = "bun --revision | grep -q canary || env -u BUN_OPTIONS bun upgrade --canary"
 
 # mise tasks are the single source of truth for commands. package.json scripts and lefthook only
 # delegate here, and `--no-script` makes Bun run its own tool instead of the same-named script.
 
 [tasks.toolchain]
 description = "Fail unless Bun is a canary build"
-run = "bun --revision | grep -q canary || { echo 'bun is not a canary build; run: bun upgrade --canary' >&2; exit 1; }"
+run = "bun --revision | grep -q canary || { echo 'bun is not a canary build; run: env -u BUN_OPTIONS bun upgrade --canary' >&2; exit 1; }"
 
 [tasks.prepare]
 description = "Install the git hooks"
