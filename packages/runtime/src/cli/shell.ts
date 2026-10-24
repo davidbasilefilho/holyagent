@@ -88,12 +88,18 @@ const scanCode = (scan: Scan, closer?: ")" | "`") => {
   let words: Array<string> = []
   let word: string | undefined
   let depth = 0
+  // The word after a redirection operator is its target, not part of the command.
+  let target = false
   const endWord = () => {
-    if (word !== undefined) words.push(word)
+    if (word !== undefined) {
+      if (!target) words.push(word)
+      target = false
+    }
     word = undefined
   }
   const endCommand = () => {
     endWord()
+    target = false
     if (words.length > 0) scan.commands.push(words)
     words = []
   }
@@ -144,6 +150,7 @@ const scanCode = (scan: Scan, closer?: ")" | "`") => {
       // A number right before a redirection is its file descriptor, not a word.
       if ((char === "<" || char === ">") && /^\d+$/.test(word ?? "")) word = undefined
       endWord()
+      if (char === "<" || char === ">") target = true
       scan.index += 1
     } else {
       word = (word ?? "") + char

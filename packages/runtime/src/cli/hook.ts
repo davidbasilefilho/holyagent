@@ -126,14 +126,37 @@ const workflowFolders = (call: Call): ReadonlyArray<string> => {
   ]
 }
 
+/** True when the `export const meta` literal of a script mentions our name, in any case. */
+const declaresOurName = (script: string): boolean => {
+  const start = script.search(/export\s+const\s+meta\b/)
+  if (start === -1) return false
+  const end = script.indexOf("\n}", start)
+  return script
+    .slice(start, end === -1 ? start + 4000 : end)
+    .toLowerCase()
+    .includes(PLUGIN_NAMESPACE)
+}
+
 /**
- * True when a workflow file that could take over one of our names may exist: any file named
- * `holyagent…` in those folders, or a folder that cannot be read, since then nobody can say.
+ * True when a workflow file that could take over one of our names may exist: a file named
+ * `holyagent…` in those folders, a script there whose meta mentions `holyagent` (the name comes
+ * from the meta, not the file), or a folder or file that cannot be read, since then nobody can
+ * say.
  */
 const shadowed = (call: Call) =>
   Effect.forEach(workflowFolders(call), (folder) =>
     io(folder, () => readdir(folder)).pipe(
-      Effect.map((names) => names.some((name) => name.toLowerCase().startsWith(PLUGIN_NAMESPACE))),
+      Effect.flatMap((names) =>
+        names.some((name) => name.toLowerCase().startsWith(PLUGIN_NAMESPACE))
+          ? Effect.succeed(true)
+          : Effect.forEach(
+              names.filter((name) => name.endsWith(".js")),
+              (name) =>
+                io(join(folder, name), () => Bun.file(join(folder, name)).text()).pipe(
+                  Effect.map(declaresOurName),
+                ),
+            ).pipe(Effect.map((found) => found.includes(true))),
+      ),
       Effect.catchIf(
         (error) => hasCode(error.cause, "ENOENT") || hasCode(error.cause, "ENOTDIR"),
         () => Effect.succeed(false),
