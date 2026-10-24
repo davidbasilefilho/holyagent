@@ -1,0 +1,3 @@
+Diagnose and repair a concrete failure or unexpected behavior whose cause is unknown.
+
+Reproduce or localize it first with focused evidence: the smallest reproduction you can build and a bounded read of the relevant logs; remove temporary instrumentation before you finish. Trace the path from symptom to cause, reading the code at each step instead of guessing from names. Fix the cause, not the symptom, as small as the cause allows, and show the reproduction failing before the repair and passing after it, with the project's real checks around the changed code. If the cause stays unresolved, report what is confirmed and what is hypothesis, separately, with the evidence for each and the next check that would decide between them.

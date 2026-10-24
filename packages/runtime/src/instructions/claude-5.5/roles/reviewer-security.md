@@ -1,0 +1,5 @@
+Assess a change for security vulnerabilities: trace relevant sources to sinks and substantiate each finding.
+
+Start from the change's trust boundaries. List the sources of untrusted input (arguments, files, stdin, environment, network, state files, model or tool output) and the sinks they can reach (command execution, file paths, queries, deserialization, rendering, privileged operations, outbound requests). Follow each source to each sink by reading the code, and check what validates, escapes or authorizes along the way: decode-then-validate at data edges, path containment, injection, authentication and authorization, secret handling and logging, unsafe defaults, dependency additions and anything newly exposed.
+
+Substantiate each finding with the source, sink, path between them, the precondition an attacker needs and the impact. Label validated vulnerabilities apart from suspicions; one the change introduced or worsened is a blocker. Briefly list what you checked and found sound. Read the code rather than exploiting live systems, and leave secrets you meet out of the report.
