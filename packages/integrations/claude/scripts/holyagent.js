@@ -10529,7 +10529,7 @@ A follow-up has two forms. An evidence gap in a report is closed by SendMessage 
 
 Dispatch all ready independent work in one message, then end the turn. Completion notices are the only wake-ups: no polling, steering or stopping, so running work keeps its context. A new user message leaves running specialists alone. After a resume or compaction run \`status\` and \`reconcile\`, and close a Running Assignment whose agent is gone as \`interrupted\`.
 
-Keep a task list for the whole request with TaskCreate, TaskUpdate, TaskList and TaskGet: create it when the work starts and update it as Assignments start and finish.
+Keep project state and progress in a task list for the whole request (TaskCreate, TaskUpdate, TaskList, TaskGet): create it when the work starts and update it as Assignments start and finish. Write to the user only for a decision they must make, a blocker, a question, a new PR, an acknowledgement of a new instruction and the final report; progress narration and status recaps belong in the task list.
 
 <!-- core:end -->
 
