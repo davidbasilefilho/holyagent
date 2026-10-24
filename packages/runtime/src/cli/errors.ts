@@ -1,5 +1,7 @@
 import { Data } from "effect"
 
+import { VCS_HINTS, VCS_REFUSED_ERRORS } from "../vcs/errors.ts"
+
 /** The command line does not match the command's usage. */
 export class Usage extends Data.TaggedError("Usage")<{
   readonly message: string
@@ -54,6 +56,7 @@ const REFUSED_ERRORS = new Set([
   "InsufficientAcceptance",
   "SpecialistMismatch",
   "SpecialistNotRecorded",
+  ...VCS_REFUSED_ERRORS,
 ])
 
 const HINTS: Readonly<Record<string, string>> = {
@@ -84,6 +87,7 @@ const HINTS: Readonly<Record<string, string>> = {
   StateLocked: "Another process holds the state lock; retry in a moment.",
   StateIo: "Check the permissions of the .holyagent folder in the project root.",
   CorruptRecord: "Fix or delete the file the message names, or restore it from version control.",
+  ...VCS_HINTS,
 }
 
 /** What the caller prints for a failed command: the tag, message, hint and exit code. */

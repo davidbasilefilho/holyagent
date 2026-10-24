@@ -1,3 +1,4 @@
+import { VCS_COMMANDS } from "../vcs/commands.ts"
 import { ASSIGNMENT_COMMANDS } from "./assignment.ts"
 import { INTENT_COMMANDS } from "./intent.ts"
 import { OVERVIEW_COMMANDS } from "./overview.ts"
@@ -8,4 +9,5 @@ export const COMMANDS: ReadonlyArray<Command> = [
   ...INTENT_COMMANDS,
   ...ASSIGNMENT_COMMANDS,
   ...OVERVIEW_COMMANDS,
+  ...VCS_COMMANDS,
 ]
