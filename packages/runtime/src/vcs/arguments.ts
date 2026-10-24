@@ -22,7 +22,7 @@ export const readArguments = (
   usage: string,
 ) =>
   Effect.gen(function* () {
-    const hint = `Usage: holyagent-runtime ${usage}`
+    const hint = `Usage: holyagent ${usage}`
     const positionals: Array<string> = []
     const values: Record<string, Array<string>> = {}
     const switches = new Set<string>()
@@ -69,7 +69,7 @@ export const requiredValue = (args: VcsArgs, name: string, usage: string) => {
     ? Effect.fail(
         new Usage({
           message: `Missing --${name}`,
-          hint: `Usage: holyagent-runtime ${usage}`,
+          hint: `Usage: holyagent ${usage}`,
         }),
       )
     : Effect.succeed(value)

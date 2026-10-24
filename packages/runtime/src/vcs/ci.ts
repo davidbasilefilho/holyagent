@@ -1,6 +1,7 @@
 import { Clock, Effect, Schema } from "effect"
 
 import { Usage } from "../cli/errors.ts"
+import type { GitHubFailed } from "./errors.ts"
 import { decodeAnswer, GitHub } from "./github.ts"
 
 const Pull = Schema.Struct({
@@ -39,6 +40,14 @@ export const ciLine = (summary: CiSummary): string => {
 }
 
 const PAGE = 100
+const NAME_LIMIT = 80
+
+/** A check name made safe to print: control characters become spaces and the length is capped. */
+const printable = (name: string) =>
+  name
+    .replace(/\p{Cc}/gu, " ")
+    .trim()
+    .slice(0, NAME_LIMIT)
 const PASSING = new Set(["success", "neutral", "skipped"])
 
 type Verdict = "failed" | "pending" | "passed"
@@ -72,7 +81,7 @@ export const parseTarget = (target: string) => {
   return Effect.fail(
     new Usage({
       message: `"${target}" is neither a pull request number nor a commit id`,
-      hint: "Usage: holyagent-runtime vcs ci <pr-number|sha> [--watch [--timeout <s>]]",
+      hint: "Usage: holyagent vcs ci <pr-number|sha> [--watch [--timeout <s>]]",
     }),
   )
 }
@@ -89,7 +98,7 @@ export const summarize = (repo: string, target: { pull: number } | { sha: string
     const sha = pull?.head.sha ?? ("sha" in target ? target.sha : "")
     const runs = yield* allCheckRuns(repo, sha)
     const statuses = yield* GitHub.use((github) =>
-      github.rest({ method: "GET", path: `repos/${repo}/commits/${sha}/status` }),
+      github.rest({ method: "GET", path: `repos/${repo}/commits/${sha}/status?per_page=100` }),
     ).pipe(Effect.flatMap((answer) => decodeAnswer(Statuses, "GET status", answer)))
 
     const verdicts = [
@@ -102,7 +111,7 @@ export const summarize = (repo: string, target: { pull: number } | { sha: string
     const count = (verdict: Verdict) => verdicts.filter((row) => row.verdict === verdict).length
     return {
       sha,
-      failed: verdicts.filter((row) => row.verdict === "failed").map((row) => row.name),
+      failed: verdicts.filter((row) => row.verdict === "failed").map((row) => printable(row.name)),
       pending: count("pending"),
       passed: count("passed"),
       mergeable:
@@ -123,9 +132,14 @@ export interface WatchOptions {
 /** The exit code of a watch that ran out of time, as `timeout(1)` uses. */
 export const TIMEOUT_EXIT = 124
 
+/** A failure that may pass on its own: no answer, a timeout, rate limiting or a server error. */
+const transient = (error: GitHubFailed) =>
+  error.status === undefined || error.status === 408 || error.status === 429 || error.status >= 500
+
 /**
  * Polls the target, printing a line whenever it changes, until no check is pending (exit 0 when
- * nothing failed, else 1) or the timeout passes (exit 124).
+ * nothing failed, else 1) or the timeout passes (exit 124). A transient GitHub failure is printed
+ * once and polling goes on until the timeout; any other failure ends the watch.
  */
 export const watchCi = (
   repo: string,
@@ -134,15 +148,23 @@ export const watchCi = (
 ) =>
   Effect.gen(function* () {
     const started = yield* Clock.currentTimeMillis
-    const step = (last: string | undefined): Effect.Effect<number, unknown, GitHub> =>
+    const step = (last: string | undefined): Effect.Effect<number, GitHubFailed | Usage, GitHub> =>
       Effect.gen(function* () {
-        const summary = yield* summarize(repo, target)
-        const line = ciLine(summary)
+        const polled = yield* summarize(repo, target).pipe(
+          Effect.map((summary) => ({ summary }) as const),
+          Effect.catchIf(transient, (error) => Effect.succeed({ error } as const)),
+        )
+        const line =
+          "summary" in polled
+            ? ciLine(polled.summary)
+            : `github error, retrying: ${printable(polled.error.message)}`
         if (line !== last) yield* options.emit(`${line}\n`)
         const elapsed = (yield* Clock.currentTimeMillis) - started
-        const checks = summary.failed.length + summary.pending + summary.passed
-        if (summary.pending === 0 && (checks > 0 || elapsed >= options.graceMillis))
-          return summary.failed.length > 0 ? 1 : 0
+        if ("summary" in polled) {
+          const { failed, pending, passed } = polled.summary
+          if (pending === 0 && (failed.length + passed > 0 || elapsed >= options.graceMillis))
+            return failed.length > 0 ? 1 : 0
+        }
         if (elapsed >= options.timeoutMillis) {
           yield* options.emit(`timeout after ${Math.round(elapsed / 1000)}s\n`)
           return TIMEOUT_EXIT

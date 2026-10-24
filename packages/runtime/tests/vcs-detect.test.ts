@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
+import { isGithubRemote, repoSlug, stripUserinfo } from "../src/vcs/git.ts"
 import {
   cleanup,
   failure,
@@ -148,15 +149,167 @@ describe("vcs detect", () => {
     const dir = await repoAs(CLAUDE)
     toon(await vcs(dir, ["vcs", "detect"], github().layer))
     const cached = await readVcs(dir)
-    expect(cached.detection).toMatchObject({ path: "api", verified: false })
+    expect(cached.detection).toMatchObject({ graphql: true, verified: false })
     expect(await sh(dir, ["git", "status", "--porcelain", "--untracked-files=all"])).not.toContain(
       "local",
     )
+  })
+
+  test("a detection made while GitHub failed is returned but never cached", async () => {
+    const dir = await repoAs({ name: "Dana", email: "dana@example.com" })
+
+    const degraded = toon(await vcs(dir, ["vcs", "detect"], github({ credential: false }).layer))
+    expect(degraded).toMatchObject({ path: "git", cached: false })
+    expect((await readVcs(dir)).detection).toBeUndefined()
+    expect(
+      toon(await vcs(dir, ["vcs", "detect"], github({ credential: false }).layer)),
+    ).toMatchObject({ cached: false })
+
+    const recovered = toon(await vcs(dir, ["vcs", "detect"], github().layer))
+    expect(recovered).toMatchObject({ path: "api", owner: "octo", cached: false })
+    expect((await readVcs(dir)).detection).toMatchObject({ graphql: true })
+  })
+
+  test("credentials in the remote URL are neither shown nor stored", async () => {
+    const dir = await repoAs(OCTO)
+    await sh(dir, [
+      "git",
+      "remote",
+      "set-url",
+      "origin",
+      "https://octo:s3cret-token@github.com/octo/project.git",
+    ])
+    const result = await vcs(dir, ["vcs", "detect"], github().layer)
+    expect(toon(result)).toMatchObject({ repo: "octo/project" })
+    expect(result.stdout).not.toContain("s3cret-token")
+    expect(await Bun.file(`${dir}/.holyagent/local/vcs.json`).text()).not.toContain("s3cret-token")
+  })
+
+  test("changing commit.gpgsign recomputes the detection", async () => {
+    const dir = await repoAs(OCTO)
+    expect(toon(await vcs(dir, ["vcs", "detect"], github().layer))).toMatchObject({ signed: false })
+    await sh(dir, ["git", "config", "commit.gpgsign", "true"])
+    expect(toon(await vcs(dir, ["vcs", "detect"], github().layer))).toMatchObject({
+      signed: true,
+      cached: false,
+    })
+  })
+
+  test("a cache file that is in an old shape or does not decode is ignored and rewritten", async () => {
+    const dir = await repoAs(CLAUDE)
+    toon(await vcs(dir, ["vcs", "detect"], github().layer))
+    const path = `${dir}/.holyagent/local/vcs.json`
+    const cached = JSON.parse(await Bun.file(path).text()) as { detection: Record<string, unknown> }
+    const recomputed = async (detection: unknown) => {
+      await Bun.write(path, JSON.stringify({ detection }))
+      expect(await vcs(dir, ["status"], github().layer)).toMatchObject({ code: 0 })
+      const result = toon(await vcs(dir, ["vcs", "detect"], github().layer))
+      expect((await readVcs(dir)).detection).toMatchObject({ graphql: true, verified: false })
+      return result
+    }
+
+    // The shape an earlier version wrote had no probe result, and carried its own path and owner.
+    const { graphql: _probe, ...earlier } = cached.detection
+    expect(await recomputed({ ...earlier, path: "git", owner: { login: "evil" } })).toMatchObject({
+      path: "api",
+      owner: "octo",
+      cached: false,
+    })
+    // Extra fields in a current-shape file are never read: the decision stays the live one.
+    await Bun.write(
+      path,
+      JSON.stringify({ detection: { ...cached.detection, path: "git", owner: { login: "evil" } } }),
+    )
+    expect(toon(await vcs(dir, ["vcs", "detect"], github().layer))).toMatchObject({
+      path: "api",
+      owner: "octo",
+    })
+    expect(await recomputed({ ...cached.detection, pending: "HEAD~1" })).toMatchObject({
+      cached: false,
+    })
+    expect(await recomputed("not an object")).toMatchObject({ cached: false })
+  })
+
+  test("a pending commit may be a SHA-1 or a SHA-256 id and anything else drops the cache", async () => {
+    const dir = await repoAs(CLAUDE)
+    toon(await vcs(dir, ["vcs", "detect"], github().layer))
+    const path = `${dir}/.holyagent/local/vcs.json`
+    const cached = JSON.parse(await Bun.file(path).text()) as { detection: Record<string, unknown> }
+    for (const pending of ["a".repeat(40), "b".repeat(64)]) {
+      await Bun.write(path, JSON.stringify({ detection: { ...cached.detection, pending } }))
+      expect(toon(await vcs(dir, ["vcs", "detect"], github().layer))).toMatchObject({
+        cached: true,
+      })
+      expect((await readVcs(dir)).detection?.pending).toBe(pending)
+    }
+    await Bun.write(
+      path,
+      JSON.stringify({ detection: { ...cached.detection, pending: "a".repeat(41) } }),
+    )
+    expect(toon(await vcs(dir, ["vcs", "detect"], github().layer))).toMatchObject({ cached: false })
+  })
+
+  test("the host and slug come from the URL git really uses, after insteadOf", async () => {
+    const dir = await repoAs(CLAUDE)
+    await sh(dir, ["git", "remote", "set-url", "origin", "gh:octo/project"])
+    await sh(dir, ["git", "config", "url.git@github.com:.insteadOf", "gh:"])
+    expect(toon(await vcs(dir, ["vcs", "detect"], github().layer))).toMatchObject({
+      path: "api",
+      repo: "octo/project",
+    })
+
+    await sh(dir, ["git", "config", "url.https://git.example.com/.insteadOf", "gh:"])
+    await sh(dir, ["git", "config", "--unset", "url.git@github.com:.insteadOf"])
+    expect(toon(await vcs(dir, ["vcs", "detect"], github().layer))).toMatchObject({
+      path: "git-owner",
+      cached: false,
+    })
   })
 
   test("an unknown flag is a usage error", async () => {
     const dir = await repoAs(OCTO)
     const result = await vcs(dir, ["vcs", "detect", "--force"], github().layer)
     expect(result.code).toBe(2)
+  })
+})
+
+describe("remote URLs", () => {
+  test.each([
+    ["https://github.com/o/r.git", true],
+    ["https://user:pw@github.com/o/r", true],
+    ["http://github.com/o/r", true],
+    ["git@github.com:o/r.git", true],
+    ["github.com:o/r.git", true],
+    ["ssh://git@github.com/o/r.git", true],
+    ["ssh://github.com/o/r.git", true],
+    ["ssh://git@github.com:22/o/r.git", true],
+    ["git://github.com/o/r.git", true],
+    ["https://GitHub.com/o/r", true],
+    ["https://github.com.evil.io/o/r", false],
+    ["https://github.com@evil.io/o/r", false],
+    ["https://evil.io/github.com/o/r", false],
+    ["git@gitlab.com:o/r.git", false],
+    ["git@github.com.evil.io:o/r.git", false],
+    ["http://local_proxy@127.0.0.1:4242/git/o/r", false],
+    ["/tmp/some/remote.git", false],
+    ["", false],
+  ])("%s is a github.com remote: %p", (url, expected) => {
+    expect(isGithubRemote(stripUserinfo(url))).toBe(expected)
+    expect(isGithubRemote(url)).toBe(expected)
+  })
+
+  test.each([
+    ["https://github.com/o/r.git", "o/r"],
+    ["git@github.com:o/r", "o/r"],
+    ["ssh://git@github.com/o/r.git/", "o/r"],
+    ["http://127.0.0.1:4242/git/o/r", "o/r"],
+    ["https://github.com/../r", undefined],
+    ["https://github.com/o/..", undefined],
+    ["https://github.com/./r", undefined],
+    ["https://github.com/o/..git", undefined],
+    ["https://github.com/o/r r", undefined],
+    ["r", undefined],
+  ])("%s names %p", (url, slug) => {
+    expect(repoSlug(url)).toBe(slug)
   })
 })

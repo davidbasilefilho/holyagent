@@ -1,25 +1,10 @@
 import { Effect } from "effect"
 
-import { Usage } from "../cli/errors.ts"
 import { detect, saveDetection } from "./detect.ts"
 import { RemoteMismatch } from "./errors.ts"
-import { currentBranch, git, gitMaybe, isAncestor, repoSlug } from "./git.ts"
+import { currentBranch, git, gitMaybe, isAncestor, repoSlug, validBranch } from "./git.ts"
 import { branchHead } from "./repo.ts"
 import { verifyIfReadable, withoutPending } from "./verify.ts"
-
-/** A branch name git accepts as it is written, so it cannot be an option or a forced refspec. */
-export const validBranch = (name: string) =>
-  gitMaybe(["check-ref-format", "--branch", name]).pipe(
-    Effect.filterOrFail(
-      // A leading plus is legal in a ref name but makes the push refspec a forced one.
-      (checked) => checked === name && !name.startsWith("+"),
-      () =>
-        new Usage({
-          message: `"${name}" is not a plain branch name`,
-          hint: "Name branches without a leading dash or plus, such as feature/parser.",
-        }),
-    ),
-  )
 
 /** The outcome of `vcs push`. */
 export interface Pushed {
@@ -54,9 +39,11 @@ export const push = (directory: string, root: string, branches: ReadonlyArray<st
       return { path: detection.path, pushed: false, heads } satisfies Pushed
     }
 
-    yield* git(["push", "-u", "origin", ...targets])
+    yield* git(["push", "-u", "origin", ...targets.map((branch) => `refs/heads/${branch}`)])
     const heads = yield* Effect.forEach(targets, (branch) =>
-      git(["rev-parse", "--short", branch]).pipe(Effect.map((sha) => `${branch}=${sha}`)),
+      git(["rev-parse", "--short", `refs/heads/${branch}`]).pipe(
+        Effect.map((sha) => `${branch}=${sha}`),
+      ),
     )
 
     const { pending } = detection
@@ -64,7 +51,9 @@ export const push = (directory: string, root: string, branches: ReadonlyArray<st
     if (pending !== undefined && repo !== undefined) {
       const known = (yield* gitMaybe(["cat-file", "-e", pending])) !== undefined
       const reachable = known
-        ? (yield* Effect.forEach(targets, (branch) => isAncestor(pending, branch))).includes(true)
+        ? (yield* Effect.forEach(targets, (branch) =>
+            isAncestor(pending, `refs/heads/${branch}`),
+          )).includes(true)
         : false
       if (reachable) note = yield* verifyIfReadable(directory, detection, repo, pending)
       else if (!known) yield* saveDetection(directory, withoutPending(detection))

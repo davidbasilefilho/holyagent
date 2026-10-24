@@ -1,6 +1,14 @@
 import { Effect } from "effect"
 
-import { HookFailed, RemoteMismatch, UnsupportedChange } from "./errors.ts"
+import { describeFailure } from "../cli/errors.ts"
+import type { StateIo } from "../state/errors.ts"
+import {
+  type GitFailed,
+  HookFailed,
+  PartialCommit,
+  RemoteMismatch,
+  UnsupportedChange,
+} from "./errors.ts"
 import { Git, git, headCommit } from "./git.ts"
 import type { Message } from "./message.ts"
 import {
@@ -131,7 +139,7 @@ export interface ApiCommit {
   readonly branch: string
   readonly message: Message
   /** Stages the named paths again, after the hook may have changed them. */
-  readonly restage: Effect.Effect<void, unknown, Git>
+  readonly restage: Effect.Effect<void, GitFailed | StateIo, Git>
   readonly limit?: number
 }
 
@@ -174,7 +182,6 @@ const checkRemote = (repo: string, branch: string) =>
 export const commitViaApi = (request: ApiCommit) =>
   Effect.gen(function* () {
     const { repo, branch, message } = request
-    const state = yield* checkRemote(repo, branch)
 
     const hook = yield* Git.use((service) =>
       service.run(["hook", "run", "--ignore-missing", "pre-commit"]),
@@ -205,60 +212,76 @@ export const commitViaApi = (request: ApiCommit) =>
           reason: `it is larger than ${Math.floor(limit / 1024 / 1024)} MiB as one request`,
         })
 
-    let expected = state.remote
-    let bootstrapped = false
-    const commits: Array<string> = []
-    for (const [index, batch] of batches.entries()) {
-      const headline =
-        batches.length === 1
-          ? message.headline
-          : `${message.headline} (${index + 1}/${batches.length})`
-      const named = { ...message, headline }
-      let rest = batch
-      if (expected === undefined) {
-        const first = batch.find((change) => change.kind === "add")
-        if (first === undefined)
-          return yield* new UnsupportedChange({
-            path: batch[0]?.path ?? "",
-            reason: "the first commit of an empty repository must add a file",
-          })
-        const sha = yield* putFirstFile(repo, {
-          path: first.path,
-          contents: first.contents,
-          message: toText(named),
-          branch,
-        })
-        if ((yield* branchHead(repo, branch)) !== sha)
-          return yield* new RemoteMismatch({
-            reason: `GitHub created the first commit ${sha.slice(0, 7)} but not on the branch ${branch}`,
-          })
-        expected = sha
-        bootstrapped = true
-        commits.push(sha)
-        rest = batch.filter((change) => change !== first)
-        if (rest.length === 0) continue
-      }
-      expected = yield* createCommitOnBranch({
-        branch: { repositoryNameWithOwner: repo, branchName: branch },
-        expectedHeadOid: expected,
-        message: named,
-        fileChanges: {
-          additions: rest
-            .filter((change) => change.kind !== "delete")
-            .map(({ path, contents }) => ({ path, contents })),
-          deletions: rest
-            .filter((change) => change.kind === "delete")
-            .map(({ path }) => ({ path })),
-        },
-      })
-      commits.push(expected)
-    }
+    // The branch is created on GitHub only now that the hook passed and the change set is known
+    // to fit through the API.
+    const state = yield* checkRemote(repo, branch)
 
-    const last = commits.at(-1)
-    if (last !== undefined) {
-      yield* git(["fetch", "origin", branch])
-      yield* git(["reset", "--soft", last])
-    }
+    let expected = state.remote
+    let bootstrapped: boolean = false
+    const commits: Array<string> = []
+    const publish = Effect.gen(function* () {
+      for (const [index, batch] of batches.entries()) {
+        const headline =
+          batches.length === 1
+            ? message.headline
+            : `${message.headline} (${index + 1}/${batches.length})`
+        const named = { ...message, headline }
+        let rest = batch
+        if (expected === undefined) {
+          const first = batch.find((change) => change.kind === "add")
+          if (first === undefined)
+            return yield* new UnsupportedChange({
+              path: batch[0]?.path ?? "",
+              reason: "the first commit of an empty repository must add a file",
+            })
+          const sha = yield* putFirstFile(repo, {
+            path: first.path,
+            contents: first.contents,
+            message: toText(named),
+            branch,
+          })
+          if ((yield* branchHead(repo, branch)) !== sha)
+            return yield* new RemoteMismatch({
+              reason: `GitHub created the first commit ${sha.slice(0, 7)} but not on the branch ${branch}`,
+            })
+          expected = sha
+          bootstrapped = true
+          commits.push(sha)
+          rest = batch.filter((change) => change !== first)
+          if (rest.length === 0) continue
+        }
+        expected = yield* createCommitOnBranch({
+          branch: { repositoryNameWithOwner: repo, branchName: branch },
+          expectedHeadOid: expected,
+          message: named,
+          fileChanges: {
+            additions: rest
+              .filter((change) => change.kind !== "delete")
+              .map(({ path, contents }) => ({ path, contents })),
+            deletions: rest
+              .filter((change) => change.kind === "delete")
+              .map(({ path }) => ({ path })),
+          },
+        })
+        commits.push(expected)
+      }
+
+      const last = commits.at(-1)
+      if (last !== undefined) {
+        yield* git(["fetch", "origin", `refs/heads/${branch}:refs/remotes/origin/${branch}`])
+        yield* git(["reset", "--soft", last])
+      }
+    })
+    // Whatever fails once GitHub holds a commit must say so, with the way back to a clean state.
+    yield* publish.pipe(
+      Effect.catch((error) =>
+        Effect.fail(
+          commits.length === 0
+            ? error
+            : new PartialCommit({ commits, branch, reason: describeFailure(error).message }),
+        ),
+      ),
+    )
     return {
       commits,
       files: changes.length,

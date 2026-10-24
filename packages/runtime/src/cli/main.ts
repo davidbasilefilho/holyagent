@@ -4,7 +4,7 @@ import { Effect } from "effect"
 import { StdinMissing } from "./errors.ts"
 import { run } from "./program.ts"
 
-/** The `holyagent-runtime` entry point: runs the command line of the process and sets its exit code. */
+/** The `holyagent` entry point: runs the command line of the process and sets its exit code. */
 const stdin = Effect.suspend(() =>
   process.stdin.isTTY
     ? Effect.fail(new StdinMissing({ reason: "stdin is a terminal" }))

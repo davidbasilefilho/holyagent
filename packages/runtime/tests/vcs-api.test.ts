@@ -11,6 +11,7 @@ import {
   bareBackedGitHub,
   cleanup,
   commitView,
+  connect,
   GIT_ENV,
   headOf,
   initBare,
@@ -31,18 +32,13 @@ const AGENT = { name: "Claude", email: "noreply@anthropic.com" }
 const cloud = async (files: Record<string, string> = { "a.txt": "a\n", "old.txt": "old\n" }) => {
   const bare = await initBare()
   const dir = await initRepo(AGENT)
-  await sh(dir, ["git", "remote", "add", "origin", bare])
+  await connect(dir, bare)
   const head = await seed(dir, files)
   await sh(dir, ["git", "push", "-q", "-u", "origin", "main"])
   return { bare, dir, head }
 }
 
-const REPO = (bare: string) =>
-  bare
-    .split("/")
-    .slice(-2)
-    .join("/")
-    .replace(/\.git$/, "")
+const REPO = "octo/project"
 
 describe("commit on the api path", () => {
   test("creates one commit with the staged diff and brings the local branch to it", async () => {
@@ -77,7 +73,7 @@ describe("commit on the api path", () => {
     const created = gh.calls.filter((call) => call.kind === "graphql" && call.variables?.["input"])
     expect(created).toHaveLength(1)
     expect(created[0]?.variables?.["input"]).toEqual({
-      branch: { repositoryNameWithOwner: REPO(bare), branchName: "main" },
+      branch: { repositoryNameWithOwner: REPO, branchName: "main" },
       expectedHeadOid: head,
       message: { headline: "Change a", body: "Because." },
       fileChanges: {
@@ -206,11 +202,87 @@ describe("commit on the api path", () => {
   })
 })
 
+describe("around an api commit", () => {
+  test("unstaged and untracked work survives the sync to the new commit", async () => {
+    const { bare, dir } = await cloud({ "a.txt": "a\n", "b.txt": "b\n" })
+    await put(dir, { "a.txt": "changed\n", "b.txt": "b edited\n", "scratch.txt": "notes\n" })
+
+    toon(
+      await vcs(
+        dir,
+        ["vcs", "commit", "-m", "Change a", "--", "a.txt"],
+        bareBackedGitHub(bare).layer,
+      ),
+    )
+
+    expect(await sh(dir, ["git", "status", "--porcelain"])).toBe(" M b.txt\n?? scratch.txt\n")
+    expect(await Bun.file(join(dir, "b.txt")).text()).toBe("b edited\n")
+    expect(await Bun.file(join(dir, "scratch.txt")).text()).toBe("notes\n")
+    expect(await headOf(dir)).toBe(await headOf(bare, "main"))
+  })
+
+  test("a failure after GitHub holds a commit names it and the way back", async () => {
+    const { bare, dir, head } = await cloud()
+    const gh = bareBackedGitHub(bare, undefined, 1)
+    await put(dir, { "a/one.txt": "x".repeat(3000), "b/two.txt": "y".repeat(3000) })
+    await sh(dir, ["git", "add", "-A"])
+
+    const error = await Effect.runPromise(
+      Effect.flip(
+        commitViaApi({
+          repo: REPO,
+          branch: "main",
+          message: { headline: "Add both" },
+          restage: Effect.void,
+          limit: 5000,
+        }),
+      ).pipe(Effect.provide(Layer.merge(gitLive(dir, GIT_ENV), gh.layer))),
+    )
+
+    const first = await headOf(bare, "main")
+    expect(first).toMatch(/^[0-9a-f]{40}$/)
+    expect(first).not.toBe(head)
+    expect(error._tag).toBe("PartialCommit")
+    expect(error.message).toContain(first ?? "")
+    expect(error.message).toContain("Bad Gateway")
+    expect(error.message).toContain("git fetch origin main && git reset --soft origin/main")
+    expect(await headOf(dir)).toBe(head)
+  })
+
+  test("the hook runs before a missing remote branch is created", async () => {
+    const { bare, dir } = await cloud()
+    const gh = bareBackedGitHub(bare)
+    const hook = join(dir, ".git/hooks/pre-commit")
+    await writeFile(hook, "#!/bin/sh\nexit 1\n")
+    await chmod(hook, 0o755)
+    await sh(dir, ["git", "switch", "-q", "-c", "feature"])
+    await put(dir, { "a.txt": "changed\n" })
+
+    const result = await vcs(dir, ["vcs", "commit", "-m", "Change a", "--", "a.txt"], gh.layer)
+
+    expect(result.code).toBe(3)
+    expect(gh.routes().some((route) => route.startsWith("POST"))).toBe(false)
+    expect(await headOf(bare, "feature")).toBeUndefined()
+  })
+
+  test("a remote that is not on github.com never takes the api path", async () => {
+    const bare = await initBare()
+    const dir = await initRepo(AGENT)
+    await sh(dir, ["git", "remote", "add", "origin", bare])
+    await seed(dir, { "a.txt": "a\n" })
+
+    const detected = toon(await vcs(dir, ["vcs", "detect"], bareBackedGitHub(bare).layer))
+
+    expect(detected).toMatchObject({ path: "git-owner" })
+    expect(String(detected["reason"])).toContain("not a github.com remote")
+  })
+})
+
 describe("commit to an empty repository", () => {
   test("the first file goes through the contents endpoint, the rest through createCommitOnBranch", async () => {
     const bare = await initBare()
     const dir = await initRepo(AGENT)
-    await sh(dir, ["git", "remote", "add", "origin", bare])
+    await connect(dir, bare)
     await put(dir, { "a.txt": "first\n", "b.txt": "second\n" })
     const gh = bareBackedGitHub(bare)
 
@@ -249,7 +321,7 @@ describe("commit to an empty repository", () => {
   test("a single file needs only the contents endpoint", async () => {
     const bare = await initBare()
     const dir = await initRepo(AGENT)
-    await sh(dir, ["git", "remote", "add", "origin", bare])
+    await connect(dir, bare)
     await put(dir, { "a.txt": "only\n" })
     const gh = bareBackedGitHub(bare)
 
@@ -290,7 +362,7 @@ describe("reading the first commit back", () => {
     expect(result.stderr).toContain("error: VerificationMismatch")
     expect(result.stderr).toContain(problem)
     const cached = await readVcs(dir)
-    expect(cached.detection).toMatchObject({ path: "api", verified: false })
+    expect(cached.detection).toMatchObject({ graphql: true, verified: false })
   })
 })
 
@@ -338,7 +410,7 @@ describe("large change sets", () => {
 
     const done = await Effect.runPromise(
       commitViaApi({
-        repo: REPO(bare),
+        repo: REPO,
         branch: "main",
         message: { headline: "Add both" },
         restage: Effect.void,

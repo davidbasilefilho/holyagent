@@ -1,5 +1,6 @@
 import { Context, Effect, Layer } from "effect"
 
+import { Usage } from "../cli/errors.ts"
 import { DetachedHead, GitFailed } from "./errors.ts"
 import { type Env, spawn } from "./process.ts"
 
@@ -66,27 +67,64 @@ export const gitMaybe = (args: ReadonlyArray<string>) =>
 export const gitPaths = (args: ReadonlyArray<string>, paths: ReadonlyArray<string>) =>
   git(["--literal-pathspecs", ...args, "--", ...paths])
 
-/** The branch HEAD is on. */
-export const currentBranch = gitMaybe(["symbolic-ref", "--short", "-q", "HEAD"]).pipe(
-  Effect.flatMap((branch) =>
-    branch === undefined || branch === ""
-      ? Effect.fail(new DetachedHead())
-      : Effect.succeed(branch),
-  ),
+/**
+ * A branch name git accepts as it is written. One that starts with a dash would read as an option
+ * and one that starts with a plus would turn a push refspec into a forced one.
+ */
+export const validBranch = (name: string): Effect.Effect<string, Usage, Git> =>
+  Effect.gen(function* () {
+    const plain = !name.startsWith("-") && !name.startsWith("+")
+    if (plain && (yield* gitMaybe(["check-ref-format", "--branch", name])) === name) return name
+    return yield* new Usage({
+      message: `"${name}" is not a plain branch name`,
+      hint: "Name branches without a leading dash or plus, such as feature/parser.",
+    })
+  })
+
+/** The branch HEAD is on, when its name is one that is safe to hand to git and GitHub. */
+export const currentBranch: Effect.Effect<string, DetachedHead | Usage, Git> = Effect.gen(
+  function* () {
+    const branch = yield* gitMaybe(["symbolic-ref", "--short", "-q", "HEAD"])
+    if (branch === undefined || branch === "") return yield* new DetachedHead()
+    return yield* validBranch(branch)
+  },
 )
 
 /** The commit HEAD points at, or undefined on a branch without commits. */
 export const headCommit = gitMaybe(["rev-parse", "-q", "--verify", "HEAD"])
 
-/** The URL of `origin`, or empty text when there is none. */
+/** The URL with any user name or password removed, so it is safe to keep and to print. */
+export const stripUserinfo = (url: string): string =>
+  url.replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/@]*@/i, "$1")
+
+/**
+ * The URL `origin` really fetches from (`git remote get-url`, so `insteadOf` rewrites apply) with
+ * any user name or password removed, or empty text when there is no origin. This is the form that
+ * is checked for its host and slug, stored and printed.
+ */
 export const originUrl = gitMaybe(["remote", "get-url", "origin"]).pipe(
-  Effect.map((url) => url ?? ""),
+  Effect.map((url) => stripUserinfo(url ?? "")),
 )
+
+/**
+ * True for a remote whose host is github.com, in https, git, ssh or scp-like form, with or without
+ * a user name. The host must end at the colon or slash, so `github.com.evil.io` and
+ * `https://github.com@evil.io/` are not GitHub.
+ */
+export const isGithubRemote = (url: string): boolean =>
+  /^(?:(?:https?|git|ssh):\/\/(?:[^/@]*@)?github\.com(?::\d+)?\/|(?:[\w.-]+@)?github\.com:)/i.test(
+    url.trim(),
+  )
 
 /** The `owner/repo` a remote URL names, in https, scp-like, ssh and local-proxy forms. */
 export const repoSlug = (url: string): string | undefined => {
   const match = /([^/:]+)\/([^/]+?)(?:\.git)?\/*$/.exec(url.trim())
-  return match === null ? undefined : `${match[1]}/${match[2]}`
+  if (match === null) return undefined
+  const [, owner = "", repo = ""] = match
+  const dots = new Set([".", ".."])
+  return dots.has(owner) || dots.has(repo) || !/^[\w.-]+\/[\w.-]+$/.test(`${owner}/${repo}`)
+    ? undefined
+    : `${owner}/${repo}`
 }
 
 /** True when `ancestor` is reachable from `descendant`. */

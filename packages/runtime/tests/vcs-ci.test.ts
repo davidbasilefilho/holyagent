@@ -3,7 +3,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { Effect } from "effect"
 
 import { ciLine, summarize, TIMEOUT_EXIT, watchCi } from "../src/vcs/ci.ts"
-import { cleanup, fakeGitHub, initRepo, seed, sh, vcs } from "./vcs-fixtures.ts"
+import { cleanup, failure, fakeGitHub, initRepo, seed, sh, vcs } from "./vcs-fixtures.ts"
 
 afterEach(cleanup)
 
@@ -42,7 +42,7 @@ const ciGithub = (
         poll += 1
         return { total_count: runs.length, check_runs: runs }
       }
-      if (request.path.endsWith("/status")) return { statuses: at().statuses ?? [] }
+      if (request.path.includes("/status")) return { statuses: at().statuses ?? [] }
       return undefined
     },
   })
@@ -85,6 +85,23 @@ describe("the ci line", () => {
     )
   })
 
+  test("check names are printed without control characters and are capped", async () => {
+    const gh = ciGithub([
+      { runs: [run("evil\u001b[2J\nname", "failure"), run("x".repeat(500), "failure")] },
+    ])
+    const summary = await Effect.runPromise(summarize(REPO, target).pipe(Effect.provide(gh.layer)))
+    const line = ciLine(summary)
+    expect(line).not.toMatch(/\p{Cc}/u)
+    expect(summary.failed[0]).toBe("evil [2J name")
+    expect(summary.failed[1]).toHaveLength(80)
+  })
+
+  test("statuses are asked for 100 at a time", async () => {
+    const gh = ciGithub([{ runs: [run("a", "success")] }])
+    await Effect.runPromise(summarize(REPO, target).pipe(Effect.provide(gh.layer)))
+    expect(gh.routes().some((route) => route.endsWith("/status?per_page=100"))).toBe(true)
+  })
+
   test("an all-green pull request prints no failing list; mergeability still computing reads unknown", async () => {
     const gh = ciGithub([{ runs: [run("build", "success")], mergeable: null, state: "unknown" }])
     const summary = await Effect.runPromise(summarize(REPO, target).pipe(Effect.provide(gh.layer)))
@@ -114,7 +131,7 @@ describe("the ci line", () => {
           ? page(first, 101)
           : request.path.endsWith("&page=2")
             ? page(["last"], 101)
-            : request.path.endsWith("/status")
+            : request.path.includes("/status")
               ? { statuses: [] }
               : undefined,
     })
@@ -179,6 +196,47 @@ describe("watching", () => {
     expect(lines).toHaveLength(2)
     expect(lines[0]).toContain("pending=1")
     expect(lines[1]).toMatch(/^timeout after \d+s\n$/)
+  })
+
+  test("transient GitHub failures are waited out, others end the watch", async () => {
+    let calls = 0
+    const flaky = (status: number, failures: number) =>
+      fakeGitHub({
+        rest: (request) => {
+          if (request.path.includes("/check-runs")) {
+            calls += 1
+            return calls <= failures
+              ? failure(status, "Bad Gateway")
+              : { total_count: 1, check_runs: [run("a", "success")] }
+          }
+          return request.path.includes("/status") ? { statuses: [] } : undefined
+        },
+      })
+    const lines: Array<string> = []
+    const emit = (text: string) => Effect.sync(() => void lines.push(text))
+
+    calls = 0
+    const recovered = await Effect.runPromise(
+      watchCi(REPO, { sha: SHA }, fast(emit)).pipe(Effect.provide(flaky(502, 2).layer)),
+    )
+    expect(recovered).toBe(0)
+    expect(lines.filter((line) => line.startsWith("github error"))).toHaveLength(1)
+
+    calls = 0
+    const gaveUp = await Effect.runPromise(
+      watchCi(REPO, { sha: SHA }, fast(emit, { timeoutMillis: 20 })).pipe(
+        Effect.provide(flaky(502, 1000).layer),
+      ),
+    )
+    expect(gaveUp).toBe(TIMEOUT_EXIT)
+
+    calls = 0
+    const failed = await Effect.runPromise(
+      Effect.flip(
+        watchCi(REPO, { sha: SHA }, fast(emit)).pipe(Effect.provide(flaky(404, 1000).layer)),
+      ),
+    )
+    expect(failed.message).toContain("404")
   })
 
   test("a commit without any check is waited for during the grace period, then counts as green", async () => {

@@ -3,29 +3,47 @@ import { Effect } from "effect"
 import { Usage } from "../cli/errors.ts"
 import { MessageRefused } from "./errors.ts"
 
-// Lines that name the agent as the author of the change or link to its session: a commit belongs
-// to the credential owner and carries no attribution.
-const ATTRIBUTION_LINE =
-  /^\s*(?:co-authored-by|claude-session)\s*:|generated\s+with\b.*claude\s+code/i
+// A commit belongs to the credential owner and carries no attribution to the agent. Session
+// trailers and the "Generated with … Claude Code" footer (alone on its line, after an optional
+// emoji or bracket) always go; a Co-authored-by trailer goes only when it names the agent, so
+// human co-authors stay.
+const SESSION_TRAILER = /^\s*claude-session\s*:/i
+const GENERATED_FOOTER = /^\s*(?:[^\p{L}\p{N}\s]\s*)*generated\s+with\b.*\bclaude\s+code\b/iu
+const CO_AUTHOR = /^\s*co-authored-by\s*:\s*(.*)$/i
 const SESSION_LINK = /https?:\/\/claude\.ai\/\S*/gi
+
+const namesAgent = (coAuthor: string) =>
+  /^claude\b/i.test(coAuthor.trim()) || /@(?:[\w-]+\.)*anthropic\.com\b/i.test(coAuthor)
+
+const isAttribution = (line: string) => {
+  if (SESSION_TRAILER.test(line) || GENERATED_FOOTER.test(line)) return true
+  const coAuthor = CO_AUTHOR.exec(line)
+  return coAuthor !== null && namesAgent(coAuthor[1] ?? "")
+}
 
 /** Phrases that talk about the user in third person or about the agent process. */
 export const DEFAULT_PHRASES: ReadonlyArray<string> = [
   "the user",
   "user asked",
   "as requested",
-  "Claude",
   "the assistant",
   "this session",
   "subagent",
-  "specialist",
+  "Claude Code",
+  "Claude Opus",
+  "Claude Sonnet",
+  "Claude Haiku",
+  "Claude Fable",
 ]
 
-/** Removes attribution trailers, "Generated with … Claude Code" lines and claude.ai session links. */
+/**
+ * Removes the agent's session trailers, its Co-authored-by trailers, the "Generated with … Claude
+ * Code" footer and claude.ai session links.
+ */
 export const cleanMessage = (text: string): string =>
   text
     .split("\n")
-    .filter((line) => !ATTRIBUTION_LINE.test(line))
+    .filter((line) => !isAttribution(line))
     .flatMap((line) => {
       const stripped = line.replace(SESSION_LINK, "")
       return stripped === line ? [line] : stripped.trim() === "" ? [] : [stripped.trimEnd()]

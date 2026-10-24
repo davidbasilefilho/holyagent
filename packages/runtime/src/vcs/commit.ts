@@ -53,7 +53,7 @@ const changedIntentFolder = (directory: string, root: string) =>
     ),
   )
 
-const stagedPaths = git(["diff", "--cached", "--name-only", "-z"]).pipe(
+const stagedPaths = git(["diff", "--cached", "--name-only", "--no-renames", "-z"]).pipe(
   Effect.map((names) => names.split("\0").filter((path) => path !== "")),
 )
 

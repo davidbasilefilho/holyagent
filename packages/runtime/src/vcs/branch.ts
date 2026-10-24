@@ -1,9 +1,9 @@
 import { Effect } from "effect"
 
+import { Usage } from "../cli/errors.ts"
 import { detect } from "./detect.ts"
 import { RemoteMismatch } from "./errors.ts"
-import { git, repoSlug } from "./git.ts"
-import { validBranch } from "./push.ts"
+import { git, repoSlug, validBranch } from "./git.ts"
 import { createBranch } from "./repo.ts"
 
 /** The outcome of `vcs branch`. */
@@ -22,6 +22,11 @@ export interface Branched {
 export const branch = (directory: string, root: string, name: string, from: string | undefined) =>
   Effect.gen(function* () {
     yield* validBranch(name)
+    if (from?.startsWith("-"))
+      return yield* new Usage({
+        message: `--from "${from}" looks like an option`,
+        hint: "Name a branch, tag or commit.",
+      })
     const { detection } = yield* detect(directory, root, false)
     const sha = yield* git(["rev-parse", "--verify", `${from ?? "HEAD"}^{commit}`])
     const apiPath = detection.path === "api"

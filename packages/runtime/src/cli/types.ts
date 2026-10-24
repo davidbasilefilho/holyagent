@@ -50,11 +50,11 @@ export interface Call {
   readonly config: Effect.Effect<ExecutionConfig, Usage>
   /** Reads stdin as raw text; blank input is StdinMissing. */
   readonly text: Effect.Effect<string, StdinMissing>
-  /** Reads stdin as JSON and decodes it strictly; unknown fields are refused. */
   /** Prints text now, for a command whose output arrives over time. */
   readonly emit: (text: string) => Effect.Effect<void>
   /** Git and GitHub for the `vcs` commands. */
   readonly vcs: Layer.Layer<Git | GitHub>
+  /** Reads stdin as JSON and decodes it strictly; unknown fields are refused. */
   readonly input: <S extends Schema.Decoder<unknown>>(
     schema: S,
   ) => Effect.Effect<S["Type"], StdinMissing | InvalidDraft, S["DecodingServices"]>

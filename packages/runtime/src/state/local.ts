@@ -3,7 +3,6 @@ import { Effect, Schema } from "effect"
 import { IntentId } from "../domain/ids.ts"
 import { Text } from "../domain/primitives.ts"
 import { type Registry, SpecialistEntry } from "../domain/specialists.ts"
-import { Detection } from "../vcs/model.ts"
 import { commitFile, encodeJson, type File, io, readJson } from "./files.ts"
 import { localFile } from "./layout.ts"
 
@@ -18,8 +17,11 @@ export const Vcs = Schema.Struct({
   branch: Schema.optionalKey(Text),
   base: Schema.optionalKey(Text),
   pullRequest: Schema.optionalKey(Text),
-  /** The commit path `vcs detect` chose and what it was computed from. */
-  detection: Schema.optionalKey(Detection),
+  /**
+   * What `vcs detect` keeps (see DetectionCache in vcs/model.ts). It is read as anything here and
+   * validated by its owner, so a file in an old shape never breaks the other commands.
+   */
+  detection: Schema.optionalKey(Schema.Unknown),
 })
 /** The version control facts of this clone. */
 export type Vcs = typeof Vcs.Type

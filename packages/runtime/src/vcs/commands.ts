@@ -33,7 +33,7 @@ const arguments_ = (
       (args) =>
         new Usage({
           message: `Expected ${positionals} argument(s), got ${args.positionals.length}`,
-          hint: `Usage: holyagent-runtime ${usage}`,
+          hint: `Usage: holyagent ${usage}`,
         }),
     ),
   )
@@ -103,7 +103,7 @@ export const VCS_COMMANDS: ReadonlyArray<Command> = [
           return yield* new Usage({
             message:
               messages.length === 0 ? "Missing -m <headline>" : "Name the paths to commit after --",
-            hint: `Usage: holyagent-runtime ${COMMIT_USAGE}`,
+            hint: `Usage: holyagent ${COMMIT_USAGE}`,
           })
         const root = rootOf(call)
         const settings = yield* readSettings(root)
@@ -176,10 +176,10 @@ export const VCS_COMMANDS: ReadonlyArray<Command> = [
         )
         const updating = valueOf(args, "update")
         const update = updating === undefined ? undefined : Number(updating)
-        if (update !== undefined && !Number.isInteger(update))
+        if (updating !== undefined && !/^[1-9]\d*$/.test(updating))
           return yield* new Usage({
             message: `--update needs a pull request number, not "${updating}"`,
-            hint: `Usage: holyagent-runtime ${PR_USAGE}`,
+            hint: `Usage: holyagent ${PR_USAGE}`,
           })
         if (update === undefined) {
           yield* requiredValue(args, "base", PR_USAGE)
@@ -220,7 +220,7 @@ export const VCS_COMMANDS: ReadonlyArray<Command> = [
         if (!Number.isFinite(seconds) || seconds < 0)
           return yield* new Usage({
             message: `--timeout needs a number of seconds, not "${valueOf(args, "timeout")}"`,
-            hint: `Usage: holyagent-runtime ${CI_USAGE}`,
+            hint: `Usage: holyagent ${CI_USAGE}`,
           })
         const repo = repoSlug(yield* originUrl)
         if (repo === undefined)

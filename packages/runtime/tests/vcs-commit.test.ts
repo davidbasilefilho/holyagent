@@ -92,6 +92,51 @@ describe("commit on the git path", () => {
     expect(await sh(dir, ["git", "diff", "--cached", "--name-only"])).toBe("b.txt\n")
   })
 
+  test("a rename staged outside the named paths refuses the commit, naming both sides", async () => {
+    const dir = await initRepo(OWNER)
+    await seed(dir, { "a.txt": "a\n", "b.txt": "b\n" })
+    await put(dir, { "a.txt": "a2\n" })
+    await sh(dir, ["git", "mv", "b.txt", "c.txt"])
+
+    const result = await vcs(
+      dir,
+      ["vcs", "commit", "-m", "Change a", "--", "a.txt"],
+      github().layer,
+    )
+
+    expect(result.code).toBe(3)
+    expect(result.stderr).toContain("error: StagedOutsideScope")
+    expect(result.stderr).toContain("b.txt")
+    expect(result.stderr).toContain("c.txt")
+  })
+
+  test("a human co-author stays in the commit and the agent's trailer does not", async () => {
+    const dir = await initRepo(OWNER)
+    await seed(dir, { "a.txt": "a\n" })
+    await put(dir, { "a.txt": "a2\n" })
+
+    toon(
+      await vcs(
+        dir,
+        [
+          "vcs",
+          "commit",
+          "-m",
+          "Change a",
+          "-m",
+          "Co-authored-by: Dana <dana@example.com>\nCo-Authored-By: Claude <noreply@anthropic.com>",
+          "--",
+          "a.txt",
+        ],
+        github().layer,
+      ),
+    )
+
+    expect((await sh(dir, ["git", "log", "-1", "--format=%B"])).trim()).toBe(
+      "Change a\n\nCo-authored-by: Dana <dana@example.com>",
+    )
+  })
+
   test("nothing changed in the named paths is refused", async () => {
     const dir = await initRepo(OWNER)
     await seed(dir, { "a.txt": "a\n" })

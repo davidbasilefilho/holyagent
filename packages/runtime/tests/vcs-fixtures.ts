@@ -5,7 +5,7 @@ import { join } from "node:path"
 
 import { decode } from "@toon-format/toon"
 import { $ } from "bun"
-import { Effect, Layer, Schema } from "effect"
+import { Effect, Layer, Option, Schema } from "effect"
 
 import { StdinMissing } from "../src/cli/errors.ts"
 import { run } from "../src/cli/program.ts"
@@ -13,12 +13,15 @@ import { Vcs } from "../src/state/local.ts"
 import { GitHubFailed } from "../src/vcs/errors.ts"
 import { gitLive } from "../src/vcs/git.ts"
 import { GitHub, type RestRequest } from "../src/vcs/github.ts"
+import { DetectionCache } from "../src/vcs/model.ts"
 
 /** Environment that keeps git off the machine's own configuration. */
 export const GIT_ENV = {
   GIT_CONFIG_GLOBAL: "/dev/null",
   GIT_CONFIG_NOSYSTEM: "1",
   GIT_TERMINAL_PROMPT: "0",
+  // Sandboxes may inject url rewrites through the environment; tests talk to local repositories only.
+  GIT_CONFIG_COUNT: "0",
 } as const
 
 /** Runs a command in a directory with the hermetic git environment and returns its text. */
@@ -77,6 +80,25 @@ export const initBare = async () => {
   const bare = join(dir, "remote.git")
   await sh(dir, ["git", "init", "-q", "--bare", "-b", "main", bare])
   return bare
+}
+
+/** The URL the repositories of these tests name as their origin: an scp-like github.com remote. */
+export const GITHUB_URL = "git@github.com:octo/project.git"
+
+/**
+ * Makes `origin` a github.com remote whose fetches and pushes land in the bare repository: git
+ * reaches it through an "ssh" command that runs the upload and receive packs on the bare
+ * repository.
+ */
+export const connect = async (dir: string, bare: string) => {
+  const script = join(await scratch("holyagent-vcs-ssh-"), "ssh")
+  await writeFile(
+    script,
+    `#!/bin/sh\nfor last; do :; done\ncmd=$(printf '%s' "$last" | sed "s#'[^']*'#'${bare}'#")\nexec sh -c "$cmd"\n`,
+    { mode: 0o755 },
+  )
+  await sh(dir, ["git", "remote", "add", "origin", GITHUB_URL])
+  await sh(dir, ["git", "config", "core.sshCommand", script])
 }
 
 /** The commit a branch of a repository points at, or undefined. */
@@ -245,8 +267,14 @@ const bareCommit = async (
  * contents endpoint for an empty repository and createCommitOnBranch with its expectedHeadOid
  * check.
  */
-export const bareBackedGitHub = (bare: string, view: () => unknown = () => commitView()) =>
-  fakeGitHub({
+export const bareBackedGitHub = (
+  bare: string,
+  view: () => unknown = () => commitView(),
+  /** Lets this many createCommitOnBranch calls succeed, then answers every later one with a 502. */
+  commitsBeforeFailing = Number.POSITIVE_INFINITY,
+) => {
+  let created = 0
+  return fakeGitHub({
     rest: async (request) => {
       const [, route = ""] = /^repos\/[^/]+\/[^/]+\/(.*)$/.exec(request.path) ?? []
       if (request.path === "user") return user()
@@ -289,6 +317,7 @@ export const bareBackedGitHub = (bare: string, view: () => unknown = () => commi
           deletions: Array<{ path: string }>
         }
       }
+      if (created >= commitsBeforeFailing) return failure(502, "Bad Gateway")
       const head = await headOf(bare, `refs/heads/${input.branch.branchName}`)
       if (head !== input.expectedHeadOid)
         return failure(422, "Expected branch to point to the expected head")
@@ -301,10 +330,21 @@ export const bareBackedGitHub = (bare: string, view: () => unknown = () => commi
         input.fileChanges.additions,
         input.fileChanges.deletions,
       )
+      created += 1
       return { createCommitOnBranch: { commit: { oid } } }
     },
   })
+}
 
-/** The per-clone `vcs.json` of a project, decoded. */
-export const readVcs = async (dir: string) =>
-  Schema.decodeUnknownSync(Vcs)(await Bun.file(join(dir, ".holyagent/local/vcs.json")).json())
+/**
+ * The per-clone `vcs.json` of a project; empty when nothing was ever saved, with `detection`
+ * decoded.
+ */
+export const readVcs = async (dir: string) => {
+  const file = Bun.file(join(dir, ".holyagent/local/vcs.json"))
+  const vcs = Schema.decodeUnknownSync(Vcs)((await file.exists()) ? await file.json() : {})
+  return {
+    ...vcs,
+    detection: Option.getOrUndefined(Schema.decodeUnknownOption(DetectionCache)(vcs.detection)),
+  }
+}

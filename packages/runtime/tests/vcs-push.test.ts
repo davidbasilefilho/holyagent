@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { chmod, writeFile } from "node:fs/promises"
+import { chmod, symlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
+import { MAX_BODY_BYTES } from "../src/vcs/pr.ts"
 import {
   bareBackedGitHub,
   cleanup,
   commitView,
+  connect,
   failure,
   fakeGitHub,
   headOf,
@@ -13,6 +15,7 @@ import {
   initRepo,
   put,
   readVcs,
+  scratch,
   seed,
   sh,
   toon,
@@ -32,7 +35,7 @@ const AGENT = { name: "Claude", email: "noreply@anthropic.com" }
 const owned = async (identity = OWNER) => {
   const bare = await initBare()
   const dir = await initRepo(identity)
-  await sh(dir, ["git", "remote", "add", "origin", bare])
+  await connect(dir, bare)
   await seed(dir, { "a.txt": "a\n" })
   await sh(dir, ["git", "push", "-q", "-u", "origin", "main"])
   return { bare, dir }
@@ -195,6 +198,17 @@ describe("vcs branch", () => {
     expect((await sh(dir, ["git", "branch", "--show-current"])).trim()).toBe("feature/x")
   })
 
+  test("a start point that looks like an option is refused", async () => {
+    const { bare, dir } = await owned()
+    const result = await vcs(
+      dir,
+      ["vcs", "branch", "feature", "--from=--output=/tmp/x"],
+      bareBackedGitHub(bare).layer,
+    )
+    expect(result.code).toBe(2)
+    expect((await sh(dir, ["git", "branch", "--show-current"])).trim()).toBe("main")
+  })
+
   test("a name git rejects is a usage error", async () => {
     const { bare, dir } = await owned()
     const result = await vcs(dir, ["vcs", "branch", "bad..name"], bareBackedGitHub(bare).layer)
@@ -288,6 +302,80 @@ describe("vcs pr", () => {
     expect(result.code).toBe(3)
     expect(result.stderr).toContain("error: MessageRefused")
     expect(gh.routes().some((route) => route.startsWith("POST"))).toBe(false)
+  })
+
+  test("a body file must be a small project file, not a path out of the project", async () => {
+    const dir = await withOrigin()
+    const outside = await scratch()
+    await writeFile(join(outside, "secret.txt"), "top secret\n")
+    await symlink(join(outside, "secret.txt"), join(dir, "link.md"))
+    await writeFile(join(dir, "big.md"), "x".repeat(MAX_BODY_BYTES + 1))
+    const gh = prGithub()
+
+    for (const file of [
+      join(outside, "secret.txt"),
+      "../secret.txt",
+      "link.md",
+      "big.md",
+      "missing.md",
+      ".",
+    ]) {
+      const result = await vcs(
+        dir,
+        ["vcs", "pr", "--base", "main", "--title", "Add it", "--body-file", file],
+        gh.layer,
+      )
+      expect([file, result.code]).toEqual([file, 2])
+    }
+    expect(gh.routes().some((route) => route.startsWith("POST"))).toBe(false)
+  })
+
+  test("a body file inside .git or ignored by git is not published", async () => {
+    const dir = await withOrigin()
+    await put(dir, {
+      ".gitignore": ".env\nprivate/\n",
+      ".env": "TOKEN=abc\n",
+      "private/notes.md": "private\n",
+      "ok.md": "fine\n",
+    })
+    const gh = prGithub()
+    for (const file of [
+      ".env",
+      "private/notes.md",
+      ".git/config",
+      ".GIT/config",
+      ".holyagent/local/vcs.json",
+    ]) {
+      const result = await vcs(
+        dir,
+        ["vcs", "pr", "--base", "main", "--title", "Add it", "--body-file", file],
+        gh.layer,
+      )
+      expect([file, result.code]).toEqual([file, 2])
+    }
+    expect(gh.routes().some((route) => route.startsWith("POST"))).toBe(false)
+
+    const fine = await vcs(
+      dir,
+      ["vcs", "pr", "--base", "main", "--title", "Add it", "--body-file", "ok.md"],
+      gh.layer,
+    )
+    expect(fine.code).toBe(0)
+    expect(gh.calls.find((call) => call.route.startsWith("POST"))?.body).toMatchObject({
+      body: "fine",
+    })
+  })
+
+  test("--update takes a plain pull request number only", async () => {
+    const dir = await withOrigin()
+    for (const bad of ["0", "07", "1e3", "-1", "7;x", ""]) {
+      const result = await vcs(
+        dir,
+        ["vcs", "pr", "--update", bad, "--title", "x"],
+        prGithub().layer,
+      )
+      expect([bad, result.code]).toEqual([bad, 2])
+    }
   })
 
   test("creating needs a base and a title", async () => {

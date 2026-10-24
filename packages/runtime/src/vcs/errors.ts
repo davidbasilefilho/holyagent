@@ -97,6 +97,18 @@ export class RemoteMismatch extends Data.TaggedError("RemoteMismatch")<{
   }
 }
 
+/** GitHub holds commits of this change, but the rest of the step failed. */
+export class PartialCommit extends Data.TaggedError("PartialCommit")<{
+  readonly commits: ReadonlyArray<string>
+  readonly branch: string
+  readonly reason: string
+}> {
+  /** The description shown to the user. */
+  override get message() {
+    return `${this.reason}. Already on GitHub: ${this.commits.join(", ")}. To bring the local branch there: git fetch origin ${this.branch} && git reset --soft origin/${this.branch}`
+  }
+}
+
 /** HEAD is not on a branch. */
 export class DetachedHead extends Data.TaggedError("DetachedHead") {
   /** The description shown to the user. */
@@ -135,16 +147,18 @@ export const VCS_HINTS: Readonly<Record<string, string>> = {
   GitHubFailed:
     "Check `gh api user`, the repository's access and that the branch is pushed; the message names the call.",
   NoCredential:
-    "Run `gh auth login` or set GH_TOKEN, or set git user.name and user.email to the user's own, then `holyagent-runtime vcs detect --refresh`.",
+    "Run `gh auth login` or set GH_TOKEN, or set git user.name and user.email to the user's own, then `holyagent vcs detect --refresh`.",
   MessageRefused:
     "Reword the message to say what changed and why; a project whose domain uses the word can list it in vcs.allowWords of .holyagent/config.json.",
   NothingToCommit: "Check the paths; commit only after the files changed.",
   StagedOutsideScope: "Unstage them with `git restore --staged <path>` or name them in the commit.",
   UnsupportedChange:
-    "Commit it with git by setting `vcs.api` to false in .holyagent/config.json, then `holyagent-runtime vcs detect --refresh`.",
+    "Commit it with git by setting `vcs.api` to false in .holyagent/config.json, then `holyagent vcs detect --refresh`.",
   HookFailed: "Fix what the hook reports, then run the command again.",
   RemoteMismatch: "Bring the local branch level with GitHub (git pull --ff-only) and retry.",
-  DetachedHead: "Check out or create a branch with `holyagent-runtime vcs branch <name>`.",
+  PartialCommit:
+    "Run the git command from the message, then `git status`; the staged changes that are not on GitHub yet can be committed again.",
+  DetachedHead: "Check out or create a branch with `holyagent vcs branch <name>`.",
   VerificationMismatch:
-    "The commit stays on GitHub. Fix the credential or git identity, then run `holyagent-runtime vcs detect --refresh`.",
+    "The commit stays on GitHub. Fix the credential or git identity, then run `holyagent vcs detect --refresh`.",
 }

@@ -25,22 +25,40 @@ export const Identity = Schema.Struct({ name: Schema.String, email: Schema.Strin
 /** The identity git would commit with. */
 export type Identity = typeof Identity.Type
 
-/** The outcome of `vcs detect`, cached in the per-clone `vcs.json`. */
-export const Detection = Schema.Struct({
+/** A full commit id, SHA-1 or SHA-256. */
+export const Sha = Schema.String.check(Schema.isPattern(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/))
+
+/**
+ * What the per-clone `vcs.json` keeps of a detection. Everything else (owner, identity, path) is
+ * decided from live inputs on every run, so a stale or edited file cannot choose whose commits
+ * these are.
+ */
+export const DetectionCache = Schema.Struct({
   /** What the detection was computed from; any change recomputes it. */
   key: Schema.String,
-  path: CommitPath,
-  /** Whether GitHub will show the commits of this path as verified. */
-  signed: Schema.Boolean,
-  reason: Schema.String,
-  /** Absent when no credential works and the git identity is the user's own. */
-  owner: Schema.optionalKey(Owner),
-  identity: Identity,
-  remote: Schema.String,
+  /** Whether the GraphQL API answered when it was probed. */
+  graphql: Schema.Boolean,
   /** True once a commit of this path was read back from GitHub and matched. */
   verified: Schema.Boolean,
   /** The first git commit awaiting that read-back, which waits for its push. */
-  pending: Schema.optionalKey(Schema.String),
+  pending: Schema.optionalKey(Sha),
 })
+/** What the per-clone `vcs.json` keeps of a detection. */
+export type DetectionCache = typeof DetectionCache.Type
+
 /** The outcome of `vcs detect`. */
-export type Detection = typeof Detection.Type
+export interface Detection {
+  readonly key: string
+  readonly path: CommitPath
+  /** Whether GitHub will show the commits of this path as verified. */
+  readonly signed: boolean
+  readonly reason: string
+  /** Absent when no credential works and the git identity is the user's own. */
+  readonly owner?: Owner
+  readonly identity: Identity
+  /** The remote URL without credentials. */
+  readonly remote: string
+  readonly graphql: boolean
+  readonly verified: boolean
+  readonly pending?: string
+}
