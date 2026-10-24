@@ -5,12 +5,13 @@ import { Cause, Effect } from "effect"
 
 import packageJson from "../../package.json" with { type: "json" }
 import { STATE_DIRECTORY } from "../state/layout.ts"
+import { vcsLive } from "../vcs/live.ts"
 import { parseArgs } from "./args.ts"
 import { COMMANDS } from "./commands.ts"
 import { loadConfig } from "./config.ts"
 import { readInput, readInputBy, readReport, stateRoot } from "./context.ts"
 import { describeFailure, Usage } from "./errors.ts"
-import { type Call, type Command, type Host, WithTrailer } from "./types.ts"
+import { type Call, type Command, type Host, Streamed, WithTrailer } from "./types.ts"
 
 /** What one run prints and the exit code it ends with. */
 export interface Result {
@@ -34,7 +35,7 @@ const topHelp = (): string =>
     "<command> --help shows the shape of its stdin",
   ].join("\n")
 
-const callFor = (command: Command, args: Call["args"], host: Host) =>
+const callFor = (args: Call["args"], host: Host, emit: Call["emit"]) =>
   Effect.gen(function* () {
     const root = yield* stateRoot(host.cwd)
     return {
@@ -42,6 +43,8 @@ const callFor = (command: Command, args: Call["args"], host: Host) =>
       directory: join(root, STATE_DIRECTORY),
       config: loadConfig(host.env, root),
       text: readReport(host),
+      emit,
+      vcs: host.vcs ?? vcsLive(root, host.env),
       input: (schema) => readInput(host, schema),
       inputBy: (pick) => readInputBy(host, pick),
     } satisfies Call
@@ -71,14 +74,25 @@ const execute = (argv: ReadonlyArray<string>, host: Host) =>
     const rest = argv.slice(command.path.length)
     if (rest.includes("--help") || rest.includes("-h"))
       return { stdout: `${help(command)}\n`, stderr: "", code: 0 }
-    const args = yield* parseArgs(rest, command.flags, command.usage)
+    const args =
+      command.raw === true
+        ? { positionals: rest, flags: {} }
+        : yield* parseArgs(rest, command.flags, command.usage)
     const count = args.positionals.length
-    if (count !== command.positionals && !(command.optional && count === command.positionals - 1))
+    if (
+      command.raw !== true &&
+      count !== command.positionals &&
+      !(command.optional && count === command.positionals - 1)
+    )
       return yield* new Usage({
         message: `Expected ${command.positionals} argument(s), got ${count}`,
         hint: `Usage: holyagent ${command.usage}`,
       })
-    const output = yield* command.run(yield* callFor(command, args, host))
+    const emitted: Array<string> = []
+    const emit = host.emit ?? ((text: string) => Effect.sync(() => void emitted.push(text)))
+    const output = yield* command.run(yield* callFor(args, host, emit))
+    if (output instanceof Streamed)
+      return { stdout: emitted.join(""), stderr: "", code: output.code }
     const stdout =
       output instanceof WithTrailer
         ? `${encode(output.fields)}\n${output.label}:\n${output.text}\n`
