@@ -10,7 +10,7 @@ import { COMMANDS } from "./commands.ts"
 import { loadConfig } from "./config.ts"
 import { readInput, readInputBy, readReport, stateRoot } from "./context.ts"
 import { describeFailure, Usage } from "./errors.ts"
-import { type Call, type Command, type Host, WithTrailer } from "./types.ts"
+import { type Call, type Command, type Host, Verbatim, WithTrailer } from "./types.ts"
 
 /** What one run prints and the exit code it ends with. */
 export interface Result {
@@ -79,6 +79,7 @@ const execute = (argv: ReadonlyArray<string>, host: Host) =>
         hint: `Usage: holyagent ${command.usage}`,
       })
     const output = yield* command.run(yield* callFor(command, args, host))
+    if (output instanceof Verbatim) return output
     const stdout =
       output instanceof WithTrailer
         ? `${encode(output.fields)}\n${output.label}:\n${output.text}\n`

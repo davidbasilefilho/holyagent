@@ -54,7 +54,7 @@ description = "Run the test suite"
 run = "bun test --pass-with-no-tests"
 
 [tasks.build]
-description = "Build the Claude plugin"
+description = "Generate the Claude plugin from the instructions, the route table and the runtime"
 run = "bun packages/integrations/claude/build.ts"
 
 [tasks.verify]

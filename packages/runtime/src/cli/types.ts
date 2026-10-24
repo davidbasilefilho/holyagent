@@ -18,6 +18,19 @@ export class WithTrailer {
   ) {}
 }
 
+/**
+ * A result printed exactly as it is, with its own exit code, for a caller that reads stdout as
+ * something other than TOON, such as a host hook.
+ */
+export class Verbatim {
+  /** Builds a result from the text of stdout and stderr and the exit code. */
+  constructor(
+    readonly stdout: string,
+    readonly stderr: string,
+    readonly code: number,
+  ) {}
+}
+
 /** What the CLI needs from the process it runs in; tests supply their own. */
 export interface Host {
   readonly cwd: string

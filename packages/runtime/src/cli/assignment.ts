@@ -7,7 +7,7 @@ import {
   createAssignment,
   type Outcome,
 } from "../domain/assignment.ts"
-import type { Directive } from "../domain/directive.ts"
+import { type Directive, isWorkflowAgent, WORKFLOW_AGENT_PREFIX } from "../domain/directive.ts"
 import { AssignmentId, IntentId, newId } from "../domain/ids.ts"
 import { closeAssignment, dispatch, record } from "../domain/lifecycle.ts"
 import { Revision } from "../domain/primitives.ts"
@@ -18,12 +18,13 @@ import { booleanFlag, choiceFlag, requiredFlag, stringFlag } from "./args.ts"
 import { nowIso } from "./context.ts"
 import { Usage } from "./errors.ts"
 import { resolveIntent } from "./intent.ts"
+import { JsonReport, renderJsonReport } from "./jsonreport.ts"
 import { acceptanceFrom, renderPrompt } from "./report.ts"
 import { type Command, WithTrailer } from "./types.ts"
 import { assignmentRow, assignmentView, byId, present } from "./views.ts"
 
-/** The plugin namespace the host knows the specialists under. */
-const AGENT_NAMESPACE = "holyagent"
+/** The plugin namespace the host knows the specialists and workflows under. */
+export const PLUGIN_NAMESPACE = "holyagent"
 
 /**
  * A new Assignment as the root writes it. The Intent and its revision default to the Intent in use
@@ -68,7 +69,7 @@ const directiveView = (directive: Directive) =>
   directive.action === "continue"
     ? { continue: directive.agentId, reason: directive.reason }
     : {
-        agent: `${AGENT_NAMESPACE}:${directive.agent}`,
+        agent: `${PLUGIN_NAMESPACE}:${directive.agent}`,
         model: directive.model,
         effort: directive.effort,
         reason: directive.reason,
@@ -88,10 +89,19 @@ const OUTCOMES: Readonly<Record<typeof OutcomeFlag.Type, Outcome>> = {
 
 const RECORD_USAGE = "assignment record <id> (--agent <agentId> | --failed)"
 const CLOSE_USAGE =
-  "assignment close <id> --outcome success|failure|errored|interrupted|stopped [--accept <rationale>]"
+  "assignment close <id> --outcome success|failure|errored|interrupted|stopped [--accept <rationale>] [--report-json]"
 const LIST_USAGE = "assignment list [--state <state>] [--all] [--full]"
 
 const idArgument = (positionals: ReadonlyArray<string>): string => positionals[0] ?? ""
+
+/** A workflow's agent is recorded as `workflow:<run-id>/<assignment-id>`, naming its own Assignment. */
+const workflowAgentProblem = (agentId: string, id: string): string | undefined => {
+  if (!isWorkflowAgent(agentId)) return undefined
+  const [run = "", assignment, ...rest] = agentId.slice(WORKFLOW_AGENT_PREFIX.length).split("/")
+  return /^\S+$/.test(run) && assignment === id && rest.length === 0
+    ? undefined
+    : `A workflow agent is recorded as workflow:<run-id>/${id}`
+}
 
 /** The `assignment` commands. */
 export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
@@ -150,7 +160,7 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
           "prompt",
           renderPrompt(
             started.assignment,
-            `${AGENT_NAMESPACE}:${routeFor(started.assignment.roleTask).agent}`,
+            `${PLUGIN_NAMESPACE}:${routeFor(started.assignment.roleTask).agent}`,
           ),
         )
       }),
@@ -158,7 +168,8 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
   {
     path: ["assignment", "record"],
     usage: RECORD_USAGE,
-    summary: "Record the launch of a dispatched Assignment, or roll it back when the launch failed",
+    summary:
+      "Record the launch of a dispatched Assignment (a workflow's agent as workflow:<run-id>/<id>), or roll it back when the launch failed",
     flags: { agent: "string", failed: "boolean" },
     positionals: 1,
     run: ({ directory, args }) =>
@@ -170,6 +181,9 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
             message: "Give exactly one of --agent and --failed",
             hint: `Usage: holyagent ${RECORD_USAGE}`,
           })
+        const problem = agentId === undefined ? undefined : workflowAgentProblem(agentId, id)
+        if (problem !== undefined)
+          return yield* new Usage({ message: problem, hint: `Usage: holyagent ${RECORD_USAGE}` })
         const { assignment } = yield* updateState(directory, (snapshot) =>
           Effect.gen(function* () {
             const { model, effort } = routeFor(
@@ -198,10 +212,10 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
     summary:
       "Finish an Assignment with the specialist's report on stdin; --accept also accepts it from the report's evidence block",
     input:
-      "the specialist's report as raw text. Required for success; optional for the other outcomes, which store the outcome name when it is empty. With --accept it ends with `evidence:` and one `<criterion or evidence label>: <support>` line per blocking criterion and required label",
-    flags: { outcome: "string", accept: "string" },
+      "the specialist's report as raw text. Required for success; optional for the other outcomes, which store the outcome name when it is empty. With --accept it ends with `evidence:` and one `<criterion or evidence label>: <support>` line per blocking criterion and required label. With --report-json it is the JSON report a workflow returned ({status: done|partial|blocked, changed_paths, checks: [{command, exit}], blockers, notes, evidence: [{key, support}]}), which is stored as the text of such a report",
+    flags: { outcome: "string", accept: "string", "report-json": "boolean" },
     positionals: 1,
-    run: ({ directory, args, text }) =>
+    run: ({ directory, args, text, input }) =>
       Effect.gen(function* () {
         const id = idArgument(args.positionals)
         const flag = yield* choiceFlag(
@@ -217,9 +231,14 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
             message: "--accept applies only to --outcome success",
             hint: `Usage: holyagent ${CLOSE_USAGE}`,
           })
+        const source = booleanFlag(args, "report-json")
+          ? input(JsonReport).pipe(Effect.map(renderJsonReport))
+          : text
         // Only success has to say what was done; a lost or stopped specialist often has no report.
         const report =
-          outcome === "Succeeded" ? yield* text : yield* text.pipe(Effect.orElseSucceed(() => ""))
+          outcome === "Succeeded"
+            ? yield* source
+            : yield* source.pipe(Effect.orElseSucceed(() => ""))
         const result =
           outcome === "Succeeded" ? report : report.trim() === "" ? flag : `${flag}: ${report}`
         const now = yield* nowIso

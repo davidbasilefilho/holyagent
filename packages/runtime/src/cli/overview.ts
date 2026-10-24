@@ -2,10 +2,47 @@ import { Effect } from "effect"
 
 import { recommend } from "../domain/plan.ts"
 import { readOpenState } from "../state/store.ts"
+import { PLUGIN_NAMESPACE } from "./assignment.ts"
 import { nowIso } from "./context.ts"
 import { intentInUse, resolveIntent } from "./intent.ts"
 import type { Command } from "./types.ts"
 import { assignmentRow, byId, oneLine, present } from "./views.ts"
+
+/** The open Intents and the work waiting on the root, as `status` prints them. */
+export const statusOf = (directory: string) =>
+  readOpenState(directory).pipe(
+    Effect.map((snapshot) => {
+      const open = byId(snapshot.project.intents.filter((intent) => intent.state === "Open"))
+      const openIds = new Set(open.map((intent) => intent.id))
+      const live = byId(snapshot.project.assignments.filter((row) => openIds.has(row.intentId)))
+      const running = live.filter((row) => row.state === "Running").map(assignmentRow)
+      const unaccepted = live
+        .filter((row) => row.state === "Succeeded" && row.acceptance === undefined)
+        .map(assignmentRow)
+      return {
+        intents: open.map(({ id, revision, objective }) => ({
+          id,
+          revision,
+          objective: oneLine(objective),
+        })),
+        ...present({
+          inUse: intentInUse(snapshot),
+          running: running.map(({ id, role, agent, objective }) => ({
+            id,
+            role,
+            agent,
+            objective,
+          })),
+          unaccepted: unaccepted.map(({ id, role, rev, objective }) => ({
+            id,
+            role,
+            rev,
+            objective,
+          })),
+        }),
+      }
+    }),
+  )
 
 /** The `plan`, `status` and `reconcile` commands. */
 export const OVERVIEW_COMMANDS: ReadonlyArray<Command> = [
@@ -35,10 +72,22 @@ export const OVERVIEW_COMMANDS: ReadonlyArray<Command> = [
           return { action: "none", reason: "no Ready Assignment can start now" }
         return present({
           action: recommendation.action,
-          workflow: recommendation.action === "workflow" ? recommendation.name : undefined,
+          workflow:
+            recommendation.action === "workflow"
+              ? `${PLUGIN_NAMESPACE}:${recommendation.name}`
+              : undefined,
           continue: recommendation.action === "continue" ? recommendation.agentId : undefined,
           assignments: recommendation.assignmentIds,
           parallel: recommendation.assignmentIds.length > 1 ? true : undefined,
+          fallback:
+            recommendation.action === "workflow"
+              ? present({
+                  action: "subagent",
+                  assignments: recommendation.fallback.assignmentIds,
+                  parallel: recommendation.fallback.assignmentIds.length > 1 ? true : undefined,
+                  afterwards: recommendation.fallback.afterwards,
+                })
+              : undefined,
           reason: recommendation.reason,
         })
       }),
@@ -49,40 +98,7 @@ export const OVERVIEW_COMMANDS: ReadonlyArray<Command> = [
     summary: "Summarize the open Intents and the work waiting on the root",
     flags: {},
     positionals: 0,
-    run: ({ directory }) =>
-      readOpenState(directory).pipe(
-        Effect.map((snapshot) => {
-          const open = byId(snapshot.project.intents.filter((intent) => intent.state === "Open"))
-          const openIds = new Set(open.map((intent) => intent.id))
-          const live = byId(snapshot.project.assignments.filter((row) => openIds.has(row.intentId)))
-          const running = live.filter((row) => row.state === "Running").map(assignmentRow)
-          const unaccepted = live
-            .filter((row) => row.state === "Succeeded" && row.acceptance === undefined)
-            .map(assignmentRow)
-          return {
-            intents: open.map(({ id, revision, objective }) => ({
-              id,
-              revision,
-              objective: oneLine(objective),
-            })),
-            ...present({
-              inUse: intentInUse(snapshot),
-              running: running.map(({ id, role, agent, objective }) => ({
-                id,
-                role,
-                agent,
-                objective,
-              })),
-              unaccepted: unaccepted.map(({ id, role, rev, objective }) => ({
-                id,
-                role,
-                rev,
-                objective,
-              })),
-            }),
-          }
-        }),
-      ),
+    run: ({ directory }) => statusOf(directory),
   },
   {
     path: ["reconcile"],

@@ -202,6 +202,93 @@ describe("lifecycle", () => {
   })
 })
 
+describe("workflow runs", () => {
+  const dispatchWriter = async () =>
+    String(data(await cli(["assignment", "dispatch"], writer())).id)
+
+  test("records a workflow's agent as workflow:<run-id>/<assignment-id> and nothing else of that kind", async () => {
+    await createIntent()
+    const id = await dispatchWriter()
+    for (const bad of ["workflow:run-1", "workflow:run-1/assignment-other", "workflow:/" + id]) {
+      const refused = await cli(["assignment", "record", id, "--agent", bad])
+      expect(refused.code).toBe(2)
+      expect(refused.stderr).toContain(`workflow:<run-id>/${id}`)
+    }
+    expect(
+      data(await cli(["assignment", "record", id, "--agent", `workflow:run-1/${id}`])),
+    ).toMatchObject({ id, state: "Running", agent: `workflow:run-1/${id}` })
+  })
+
+  test("a workflow's agent is never continued, even for a follow-up of its Assignment", async () => {
+    await createIntent()
+    const id = await dispatchWriter()
+    data(await cli(["assignment", "record", id, "--agent", `workflow:run-1/${id}`]))
+    data(
+      await cli(["assignment", "close", id, "--outcome", "success", "--accept", "ok"], FULL_REPORT),
+    )
+    const next = data(
+      await cli(["assignment", "dispatch"], writer({ objective: "Fix it", followUpOf: id })),
+    )
+    expect(next).toMatchObject({ agent: "holyagent:worker-implementation" })
+    expect(next).not.toHaveProperty("continue")
+  })
+
+  test("closes from the JSON report a workflow returned, evidence included", async () => {
+    await createIntent()
+    const id = await dispatchWriter()
+    data(await cli(["assignment", "record", id, "--agent", `workflow:run-1/${id}`]))
+    const json = {
+      status: "done",
+      changed_paths: ["src/parser.ts"],
+      checks: [{ command: "bun test", exit: 0 }],
+      blockers: [],
+      notes: ["none"],
+      evidence: [
+        { key: "parses", support: "ran the parser" },
+        { key: "tests", support: "bun test passed" },
+      ],
+    }
+    expect(
+      data(
+        await cli(
+          ["assignment", "close", id, "--outcome", "success", "--accept", "ok", "--report-json"],
+          json,
+        ),
+      ),
+    ).toMatchObject({ state: "Succeeded", accepted: true })
+    const stored = data(await cli(["assignment", "show", id, "--full"]))
+    expect(stored.result).toBe(
+      [
+        "status: done",
+        "changed:",
+        "- src/parser.ts",
+        "checks:",
+        "- bun test -> exit 0",
+        "notes:",
+        "- none",
+        "evidence:",
+        "- parses: ran the parser",
+        "- tests: bun test passed",
+      ].join("\n"),
+    )
+  })
+
+  test("refuses a JSON report that is not one, and closes nothing", async () => {
+    await createIntent()
+    const id = await dispatchWriter()
+    data(await cli(["assignment", "record", id, "--agent", `workflow:run-1/${id}`]))
+    const refused = await cli(
+      ["assignment", "close", id, "--outcome", "success", "--report-json"],
+      { status: "done" },
+    )
+    expect(refused.code).toBe(2)
+    expect(refused.stderr).toContain("error: InvalidDraft:")
+    expect(data(await cli(["assignment", "show", id, "--full"]))).toMatchObject({
+      state: "Running",
+    })
+  })
+})
+
 describe("report and prompt", () => {
   const dispatchWriter = async () =>
     String(data(await cli(["assignment", "dispatch"], writer())).id)
@@ -410,8 +497,24 @@ describe("plan", () => {
     const ids = await readyPair()
     expect(data(await cli(["plan"]))).toMatchObject({
       action: "workflow",
-      workflow: "review-diff",
+      workflow: "holyagent:review-diff",
       assignments: ids,
+      fallback: { action: "subagent", assignments: ids, parallel: true },
+    })
+  })
+
+  test("a writer and the review that names it in independentFrom run as implement-review", async () => {
+    await createIntent()
+    const w = String(data(await cli(["assignment", "create"], writer())).id)
+    const r = String(
+      data(await cli(["assignment", "create"], reviewer("Reviewer.code", { independentFrom: [w] })))
+        .id,
+    )
+    expect(data(await cli(["plan"]))).toMatchObject({
+      action: "workflow",
+      workflow: "holyagent:implement-review",
+      assignments: [w, r],
+      fallback: { action: "subagent", assignments: [w], afterwards: [r] },
     })
   })
 

@@ -63,6 +63,15 @@ describe("execution directive", () => {
     expect(DEFAULT_CONFIG.ttlMinutes).toBe(55)
   })
 
+  test("never continues a specialist a workflow launched, however warm and relevant", () => {
+    const launched = warmFor({ agentId: "workflow:run-1/assignment-old" })
+    expect(directive([launched]).action).toBe("spawn")
+    expect(directive([launched, warmFor({ agentId: "agent-2" })])).toMatchObject({
+      action: "continue",
+      agentId: "agent-2",
+    })
+  })
+
   test("a specialist that never finished is not warm", () => {
     const { lastFinishedAt: _gone, ...unfinished } = warmFor()
     expect(directive([unfinished]).action).toBe("spawn")
@@ -139,7 +148,7 @@ describe("workflow recommendation", () => {
   })
 
   test("a ready writer with the review of its work is implement-review", () => {
-    const pair = [writer("w"), review("r", { dependencies: ["w"] })]
+    const pair = [writer("w"), review("r", { independentFrom: ["w"] })]
     expect(plan(pair)).toMatchObject({
       action: "workflow",
       name: "implement-review",
@@ -147,9 +156,65 @@ describe("workflow recommendation", () => {
     })
   })
 
-  test("a review waiting on anything but the writer is not paired with it", () => {
-    const pair = [writer("w"), review("r", { dependencies: ["w", "assignment-other"] })]
-    expect(plan([...pair, assignment({ id: "assignment-other" })])?.action).not.toBe("workflow")
+  test("a workflow comes with the direct-subagent fallback for the same work", () => {
+    expect(plan([review("r1"), review("r2")])).toMatchObject({
+      fallback: { assignmentIds: ["r1", "r2"], afterwards: [] },
+    })
+    // The reviews of implement-review wait for their writers, so the fallback launches them after.
+    const rows = [
+      writer("w1"),
+      writer("w2"),
+      review("r1", { independentFrom: ["w1"] }),
+      review("r2", { independentFrom: ["w2"] }),
+    ]
+    expect(plan(rows)).toMatchObject({
+      assignmentIds: ["w1", "r1", "w2", "r2"],
+      fallback: { assignmentIds: ["w1", "w2"], afterwards: ["r1", "r2"] },
+    })
+  })
+
+  test("several writers with their reviews are pairs in turn, unless their paths collide", () => {
+    const rows = [
+      writer("w1"),
+      writer("w2"),
+      review("r2", { independentFrom: ["w2"] }),
+      review("r1", { independentFrom: ["w1"] }),
+    ]
+    expect(plan(rows)).toMatchObject({
+      name: "implement-review",
+      assignmentIds: ["w1", "r1", "w2", "r2"],
+    })
+    const colliding = [
+      writer("w1"),
+      writer("w2", { ownershipPaths: ["src/w1.ts"] }),
+      ...rows.slice(2),
+    ]
+    expect(plan(colliding)).toMatchObject({ assignmentIds: ["w1", "r1"] })
+  })
+
+  test("a review that depends on the writer waits for its acceptance and is not paired", () => {
+    const rows = [writer("w"), review("r", { dependencies: ["w"], independentFrom: ["w"] })]
+    expect(plan(rows)).toMatchObject({ action: "subagent", assignmentIds: ["w"] })
+  })
+
+  test("a review waits for any unfinished work it names, and is not paired with just one of them", () => {
+    const rows = [writer("w"), writer("other"), review("r", { independentFrom: ["w", "other"] })]
+    expect(plan(rows)).toMatchObject({ name: "run-assignments", assignmentIds: ["w", "other"] })
+    expect(plan(rows, [], DEFAULT_CONFIG)).toMatchObject({ action: "subagent" })
+    const finished = succeeded({ id: "other" }, 1)
+    expect(
+      plan([writer("w"), finished, review("r", { independentFrom: ["w", "other"] })]),
+    ).toMatchObject({ name: "implement-review", assignmentIds: ["w", "r"] })
+  })
+
+  test("a review of work still running starts after it finishes, not before", () => {
+    const rows = [running({ id: "w", ownershipPaths: ["src/w.ts"] })]
+    const check = review("r", { independentFrom: ["w"] })
+    expect(plan([...rows, check])).toBeUndefined()
+    expect(plan([succeeded({ id: "w" }), check])).toMatchObject({
+      action: "subagent",
+      assignmentIds: ["r"],
+    })
   })
 
   test("independent reviews are review-diff; dependent ones are not", () => {
@@ -160,9 +225,27 @@ describe("workflow recommendation", () => {
     expect(plan([review("r1"), review("r2", { dependencies: ["r1"] })])?.action).toBe("subagent")
   })
 
-  test("independent validations are validate-criteria", () => {
+  test("other independent Assignments are run-assignments", () => {
     expect(plan([validation("v1"), validation("v2")])).toMatchObject({
-      name: "validate-criteria",
+      action: "workflow",
+      name: "run-assignments",
+      assignmentIds: ["v1", "v2"],
+    })
+    expect(plan([writer("w"), validation("v")])).toMatchObject({ name: "run-assignments" })
+    expect(plan([validation("v1"), validation("v2", { dependencies: ["v1"] })])?.action).toBe(
+      "subagent",
+    )
+  })
+
+  test("work that would continue a warm specialist stays out of a workflow", () => {
+    const follow = writer("w2", { followUpOf: "assignment-old" })
+    expect(plan([writer("w1"), follow], [warmFor()])).toMatchObject({
+      action: "subagent",
+      assignmentIds: ["w1", "w2"],
+    })
+    expect(plan([writer("w1"), follow, writer("w3")], [warmFor()])).toMatchObject({
+      name: "run-assignments",
+      assignmentIds: ["w1", "w3"],
     })
   })
 

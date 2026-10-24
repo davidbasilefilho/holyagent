@@ -40,6 +40,17 @@ Only `roleTask`, `objective` and `criteria` are required. Dimensions are behavio
 - `assignment accept <id> --rationale <text> [--carry-forward]` accepts later from the stored report, or accepts work done at an earlier revision at the live one when it still holds; the rationale says why.
 - `assignment show <id> [--full]`, `assignment list [--state <s>] [--all] [--full]`, `plan`, `status`, `reconcile`.
 
+## Workflows
+
+`plan` may name a prebuilt workflow, `holyagent:<name>`, with the ids to run and a `fallback` of direct subagents (for `implement-review`, the writers to launch together and the reviews to launch after they close). Use the workflow when the session has the user's opt-in, the fallback otherwise. For the workflow, `assignment dispatch` each id for its agent, model, effort and prompt, then run the Workflow tool with `name` and `args` built from them, an entry being `{id, agent, model, effort, prompt}`:
+
+- `holyagent:run-assignments`: `{assignments: [entry…]}`; returns `[{id, report}]`.
+- `holyagent:review-diff`: `{change, reviewers: [entry…]}`, where `change` names what is reviewed (the diff file or `base..head`); returns each reviewer's report and the deduplicated blockers.
+- `holyagent:implement-review`: `{pairs: [{writer: entry, reviewer: entry}…]}`; the reviewer's prompt gets the writer's changed paths and checks; returns both reports per pair.
+
+The run ends with a notice that carries the returned value. The tool result has the run id: `assignment record <id> --agent workflow:<run-id>/<id>` for each entry, and `assignment close <id> --outcome <o> [--accept "<rationale>"] --report-json` with the entry's report as stdin. A null report means the agent died: close it `errored`. A workflow's agents cannot be messaged, so a gap in a report is a new draft with `followUpOf`.
+A custom script follows the same entry shape, report schema and recording, and the root's rule for workflow agents.
+
 ## Evidence block
 
 A specialist's report ends with the `evidence:` block that the specialist conduct defines: a line per blocking criterion and per required label, starting with the criterion text alone. Accept only support you judge true. Labels you declare get answered by name, so keep them few and observable (`checks-run`, `changed-paths`, `diff-file`).
