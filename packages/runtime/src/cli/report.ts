@@ -31,13 +31,22 @@ export const acceptanceFrom = (
   rationale: string,
   carryForward: boolean,
 ) => {
-  const lines = evidenceLines(report)
-  const supportFor = (key: string): string | undefined => {
-    const prefix = `${key.toLowerCase()}:`
-    const line = lines.find((candidate) => candidate.toLowerCase().startsWith(prefix))
-    const support = line?.slice(prefix.length).trim()
-    return support === "" ? undefined : support
+  const keys = [
+    ...new Set([...assignment.criteria.map(({ text }) => text), ...assignment.evidence]),
+  ]
+  // A line belongs to the longest declared key that prefixes it, so "Handles errors: network: ok"
+  // is the support of that key and not of "Handles errors".
+  const supports = new Map<string, string>()
+  for (const line of evidenceLines(report)) {
+    const lower = line.toLowerCase()
+    const owner = keys
+      .filter((key) => lower === key.toLowerCase() || lower.startsWith(`${key.toLowerCase()}:`))
+      .toSorted((a, b) => b.length - a.length)[0]
+    // A line that is exactly a key has no support and still claims the key.
+    const support = owner === undefined ? "" : line.slice(owner.length + 1).trim()
+    if (owner !== undefined && support !== "" && !supports.has(owner)) supports.set(owner, support)
   }
+  const supportFor = (key: string): string | undefined => supports.get(key)
   const criteria = assignment.criteria.map((criterion) => ({
     criterion,
     support: supportFor(criterion.text),

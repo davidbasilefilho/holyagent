@@ -301,6 +301,102 @@ describe("report and prompt", () => {
   })
 })
 
+describe("close without a report, and report matching", () => {
+  const running = async () => {
+    await createIntent()
+    const id = String(data(await cli(["assignment", "dispatch"], writer())).id)
+    data(await cli(["assignment", "record", id, "--agent", "agent-1"]))
+    return id
+  }
+
+  test("a lost or stopped specialist closes with empty stdin, keeping which outcome it was", async () => {
+    const id = await running()
+    expect(data(await cli(["assignment", "close", id, "--outcome", "interrupted"]))).toMatchObject({
+      state: "Cancelled",
+    })
+    expect(data(await cli(["assignment", "show", id, "--full"]))).toMatchObject({
+      result: "interrupted",
+    })
+
+    const other = String(
+      data(await cli(["assignment", "dispatch"], writer({ objective: "Second" }))).id,
+    )
+    data(await cli(["assignment", "close", other, "--outcome", "stopped"], "user pressed stop"))
+    expect(data(await cli(["assignment", "show", other, "--full"]))).toMatchObject({
+      state: "Cancelled",
+      result: "stopped: user pressed stop",
+    })
+  })
+
+  test("success still needs a report", async () => {
+    const id = await running()
+    const result = await cli(["assignment", "close", id, "--outcome", "success"])
+    expect(result.code).toBe(2)
+    expect(result.stderr).toContain("error: StdinMissing: This command needs input on stdin")
+  })
+
+  test("a key that prefixes another key does not take the longer key's line", async () => {
+    await createIntent()
+    const draft = writer({
+      criteria: [
+        { text: "Handles errors", blocking: true, dimension: "behavior" },
+        { text: "Handles errors: network", blocking: true, dimension: "behavior" },
+      ],
+      evidence: [],
+    })
+    const id = String(data(await cli(["assignment", "dispatch"], draft)).id)
+    data(await cli(["assignment", "record", id, "--agent", "agent-1"]))
+    const close = ["assignment", "close", id, "--outcome", "success", "--accept", "ok"]
+
+    const refused = await cli(close, report("Handles errors: network: retried 3 times"))
+    expect(refused.code).toBe(3)
+    expect(refused.stderr).toContain('criterion "Handles errors"')
+    expect(refused.stderr).not.toContain('criterion "Handles errors: network"')
+
+    // A bare longer key claims its line with no support; it is not support for the shorter key.
+    const bare = await cli(close, report("Handles errors: network", "handles errors: caught"))
+    expect(bare.code).toBe(3)
+    expect(bare.stderr).toContain('criterion "Handles errors: network"')
+    expect(bare.stderr).not.toContain('criterion "Handles errors",')
+
+    const both = report("Handles errors: network: retried 3 times", "handles errors: caught")
+    expect(data(await cli(close, both))).toMatchObject({ accepted: true })
+  })
+})
+
+describe("command line", () => {
+  test("flags: inherited names, values on boolean flags and a swallowed next flag are refused", async () => {
+    await createIntent()
+    for (const argv of [
+      ["intent", "update", "--constructor"],
+      ["intent", "update", "--material=false"],
+      ["assignment", "close", "assignment-x", "--accept", "--outcome", "success"],
+    ]) {
+      const result = await cli(argv, "{}")
+      expect(result.code).toBe(2)
+      expect(result.stderr).toStartWith("error: Usage:")
+    }
+  })
+
+  test("a group name with --help lists the group's commands", async () => {
+    const help = await cli(["intent", "--help"])
+    expect(help.code).toBe(0)
+    expect(help.stdout).toContain("intent create")
+    expect(help.stdout).toContain("intent use <id>")
+    expect(help.stdout).not.toContain("assignment")
+  })
+
+  test("a bad role task is reported in one short line", async () => {
+    await createIntent()
+    const result = await cli(["assignment", "dispatch"], writer({ roleTask: "Worker.nope" }))
+    expect(result.code).toBe(2)
+    expect(result.stderr).toContain('["roleTask"]')
+    expect(result.stderr).toContain("choices")
+    expect(result.stderr.length).toBeLessThan(500)
+    expect(result.stderr).not.toContain("excess property")
+  })
+})
+
 describe("plan", () => {
   const readyPair = async () => {
     await createIntent()

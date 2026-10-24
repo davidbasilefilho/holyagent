@@ -1,3 +1,4 @@
+#!/usr/bin/env bun
 import { Effect } from "effect"
 
 import { StdinMissing } from "./errors.ts"

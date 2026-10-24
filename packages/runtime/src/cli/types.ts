@@ -39,6 +39,10 @@ export interface Call {
   readonly input: <S extends Schema.Decoder<unknown>>(
     schema: S,
   ) => Effect.Effect<S["Type"], StdinMissing | InvalidDraft, S["DecodingServices"]>
+  /** Like `input`, with the schema chosen from the parsed JSON, for a command with two shapes. */
+  readonly inputBy: <S extends Schema.Decoder<unknown>>(
+    pick: (raw: unknown) => S,
+  ) => Effect.Effect<S["Type"], StdinMissing | InvalidDraft, S["DecodingServices"]>
 }
 
 /** One CLI command: its words, help and implementation. */

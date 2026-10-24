@@ -9,7 +9,8 @@ export const present = (record: Readonly<Record<string, unknown>>): Record<strin
     ),
   )
 
-const oneLine = (text: string): string => text.replace(/\s+/g, " ").trim()
+/** Text on one line: runs of whitespace become a single space. */
+export const oneLine = (text: string): string => text.replace(/\s+/g, " ").trim()
 
 /** An Intent as the model reads it. */
 export const intentView = (intent: Intent) =>

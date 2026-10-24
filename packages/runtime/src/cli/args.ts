@@ -28,13 +28,19 @@ export const parseArgs = (args: ReadonlyArray<string>, spec: FlagSpec, usage: st
       }
       const equals = arg.indexOf("=")
       const name = equals === -1 ? arg.slice(2) : arg.slice(2, equals)
-      const kind = spec[name]
+      const kind = Object.hasOwn(spec, name) ? spec[name] : undefined
       if (kind === undefined) return yield* new Usage({ message: `Unknown flag --${name}`, hint })
       if (kind === "boolean") {
+        if (equals !== -1)
+          return yield* new Usage({ message: `Flag --${name} takes no value`, hint })
         flags[name] = true
         continue
       }
-      const value = equals === -1 ? args[++index] : arg.slice(equals + 1)
+      // A value that starts like a flag is a forgotten value; `--name=--text` passes one on purpose.
+      const next = args[index + 1]
+      const value =
+        equals === -1 ? (next?.startsWith("--") ? undefined : next) : arg.slice(equals + 1)
+      if (equals === -1 && value !== undefined) index += 1
       if (value === undefined)
         return yield* new Usage({ message: `Flag --${name} needs a value`, hint })
       flags[name] = value
