@@ -1,0 +1,6 @@
+{
+  "name": "@holyagent/claude",
+  "version": "0.1.0",
+  "description": "The holyagent integration for Claude Code.",
+  "type": "module"
+}

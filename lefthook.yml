@@ -1,0 +1,17 @@
+# Hooks run the same mise tasks as CI; arguments after `--` go to the underlying Bun command.
+# `--staged` limits lint and fmt to the staged files, and Bun leaves a partly staged file unwritten
+# rather than committing its unstaged changes. `stage_fixed` re-stages what lint fixed, since the
+# `bun lint` docs do not say `--staged --fix` stages again (`bun fmt --staged` does). `piped` stops at
+# the first failing job.
+pre-commit:
+  piped: true
+  jobs:
+    - name: lint
+      run: mise run lint:fix -- --staged
+      stage_fixed: true
+    - name: fmt
+      run: mise run fmt -- --staged
+      stage_fixed: true
+    # The build job will stage its generated plugin paths once the integration defines them.
+    - name: build
+      run: mise run build

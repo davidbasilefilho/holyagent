@@ -1,0 +1,9 @@
+{
+  "name": "@holyagent/runtime",
+  "version": "0.1.0",
+  "description": "The holyagent runtime: instructions and the shared command surface.",
+  "type": "module",
+  "dependencies": {
+    "effect": "^4.0.0"
+  }
+}

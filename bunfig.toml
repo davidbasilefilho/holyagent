@@ -1,0 +1,40 @@
+[lint]
+typeAware = true
+typeCheck = true
+maxWarnings = 0
+plugins = ["eslint-plugin-jsdoc"]
+
+[lint.categories]
+correctness = "error"
+
+[lint.rules]
+"typescript/consistent-type-imports" = "error"
+"typescript/no-floating-promises" = "error"
+"typescript/no-misused-promises" = "error"
+"jsdoc/require-jsdoc" = [
+  "error",
+  { publicOnly = true, enableFixer = false, require = { FunctionDeclaration = true, ClassDeclaration = true, MethodDefinition = true }, contexts = ["TSInterfaceDeclaration", "TSTypeAliasDeclaration", "TSEnumDeclaration", "ExportNamedDeclaration > VariableDeclaration"] },
+]
+
+# Domain and runtime code models effects and failures with Effect, so handwritten promises,
+# async functions and try/catch are out. Adapters at the integration boundary get a path
+# override below once they exist.
+[[lint.overrides]]
+files = ["packages/runtime/src/**", "packages/cli/src/**"]
+
+[lint.overrides.rules]
+"oxc/no-async-await" = "error"
+"promise/avoid-new" = "error"
+"no-restricted-syntax" = [
+  "error",
+  { selector = "TryStatement", message = "Model failures with Effect and tagged errors instead of try/catch." },
+  { selector = "CallExpression[callee.object.name='Promise']", message = "Compose effects with Effect instead of Promise statics." },
+]
+
+[fmt]
+semi = false
+printWidth = 100
+bracketSameLine = true
+sortImports = true
+sortPackageJson = true
+jsdoc = true

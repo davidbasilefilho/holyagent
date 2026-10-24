@@ -1,0 +1,62 @@
+[tools]
+# Billion Context and ctx7 run on Node.
+node = "lts"
+# The toolchain is Bun's builtin `bun check`, `bun lint` and `bun fmt`, which exist only in canary
+# builds, and mise cannot install bun@canary. mise installs the stable base and the postinstall hook
+# below upgrades it to canary; the `toolchain` task, which every gate depends on, fails on a
+# non-canary Bun and names the fix.
+bun = "1.4.4"
+
+[hooks]
+# Runs after `mise install` (also on `mise use` and the automatic install before `mise run`), with
+# the mise-installed Bun first on PATH. Idempotent: a canary Bun is left alone.
+postinstall = "bun --revision | grep -q canary || bun upgrade --canary"
+
+# mise tasks are the single source of truth for commands. package.json scripts and lefthook only
+# delegate here, and `--no-script` makes Bun run its own tool instead of the same-named script.
+
+[tasks.toolchain]
+description = "Fail unless Bun is a canary build"
+run = "bun --revision | grep -q canary || { echo 'bun is not a canary build; run: bun upgrade --canary' >&2; exit 1; }"
+
+[tasks.prepare]
+description = "Install the git hooks"
+run = "bunx lefthook install"
+
+[tasks.check]
+description = "Type-check the repository"
+depends = ["toolchain"]
+run = "bun check --no-script"
+
+[tasks.lint]
+description = "Lint the repository with type-aware rules, without fixing"
+depends = ["toolchain"]
+run = "bun lint --no-script"
+
+[tasks."lint:fix"]
+description = "Lint the repository and write fixes (extra arguments go to bun lint, e.g. --staged)"
+depends = ["toolchain"]
+run = "bun lint --no-script --fix"
+
+[tasks.fmt]
+description = "Format the repository in place (extra arguments go to bun fmt, e.g. --staged)"
+depends = ["toolchain"]
+run = "bun fmt --no-script"
+
+[tasks."fmt:check"]
+description = "Check formatting without writing"
+depends = ["toolchain"]
+run = "bun fmt --no-script --check"
+
+[tasks.test]
+description = "Run the test suite"
+# Passes while the skeleton has no tests; drop the flag once tests exist so an empty run fails.
+run = "bun test --pass-with-no-tests"
+
+[tasks.build]
+description = "Build the Claude plugin"
+run = "bun packages/integrations/claude/build.ts"
+
+[tasks.verify]
+description = "Run every read-only gate: check, lint, fmt:check and test"
+depends = ["check", "lint", "fmt:check", "test"]

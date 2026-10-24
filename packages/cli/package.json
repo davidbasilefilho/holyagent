@@ -1,0 +1,12 @@
+{
+  "name": "@holyagent/cli",
+  "version": "0.1.0",
+  "description": "The holyagent command line.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "effect": "^4.0.0"
+  }
+}

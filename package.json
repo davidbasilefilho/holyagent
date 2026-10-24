@@ -1,0 +1,26 @@
+{
+  "name": "holyagent",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "packages/integrations/*"
+  ],
+  "type": "module",
+  "scripts": {
+    "prepare": "mise run prepare",
+    "build": "mise run build",
+    "check": "mise run check",
+    "fmt": "mise run fmt",
+    "fmt:check": "mise run fmt:check",
+    "lint": "mise run lint",
+    "lint:fix": "mise run lint:fix",
+    "test": "mise run test",
+    "verify": "mise run verify"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.0.0",
+    "eslint-plugin-jsdoc": "^65.4.2",
+    "lefthook": "^2.0.0"
+  }
+}
