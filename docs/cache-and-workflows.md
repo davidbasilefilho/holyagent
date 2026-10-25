@@ -16,7 +16,7 @@ The model never reasons about the prompt cache, its lifetime or cost. The design
 
 The strongest relevance wins, then the most recently finished. If a stage empties the pool the CLI spawns and the `reason` names the stage (`no idle specialist of this role task`). A reviewer, or any Assignment that names `independentFrom`, never continues a specialist that worked on or reviewed those Assignments, so a reviewer is never the writer or an earlier reviewer of the change. The registry of launched specialists is per clone, in `.holyagent/local/specialists.json`.
 
-**Cache lifetimes.** `holyagent setup` writes `subagentPromptCacheTtl: "1h"` into the project settings (Claude Code 2.1.242 or later), which covers subagents, workflows and Claude Code's own helper requests. Each generated specialist file also sets `experimental.cacheTtl: 1h`.
+**Cache lifetimes.** `holyagent setup claude` writes `subagentPromptCacheTtl: "1h"` into the project settings (Claude Code 2.1.242 or later), which covers subagents, workflows and Claude Code's own helper requests. Each generated specialist file also sets `experimental.cacheTtl: 1h`.
 
 **Compact outputs.** CLI output is TOON, `status`, `show` and `list` print one row per record, `vcs ci` prints one line per change of state, specialists end with a fixed compact report (`result`, `changed`, `checks`, `blockers`, `questions`, `notes`, then an `evidence:` block) and long logs go to files outside the repository. The root's large prefix therefore grows slowly and stays warm.
 

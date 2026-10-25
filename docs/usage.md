@@ -4,20 +4,22 @@
 
 Check [requirements.md](requirements.md) first. Pick one route.
 
-**Marketplace.** In Claude Code:
-
-```text
-/plugin marketplace add davidbasilefilho/holyagent
-/plugin install holyagent@holyagent
-```
-
-This installs only the plugin. The plugin's own `settings.json` makes the main thread the root agent (`agent: holyagent`) while the plugin is enabled.
-
-**`holyagent install`.** The public CLI installs the plugin through `claude plugin marketplace add` and `claude plugin install`, then Billion Context and ctx7. Every step checks its own result first and a failed step does not stop the others.
+**Marketplace.** The plugin is published from this repository's `main` branch. From a shell:
 
 ```sh
-holyagent install [--skip-billion-context] [--skip-ctx7]
+claude plugin marketplace add davidbasilefilho/holyagent
+claude plugin install holyagent@holyagent
 ```
+
+Inside Claude Code the same two steps are `/plugin marketplace add davidbasilefilho/holyagent` and `/plugin install holyagent@holyagent`. This installs only the plugin. The plugin's own `settings.json` makes the main thread the root agent (`agent: holyagent`) while the plugin is enabled.
+
+**`holyagent setup claude`.** The public CLI installs the plugin the same way, then Billion Context and ctx7, then configures the project you run it in (see [Set up a project](#set-up-a-project)). Use it when you also want the project settings and the two tools; it is the only route that writes them.
+
+```sh
+holyagent setup claude [--dir <path>] [--subagent-cache-ttl 1h|5m] [--dry-run] [--skip-billion-context] [--skip-ctx7]
+```
+
+The steps run in this order: plugin, Billion Context, ctx7, project settings. Every step checks its own result first, so a re-run changes nothing that is already set, and a failed step does not stop the others; the command exits 1 at the end if any step failed. `--dry-run` shows what would change and installs and writes nothing. `setup` is the parent command for per-harness setups; `claude` is the only one so far.
 
 The output has one line per step: `+` done now, `=` already done, `-` skipped, `~` a hint (such as a directory to add to `PATH`), `!` failed (exit 1). The ctx7 skill needs `CONTEXT7_API_KEY` or a saved `ctx7 login`; without either that step is skipped with a hint. What each piece is and why it is installed is in [components.md](components.md).
 
@@ -27,13 +29,7 @@ Restart Claude Code after installing so the plugin and Billion Context's native 
 
 ## Set up a project
 
-Run once per project, from its root:
-
-```sh
-holyagent setup [--dir <path>] [--subagent-cache-ttl 1h|5m] [--dry-run]
-```
-
-A plugin can only set `agent` and `subagentStatusLine`, so the rest of the project settings are this command's job. It adds the missing keys to `.claude/settings.json` and never changes a value that is already set (`+` added, `=` already that value, `~` kept, with the recommendation shown).
+`holyagent setup claude` does this as its last step. Run it once per project, from its root, or pass `--dir <path>`. A plugin can only set `agent` and `subagentStatusLine`, so the rest of the project settings are this command's job. It adds the missing keys to `.claude/settings.json` and never changes a value that is already set (`+` added, `=` already that value, `~` kept, with the recommendation shown).
 
 | Key                                     | Value                               | Why                                                                                                    |
 | --------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------ |
@@ -79,7 +75,7 @@ Cloud sessions (claude.ai/code) are a different case: Claude Code does not load 
 
 T3 Code drives Claude Code through the Claude Agent SDK. From its source (read 2026-10-24; it is early software and changes):
 
-- It loads the user, project and local settings like the CLI, so the plugin, the project settings from `holyagent setup` and Billion Context's `~/.claude/settings.json` entries apply, unless a provider instance sets a custom `CLAUDE_CONFIG_DIR`. A provider instance can also set `ANTHROPIC_BASE_URL`; which of the two wins was not checked, and an instance that points elsewhere bypasses Billion Context.
+- It loads the user, project and local settings like the CLI, so the plugin, the project settings from `holyagent setup claude` and Billion Context's `~/.claude/settings.json` entries apply, unless a provider instance sets a custom `CLAUDE_CONFIG_DIR`. A provider instance can also set `ANTHROPIC_BASE_URL`; which of the two wins was not checked, and an instance that points elsewhere bypasses Billion Context.
 - It appends to Claude Code's system prompt rather than replacing it.
 - It exposes tools under `mcp__t3-code__`: `html_render` and `html_preview` for visual replies, `preview_*` for the integrated browser and `device_*` for simulators. The root takes `html_render`, `html_preview` and `watch_pull_request`; the visual specialists take the browser and device tools named in the `interface-inspection` skill. Tool names differ across T3 versions.
 - Its "Auto-compact after" setting maps to Claude Code's `autoCompactWindow`, which HolyAgent leaves alone (see [decisions.md](decisions.md)).

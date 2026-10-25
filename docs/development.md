@@ -19,7 +19,7 @@ packages/
     vendor/frontend-design/     Anthropic's skill, kept byte for byte
     tests/
     (generated)                 .claude-plugin/, settings.json, agents/, skills/, hooks/, workflows/, scripts/
-  cli/                          the public CLI: setup, install, doctor
+  cli/                          the public CLI: setup, doctor
 .claude-plugin/marketplace.json generated; the marketplace entry for the plugin
 install/wsl-install.sh          development environment installer
 docs/                           these pages; docs/pi holds the Pi research

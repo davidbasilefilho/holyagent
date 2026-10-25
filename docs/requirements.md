@@ -17,9 +17,9 @@ The plugin's runtime only calls `bun` and does not check the build. Running the 
 
 ## Claude Code version
 
-- Documented minimums: `subagentPromptCacheTtl` (written by `holyagent setup`) 2.1.242 or later, agent `experimental.cacheTtl` (set in every specialist file) 2.1.248 or later, hook `onFailure: "block"` 2.1.295 or later (stated on the Claude Code [hooks](https://code.claude.com/docs/en/hooks.md), [sub-agents](https://code.claude.com/docs/en/sub-agents.md) and settings reference pages). The 55-minute reuse window assumes the 1-hour cache that `subagentPromptCacheTtl` selects. The plugin was tested with 2.1.310.
+- Documented minimums: `subagentPromptCacheTtl` (written by `holyagent setup claude`) 2.1.242 or later, agent `experimental.cacheTtl` (set in every specialist file) 2.1.248 or later, hook `onFailure: "block"` 2.1.295 or later (stated on the Claude Code [hooks](https://code.claude.com/docs/en/hooks.md), [sub-agents](https://code.claude.com/docs/en/sub-agents.md) and settings reference pages). The 55-minute reuse window assumes the 1-hour cache that `subagentPromptCacheTtl` selects. The plugin was tested with 2.1.310.
 - The `PreToolUse` hooks use `onFailure: "block"`, the `vcs-redirect` entries use `if` filters, the launch recorder is a `PostToolUse` hook on Agent, and the prebuilt workflows use the `Workflow` tool. Workflows are also subject to your plan and settings: `enableWorkflows: false`, `disableWorkflows: true` or `CLAUDE_CODE_DISABLE_WORKFLOWS=1` turns them off, and `plan` then recommends direct subagents (see [cache-and-workflows.md](cache-and-workflows.md)).
-- Plugin `settings.json` supports `agent` (and `subagentStatusLine`) only, which is why `holyagent setup` exists.
+- Plugin `settings.json` supports `agent` (and `subagentStatusLine`) only, which is why `holyagent setup claude` exists.
 
 ## Supported environments
 

@@ -13,7 +13,7 @@ Two commands are called `holyagent`, and they are different programs:
 
 | Program                                                                                                                                                       | Where                                                                  | For                                                                  |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| Public CLI (`packages/cli`)                                                                                                                                   | You run it                                                             | `setup`, `install`, `doctor`                                         |
+| Public CLI (`packages/cli`)                                                                                                                                   | You run it                                                             | `setup`, `doctor`                                                    |
 | Runtime CLI (`${CLAUDE_PLUGIN_ROOT}/scripts/holyagent` inside the plugin folder; `holyagent vcs`, `holyagent plan` and the like in these pages mean this one) | The root agent and the plugin's hooks run it; it is not on your `PATH` | `intent`, `assignment`, `plan`, `status`, `reconcile`, `vcs`, `hook` |
 
 ## Pages

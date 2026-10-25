@@ -1,6 +1,6 @@
 # Components
 
-What HolyAgent installs or configures, and why. The WSL installer (`install/wsl-install.sh`) and the public CLI (`holyagent install`, `holyagent doctor`) both skip any step that is already right, so re-running changes nothing that is already set.
+What HolyAgent installs or configures, and why. The WSL installer (`install/wsl-install.sh`) and the public CLI (`holyagent setup claude`, `holyagent doctor`) both skip any step that is already right, so re-running changes nothing that is already set.
 
 | Component        | Installed by                                           | Why                                                                         |
 | ---------------- | ------------------------------------------------------ | --------------------------------------------------------------------------- |
@@ -8,9 +8,9 @@ What HolyAgent installs or configures, and why. The WSL installer (`install/wsl-
 | Node.js LTS      | WSL installer (`mise use -g node@lts`)                 | Billion Context and ctx7 run on Node                                        |
 | Bun (canary)     | WSL installer (`mise use -g bun`, then canary)         | Runs the plugin CLI and the repository toolchain                            |
 | Claude Code      | WSL installer (`bun add -g @anthropic-ai/claude-code`) | The harness                                                                 |
-| HolyAgent plugin | Marketplace, `holyagent install`                       | The root agent, specialists, skills, workflows, hooks and runtime CLI       |
-| Billion Context  | WSL installer, `holyagent install`                     | Compresses the conversation so long sessions stay inside the context window |
-| ctx7 and skill   | WSL installer, `holyagent install`                     | Current library documentation for the agents                                |
+| HolyAgent plugin | Marketplace, `holyagent setup claude`                  | The root agent, specialists, skills, workflows, hooks and runtime CLI       |
+| Billion Context  | WSL installer, `holyagent setup claude`                | Compresses the conversation so long sessions stay inside the context window |
+| ctx7 and skill   | WSL installer, `holyagent setup claude`                | Current library documentation for the agents                                |
 
 Pi is not installed: 0.1.0 has no Pi integration ([pi/README.md](pi/README.md)).
 
@@ -28,7 +28,7 @@ The installer installs `@anthropic-ai/claude-code` with Bun. Anthropic documents
 
 [Billion Context](https://github.com/ranxianglei/billion-context) (`bili`) is a local HTTP proxy between Claude Code and the model API. It adds four tools (`compress`, `decompress`, `search_context`, `acp_status`) and a compression prompt to each request, and the model decides what to fold. See [attributions.md](attributions.md) for its license terms.
 
-`holyagent install` and the installer run `bun add -g billion-context` (its README documents npm only; the commands run on Node through their shebang), then `bili plugin install claude`, the native mode. Native mode merges into `~/.claude/settings.json`:
+`holyagent setup claude` and the installer run `bun add -g billion-context` (its README documents npm only; the commands run on Node through their shebang), then `bili plugin install claude`, the native mode. Native mode merges into `~/.claude/settings.json`:
 
 - `env.ANTHROPIC_BASE_URL` pointing at `http://127.0.0.1:18787/bili/https://api.anthropic.com` (an existing, different `ANTHROPIC_BASE_URL` is never overwritten),
 - `env.DISABLE_AUTO_COMPACT=1`, because Billion Context owns compression; a manual `/compact` still works,
@@ -64,5 +64,5 @@ One line per check, exit 1 when any fails:
 
 - Bun is a canary build (`--fix` upgrades it);
 - `claude`, `bili` and `ctx7` are on `PATH`;
-- the project's `.claude/settings.json` has the keys `holyagent setup` writes;
+- the project's `.claude/settings.json` has the keys `holyagent setup claude` writes;
 - the `holyagent@holyagent` plugin is installed.

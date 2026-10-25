@@ -57,7 +57,7 @@ An unknown key inside `vcs` is an error that names the file. Reword rather than 
 
 A `PreToolUse` hook on the Bash tool denies a `git commit` or `git push` command and names the `holyagent vcs` replacement; [hooks.md](hooks.md) has the details and its limits.
 
-## Settings that `holyagent setup` writes
+## Settings that `holyagent setup claude` writes
 
 `attribution.commit` and `attribution.pr` as empty strings, `attribution.sessionUrl` as `false` and `includeGitInstructions` as `false` (see [usage.md](usage.md)). They stop Claude Code adding its trailer, its PR line and the session link, and remove its built-in commit and PR instructions from the context. They apply to commits made by Claude Code itself; `vcs commit` cleans the text either way.
 
