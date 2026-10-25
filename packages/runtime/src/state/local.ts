@@ -17,6 +17,11 @@ export const Vcs = Schema.Struct({
   branch: Schema.optionalKey(Text),
   base: Schema.optionalKey(Text),
   pullRequest: Schema.optionalKey(Text),
+  /**
+   * What `vcs detect` keeps (see DetectionCache in vcs/model.ts). It is read as anything here and
+   * validated by its owner, so a file in an old shape never breaks the other commands.
+   */
+  detection: Schema.optionalKey(Schema.Unknown),
 })
 /** The version control facts of this clone. */
 export type Vcs = typeof Vcs.Type

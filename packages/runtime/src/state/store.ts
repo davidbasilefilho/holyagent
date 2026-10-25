@@ -1,4 +1,4 @@
-import { join } from "node:path"
+import { join, relative } from "node:path"
 
 import { Effect, Schedule } from "effect"
 
@@ -28,26 +28,28 @@ const requireLocation = (path: string, expected: string) =>
     ? Effect.void
     : Effect.fail(new CorruptRecord({ path, reason: `the record belongs in ${expected}` }))
 
-/**
- * Reads and validates every Intent and Assignment under the state folder. Each file must decode
- * strictly and sit at the path its own fields name (`intents/<slug>-<id>/intent.json`,
- * `.../assignments/<role-task>-<slug>-<id>.json`), and an Assignment must belong to an Intent that
- * exists; a file that does not is reported with its path. A folder with nothing in it is an empty
- * project.
- */
-export const loadProject = (directory: string) =>
+const loadIntents = (directory: string) =>
   Effect.gen(function* () {
     const intents: Array<Intent> = []
-    for (const relative of yield* scan(directory, "intents/*/intent.json")) {
-      const path = join(directory, relative)
+    for (const file of yield* scan(directory, "intents/*/intent.json")) {
+      const path = join(directory, file)
       const intent = yield* readJson(Intent, path)
       if (intent === undefined) continue
       yield* requireLocation(path, intentFile(directory, intent))
       intents.push(intent)
     }
+    return intents
+  })
+
+const loadAssignments = (
+  directory: string,
+  relatives: ReadonlyArray<string>,
+  intents: ReadonlyArray<Intent>,
+) =>
+  Effect.gen(function* () {
     const assignments: Array<Assignment> = []
-    for (const relative of yield* scan(directory, "intents/*/assignments/*.json")) {
-      const path = join(directory, relative)
+    for (const file of relatives) {
+      const path = join(directory, file)
       const assignment = yield* readJson(Assignment, path)
       if (assignment === undefined) continue
       const intent = intents.find((candidate) => candidate.id === assignment.intentId)
@@ -59,6 +61,43 @@ export const loadProject = (directory: string) =>
       yield* requireLocation(path, assignmentFile(intentFolder(directory, intent), assignment))
       assignments.push(assignment)
     }
+    return assignments
+  })
+
+/**
+ * Reads and validates every Intent and Assignment under the state folder. Each file must decode
+ * strictly and sit at the path its own fields name (`intents/<slug>-<id>/intent.json`,
+ * `.../assignments/<role-task>-<slug>-<id>.json`), and an Assignment must belong to an Intent that
+ * exists; a file that does not is reported with its path. A folder with nothing in it is an empty
+ * project.
+ */
+export const loadProject = (directory: string) =>
+  Effect.gen(function* () {
+    const intents = yield* loadIntents(directory)
+    const assignments = yield* loadAssignments(
+      directory,
+      yield* scan(directory, "intents/*/assignments/*.json"),
+      intents,
+    )
+    return { intents, assignments } satisfies Project
+  })
+
+/**
+ * Like {@link loadProject}, but for the open Intents only: every Intent file is read to see its
+ * state, while Assignment files are read only under the open ones, so the cost does not grow with
+ * closed history. The checks on what is read are the same; closed Intents and their Assignments are
+ * left out and not validated.
+ */
+export const loadOpenProject = (directory: string) =>
+  Effect.gen(function* () {
+    const intents = (yield* loadIntents(directory)).filter((intent) => intent.state === "Open")
+    const relatives = yield* Effect.forEach(intents, (intent) =>
+      scan(
+        directory,
+        join(relative(directory, intentFolder(directory, intent)), "assignments/*.json"),
+      ),
+    )
+    const assignments = yield* loadAssignments(directory, relatives.flat(), intents)
     return { intents, assignments } satisfies Project
   })
 
@@ -67,23 +106,30 @@ export interface Snapshot extends Local {
   readonly project: Project
 }
 
-const readSnapshot = (directory: string) =>
-  Effect.all({ project: loadProject(directory), local: readLocal(directory) }).pipe(
+const readSnapshot = (directory: string, load: typeof loadProject = loadProject) =>
+  Effect.all({ project: load(directory), local: readLocal(directory) }).pipe(
     Effect.map(({ project, local }): Snapshot => ({ ...local, project })),
   )
+
+const retryCorrupt = {
+  schedule: Schedule.spaced("25 millis"),
+  times: 3,
+  while: (error: { readonly _tag: string }) => error._tag === "CorruptRecord",
+} as const
 
 /**
  * Reads the whole state without locking. A writer may be between two of its files, which reads as a
  * corrupt record for a moment, so a corrupt read is repeated a few times before it is reported.
  */
 export const readState = (directory: string) =>
-  readSnapshot(directory).pipe(
-    Effect.retry({
-      schedule: Schedule.spaced("25 millis"),
-      times: 3,
-      while: (error) => error._tag === "CorruptRecord",
-    }),
-  )
+  readSnapshot(directory).pipe(Effect.retry(retryCorrupt))
+
+/**
+ * Reads the state of the open Intents only (see {@link loadOpenProject}), repeating as `readState`
+ * does.
+ */
+export const readOpenState = (directory: string) =>
+  readSnapshot(directory, loadOpenProject).pipe(Effect.retry(retryCorrupt))
 
 /** What to write: the changed records of a transition and the per-clone files to update. */
 export type StateChange = Change & Omit<LocalChange, "specialists">
