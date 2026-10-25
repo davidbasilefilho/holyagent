@@ -11,14 +11,14 @@
 
 ## Why Bun canary
 
-The repository's toolchain is Bun's own `bun check`, `bun lint` and `bun fmt`, which exist only in canary builds. mise cannot install `bun@canary`, so it installs the stable base and `bun upgrade --canary` replaces the binary in place (mise's `postinstall` hook, the installer and `holyagent doctor --fix` do this). A later `mise upgrade bun` that installs a new stable version brings stable back, so every repository gate first runs the `toolchain` task and fails with the fix when Bun is not canary. A `--smol` in `BUN_OPTIONS` makes `bun upgrade` fail; unset it first.
+The repository's toolchain is Bun's own `bun check`, `bun lint` and `bun fmt`, which exist only in canary builds. mise cannot install `bun@canary`, so it installs the stable base and `bun upgrade --canary` replaces the binary in place (mise's `postinstall` hook, the installer and `holyagent doctor --fix` do this). A later `mise upgrade bun` that installs a new stable version brings stable back, so every repository gate first runs the `toolchain` task and fails with the fix when Bun is not canary. A `--smol` in `BUN_OPTIONS` makes `bun upgrade` fail, so the `postinstall` hook in `mise.toml` and `holyagent doctor --fix` run the upgrade with `BUN_OPTIONS` unset; when you upgrade by hand, run `env -u BUN_OPTIONS bun upgrade --canary`.
 
 The plugin's runtime only calls `bun` and does not check the build. Running the plugin needs Bun; developing HolyAgent needs the canary.
 
 ## Claude Code version
 
 - Documented minimums: `subagentPromptCacheTtl` (written by `holyagent setup`) 2.1.242 or later, agent `experimental.cacheTtl` (set in every specialist file) 2.1.248 or later, hook `onFailure: "block"` 2.1.295 or later (stated on the Claude Code [hooks](https://code.claude.com/docs/en/hooks.md), [sub-agents](https://code.claude.com/docs/en/sub-agents.md) and settings reference pages). The 55-minute reuse window assumes the 1-hour cache that `subagentPromptCacheTtl` selects. The plugin was tested with 2.1.310.
-- The two `PreToolUse` hooks use `onFailure: "block"` and `if` filters, and the prebuilt workflows use the `Workflow` tool. Workflows are also subject to your plan and settings: `enableWorkflows: false`, `disableWorkflows: true` or `CLAUDE_CODE_DISABLE_WORKFLOWS=1` turns them off, and `plan` then recommends direct subagents (see [cache-and-workflows.md](cache-and-workflows.md)).
+- The `PreToolUse` hooks use `onFailure: "block"`, the `vcs-redirect` entries use `if` filters, the launch recorder is a `PostToolUse` hook on Agent, and the prebuilt workflows use the `Workflow` tool. Workflows are also subject to your plan and settings: `enableWorkflows: false`, `disableWorkflows: true` or `CLAUDE_CODE_DISABLE_WORKFLOWS=1` turns them off, and `plan` then recommends direct subagents (see [cache-and-workflows.md](cache-and-workflows.md)).
 - Plugin `settings.json` supports `agent` (and `subagentStatusLine`) only, which is why `holyagent setup` exists.
 
 ## Supported environments
