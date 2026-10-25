@@ -1,10 +1,10 @@
-import { existsSync, realpathSync } from "node:fs"
 import { stat } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
 import { Effect, Schema } from "effect"
 
 import { ROOT_CORE } from "../instructions/claude-5.5/root-core.ts"
+import stateChanges from "../instructions/claude-5.5/specialist/state-changes.md" with { type: "text" }
 import { hasCode, io } from "../state/files.ts"
 import { STATE_DIRECTORY } from "../state/layout.ts"
 import { readOpenState } from "../state/store.ts"
@@ -19,7 +19,6 @@ import { resolveIntent } from "./intent.ts"
 import { resumeOf, statusOf } from "./overview.ts"
 import { dispatchedAssignment } from "./report.ts"
 import { type IntentRequirements, sessionContext } from "./sessioncontext.ts"
-import { type GitWrite, gitWrites, type OwnWrapper } from "./shell.ts"
 import { type Call, type Command, Verbatim } from "./types.ts"
 import { workflowRefusal } from "./workflow-check.ts"
 
@@ -133,18 +132,24 @@ const HAND_BACK: Readonly<Record<string, string>> = {
 const postToolUse = (additionalContext: string) =>
   output({ hookEventName: "PostToolUse", additionalContext })
 
-const REDIRECTS: Readonly<Record<GitWrite, string>> = {
-  commit:
-    "Commit with `holyagent vcs commit -m <headline> -- <paths…>`, which adds the Intent's state and checks the message.",
-  "force-push":
-    "Force pushes are denied (--force, --force-with-lease, --mirror, --delete, --prune, a + or : refspec). Push without them; rewriting or deleting published history needs the user's approval, and the user does it.",
-  unclear:
-    "This command mentions git commit or push and cannot be read with certainty: it runs a program outside the everyday set (git, gh, holyagent, mise, bun and basic file and text tools), or it has a variable, substitution, brace, glob or escape where a literal word is needed, or it nests too deep. Write each command out plainly with literal arguments: no shell, wrapper, script or alias in between, and commits through `holyagent vcs commit`.",
-}
+/**
+ * The version-control rules of the specialist text, which a SubagentStart hook adds to the context
+ * of every holyagent specialist at its start; the text is the specialist section itself, so the
+ * rule has one owner.
+ */
+export const SPECIALIST_RULES: string = stateChanges.trim()
+
+/** The one-line reminder a PreToolUse hook adds to a Bash command that mentions git commit or push. */
+export const VCS_REMINDER =
+  "Version control is the root's: it commits with `holyagent vcs commit`, never force-pushes and pushes to a protected branch only with the user's approval; a specialist makes no version-control writes."
+
+/** The agent types of the plugin's specialists: namespaced by the plugin, the root excepted. */
+const isSpecialist = (type: string | undefined): boolean =>
+  type !== undefined && type.startsWith("holyagent:") && !ROOT_AGENTS.has(type)
 
 /**
  * The text the host's `if` rules of the hook (`Bash(*git*commit*)`, `Bash(*git*push*)`) match:
- * `git` followed somewhere by `commit` or `push`. A command without it is not looked at.
+ * `git` followed somewhere by `commit` or `push`. A command without it gets no reminder.
  */
 const MENTIONS_GIT_WRITE = /git[\s\S]*(?:commit|push)/i
 
@@ -172,30 +177,11 @@ const commentPrefix = Effect.gen(function* () {
   return configured === undefined || configured === "" || configured === "auto" ? "#" : configured
 })
 
-/**
- * Tells whether a path is the wrapper this hook runs from: `scripts/holyagent` of the plugin folder
- * the host names in `CLAUDE_PLUGIN_ROOT`, else the one next to the running bundle. The paths are
- * compared after links resolve, so only the wrapper itself passes and a file of the same name
- * elsewhere does not. A path that does not exist, or whose links cannot resolve, is not it.
- */
-const ownWrapperOf = (pluginRoot: string | undefined): OwnWrapper => {
-  const wrapper =
-    pluginRoot === undefined || pluginRoot === ""
-      ? join(dirname(Bun.main), "holyagent")
-      : join(pluginRoot, "scripts", "holyagent")
-  return (path) =>
-    existsSync(path) && existsSync(wrapper) && realpathSync(path) === realpathSync(wrapper)
-}
-
 /** The Workflow inputs an inline run may carry; a script path, name or resume would run other code. */
 const INLINE_INPUTS: ReadonlySet<string> = new Set(["script", "args"])
 
-// The vcs-redirect hook only sees what the `if` rules of hooks.json let through, and those match
-// the command text: `git` followed by `commit` or `push` anywhere in it. For such a command it is an
-// allowlist: every simple command must be read with certainty and run a known program, and only
-// `git commit` and a force push are named; anything else it cannot read is denied as unclear. A
-// command whose text never spells the words (`g''it commit`, a git alias, `git ci`) does not reach
-// the hook, nor does a script, make target or package script that runs git inside.
+// Both version-control hooks only add context, so neither can deny, allow or block: they carry no
+// permission decision, and the plugin wires them without `onFailure: block`.
 
 /** The `hook` commands the plugin's hooks call. */
 export const HOOK_COMMANDS: ReadonlyArray<Command> = [
@@ -259,27 +245,25 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
     true,
   ),
   hook(
-    "vcs-redirect",
-    "PreToolUse for Bash: for a command that mentions git and then commit or push, deny git commit (and point to holyagent vcs commit), a force git push, and whatever runs a program outside the allowlist or cannot be read with certainty; say nothing otherwise, a plain git push included",
-    (payload, call) => {
+    "subagent-start",
+    "SubagentStart: add the version-control rules of the specialist text to the context of a holyagent specialist at its start; nothing for the root or any other agent",
+    (payload) =>
+      Effect.succeed(
+        isSpecialist(payload.agent_type)
+          ? output({ hookEventName: "SubagentStart", additionalContext: SPECIALIST_RULES })
+          : NOTHING,
+      ),
+    true,
+  ),
+  hook(
+    "vcs-reminder",
+    "PreToolUse for Bash: for a command that mentions git and then commit or push, add a one-line reminder of the version-control rules as context; never a permission decision, and nothing for any other command",
+    (payload) => {
       const command = payload.tool_name === "Bash" ? payload.tool_input?.command : undefined
-      // Whatever the command looks like, this hook decides and never fails, since its onFailure
-      // block would then stop a call that has no git write in it. A command it cannot read at all
-      // (the scan ran out of stack) is denied as unclear, as is one it does not know with certainty:
-      // the text has git and then commit or push in it.
-      return Effect.try({
-        try: () =>
-          typeof command === "string" && MENTIONS_GIT_WRITE.test(command)
-            ? gitWrites(command, ownWrapperOf(call.env.CLAUDE_PLUGIN_ROOT))
-            : [],
-        catch: (cause) => cause,
-      }).pipe(
-        Effect.orElseSucceed((): ReadonlyArray<GitWrite> => ["unclear"]),
-        Effect.map((writes) =>
-          writes.length === 0
-            ? NOTHING
-            : decision("deny", writes.map((write) => REDIRECTS[write]).join(" ")),
-        ),
+      return Effect.succeed(
+        typeof command === "string" && MENTIONS_GIT_WRITE.test(command)
+          ? output({ hookEventName: "PreToolUse", additionalContext: VCS_REMINDER })
+          : NOTHING,
       )
     },
     true,

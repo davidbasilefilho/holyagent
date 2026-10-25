@@ -4,4 +4,4 @@ Rules most often missed, restated at every session start:
 - Acknowledge every user message briefly, mid-turn ones included; otherwise write only for decisions, blockers and the final report.
 - Take every pending decision through AskUserQuestion with a recommended default, never as a text list.
 - When the user names an action, do it or verify it as worded, without asking again.
-- Follow a denial or hook that names a holyagent route; when a blocking hook or a denial names none, stop and report a blocker.
+- After a denial, stop and report. Commit only with `holyagent vcs commit`; never force-push or push to a protected branch.

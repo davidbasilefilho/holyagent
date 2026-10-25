@@ -149,7 +149,7 @@ describe("manifests", () => {
 
 describe("hooks", () => {
   const { hooks } = JSON.parse(read("packages/integrations/claude/dist/hooks/hooks.json")) as {
-    hooks: Record<string, Array<{ matcher: string; hooks: Array<Record<string, unknown>> }>>
+    hooks: Record<string, Array<{ matcher?: string; hooks: Array<Record<string, unknown>> }>>
   }
   const command = (name: string, extra: Record<string, unknown> = {}) => ({
     type: "command",
@@ -159,17 +159,18 @@ describe("hooks", () => {
     ...extra,
   })
 
-  test("are exactly the session, redirect, workflow and launch hooks, in exec form through the wrapper", () => {
+  test("are exactly the session, subagent-start, reminder, workflow and launch hooks, in exec form through the wrapper", () => {
     expect(hooks).toEqual({
       SessionStart: [
         { matcher: "startup|resume|clear|compact", hooks: [command("session-start")] },
       ],
+      SubagentStart: [{ hooks: [command("subagent-start")] }],
       PreToolUse: [
         {
           matcher: "Bash",
           hooks: [
-            command("vcs-redirect", { if: "Bash(*git*commit*)", onFailure: "block" }),
-            command("vcs-redirect", { if: "Bash(*git*push*)", onFailure: "block" }),
+            command("vcs-reminder", { if: "Bash(*git*commit*)" }),
+            command("vcs-reminder", { if: "Bash(*git*push*)" }),
           ],
         },
         { matcher: "Workflow", hooks: [command("workflow", { onFailure: "block" })] },
@@ -185,7 +186,16 @@ describe("hooks", () => {
       expect(hook).not.toHaveProperty("onFailure")
   })
 
-  test("the redirect rules start on git with commit or push anywhere after it, and on nothing else", () => {
+  test("no hook that carries version-control rules can block, and no hook is a Bash guard", () => {
+    const carriers = [...(hooks.SubagentStart ?? []), ...(hooks.PreToolUse ?? [])]
+      .filter((group) => group.matcher !== "Workflow")
+      .flatMap((group) => group.hooks)
+    expect(carriers).toHaveLength(3)
+    for (const hook of carriers) expect(hook).not.toHaveProperty("onFailure")
+    expect(JSON.stringify(hooks)).not.toContain("redirect")
+  })
+
+  test("the reminder rules start on git with commit or push anywhere after it, and on nothing else", () => {
     const glob = (rule: string) => {
       const inner = rule.slice("Bash(".length, -1)
       return new RegExp(`^${inner.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`)
@@ -248,7 +258,7 @@ describe("agents", () => {
       "names an action",
       "Every pending decision goes through AskUserQuestion",
       "never reach the same result through another tool",
-      "Follow a denial or hook that names a holyagent route",
+      "After a denial, stop that line of work",
       "A brief acknowledgment is always allowed",
       "update_plan",
     ])
@@ -261,7 +271,7 @@ describe("agents", () => {
       "Acknowledge every user message",
       "names an action",
       "AskUserQuestion",
-      "Follow a denial or hook that names a holyagent route",
+      "After a denial, stop and report",
       "otherwise write only for decisions, blockers and the final report",
       "update_plan",
     ])

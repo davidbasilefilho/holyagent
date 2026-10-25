@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
@@ -64,357 +64,174 @@ const bash = (command: string) => ({ tool_name: "Bash", tool_input: { command } 
 const preToolUse = (permissionDecision: string, permissionDecisionReason: string) =>
   `${JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision, permissionDecisionReason } })}\n`
 
-const COMMIT =
-  "Commit with `holyagent vcs commit -m <headline> -- <paths…>`, which adds the Intent's state and checks the message."
-const FORCE =
-  "Force pushes are denied (--force, --force-with-lease, --mirror, --delete, --prune, a + or : refspec). Push without them; rewriting or deleting published history needs the user's approval, and the user does it."
-const UNCLEAR =
-  "This command mentions git commit or push and cannot be read with certainty: it runs a program outside the everyday set (git, gh, holyagent, mise, bun and basic file and text tools), or it has a variable, substitution, brace, glob or escape where a literal word is needed, or it nests too deep. Write each command out plainly with literal arguments: no shell, wrapper, script or alias in between, and commits through `holyagent vcs commit`."
+/**
+ * The context a hook adds for the host, parsed from its stdout; `undefined` for a hook that said
+ * nothing.
+ */
+const addedContext = (stdout: string) =>
+  stdout === ""
+    ? undefined
+    : (JSON.parse(stdout) as { hookSpecificOutput: Record<string, unknown> }).hookSpecificOutput
 
-describe("hook vcs-redirect", () => {
-  const denied: ReadonlyArray<readonly [string, string]> = [
-    ["git commit -m x", COMMIT],
-    ["git push --force", FORCE],
-    ["cd a && git push --force", FORCE],
-    ["git status && git commit -m 'a && b'", COMMIT],
-    ["git -C repo commit --amend", COMMIT],
-    ["git -c user.name=x push origin +main", FORCE],
-    ["FOO=1 git push --force origin main", FORCE],
-    ["env FOO=1 git push --force origin main", FORCE],
-    ["/usr/bin/git commit -m x", COMMIT],
-    ["(cd a; git push --force)", FORCE],
-    ["echo $(git commit -m x)", COMMIT],
-    ['echo "$(git push --force)"', FORCE],
-    ["echo `git push --force`", FORCE],
-    ["true | git commit -F -", COMMIT],
-    ["git commit -m x \\\n  && git push --force", `${COMMIT} ${FORCE}`],
-    ["git commit -m x; git commit -m y; git push --force", `${COMMIT} ${FORCE}`],
-    ["if true; then git push --force; fi", FORCE],
-    ["cat <<EOF\nnotes\nEOF\ngit commit -m x", COMMIT],
-    ["git commit -m x 2>&1", COMMIT],
-    ["git push --force >/dev/null 2>&1 && echo ok", FORCE],
-    ["echo ok &>/dev/null; git push --force", FORCE],
-    ["cat <<\\EOF\nx\nEOF\ngit push --force", FORCE],
-    ["git status\r\ngit push --force\r\n", FORCE],
-    ["2>&1 git push --force", FORCE],
-    [">/dev/null git commit -m x", COMMIT],
-    ["2>/dev/null git -C d push -f", FORCE],
-    ["for b in a b; do git commit -m x; done", COMMIT],
-  ]
-  test.each(denied)("denies %j", async (command, reason) => {
-    expect(await hook("vcs-redirect", bash(command))).toEqual({
-      stdout: preToolUse("deny", reason),
-      stderr: "",
-      code: 0,
-    })
+const nothing = { stdout: "", stderr: "", code: 0 }
+
+describe("hook subagent-start", () => {
+  const specialist = (agent_type: string) => ({
+    hook_event_name: "SubagentStart",
+    agent_id: "agent-1",
+    agent_type,
   })
 
-  // What is not a git write passes, also when its text mentions Git with commit or push.
-  const allowedThrough = [
-    "git push",
-    "git push -u origin feature/parser",
-    "cd a && git push origin main",
-    "git push origin main:other --follow-tags",
-    "git push --no-force",
-    "git -C repo push --set-upstream origin x",
-    "(cd a; git push)",
-    "git push origin main 2>&1 | tail -3",
-    "git status",
-    "git log --oneline -3",
-    "git diff HEAD~1",
-    'echo "git commit"',
-    "echo git push",
-    "echo 'git push' | cat",
-    'grep -r "git commit" docs',
-    "# git commit -m x",
-    "cat <<'EOF'\ngit commit -m x\ngit push\nEOF",
-    "cat <<-EOF\n\tgit push\n\tEOF",
-    "cat <<\\EOF\ngit push\nEOF",
-    "cat <<E\\OF\ngit commit -m x\nEOF",
-    "echo hi >git push",
-    "2>&1 echo git push",
-    "holyagent vcs commit -m x -- a.ts",
-    "",
-  ]
-  test.each(allowedThrough)("says nothing for %j", async (command) => {
-    expect(await hook("vcs-redirect", bash(command))).toEqual({ stdout: "", stderr: "", code: 0 })
-  })
-
-  test.each<readonly [string, string]>([
-    ["git push --force", FORCE],
-    ["git push -f", FORCE],
-    ["git push origin main -f", FORCE],
-    ["git push -fu origin main", FORCE],
-    ["git push --force-with-lease", FORCE],
-    ["git push --force-with-lease=main:abc123 origin main", FORCE],
-    ["git push --force-if-includes --force-with-lease", FORCE],
-    ["git push origin +main", FORCE],
-    ["git push origin +HEAD:main", FORCE],
-    ["git push origin 'feature:+x'", ""],
-    ["git push --mirror", FORCE],
-    ["git push --delete origin old", FORCE],
-    ["git push -d origin old", FORCE],
-    ["git push origin :old", FORCE],
-    ["git push --prune origin", FORCE],
-    ["git push --force-w origin main", FORCE],
-    ["git push --mirr origin", FORCE],
-    ["git push $'\\x2d\\x2dforce' origin main", FORCE],
-    ["git push $'\\055f' origin main", FORCE],
-    ["git push origin $branch", UNCLEAR],
-    ['git push -u origin "$(git branch --show-current)"', UNCLEAR],
-    ["git push origin refs/heads/*", UNCLEAR],
-    ["git push origin {a,b}", UNCLEAR],
-    ["git push origin $'\\qmain'", UNCLEAR],
-    ["git push origin main", ""],
-  ])("pushes: %j", async (command, reason) => {
-    const result = await hook("vcs-redirect", bash(command))
-    expect(result).toEqual(
-      reason === ""
-        ? { stdout: "", stderr: "", code: 0 }
-        : { stdout: preToolUse("deny", reason), stderr: "", code: 0 },
-    )
-  })
-
-  // Shapes that once ended in an error instead of a decision: the hook parses each, denies only a
-  // real git commit or force push, and never fails.
-  test.each<readonly [string, string]>([
-    ["for f in a b; do echo $f; done", ""],
-    ["for w in git commit; do echo $w; done", ""],
-    ["for b in a b; do git commit -m x; done", COMMIT],
-    ["cat <<EOF\nthe git commit step\nEOF", ""],
-    ["cat <<EOF > notes.md\nUse git push --force never\nEOF\ngit status", ""],
-    ["cat <<EOF\nnotes\nEOF\nrm -rf build && git commit -m x", COMMIT],
-    ["rm -rf dist node_modules && echo done", ""],
-    ["rm -rf /tmp/x; git commit -m x", COMMIT],
-    ['gh pr create --body "Uses Git a lot; each commit is small"', ""],
-    ["echo 'Git history: commit often'", ""],
-    ['git log --grep="git commit" --oneline', ""],
-    ['git commit -m "fix (parser) $(cat msg)"', COMMIT],
-    ["echo $((1 + 2)) && git commit -m x", COMMIT],
-    ["echo $'it\\'s git commit'", ""],
-    ["git commit -m 'a'\\\n -m 'b'", COMMIT],
-    ["cat <<< x\ngit commit -m y", COMMIT],
-    ["cat <<< x\ngit push --force", FORCE],
-    ["echo $((1<<2))\ngit commit -m x", COMMIT],
-    ["(( 1 << 2 ))\ngit commit -m x", COMMIT],
-  ])("never errors on %j", async (command, reason) => {
-    const result = await hook("vcs-redirect", bash(command))
-    expect(result).toEqual(
-      reason === ""
-        ? { stdout: "", stderr: "", code: 0 }
-        : { stdout: preToolUse("deny", reason), stderr: "", code: 0 },
-    )
-  })
-
-  test("stays quiet about a very long or odd command", async () => {
-    const long = `echo ${"git commit ".repeat(5000)}`
-    expect(await hook("vcs-redirect", bash(long))).toEqual({ stdout: "", stderr: "", code: 0 })
-    const nested = `${"$(".repeat(300)}git commit -m x${")".repeat(300)}`
-    expect(await hook("vcs-redirect", bash(nested))).toEqual({
-      stdout: preToolUse("deny", UNCLEAR),
-      stderr: "",
-      code: 0,
-    })
-    expect((await hook("vcs-redirect", bash("echo '\"\\`$(("))).code).toBe(0)
-  })
-
-  // The hook is an allowlist: a command that mentions git and then commit or push passes only when
-  // every simple command runs a known program with words it reads exactly, so each of these, which
-  // a denylist of wrappers, shells and expansions once let through, is denied as unclear.
-  test.each<string>([
-    // The program word is computed.
-    "git${IFS}commit${IFS}-m${IFS}x",
-    "{git,commit,-m,x}",
-    "g=git c=commit; $g $c -m x",
-    "g=git; $g commit -m x",
-    "p=push; git $p -f origin main # git push",
-    "$(echo git) $(echo commit) -m x",
-    "bash -c '\"$@\"' _ git commit -m x",
-    "sh -c '$1' _ 'git commit -m x'",
-    "sh -c '$0 $1' git commit",
-    // Subshells that read like arithmetic, arithmetic that is not plain, and `<<` that shifts.
-    "((git commit) && (true))",
-    "((git push -f) && (true))",
-    "(( $(git commit -m x; echo 1) ))",
-    "for ((i=1<<2; i<9; i++)); do :; done\ngit commit -m x",
-    "echo $[1<<2]\ngit commit -m x",
-    "echo ${x:1<<2 }\ngit commit -m x\n2",
-    "a[1<<2 ]=1\ngit commit -m x\n2",
-    // Keywords, wrappers, shells and runners.
-    "time -p git commit -m x",
-    "/usr/bin/time git commit -m x",
-    "coproc git commit -m x",
-    "coproc N { git commit -m x; }",
-    "function f { git commit -m x; }; f",
-    "f() { git commit -m x; }; f",
-    "trap 'git commit -m x' EXIT",
-    "source /dev/stdin <<< 'git commit -m x'",
-    ". <(echo 'git commit -m x')",
-    "fakeroot git commit -m x",
-    "mise exec -- git commit -m x",
-    "docker exec c git commit -m x",
-    "xargs git < <(echo commit)",
-    "echo 'git commit -m x' | xargs -I{} sh -c '{}'",
-    "ls | xargs -I {} git commit -m {}",
-    "env -iS 'git commit -m x'",
-    "env -u HOME git push --force",
-    "timeout .5 git commit -m x",
-    "timeout 5 git push --force",
-    "bash -c -x 'git commit -m x'",
-    "sh -c -- 'git commit -m x'",
-    "bash -c 'git push --force origin main'",
-    'sh -lc "cd a && git commit -m x"',
-    "fish -c 'git commit -m x'",
-    "bash <<'EOF'\ngit commit -m x\nEOF",
-    "echo 'git commit -m x' | sh",
-    'bash -c "$cmd" # git commit',
-    "sudo -n git commit -m x",
-    "nice -n 5 git push --force",
-    "eval 'git commit -m x'",
-    "setsid git commit -m x",
-    "stdbuf -o0 git push origin x",
-    "ionice -c3 git commit -m x",
-    "flock /tmp/lock git commit -m x",
-    "find . -name a -exec git commit -m x {} ;",
-    "ssh host 'git commit -m x'",
-    "env -S 'git commit -m x'",
-    "echo git commit | sed e",
-    "echo git commit | awk '{system($0)}'",
-    "python3 - <<'PY'\nprint('git commit')\nPY",
-    "while read l; do git push --force; done < list",
-    "case $x in a) git commit -m y ;; b) echo hi ;; esac",
-    // Aliases and settings, and a git command without a known subcommand.
-    "export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.ci GIT_CONFIG_VALUE_0=commit; git ci -m x # git commit",
-    "git config alias.ci commit; git ci -m x",
-    "git -c alias.pf='push -f' pf origin main # git push",
-    "git -c remote.origin.push=+HEAD push origin",
-    "git --config-env foo=BAR commit",
-    "git --attr-source=HEAD commit",
-    "GIT_CONFIG_COUNT=1 git push origin x",
-    "git # git commit",
-    "git commitizen",
-    "git commit-tree abc",
-    "git pushall",
-    // Constructs the scan does not read.
-    "git push $'--force\\0' origin main",
-    "git $'commit\\x00' -m x",
-    "cat <<EOF\n$(git commit -m x)\nEOF",
-    "gh pr create --body-file - <<EOF\n`git push --force origin x`\nEOF",
-    "echo `echo \\`git commit -m x\\``",
-  ])("denies as unclear: %j", async (command) => {
-    const result = await hook("vcs-redirect", bash(command))
-    expect(result.code).toBe(0)
-    expect(result.stdout).toContain(UNCLEAR)
-  })
-
-  test.each<readonly [string, string]>([
-    ['git "com\\\nmit" -m x # git commit', COMMIT],
-    ['git "pu\\\nsh" --force origin # push', FORCE],
-    ["if ((1<<2)); then true; fi\ngit push --force", FORCE],
-    ["cat <<< x\ngit commit -m y", COMMIT],
-  ])("still reads %j", async (command, reason) => {
-    expect(await hook("vcs-redirect", bash(command))).toEqual({
-      stdout: preToolUse("deny", reason),
-      stderr: "",
-      code: 0,
-    })
-  })
-
-  // What the root runs every day passes: only known programs, literal words, no write.
-  test.each<string>([
-    "git status --short && git push",
-    "git log --oneline -5 -- packages/commit.ts",
-    "git show HEAD --stat && git push -u origin feature/parser",
-    "git diff --stat main...HEAD | tail -3; git push",
-    "git branch --show-current && git push",
-    "git merge --no-ff release/0.1.2/a && git push",
-    "git stash push -- .holyagent && git stash pop && git push",
-    "git worktree add ../holyagent-x -b release/0.1.2/x main && git push",
-    "git switch -c feature/x main && git push -u origin feature/x",
-    "git -C ../wt push origin release/0.1.2/fix/x",
-    "gh pr create --title 'Add parser' --body-file - <<'EOF'\nWhat changed, with $(a literal substitution) and `ticks`, then git commit.\nEOF",
-    "gh pr checks 12 --watch && git push",
-    "gh pr view 12 --json mergeStateStatus,reviewDecision && git push",
-    "mise run verify 2>&1 | tail -20 && git push",
-    "bun test packages/runtime/tests/shell.test.ts && git push",
-    '"${CLAUDE_PLUGIN_ROOT}/scripts/holyagent" vcs commit -m "fix: deny git commit shapes" -- a.ts',
-    "cat <<EOF\nplain text with $HOME and git push\nEOF",
-    "for f in a.ts b.ts; do git log --oneline -1 -- $f; done; git push",
-    "echo $((1 + 2)) && git push",
-  ])("passes %j", async (command) => {
-    expect(await hook("vcs-redirect", bash(command))).toEqual({ stdout: "", stderr: "", code: 0 })
-  })
-
-  describe("the wrapper by its absolute path", () => {
-    const wrapper = join(dirname(bundle), "holyagent")
-    const call = `vcs commit -m "fix: git commit hook" -- a.ts`
-    const passes = { stdout: "", stderr: "", code: 0 }
-    const unclear = {
-      stdout: preToolUse("deny", UNCLEAR),
-      stderr: "",
-      code: 0,
+  test("adds the version-control rules of the specialist text as context to every holyagent specialist", async () => {
+    for (const route of ROUTES) {
+      const result = await hook("subagent-start", specialist(`holyagent:${route.agent}`))
+      expect(result.code).toBe(0)
+      expect(result.stderr).toBe("")
+      const output = addedContext(result.stdout)
+      expect(Object.keys(output ?? {}).toSorted()).toEqual(["additionalContext", "hookEventName"])
+      expect(output?.hookEventName).toBe("SubagentStart")
+      const text = String(output?.additionalContext)
+      for (const part of [
+        "commit",
+        "push",
+        "checkout",
+        "branch",
+        "stash",
+        "merge",
+        "reset",
+        "`.git/`",
+        "`.holyagent/`",
+        "report",
+      ])
+        expect(text).toContain(part)
+      expect(text).toContain("the root")
     }
-
-    test("passes the hook's own wrapper, found from the running bundle", async () => {
-      expect(await hook("vcs-redirect", bash(`${wrapper} ${call}`))).toEqual(passes)
-    })
-
-    test("passes it when CLAUDE_PLUGIN_ROOT names its plugin folder", async () => {
-      const env = { CLAUDE_PLUGIN_ROOT: dirname(dirname(bundle)) }
-      expect(await hook("vcs-redirect", bash(`${wrapper} ${call}`), project, env)).toEqual(passes)
-    })
-
-    test("passes a link to it, since the real paths are equal", async () => {
-      const folder = await mkdtemp(join(project, "link-"))
-      const link = join(folder, "holyagent")
-      await symlink(wrapper, link)
-      expect(await hook("vcs-redirect", bash(`${link} ${call}`))).toEqual(passes)
-    })
-
-    test("keeps another path that ends in scripts/holyagent unclear", async () => {
-      const folder = await mkdtemp(join(project, "other-"))
-      await mkdir(join(folder, "scripts"))
-      const copy = join(folder, "scripts", "holyagent")
-      await writeFile(copy, await readFile(wrapper))
-      for (const path of [copy, join(folder, "scripts", "missing", "holyagent")])
-        expect(await hook("vcs-redirect", bash(`${path} ${call}`))).toEqual(unclear)
-    })
-
-    test("takes the wrapper from CLAUDE_PLUGIN_ROOT when it is set", async () => {
-      const folder = await mkdtemp(join(project, "root-"))
-      const env = { CLAUDE_PLUGIN_ROOT: folder }
-      // The running bundle's wrapper is no longer the plugin's, and a folder with none matches nothing.
-      expect(await hook("vcs-redirect", bash(`${wrapper} ${call}`), project, env)).toEqual(unclear)
-    })
   })
 
-  test("ignores a command that is not Bash, or has no command text", async () => {
-    const nothing = { stdout: "", stderr: "", code: 0 }
-    expect(
-      await hook("vcs-redirect", { tool_name: "Edit", tool_input: { command: "git push" } }),
-    ).toEqual(nothing)
-    expect(await hook("vcs-redirect", { tool_name: "Bash", tool_input: {} })).toEqual(nothing)
-    expect(await hook("vcs-redirect", { tool_name: "Bash" })).toEqual(nothing)
+  test("is the specialist section of the agent prompts, so the rule has one owner", async () => {
+    const section = (
+      await readFile(
+        join(
+          import.meta.dir,
+          "../../../runtime/src/instructions/claude-5.5/specialist/state-changes.md",
+        ),
+        "utf8",
+      )
+    ).trim()
+    const output = addedContext(
+      (await hook("subagent-start", specialist("holyagent:reviewer-code"))).stdout,
+    )
+    expect(output?.additionalContext).toBe(section)
+    const agent = await readFile(
+      join(await freshPlugin, "agents", "worker-implementation.md"),
+      "utf8",
+    )
+    expect(agent).toContain(section)
   })
 
-  test("looks only at a command that mentions git and then commit or push", async () => {
-    const nothing = { stdout: "", stderr: "", code: 0 }
-    // Not run by the host for these (its `if` rules do not match), and said nothing about here too.
-    expect(await hook("vcs-redirect", bash("python3 -c 'print(1)'"))).toEqual(nothing)
-    expect(await hook("vcs-redirect", bash("sudo ls && commit push git"))).toEqual(nothing)
-    expect(await hook("vcs-redirect", bash("python3 -c 'print(1)' # git push"))).toMatchObject({
-      stdout: preToolUse("deny", UNCLEAR),
-    })
+  test("says nothing for the root and for any agent that is not a holyagent specialist", async () => {
+    for (const type of [
+      "holyagent",
+      "holyagent:holyagent",
+      "general-purpose",
+      "Explore",
+      "other:worker",
+    ])
+      expect(await hook("subagent-start", specialist(type))).toEqual(nothing)
+    expect(await hook("subagent-start", { hook_event_name: "SubagentStart" })).toEqual(nothing)
   })
 
-  test("fails with exit 1 and a stderr line on a payload it cannot read, never exit 2", async () => {
+  test("never blocks: a payload it cannot read is exit 1 with one stderr line, never exit 2 and never a decision", async () => {
     for (const payload of ["not json", "[]", undefined]) {
-      const result = await hook("vcs-redirect", payload)
+      const result = await hook("subagent-start", payload)
       expect(result.code).toBe(1)
       expect(result.stdout).toBe("")
-      expect(result.stderr).toStartWith("holyagent hook vcs-redirect: ")
+      expect(result.stderr).toStartWith("holyagent hook subagent-start: ")
       expect(result.stderr.trimEnd().split("\n")).toHaveLength(1)
     }
+  })
+})
+
+describe("hook vcs-reminder", () => {
+  const reminded = [
+    "git commit -m x",
+    "git -C d commit -m x",
+    "git push",
+    "git push --force origin main",
+    "git push -f origin main",
+    "git push origin +main",
+    "cd a && git commit -am x && git push",
+    "sudo git push",
+    "bash -c 'git push origin main'",
+    "echo $(git commit -m x)",
+  ]
+
+  test("adds the one-line reminder as context, with no permission decision, for a command that mentions git commit or push", async () => {
+    for (const command of reminded) {
+      const result = await hook("vcs-reminder", bash(command))
+      expect(result.code).toBe(0)
+      expect(result.stderr).toBe("")
+      const output = addedContext(result.stdout)
+      expect(Object.keys(output ?? {}).toSorted()).toEqual(["additionalContext", "hookEventName"])
+      expect(output?.hookEventName).toBe("PreToolUse")
+      const text = String(output?.additionalContext)
+      expect(text).toContain("force-push")
+      expect(text).toContain("protected branch")
+      expect(text).toContain("approval")
+      expect(text).toContain("no version-control writes")
+      expect(text.trim().split("\n")).toHaveLength(1)
+      expect(result.stdout).not.toContain("permissionDecision")
+    }
+  })
+
+  test("says nothing for any other command, any other tool and an input without a command", async () => {
+    for (const command of [
+      "git status",
+      "git log --oneline",
+      "npm test",
+      "ls -la",
+      "commit push git",
+      "python3 -c 'print(1)'",
+    ])
+      expect(await hook("vcs-reminder", bash(command))).toEqual(nothing)
+    expect(
+      await hook("vcs-reminder", { tool_name: "Edit", tool_input: { command: "git push" } }),
+    ).toEqual(nothing)
+    expect(await hook("vcs-reminder", { tool_name: "Bash", tool_input: {} })).toEqual(nothing)
+    expect(await hook("vcs-reminder", { tool_name: "Bash" })).toEqual(nothing)
+  })
+
+  test("never denies or redirects: nothing it prints carries a decision, whatever the command", async () => {
+    for (const command of [
+      ...reminded,
+      "g''it commit",
+      "$(printf 'git push')",
+      "git push\u0000 --force",
+      "x".repeat(50_000) + "git push",
+    ]) {
+      const result = await hook("vcs-reminder", bash(command))
+      expect(result.code).toBe(0)
+      expect(result.stdout).not.toContain("permissionDecision")
+      expect(result.stdout).not.toContain("deny")
+    }
+  })
+
+  test("never blocks: a payload it cannot read is exit 1 with one stderr line, never exit 2", async () => {
+    for (const payload of ["not json", "[]", undefined]) {
+      const result = await hook("vcs-reminder", payload)
+      expect(result.code).toBe(1)
+      expect(result.stdout).toBe("")
+      expect(result.stderr).toStartWith("holyagent hook vcs-reminder: ")
+      expect(result.stderr.trimEnd().split("\n")).toHaveLength(1)
+    }
+  })
+})
+
+describe("the removed vcs-redirect hook", () => {
+  test("is not a command any more", async () => {
+    const result = await hook("vcs-redirect", bash("git commit -m x"))
+    expect(result.code).not.toBe(0)
+    expect(result.stdout).toBe("")
   })
 })
 
@@ -1689,7 +1506,7 @@ describe("hook agent-launch", () => {
 })
 
 describe("hooks that need no state", () => {
-  test("do not run git, so a failing git cannot stop vcs-redirect or workflow", async () => {
+  test("do not run git, so a failing git cannot stop the version-control hooks or workflow", async () => {
     const bin = await mkdtemp(join(tmpdir(), "holyagent-hook-badgit-"))
     try {
       await writeFile(
@@ -1700,10 +1517,12 @@ describe("hooks that need no state", () => {
         },
       )
       const env = { PATH: `${bin}:${dirname(process.execPath)}:/usr/bin:/bin` }
-      expect(await hook("vcs-redirect", bash("git push --force"), project, env)).toMatchObject({
-        stdout: preToolUse("deny", FORCE),
-        code: 0,
-      })
+      expect(
+        addedContext((await hook("vcs-reminder", bash("git push --force"), project, env)).stdout),
+      ).toMatchObject({ hookEventName: "PreToolUse" })
+      expect(
+        await hook("subagent-start", { agent_type: "holyagent:worker-debugging" }, project, env),
+      ).toMatchObject({ code: 0, stderr: "" })
       expect(await hook("workflow", inlineRun(ALLOWED_SCRIPT), project, env)).toEqual({
         stdout: preToolUse("allow", INLINE_REASON),
         stderr: "",
@@ -1780,11 +1599,15 @@ describe("the built wrapper", () => {
 
   test("runs each hook through the bundle", async () => {
     const env = { PATH: `${BUN}:/usr/bin:/bin`, HOME: home }
-    expect(await call("vcs-redirect", bash("cd a && git push -f"), env)).toEqual({
-      code: 0,
-      stdout: preToolUse("deny", FORCE),
-      stderr: "",
-    })
+    const reminder = await call("vcs-reminder", bash("cd a && git push -f"), env)
+    expect(reminder).toMatchObject({ code: 0, stderr: "" })
+    expect(addedContext(reminder.stdout)?.hookEventName).toBe("PreToolUse")
+    expect(String(addedContext(reminder.stdout)?.additionalContext)).toContain(
+      "holyagent vcs commit",
+    )
+    const start = await call("subagent-start", { agent_type: "holyagent:reviewer-code" }, env)
+    expect(start).toMatchObject({ code: 0, stderr: "" })
+    expect(addedContext(start.stdout)).toMatchObject({ hookEventName: "SubagentStart" })
     expect(await call("workflow", inlineRun(ALLOWED_SCRIPT), env)).toMatchObject({
       code: 0,
       stdout: preToolUse("allow", INLINE_REASON),
@@ -1835,7 +1658,7 @@ describe("the built wrapper", () => {
   test("without Bun it says so on stderr and exits 127, hooks included, never 0", async () => {
     const empty = await mkdtemp(join(tmpdir(), "holyagent-hook-nobun-"))
     try {
-      for (const args of [["hook", "session-start"], ["hook", "vcs-redirect"], ["status"]]) {
+      for (const args of [["hook", "session-start"], ["hook", "vcs-reminder"], ["status"]]) {
         const result = await $`/bin/sh ${wrapper} ${args}`
           .cwd(project)
           .env({ PATH: empty, HOME: empty })
