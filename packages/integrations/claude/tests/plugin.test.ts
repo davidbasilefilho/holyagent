@@ -384,9 +384,18 @@ describe("agents", () => {
       expect(own.includes("Monitor")).toBe(own.includes("Bash"))
       expect(own.includes("Write")).toBe(route.capabilities.includes("Write"))
       expect(own.includes("WebSearch") || own.includes("WebFetch")).toBe(false)
-      expect(own.includes("mcp__plugin_exa_exa__web_search_exa")).toBe(
-        route.capabilities.includes("Search"),
+      const web = own.filter((tool) => /^mcp__(claude_ai_Exa|plugin_exa_exa)__/.test(tool))
+      expect(web).toEqual(
+        route.capabilities.includes("Search")
+          ? [
+              "mcp__claude_ai_Exa__web_search_exa",
+              "mcp__claude_ai_Exa__web_fetch_exa",
+              "mcp__plugin_exa_exa__web_search_exa",
+              "mcp__plugin_exa_exa__web_fetch_exa",
+            ]
+          : [],
       )
+      expect(own.some((tool) => tool.endsWith("agent_run"))).toBe(false)
       expect(own.some((tool) => tool.startsWith("mcp__t3-code__"))).toBe(
         route.capabilities.includes("VisualInspection"),
       )

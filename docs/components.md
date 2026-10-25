@@ -57,7 +57,7 @@ Settings HolyAgent relies on:
 
 ## Exa
 
-The HolyAgent plugin depends on Exa's Claude Code plugin, `exa@claude-plugins-official`. It brings a hosted MCP server (`https://mcp.exa.ai/mcp`) and two skills. The Search specialists (Librarian.lookup and Librarian.research) get its `web_search_exa`, `web_fetch_exa` and `agent_run` tools in place of Claude Code's `WebSearch` and `WebFetch`, and their role text says when to use each. The server works anonymously under a rate limit; `agent_run` appears only after signing in to Exa (OAuth) or with an API key.
+The HolyAgent plugin depends on Exa's Claude Code plugin, `exa@claude-plugins-official`. It brings a hosted MCP server (`https://mcp.exa.ai/mcp`) and two skills. The Search specialists (Librarian.lookup and Librarian.research) get `web_search_exa` and `web_fetch_exa` in place of Claude Code's `WebSearch` and `WebFetch`, and their role text says when to use each. Their tool lists name both the claude.ai connector named Exa (`mcp__claude_ai_Exa__*`) and the plugin server (`mcp__plugin_exa_exa__*`), so either the connector or the authenticated plugin works; the plugin server works anonymously under a rate limit. They do not get `agent_run` (Run Exa Agent), which the connector can block. When neither server is connected, they report a missing web tool as a blocker instead of guessing.
 
 `holyagent setup claude` also adds `WebSearch` and `WebFetch` to the project's `permissions.deny`, so agents outside HolyAgent's lists do not fall back to them either. A project that already has a `permissions.deny` list keeps it unchanged; add the two entries by hand there. A plugin cannot set permissions, so the marketplace route alone leaves the built-in tools on for agents other than the Search specialists.
 
