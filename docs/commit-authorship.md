@@ -6,7 +6,7 @@ Commits and PR text read as the user wrote them: the author and committer are th
 
 `holyagent vcs` has two commands. Everything else a change needs is plain Git and `gh`: branches, pushes, merges, force-push protection (a hook, below) and CI (`gh pr checks <n> --watch`).
 
-A previous design also committed through GitHub's API as the credential owner (`vcs detect`, the `api` and `git-owner` paths, a read-back of the first commit, and `vcs push`, `vcs branch` and `vcs ci`). It is gone: it needed a GraphQL endpoint that is blocked in some hosted sessions, signed or unsigned commits depending on the session, and a cache to explain it. Commits are now plain `git commit` with the repository's own identity and hooks, which also keeps Intent state versioned in Git like any other file.
+An earlier design also detected how to commit and then committed through GitHub's API as the credential owner, read the first commit back, and wrapped pushing, branching and CI watching in commands of their own. All of that is gone: it needed a GraphQL endpoint that is blocked in some hosted sessions, signed or unsigned commits depending on the session, and a cache to explain it. Commits are now plain `git commit` with the repository's own identity and hooks, which also keeps Intent state versioned in Git like any other file.
 
 ## What `vcs commit` does
 
@@ -38,7 +38,7 @@ An unknown key inside `vcs` is an error that names the file (an old `api` key is
 
 ## The `commit-msg` hook
 
-`holyagent hook commit-msg <message-file>` runs the same cleaning and check on the message file git passes to a `commit-msg` hook. It rewrites the file without the attribution lines and exits 3 on a refused message, which stops the commit, so a commit made with plain `git commit` (by the user, or by an agent that slipped past the redirect) gets the same text rule. Git's own comment lines (`#`) are left alone and not checked.
+`holyagent hook commit-msg <message-file>` runs the same cleaning and check on the message file git passes to a `commit-msg` hook. It rewrites the file without the attribution lines and exits 3 on a refused message, which stops the commit, so a commit made with plain `git commit` (by the user, or by an agent that slipped past the redirect) gets the same text rule. Git's own comment lines (`core.commentString` or `core.commentChar`, `#` by default) are left alone and not checked, and so is everything after the scissors line that `git commit -v` adds before the staged diff: only the message above it is cleaned, checked and written back.
 
 Install it in any repository as `.git/hooks/commit-msg`:
 
@@ -60,7 +60,7 @@ This repository wires it that way in `lefthook.yml`, through the built wrapper i
 
 ## Redirecting raw git
 
-A `PreToolUse` hook on the Bash tool denies a `git commit` command and names `holyagent vcs commit`, and denies a force push (`--force`, `-f`, `--force-with-lease`, `--force-if-includes`, a `+` refspec); a plain `git push` passes. [hooks.md](hooks.md) has the details and its limits.
+A `PreToolUse` hook on the Bash tool denies a `git commit` command and names `holyagent vcs commit`, and denies a force push or a push that deletes or mirrors remote refs (`--force`, `-f`, `--force-with-lease`, `--force-if-includes`, `--mirror`, `--delete`, `-d`, `--prune`, any unambiguous abbreviation of those, a `+` or `:` refspec) and a push argument it cannot read with certainty (a variable, substitution, brace, glob or escape it does not decode); a plain `git push` with literal arguments passes. [hooks.md](hooks.md) has the details and its limits.
 
 ## Settings that `holyagent setup claude` writes
 

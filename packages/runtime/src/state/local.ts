@@ -18,8 +18,8 @@ export const Vcs = Schema.Struct({
   base: Schema.optionalKey(Text),
   pullRequest: Schema.optionalKey(Text),
   /**
-   * What the removed `vcs detect` kept. It is read as anything and kept as it was, so an older file
-   * never breaks the other commands.
+   * What an earlier version of the CLI kept about how commits are made. It is read as anything and
+   * kept as it was, so an older file never breaks the other commands.
    */
   detection: Schema.optionalKey(Schema.Unknown),
 })

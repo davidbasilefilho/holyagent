@@ -482,6 +482,30 @@ describe("report and prompt", () => {
     })
   })
 
+  test("a key line whose support is only emphasis marks and punctuation is no support", async () => {
+    await createIntent()
+    const id = await dispatchWriter()
+    data(await cli(["assignment", "record", id, "--agent", "agent-1"]))
+    const accept = ["assignment", "close", id, "--outcome", "success", "--accept", "ok"]
+    for (const block of [
+      report("**parses:**", "**tests:**"),
+      report("parses: **", "tests: passed"),
+      report("parses: `` .", "tests: passed"),
+      report("- parses: ---", "tests: passed"),
+    ]) {
+      const refused = await cli(accept, block)
+      expect(refused.code).toBe(3)
+      expect(refused.stderr).toContain("error: InsufficientAcceptance:")
+      expect(refused.stderr).toContain('criterion "parses"')
+    }
+    expect(data(await cli(["assignment", "show", id, "--full"]))).toMatchObject({
+      state: "Running",
+    })
+    expect(
+      data(await cli(accept, report("**parses:** ran it", "tests: `bun test`"))),
+    ).toMatchObject({ accepted: true })
+  })
+
   test("a support given as indented sub-bullets under its entry counts", async () => {
     await createIntent()
     const id = await dispatchWriter()

@@ -55,8 +55,8 @@ const normalized = (text: string): string =>
  * The declared key an entry belongs to and its support: the entry is `<key>: <support>`, where the
  * key matches a declared criterion or label after normalizing. A key may itself hold colons, so
  * every colon is tried and the longest matching head wins ("Handles errors: network: ok" is the
- * support of "Handles errors: network", not of "Handles errors"). An entry that is only a key has
- * no support and claims nothing.
+ * support of "Handles errors: network", not of "Handles errors"). An entry that is only a key, or
+ * whose support is only emphasis marks and punctuation, has no support and claims nothing.
  */
 const ownerOf = (
   entry: string,
@@ -65,7 +65,8 @@ const ownerOf = (
   for (let at = entry.lastIndexOf(":"); at > 0; at = entry.lastIndexOf(":", at - 1)) {
     const key = known.get(normalized(entry.slice(0, at)))
     const support = entry.slice(at + 1).trim()
-    if (key !== undefined && support !== "") return { key, support }
+    // Emphasis marks, backticks and punctuation alone (`**Key:**`) are no support.
+    if (key !== undefined && /[\p{L}\p{N}]/u.test(support)) return { key, support }
   }
   return undefined
 }

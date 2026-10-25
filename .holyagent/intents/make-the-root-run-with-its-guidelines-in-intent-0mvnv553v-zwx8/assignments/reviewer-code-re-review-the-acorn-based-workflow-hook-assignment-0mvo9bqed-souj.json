@@ -1,0 +1,70 @@
+{
+  "id": "assignment-0mvo9bqed-souj",
+  "intentId": "intent-0mvnv553v-zwx8",
+  "intentRevision": 12,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-acorn-based-workflow-hook",
+  "objective": "Re-review the acorn-based Workflow hook in 8fdedd0..7e840ab on release/0.1.2/feat/inline-workflows for correctness, regressions and false allows.",
+  "state": "Succeeded",
+  "scope": [
+    "Worktree /home/davidbasile/dev/holyagent-feat-inline-workflows; run commands there. Earlier findings and probes: r-kuyn.json, r-gcrq.json and probe*.ts in /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad. Run the probes and try new bypasses against the built hook; confirm normal root scripts (pipeline of writer and review, parallel, args entries, then, Object.fromEntries) stay allowed; confirm acorn is pinned and bundled and the dependency follows .claude/CLAUDE.md; run mise run verify."
+  ],
+  "constraints": [
+    "Read-only: no edits and no version-control writes."
+  ],
+  "criteria": [
+    {
+      "text": "The earlier blocker is marked closed or open with evidence, and any new blocking finding has file, line and a concrete failure.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify is run on 7e840ab and its result reported.",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "checks"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvo8x9zp-a059"
+  ],
+  "followUpOf": "assignment-0mvo6nomd-kuyn",
+  "specialist": {
+    "agentId": "workflow:wf_dcdb1edb-cb1/assignment-0mvo9bqed-souj",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-25T20:05:14.726Z",
+    "finishedAt": "2026-10-25T20:12:24.760Z"
+  },
+  "result": "status: done\nchecks:\n- mise run verify (worktree /home/davidbasile/dev/holyagent-feat-inline-workflows, HEAD 7e840ab; log /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/verify-rc4c.log) -> exit 0\n- bun run scratchpad/probe.ts, probe2.ts, probe3.ts, probe4.ts (earlier probes against the hook command) -> exit 0\n- bun run scratchpad/probe5.ts (44 new bypass and normal-shape probes against workflowRefusal) -> exit 0\n- bun run scratchpad/dist.ts (built dist/scripts/holyagent.js hook workflow, 7 payloads) -> exit 0\n- Skill code-review 8fdedd0...7e840ab -> exit 0\nblockers:\n- OPEN (behavior, false allow against the documented guarantee): packages/runtime/src/cli/workflow-check.ts:458-466 (writeTarget), :395 (memberExpression) and :177-178 (CALLABLE_PROPERTIES includes assign and freeze). docs/hooks.md says a script 'may not assign to a global or into one (budget = 1, Math.max = ...)' and 'a method may be called only by a name from a fixed list of data methods'. Run through workflowRefusal after a valid agent() call, each returns ALLOW: `Object.assign(Math, {max: (a) => a})`, `Object.freeze(JSON)`, `const o = Math; o.max = () => 1`, `const O = Object; O.assign = (t, s) => { s.agentType = 'general-purpose'; return s }`, `Object.assign(Object, {assign: (t, s) => { s.agentType = 'general-purpose' }})`, `Object.assign(JSON, {stringify: (x) => { x.agentType = 'general-purpose'; return '' }})`, `const f = Object.groupBy; f([1], (x) => x)` and `const { assign } = Object; assign(Math, {})`. Only the direct `Math.max = ...` form is refused and tested (tests/hooks.test.ts:500-503). A script can therefore replace or freeze a built-in (Object.assign, JSON.stringify, Array methods) that the Workflow runtime may call with its own agent() options. I could not run the Workflow sandbox, so I could not show that the host shares the realm with the script, and I found no route to Function, eval, Bun, fetch or a non-holyagent agent() call by name (I listed every own property of the allowed globals and prototypes minus DENIED_NAMES and found nothing that reaches code). The failure is that the stated guarantee does not hold and a global can be rewritten with no prompt. Resolve one of two ways. Either (a) refuse `assign` and `freeze` unless the first argument is a literal, a call result or a name declared from a literal, refuse a member write whose root was initialised from a global or a member of one (the alias form), and refuse reading a CALLABLE_PROPERTIES-excluded member as a value or by destructuring from a global; add a test per form beside tests/hooks.test.ts:500. Or (b) if the maintainer accepts that the sandbox isolates the script's built-ins from the host, narrow the docs/hooks.md claims to 'a direct assignment into a global' and say so in docs/decisions.md. Root decides which.\nnotes:\n- The earlier blocker (r-kuyn: computed destructuring key `const { [\"constructor\"]: F } = Math.max`, `Array.of['constructor']`, and a dummy parameter `(fetch) => 1` making fetch, Bun or setTimeout look declared) is CLOSED on 7e840ab. probe2.ts: destrKey, destrConcat, arrayOf, arrayIn, paramFetch, paramBun and paramSetTimeout all give nothing. The refusals come from computed keys being refused (workflow-check.ts:326, :386-389) and from HOST_GLOBALS names being undeclarable (:284). tests/hooks.test.ts:456-473 add a case for each shape. probe.ts: ctor, ctorTpl, bun, fetch, extraKey, isolation, proto, dupe, nest and deep are all refused.\n- Normal root scripts stay allowed: probe3.ts gives ALLOW for the writer-then-reviewer pipeline, parallel(args.entries.map(...)) with e.prompt, e.model, e.effort and e.id, pipeline([...]) with (prev) =>, .then chains, Object.fromEntries(rs.map(...)), array destructuring, Promise.all, object spread, try/catch, template literals, phase(), budget.remaining(), division, and `all[0]`; probe2.ts gives ALLOW for for-of over Object.entries(args). The built dist/scripts/holyagent.js (run through `hook workflow`) allows the plain script and refuses constructor, computed-destructuring, fetch and general-purpose payloads.\n- acorn is pinned and bundled: packages/runtime/package.json adds \"acorn\": \"8.19.0\" (exact), bun.lock:41 and :145 resolve acorn@8.19.0, and dist/scripts/holyagent.js embeds acorn 8.19.0 (line 16359, version var). The tree is clean after verify, so the committed dist matches the build. It follows .claude/CLAUDE.md: Bun has no JS parser, and the choice is recorded in docs/decisions.md. The check uses Effect.try with no try/catch, a JSDoc on the export, and a Schema-free input (a plain string). I read these but did not run the Workflow sandbox.\n- Optional over-refusals that fail closed to the normal prompt: `new Error(...)` and `new Set()` (NewExpression is refused, so Map, Set and Error in GLOBALS are unusable); a write to a name declared later at module level from an earlier function (`function f(){ state.x = 1 } const state = {}` gives 'assigns into a global', because writeTarget at :462 resolves bound() at walk time while other names resolve after the walk); a left-deep chain of about 130 `+` or `||` operands hits MAX_DEPTH 120; an index by a variable (`all[n]`) is refused.\n- Optional performance: acorn's parse is quadratic in the number of top-level declarations. Through the built hook, a 778k-character script of 40000 `const x=i;` statements takes about 5.0 s, and 20000 statements took 1.05 s in-process. Near the 1,000,000-character cap this approaches the hook's 10 s timeout, and with onFailure block a timeout blocks the Workflow call instead of prompting. Ordinary scripts take about 40 ms. Consider lowering MAX_WORKFLOW_SCRIPT (it is exported but unused outside the file, so it could also be made private).\n- Optional: `while (true) { await agent(...) }` and similar unbounded loops are allowed, so a loop is bounded only by the budget; `'x'.match('(a+)+$')` style calls are refused only because match is not in the list. Optional: `declarePattern` (:302) reports 'nests too deep' for a missing node as well, which hides the cause.\n- The code-review findings were checked as claims: assign/freeze and alias tampering (confirmed, blocker above); method read into a variable (confirmed, same blocker); hoisted write (confirmed, optional); new Error/Set (confirmed, optional); MAX_DEPTH on binary chains (confirmed, optional); 'nests too deep' message (confirmed, optional); references kept after a refusal (accepted, optional); exported MAX_WORKFLOW_SCRIPT (confirmed, optional); exact acorn pin (rejected: the pin is deliberate and the lockfile, package.json and the bundle agree).\n- The tree was static (git status clean before and after) during the review; the evidence is not from a moving tree.\nevidence:\n- The earlier blocker is marked closed or open with evidence, and any new blocking finding has file, line and a concrete failure.: Earlier blocker (r-kuyn: computed destructuring key, Array.of['constructor'], dummy-parameter shadow of fetch/Bun/setTimeout) CLOSED: probe2.ts destrKey, destrConcat, arrayOf, arrayIn, paramFetch, paramBun and paramSetTimeout all print 'nothing'; workflow-check.ts:284, :326 and :386-389; tests at packages/integrations/claude/tests/hooks.test.ts:456-473. New blocker OPEN: workflow-check.ts:458-466, :395, :177-178, with the 8 ALLOW forms listed in blockers (probe5.ts: assignMath, freezeJSON, aliasWrite, aliasObjAssign, tamperViaAssign, tamperJSON, readMethod, destrMethod), contradicting docs/hooks.md 'may not assign to a global or into one'.\n- mise run verify is run on 7e840ab and its result reported.: mise run verify on HEAD 7e840ab -> exit 0: type-check no errors in 104 files, lint no problems in 105 files, format check all 213 files formatted, tests 767 pass, 1 skip, 0 fail, 3902 expect() calls; log /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/verify-rc4c.log; git status clean afterwards.\n- findings: One blocker (global tampering and method-read bypass of the documented guarantees, workflow-check.ts:458-466 and :395) and the optional notes above; earlier blocker closed. Probes: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/probe5.ts, probe2.ts, probe3.ts, enum.ts, perf.ts, dist.ts.\n- checks: mise run verify exit 0 (767 pass, 0 fail); probe.ts, probe2.ts, probe3.ts, probe4.ts, probe5.ts, dist.ts and perf.ts exit 0; code-review skill on 8fdedd0...7e840ab run (built-in text loaded) and its findings classified; the Workflow sandbox itself was not run, so realm sharing with the host was only read, not tested.",
+  "acceptance": {
+    "revision": 12,
+    "rationale": "Blocker reproduced through workflowRefusal; verify exit 0 on 7e840ab.",
+    "criteria": [
+      {
+        "criterion": "The earlier blocker is marked closed or open with evidence, and any new blocking finding has file, line and a concrete failure.",
+        "support": "Earlier blocker (r-kuyn: computed destructuring key, Array.of['constructor'], dummy-parameter shadow of fetch/Bun/setTimeout) CLOSED: probe2.ts destrKey, destrConcat, arrayOf, arrayIn, paramFetch, paramBun and paramSetTimeout all print 'nothing'; workflow-check.ts:284, :326 and :386-389; tests at packages/integrations/claude/tests/hooks.test.ts:456-473. New blocker OPEN: workflow-check.ts:458-466, :395, :177-178, with the 8 ALLOW forms listed in blockers (probe5.ts: assignMath, freezeJSON, aliasWrite, aliasObjAssign, tamperViaAssign, tamperJSON, readMethod, destrMethod), contradicting docs/hooks.md 'may not assign to a global or into one'."
+      },
+      {
+        "criterion": "mise run verify is run on 7e840ab and its result reported.",
+        "support": "mise run verify on HEAD 7e840ab -> exit 0: type-check no errors in 104 files, lint no problems in 105 files, format check all 213 files formatted, tests 767 pass, 1 skip, 0 fail, 3902 expect() calls; log /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/verify-rc4c.log; git status clean afterwards."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "One blocker (global tampering and method-read bypass of the documented guarantees, workflow-check.ts:458-466 and :395) and the optional notes above; earlier blocker closed. Probes: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/probe5.ts, probe2.ts, probe3.ts, enum.ts, perf.ts, dist.ts."
+      },
+      {
+        "label": "checks",
+        "support": "mise run verify exit 0 (767 pass, 0 fail); probe.ts, probe2.ts, probe3.ts, probe4.ts, probe5.ts, dist.ts and perf.ts exit 0; code-review skill on 8fdedd0...7e840ab run (built-in text loaded) and its findings classified; the Workflow sandbox itself was not run, so realm sharing with the host was only read, not tested."
+      }
+    ]
+  },
+  "createdAt": "2026-10-25T20:05:14.726Z"
+}

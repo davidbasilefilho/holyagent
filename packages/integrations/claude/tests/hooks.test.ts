@@ -67,7 +67,9 @@ const preToolUse = (permissionDecision: string, permissionDecisionReason: string
 const COMMIT =
   "Commit with `holyagent vcs commit -m <headline> -- <paths…>`, which adds the Intent's state and checks the message."
 const FORCE =
-  "Force pushes are denied. Push without --force, --force-with-lease or a + refspec; rewriting published history needs the user's approval, and the user pushes it."
+  "Force pushes are denied (--force, --force-with-lease, --mirror, --delete, --prune, a + or : refspec). Push without them; rewriting or deleting published history needs the user's approval, and the user does it."
+const UNCLEAR =
+  "This command could force-push and cannot be read with certainty (a variable, substitution, brace, glob or escape in a push argument, or nesting too deep). Write the push out with literal branch names and flags, in a shallower command."
 
 describe("hook vcs-redirect", () => {
   const denied: ReadonlyArray<readonly [string, string]> = [
@@ -168,7 +170,22 @@ describe("hook vcs-redirect", () => {
     ["git push origin +main", FORCE],
     ["git push origin +HEAD:main", FORCE],
     ["git push origin 'feature:+x'", ""],
-  ])("force pushes: %j", async (command, reason) => {
+    ["git push --mirror", FORCE],
+    ["git push --delete origin old", FORCE],
+    ["git push -d origin old", FORCE],
+    ["git push origin :old", FORCE],
+    ["git push --prune origin", FORCE],
+    ["git push --force-w origin main", FORCE],
+    ["git push --mirr origin", FORCE],
+    ["git push $'\\x2d\\x2dforce' origin main", FORCE],
+    ["git push $'\\055f' origin main", FORCE],
+    ["git push origin $branch", UNCLEAR],
+    ['git push -u origin "$(git branch --show-current)"', UNCLEAR],
+    ["git push origin refs/heads/*", UNCLEAR],
+    ["git push origin {a,b}", UNCLEAR],
+    ["git push origin $'\\qmain'", UNCLEAR],
+    ["git push origin main", ""],
+  ])("pushes: %j", async (command, reason) => {
     const result = await hook("vcs-redirect", bash(command))
     expect(result).toEqual(
       reason === ""
@@ -203,6 +220,10 @@ describe("hook vcs-redirect", () => {
     ["{ echo a; echo b; } | tee out", ""],
     ["git commit -m 'a'\\\n -m 'b'", COMMIT],
     ["x=$(git rev-parse HEAD) && echo $x", ""],
+    ["cat <<< x\ngit commit -m y", COMMIT],
+    [": <<< x\ngit push --force", FORCE],
+    ["echo $((1<<2))\ngit commit -m x", COMMIT],
+    ["(( x = 1 << 2 ))\ngit commit -m x", COMMIT],
   ])("never errors on %j", async (command, reason) => {
     const result = await hook("vcs-redirect", bash(command))
     expect(result).toEqual(
@@ -215,8 +236,12 @@ describe("hook vcs-redirect", () => {
   test("stays quiet about a very long or odd command", async () => {
     const long = `echo ${"git commit ".repeat(5000)}`
     expect(await hook("vcs-redirect", bash(long))).toEqual({ stdout: "", stderr: "", code: 0 })
-    const nested = `${"$(".repeat(300)}echo x${")".repeat(300)}`
-    expect((await hook("vcs-redirect", bash(nested))).code).toBe(0)
+    const nested = `${"$(".repeat(300)}git commit -m x${")".repeat(300)}`
+    expect(await hook("vcs-redirect", bash(nested))).toEqual({
+      stdout: preToolUse("deny", UNCLEAR),
+      stderr: "",
+      code: 0,
+    })
     expect((await hook("vcs-redirect", bash("echo '\"\\`$(("))).code).toBe(0)
   })
 
@@ -288,6 +313,73 @@ describe("hook commit-msg", () => {
       expect((await cli(["hook", "commit-msg", file], "", domain)).code).toBe(0)
     } finally {
       await rm(domain, { recursive: true, force: true })
+    }
+  })
+
+  const SCISSORS = "# ------------------------ >8 ------------------------"
+  const DIFF = [
+    "# Do not modify or remove the line above.",
+    "# Everything below it will be ignored.",
+    "diff --git a/a.md b/a.md",
+    "+Ask the user which setting to use.",
+    "+Co-Authored-By: Claude <noreply@anthropic.com>",
+    "",
+  ].join("\n")
+
+  test("checks only the message above a verbose commit's scissors line", async () => {
+    const text = `Fix the parser\n\n# Please enter the commit message.\n${SCISSORS}\n${DIFF}`
+    const file = await messageFile(text)
+    const result = await cli(["hook", "commit-msg", file], "", project)
+    expect(result).toEqual({ stdout: "", stderr: "", code: 0 })
+    expect(await readFile(file, "utf8")).toBe(text)
+  })
+
+  test("cleans the message above the scissors line and leaves the diff below it as it was", async () => {
+    const file = await messageFile(
+      `Fix the parser\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n${SCISSORS}\n${DIFF}`,
+    )
+    expect((await cli(["hook", "commit-msg", file], "", project)).code).toBe(0)
+    expect(await readFile(file, "utf8")).toBe(`Fix the parser\n\n${SCISSORS}\n${DIFF}`)
+  })
+
+  test("still refuses a message above the scissors line", async () => {
+    const file = await messageFile(`Do it as the user asked\n${SCISSORS}\n${DIFF}`)
+    const result = await cli(["hook", "commit-msg", file], "", project)
+    expect(result.code).toBe(3)
+    expect(result.stderr).toContain("MessageRefused")
+  })
+
+  test("honours core.commentChar for the scissors line and the comment lines", async () => {
+    const repo = await mkdtemp(join(tmpdir(), "holyagent-hook-comment-"))
+    try {
+      const git = (...args: Array<string>) =>
+        $`git ${args}`
+          .cwd(repo)
+          .env({
+            ...process.env,
+            HOME: home,
+            GIT_CONFIG_GLOBAL: "/dev/null",
+            GIT_CONFIG_NOSYSTEM: "1",
+            PATH: `${dirname(process.execPath)}:/usr/bin:/bin`,
+          })
+          .quiet()
+      await git("init", "-q", "-b", "main", ".")
+      await git("config", "core.commentChar", ";")
+      const text = [
+        "Fix the parser",
+        "",
+        "; the user may edit this",
+        "; ------------------------ >8 ------------------------",
+        "+Ask the user which setting to use.",
+        "",
+      ].join("\n")
+      const file = join(repo, "message")
+      await writeFile(file, text)
+      const result = await cli(["hook", "commit-msg", file], "", repo)
+      expect(result).toEqual({ stdout: "", stderr: "", code: 0 })
+      expect(await readFile(file, "utf8")).toBe(text)
+    } finally {
+      await rm(repo, { recursive: true, force: true })
     }
   })
 
@@ -437,6 +529,10 @@ describe("hook workflow", () => {
     ],
     ["decimal numbers", script("const n = 1.5e3 + 0.5 + 10", GOOD)],
     [
+      "an agentType whose escapes spell a specialist",
+      script(start('"holyagent:\\u0077orker-implementation"')),
+    ],
+    [
       "array literals after operators, keywords and brackets",
       script(
         GOOD,
@@ -444,6 +540,47 @@ describe("hook workflow", () => {
         "const b = [...a, [3]]",
         "const c = a.map((x) => [x, x])",
         "return [a, b, c]",
+      ),
+    ],
+    ["division, hexadecimal and separated numbers", script("const n = 4 / 2 + 0x1f + 1_000", GOOD)],
+    [
+      "a numeric index, an optional chain and a method call on the budget",
+      script(
+        GOOD,
+        "const a = [1, 2]",
+        "log(a[0], args?.entries, args.entries.map((x) => x)[0], 'abc'[0])",
+        "if (budget.remaining() < 10) return null",
+      ),
+    ],
+    [
+      "the same name in different scopes, a hoisted function and a closure",
+      script(
+        "const total = size(args)",
+        "function size(value) { const total = JSON.stringify(value).length; return total }",
+        "const run = (n, limit = n) => { let count = 0; for (const x of [1, 2]) { count += x } return count + limit }",
+        "try { log(run(1)) } catch (error) { log(error.message) } finally { log('done') }",
+        "{ const total = 2; log(total) }",
+        GOOD,
+      ),
+    ],
+    [
+      "destructuring of plain keys with defaults and a rest",
+      script(
+        "const { id, prompt = 'p', ...others } = args.entries[0]",
+        "const [first, , third = 3] = [1, 2]",
+        "log(id, prompt, others, first, third)",
+        GOOD,
+      ),
+    ],
+    [
+      "a loop with break and continue, a switch and a ternary",
+      script(
+        "let n = 0",
+        "while (n < 3) { n += 1; if (n === 2) continue; if (n > 5) break }",
+        "switch (n) { case 1: log('one'); break; default: log(n > 1 ? 'many' : 'none') }",
+        "for (let i = 0; i < 2; i++) { n += i }",
+        "for (const key in args) { log(key) }",
+        GOOD,
       ),
     ],
     [
@@ -467,7 +604,6 @@ describe("hook workflow", () => {
     ["a bare specialist name", start('"worker-implementation"')],
     ["a name with trailing text", start('"holyagent:worker-implementation "')],
     ["another case", start('"HolyAgent:worker-implementation"')],
-    ["an escaped literal", start('"holyagent:\\u0077orker-implementation"')],
   ])("says nothing for %s", async (_label, bad) => {
     expect(await hook("workflow", inlineRun(script(bad)))).toEqual(NOTHING)
     expect(await hook("workflow", inlineRun(script(GOOD, bad)))).toEqual(NOTHING)
@@ -545,14 +681,9 @@ describe("hook workflow", () => {
     ["a destructured constructor", "const { constructor } = () => 1"],
     ["a number followed by member access", '5..constructor.constructor("return agent")()'],
     ["a number with a single dot member", "5.constructor"],
-    ["a hexadecimal number", "const n = 0x1f"],
-    ["a number with a separator", "const n = 1_000"],
     ["a number with a suffix", "const n = 10n"],
-    ["a plain index", "const a = [1, 2]\nlog(a[0])"],
     ["an index by a variable", "const a = [1, 2]\nconst i = 0\nlog(a[i])"],
     ["an optional subscript", "log(args?.['entries'])"],
-    ["a subscript after a call", "log(args.entries.map((x) => x)[0])"],
-    ["a subscript after a string", "log('abc'[0])"],
     ["Bun", "await Bun.$`echo hi`"],
     ["fetch", "await fetch('http://x')"],
     ["a timer", "setTimeout(() => 1, 1)"],
@@ -583,6 +714,146 @@ describe("hook workflow", () => {
     expect(await hook("workflow", inlineRun(script(GOOD, bad)))).toEqual(NOTHING)
   })
 
+  // The bypasses of the hand-written lexer, each of which reached Function or a host global with a
+  // legitimate agent() call beside it.
+  test.each<readonly [string, string]>([
+    [
+      "a quoted constructor key in a pattern",
+      'const { "constructor": F } = Array\nF("return agent")()',
+    ],
+    [
+      "a computed constructor key in a pattern",
+      'const { ["constructor"]: F } = Math.max\nF("return process")()',
+    ],
+    [
+      "a concatenated key in a pattern",
+      'const { ["con" + "structor"]: F } = Math.max\nF("return 1")()',
+    ],
+    ["a plain constructor key in a pattern", "const { constructor: F } = Array\nF('return 1')()"],
+    [
+      "a shorthand constructor in a pattern",
+      "const { constructor } = Array\nconstructor('return 1')()",
+    ],
+    ["Array.of with a quoted constructor subscript", 'Array.of["constructor"]("return process")()'],
+    [
+      "a keyword-like name before a subscript",
+      'const of = Array\nconst F = of["constructor"]\nF("return 1")()',
+    ],
+    ["a parameter named fetch", "const f = (fetch) => 1\nawait fetch('http://x')"],
+    ["a parameter named Bun", "const f = (Bun) => 1\nawait Bun.$`echo hi`"],
+    ["a parameter named setTimeout", "const f = (setTimeout) => 1\nsetTimeout(() => 1, 1)"],
+    ["a block constant named fetch", "{ const fetch = 1 }\nawait fetch('http://x')"],
+    ["a catch binding named Bun", "try { log(1) } catch (Bun) { log(Bun) }\nBun.spawn(['ls'])"],
+    ["a function named process", "function process() { return 1 }\nprocess.exit(1)"],
+  ])("says nothing for %s", async (_label, bad) => {
+    expect(await hook("workflow", inlineRun(script(GOOD, bad)))).toEqual(NOTHING)
+  })
+
+  // Real scoping: a name is allowed only when the script declared it in an enclosing scope or it is
+  // one of the few free globals, and a script may not declare a name of the host.
+  test.each<readonly [string, string]>([
+    ["a use of a name declared in a sibling scope", "{ const hidden = 1 }\nlog(hidden)"],
+    ["a use of a name declared in a function", "function f() { const inner = 1 }\nlog(inner)"],
+    [
+      "a use outside the loop that declares it",
+      "for (const item of args.entries) { log(item) }\nlog(item)",
+    ],
+    ["a declared Math", "const Math = { max: () => 1 }"],
+    ["a declared JSON parameter", "const f = (JSON) => JSON"],
+    ["a declared args", "let args = 1"],
+    ["a declared agent", "function agent() { return 1 }"],
+    ["a declared undefined", "const undefined = 1"],
+    ["a declared Date", "const Date = 1"],
+    ["a declared constructor", "const constructor = 1"],
+    ["a declared name in a destructuring pattern", "const { fetch } = args"],
+    ["an assignment to a global", "budget = 1"],
+    ["an assignment into a global", "Math.max = () => 1"],
+    ["an update of a global", "args.count++"],
+    ["an assignment to a name that is not declared", "total = 1"],
+    ["a name that is only a global of the host", "log(process.env)"],
+    ["arguments", "function f() { return arguments }"],
+  ])("says nothing for %s", async (_label, bad) => {
+    expect(await hook("workflow", inlineRun(script(GOOD, bad)))).toEqual(NOTHING)
+  })
+
+  // Only a closed set of syntax is read; any other construct asks.
+  test.each<readonly [string, string]>([
+    ["a regular expression", "const r = /a+/g\nlog(r)"],
+    ["a tagged template", "log`x`"],
+    ["new", "const m = new Map()"],
+    ["this", "log(this)"],
+    ["a class", "class A {}"],
+    ["a class expression", "const A = class {}"],
+    ["a getter", "const o = { get a() { return 1 } }"],
+    ["a setter", "const o = { set a(v) {} }"],
+    ["a method", "const o = { a() { return 1 } }"],
+    ["a generator", "function* g() { yield 1 }"],
+    ["an async generator", "async function* g() { yield 1 }"],
+    ["a label", "outer: for (const x of args.entries) { break outer }"],
+    ["a sequence", "log((1, 2))"],
+    ["a sequence naming agent", "const f = (0, agent)"],
+    ["a sequence calling agent", '(0, agent)("p", { agentType: "general-purpose" })'],
+    ["a reassigned agent", "agent = (prompt, options) => 1"],
+    [
+      "a call with the wrong shape after a good one",
+      'agent("p", { agentType: "holyagent:reviewer-code" }, 1)',
+    ],
+    ["delete", "delete args.entries"],
+    ["a computed key in an object", 'const o = { ["a"]: 1 }'],
+    ["a computed key from a variable", "const k = 'a'\nconst o = { [k]: 1 }"],
+    ["a computed member by a string", "log(args['entries'])"],
+    ["a computed member by a template", "log(args[`entries`])"],
+    ["a computed member by a negative number", "log(args.entries[-1])"],
+    ["a private name test", "class A { #p = 1; static has(o) { return #p in o } }"],
+    ["a dynamic import", "const m = await import('x')"],
+    ["a static import", "import fs from 'fs'"],
+    ["import.meta", "log(import.meta)"],
+    ["new.target", "function f() { return new.target }"],
+    ["super", "const o = { f() { return super.x } }"],
+    ["with", "with (args) { log(entries) }"],
+    ["debugger", "debugger"],
+    ["yield", "log(yield)"],
+    ["a default export", "export default 1"],
+    ["an export of a function", "export function f() {}"],
+    ["a second export", "export const other = 1"],
+    ["an export list", "export { GOOD }"],
+    ["a bigint", "log(10n)"],
+    ["a call of a call result", "log(args.entries.map((x) => x).at(0)())"],
+    ["a call of a method that is not a data method", "args.entries.run()"],
+    ["a call through call", "log.call(null, 1)"],
+    ["a call through apply", "log.apply(null, [1])"],
+    ["a call through bind", "log.bind(null)()"],
+    ["an optional call", "log?.(1)"],
+    ["a getter name as a property", "log(args.__lookupGetter__)"],
+    ["a prototype property", "log(Array.prototype)"],
+    ["Object.getOwnPropertyNames", "log(Object.getOwnPropertyNames(args))"],
+  ])("says nothing for %s", async (_label, bad) => {
+    expect(await hook("workflow", inlineRun(script(GOOD, bad)))).toEqual(NOTHING)
+  })
+
+  test.each<readonly [string, string]>([
+    ["no meta literal: a call in it", "export const meta = { name: String(1), description: 'd' }"],
+    [
+      "a meta that uses a variable",
+      "const label = 'x'\nexport const meta = { name: label, description: 'd' }",
+    ],
+    ["a meta with a spread", "export const meta = { ...args }"],
+    ["a meta with a template", "export const meta = { name: `a`, description: 'd' }"],
+    ["a meta with a computed key", "export const meta = { ['name']: 'w' }"],
+    ["a meta that is not an object", "export const meta = 1"],
+    ["a meta that is let", "export let meta = {}"],
+    ["another export name", "export const other = {}"],
+  ])("says nothing for a bad meta: %s", async (_label, text) => {
+    expect(await hook("workflow", inlineRun(`${text}\n${GOOD}`))).toEqual(NOTHING)
+  })
+
+  test("allows a meta of literals only, with phases", async () => {
+    const meta =
+      'export const meta = { name: "w", description: "d", phases: [{ title: "Write", model: "sonnet" }], whenToUse: "x" }'
+    expect(await hook("workflow", inlineRun(`${meta}\n${GOOD}`))).toEqual(ALLOW)
+    expect(await hook("workflow", inlineRun(GOOD))).toEqual(ALLOW)
+  })
+
   test.each(LOOKALIKES)("says nothing for a call hidden behind the character %d", async (code) => {
     const lookalike = String.fromCharCode(code)
     const hidden = `agent${lookalike}("do anything", { agentType: "general-purpose" })`
@@ -590,7 +861,6 @@ describe("hook workflow", () => {
       script(GOOD, `await ${hidden}`),
       script(GOOD, `await${lookalike}agent("do anything", { agentType: "general-purpose" })`),
       script(GOOD, `return${lookalike}${hidden}`),
-      script(GOOD, `const x${lookalike}= 1`),
     ])
       expect(await hook("workflow", inlineRun(text))).toEqual(NOTHING)
   })
@@ -605,6 +875,11 @@ describe("hook workflow", () => {
           inlineRun(script(GOOD, `${open.repeat(depth)}x${close.repeat(depth)}`)),
         ),
       ).toEqual(NOTHING)
+    const arrows = await hook(
+      "workflow",
+      inlineRun(script(GOOD, `${"(".repeat(20000)}x${")=>".repeat(20000)}`)),
+    )
+    expect(arrows).toEqual(NOTHING)
     const parens = await hook(
       "workflow",
       inlineRun(script(GOOD, `${"(".repeat(100000)}${")".repeat(100000)}`)),
@@ -623,7 +898,6 @@ describe("hook workflow", () => {
       "a regular expression that hides a quote",
       `${GOOD}\nconst r = /"/\n${start('"other:x"')}\n// "`,
     ],
-    ["a division", `${GOOD}\nconst half = 4 / 2`],
     ["an escaped identifier", `${GOOD}\nag\\u0065nt("p", { agentType: "other" })`],
     [
       "a line separator that ends a comment",
