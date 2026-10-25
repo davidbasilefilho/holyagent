@@ -76,7 +76,7 @@ Everything is configured in `bunfig.toml`. Bun's own `check`, `lint` and `fmt` a
 
 Every agent prompt is split into one file per section, and the order of the sections is fixed in `src/agents.ts`, not by file name; the sync test fails when a file in `root/`, `specialist/` or `roles/<agent>/` is not assembled or an assembled file is missing. The core of the root rules, which the SessionStart hook injects when the root is not the main thread, is the files named in `ROOT_CORE_FILES` (`root-core.ts`); a test caps it at 4,000 characters. `root/instruction-guidelines.md` holds the rules the root applies when it writes model-facing text, each tagged with the Anthropic prompting page it follows.
 
-A session in this checkout loads the plugin straight from `packages/integrations/claude/dist` through the directory marketplace, so a rebuilt plugin takes effect in the next session or after `/reload-plugins`, with no update command (see [usage.md](usage.md#install)).
+For how a rebuilt plugin reaches a session, see the Updates paragraph in [usage.md](usage.md#install).
 
 Do not edit generated files; each carries a note naming its source. `.prettierignore` and `.eslintignore` list them so the formatter leaves them as built.
 

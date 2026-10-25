@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "let-the-allowlist-bash-hook-pass-the",
   "objective": "Let the allowlist Bash hook pass the root invoking the holyagent wrapper by its absolute path.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/davidbasile/dev/holyagent-fix-cli-and-vcs (head 667bc31); ownership paths relative to it.",
     "The root core text says holyagent <command> stands for the absolute wrapper path (for example /home/<user>/dev/holyagent/packages/integrations/claude/dist/scripts/holyagent vcs commit -m ... with a message mentioning Git and commit). The new allowlist accepts only the ${CLAUDE_PLUGIN_ROOT}/scripts/holyagent form, so such a call would be denied as unclear. Accept a program word that is a literal absolute path equal to the hook own wrapper (resolve from CLAUDE_PLUGIN_ROOT when set, else from the running script location, comparing real paths); keep any other path unclear. Test both."
@@ -45,7 +45,33 @@
     "agentId": "workflow:wf_c33c989b-37a/assignment-0mvob28tu-bvh5",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-10-25T20:53:51.283Z"
+    "startedAt": "2026-10-25T20:53:51.283Z",
+    "finishedAt": "2026-10-25T20:56:44.124Z"
+  },
+  "result": "status: done\nchanged:\n- /home/davidbasile/dev/holyagent-fix-cli-and-vcs/packages/runtime/src/cli/shell.ts\n- /home/davidbasile/dev/holyagent-fix-cli-and-vcs/packages/runtime/src/cli/hook.ts\n- /home/davidbasile/dev/holyagent-fix-cli-and-vcs/packages/runtime/tests/shell.test.ts\n- /home/davidbasile/dev/holyagent-fix-cli-and-vcs/packages/integrations/claude/tests/hooks.test.ts\n- /home/davidbasile/dev/holyagent-fix-cli-and-vcs/packages/integrations/claude/dist/scripts/holyagent.js\n- /home/davidbasile/dev/holyagent-fix-cli-and-vcs/docs/hooks.md\nchecks:\n- mise run build -> exit 0\n- mise run verify (check, lint, fmt:check, test: 1210 pass, 1 skip, 0 fail) -> exit 0\nnotes:\n- Behavior tightened beyond the base: before this change any path ending in /holyagent was accepted as the holyagent program (the base test passed /home/u/plugin/scripts/holyagent). Now only the name holyagent, the ${CLAUDE_PLUGIN_ROOT}/scripts/holyagent form and the hook's own wrapper by absolute path pass; that old test case moved to the unclear list and docs/hooks.md was updated to match. This follows the Assignment's 'keep any other path unclear'.\n- gitWrites(line, ownWrapper?) takes a predicate, so shell.ts stays free of file system access. hook.ts builds it: the wrapper is scripts/holyagent under CLAUDE_PLUGIN_ROOT when set and non-empty, else holyagent next to Bun.main (the running bundle). The predicate requires both paths to exist and compares realpathSync results. A throw from realpathSync is caught by the hook's existing Effect.try and read as unclear.\n- A link to the wrapper passes because the real paths are equal; this is tested.\n- The positive tests (own wrapper passes) also passed on the base, because it accepted any holyagent path. The tests that fail on the base are the unclear ones: a copy of the wrapper elsewhere, and the own wrapper when CLAUDE_PLUGIN_ROOT names another folder.\n- Full diff for review: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/own-wrapper.diff (source, tests and docs; the generated dist/scripts/holyagent.js diff is left out).\nevidence:\n- The absolute path of the hook own wrapper passes and any other path ending in scripts/holyagent stays unclear, each with a test.: packages/runtime/tests/shell.test.ts: describe 'gitWrites with the hook's own wrapper' (passes and keeps-unclear tables) plus new unclear cases in the main unclear list. packages/integrations/claude/tests/hooks.test.ts: describe 'the wrapper by its absolute path' with five tests: own wrapper from the running bundle, from CLAUDE_PLUGIN_ROOT, via a symlink, a copy elsewhere or a missing path unclear, and a CLAUDE_PLUGIN_ROOT naming another folder unclear. All pass in mise run verify (exit 0).\n- mise run verify passes and dist is rebuilt with mise run build.: mise run build -> exit 0 ('built 29 files'), dist/scripts/holyagent.js regenerated. mise run verify -> exit 0 (type-check 95 files no errors, lint no problems, format 208 files formatted, 1210 pass, 1 skip, 0 fail).\n- changed-paths: docs/hooks.md, packages/runtime/src/cli/shell.ts, packages/runtime/src/cli/hook.ts, packages/runtime/tests/shell.test.ts, packages/integrations/claude/tests/hooks.test.ts, packages/integrations/claude/dist/scripts/holyagent.js, all under /home/davidbasile/dev/holyagent-fix-cli-and-vcs.\n- checks: mise run build -> 0; mise run verify -> 0 (1210 pass, 1 skip, 0 fail). I also ran mise run fmt once to format the edited files. I ran no VCS writes.",
+  "acceptance": {
+    "revision": 12,
+    "rationale": "Own-wrapper pass and other-path unclear tested; verify exit 0 with 1210 pass.",
+    "criteria": [
+      {
+        "criterion": "The absolute path of the hook own wrapper passes and any other path ending in scripts/holyagent stays unclear, each with a test.",
+        "support": "packages/runtime/tests/shell.test.ts: describe 'gitWrites with the hook's own wrapper' (passes and keeps-unclear tables) plus new unclear cases in the main unclear list. packages/integrations/claude/tests/hooks.test.ts: describe 'the wrapper by its absolute path' with five tests: own wrapper from the running bundle, from CLAUDE_PLUGIN_ROOT, via a symlink, a copy elsewhere or a missing path unclear, and a CLAUDE_PLUGIN_ROOT naming another folder unclear. All pass in mise run verify (exit 0)."
+      },
+      {
+        "criterion": "mise run verify passes and dist is rebuilt with mise run build.",
+        "support": "mise run build -> exit 0 ('built 29 files'), dist/scripts/holyagent.js regenerated. mise run verify -> exit 0 (type-check 95 files no errors, lint no problems, format 208 files formatted, 1210 pass, 1 skip, 0 fail)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "docs/hooks.md, packages/runtime/src/cli/shell.ts, packages/runtime/src/cli/hook.ts, packages/runtime/tests/shell.test.ts, packages/integrations/claude/tests/hooks.test.ts, packages/integrations/claude/dist/scripts/holyagent.js, all under /home/davidbasile/dev/holyagent-fix-cli-and-vcs."
+      },
+      {
+        "label": "checks",
+        "support": "mise run build -> 0; mise run verify -> 0 (1210 pass, 1 skip, 0 fail). I also ran mise run fmt once to format the edited files. I ran no VCS writes."
+      }
+    ]
   },
   "createdAt": "2026-10-25T20:53:51.283Z"
 }

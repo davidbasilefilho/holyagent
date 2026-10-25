@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mvob6dsh-4ddo",
+  "intentId": "intent-0mvnv553v-zwx8",
+  "intentRevision": 12,
+  "roleTask": "Reviewer.security",
+  "slug": "re-review-the-allowlist-bash-hook-in",
+  "objective": "Re-review the allowlist Bash hook in 675a95e..63aa076 and confirm no command that runs a Git commit or a history-rewriting push passes it.",
+  "state": "Running",
+  "scope": [
+    "Diff: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/allow-review.diff; full files /home/davidbasile/dev/holyagent-fix-cli-and-vcs/packages/runtime/src/cli/shell.ts and hook.ts. Earlier findings: r-i65u.json, r-28nh.json in that folder.",
+    "Mark each earlier finding closed or open. Then attack the allowlist itself: options of allowlisted programs that execute code (git, gh, sed, awk, find, sort, rg, mise, bun, bunx, jq, test, printf, cp or mv onto hook or config files, rm), git subcommands on the list that run hooks or external programs, the own-wrapper path check, the gate regex. Accepted residuals: git aliases from user config files and host if-rule matching on raw text (documented)."
+  ],
+  "constraints": [
+    "Decision (user, verbatim): slim holyagent vcs. Remove the GitHub API commit path; push, branch and ci become plain Git and gh, with a commit-msg hook for attribution and a deny rule for force pushes. Keep only vcs commit (exact paths + Intent state + message check) and vcs pr (PR text check). Intent state stays versioned in Git.",
+    "Read-only."
+  ],
+  "criteria": [
+    {
+      "text": "Each earlier finding is marked closed or open with the reason, and any new finding has a concrete command and the path it takes.",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvoaguwn-h2cv",
+    "assignment-0mvob28tu-bvh5"
+  ],
+  "followUpOf": "assignment-0mvoa9f8w-i65u",
+  "specialist": {
+    "agentId": "workflow:wf_2595fa08-05e/assignment-0mvob6dsh-4ddo",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-25T20:57:04.337Z"
+  },
+  "createdAt": "2026-10-25T20:57:04.337Z"
+}
