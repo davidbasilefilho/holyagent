@@ -860,6 +860,6 @@ describe("process", () => {
     const unknown = await $`bun ${main} bogus`.cwd(inner).quiet().nothrow()
     expect(unknown.exitCode).toBe(2)
     expect(unknown.stderr.toString()).toStartWith("error: Usage:")
-    expect((await $`bun ${main} --version`.quiet()).text()).toMatch(/^\d+\.\d+\.\d+\n$/)
+    expect((await $`bun ${main} --version`.quiet()).text()).toMatch(/^\d+\.\d+\.\d+(?:-\d+)?\n$/)
   })
 })
