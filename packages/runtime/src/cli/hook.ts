@@ -139,8 +139,10 @@ const SPECIALISTS: ReadonlySet<string> = new Set(ROUTES.map((route) => route.age
 // An inline Workflow script is JavaScript the root writes on the spot, and the only way it starts an
 // agent is the global `agent()`. The hook allows it without a prompt when every start is lexically
 // visible and names one of our specialists, so it reads the script with a small lexer instead of
-// running it. Anything the lexer cannot place with certainty makes the script refused, and a
-// refusal only means the normal permission flow.
+// running it. The lexer allows a narrow subset of JavaScript and reads everything else as unknown:
+// ASCII code only outside strings, comments and template text, strict numbers, no computed member
+// access, and only names the workflow needs. Anything it cannot place with certainty makes the
+// script refused, and a refusal only means the normal permission flow.
 
 /** One token of a script; `template` is a chunk of a template literal, whose text is dropped. */
 interface Token {
@@ -149,11 +151,13 @@ interface Token {
 }
 
 const PUNCTUATION = "()[]{},;:?.=<>+-*%&|^!~@"
-// Identifier characters: ASCII word characters and `$`, and every non-ASCII character, which the
-// lexer reads as part of a name so that a lookalike never splits one.
-const IDENTIFIER = /[\w$]|\P{ASCII}/u
-// The characters that end a line comment; U+2028 and U+2029 end one in JavaScript too.
-const LINE_END = new RegExp(`[\\n\\r${String.fromCharCode(0x2028, 0x2029)}]`)
+// Names are ASCII: a non-ASCII character in code is refused, so no whitespace lookalike can fuse
+// with a name and hide it.
+const IDENTIFIER = /[\w$]/
+const DIGIT = /\d/
+/** The longest script the hook reads, and the deepest template nesting it follows. */
+const MAX_SCRIPT = 1_000_000
+const MAX_NESTING = 32
 const OPENERS: ReadonlyMap<string, string> = new Map([
   ["(", ")"],
   ["[", "]"],
@@ -162,14 +166,46 @@ const OPENERS: ReadonlyMap<string, string> = new Map([
 ])
 const CLOSERS: ReadonlySet<string> = new Set(OPENERS.values())
 
+/** The index of the next line end at or after `from`; U+2028 and U+2029 end a line in JavaScript. */
+const lineEnd = (source: string, from: number): number => {
+  for (let at = from; at < source.length; at += 1) {
+    const code = source.charCodeAt(at)
+    if (code === 10 || code === 13 || code === 0x2028 || code === 0x2029) return at
+  }
+  return source.length
+}
+
+/**
+ * The index after the decimal number that starts at `from`: digits, an optional fraction and an
+ * optional exponent, and nothing else (no hex, separator, suffix or member access).
+ */
+const numberEnd = (source: string, from: number): number => {
+  let at = from
+  while (DIGIT.test(source.charAt(at))) at += 1
+  if (source.charAt(at) === "." && DIGIT.test(source.charAt(at + 1))) {
+    at += 1
+    while (DIGIT.test(source.charAt(at))) at += 1
+  }
+  if (source.charAt(at) === "e" || source.charAt(at) === "E") {
+    const sign = source.charAt(at + 1) === "+" || source.charAt(at + 1) === "-" ? 1 : 0
+    if (DIGIT.test(source.charAt(at + 1 + sign))) {
+      at += 1 + sign
+      while (DIGIT.test(source.charAt(at))) at += 1
+    }
+  }
+  return at
+}
+
 /**
  * The tokens of a script, or undefined when it holds anything the lexer cannot place with
- * certainty: an unterminated string or comment, a backslash outside a string (an escaped
- * identifier), a `/` that is not a comment (division and a regular expression look alike, and a
- * regular expression can hide a quote), a legacy HTML-style comment, or a character that starts no
- * token.
+ * certainty: a script or template nesting past the caps, an unterminated string or comment, a
+ * non-ASCII character or backslash outside a string, comment or template text (an escaped or
+ * lookalike identifier), a number followed by a name or a dot (`5..constructor`), a `/` that is not
+ * a comment (division and a regular expression look alike, and a regular expression can hide a
+ * quote), a legacy HTML-style comment, or a character that starts no token.
  */
 const tokenize = (source: string): ReadonlyArray<Token> | undefined => {
+  if (source.length > MAX_SCRIPT) return undefined
   const tokens: Array<Token> = []
   const push = (kind: Token["kind"], text: string) => tokens.push({ kind, text })
   const stringEnd = (from: number): number | undefined => {
@@ -183,7 +219,8 @@ const tokenize = (source: string): ReadonlyArray<Token> | undefined => {
     return undefined
   }
   // Reads a template literal that opens at `from` and returns the index after it.
-  const template = (from: number): number | undefined => {
+  const template = (from: number, nesting: number): number | undefined => {
+    if (nesting > MAX_NESTING) return undefined
     let at = from + 1
     while (at < source.length) {
       const char = source.charAt(at)
@@ -194,7 +231,7 @@ const tokenize = (source: string): ReadonlyArray<Token> | undefined => {
       } else if (source.startsWith("${", at)) {
         push("template", "")
         push("punct", "${")
-        const end = code(at + 2, true)
+        const end = code(at + 2, true, nesting + 1)
         if (end === undefined) return undefined
         at = end
       } else at += 1
@@ -203,16 +240,14 @@ const tokenize = (source: string): ReadonlyArray<Token> | undefined => {
   }
   // Reads code from `from` to the end of the source, or inside a template substitution to the `}`
   // that closes it, and returns the index after it.
-  const code = (from: number, substitution: boolean): number | undefined => {
+  const code = (from: number, substitution: boolean, nesting: number): number | undefined => {
     let depth = 0
     let at = from
     while (at < source.length) {
       const char = source.charAt(at)
-      if (/\s/.test(char)) at += 1
-      else if (source.startsWith("//", at)) {
-        const end = source.slice(at).search(LINE_END)
-        at = end === -1 ? source.length : at + end
-      } else if (source.startsWith("/*", at)) {
+      if (char === " " || char === "\t" || char === "\n" || char === "\r") at += 1
+      else if (source.startsWith("//", at)) at = lineEnd(source, at)
+      else if (source.startsWith("/*", at)) {
         const end = source.indexOf("*/", at + 2)
         if (end === -1) return undefined
         at = end + 2
@@ -222,12 +257,13 @@ const tokenize = (source: string): ReadonlyArray<Token> | undefined => {
         push("string", source.slice(at, end))
         at = end
       } else if (char === "`") {
-        const end = template(at)
+        const end = template(at, nesting)
         if (end === undefined) return undefined
         at = end
-      } else if (/\d/.test(char)) {
-        const length = source.slice(at).search(/[^\w.]/)
-        const end = length === -1 ? source.length : at + length
+      } else if (DIGIT.test(char)) {
+        const end = numberEnd(source, at)
+        const next = source.charAt(end)
+        if (next === "." || IDENTIFIER.test(next)) return undefined
         push("number", source.slice(at, end))
         at = end
       } else if (IDENTIFIER.test(char)) {
@@ -244,7 +280,7 @@ const tokenize = (source: string): ReadonlyArray<Token> | undefined => {
       } else if (source.startsWith("...", at)) {
         push("punct", "...")
         at += 3
-      } else if (source.startsWith("?.", at) && !/\d/.test(source.charAt(at + 2))) {
+      } else if (source.startsWith("?.", at) && !DIGIT.test(source.charAt(at + 2))) {
         push("punct", "?.")
         at += 2
       } else if (PUNCTUATION.includes(char)) {
@@ -256,7 +292,7 @@ const tokenize = (source: string): ReadonlyArray<Token> | undefined => {
     }
     return substitution ? undefined : at
   }
-  return code(0, false) === undefined ? undefined : tokens
+  return code(0, false, 0) === undefined ? undefined : tokens
 }
 
 /** The index of the token that closes the opener at `open`, or undefined when unbalanced. */
@@ -271,6 +307,19 @@ const closeOf = (tokens: ReadonlyArray<Token>, open: number): number | undefined
       if (expected.pop() !== token.text) return undefined
       if (expected.length === 0) return at
     }
+  }
+  return undefined
+}
+
+/** The index of the opener that the closer at `close` ends, or undefined when unbalanced. */
+const openOf = (tokens: ReadonlyArray<Token>, close: number): number | undefined => {
+  let depth = 0
+  for (let at = close; at >= 0; at -= 1) {
+    const token = tokens[at]
+    if (token?.kind !== "punct") continue
+    if (CLOSERS.has(token.text)) depth += 1
+    else if (OPENERS.has(token.text)) depth -= 1
+    if (depth === 0) return at
   }
   return undefined
 }
@@ -318,11 +367,20 @@ const namesOurSpecialist = (token: Token | undefined): boolean => {
   )
 }
 
+/** The options of `agent()` the hook lets a script set; any other key refuses the call. */
+const AGENT_OPTIONS: ReadonlySet<string> = new Set([
+  "agentType",
+  "model",
+  "effort",
+  "label",
+  "phase",
+])
+
 /**
  * True when the arguments of one `agent(prompt, options)` call are two plain arguments, the second
- * an object literal with exactly one `agentType` property whose value is a string literal naming
- * one of our specialists. A spread, computed key, getter or escaped key could set another agent
- * type, so each refuses the call.
+ * an object literal of the {@link AGENT_OPTIONS} keys with exactly one `agentType` property whose
+ * value is a string literal naming one of our specialists. A spread, computed or escaped key, a
+ * getter and any other key could set another agent type or option, so each refuses the call.
  */
 const startsOurAgent = (args: ReadonlyArray<Token>): boolean => {
   const [prompt, options, ...rest] = splitTop(args)
@@ -333,8 +391,8 @@ const startsOurAgent = (args: ReadonlyArray<Token>): boolean => {
   for (const property of splitTop(options.slice(1, -1))) {
     const [key, colon, ...value] = property
     const name = key?.kind === "string" ? key.text.slice(1, -1) : key?.text
-    if (key === undefined || key.kind === "template" || key.kind === "punct") return false
-    if (name?.includes("\\")) return false
+    if (key === undefined || (key.kind !== "ident" && key.kind !== "string")) return false
+    if (name === undefined || !AGENT_OPTIONS.has(name)) return false
     if (name === "agentType") {
       if (colon?.text !== ":" || value.length !== 1 || !namesOurSpecialist(value[0])) return false
       named += 1
@@ -343,12 +401,26 @@ const startsOurAgent = (args: ReadonlyArray<Token>): boolean => {
   return named === 1
 }
 
-/** Names that could reach `agent` or run code the lexer never sees; a script using one is refused. */
-const UNSAFE_NAMES: ReadonlySet<string> = new Set([
+/**
+ * Names that reach reflection, other scopes or other code, refused wherever they appear: as a name,
+ * a property, a key or a declaration.
+ */
+const DENIED_NAMES: ReadonlySet<string> = new Set([
   "arguments",
+  "apply",
+  "bind",
+  "call",
+  "callee",
+  "caller",
   "constructor",
+  "defineProperties",
+  "defineProperty",
   "eval",
   "Function",
+  "getOwnPropertyDescriptor",
+  "getOwnPropertyDescriptors",
+  "getOwnPropertyNames",
+  "getPrototypeOf",
   "global",
   "globalThis",
   "import",
@@ -358,34 +430,203 @@ const UNSAFE_NAMES: ReadonlySet<string> = new Set([
   "Reflect",
   "require",
   "self",
+  "setPrototypeOf",
   "this",
   "window",
   "with",
   "workflow",
+  "__defineGetter__",
+  "__defineSetter__",
+  "__lookupGetter__",
+  "__lookupSetter__",
   "__proto__",
 ])
 
+/**
+ * The names a script may use without declaring them: the workflow globals, the JavaScript keywords
+ * it needs and the plain built-ins. Any other name must be declared by the script itself.
+ */
+const ALLOWED_NAMES: ReadonlySet<string> = new Set([
+  "agent",
+  "args",
+  "budget",
+  "log",
+  "parallel",
+  "phase",
+  "pipeline",
+  "Array",
+  "Boolean",
+  "Error",
+  "Infinity",
+  "isFinite",
+  "isNaN",
+  "JSON",
+  "Map",
+  "Math",
+  "NaN",
+  "Number",
+  "Object",
+  "parseFloat",
+  "parseInt",
+  "Promise",
+  "Set",
+  "String",
+  "undefined",
+  "async",
+  "await",
+  "break",
+  "case",
+  "catch",
+  "const",
+  "continue",
+  "default",
+  "do",
+  "else",
+  "export",
+  "false",
+  "finally",
+  "for",
+  "function",
+  "if",
+  "in",
+  "instanceof",
+  "let",
+  "new",
+  "null",
+  "of",
+  "return",
+  "switch",
+  "throw",
+  "true",
+  "try",
+  "typeof",
+  "var",
+  "void",
+  "while",
+])
+
+/**
+ * Keywords after which a `[` opens an array literal or a destructuring pattern rather than a
+ * computed member access.
+ */
+const ARRAY_AFTER: ReadonlySet<string> = new Set([
+  "await",
+  "case",
+  "const",
+  "else",
+  "in",
+  "instanceof",
+  "let",
+  "of",
+  "return",
+  "throw",
+  "typeof",
+  "var",
+  "void",
+  "yield",
+])
+
+/**
+ * True when a `[` follows a name, a closing bracket, a number, a string or a template, or `?.`:
+ * computed member access, which can build a name such as `constructor` from text. Array literals
+ * after an operator, an opening bracket or a keyword are not computed access.
+ */
+const hasComputedAccess = (tokens: ReadonlyArray<Token>): boolean =>
+  tokens.some((token, at) => {
+    const before = tokens[at - 1]
+    if (token.kind !== "punct" || token.text !== "[" || before === undefined) return false
+    if (before.kind === "punct") return [")", "]", "}", "?."].includes(before.text)
+    return before.kind !== "ident" || !ARRAY_AFTER.has(before.text)
+  })
+
+/**
+ * The names a parameter list or destructuring pattern binds, from its tokens with their brackets: a
+ * name between an opener or comma (or `...` or `:`) and a closer or comma. A pattern with a default
+ * value (`=`) binds nothing here, since its names would mix with expressions.
+ */
+const bindingsIn = (region: ReadonlyArray<Token>): ReadonlyArray<string> =>
+  region.some((token) => token.kind === "punct" && token.text === "=")
+    ? []
+    : region.flatMap((token, at) => {
+        const before = region[at - 1]
+        const after = region[at + 1]
+        return token.kind === "ident" &&
+          before?.kind === "punct" &&
+          ["(", "[", "{", ",", "...", ":"].includes(before.text) &&
+          after?.kind === "punct" &&
+          [",", ")", "]", "}"].includes(after.text)
+          ? [token.text]
+          : []
+      })
+
+/**
+ * The names the script declares itself, in the forms it is likely to use: `const`, `let` and `var`
+ * (a name or a simple pattern), function names and parameters, arrow parameters, and `catch`. Any
+ * other form declares nothing here, so a name bound that way is refused when used.
+ */
+const declaredNames = (tokens: ReadonlyArray<Token>): ReadonlySet<string> => {
+  const names = new Set<string>()
+  const region = (open: number): ReadonlyArray<Token> => {
+    const close = closeOf(tokens, open)
+    return close === undefined ? [] : tokens.slice(open, close + 1)
+  }
+  for (const [at, token] of tokens.entries()) {
+    const next = tokens[at + 1]
+    if (token.kind === "ident" && ["const", "let", "var"].includes(token.text)) {
+      if (next?.kind === "ident") names.add(next.text)
+      else if (next?.kind === "punct" && (next.text === "[" || next.text === "{"))
+        for (const name of bindingsIn(region(at + 1))) names.add(name)
+    } else if (token.kind === "ident" && token.text === "function") {
+      const open = next?.kind === "ident" ? at + 2 : at + 1
+      if (next?.kind === "ident") names.add(next.text)
+      if (tokens[open]?.text === "(") for (const name of bindingsIn(region(open))) names.add(name)
+    } else if (token.kind === "ident" && token.text === "catch" && next?.text === "(") {
+      for (const name of bindingsIn(region(at + 1))) names.add(name)
+    } else if (token.kind === "punct" && token.text === "=" && next?.text === ">") {
+      const before = tokens[at - 1]
+      if (before?.kind === "ident") names.add(before.text)
+      else if (before?.text === ")") {
+        const open = openOf(tokens, at - 1)
+        if (open !== undefined) for (const name of bindingsIn(region(open))) names.add(name)
+      }
+    }
+  }
+  return names
+}
+
+/** Words that may stand before `agent(` in a call; after any other name it declares or constructs. */
 const CALL_PREFIXES: ReadonlySet<string> = new Set(["await", "return"])
 
 /**
  * True when the script starts agents and every start is a direct `agent(prompt, {…agentType:
- * "holyagent:<specialist>"…})` call. A mention of `agent` that is not such a call (an alias, a
- * parameter, `.call`, a key) refuses the script, as does `workflow`, which would run another
- * script.
+ * "holyagent:<specialist>"…})` call, and it uses only names it may: the workflow globals and plain
+ * built-ins, and names it declares. A mention of `agent` that is not such a call (an alias, a
+ * parameter, `.call`) refuses the script, as do `workflow`, reflection, an undeclared name and any
+ * computed member access.
  */
 const onlyOurAgents = (script: string): boolean => {
   const tokens = tokenize(script)
-  if (tokens === undefined || !balanced(tokens)) return false
+  if (tokens === undefined || !balanced(tokens) || hasComputedAccess(tokens)) return false
+  const declared = declaredNames(tokens)
   let starts = 0
   for (const [at, token] of tokens.entries()) {
     if (token.kind !== "ident") continue
-    if (UNSAFE_NAMES.has(token.text)) return false
-    if (token.text !== "agent") continue
+    if (DENIED_NAMES.has(token.text)) return false
     const before = tokens[at - 1]
+    const after = tokens[at + 1]
     const member = before?.kind === "punct" && (before.text === "." || before.text === "?.")
-    const called = tokens[at + 1]?.kind === "punct" && tokens[at + 1]?.text === "("
-    // `entry.agent` reads a property; it starts nothing.
-    if (member && !called) continue
+    const called = after?.kind === "punct" && after.text === "("
+    // `entry.agent` and `{ agent: 1 }` name a property; they start nothing.
+    const key =
+      before?.kind === "punct" &&
+      (before.text === "{" || before.text === ",") &&
+      after?.kind === "punct" &&
+      after.text === ":"
+    if ((member && !(token.text === "agent" && called)) || key) continue
+    if (token.text !== "agent") {
+      if (!ALLOWED_NAMES.has(token.text) && !declared.has(token.text)) return false
+      continue
+    }
     const close = called ? closeOf(tokens, at + 1) : undefined
     // After a name other than `await` or `return`, `agent(` declares a function or constructs one.
     if (before?.kind === "ident" && !CALL_PREFIXES.has(before.text)) return false

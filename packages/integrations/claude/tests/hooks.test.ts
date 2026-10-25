@@ -176,13 +176,34 @@ const GOOD = start('"holyagent:worker-implementation"')
 const INLINE_REASON = "Inline workflow script whose every agent() call is a holyagent specialist."
 /** A writer stage and a review stage over the entries, as the root writes them. */
 const ALLOWED_SCRIPT = script(
-  "const writes = await pipeline(",
+  "const results = await pipeline(",
   "  args.entries,",
   '  (entry) => agent(`Do ${entry.id}: ${entry.prompt}`, { agentType: "holyagent:worker-implementation", model: entry.model, effort: entry.effort, label: entry.id }),',
-  "  (report, entry) => agent('Review ' + entry.id + ': ' + report, { label: entry.agent, agentType: 'holyagent:reviewer-code', }),",
+  "  (report, entry) => agent('Review ' + entry.id + ': ' + report, { label: entry.agent, agentType: 'holyagent:reviewer-code', }).then((review) => ({ id: entry.id, report, review })),",
   ")",
-  "return Object.fromEntries(args.entries.map((entry, at) => [entry.id, writes[at]]))",
+  "return Object.fromEntries(results.map((result) => [result.id, result]))",
 )
+/** A script that also uses phase(), log(), parallel(), budget, destructuring and built-ins. */
+const FULL_SCRIPT = script(
+  "phase('Write')",
+  "const [first, ...others] = args.entries",
+  "const { id: firstId, prompt } = first",
+  "log(`writing ${firstId} of ${args.entries.length}, budget ${budget}`)",
+  "const written = await parallel(others.map((entry) => () => agent(entry.prompt, { agentType: 'holyagent:worker-implementation', label: entry.id, phase: 'Write' })))",
+  "phase('Review')",
+  "const checked = await pipeline(written, async (report, at) => {",
+  "  const text = String(report ?? '').trim()",
+  "  if (text === '') return null",
+  "  return await agent(text, { agentType: 'holyagent:reviewer-code', model: 'sonnet', effort: 'high' })",
+  "})",
+  "const n = Math.max(1, Number(1.5e3) + parseInt('2', 10))",
+  "return { first: await agent(prompt, { agentType: 'holyagent:worker-implementation' }), checked, n, json: JSON.stringify(others) }",
+)
+/** Characters that JavaScript reads as whitespace or a line end, and that are not ASCII. */
+const LOOKALIKES = [
+  0x00a0, 0x1680, 0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2006, 0x2007, 0x2008, 0x2009,
+  0x200a, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000, 0xfeff,
+]
 const inlineRun = (script: unknown, extra: Record<string, unknown> = {}) => ({
   tool_name: "Workflow",
   tool_input: { script, args: { entries: [] }, ...extra },
@@ -225,6 +246,36 @@ describe("hook workflow", () => {
       script(
         `const both = await parallel([() => ${GOOD.slice(6)}, () => ${GOOD.slice(6)}])`,
         "return both",
+      ),
+    ],
+    ["phase, log, parallel, pipeline, args and built-ins", FULL_SCRIPT],
+    ["an entry shape with an agent key", script("const entry = { id: 1, agent: 'x' }", GOOD)],
+    [
+      "an else branch with an agent call",
+      script("const ok = true", `if (ok) { log('a') } else ${GOOD}`),
+    ],
+    [
+      "names that merely resemble globals",
+      script("const fetchCount = 1", "const agent2 = 2", GOOD),
+    ],
+    ["decimal numbers", script("const n = 1.5e3 + 0.5 + 10", GOOD)],
+    [
+      "array literals after operators, keywords and brackets",
+      script(
+        GOOD,
+        "const a = [1, 2]",
+        "const b = [...a, [3]]",
+        "const c = a.map((x) => [x, x])",
+        "return [a, b, c]",
+      ),
+    ],
+    [
+      "non-ASCII text in a string, a comment and a template",
+      script(
+        `// caf${String.fromCharCode(0xe9)}`,
+        `const word = "caf${String.fromCharCode(0xe9)}"`,
+        `const text = \`caf${String.fromCharCode(0xe9)} \${word}\``,
+        GOOD,
       ),
     ],
   ])("allows %s", async (_label, text) => {
@@ -297,6 +348,92 @@ describe("hook workflow", () => {
     ["a nested workflow", 'await workflow("holyagent:x", {})'],
   ])("says nothing for %s", async (_label, bad) => {
     expect(await hook("workflow", inlineRun(script(GOOD, bad)))).toEqual(NOTHING)
+  })
+
+  // Each reaches the Function constructor, another scope or another agent type without writing
+  // `agent(` with a literal specialist, so it must be refused beside a legitimate call.
+  test.each<readonly [string, string]>([
+    [
+      "a quoted constructor subscript",
+      `[].at['constructor']('return agent("p",{agentType:"general-purpose"})')()`,
+    ],
+    ["a template constructor subscript", "[].at[`constructor`]('return 1')()"],
+    [
+      "a concatenated constructor subscript",
+      '({})["const" + "ructor"]["const" + "ructor"]("return agent")()',
+    ],
+    ["an escaped constructor subscript", '({})["\\x63onstructor"]("return 1")()'],
+    ["a dotted constructor", '[].at.constructor("return 1")()'],
+    ["the constructor of an arrow function", '(() => 1).constructor("return 1")()'],
+    ["a destructured constructor", "const { constructor } = () => 1"],
+    ["a number followed by member access", '5..constructor.constructor("return agent")()'],
+    ["a number with a single dot member", "5.constructor"],
+    ["a hexadecimal number", "const n = 0x1f"],
+    ["a number with a separator", "const n = 1_000"],
+    ["a number with a suffix", "const n = 10n"],
+    ["a plain index", "const a = [1, 2]\nlog(a[0])"],
+    ["an index by a variable", "const a = [1, 2]\nconst i = 0\nlog(a[i])"],
+    ["an optional subscript", "log(args?.['entries'])"],
+    ["a subscript after a call", "log(args.entries.map((x) => x)[0])"],
+    ["a subscript after a string", "log('abc'[0])"],
+    ["Bun", "await Bun.$`echo hi`"],
+    ["fetch", "await fetch('http://x')"],
+    ["a timer", "setTimeout(() => 1, 1)"],
+    ["Date", "log(Date.now())"],
+    ["Symbol", "log(Symbol('x'))"],
+    ["an undeclared name", "log(undeclaredName)"],
+    ["a default parameter value that names fetch", "const f = (a = fetch) => a\nf()"],
+    ["a reflective call", "Object.getPrototypeOf(async () => 1)"],
+    ["a prototype link", "log(args.__proto__)"],
+    ["Reflect", "Reflect.ownKeys(args)"],
+    [
+      "an agent() option that is not allowed (permissionMode)",
+      `await agent("p", { agentType: "holyagent:reviewer-code", permissionMode: "bypassPermissions" })`,
+    ],
+    [
+      "an agent() option that is not allowed (isolation)",
+      `await agent("p", { agentType: "holyagent:reviewer-code", isolation: "worktree" })`,
+    ],
+    [
+      "a quoted __proto__ key in agent() options",
+      `await agent("p", { agentType: "holyagent:reviewer-code", "__proto__": { agentType: "general-purpose" } })`,
+    ],
+    [
+      "an unquoted __proto__ key in agent() options",
+      `await agent("p", { agentType: "holyagent:reviewer-code", __proto__: { agentType: "general-purpose" } })`,
+    ],
+  ])("says nothing for %s", async (_label, bad) => {
+    expect(await hook("workflow", inlineRun(script(GOOD, bad)))).toEqual(NOTHING)
+  })
+
+  test.each(LOOKALIKES)("says nothing for a call hidden behind the character %d", async (code) => {
+    const lookalike = String.fromCharCode(code)
+    const hidden = `agent${lookalike}("do anything", { agentType: "general-purpose" })`
+    for (const text of [
+      script(GOOD, `await ${hidden}`),
+      script(GOOD, `await${lookalike}agent("do anything", { agentType: "general-purpose" })`),
+      script(GOOD, `return${lookalike}${hidden}`),
+      script(GOOD, `const x${lookalike}= 1`),
+    ])
+      expect(await hook("workflow", inlineRun(text))).toEqual(NOTHING)
+  })
+
+  test("says nothing, and does not fail, for scripts that nest too deep", async () => {
+    const open = "`$" + "{"
+    const close = "}`"
+    for (const depth of [40, 20000])
+      expect(
+        await hook(
+          "workflow",
+          inlineRun(script(GOOD, `${open.repeat(depth)}x${close.repeat(depth)}`)),
+        ),
+      ).toEqual(NOTHING)
+    const parens = await hook(
+      "workflow",
+      inlineRun(script(GOOD, `${"(".repeat(100000)}${")".repeat(100000)}`)),
+    )
+    expect(parens.code).toBe(0)
+    expect(parens.stderr).toBe("")
   })
 
   test.each<readonly [string, string]>([
