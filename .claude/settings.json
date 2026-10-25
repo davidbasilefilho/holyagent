@@ -2,5 +2,10 @@
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "attribution": { "commit": "", "pr": "", "sessionUrl": false },
   "includeGitInstructions": false,
-  "subagentPromptCacheTtl": "1h"
+  "subagentPromptCacheTtl": "1h",
+  "extraKnownMarketplaces": {
+    "holyagent": { "source": { "source": "directory", "path": "." } },
+    "billion-context": { "source": { "source": "github", "repo": "ranxianglei/billion-context" } }
+  },
+  "enabledPlugins": { "holyagent@holyagent": true }
 }
