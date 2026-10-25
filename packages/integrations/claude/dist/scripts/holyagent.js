@@ -10334,7 +10334,7 @@ var ASSIGNMENT_COMMANDS = [
     usage: "assignment dispatch",
     summary: "Start an Assignment and say how to run it: spawn an agent or continue a warm one. A new draft is created and started in one step",
     input: `{id} for a Ready Assignment, or a new draft ${DRAFT_SHAPE}`,
-    output: "TOON fields (id, state, agent/model/effort or continue, reason), then a line `prompt:` alone, then the specialist prompt verbatim to the end; pass that text as it is: as the prompt of a workflow entry first, to the Agent tool only when the Workflow tool is disabled or unavailable, and by SendMessage only for a warm continuation",
+    output: "TOON fields (id, state, agent/model/effort or continue, reason), then a line `prompt:` alone, then the specialist prompt verbatim to the end; pass that text as it is: as the prompt of its agent() in your inline workflow script first, to the Agent tool only when the Workflow tool is disabled or unavailable, and by SendMessage only for a warm continuation",
     notes: [...DRAFT_NOTES, 'dispatching a Ready Assignment takes {"id": "<id>"}'],
     flags: {},
     positionals: 0,
@@ -10388,12 +10388,12 @@ var ASSIGNMENT_COMMANDS = [
     path: ["assignment", "close"],
     usage: CLOSE_USAGE,
     summary: "Finish an Assignment with the specialist's report on stdin; --accept also accepts it from the report's evidence block",
-    input: "the specialist's report as raw text. Required for success; optional for the other outcomes, which store the outcome name when it is empty. With --accept it ends with `evidence:` and one `<criterion or evidence label>: <support>` line per blocking criterion and required label. With --report-json it is the JSON report a workflow returned ({status: done|partial|blocked, changed_paths, checks: [{command, exit}], blockers, notes, evidence: [{key, support}]}), which is stored as the text of such a report",
+    input: "the specialist's report as raw text. Required for success; optional for the other outcomes, which store the outcome name when it is empty. With --accept it ends with `evidence:` and one `<criterion or evidence label>: <support>` line per blocking criterion and required label. With --report-json it is a JSON report object returned by an agent() that was given a schema ({status: done|partial|blocked, changed_paths, checks: [{command, exit}], blockers, notes, evidence: [{key, support}]}), which is stored as the text of such a report",
     notes: [
       "pass the report through a quoted heredoc so it stays intact",
       "--accept applies to success only and reads the last `evidence:` block: one `<criterion text or evidence label>: <support>` line per blocking criterion and per required label, each starting with that text alone. Accept only support you judge true",
       "an evidence gap (InsufficientAcceptance) records nothing: SendMessage the missing support to the same subagent, then close again; a workflow agent cannot be messaged, so draft a follow-up with followUpOf",
-      "outcomes: success; failure (the work failed); errored (the agent died or returned no report); interrupted (its agent is gone after a resume or compaction); stopped (you stopped it). A report from a workflow is closed with --report-json"
+      "outcomes: success; failure (the work failed); errored (the agent died or returned no report); interrupted (its agent is gone after a resume or compaction); stopped (you stopped it). A report from an inline workflow script is the specialist's own text: pass it verbatim on stdin, with --report-json only for a JSON report object"
     ],
     flags: { outcome: "string", accept: "string", "report-json": "boolean" },
     positionals: 1,
@@ -10527,17 +10527,12 @@ var reviewedWriters = ({ project, dispatchable, ready }) => {
   }
   return pairs;
 };
-var WORKFLOWS = [
-  ["implement-review", "a writer and the review of its work are both ready", reviewedWriters],
+var SHAPES = [
+  ["a writer and the review of its work are both ready", reviewedWriters, true],
   [
-    "review-diff",
-    "independent reviews can start together",
-    ({ dispatchable }) => parallelSet(dispatchable, (row) => isReviewer(row.roleTask))
-  ],
-  [
-    "run-assignments",
     "independent Assignments can start together",
-    ({ dispatchable }) => parallelSet(dispatchable, () => true)
+    ({ dispatchable }) => parallelSet(dispatchable, () => true),
+    false
   ]
 ];
 var continuations = (rows, beside, registry, now, config) => parallelSet(rows.filter((row) => beside.every((other) => independent(other, row))), () => true).flatMap((row) => {
@@ -10554,11 +10549,11 @@ var recommend = (project, registry, now, config) => {
       dispatchable: dispatchable.filter(spawns),
       ready: ready.filter(spawns)
     };
-    for (const [name, reason, pick] of WORKFLOWS) {
+    for (const [reason, pick, paired] of SHAPES) {
       const chosen = pick(pool);
-      if (chosen.length >= (name === "run-assignments" ? 1 : 2)) {
+      if (chosen.length >= 1) {
         const assignmentIds = chosen.map((row) => row.id);
-        const reviews = name === "implement-review" ? assignmentIds.filter((_, at) => at % 2 === 1) : [];
+        const reviews = paired ? assignmentIds.filter((_, at) => at % 2 === 1) : [];
         const fallback = {
           assignmentIds: assignmentIds.filter((id) => !reviews.includes(id)),
           afterwards: reviews
@@ -10566,7 +10561,6 @@ var recommend = (project, registry, now, config) => {
         const continues = continuations(dispatchable.filter((row) => !spawns(row)), chosen, registry, now, config);
         return {
           action: "workflow",
-          name,
           assignmentIds,
           fallback,
           continues,

@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mvo5wqz3-yz2h",
+  "intentId": "intent-0mvnv553v-zwx8",
+  "intentRevision": 11,
+  "roleTask": "Worker.operations",
+  "slug": "determine-by-experiment-when-claude-code",
+  "objective": "Determine by experiment when Claude Code refreshes the installed copy of a directory-marketplace plugin after its source changes, so holyagent updates itself when its content changes.",
+  "state": "Running",
+  "scope": [
+    "Run everything under the experiment folder /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/plugin-exp with CLAUDE_CONFIG_DIR set to a fresh folder inside it, so the real ~/.claude is never touched. Create there a tiny directory marketplace (.claude-plugin/marketplace.json) with one plugin holding one skill, and a project folder whose .claude/settings.json declares the marketplace (source directory) and enables the plugin, like /home/davidbasile/dev/holyagent/.claude/settings.json does.",
+    "Cases: (1) install at project scope with claude plugin install, record installed_plugins.json and the cache path; (2) change the skill text without changing version, then run claude plugin marketplace update <name> and claude plugin update <plugin>@<name> --scope project, and check whether the cache content changed; (3) same with the version changed in marketplace.json only, in plugin.json only, and in both; (4) with no version field at all; (5) a version carrying build metadata such as 0.1.2+abc123. For each, note whether a new cache folder appears, whether content refreshes, and the exact CLI output.",
+    "If a headless session can be started cheaply in that config (claude -p with a trivial prompt, no network auth needed), check whether simply starting a session in the project refreshes the plugin without any update command; if it needs login, say so and skip it.",
+    "Read claude plugin --help, claude plugin install --help, claude plugin update --help and claude plugin marketplace update --help and quote the lines that matter."
+  ],
+  "constraints": [
+    "Never touch /home/davidbasile/.claude, /mnt/c or the holyagent checkout; every write stays inside the experiment folder.",
+    "Do not log in or use credentials."
+  ],
+  "criteria": [
+    {
+      "text": "Each case has its observed result with the commands run and their output.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The report states the cheapest reliable way to make an installed directory-marketplace plugin pick up new content, and whether a restart is needed.",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks",
+    "results-file"
+  ],
+  "ownershipPaths": [
+    "experiment"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "workflow:wf_f6fb36d9-f80/assignment-0mvo5wqz3-yz2h",
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-25T18:29:36.784Z"
+  },
+  "createdAt": "2026-10-25T18:29:36.784Z"
+}

@@ -130,6 +130,9 @@ describe("reviewer independence", () => {
 
 describe("workflow recommendation", () => {
   const on: ExecutionConfig = { ttlMinutes: 55, workflowsAvailable: true }
+  /** The reasons of the two shapes: writer and review pairs, and Assignments side by side. */
+  const PAIRS = "a writer and the review of its work are both ready"
+  const PARALLEL = "independent Assignments can start together"
   const writer = (id: string, over = {}) =>
     assignment({ id, ownershipPaths: [`src/${id}.ts`], ...over })
   const review = (id: string, over = {}) =>
@@ -147,12 +150,13 @@ describe("workflow recommendation", () => {
     expect(plan([running()])).toBeUndefined()
   })
 
-  test("a ready writer with the review of its work is implement-review", () => {
+  test("a ready writer with the review of its work is a writer-then-review pair", () => {
     const pair = [writer("w"), review("r", { independentFrom: ["w"] })]
     expect(plan(pair)).toMatchObject({
       action: "workflow",
-      name: "implement-review",
       assignmentIds: ["w", "r"],
+      fallback: { assignmentIds: ["w"], afterwards: ["r"] },
+      reason: PAIRS,
     })
   })
 
@@ -160,7 +164,7 @@ describe("workflow recommendation", () => {
     expect(plan([review("r1"), review("r2")])).toMatchObject({
       fallback: { assignmentIds: ["r1", "r2"], afterwards: [] },
     })
-    // The reviews of implement-review wait for their writers, so the fallback launches them after.
+    // The reviews of pairs wait for their writers, so the fallback launches them after.
     const rows = [
       writer("w1"),
       writer("w2"),
@@ -181,8 +185,8 @@ describe("workflow recommendation", () => {
       review("r1", { independentFrom: ["w1"] }),
     ]
     expect(plan(rows)).toMatchObject({
-      name: "implement-review",
       assignmentIds: ["w1", "r1", "w2", "r2"],
+      fallback: { afterwards: ["r1", "r2"] },
     })
     const colliding = [
       writer("w1"),
@@ -196,19 +200,20 @@ describe("workflow recommendation", () => {
     const rows = [writer("w"), review("r", { dependencies: ["w"], independentFrom: ["w"] })]
     expect(plan(rows)).toMatchObject({
       action: "workflow",
-      name: "run-assignments",
       assignmentIds: ["w"],
+      fallback: { afterwards: [] },
+      reason: PARALLEL,
     })
   })
 
   test("a review waits for any unfinished work it names, and is not paired with just one of them", () => {
     const rows = [writer("w"), writer("other"), review("r", { independentFrom: ["w", "other"] })]
-    expect(plan(rows)).toMatchObject({ name: "run-assignments", assignmentIds: ["w", "other"] })
+    expect(plan(rows)).toMatchObject({ reason: PARALLEL, assignmentIds: ["w", "other"] })
     expect(plan(rows, [], DEFAULT_CONFIG)).toMatchObject({ action: "subagent" })
     const finished = succeeded({ id: "other" }, 1)
     expect(
       plan([writer("w"), finished, review("r", { independentFrom: ["w", "other"] })]),
-    ).toMatchObject({ name: "implement-review", assignmentIds: ["w", "r"] })
+    ).toMatchObject({ reason: PAIRS, assignmentIds: ["w", "r"] })
   })
 
   test("a review of work still running starts after it finishes, not before", () => {
@@ -217,31 +222,32 @@ describe("workflow recommendation", () => {
     expect(plan([...rows, check])).toBeUndefined()
     expect(plan([succeeded({ id: "w" }), check])).toMatchObject({
       action: "workflow",
-      name: "run-assignments",
+      reason: PARALLEL,
       assignmentIds: ["r"],
     })
   })
 
-  test("independent reviews are review-diff; dependent ones are not", () => {
+  test("independent reviews run side by side; dependent ones do not", () => {
     expect(plan([review("r1"), review("r2")])).toMatchObject({
-      name: "review-diff",
+      reason: PARALLEL,
       assignmentIds: ["r1", "r2"],
     })
     expect(plan([review("r1"), review("r2", { dependencies: ["r1"] })])).toMatchObject({
-      name: "run-assignments",
+      reason: PARALLEL,
       assignmentIds: ["r1"],
     })
   })
 
-  test("other independent Assignments are run-assignments", () => {
+  test("other independent Assignments run side by side, and a single one is a one-entry workflow", () => {
     expect(plan([validation("v1"), validation("v2")])).toMatchObject({
       action: "workflow",
-      name: "run-assignments",
+      reason: PARALLEL,
       assignmentIds: ["v1", "v2"],
+      fallback: { assignmentIds: ["v1", "v2"], afterwards: [] },
     })
-    expect(plan([writer("w"), validation("v")])).toMatchObject({ name: "run-assignments" })
+    expect(plan([writer("w"), validation("v")])).toMatchObject({ reason: PARALLEL })
     expect(plan([validation("v1"), validation("v2", { dependencies: ["v1"] })])).toMatchObject({
-      name: "run-assignments",
+      reason: PARALLEL,
       assignmentIds: ["v1"],
     })
   })
@@ -251,16 +257,14 @@ describe("workflow recommendation", () => {
     const warm = [{ assignmentId: "w2", agentId: "agent-1" }]
     expect(plan([writer("w1"), follow], [warmFor()])).toMatchObject({
       action: "workflow",
-      name: "run-assignments",
       assignmentIds: ["w1"],
       continues: warm,
     })
     expect(plan([writer("w1"), follow], [warmFor()])).toHaveProperty(
       "reason",
-      "independent Assignments can start together; the Assignments in continues go by SendMessage to their warm specialists",
+      `${PARALLEL}; the Assignments in continues go by SendMessage to their warm specialists`,
     )
     expect(plan([writer("w1"), follow, writer("w3")], [warmFor()])).toMatchObject({
-      name: "run-assignments",
       assignmentIds: ["w1", "w3"],
       continues: warm,
     })
@@ -299,19 +303,18 @@ describe("workflow recommendation", () => {
       writer("a", { ownershipPaths: ["src"] }),
       writer("b", { ownershipPaths: ["src/b.ts"] }),
     ]
-    expect(plan(rows)).toMatchObject({ name: "run-assignments", assignmentIds: ["a"] })
+    expect(plan(rows)).toMatchObject({ assignmentIds: ["a"] })
   })
 
   test("Assignments that cannot start now are left out", () => {
     const blockedByDependency = review("r1", { dependencies: ["assignment-dep"] })
     const dep = succeeded({ id: "assignment-dep" })
     expect(plan([blockedByDependency, review("r2"), dep])).toMatchObject({
-      name: "run-assignments",
       assignmentIds: ["r2"],
     })
     const accepted = succeeded({ id: "assignment-dep" }, 1)
     expect(plan([blockedByDependency, review("r2"), accepted])).toMatchObject({
-      name: "review-diff",
+      assignmentIds: ["r1", "r2"],
     })
     const holder = running({ id: "assignment-holder", ownershipPaths: ["src/w.ts"] })
     expect(plan([writer("w"), holder])).toBeUndefined()
@@ -332,7 +335,7 @@ describe("workflow recommendation", () => {
       continues: [{ assignmentId: "w", agentId: "agent-1" }],
     })
     expect(plan([row], [warmFor()], DEFAULT_CONFIG)).toMatchObject({ action: "continue" })
-    expect(plan([row])).toMatchObject({ name: "run-assignments", assignmentIds: ["w"] })
+    expect(plan([row])).toMatchObject({ reason: PARALLEL, assignmentIds: ["w"] })
     expect(plan([row], [], DEFAULT_CONFIG)).toMatchObject({
       action: "subagent",
       assignmentIds: ["w"],
