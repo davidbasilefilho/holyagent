@@ -16,6 +16,21 @@
         ]
       }
     ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/holyagent",
+            "args": [
+              "hook",
+              "subagent-start"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
@@ -25,22 +40,20 @@
             "command": "${CLAUDE_PLUGIN_ROOT}/scripts/holyagent",
             "args": [
               "hook",
-              "vcs-redirect"
+              "vcs-reminder"
             ],
             "timeout": 10,
-            "if": "Bash(*git*commit*)",
-            "onFailure": "block"
+            "if": "Bash(*git*commit*)"
           },
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/scripts/holyagent",
             "args": [
               "hook",
-              "vcs-redirect"
+              "vcs-reminder"
             ],
             "timeout": 10,
-            "if": "Bash(*git*push*)",
-            "onFailure": "block"
+            "if": "Bash(*git*push*)"
           }
         ]
       },

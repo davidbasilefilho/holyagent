@@ -4,7 +4,7 @@ Commits and PR text read as the user wrote them: the author and committer are th
 
 ## The `vcs` commands
 
-`holyagent vcs` has two commands. Everything else a change needs is plain Git and `gh`: branches, pushes, merges, force-push protection (a hook, below) and CI (`gh pr checks <n> --watch`).
+`holyagent vcs` has two commands. Everything else a change needs is plain Git and `gh`: branches, pushes, merges, CI (`gh pr checks <n> --watch`).
 
 An earlier design also detected how to commit and then committed through GitHub's API as the credential owner, read the first commit back, and wrapped pushing, branching and CI watching in commands of their own. All of that is gone: it needed a GraphQL endpoint that is blocked in some hosted sessions, signed or unsigned commits depending on the session, and a cache to explain it. Commits are now plain `git commit` with the repository's own identity and hooks, which also keeps Intent state versioned in Git like any other file.
 
@@ -38,7 +38,7 @@ An unknown key inside `vcs` is an error that names the file (an old `api` key is
 
 ## The `commit-msg` hook
 
-`holyagent hook commit-msg <message-file>` runs the same cleaning and check on the message file git passes to a `commit-msg` hook. It rewrites the file without the attribution lines and exits 3 on a refused message, which stops the commit, so a commit made with plain `git commit` (by the user, or by an agent that slipped past the redirect) gets the same text rule. Git's own comment lines (`core.commentString` or `core.commentChar`, `#` by default) are left alone and not checked for phrases, and so is everything after the exact scissors line (`<comment> ------------------------ >8 ------------------------`) that `git commit -v` adds before the staged diff. Attribution lines are removed from there too, since a message made by hand keeps everything below such a line. A comment string that comes only from a `-c` on the command line is ignored; the repository's files decide.
+`holyagent hook commit-msg <message-file>` runs the same cleaning and check on the message file git passes to a `commit-msg` hook. It rewrites the file without the attribution lines and exits 3 on a refused message, which stops the commit, so a commit made with plain `git commit` (by the user, or by an agent that ran it anyway) gets the same text rule. Git's own comment lines (`core.commentString` or `core.commentChar`, `#` by default) are left alone and not checked for phrases, and so is everything after the exact scissors line (`<comment> ------------------------ >8 ------------------------`) that `git commit -v` adds before the staged diff. Attribution lines are removed from there too, since a message made by hand keeps everything below such a line. A comment string that comes only from a `-c` on the command line is ignored; the repository's files decide.
 
 Install it in any repository as `.git/hooks/commit-msg`:
 
@@ -58,9 +58,9 @@ commit-msg:
 
 This repository wires it that way in `lefthook.yml`, through the built wrapper in `packages/integrations/claude/dist/scripts/holyagent`.
 
-## Redirecting raw git
+## Raw git commits
 
-A `PreToolUse` hook on the Bash tool denies a `git commit` command and names `holyagent vcs commit`, and denies a force push or a push that deletes or mirrors remote refs (`--force`, `-f`, `--force-with-lease`, `--force-if-includes`, `--mirror`, `--delete`, `-d`, `--prune`, any unambiguous abbreviation of those, a `+` or `:` refspec) and a push argument it cannot read with certainty (a variable, substitution, brace, glob or escape it does not decode); a plain `git push` with literal arguments passes. [hooks.md](hooks.md) has the details and its limits.
+The rule that commits go through `holyagent vcs commit` is instruction text, not a guard: the root's and the specialists' texts state it, a `SubagentStart` hook restates it to every specialist at its start, and a `PreToolUse` hook on the Bash tool adds a one-line reminder to a command that mentions `git` and then `commit` or `push`. No hook denies or rewrites a command, so a raw `git commit` still runs; its message gets the `commit-msg` hook above where that is installed. [hooks.md](hooks.md) has the details and the reason is in [decisions.md](decisions.md).
 
 ## Settings that `holyagent setup claude` writes
 
