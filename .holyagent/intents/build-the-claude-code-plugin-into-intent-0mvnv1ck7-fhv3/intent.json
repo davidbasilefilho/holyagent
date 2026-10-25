@@ -1,0 +1,17 @@
+{
+  "id": "intent-0mvnv1ck7-fhv3",
+  "slug": "build-the-claude-code-plugin-into",
+  "objective": "Build the Claude Code plugin into packages/integrations/claude/dist so it works from there, and answer the user's questions about skill duplication and prebuilt workflows.",
+  "requirements": [
+    "verifique se há duplicação de skills no código",
+    "a build do claude plugin deve ser colocada em packages/integrations/claude/dist e corretamente funcionar lá",
+    "porque tem workflows prebuilt no projeto? existem diretrizes falando como o root agente deve fazer workflows? porque prebuilt workflows não faz sentido.",
+    "me responda como funciona os workflows no claude code como o holyagent está fazendo aqui",
+    "The marketplace file stays at the repository root (.claude-plugin/marketplace.json) and its plugin source points at ./packages/integrations/claude/dist.",
+    "Prebuilt workflows are not removed or changed in this Intent; their removal is handled by intent-0mvnv553v-zwx8.",
+    "isso vai ser o 0.1.2"
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-10-25T13:25:15.607Z"
+}

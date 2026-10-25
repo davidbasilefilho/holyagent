@@ -4,6 +4,7 @@ import { WORKFLOW_NAMES } from "../../../runtime/src/domain/plan.ts"
 import packageJson from "../package.json" with { type: "json" }
 import { agentFiles, PLUGIN_NAME } from "./agents.ts"
 import {
+  DIST_DIRECTORY,
   type GeneratedFile,
   generatedNote,
   INSTRUCTIONS_DIRECTORY,
@@ -19,19 +20,11 @@ import {
 export const MARKETPLACE_PATH = ".claude-plugin/marketplace.json"
 
 /**
- * Every path the build writes, relative to the repository root. The build removes these before it
- * writes and touches nothing else; the commit hook stages exactly these.
+ * Every path the build writes, relative to the repository root: the marketplace, which Claude Code
+ * reads at the repository root, and the built plugin. The build removes these before it writes and
+ * touches nothing else; the commit hook stages exactly these.
  */
-export const GENERATED_PATHS: ReadonlyArray<string> = [
-  MARKETPLACE_PATH,
-  `${PLUGIN_DIRECTORY}/.claude-plugin/plugin.json`,
-  `${PLUGIN_DIRECTORY}/settings.json`,
-  `${PLUGIN_DIRECTORY}/agents`,
-  `${PLUGIN_DIRECTORY}/skills`,
-  `${PLUGIN_DIRECTORY}/hooks/hooks.json`,
-  `${PLUGIN_DIRECTORY}/workflows`,
-  `${PLUGIN_DIRECTORY}/scripts`,
-]
+export const GENERATED_PATHS: ReadonlyArray<string> = [MARKETPLACE_PATH, DIST_DIRECTORY]
 
 const SOURCES = `${PLUGIN_DIRECTORY}/src`
 /** The official frontend-design skill, kept byte for byte as Anthropic ships it. */
@@ -53,7 +46,7 @@ const DEPENDENCIES = [
   `exa@${OFFICIAL_MARKETPLACE}`,
 ]
 
-const inPlugin = (path: string) => `${PLUGIN_DIRECTORY}/${path}`
+const inPlugin = (path: string) => `${DIST_DIRECTORY}/${path}`
 
 const manifests = (): ReadonlyArray<GeneratedFile> => [
   {
@@ -77,7 +70,7 @@ const manifests = (): ReadonlyArray<GeneratedFile> => [
       plugins: [
         {
           name: PLUGIN_NAME,
-          source: `./${PLUGIN_DIRECTORY}`,
+          source: `./${DIST_DIRECTORY}`,
           description: DESCRIPTION,
           version: packageJson.version,
         },

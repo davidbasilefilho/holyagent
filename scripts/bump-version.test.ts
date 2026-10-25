@@ -246,7 +246,7 @@ describe("the repository's versions", () => {
     }
     const marketplace = await readJson<{ plugins: Versioned[] }>(".claude-plugin/marketplace.json")
     const plugin = await readJson<Versioned>(
-      "packages/integrations/claude/.claude-plugin/plugin.json",
+      "packages/integrations/claude/dist/.claude-plugin/plugin.json",
     )
     const versions = new Set<string | undefined>([
       ...(await Promise.all(

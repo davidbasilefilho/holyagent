@@ -1,9 +1,9 @@
 import { type Capability, type Route, ROUTES } from "../../../runtime/src/domain/route.ts"
 import {
+  DIST_DIRECTORY,
   type GeneratedFile,
   generatedNote,
   INSTRUCTIONS_DIRECTORY,
-  PLUGIN_DIRECTORY,
   readSource,
 } from "./files.ts"
 
@@ -138,7 +138,7 @@ const specialist = async (
     ...(WRITING_BAR.has(route.roleTask) ? [writingBar.trim()] : []),
   ].join("\n\n")
   return {
-    path: `${PLUGIN_DIRECTORY}/agents/${route.agent}.md`,
+    path: `${DIST_DIRECTORY}/agents/${route.agent}.md`,
     content: `${head}\n\n${body}\n`,
   }
 }
@@ -170,7 +170,7 @@ const rootAgent = async (): Promise<GeneratedFile> => {
     `tools: ${tools.join(", ")}`,
   ])
   return {
-    path: `${PLUGIN_DIRECTORY}/agents/${PLUGIN_NAME}.md`,
+    path: `${DIST_DIRECTORY}/agents/${PLUGIN_NAME}.md`,
     content: `${head}\n\n${await readSource(source)}`,
   }
 }

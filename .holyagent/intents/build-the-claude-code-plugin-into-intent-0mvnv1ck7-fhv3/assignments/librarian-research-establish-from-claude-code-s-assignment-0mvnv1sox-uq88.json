@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mvnv1sox-uq88",
+  "intentId": "intent-0mvnv1ck7-fhv3",
+  "intentRevision": 1,
+  "roleTask": "Librarian.research",
+  "slug": "establish-from-claude-code-s",
+  "objective": "Establish from Claude Code's documentation and the locked @anthropic-ai/claude-code package how the Workflow tool finds and runs workflows, including named workflows shipped by a plugin.",
+  "state": "Running",
+  "scope": [
+    "Where named workflows are loaded from (built-in, .claude/workflows/, a plugin's workflows/ folder) and how a plugin workflow is named (plugin:name).",
+    "How a run is authorized (opt-in, permission prompt, PreToolUse hooks) and what `script`, `scriptPath`, `name` and `args` do.",
+    "Whether a workflow agent can be messaged or continued, and how agentType selects a plugin agent.",
+    "Read node_modules/@anthropic-ai/claude-code in this repository (version 2.1.300) and the official docs; cite each fact with a source path or URL."
+  ],
+  "constraints": [
+    "Read only; write nothing in the repository."
+  ],
+  "criteria": [
+    {
+      "text": "Each answer cites a doc URL or a path in the installed package; unknowns are named as Unknown.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Answers only the listed questions.",
+      "blocking": false,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "sources"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "aa9d881ff5783e64c",
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-10-25T13:25:36.514Z"
+  },
+  "createdAt": "2026-10-25T13:25:36.514Z"
+}
