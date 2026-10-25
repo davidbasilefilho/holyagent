@@ -41,7 +41,8 @@
     "User: altere o AGENTS.md do projeto para que erros DENTRO do repo não sejam mais cometidos. mas comportamentos do holyagent devem ser reforçados lá (repo-specific pitfalls go in the project's AGENTS.md; holyagent behaviors are reinforced in the holyagent instructions)",
     "User: cara como pode toda vez que vou criar uma sessão os agentes ignoram as instruções do holyagent (e anteriormente holyclaude)",
     "Decision (user): avoid wasteful hooks (no per-message UserPromptSubmit reminder); reinforce the instruction text itself; the existing SessionStart hook (startup|resume|clear|compact) appends a short block of the most-violated root rules: load and keep the app task list, acknowledge every user message, decisions through AskUserQuestion, act on what the user names, never work around a blocking hook, speak only for decisions, blockers and the final report.",
-    "Decision (user): after compact or resume only, SessionStart also injects the in-use Intent's requirements, marked as data; a fresh session does not."
+    "Decision (user): after compact or resume only, SessionStart also injects the in-use Intent's requirements, marked as data; a fresh session does not.",
+    "Audit findings to fix (sessions 76e01786 and e7f538f4): the root text does not say what to do when holyagent:* agent types do not resolve (it fell back silently to general-purpose agents); vcs has no route for merge, git identity, stash or state repair, so the root used raw git on .holyagent; the harness nudge to narrate progress overrides the quiet rule; reports were retyped by the root into assignment close instead of passed verbatim; a push followed a raw-git merge without a review of that head."
   ],
   "revision": 10,
   "state": "Open",

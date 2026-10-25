@@ -178,14 +178,15 @@ describe("the rules block that ends the session context", () => {
       "utf8",
     )
     expect(SESSION_REMINDER).toBe(file.trim())
-    expect(SESSION_REMINDER.split("\n").filter((line) => line.startsWith("- "))).toHaveLength(6)
+    expect(SESSION_REMINDER.split("\n").filter((line) => line.startsWith("- "))).toHaveLength(5)
     for (const part of [
-      "task-list tool if it is deferred",
+      "task-list tool if it is deferred (Claude Code's TaskCreate/TaskUpdate, the desktop app's update_plan",
       "Acknowledge every user message",
       "AskUserQuestion",
       "without asking again",
-      "blocking hook or a denial",
-      "decisions, blockers and the final report",
+      "Follow a denial or hook that names a holyagent route",
+      "blocking hook or a denial names none",
+      "otherwise write only for decisions, blockers and the final report",
     ])
       expect(SESSION_REMINDER).toContain(part)
   })

@@ -247,8 +247,24 @@ describe("agents", () => {
       "names an action",
       "Every pending decision goes through AskUserQuestion",
       "never reach the same result through another tool",
+      "Follow a denial or hook that names a holyagent route",
+      "A brief acknowledgment is always allowed",
+      "update_plan",
     ])
       expect({ rule, count: content.split(rule).length - 1 }).toEqual({ rule, count: 1 })
+  })
+
+  test("the session reminder states each of the user's behavior rules once", () => {
+    const reminder = read(CLAUDE, "session-reminder.md")
+    for (const rule of [
+      "Acknowledge every user message",
+      "names an action",
+      "AskUserQuestion",
+      "Follow a denial or hook that names a holyagent route",
+      "otherwise write only for decisions, blockers and the final report",
+      "update_plan",
+    ])
+      expect({ rule, count: reminder.split(rule).length - 1 }).toEqual({ rule, count: 1 })
   })
 
   test("every requirement of requirements.md is implemented by a section that reaches its agents", () => {

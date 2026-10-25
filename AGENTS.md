@@ -10,13 +10,9 @@ Rules for working in this repository, each with the reason it exists. The contri
 ## Commits and pull requests
 
 - Pass `holyagent vcs pr --body-file` an unignored file inside the project. Files outside the project or ignored by git are rejected, so a scratch file will not work.
-- Keep process words such as "Claude Code" out of commit and PR text, because `holyagent vcs` refuses them. Rephrase, or list a genuine domain word in `vcs.allowWords` of `.holyagent/config.json`.
+- `holyagent vcs` refuses process words such as "Claude Code" in commit and PR text. Rephrase, or list a genuine domain word in `vcs.allowWords` of `.holyagent/config.json`.
 - Repeat the criterion text exactly in each evidence line of a specialist report, trailing period included. `assignment close --accept` matches evidence to criteria literally and rejects a paraphrase.
-
-## Gates
-
-- Run the gates through mise: `mise run verify`, and `mise run build` after plugin source changes. Mise first checks for the canary Bun that provides `bun check`, `bun lint` and `bun fmt`, so calling those scripts directly can fail with a misleading error on a stable Bun.
 
 ## Blocked actions
 
-- When a hook blocks a command or a command is denied, stop and report it. Do not route around it through another tool, because the block is a deliberate boundary and a workaround defeats it.
+- When a denial or a blocking hook names a holyagent route, follow it: the `vcs-redirect` hook denies `git commit` and `git push` and names `holyagent vcs commit` and `holyagent vcs push`. When one names none, stop and report it, and do not route around it through another tool, because the block is a deliberate boundary and a workaround defeats it.
