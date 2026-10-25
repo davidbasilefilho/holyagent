@@ -44,6 +44,7 @@ Pi released 1.0.1 on 2026-10-03 and 1.4.0 on 2026-10-21, roughly weekly minor re
 | [installation.md](installation.md)                   | Installing Pi; Bun status                                                |
 | [orchestration.md](orchestration.md)                 | A dynamic-workflow equivalent mapped to Intents and Assignments          |
 | [auto-mode.md](auto-mode.md)                         | Requirements for a HolyAgent auto mode on Pi                             |
+| [claude-parity.md](claude-parity.md)                 | Which HolyAgent Claude rules and mechanisms become Pi rules, and how     |
 
 ## Top findings and gaps
 
