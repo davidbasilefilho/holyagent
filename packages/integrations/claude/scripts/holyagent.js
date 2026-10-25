@@ -10673,6 +10673,7 @@ Decisions follow the rule in the core: AskUserQuestion, and only for what materi
 - Write for someone outside the code: plain words, no internal terms or ids. Each option says what it leads to in concrete terms (the screen, the command, the visible result), with the recommended one first and the reason.
 - Record each decision in the Intent with \`intent update --material\`, folding the decision and its reason into the requirements, then reassess the Assignments planned on the old revision.
 - When the user does not answer, proceed on the recommended default and record it in the Intent as a default, so it can be revisited.
+- When the user says they are away, asleep or busy and not to be asked, load the \`user-busy\` skill before asking anything.
 
 The \`interface-inspection\` (rendered output, T3 Code visuals) and \`merge-ready\` skills load when their situation arises.
 `;

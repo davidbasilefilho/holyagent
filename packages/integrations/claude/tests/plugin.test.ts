@@ -205,7 +205,13 @@ describe("agents", () => {
       .filter((file) => !file.path.includes("/scripts/"))
       .flatMap((file) => file.content.match(/holyagent:[A-Za-z0-9._-]+/g) ?? [])
       .map((reference) => reference.slice("holyagent:".length))
-    const known = new Set([...agents, "merge-ready", "interface-inspection", ...WORKFLOW_NAMES])
+    const known = new Set([
+      ...agents,
+      "merge-ready",
+      "interface-inspection",
+      "user-busy",
+      ...WORKFLOW_NAMES,
+    ])
     for (const name of [...references, ...ROUTES.map((route) => route.agent)]) {
       expect(name).toMatch(/^[a-z]+(?:-[a-z]+)*$/)
       expect(known.has(name)).toBe(true)
@@ -290,7 +296,7 @@ describe("agents", () => {
       .filter((file) => file.path.endsWith("SKILL.md"))
       .map((file) => file.path.split("/").at(-2) ?? "")
       .toSorted()
-    expect(names).toEqual(["frontend-design", "interface-inspection", "merge-ready"])
+    expect(names).toEqual(["frontend-design", "interface-inspection", "merge-ready", "user-busy"])
     expect(agent("reviewer-code")?.content).toContain(
       "Start every review, re-reviews included, with the built-in `/code-review`",
     )
