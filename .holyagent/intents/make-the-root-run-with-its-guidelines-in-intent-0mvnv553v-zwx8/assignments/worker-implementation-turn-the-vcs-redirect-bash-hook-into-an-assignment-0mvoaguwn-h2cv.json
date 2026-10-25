@@ -1,0 +1,93 @@
+{
+  "id": "assignment-0mvoaguwn-h2cv",
+  "intentId": "intent-0mvnv553v-zwx8",
+  "intentRevision": 12,
+  "roleTask": "Worker.implementation",
+  "slug": "turn-the-vcs-redirect-bash-hook-into-an",
+  "objective": "Turn the vcs-redirect Bash hook into an allowlist: once a command mentions Git with commit or push, it passes only when every simple command in it is fully read and runs a known program; everything else is denied as unclear.",
+  "state": "Succeeded",
+  "scope": [
+    "Work only in the worktree /home/davidbasile/dev/holyagent-fix-cli-and-vcs (branch release/0.1.2/fix/cli-and-vcs, head 675a95e). Ownership paths are relative to it.",
+    "Why: each fix to the denylist in packages/runtime/src/cli/shell.ts left new bypasses. Latest findings: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/r-i65u.json (N1 to N4 and more: expansions in the program word such as git${IFS}commit or {git,commit}, a $() program, sh -c with positional parameters, (( used as nested subshells, time -p, /usr/bin/time, coproc, function f { }, trap, source and ., unknown prefixes like fakeroot, mise exec, docker exec, xargs git with no subcommand, env -iS).",
+    "Design: the hook runs only when the text matches Git followed by commit or push. Then: (1) every simple command must be parsed with certainty, its program word a plain literal (no $, braces, globs, backticks, quotes tricks, no expansion) from an allowlist of programs the root uses (git, gh, echo, printf, cat, head, tail, wc, grep, rg, ls, cd, pwd, mise, bun, bunx, jq, sort, uniq, cut, tr, test, [, true, false, sleep, mkdir, cp, mv, rm, touch, diff, sed, awk, find without -exec/-execdir/-ok/-okdir/-delete... and holyagent wrapper paths); any other program, keyword construct (function, coproc, trap, time with options, source, ., eval, exec, xargs, env with options, shells, subshell with ((, arithmetic with commands) gives unclear; (2) for git, every word is a literal, the subcommand is literal, a commit routes to vcs commit, a push is checked by the existing force rules, and missing subcommand, -c/--config-env overrides of alias, push or remote, or a dynamic word give unclear; (3) git appearing as a non-first word of any command (an argument of another program) gives unclear unless that program only prints text (echo, printf, grep, rg) and the word is quoted data. Keep everyday commands passing with tests: git status/log/show/diff/branch/merge/stash/worktree, plain git push with -u, gh pr create --body-file with a quoted heredoc, gh pr checks --watch, mise run verify piped into tail, bun test, a for loop over literal words calling git log.",
+    "Rewrite docs/hooks.md for the allowlist, keeping the documented residuals honest (user git aliases in config files)."
+  ],
+  "constraints": [
+    "Decision (user, verbatim): slim holyagent vcs. Remove the GitHub API commit path; push, branch and ci become plain Git and gh, with a commit-msg hook for attribution and a deny rule for force pushes. Keep only vcs commit (exact paths + Intent state + message check) and vcs pr (PR text check). Intent state stays versioned in Git.",
+    "No version-control writes and no edits under .holyagent or the repository metadata folder. Report the changed paths.",
+    "Done means mise run verify passes in the worktree; run mise run build so dist is regenerated."
+  ],
+  "criteria": [
+    {
+      "text": "Every command shape in the latest security report is denied, each with a test.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The listed everyday commands still pass, with tests.",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "mise run verify passes and dist is rebuilt with mise run build.",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli/shell.ts",
+    "packages/runtime/src/cli/hook.ts",
+    "packages/runtime/tests/shell.test.ts",
+    "packages/integrations/claude/tests/hooks.test.ts",
+    "packages/integrations/claude/dist",
+    "docs/hooks.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "workflow:wf_2d9698ba-5a2/assignment-0mvoaguwn-h2cv",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-25T20:37:13.464Z",
+    "finishedAt": "2026-10-25T20:53:22.584Z"
+  },
+  "result": "status: done\nchanged:\n- /home/davidbasile/dev/holyagent-fix-cli-and-vcs/packages/runtime/src/cli/shell.ts\n- /home/davidbasile/dev/holyagent-fix-cli-and-vcs/packages/runtime/src/cli/hook.ts\n- /home/davidbasile/dev/holyagent-fix-cli-and-vcs/packages/runtime/tests/shell.test.ts\n- /home/davidbasile/dev/holyagent-fix-cli-and-vcs/packages/integrations/claude/tests/hooks.test.ts\n- /home/davidbasile/dev/holyagent-fix-cli-and-vcs/packages/integrations/claude/dist/scripts/holyagent.js\n- /home/davidbasile/dev/holyagent-fix-cli-and-vcs/docs/hooks.md\nchecks:\n- mise run verify (type-check, lint, format check, bun test) in /home/davidbasile/dev/holyagent-fix-cli-and-vcs; log at /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/verify-allow.log -> exit 0\n- mise run build (regenerates packages/integrations/claude/dist; only dist/scripts/holyagent.js changed) -> exit 0\n- bun test packages/runtime/tests/shell.test.ts -> exit 0\n- bun test packages/integrations/claude/tests/hooks.test.ts -t vcs-redirect (197 pass, 0 fail) -> exit 0\n- Base check: the new shell.test.ts run against shell.ts from HEAD (git show). 95 'is unclear' cases fail there and pass on the new code. Throwaway copy, deleted afterwards. -> exit 1\nnotes:\n- Diff file: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/allow.diff. It covers all six paths, dist included. No new files.\n- Design: gitWrites in shell.ts is now an allowlist. hook.ts applies the gate /git[\\s\\S]*(?:commit|push)/i before calling it, so the allowlist logic is tested directly in shell.test.ts without the gate. shellWrites, WRAPPERS, RUNNERS, SHELLS and the nested sh -c recursion are gone, so shells, wrappers and runners are simply unknown programs.\n- Extras I added beyond the brief, each needed to close an exec route through an allowlisted program or an alias; drop any you do not want. (1) A fixed list of git subcommands: git ignores aliases of built-ins, so this closes git ci and git config alias.x without chasing alias text. commit-tree, clone, submodule, bisect and filter-branch are unclear. (2) -c passes only for identity and display settings, and global options come from a short list. (3) Option guards: git --exec, --receive-pack, --upload-pack, grep -O and rebase -x; find; sed e and -f; awk system, getline and pipes; sort --compress-program; rg --pre; test -v and printf -v; mise exec; bun -e; gh alias. (4) Arithmetic is skipped only when it holds numbers and operators, and a ${...} is read only as a name. This closes N2 and N5 and the x='a[$(cmd)]'; echo $((x)) route. (5) Assignment prefixes such as PATH=, HOME=, GIT_* and CLAUDE_* are unclear.\n- The root writes \"${CLAUDE_PLUGIN_ROOT}/scripts/holyagent\" for every holyagent command (dispatch.md), so $CLAUDE_PLUGIN_ROOT and ${CLAUDE_PLUGIN_ROOT} are carried as a plugin-folder marker. It is accepted only as the exact program word <root>/scripts/holyagent. A CLAUDE_* assignment is unclear. Tested.\n- Behavior changes the root will notice. These now deny as unclear: sudo, timeout, nice, xargs, bash and sh including bash -c, case, read, : and export, because they are not in the allowlist. git -C \"$dir\" ... is unclear, because a word the shell computes before the subcommand could shift which word is the subcommand. git commitizen, commit-tree and pushall are unclear. The unclear reason text changed in hook.ts, and the tests' UNCLEAR constant matches it.\n- Not probed: the host's if rules (Bash(*git*commit*)) match the raw command text, so g''it commit or $'\\x67it' commit never reach the hook. docs/hooks.md now lists this as a residual next to user aliases. The probe on Claude Code 2.1.310 only covered plain text. S1 in the review (whether * matches newlines) is also still unverified.\n- Other docs still describe the old behavior in passing and are outside my ownership: docs/pi/claude-parity.md line 136, docs/requirements.md line 21. Both are still accurate at their level of detail.\n- Known false positives of the guards, which deny instead of allow: awk with a || in its script, sed scripts or file names with an e flag lookalike such as .service, and any word computed by the shell in the arguments of find, sed, awk, sort, rg, test, mise, bun, bunx or the first two words of gh.\n- No git, gh, .holyagent or .git writes were made. A leftover stray directory I created by a mistyped scratch path was removed.\nevidence:\n- Every command shape in the latest security report is denied, each with a test.: packages/runtime/tests/shell.test.ts, test.each 'is unclear: %j', has N1 (git${IFS}commit, {git,commit,-m,x}, g=git c=commit; $g $c, $(echo git) $(echo commit), bash -c '\"$@\"' _ git commit, sh -c '$1' _ ..., sh -c '$0 $1' git commit), N2 (((git commit) && (true)) and the push -f form), N3 (time -p, /usr/bin/time, coproc and coproc N { }, function f { }, trap, source /dev/stdin, . <(...), fakeroot, mise exec, docker exec, pkexec, bwrap, faketime, at, xargs git < <(...), xargs sh -c '{}'), N4 (env -iS, timeout .5, timeout inf, bash -c -x, sh -c --), N5 (${x:1<<2 } and a[1<<2 ]=1), N6 (export GIT_CONFIG_*; git ci, git config alias.ci commit; git ci). Representative shapes are repeated through the built bundle in packages/integrations/claude/tests/hooks.test.ts, test.each 'denies as unclear: %j'. 'bun test packages/runtime/tests/shell.test.ts' exit 0; 95 of these cases fail on shell.ts at HEAD and pass now.\n- The listed everyday commands still pass, with tests.: shell.test.ts 'passes: %j' (no gate, so the allowlist itself is exercised) and hooks.test.ts 'passes %j' (through the built hook). Covered: git status/log/show/diff/branch/merge/stash/worktree/switch, plain git push and push -u, git -C ../wt push, gh pr create --body-file - with a quoted heredoc, gh pr checks 12 --watch, mise run verify 2>&1 | tail -20, bun test, a for loop over literal words calling git log, and the \"${CLAUDE_PLUGIN_ROOT}/scripts/holyagent\" vcs commit form. Exit 0.\n- mise run verify passes and dist is rebuilt with mise run build.: mise run build exit 0 ('built 29 files'); then mise run verify exit 0: no type errors in 95 files, lint no problems in 96 files, all 208 files formatted, 1192 pass, 1 skip, 0 fail. Log at /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/verify-allow.log. dist/scripts/holyagent.js is the only dist file changed.\n- changed-paths: packages/runtime/src/cli/shell.ts, packages/runtime/src/cli/hook.ts, packages/runtime/tests/shell.test.ts, packages/integrations/claude/tests/hooks.test.ts, packages/integrations/claude/dist/scripts/holyagent.js, docs/hooks.md (all under /home/davidbasile/dev/holyagent-fix-cli-and-vcs).\n- checks: mise run build exit 0; mise run verify exit 0 (1192 pass, 0 fail); shell.test.ts and hooks.test.ts vcs-redirect exit 0; base comparison of the new tests against HEAD's shell.ts (95 'is unclear' cases fail there). Not run: any real Claude Code session, so the host's if rules were not re-probed.\n- diff-file: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/allow.diff",
+  "acceptance": {
+    "revision": 12,
+    "rationale": "All listed shapes tested unclear, everyday commands pass, verify exit 0 with 1192 pass.",
+    "criteria": [
+      {
+        "criterion": "Every command shape in the latest security report is denied, each with a test.",
+        "support": "packages/runtime/tests/shell.test.ts, test.each 'is unclear: %j', has N1 (git${IFS}commit, {git,commit,-m,x}, g=git c=commit; $g $c, $(echo git) $(echo commit), bash -c '\"$@\"' _ git commit, sh -c '$1' _ ..., sh -c '$0 $1' git commit), N2 (((git commit) && (true)) and the push -f form), N3 (time -p, /usr/bin/time, coproc and coproc N { }, function f { }, trap, source /dev/stdin, . <(...), fakeroot, mise exec, docker exec, pkexec, bwrap, faketime, at, xargs git < <(...), xargs sh -c '{}'), N4 (env -iS, timeout .5, timeout inf, bash -c -x, sh -c --), N5 (${x:1<<2 } and a[1<<2 ]=1), N6 (export GIT_CONFIG_*; git ci, git config alias.ci commit; git ci). Representative shapes are repeated through the built bundle in packages/integrations/claude/tests/hooks.test.ts, test.each 'denies as unclear: %j'. 'bun test packages/runtime/tests/shell.test.ts' exit 0; 95 of these cases fail on shell.ts at HEAD and pass now."
+      },
+      {
+        "criterion": "The listed everyday commands still pass, with tests.",
+        "support": "shell.test.ts 'passes: %j' (no gate, so the allowlist itself is exercised) and hooks.test.ts 'passes %j' (through the built hook). Covered: git status/log/show/diff/branch/merge/stash/worktree/switch, plain git push and push -u, git -C ../wt push, gh pr create --body-file - with a quoted heredoc, gh pr checks 12 --watch, mise run verify 2>&1 | tail -20, bun test, a for loop over literal words calling git log, and the \"${CLAUDE_PLUGIN_ROOT}/scripts/holyagent\" vcs commit form. Exit 0."
+      },
+      {
+        "criterion": "mise run verify passes and dist is rebuilt with mise run build.",
+        "support": "mise run build exit 0 ('built 29 files'); then mise run verify exit 0: no type errors in 95 files, lint no problems in 96 files, all 208 files formatted, 1192 pass, 1 skip, 0 fail. Log at /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/verify-allow.log. dist/scripts/holyagent.js is the only dist file changed."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "packages/runtime/src/cli/shell.ts, packages/runtime/src/cli/hook.ts, packages/runtime/tests/shell.test.ts, packages/integrations/claude/tests/hooks.test.ts, packages/integrations/claude/dist/scripts/holyagent.js, docs/hooks.md (all under /home/davidbasile/dev/holyagent-fix-cli-and-vcs)."
+      },
+      {
+        "label": "checks",
+        "support": "mise run build exit 0; mise run verify exit 0 (1192 pass, 0 fail); shell.test.ts and hooks.test.ts vcs-redirect exit 0; base comparison of the new tests against HEAD's shell.ts (95 'is unclear' cases fail there). Not run: any real Claude Code session, so the host's if rules were not re-probed."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/allow.diff"
+      }
+    ]
+  },
+  "createdAt": "2026-10-25T20:37:13.464Z"
+}

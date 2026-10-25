@@ -1,0 +1,51 @@
+{
+  "id": "assignment-0mvob28tu-bvh5",
+  "intentId": "intent-0mvnv553v-zwx8",
+  "intentRevision": 12,
+  "roleTask": "Worker.implementation",
+  "slug": "let-the-allowlist-bash-hook-pass-the",
+  "objective": "Let the allowlist Bash hook pass the root invoking the holyagent wrapper by its absolute path.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/davidbasile/dev/holyagent-fix-cli-and-vcs (head 667bc31); ownership paths relative to it.",
+    "The root core text says holyagent <command> stands for the absolute wrapper path (for example /home/<user>/dev/holyagent/packages/integrations/claude/dist/scripts/holyagent vcs commit -m ... with a message mentioning Git and commit). The new allowlist accepts only the ${CLAUDE_PLUGIN_ROOT}/scripts/holyagent form, so such a call would be denied as unclear. Accept a program word that is a literal absolute path equal to the hook own wrapper (resolve from CLAUDE_PLUGIN_ROOT when set, else from the running script location, comparing real paths); keep any other path unclear. Test both."
+  ],
+  "constraints": [
+    "No version-control writes and no edits under .holyagent or the repository metadata folder. Report the changed paths.",
+    "Done means mise run verify passes in the worktree; run mise run build so dist is regenerated."
+  ],
+  "criteria": [
+    {
+      "text": "The absolute path of the hook own wrapper passes and any other path ending in scripts/holyagent stays unclear, each with a test.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify passes and dist is rebuilt with mise run build.",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli/shell.ts",
+    "packages/runtime/src/cli/hook.ts",
+    "packages/runtime/tests/shell.test.ts",
+    "packages/integrations/claude/tests/hooks.test.ts",
+    "packages/integrations/claude/dist",
+    "docs/hooks.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvoaguwn-h2cv",
+  "specialist": {
+    "agentId": "workflow:wf_c33c989b-37a/assignment-0mvob28tu-bvh5",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-25T20:53:51.283Z"
+  },
+  "createdAt": "2026-10-25T20:53:51.283Z"
+}
