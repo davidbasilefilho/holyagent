@@ -10156,6 +10156,12 @@ var sessionContext = (status, core, reconcile, intent) => {
 
 var MAX_NESTING = 64;
 var EXPANDED = "\uE000";
+var isDynamic = (word) => word.includes(EXPANDED);
+var PLUGIN_ROOT = "\uE001";
+var expansionOf = (name) => name === "CLAUDE_PLUGIN_ROOT" ? PLUGIN_ROOT : "$" + EXPANDED;
+var SIMPLE_EXPANSION = /^(?:#?[A-Za-z_]\w*|\d+|[@*#?$!-])$/;
+var ARITHMETIC = /^[ \t\d()+\-*/%<>=!&|^?:,]*$/;
+var pluginRootAt = (text, at) => /^\$CLAUDE_PLUGIN_ROOT(?!\w)/.test(text.slice(at, at + 20)) ? 19 : 0;
 var expands = (text, at) => /[\w{@*#?!$-]/.test(text[at + 1] ?? "");
 var SPACE = /[ \t\r]/;
 var STOPS = /[\s;&|()<>]/;
@@ -10227,15 +10233,20 @@ var scanDouble = (scan) => {
     } else if (char === "$" && next === "[") {
       scan.unclear = true;
       value += char;
+    } else if (char === "$" && next === "{") {
+      scan.index += 1;
+      value += scanBraced(scan);
     } else if (char === "$" && next !== "(" && expands(scan.text, scan.index - 1)) {
-      value += char + EXPANDED;
+      const plugin = pluginRootAt(scan.text, scan.index - 1);
+      scan.index += Math.max(plugin - 1, 0);
+      value += plugin > 0 ? PLUGIN_ROOT : char + EXPANDED;
     } else if (char === "$" && next === "(") {
       scan.index += 1;
       scanSubstitution(scan);
-      value += "$()";
+      value += EXPANDED;
     } else if (char === "`") {
       scanCode(scan, "`");
-      value += "$()";
+      value += EXPANDED;
     } else
       value += char;
   }
@@ -10307,13 +10318,46 @@ var scanAnsiC = (scan) => {
   }
   return value;
 };
+var skipArithmetic = (scan) => {
+  const from = scan.index;
+  let open = 0;
+  let closed = false;
+  while (scan.index < scan.text.length && !closed) {
+    const here = scan.text[scan.index] ?? "";
+    scan.index += 1;
+    if (here === "(")
+      open += 1;
+    if (here === ")")
+      closed = (open -= 1) === 0;
+  }
+  const skipped = scan.text.slice(from, scan.index);
+  if (!closed || !skipped.endsWith("))") || !ARITHMETIC.test(skipped))
+    scan.unclear = true;
+};
 var scanSubstitution = (scan) => {
-  const arithmetic = scan.text[scan.index] === "(";
-  if (arithmetic)
-    scan.arithmetic += 1;
-  scanCode(scan, ")");
-  if (arithmetic)
-    scan.arithmetic -= 1;
+  if (scan.text[scan.index] === "(") {
+    scan.index -= 1;
+    skipArithmetic(scan);
+  } else
+    scanCode(scan, ")");
+};
+var scanBraced = (scan) => {
+  const from = scan.index;
+  let open = 1;
+  while (scan.index < scan.text.length) {
+    const char = scan.text[scan.index] ?? "";
+    scan.index += 1;
+    if (char === "{")
+      open += 1;
+    if (char === "}" && (open -= 1) === 0) {
+      const name = scan.text.slice(from, scan.index - 1);
+      if (!SIMPLE_EXPANSION.test(name))
+        scan.unclear = true;
+      return expansionOf(name);
+    }
+  }
+  scan.unclear = true;
+  return expansionOf("");
 };
 var scanCode = (scan, closer) => {
   if (scan.nesting >= MAX_NESTING) {
@@ -10345,19 +10389,7 @@ var scanCode = (scan, closer) => {
     const char = scan.text[scan.index] ?? "";
     const next = scan.text[scan.index + 1] ?? "";
     if (char === "(" && next === "(") {
-      const from = scan.index;
-      let open = 0;
-      while (scan.index < scan.text.length) {
-        const here = scan.text[scan.index] ?? "";
-        scan.index += 1;
-        if (here === "(")
-          open += 1;
-        if (here === ")" && (open -= 1) === 0)
-          break;
-      }
-      const skipped = scan.text.slice(from, scan.index);
-      if (!skipped.endsWith("))") || /\$\(|`|;|["'\\\n]/.test(skipped))
-        scan.unclear = true;
+      skipArithmetic(scan);
       continue;
     }
     if (char === closer && depth === 0) {
@@ -10375,6 +10407,9 @@ var scanCode = (scan, closer) => {
       scan.unclear = true;
       word = (word ?? "") + char;
       scan.index += 1;
+    } else if (char === "$" && next === "{") {
+      scan.index += 2;
+      word = (word ?? "") + scanBraced(scan);
     } else if (char === "'") {
       const end = scan.text.indexOf("'", scan.index + 1);
       const stop = end === -1 ? scan.text.length : end;
@@ -10392,7 +10427,7 @@ var scanCode = (scan, closer) => {
         scanCode(scan, "`");
       else
         scanSubstitution(scan);
-      word = (word ?? "") + "$()";
+      word = (word ?? "") + EXPANDED;
     } else if (char === "#" && word === undefined) {
       const end = scan.text.indexOf(`
 `, scan.index);
@@ -10401,7 +10436,9 @@ var scanCode = (scan, closer) => {
       endWord();
       target = true;
       scan.index += 3;
-    } else if (char === "<" && next === "<" && scan.arithmetic === 0) {
+    } else if (char === "<" && next === "<") {
+      if (word?.includes("[") && !word.includes("]"))
+        scan.unclear = true;
       endWord();
       readHeredoc(scan);
     } else if (char === `
@@ -10425,6 +10462,9 @@ var scanCode = (scan, closer) => {
       if (char === "<" || char === ">")
         target = true;
       scan.index += 1;
+    } else if (char === "$" && pluginRootAt(scan.text, scan.index) > 0) {
+      scan.index += pluginRootAt(scan.text, scan.index);
+      word = (word ?? "") + PLUGIN_ROOT;
     } else {
       word = (word ?? "") + char + (char === "$" && expands(scan.text, scan.index) ? EXPANDED : "");
       scan.index += 1;
@@ -10439,7 +10479,6 @@ var scanLine = (line) => {
     index: 0,
     commands: [],
     heredocs: [],
-    arithmetic: 0,
     nesting: 0,
     overflow: false,
     unclear: false
@@ -10448,62 +10487,145 @@ var scanLine = (line) => {
   return scan;
 };
 var ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
-var KEYWORDS = new Set(["!", "{", "if", "then", "else", "elif", "do", "while", "until", "time"]);
-var SHELLS = new Set(["sh", "bash", "zsh", "dash", "ksh", "ash", "fish", "csh", "tcsh"]);
-var RUNNERS = new Set([
-  "eval",
-  "setsid",
-  "stdbuf",
-  "ionice",
-  "flock",
-  "ssh",
-  "su",
-  "runuser",
-  "chroot",
-  "script",
-  "watch",
-  "parallel",
-  "unbuffer",
-  "taskset",
-  "chrt",
-  "numactl",
-  "eatmydata",
-  "strace",
-  "ltrace",
-  "nsenter",
-  "unshare",
-  "systemd-run",
-  "busybox",
-  "caffeinate"
+var RISKY_VARIABLE = /^(?:GIT_|CLAUDE_|PATH=|HOME=|XDG_|LD_|DYLD_|BASH_|ENV=|IFS=|SHELL=|PAGER=|EDITOR=|VISUAL=|CDPATH=|TMPDIR=)/;
+var GRAMMAR = new Set(["!", "{", "if", "then", "else", "elif", "do", "while", "until", "time"]);
+var CLOSERS = new Set(["}", "fi", "done"]);
+var PROGRAMS = new Set([
+  "git",
+  "gh",
+  "holyagent",
+  "echo",
+  "printf",
+  "cat",
+  "head",
+  "tail",
+  "wc",
+  "grep",
+  "rg",
+  "ls",
+  "cd",
+  "pwd",
+  "mise",
+  "bun",
+  "bunx",
+  "jq",
+  "sort",
+  "uniq",
+  "cut",
+  "tr",
+  "test",
+  "[",
+  "true",
+  "false",
+  "sleep",
+  "mkdir",
+  "cp",
+  "mv",
+  "rm",
+  "touch",
+  "diff",
+  "sed",
+  "awk",
+  "find"
 ]);
-var WRAPPERS = {
-  sudo: new Set(["-u", "-g", "-h", "-p", "-C", "-D", "-R", "-T", "-U", "--user", "--group"]),
-  doas: new Set(["-u", "-C"]),
-  env: new Set(["-u", "-C", "-S", "--unset", "--chdir"]),
-  nice: new Set(["-n", "--adjustment"]),
-  timeout: new Set(["-s", "-k", "--signal", "--kill-after"]),
-  xargs: new Set(["-I", "-n", "-P", "-d", "-L", "-s", "-E", "-a", "--max-args", "--max-procs"]),
-  command: new Set,
-  exec: new Set(["-a"]),
-  nohup: new Set,
-  builtin: new Set
+var READERS = new Set(["echo", "printf", "grep", "rg"]);
+var PLAIN_PROGRAM = /^(?:[\w./+\uE001-]+|\[)$/;
+var isGit = (word) => /(?:^|\/)git$/i.test(word);
+var isHolyagent = (word) => /(?:^|\/)holyagent$/.test(word);
+var GH_RUNNERS = new Set(["alias", "extension", "ext", "codespace", "cs"]);
+var GUARDS = {
+  find: (args) => args.some((arg) => isDynamic(arg) || /^-(?:exec|execdir|ok|okdir|delete)$/.test(arg)),
+  sed: (args) => args.some((arg) => isDynamic(arg) || /^-(?:[A-Za-z]*f|-file)/.test(arg) || /(?:^|[;{}\s=])(?:\d+|\$)?e(?:\s|;|$|\})/.test(arg) || /[^\w\s\\][a-z0-9]*e[a-z0-9]*(?=$|[;\s}])/i.test(arg)),
+  awk: (args) => args.some((arg) => isDynamic(arg) || /system|getline|\||@|^(?:-f|-i|-l|--file|--include|--load)/.test(arg)),
+  sort: (args) => args.some((arg) => {
+    const name = arg.split("=")[0] ?? arg;
+    return isDynamic(arg) || name.length >= 4 && "--compress-program".startsWith(name);
+  }),
+  rg: (args) => args.some((arg) => isDynamic(arg) || /^--(?:pre|hostname-bin)/.test(arg)),
+  test: (args) => args.some((arg) => isDynamic(arg) || /^-[vR]$/.test(arg)),
+  "[": (args) => args.some((arg) => isDynamic(arg) || /^-[vR]$/.test(arg)),
+  printf: (args) => args.includes("-v"),
+  mise: (args) => args.some((arg) => isDynamic(arg) || ["exec", "x", "shell", "watch", "w"].includes(arg)),
+  bun: (args) => args.some((arg) => isDynamic(arg) || /^(?:-e|--eval|-p|--print|-|x|exec|repl|create|c)$/.test(arg) || arg.startsWith("/dev/")),
+  bunx: (args) => args.some(isDynamic),
+  gh: (args) => args.slice(0, 2).some(isDynamic) || args.some((arg) => GH_RUNNERS.has(arg))
 };
-var VALUE_OPTIONS = new Set([
-  "-C",
-  "-c",
-  "--git-dir",
-  "--work-tree",
-  "--namespace",
-  "--super-prefix"
+var SUBCOMMANDS = new Set([
+  "add",
+  "am",
+  "apply",
+  "archive",
+  "blame",
+  "branch",
+  "cat-file",
+  "check-ignore",
+  "checkout",
+  "cherry",
+  "cherry-pick",
+  "clean",
+  "config",
+  "count-objects",
+  "describe",
+  "diff",
+  "diff-tree",
+  "fetch",
+  "for-each-ref",
+  "format-patch",
+  "fsck",
+  "gc",
+  "grep",
+  "init",
+  "log",
+  "ls-files",
+  "ls-remote",
+  "ls-tree",
+  "merge",
+  "merge-base",
+  "mv",
+  "name-rev",
+  "notes",
+  "pull",
+  "push",
+  "range-diff",
+  "rebase",
+  "reflog",
+  "remote",
+  "reset",
+  "restore",
+  "rev-list",
+  "rev-parse",
+  "revert",
+  "rm",
+  "shortlog",
+  "show",
+  "show-branch",
+  "show-ref",
+  "stash",
+  "status",
+  "switch",
+  "symbolic-ref",
+  "tag",
+  "update-ref",
+  "worktree"
 ]);
-var programName = (word) => word?.split("/").at(-1) ?? "";
-var afterWrapper = (words, at, program) => {
-  const valued = WRAPPERS[program] ?? new Set;
-  let index = at + 1;
-  while (words[index]?.startsWith("-"))
-    index += valued.has(words[index] ?? "") ? 2 : 1;
-  return program === "timeout" && /^\d/.test(words[index] ?? "") ? index + 1 : index;
-};
+var GIT_FLAGS = new Set([
+  "--no-pager",
+  "-P",
+  "--paginate",
+  "-p",
+  "--no-optional-locks",
+  "--bare",
+  "--literal-pathspecs",
+  "--no-literal-pathspecs",
+  "--glob-pathspecs",
+  "--noglob-pathspecs",
+  "--icase-pathspecs",
+  "--no-replace-objects"
+]);
+var GIT_VALUED = new Set(["-C", "--git-dir", "--work-tree", "--namespace"]);
+var SAFE_SETTING = /^(?:user\.(?:name|email|signingkey)|color\.[\w.-]+|advice\.[\w.-]+|core\.(?:quotepath|abbrev|autocrlf|filemode|whitespace)|commit\.(?:gpgsign|verbose)|log\.[\w.-]+|status\.[\w.-]+|init\.defaultbranch|pull\.(?:rebase|ff)|merge\.(?:ff|conflictstyle))=/i;
+var RISKY_CONFIG = /^(?:alias\.|include|remote\..*\.(?:push|mirror|pushurl)|push\.|core\.(?:sshcommand|editor|hookspath|pager|fsmonitor)|credential|url\.)/i;
+var PROGRAM_OPTIONS = ["--exec", "--receive-pack", "--upload-pack", "--open-files-in-pager"];
 var DANGEROUS_OPTIONS = [
   "--force",
   "--force-with-lease",
@@ -10512,7 +10634,14 @@ var DANGEROUS_OPTIONS = [
   "--delete",
   "--prune"
 ];
-var UNREADABLE = /[$`{}*?[\]\\]/;
+var UNREADABLE = /[$`{}*?[\]\\\uE000]/;
+var startsProgram = (args) => {
+  const dashes = args.indexOf("--");
+  return (dashes === -1 ? args : args.slice(0, dashes)).some((arg) => {
+    const name = arg.split("=")[0] ?? arg;
+    return name.startsWith("--") && name.length >= 4 && PROGRAM_OPTIONS.some((option) => option.startsWith(name));
+  });
+};
 var pushVerdict = (args) => {
   const dangerous = (arg, options) => {
     if (options && arg.startsWith("--")) {
@@ -10530,72 +10659,94 @@ var pushVerdict = (args) => {
     return ["force-push"];
   return args.some((arg) => UNREADABLE.test(arg)) ? ["unclear"] : [];
 };
-var RISKY_CONFIG = /^(?:alias\.|remote\..*\.(?:push|mirror)=|push\.)/i;
-var shellWrites = (words, start, nesting) => {
-  const flag = words.findIndex((word, index) => index > start && /^-[a-z]*c[a-z]*$/.test(word));
-  if (flag !== -1) {
-    const script = words[flag + 1];
-    return script === undefined || script.includes(EXPANDED) || script.includes("$()") ? ["unclear"] : writesIn(script, nesting + 1);
-  }
-  const reading = words.some((word, index) => index > start && /^-[a-z]*s[a-z]*$/.test(word));
-  const file = words.some((word, index) => index > start && !word.startsWith("-"));
-  return reading || !file ? ["unclear"] : [];
-};
-var writesOf = (words, nesting) => {
-  let start = 0;
-  while (start < words.length) {
-    const word = words[start] ?? "";
-    const program = programName(word);
-    if (/^GIT_(?:CONFIG|ALIAS)/.test(word))
-      return ["unclear"];
-    if (program === "env" && words.some((arg) => /^(?:-S|--split-string)/.test(arg)))
-      return ["unclear"];
-    if (ASSIGNMENT.test(word) || KEYWORDS.has(word))
-      start += 1;
-    else if (Object.hasOwn(WRAPPERS, program))
-      start = afterWrapper(words, start, program);
-    else
-      break;
-  }
-  const program = programName(words[start]);
-  if (RUNNERS.has(program))
-    return ["unclear"];
-  if (program === "find" && words.some((word) => /^-(?:exec|execdir|ok|okdir)$/.test(word)))
-    return ["unclear"];
-  if (SHELLS.has(program))
-    return shellWrites(words, start, nesting);
-  if (UNREADABLE.test(program) && words.slice(start + 1).some((w) => w === "commit" || w === "push"))
-    return ["unclear"];
-  if (program !== "git")
-    return [];
+var gitVerdict = (words, start) => {
   let at = start + 1;
+  let risky = false;
   while (words[at]?.startsWith("-")) {
     const option = words[at] ?? "";
-    if (/^--(?:config-env|attr-source)(?:=|$)/.test(option))
+    const name = option.split("=")[0] ?? option;
+    if (isDynamic(option))
       return ["unclear"];
-    if (option === "-c" && RISKY_CONFIG.test(words[at + 1] ?? ""))
+    if (option === "-c") {
+      const setting = words[at + 1];
+      if (setting === undefined || isDynamic(setting))
+        return ["unclear"];
+      risky ||= !SAFE_SETTING.test(setting);
+      at += 2;
+    } else if (GIT_VALUED.has(name)) {
+      const hasValue = option.includes("=");
+      if (isDynamic(words[at + (hasValue ? 0 : 1)] ?? EXPANDED))
+        return ["unclear"];
+      at += hasValue ? 1 : 2;
+    } else if (GIT_FLAGS.has(option))
+      at += 1;
+    else
       return ["unclear"];
-    at += VALUE_OPTIONS.has(option) ? 2 : 1;
   }
   const subcommand = words[at];
-  if (subcommand === undefined)
-    return [];
-  if (UNREADABLE.test(subcommand))
+  if (subcommand === undefined || isDynamic(subcommand))
     return ["unclear"];
   if (subcommand === "commit")
     return ["commit"];
-  return subcommand === "push" ? pushVerdict(words.slice(at + 1)) : [];
-};
-var writesIn = (line, nesting) => {
-  if (nesting > MAX_NESTING)
+  if (risky || !SUBCOMMANDS.has(subcommand))
     return ["unclear"];
+  const args = words.slice(at + 1);
+  if (startsProgram(args))
+    return ["unclear"];
+  if (subcommand === "rebase" && args.some((arg) => /^-[A-Za-z]*x/.test(arg)))
+    return ["unclear"];
+  if (subcommand === "grep" && args.some((arg) => /^-[A-Za-z]*O/.test(arg)))
+    return ["unclear"];
+  if (subcommand === "config" && args.some((arg) => RISKY_CONFIG.test(arg)))
+    return ["unclear"];
+  return subcommand === "push" ? pushVerdict(args) : [];
+};
+var writesOf = (words) => {
+  let start = 0;
+  while (start < words.length) {
+    const word = words[start] ?? "";
+    if (ASSIGNMENT.test(word)) {
+      if (RISKY_VARIABLE.test(word))
+        return ["unclear"];
+      start += 1;
+    } else if (GRAMMAR.has(word))
+      start += 1;
+    else if (word === "env") {
+      start += 1;
+      if (words[start]?.startsWith("-"))
+        return ["unclear"];
+    } else
+      break;
+  }
+  const first = words[start];
+  if (first === undefined)
+    return [];
+  if (CLOSERS.has(first) && start === words.length - 1)
+    return [];
+  if (first === "for" && /^[A-Za-z_]\w*$/.test(words[start + 1] ?? "") && (words.length === start + 2 || words[start + 2] === "in"))
+    return [];
+  if (isDynamic(first) || !PLAIN_PROGRAM.test(first))
+    return ["unclear"];
+  if (first.includes(PLUGIN_ROOT) && first !== `${PLUGIN_ROOT}/scripts/holyagent`)
+    return ["unclear"];
+  const program = isGit(first) ? "git" : isHolyagent(first) ? "holyagent" : first;
+  if (!PROGRAMS.has(program) || first !== program && !first.endsWith(`/${program}`))
+    return ["unclear"];
+  const args = words.slice(start + 1);
+  if (!READERS.has(program) && args.some(isGit))
+    return ["unclear"];
+  if (GUARDS[program]?.(args) === true)
+    return ["unclear"];
+  return program === "git" ? gitVerdict(words, start) : [];
+};
+var writesIn = (line) => {
   const scan = scanLine(line);
   return [
-    ...scan.commands.flatMap((words) => writesOf(words, nesting)),
+    ...scan.commands.flatMap(writesOf),
     ...scan.overflow || scan.unclear ? ["unclear"] : []
   ];
 };
-var gitWrites = (line) => [...new Set(writesIn(line, 0))];
+var gitWrites = (line) => [...new Set(writesIn(line))];
 
 var astralIdentifierCodes = [509, 0, 227, 0, 150, 4, 294, 9, 1368, 2, 2, 1, 6, 3, 41, 2, 5, 0, 166, 1, 574, 3, 9, 9, 7, 9, 32, 4, 318, 1, 31, 4, 33, 15, 71, 10, 50, 3, 123, 2, 54, 14, 32, 10, 3, 1, 11, 3, 46, 10, 8, 0, 46, 9, 7, 2, 37, 13, 2, 9, 6, 1, 45, 0, 13, 2, 49, 13, 9, 3, 2, 11, 83, 11, 7, 0, 3, 0, 158, 11, 6, 9, 7, 3, 56, 1, 2, 6, 3, 1, 3, 2, 10, 0, 11, 1, 3, 6, 4, 4, 68, 8, 2, 0, 3, 0, 2, 3, 2, 4, 2, 0, 15, 1, 83, 17, 10, 9, 5, 0, 82, 19, 13, 9, 214, 6, 3, 8, 28, 1, 83, 16, 16, 9, 82, 12, 9, 9, 7, 19, 58, 14, 5, 9, 243, 14, 166, 9, 71, 5, 2, 1, 3, 3, 2, 0, 2, 1, 13, 9, 120, 6, 3, 6, 4, 0, 29, 9, 41, 6, 2, 3, 9, 0, 10, 10, 47, 15, 199, 7, 137, 9, 54, 7, 2, 7, 17, 9, 57, 21, 2, 13, 123, 5, 4, 0, 2, 1, 2, 6, 2, 0, 9, 9, 49, 4, 2, 1, 2, 4, 9, 9, 55, 9, 7, 0, 259, 3, 10, 1, 2, 0, 49, 6, 4, 4, 14, 10, 5350, 0, 7, 14, 11465, 27, 2343, 9, 87, 9, 39, 4, 60, 6, 26, 9, 535, 9, 470, 0, 2, 54, 8, 3, 82, 0, 12, 1, 19628, 1, 4178, 9, 519, 45, 3, 22, 481, 1, 61, 4, 4, 5, 9, 7, 3, 6, 31, 3, 149, 2, 12, 2, 9, 1, 3, 0, 33, 1, 1357, 49, 513, 54, 5, 49, 9, 0, 15, 0, 23, 4, 2, 14, 1361, 6, 2, 16, 3, 6, 2, 1, 2, 4, 101, 0, 161, 6, 10, 9, 357, 0, 62, 13, 499, 13, 245, 1, 2, 9, 233, 0, 3, 0, 8, 1, 6, 0, 475, 6, 110, 6, 6, 9, 4759, 9, 787719, 239];
 var astralIdentifierStartCodes = [0, 11, 2, 25, 2, 18, 2, 1, 2, 14, 3, 13, 35, 122, 70, 52, 268, 28, 4, 48, 48, 31, 14, 29, 6, 37, 11, 29, 3, 35, 5, 7, 2, 4, 43, 157, 19, 35, 5, 35, 5, 39, 9, 51, 13, 10, 2, 14, 2, 6, 2, 1, 2, 10, 2, 14, 2, 6, 2, 1, 4, 51, 13, 310, 10, 21, 11, 7, 25, 5, 2, 41, 2, 13, 65, 5, 3, 0, 2, 43, 2, 1, 4, 0, 3, 22, 11, 22, 10, 30, 66, 18, 2, 1, 11, 21, 11, 25, 7, 25, 39, 55, 7, 1, 65, 0, 16, 3, 2, 2, 2, 28, 43, 28, 4, 28, 36, 7, 2, 27, 28, 53, 11, 21, 11, 18, 14, 17, 111, 72, 56, 50, 14, 50, 14, 35, 39, 27, 10, 22, 251, 41, 7, 1, 17, 5, 18, 21, 18, 28, 11, 0, 9, 21, 43, 17, 47, 20, 28, 22, 13, 52, 58, 1, 3, 0, 14, 44, 33, 24, 27, 35, 30, 0, 3, 0, 9, 34, 4, 0, 13, 47, 15, 3, 22, 0, 2, 0, 36, 17, 2, 24, 20, 1, 64, 6, 2, 0, 2, 3, 2, 14, 2, 9, 8, 46, 39, 7, 3, 1, 3, 21, 2, 6, 2, 1, 2, 4, 4, 0, 19, 0, 13, 4, 31, 9, 2, 0, 3, 0, 2, 37, 2, 0, 26, 0, 2, 0, 45, 52, 19, 3, 21, 2, 31, 47, 21, 1, 2, 0, 185, 46, 42, 3, 37, 47, 21, 0, 60, 42, 14, 0, 72, 26, 38, 6, 186, 43, 117, 63, 32, 7, 3, 0, 3, 7, 2, 1, 2, 23, 16, 0, 2, 0, 95, 7, 3, 38, 17, 0, 2, 0, 29, 0, 11, 39, 8, 0, 22, 0, 12, 45, 20, 0, 19, 72, 18, 0, 182, 32, 32, 8, 2, 36, 18, 0, 50, 29, 113, 6, 2, 1, 2, 37, 22, 0, 26, 5, 2, 1, 2, 31, 15, 0, 24, 43, 22, 0, 239, 18, 16, 0, 2, 12, 2, 33, 125, 0, 80, 921, 103, 111, 6, 206, 13, 310, 2314, 96, 16, 1071, 18, 5, 26, 3994, 6, 582, 6842, 29, 1763, 568, 8, 30, 18, 78, 18, 29, 19, 47, 17, 3, 32, 20, 6, 18, 433, 44, 212, 63, 33, 24, 3, 24, 45, 74, 6, 0, 67, 12, 65, 1, 2, 0, 15, 4, 10, 7386, 37, 33, 96, 114, 14, 913, 15, 50, 7710, 3, 2, 6, 2, 1, 2, 296, 10, 0, 30, 2, 3, 0, 15, 4, 8, 395, 2309, 106, 6, 12, 4, 8, 8, 9, 5991, 84, 2, 70, 2, 1, 3, 0, 3, 1, 3, 3, 2, 11, 2, 0, 2, 6, 2, 64, 2, 3, 3, 7, 2, 6, 2, 27, 2, 3, 2, 4, 2, 0, 4, 6, 2, 340, 2, 24, 2, 24, 2, 30, 2, 24, 2, 30, 2, 24, 2, 30, 2, 24, 2, 30, 2, 24, 2, 7, 1845, 129, 15, 6, 55, 50, 49, 61, 147, 44, 11, 6, 17, 0, 322, 29, 19, 43, 485, 27, 229, 29, 3, 0, 208, 30, 2, 2, 2, 1, 2, 6, 3, 4, 10, 1, 225, 6, 2, 3, 2, 1, 2, 14, 2, 196, 60, 67, 8, 0, 1205, 3, 2, 26, 2, 1, 2, 0, 3, 0, 2, 9, 2, 3, 2, 0, 2, 0, 7, 0, 5, 0, 2, 0, 2, 0, 2, 2, 2, 1, 2, 0, 3, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 1, 2, 0, 3, 3, 2, 6, 2, 3, 2, 3, 2, 0, 2, 9, 2, 16, 6, 2, 2, 4, 2, 16, 4421, 42719, 33, 4382, 2, 5773, 3, 7472, 16, 621, 2467, 541, 1507, 4938, 6, 8489, 39815, 11327];
@@ -16661,8 +16812,9 @@ var postToolUse = (additionalContext) => output({ hookEventName: "PostToolUse", 
 var REDIRECTS = {
   commit: "Commit with `holyagent vcs commit -m <headline> -- <paths\u2026>`, which adds the Intent's state and checks the message.",
   "force-push": "Force pushes are denied (--force, --force-with-lease, --mirror, --delete, --prune, a + or : refspec). Push without them; rewriting or deleting published history needs the user's approval, and the user does it.",
-  unclear: "This command could force-push and cannot be read with certainty (a variable, substitution, brace, glob or escape in a push argument, or nesting too deep). Write the push out with literal branch names and flags, in a shallower command."
+  unclear: "This command mentions git commit or push and cannot be read with certainty: it runs a program outside the everyday set (git, gh, holyagent, mise, bun and basic file and text tools), or it has a variable, substitution, brace, glob or escape where a literal word is needed, or it nests too deep. Write each command out plainly with literal arguments: no shell, wrapper, script or alias in between, and commits through `holyagent vcs commit`."
 };
+var MENTIONS_GIT_WRITE = /git[\s\S]*(?:commit|push)/i;
 var fileSetting = (key) => gitMaybe(["config", "--show-origin", "--get", key]).pipe(map4((line) => {
   if (line === undefined)
     return;
@@ -16709,10 +16861,10 @@ var HOOK_COMMANDS = [
       return succeed6(postToolUse(`holyagent: could not record the launch of ${id} (${tag}). ${next}`));
     }));
   }, true),
-  hook("vcs-redirect", "PreToolUse for Bash: deny a command that runs git commit (and point to holyagent vcs commit) or a force git push; say nothing otherwise, a plain git push included", (payload) => {
+  hook("vcs-redirect", "PreToolUse for Bash: for a command that mentions git and then commit or push, deny git commit (and point to holyagent vcs commit), a force git push, and whatever runs a program outside the allowlist or cannot be read with certainty; say nothing otherwise, a plain git push included", (payload) => {
     const command = payload.tool_name === "Bash" ? payload.tool_input?.command : undefined;
     return try_2({
-      try: () => typeof command === "string" ? gitWrites(command) : [],
+      try: () => typeof command === "string" && MENTIONS_GIT_WRITE.test(command) ? gitWrites(command) : [],
       catch: (cause) => cause
     }).pipe(orElseSucceed2(() => ["unclear"]), map4((writes) => writes.length === 0 ? NOTHING : decision("deny", writes.map((write) => REDIRECTS[write]).join(" "))));
   }, true),

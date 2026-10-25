@@ -69,7 +69,7 @@ const COMMIT =
 const FORCE =
   "Force pushes are denied (--force, --force-with-lease, --mirror, --delete, --prune, a + or : refspec). Push without them; rewriting or deleting published history needs the user's approval, and the user does it."
 const UNCLEAR =
-  "This command could force-push and cannot be read with certainty (a variable, substitution, brace, glob or escape in a push argument, or nesting too deep). Write the push out with literal branch names and flags, in a shallower command."
+  "This command mentions git commit or push and cannot be read with certainty: it runs a program outside the everyday set (git, gh, holyagent, mise, bun and basic file and text tools), or it has a variable, substitution, brace, glob or escape where a literal word is needed, or it nests too deep. Write each command out plainly with literal arguments: no shell, wrapper, script or alias in between, and commits through `holyagent vcs commit`."
 
 describe("hook vcs-redirect", () => {
   const denied: ReadonlyArray<readonly [string, string]> = [
@@ -80,36 +80,26 @@ describe("hook vcs-redirect", () => {
     ["git -C repo commit --amend", COMMIT],
     ["git -c user.name=x push origin +main", FORCE],
     ["FOO=1 git push --force origin main", FORCE],
-    ["sudo -n git commit -m x", COMMIT],
+    ["env FOO=1 git push --force origin main", FORCE],
     ["/usr/bin/git commit -m x", COMMIT],
     ["(cd a; git push --force)", FORCE],
     ["echo $(git commit -m x)", COMMIT],
     ['echo "$(git push --force)"', FORCE],
     ["echo `git push --force`", FORCE],
-    ["bash -c 'git push --force origin main'", FORCE],
-    ['sh -lc "cd a && git commit -m x"', COMMIT],
     ["true | git commit -F -", COMMIT],
     ["git commit -m x \\\n  && git push --force", `${COMMIT} ${FORCE}`],
     ["git commit -m x; git commit -m y; git push --force", `${COMMIT} ${FORCE}`],
     ["if true; then git push --force; fi", FORCE],
     ["cat <<EOF\nnotes\nEOF\ngit commit -m x", COMMIT],
-    ["env -u HOME git push --force", FORCE],
-    ["sudo -u deploy git commit -m x", COMMIT],
-    ["nice -n 5 git push --force", FORCE],
-    ["timeout 5 git push --force", FORCE],
-    ["timeout -s KILL 5 git commit -m x", COMMIT],
-    ["ls | xargs -I {} git commit -m {}", COMMIT],
-    ["xargs -n 1 git push --force", FORCE],
     ["git commit -m x 2>&1", COMMIT],
     ["git push --force >/dev/null 2>&1 && echo ok", FORCE],
     ["echo ok &>/dev/null; git push --force", FORCE],
     ["cat <<\\EOF\nx\nEOF\ngit push --force", FORCE],
     ["git status\r\ngit push --force\r\n", FORCE],
-    ["bash -c 'git -C d commit -m x'", COMMIT],
     ["2>&1 git push --force", FORCE],
     [">/dev/null git commit -m x", COMMIT],
     ["2>/dev/null git -C d push -f", FORCE],
-    ["</dev/null >out 2>&1 sudo git push --force", FORCE],
+    ["for b in a b; do git commit -m x; done", COMMIT],
   ]
   test.each(denied)("denies %j", async (command, reason) => {
     expect(await hook("vcs-redirect", bash(command))).toEqual({
@@ -119,6 +109,7 @@ describe("hook vcs-redirect", () => {
     })
   })
 
+  // What is not a git write passes, also when its text mentions Git with commit or push.
   const allowedThrough = [
     "git push",
     "git push -u origin feature/parser",
@@ -127,14 +118,10 @@ describe("hook vcs-redirect", () => {
     "git push --no-force",
     "git -C repo push --set-upstream origin x",
     "(cd a; git push)",
-    "bash -c 'git push origin main'",
     "git push origin main 2>&1 | tail -3",
-    "git commitizen",
-    "git commit-tree abc",
     "git status",
     "git log --oneline -3",
     "git diff HEAD~1",
-    "git pushall",
     'echo "git commit"',
     "echo git push",
     "echo 'git push' | cat",
@@ -146,13 +133,7 @@ describe("hook vcs-redirect", () => {
     "cat <<E\\OF\ngit commit -m x\nEOF",
     "echo hi >git push",
     "2>&1 echo git push",
-    "env -u HOME ls",
-    "timeout 5 ls",
-    "nice -n 5 sleep 1",
-    "xargs -n 1 echo git push",
-    "sudo -u deploy ls git push",
     "holyagent vcs commit -m x -- a.ts",
-    "bun test && bun check",
     "",
   ]
   test.each(allowedThrough)("says nothing for %j", async (command) => {
@@ -198,32 +179,24 @@ describe("hook vcs-redirect", () => {
   // real git commit or force push, and never fails.
   test.each<readonly [string, string]>([
     ["for f in a b; do echo $f; done", ""],
-    ["for f in a b; do rm -rf $f; done", ""],
     ["for w in git commit; do echo $w; done", ""],
     ["for b in a b; do git commit -m x; done", COMMIT],
-    ["while read l; do git push --force; done < list", FORCE],
     ["cat <<EOF\nthe git commit step\nEOF", ""],
     ["cat <<EOF > notes.md\nUse git push --force never\nEOF\ngit status", ""],
     ["cat <<EOF\nnotes\nEOF\nrm -rf build && git commit -m x", COMMIT],
-    ["python3 - <<'PY'\nprint('git commit')\nPY", ""],
     ["rm -rf dist node_modules && echo done", ""],
     ["rm -rf /tmp/x; git commit -m x", COMMIT],
     ['gh pr create --body "Uses Git a lot; each commit is small"', ""],
     ["echo 'Git history: commit often'", ""],
     ['git log --grep="git commit" --oneline', ""],
-    ['git commit -m "fix (parser) $(date)"', COMMIT],
-    ["case $x in a) git commit -m y ;; b) echo hi ;; esac", COMMIT],
-    ["f() { git commit -m x; }; f", COMMIT],
+    ['git commit -m "fix (parser) $(cat msg)"', COMMIT],
     ["echo $((1 + 2)) && git commit -m x", COMMIT],
-    ["diff <(git show a) <(git show b)", ""],
     ["echo $'it\\'s git commit'", ""],
-    ["{ echo a; echo b; } | tee out", ""],
     ["git commit -m 'a'\\\n -m 'b'", COMMIT],
-    ["x=$(git rev-parse HEAD) && echo $x", ""],
     ["cat <<< x\ngit commit -m y", COMMIT],
-    [": <<< x\ngit push --force", FORCE],
+    ["cat <<< x\ngit push --force", FORCE],
     ["echo $((1<<2))\ngit commit -m x", COMMIT],
-    ["(( x = 1 << 2 ))\ngit commit -m x", COMMIT],
+    ["(( 1 << 2 ))\ngit commit -m x", COMMIT],
   ])("never errors on %j", async (command, reason) => {
     const result = await hook("vcs-redirect", bash(command))
     expect(result).toEqual(
@@ -245,17 +218,58 @@ describe("hook vcs-redirect", () => {
     expect((await hook("vcs-redirect", bash("echo '\"\\`$(("))).code).toBe(0)
   })
 
-  // Constructs the scanner does not read with certainty are denied as unclear, since each could
-  // hide a commit or a history-rewriting push that the `if` rule has already matched.
+  // The hook is an allowlist: a command that mentions git and then commit or push passes only when
+  // every simple command runs a known program with words it reads exactly, so each of these, which
+  // a denylist of wrappers, shells and expansions once let through, is denied as unclear.
   test.each<string>([
-    "git push $'--force\\0' origin main",
-    "git $'commit\\x00' -m x",
-    "cat <<EOF\n$(git commit -m x)\nEOF",
-    "gh pr create --body-file - <<EOF\n`git push --force origin x`\nEOF",
-    "echo $[1<<2]\ngit commit -m x",
-    "for ((i=1<<2; i<9; i++)); do :; done\ngit commit -m x",
+    // The program word is computed.
+    "git${IFS}commit${IFS}-m${IFS}x",
+    "{git,commit,-m,x}",
+    "g=git c=commit; $g $c -m x",
+    "g=git; $g commit -m x",
+    "p=push; git $p -f origin main # git push",
+    "$(echo git) $(echo commit) -m x",
+    "bash -c '\"$@\"' _ git commit -m x",
+    "sh -c '$1' _ 'git commit -m x'",
+    "sh -c '$0 $1' git commit",
+    // Subshells that read like arithmetic, arithmetic that is not plain, and `<<` that shifts.
+    "((git commit) && (true))",
+    "((git push -f) && (true))",
     "(( $(git commit -m x; echo 1) ))",
-    "echo `echo \\`git commit -m x\\``",
+    "for ((i=1<<2; i<9; i++)); do :; done\ngit commit -m x",
+    "echo $[1<<2]\ngit commit -m x",
+    "echo ${x:1<<2 }\ngit commit -m x\n2",
+    "a[1<<2 ]=1\ngit commit -m x\n2",
+    // Keywords, wrappers, shells and runners.
+    "time -p git commit -m x",
+    "/usr/bin/time git commit -m x",
+    "coproc git commit -m x",
+    "coproc N { git commit -m x; }",
+    "function f { git commit -m x; }; f",
+    "f() { git commit -m x; }; f",
+    "trap 'git commit -m x' EXIT",
+    "source /dev/stdin <<< 'git commit -m x'",
+    ". <(echo 'git commit -m x')",
+    "fakeroot git commit -m x",
+    "mise exec -- git commit -m x",
+    "docker exec c git commit -m x",
+    "xargs git < <(echo commit)",
+    "echo 'git commit -m x' | xargs -I{} sh -c '{}'",
+    "ls | xargs -I {} git commit -m {}",
+    "env -iS 'git commit -m x'",
+    "env -u HOME git push --force",
+    "timeout .5 git commit -m x",
+    "timeout 5 git push --force",
+    "bash -c -x 'git commit -m x'",
+    "sh -c -- 'git commit -m x'",
+    "bash -c 'git push --force origin main'",
+    'sh -lc "cd a && git commit -m x"',
+    "fish -c 'git commit -m x'",
+    "bash <<'EOF'\ngit commit -m x\nEOF",
+    "echo 'git commit -m x' | sh",
+    'bash -c "$cmd" # git commit',
+    "sudo -n git commit -m x",
+    "nice -n 5 git push --force",
     "eval 'git commit -m x'",
     "setsid git commit -m x",
     "stdbuf -o0 git push origin x",
@@ -264,17 +278,29 @@ describe("hook vcs-redirect", () => {
     "find . -name a -exec git commit -m x {} ;",
     "ssh host 'git commit -m x'",
     "env -S 'git commit -m x'",
-    "bash <<'EOF'\ngit commit -m x\nEOF",
-    "echo 'git commit -m x' | sh",
-    'bash -c "$cmd" # git commit',
-    "fish <<EOF\ngit commit -m x\nEOF",
-    "p=push; git $p -f origin main # git push",
-    "g=git; $g commit -m x",
+    "echo git commit | sed e",
+    "echo git commit | awk '{system($0)}'",
+    "python3 - <<'PY'\nprint('git commit')\nPY",
+    "while read l; do git push --force; done < list",
+    "case $x in a) git commit -m y ;; b) echo hi ;; esac",
+    // Aliases and settings, and a git command without a known subcommand.
+    "export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.ci GIT_CONFIG_VALUE_0=commit; git ci -m x # git commit",
+    "git config alias.ci commit; git ci -m x",
     "git -c alias.pf='push -f' pf origin main # git push",
     "git -c remote.origin.push=+HEAD push origin",
     "git --config-env foo=BAR commit",
     "git --attr-source=HEAD commit",
     "GIT_CONFIG_COUNT=1 git push origin x",
+    "git # git commit",
+    "git commitizen",
+    "git commit-tree abc",
+    "git pushall",
+    // Constructs the scan does not read.
+    "git push $'--force\\0' origin main",
+    "git $'commit\\x00' -m x",
+    "cat <<EOF\n$(git commit -m x)\nEOF",
+    "gh pr create --body-file - <<EOF\n`git push --force origin x`\nEOF",
+    "echo `echo \\`git commit -m x\\``",
   ])("denies as unclear: %j", async (command) => {
     const result = await hook("vcs-redirect", bash(command))
     expect(result.code).toBe(0)
@@ -284,9 +310,8 @@ describe("hook vcs-redirect", () => {
   test.each<readonly [string, string]>([
     ['git "com\\\nmit" -m x # git commit', COMMIT],
     ['git "pu\\\nsh" --force origin # push', FORCE],
-    ["if ((1<<2)); then :; fi\ngit push --force", FORCE],
+    ["if ((1<<2)); then true; fi\ngit push --force", FORCE],
     ["cat <<< x\ngit commit -m y", COMMIT],
-    ["fish -c 'git commit -m x'", COMMIT],
   ])("still reads %j", async (command, reason) => {
     expect(await hook("vcs-redirect", bash(command))).toEqual({
       stdout: preToolUse("deny", reason),
@@ -295,27 +320,27 @@ describe("hook vcs-redirect", () => {
     })
   })
 
-  // What the root runs every day passes: no write, nothing that hides one.
+  // What the root runs every day passes: only known programs, literal words, no write.
   test.each<string>([
-    "git status",
-    "git status --short && git diff HEAD~1 | head -50",
-    "git log --oneline -5",
-    "git show HEAD --stat",
-    "git push",
-    "git push -u origin feature/parser",
+    "git status --short && git push",
+    "git log --oneline -5 -- packages/commit.ts",
+    "git show HEAD --stat && git push -u origin feature/parser",
+    "git diff --stat main...HEAD | tail -3; git push",
+    "git branch --show-current && git push",
+    "git merge --no-ff release/0.1.2/a && git push",
+    "git stash push -- .holyagent && git stash pop && git push",
+    "git worktree add ../holyagent-x -b release/0.1.2/x main && git push",
+    "git switch -c feature/x main && git push -u origin feature/x",
     "git -C ../wt push origin release/0.1.2/fix/x",
-    "gh pr create --title 'Add parser' --body-file - <<'EOF'\nWhat changed, with $(a literal substitution) and `ticks`.\nEOF",
-    "gh pr checks 12 --watch",
-    "gh pr view 12 --json mergeStateStatus,reviewDecision",
-    "git switch -c feature/x main && git merge --no-ff release/0.1.2/a",
-    "git stash push -- .holyagent && git stash pop",
-    "bash install/wsl-install.sh",
-    "bash -c 'echo $HOME'",
-    "find packages -name '*.ts' | xargs grep -l commit",
-    "echo $((1 + 2)) && ls",
-    "for f in a b; do echo $f; done",
-    "cat <<EOF\nplain text with $HOME\nEOF",
-    "mise run verify 2>&1 | tail -20",
+    "gh pr create --title 'Add parser' --body-file - <<'EOF'\nWhat changed, with $(a literal substitution) and `ticks`, then git commit.\nEOF",
+    "gh pr checks 12 --watch && git push",
+    "gh pr view 12 --json mergeStateStatus,reviewDecision && git push",
+    "mise run verify 2>&1 | tail -20 && git push",
+    "bun test packages/runtime/tests/shell.test.ts && git push",
+    '"${CLAUDE_PLUGIN_ROOT}/scripts/holyagent" vcs commit -m "fix: deny git commit shapes" -- a.ts',
+    "cat <<EOF\nplain text with $HOME and git push\nEOF",
+    "for f in a.ts b.ts; do git log --oneline -1 -- $f; done; git push",
+    "echo $((1 + 2)) && git push",
   ])("passes %j", async (command) => {
     expect(await hook("vcs-redirect", bash(command))).toEqual({ stdout: "", stderr: "", code: 0 })
   })
@@ -327,6 +352,16 @@ describe("hook vcs-redirect", () => {
     ).toEqual(nothing)
     expect(await hook("vcs-redirect", { tool_name: "Bash", tool_input: {} })).toEqual(nothing)
     expect(await hook("vcs-redirect", { tool_name: "Bash" })).toEqual(nothing)
+  })
+
+  test("looks only at a command that mentions git and then commit or push", async () => {
+    const nothing = { stdout: "", stderr: "", code: 0 }
+    // Not run by the host for these (its `if` rules do not match), and said nothing about here too.
+    expect(await hook("vcs-redirect", bash("python3 -c 'print(1)'"))).toEqual(nothing)
+    expect(await hook("vcs-redirect", bash("sudo ls && commit push git"))).toEqual(nothing)
+    expect(await hook("vcs-redirect", bash("python3 -c 'print(1)' # git push"))).toMatchObject({
+      stdout: preToolUse("deny", UNCLEAR),
+    })
   })
 
   test("fails with exit 1 and a stderr line on a payload it cannot read, never exit 2", async () => {

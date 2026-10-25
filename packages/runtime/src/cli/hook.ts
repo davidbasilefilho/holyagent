@@ -138,8 +138,14 @@ const REDIRECTS: Readonly<Record<GitWrite, string>> = {
   "force-push":
     "Force pushes are denied (--force, --force-with-lease, --mirror, --delete, --prune, a + or : refspec). Push without them; rewriting or deleting published history needs the user's approval, and the user does it.",
   unclear:
-    "This command could force-push and cannot be read with certainty (a variable, substitution, brace, glob or escape in a push argument, or nesting too deep). Write the push out with literal branch names and flags, in a shallower command.",
+    "This command mentions git commit or push and cannot be read with certainty: it runs a program outside the everyday set (git, gh, holyagent, mise, bun and basic file and text tools), or it has a variable, substitution, brace, glob or escape where a literal word is needed, or it nests too deep. Write each command out plainly with literal arguments: no shell, wrapper, script or alias in between, and commits through `holyagent vcs commit`.",
 }
+
+/**
+ * The text the host's `if` rules of the hook (`Bash(*git*commit*)`, `Bash(*git*push*)`) match:
+ * `git` followed somewhere by `commit` or `push`. A command without it is not looked at.
+ */
+const MENTIONS_GIT_WRITE = /git[\s\S]*(?:commit|push)/i
 
 /**
  * The value of a git setting from the repository's own files, not from a `-c` on the command line
@@ -169,10 +175,11 @@ const commentPrefix = Effect.gen(function* () {
 const INLINE_INPUTS: ReadonlySet<string> = new Set(["script", "args"])
 
 // The vcs-redirect hook only sees what the `if` rules of hooks.json let through, and those match
-// the command text: `git` followed by `commit` or `push` anywhere in it. A command that hides the
-// words escapes it: a variable (`g=git; $g commit`), a git alias (`git ci`), or a script, make
-// target or package script that runs git inside. Wrappers, `sh -c`, `xargs`, subshells and
-// substitutions that show the words reach the scanner and are denied.
+// the command text: `git` followed by `commit` or `push` anywhere in it. For such a command it is an
+// allowlist: every simple command must be read with certainty and run a known program, and only
+// `git commit` and a force push are named; anything else it cannot read is denied as unclear. A
+// command whose text never spells the words (`g''it commit`, a git alias, `git ci`) does not reach
+// the hook, nor does a script, make target or package script that runs git inside.
 
 /** The `hook` commands the plugin's hooks call. */
 export const HOOK_COMMANDS: ReadonlyArray<Command> = [
@@ -237,15 +244,16 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
   ),
   hook(
     "vcs-redirect",
-    "PreToolUse for Bash: deny a command that runs git commit (and point to holyagent vcs commit) or a force git push; say nothing otherwise, a plain git push included",
+    "PreToolUse for Bash: for a command that mentions git and then commit or push, deny git commit (and point to holyagent vcs commit), a force git push, and whatever runs a program outside the allowlist or cannot be read with certainty; say nothing otherwise, a plain git push included",
     (payload) => {
       const command = payload.tool_name === "Bash" ? payload.tool_input?.command : undefined
       // Whatever the command looks like, this hook decides and never fails, since its onFailure
       // block would then stop a call that has no git write in it. A command it cannot read at all
-      // (the scan ran out of stack) is denied as unclear: the `if` rules only start the hook for
-      // text that has git and commit or push in it.
+      // (the scan ran out of stack) is denied as unclear, as is one it does not know with certainty:
+      // the text has git and then commit or push in it.
       return Effect.try({
-        try: () => (typeof command === "string" ? gitWrites(command) : []),
+        try: () =>
+          typeof command === "string" && MENTIONS_GIT_WRITE.test(command) ? gitWrites(command) : [],
         catch: (cause) => cause,
       }).pipe(
         Effect.orElseSucceed((): ReadonlyArray<GitWrite> => ["unclear"]),
