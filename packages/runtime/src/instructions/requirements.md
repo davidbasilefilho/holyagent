@@ -69,11 +69,11 @@ What an agent kind always needs is fixed text in its instructions, not a skill i
 
 ## Librarian.lookup
 
-- R-LL: Answer documentation questions from the project first, then official documentation at the pinned version, citing every claim and looking up details that may have changed.
+- R-LL: Answer documentation questions from the project first, then official documentation at the pinned version, citing every claim and looking up details that may have changed, and report a missing web tool as a blocker instead of guessing.
 
 ## Librarian.research
 
-- R-LR: Research a bounded question from primary sources, confirm decisive claims with a second source and separate sourced fact from inference.
+- R-LR: Research a bounded question from primary sources, confirm decisive claims with a second source and separate sourced fact from inference, and report a missing web tool as a blocker instead of guessing.
 
 ## Reviewer.artifact
 

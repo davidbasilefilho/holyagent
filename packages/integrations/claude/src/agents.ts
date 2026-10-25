@@ -16,12 +16,13 @@ const ROOT_DESCRIPTION =
   "Use as the main-thread agent: it plans the work as an Intent with Assignments, dispatches the holyagent specialists through the CLI, judges their reports, accepts work on evidence and owns version control."
 
 /**
- * The web tools of the Search roles: the MCP server of Exa's plugin, a dependency of this one, in
- * place of Claude Code's WebSearch and WebFetch. `agent_run` is listed only when the user has
- * signed in to Exa or set an API key.
+ * The web tools of the Search roles, in place of Claude Code's WebSearch and WebFetch: Exa's search
+ * and fetch, from the claude.ai connector named Exa and from the MCP server of Exa's plugin, a
+ * dependency of this one. Either one works, so both prefixes are listed; a name that matches no
+ * connected server is ignored. `agent_run` is left out because the connector can block it.
  */
-const WEB = ["web_search_exa", "web_fetch_exa", "agent_run"].map(
-  (name) => `mcp__plugin_exa_exa__${name}`,
+const WEB = ["mcp__claude_ai_Exa__", "mcp__plugin_exa_exa__"].flatMap((prefix) =>
+  ["web_search_exa", "web_fetch_exa"].map((name) => `${prefix}${name}`),
 )
 const WRITING = ["Write", "Edit", "Bash"]
 /**
