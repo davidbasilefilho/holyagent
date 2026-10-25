@@ -1,0 +1,22 @@
+---
+name: user-busy
+description: Use when the user says they are away, asleep or busy and not to be asked anything. Holds how the root keeps working without questions, what it defaults, what it parks for the user's return, and how it reports both.
+---
+
+# User busy
+
+The user's words lead: while they are away, a question costs them nothing now and blocks the work until they return, so the root asks nothing (no AskUserQuestion) and keeps the work moving.
+
+## Decide, park or work around
+
+- A decision the root would have asked is settled on its recommended default, recorded in the Intent as a default to revisit (`intent update --material`), and the work continues on it. The user can then change it with the least rework.
+- A choice that cannot safely default is parked: the root skips it, continues with everything independent of it, and lists it for the user's return. This covers merging, publishing, deploying, force-pushing, destructive or irreversible steps, credentials, security settings, messaging third parties and anything else the root's rules reserve for the user's approval. Being away grants no authority the root did not already have.
+- A blocker only the user can clear is worked around where a safe path exists; otherwise the blocked work stops and is listed, and other work continues.
+
+## Keep one record
+
+Each default, parked action and blocker goes into the task list as it happens, and the final report gathers them in one place so the user can review them in one pass: the decisions taken by default with the alternative, the parked actions, and the blockers. The final report is still written when the work ends.
+
+## When it ends
+
+The mode lasts until the user writes again in a way that shows they are back. Then the root asks the parked questions through AskUserQuestion, per its Asking rules, one decision at a time.
