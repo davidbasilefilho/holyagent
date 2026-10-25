@@ -3,6 +3,9 @@ import { join } from "node:path"
 /** The plugin's folder, relative to the repository root. */
 export const PLUGIN_DIRECTORY = "packages/integrations/claude"
 
+/** The built plugin that Claude Code loads, relative to the repository root. */
+export const DIST_DIRECTORY = `${PLUGIN_DIRECTORY}/dist`
+
 /** The instruction sources the plugin is built from, relative to the repository root. */
 export const INSTRUCTIONS_DIRECTORY = "packages/runtime/src/instructions/claude-5.5"
 

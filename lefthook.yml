@@ -18,10 +18,4 @@ pre-commit:
       run: >-
         mise run build && git add -A --
         .claude-plugin/marketplace.json
-        packages/integrations/claude/.claude-plugin/plugin.json
-        packages/integrations/claude/settings.json
-        packages/integrations/claude/agents
-        packages/integrations/claude/skills
-        packages/integrations/claude/hooks/hooks.json
-        packages/integrations/claude/workflows
-        packages/integrations/claude/scripts
+        packages/integrations/claude/dist

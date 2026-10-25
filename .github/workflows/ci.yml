@@ -43,13 +43,7 @@ jobs:
           # packages/integrations/claude/build.ts generates (its GENERATED_PATHS).
           status="$(git status --porcelain --ignored -- \
             .claude-plugin/marketplace.json \
-            packages/integrations/claude/.claude-plugin/plugin.json \
-            packages/integrations/claude/settings.json \
-            packages/integrations/claude/agents \
-            packages/integrations/claude/skills \
-            packages/integrations/claude/hooks/hooks.json \
-            packages/integrations/claude/workflows \
-            packages/integrations/claude/scripts)"
+            packages/integrations/claude/dist)"
           if [ -n "$status" ]; then
             echo "$status"
             echo "::error::The generated plugin is stale. Run 'mise run build' and commit the files it writes."
@@ -62,7 +56,7 @@ jobs:
         run: |
           # Claude Code is a locked devDependency, so a new release cannot turn the job red on its
           # own and the binary is integrity-checked; validation needs no credentials.
-          bun run claude plugin validate --strict packages/integrations/claude
+          bun run claude plugin validate --strict packages/integrations/claude/dist
           bun run claude plugin validate --strict .
 
       - name: Lint the install script

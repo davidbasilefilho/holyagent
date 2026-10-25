@@ -18,7 +18,7 @@ packages/
     build.ts, src/              the generator, the wrapper source, the workflow sources
     vendor/frontend-design/     Anthropic's skill, kept byte for byte
     tests/
-    (generated)                 .claude-plugin/, settings.json, agents/, skills/, hooks/, workflows/, scripts/
+    dist/                       generated: the built plugin (.claude-plugin/, settings.json, agents/, skills/, hooks/, workflows/, scripts/)
   cli/                          the public CLI: setup, doctor
 .claude-plugin/marketplace.json generated; the marketplace entry for the plugin
 install/wsl-install.sh          development environment installer
@@ -66,7 +66,7 @@ Everything is configured in `bunfig.toml`. Bun's own `check`, `lint` and `fmt` a
 
 ## The generated plugin
 
-`mise run build` runs `packages/integrations/claude/build.ts`. It removes the generated paths (`GENERATED_PATHS` in `src/generate.ts`) and writes them again from:
+`mise run build` runs `packages/integrations/claude/build.ts`. It removes the generated paths (`GENERATED_PATHS` in `src/generate.ts`: the root `.claude-plugin/marketplace.json` and the built plugin in `packages/integrations/claude/dist/`) and writes them again from:
 
 - `packages/runtime/src/instructions/claude-5.5/`: the root agent (the body of `agents/holyagent.md` is `root.md`), the eighteen specialist agents (role text, `specialist.md` and, for some roles, the writing bar), the two skills of its own (`merge-ready` and `interface-inspection`; the vendored `frontend-design` comes from `packages/integrations/claude/vendor/`);
 - the route table in `packages/runtime/src/domain/route.ts` (model, effort and tools of each agent) and `packages/integrations/claude/src/agents.ts` (the skills each agent loads);

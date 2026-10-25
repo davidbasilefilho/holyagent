@@ -11,7 +11,7 @@ import { generate, GENERATED_PATHS, MARKETPLACE_PATH } from "../src/generate.ts"
 import { fresh, PLUGIN, ROOT } from "./built.ts"
 
 const read = (...path: Array<string>) => readFileSync(join(ROOT, ...path), "utf8")
-const AGENTS = join("packages", "integrations", "claude", "agents")
+const AGENTS = join("packages", "integrations", "claude", "dist", "agents")
 
 /** The paths of every file below a path of the repository, relative to the repository. */
 const filesBelow = async (path: string): Promise<ReadonlyArray<string>> => {
@@ -57,7 +57,7 @@ describe("the generated plugin is in step with its sources", () => {
     const wrapper = join(PLUGIN, "scripts", "holyagent")
     expect((await Bun.file(wrapper).stat()).mode & 0o111).not.toBe(0)
     expect(generated.filter((file) => file.executable).map((file) => file.path)).toEqual([
-      "packages/integrations/claude/scripts/holyagent",
+      "packages/integrations/claude/dist/scripts/holyagent",
     ])
   })
 
@@ -86,7 +86,7 @@ describe("the generated plugin is in step with its sources", () => {
 
   test("frontend-design is the vendored skill, untouched", () => {
     for (const name of ["SKILL.md", "LICENSE.txt"])
-      expect(read("packages/integrations/claude/skills/frontend-design", name)).toBe(
+      expect(read("packages/integrations/claude/dist/skills/frontend-design", name)).toBe(
         read("packages/integrations/claude/vendor/frontend-design", name),
       )
   })
@@ -94,7 +94,7 @@ describe("the generated plugin is in step with its sources", () => {
 
 describe("manifests", () => {
   const manifest = JSON.parse(
-    read("packages/integrations/claude/.claude-plugin/plugin.json"),
+    read("packages/integrations/claude/dist/.claude-plugin/plugin.json"),
   ) as Record<string, unknown>
   const marketplace = JSON.parse(read(MARKETPLACE_PATH)) as Record<string, unknown>
 
@@ -108,7 +108,7 @@ describe("manifests", () => {
     expect(manifest).not.toHaveProperty("license")
   })
 
-  test("the marketplace points at the plugin folder with the same version", () => {
+  test("the marketplace points at the built plugin with the same version", () => {
     expect(marketplace).toMatchObject({
       name: "holyagent",
       owner: { name: "davidbasilefilho" },
@@ -116,7 +116,7 @@ describe("manifests", () => {
       plugins: [
         {
           name: "holyagent",
-          source: "./packages/integrations/claude",
+          source: "./packages/integrations/claude/dist",
           version: packageJson.version,
           description: manifest.description,
         },
@@ -125,14 +125,14 @@ describe("manifests", () => {
   })
 
   test("the root agent is the main thread", () => {
-    expect(JSON.parse(read("packages/integrations/claude/settings.json"))).toEqual({
+    expect(JSON.parse(read("packages/integrations/claude/dist/settings.json"))).toEqual({
       agent: "holyagent",
     })
   })
 })
 
 describe("hooks", () => {
-  const { hooks } = JSON.parse(read("packages/integrations/claude/hooks/hooks.json")) as {
+  const { hooks } = JSON.parse(read("packages/integrations/claude/dist/hooks/hooks.json")) as {
     hooks: Record<string, Array<{ matcher: string; hooks: Array<Record<string, unknown>> }>>
   }
   const command = (name: string, extra: Record<string, unknown> = {}) => ({
@@ -344,7 +344,7 @@ describe("agents", () => {
   })
 
   test("agent files sit where the plugin expects them", () => {
-    expect(AGENTS).toBe("packages/integrations/claude/agents")
+    expect(AGENTS).toBe("packages/integrations/claude/dist/agents")
   })
 })
 
@@ -366,7 +366,7 @@ describe("claude plugin validate", () => {
     expect(own).not.toMatch(/×|Found \d+ (?:error|warning)/)
   }
 
-  test.skipIf(!available)("the plugin folder passes strict validation", async () => {
+  test.skipIf(!available)("the built plugin passes strict validation", async () => {
     const { code, text } = await check(PLUGIN)
     expect(code).toBe(0)
     clean(text)
