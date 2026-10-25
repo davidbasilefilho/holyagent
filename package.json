@@ -8,6 +8,9 @@
   ],
   "type": "module",
   "scripts": {
+    "bump:hotfix": "mise run bump:hotfix",
+    "bump:minor": "mise run bump:minor",
+    "bump:patch": "mise run bump:patch",
     "prepare": "mise run prepare",
     "build": "mise run build",
     "check": "mise run check",
@@ -19,7 +22,9 @@
     "verify": "mise run verify"
   },
   "devDependencies": {
+    "@anthropic-ai/claude-code": "2.1.300",
     "@types/bun": "^1.0.0",
+    "effect": "^4.0.0",
     "eslint-plugin-jsdoc": "^65.4.2",
     "lefthook": "^2.0.0"
   }
