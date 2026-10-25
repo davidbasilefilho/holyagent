@@ -188,7 +188,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
   },
   "R-GIT": {
     section: "root/version-control.md",
-    phrase: "Never force-push, and never push to a protected branch",
+    phrase: "Never force-push, and never push to the base, default or a protected branch",
   },
   "R-CI": {
     section: "root/ci.md",
