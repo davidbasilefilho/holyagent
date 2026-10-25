@@ -35,7 +35,7 @@ A new harness gets its own folder under `packages/integrations/`. It reuses the 
 | Task        | Does                                                     |
 | ----------- | -------------------------------------------------------- |
 | `toolchain` | Fails unless Bun is a canary build, and names the fix    |
-| `prepare`   | Installs the git hooks (`bunx lefthook install`)         |
+| `prepare`   | Installs the git hooks; skips outside a git work tree    |
 | `check`     | `bun check`: type-check                                  |
 | `lint`      | `bun lint`: type-aware lint, no fixing                   |
 | `lint:fix`  | `bun lint --fix`; extra arguments go to Bun (`--staged`) |
