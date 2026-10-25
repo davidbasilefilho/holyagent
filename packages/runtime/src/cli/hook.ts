@@ -142,14 +142,26 @@ const REDIRECTS: Readonly<Record<GitWrite, string>> = {
 }
 
 /**
+ * The value of a git setting from the repository's own files, not from a `-c` on the command line
+ * (or `GIT_CONFIG_PARAMETERS`), which the caller of `git commit` could set to hide text.
+ */
+const fileSetting = (key: string) =>
+  gitMaybe(["config", "--show-origin", "--get", key]).pipe(
+    Effect.map((line) => {
+      if (line === undefined) return undefined
+      const [origin = "", ...value] = line.split("\t")
+      return origin.startsWith("command line:") ? undefined : value.join("\t")
+    }),
+  )
+
+/**
  * The text that starts a comment line in a commit message file: `core.commentString` or
- * `core.commentChar` of the repository, else `#` (`auto` too, which only picks another character
- * when the message already uses `#`).
+ * `core.commentChar` of the repository's files, else `#` (`auto` too, which only picks another
+ * character when the message already uses `#`).
  */
 const commentPrefix = Effect.gen(function* () {
   const configured =
-    (yield* gitMaybe(["config", "--get", "core.commentString"])) ??
-    (yield* gitMaybe(["config", "--get", "core.commentChar"]))
+    (yield* fileSetting("core.commentString")) ?? (yield* fileSetting("core.commentChar"))
   return configured === undefined || configured === "" || configured === "auto" ? "#" : configured
 })
 
@@ -269,6 +281,9 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
         const above = (cut === -1 ? lines : lines.slice(0, cut)).join("\n")
         const below = cut === -1 ? "" : lines.slice(cut).join("\n")
         const cleaned = cleanMessage(above)
+        // Below the scissors line git itself keeps only a staged diff, but a message made by hand
+        // keeps everything: agent attribution goes from there too, and the phrase check stays above.
+        const cleanedBelow = below === "" ? "" : cleanMessage(below)
         const message = cleaned
           .split("\n")
           .filter((line) => !line.startsWith(comment))
@@ -278,9 +293,9 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
           (yield* readSettings(dirname(call.directory))).allowWords,
         )
         if (phrases.length > 0) return yield* new MessageRefused({ phrases })
-        if (cleaned !== above.trim())
+        if (cleaned !== above.trim() || cleanedBelow !== below.trim())
           yield* io(file, () =>
-            Bun.write(file, below === "" ? `${cleaned}\n` : `${cleaned}\n\n${below}`),
+            Bun.write(file, below === "" ? `${cleaned}\n` : `${cleaned}\n\n${cleanedBelow}\n`),
           )
         return NOTHING
       }),

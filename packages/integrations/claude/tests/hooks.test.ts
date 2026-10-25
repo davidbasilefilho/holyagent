@@ -245,6 +245,81 @@ describe("hook vcs-redirect", () => {
     expect((await hook("vcs-redirect", bash("echo '\"\\`$(("))).code).toBe(0)
   })
 
+  // Constructs the scanner does not read with certainty are denied as unclear, since each could
+  // hide a commit or a history-rewriting push that the `if` rule has already matched.
+  test.each<string>([
+    "git push $'--force\\0' origin main",
+    "git $'commit\\x00' -m x",
+    "cat <<EOF\n$(git commit -m x)\nEOF",
+    "gh pr create --body-file - <<EOF\n`git push --force origin x`\nEOF",
+    "echo $[1<<2]\ngit commit -m x",
+    "for ((i=1<<2; i<9; i++)); do :; done\ngit commit -m x",
+    "(( $(git commit -m x; echo 1) ))",
+    "echo `echo \\`git commit -m x\\``",
+    "eval 'git commit -m x'",
+    "setsid git commit -m x",
+    "stdbuf -o0 git push origin x",
+    "ionice -c3 git commit -m x",
+    "flock /tmp/lock git commit -m x",
+    "find . -name a -exec git commit -m x {} ;",
+    "ssh host 'git commit -m x'",
+    "env -S 'git commit -m x'",
+    "bash <<'EOF'\ngit commit -m x\nEOF",
+    "echo 'git commit -m x' | sh",
+    'bash -c "$cmd" # git commit',
+    "fish <<EOF\ngit commit -m x\nEOF",
+    "p=push; git $p -f origin main # git push",
+    "g=git; $g commit -m x",
+    "git -c alias.pf='push -f' pf origin main # git push",
+    "git -c remote.origin.push=+HEAD push origin",
+    "git --config-env foo=BAR commit",
+    "git --attr-source=HEAD commit",
+    "GIT_CONFIG_COUNT=1 git push origin x",
+  ])("denies as unclear: %j", async (command) => {
+    const result = await hook("vcs-redirect", bash(command))
+    expect(result.code).toBe(0)
+    expect(result.stdout).toContain(UNCLEAR)
+  })
+
+  test.each<readonly [string, string]>([
+    ['git "com\\\nmit" -m x # git commit', COMMIT],
+    ['git "pu\\\nsh" --force origin # push', FORCE],
+    ["if ((1<<2)); then :; fi\ngit push --force", FORCE],
+    ["cat <<< x\ngit commit -m y", COMMIT],
+    ["fish -c 'git commit -m x'", COMMIT],
+  ])("still reads %j", async (command, reason) => {
+    expect(await hook("vcs-redirect", bash(command))).toEqual({
+      stdout: preToolUse("deny", reason),
+      stderr: "",
+      code: 0,
+    })
+  })
+
+  // What the root runs every day passes: no write, nothing that hides one.
+  test.each<string>([
+    "git status",
+    "git status --short && git diff HEAD~1 | head -50",
+    "git log --oneline -5",
+    "git show HEAD --stat",
+    "git push",
+    "git push -u origin feature/parser",
+    "git -C ../wt push origin release/0.1.2/fix/x",
+    "gh pr create --title 'Add parser' --body-file - <<'EOF'\nWhat changed, with $(a literal substitution) and `ticks`.\nEOF",
+    "gh pr checks 12 --watch",
+    "gh pr view 12 --json mergeStateStatus,reviewDecision",
+    "git switch -c feature/x main && git merge --no-ff release/0.1.2/a",
+    "git stash push -- .holyagent && git stash pop",
+    "bash install/wsl-install.sh",
+    "bash -c 'echo $HOME'",
+    "find packages -name '*.ts' | xargs grep -l commit",
+    "echo $((1 + 2)) && ls",
+    "for f in a b; do echo $f; done",
+    "cat <<EOF\nplain text with $HOME\nEOF",
+    "mise run verify 2>&1 | tail -20",
+  ])("passes %j", async (command) => {
+    expect(await hook("vcs-redirect", bash(command))).toEqual({ stdout: "", stderr: "", code: 0 })
+  })
+
   test("ignores a command that is not Bash, or has no command text", async () => {
     const nothing = { stdout: "", stderr: "", code: 0 }
     expect(
@@ -378,6 +453,44 @@ describe("hook commit-msg", () => {
       const result = await cli(["hook", "commit-msg", file], "", repo)
       expect(result).toEqual({ stdout: "", stderr: "", code: 0 })
       expect(await readFile(file, "utf8")).toBe(text)
+    } finally {
+      await rm(repo, { recursive: true, force: true })
+    }
+  })
+
+  test("cleans attribution a hand-made message keeps below a scissors-looking line", async () => {
+    const file = await messageFile(
+      `Fix the parser\n\n${SCISSORS}\nCo-Authored-By: Claude <noreply@anthropic.com>\nCo-authored-by: Dana <dana@example.com>\n`,
+    )
+    expect((await cli(["hook", "commit-msg", file], "", project)).code).toBe(0)
+    expect(await readFile(file, "utf8")).toBe(
+      `Fix the parser\n\n${SCISSORS}\nCo-authored-by: Dana <dana@example.com>\n`,
+    )
+  })
+
+  test("takes the comment string from the repository's files, not from a -c on the command line", async () => {
+    const repo = await mkdtemp(join(tmpdir(), "holyagent-hook-cmdline-"))
+    try {
+      await $`git init -q -b main .`
+        .cwd(repo)
+        .env({
+          ...process.env,
+          HOME: home,
+          GIT_CONFIG_GLOBAL: "/dev/null",
+          GIT_CONFIG_NOSYSTEM: "1",
+        })
+        .quiet()
+      // A comment string set only by the caller of `git commit` hides every line that starts with it.
+      const text = "Fix the parser\n\nX Ask the user which setting to use.\n"
+      const file = join(repo, "message")
+      await writeFile(file, text)
+      const result = await cli(["hook", "commit-msg", file], "", repo, {
+        GIT_CONFIG_COUNT: "1",
+        GIT_CONFIG_KEY_0: "core.commentString",
+        GIT_CONFIG_VALUE_0: "X",
+      })
+      expect(result.code).toBe(3)
+      expect(result.stderr).toContain("MessageRefused")
     } finally {
       await rm(repo, { recursive: true, force: true })
     }

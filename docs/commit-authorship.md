@@ -38,7 +38,7 @@ An unknown key inside `vcs` is an error that names the file (an old `api` key is
 
 ## The `commit-msg` hook
 
-`holyagent hook commit-msg <message-file>` runs the same cleaning and check on the message file git passes to a `commit-msg` hook. It rewrites the file without the attribution lines and exits 3 on a refused message, which stops the commit, so a commit made with plain `git commit` (by the user, or by an agent that slipped past the redirect) gets the same text rule. Git's own comment lines (`core.commentString` or `core.commentChar`, `#` by default) are left alone and not checked, and so is everything after the scissors line that `git commit -v` adds before the staged diff: only the message above it is cleaned, checked and written back.
+`holyagent hook commit-msg <message-file>` runs the same cleaning and check on the message file git passes to a `commit-msg` hook. It rewrites the file without the attribution lines and exits 3 on a refused message, which stops the commit, so a commit made with plain `git commit` (by the user, or by an agent that slipped past the redirect) gets the same text rule. Git's own comment lines (`core.commentString` or `core.commentChar`, `#` by default) are left alone and not checked for phrases, and so is everything after the exact scissors line (`<comment> ------------------------ >8 ------------------------`) that `git commit -v` adds before the staged diff. Attribution lines are removed from there too, since a message made by hand keeps everything below such a line. A comment string that comes only from a `-c` on the command line is ignored; the repository's files decide.
 
 Install it in any repository as `.git/hooks/commit-msg`:
 

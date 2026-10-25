@@ -10155,18 +10155,28 @@ var sessionContext = (status, core, reconcile, intent) => {
 };
 
 var MAX_NESTING = 64;
+var EXPANDED = "\uE000";
+var expands = (text, at) => /[\w{@*#?!$-]/.test(text[at + 1] ?? "");
 var SPACE = /[ \t\r]/;
 var STOPS = /[\s;&|()<>]/;
 var skipHeredocs = (scan) => {
-  for (const { delimiter, strip } of scan.heredocs.splice(0)) {
+  for (const { delimiter, strip, quoted } of scan.heredocs.splice(0)) {
+    const body = [];
+    let closed = false;
     while (scan.index < scan.text.length) {
       const end = scan.text.indexOf(`
 `, scan.index);
       const line = scan.text.slice(scan.index, end === -1 ? scan.text.length : end);
       scan.index = end === -1 ? scan.text.length : end + 1;
-      if ((strip ? line.replace(/^\t+/, "") : line) === delimiter)
+      if ((strip ? line.replace(/^\t+/, "") : line) === delimiter) {
+        closed = true;
         break;
+      }
+      body.push(line);
     }
+    if (!closed || !quoted && /\$\(|`/.test(body.join(`
+`)))
+      scan.unclear = true;
   }
 };
 var readHeredoc = (scan) => {
@@ -10177,14 +10187,17 @@ var readHeredoc = (scan) => {
   while (SPACE.test(scan.text[scan.index] ?? ""))
     scan.index += 1;
   let delimiter = "";
+  let quoted = false;
   while (scan.index < scan.text.length) {
     const char = scan.text[scan.index] ?? "";
     if (char === "'" || char === '"') {
+      quoted = true;
       const end = scan.text.indexOf(char, scan.index + 1);
       const stop = end === -1 ? scan.text.length : end;
       delimiter += scan.text.slice(scan.index + 1, stop);
       scan.index = stop + 1;
     } else if (char === "\\") {
+      quoted = true;
       delimiter += scan.text[scan.index + 1] ?? "";
       scan.index += 2;
     } else if (STOPS.test(char))
@@ -10194,7 +10207,9 @@ var readHeredoc = (scan) => {
       scan.index += 1;
     }
   }
-  scan.heredocs.push({ delimiter, strip });
+  if (!/^[\w.-]+$/.test(delimiter))
+    scan.unclear = true;
+  scan.heredocs.push({ delimiter, strip, quoted });
 };
 var scanDouble = (scan) => {
   let value = "";
@@ -10205,8 +10220,15 @@ var scanDouble = (scan) => {
     if (char === '"')
       break;
     if (char === "\\") {
-      value += '$`"\\'.includes(next) ? next : `\\${next}`;
+      if (next !== `
+`)
+        value += '$`"\\'.includes(next) ? next : `\\${next}`;
       scan.index += 1;
+    } else if (char === "$" && next === "[") {
+      scan.unclear = true;
+      value += char;
+    } else if (char === "$" && next !== "(" && expands(scan.text, scan.index - 1)) {
+      value += char + EXPANDED;
     } else if (char === "$" && next === "(") {
       scan.index += 1;
       scanSubstitution(scan);
@@ -10274,6 +10296,8 @@ var scanAnsiC = (scan) => {
     }
     if (char === "\\") {
       const decoded = decodeEscape(scan.text, scan.index);
+      if (decoded.value.includes("\x00"))
+        scan.unclear = true;
       value += decoded.value;
       scan.index = decoded.next;
     } else {
@@ -10320,7 +10344,8 @@ var scanCode = (scan, closer) => {
   while (scan.index < scan.text.length) {
     const char = scan.text[scan.index] ?? "";
     const next = scan.text[scan.index + 1] ?? "";
-    if (char === "(" && next === "(" && word === undefined && words.length === 0 && !target) {
+    if (char === "(" && next === "(") {
+      const from = scan.index;
       let open = 0;
       while (scan.index < scan.text.length) {
         const here = scan.text[scan.index] ?? "";
@@ -10330,6 +10355,9 @@ var scanCode = (scan, closer) => {
         if (here === ")" && (open -= 1) === 0)
           break;
       }
+      const skipped = scan.text.slice(from, scan.index);
+      if (!skipped.endsWith("))") || /\$\(|`|;|["'\\\n]/.test(skipped))
+        scan.unclear = true;
       continue;
     }
     if (char === closer && depth === 0) {
@@ -10337,10 +10365,16 @@ var scanCode = (scan, closer) => {
       break;
     }
     if (char === "\\") {
+      if (closer === "`" && next === "`")
+        scan.unclear = true;
       scan.index += 2;
       if (next !== `
 `)
         word = (word ?? "") + next;
+    } else if (char === "$" && next === "[") {
+      scan.unclear = true;
+      word = (word ?? "") + char;
+      scan.index += 1;
     } else if (char === "'") {
       const end = scan.text.indexOf("'", scan.index + 1);
       const stop = end === -1 ? scan.text.length : end;
@@ -10392,7 +10426,7 @@ var scanCode = (scan, closer) => {
         target = true;
       scan.index += 1;
     } else {
-      word = (word ?? "") + char;
+      word = (word ?? "") + char + (char === "$" && expands(scan.text, scan.index) ? EXPANDED : "");
       scan.index += 1;
     }
   }
@@ -10407,14 +10441,41 @@ var scanLine = (line) => {
     heredocs: [],
     arithmetic: 0,
     nesting: 0,
-    overflow: false
+    overflow: false,
+    unclear: false
   };
   scanCode(scan);
   return scan;
 };
 var ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
 var KEYWORDS = new Set(["!", "{", "if", "then", "else", "elif", "do", "while", "until", "time"]);
-var SHELLS = new Set(["sh", "bash", "zsh", "dash", "ksh"]);
+var SHELLS = new Set(["sh", "bash", "zsh", "dash", "ksh", "ash", "fish", "csh", "tcsh"]);
+var RUNNERS = new Set([
+  "eval",
+  "setsid",
+  "stdbuf",
+  "ionice",
+  "flock",
+  "ssh",
+  "su",
+  "runuser",
+  "chroot",
+  "script",
+  "watch",
+  "parallel",
+  "unbuffer",
+  "taskset",
+  "chrt",
+  "numactl",
+  "eatmydata",
+  "strace",
+  "ltrace",
+  "nsenter",
+  "unshare",
+  "systemd-run",
+  "busybox",
+  "caffeinate"
+]);
 var WRAPPERS = {
   sudo: new Set(["-u", "-g", "-h", "-p", "-C", "-D", "-R", "-T", "-U", "--user", "--group"]),
   doas: new Set(["-u", "-C"]),
@@ -10469,11 +10530,26 @@ var pushVerdict = (args) => {
     return ["force-push"];
   return args.some((arg) => UNREADABLE.test(arg)) ? ["unclear"] : [];
 };
+var RISKY_CONFIG = /^(?:alias\.|remote\..*\.(?:push|mirror)=|push\.)/i;
+var shellWrites = (words, start, nesting) => {
+  const flag = words.findIndex((word, index) => index > start && /^-[a-z]*c[a-z]*$/.test(word));
+  if (flag !== -1) {
+    const script = words[flag + 1];
+    return script === undefined || script.includes(EXPANDED) || script.includes("$()") ? ["unclear"] : writesIn(script, nesting + 1);
+  }
+  const reading = words.some((word, index) => index > start && /^-[a-z]*s[a-z]*$/.test(word));
+  const file = words.some((word, index) => index > start && !word.startsWith("-"));
+  return reading || !file ? ["unclear"] : [];
+};
 var writesOf = (words, nesting) => {
   let start = 0;
   while (start < words.length) {
     const word = words[start] ?? "";
     const program = programName(word);
+    if (/^GIT_(?:CONFIG|ALIAS)/.test(word))
+      return ["unclear"];
+    if (program === "env" && words.some((arg) => /^(?:-S|--split-string)/.test(arg)))
+      return ["unclear"];
     if (ASSIGNMENT.test(word) || KEYWORDS.has(word))
       start += 1;
     else if (Object.hasOwn(WRAPPERS, program))
@@ -10482,17 +10558,30 @@ var writesOf = (words, nesting) => {
       break;
   }
   const program = programName(words[start]);
-  if (SHELLS.has(program)) {
-    const flag = words.findIndex((word, index) => index > start && /^-[a-z]*c[a-z]*$/.test(word));
-    const script = flag === -1 ? undefined : words[flag + 1];
-    return script === undefined ? [] : writesIn(script, nesting + 1);
-  }
+  if (RUNNERS.has(program))
+    return ["unclear"];
+  if (program === "find" && words.some((word) => /^-(?:exec|execdir|ok|okdir)$/.test(word)))
+    return ["unclear"];
+  if (SHELLS.has(program))
+    return shellWrites(words, start, nesting);
+  if (UNREADABLE.test(program) && words.slice(start + 1).some((w) => w === "commit" || w === "push"))
+    return ["unclear"];
   if (program !== "git")
     return [];
   let at = start + 1;
-  while (words[at]?.startsWith("-"))
-    at += VALUE_OPTIONS.has(words[at] ?? "") ? 2 : 1;
+  while (words[at]?.startsWith("-")) {
+    const option = words[at] ?? "";
+    if (/^--(?:config-env|attr-source)(?:=|$)/.test(option))
+      return ["unclear"];
+    if (option === "-c" && RISKY_CONFIG.test(words[at + 1] ?? ""))
+      return ["unclear"];
+    at += VALUE_OPTIONS.has(option) ? 2 : 1;
+  }
   const subcommand = words[at];
+  if (subcommand === undefined)
+    return [];
+  if (UNREADABLE.test(subcommand))
+    return ["unclear"];
   if (subcommand === "commit")
     return ["commit"];
   return subcommand === "push" ? pushVerdict(words.slice(at + 1)) : [];
@@ -10503,7 +10592,7 @@ var writesIn = (line, nesting) => {
   const scan = scanLine(line);
   return [
     ...scan.commands.flatMap((words) => writesOf(words, nesting)),
-    ...scan.overflow ? ["unclear"] : []
+    ...scan.overflow || scan.unclear ? ["unclear"] : []
   ];
 };
 var gitWrites = (line) => [...new Set(writesIn(line, 0))];
@@ -16574,8 +16663,14 @@ var REDIRECTS = {
   "force-push": "Force pushes are denied (--force, --force-with-lease, --mirror, --delete, --prune, a + or : refspec). Push without them; rewriting or deleting published history needs the user's approval, and the user does it.",
   unclear: "This command could force-push and cannot be read with certainty (a variable, substitution, brace, glob or escape in a push argument, or nesting too deep). Write the push out with literal branch names and flags, in a shallower command."
 };
+var fileSetting = (key) => gitMaybe(["config", "--show-origin", "--get", key]).pipe(map4((line) => {
+  if (line === undefined)
+    return;
+  const [origin = "", ...value] = line.split("\t");
+  return origin.startsWith("command line:") ? undefined : value.join("\t");
+}));
 var commentPrefix = gen2(function* () {
-  const configured = (yield* gitMaybe(["config", "--get", "core.commentString"])) ?? (yield* gitMaybe(["config", "--get", "core.commentChar"]));
+  const configured = (yield* fileSetting("core.commentString")) ?? (yield* fileSetting("core.commentChar"));
   return configured === undefined || configured === "" || configured === "auto" ? "#" : configured;
 });
 var INLINE_INPUTS = new Set(["script", "args"]);
@@ -16644,17 +16739,19 @@ var HOOK_COMMANDS = [
       const below = cut === -1 ? "" : lines.slice(cut).join(`
 `);
       const cleaned = cleanMessage(above);
+      const cleanedBelow = below === "" ? "" : cleanMessage(below);
       const message = cleaned.split(`
 `).filter((line) => !line.startsWith(comment)).join(`
 `);
       const phrases = forbiddenPhrases(message, (yield* readSettings(dirname2(call.directory))).allowWords);
       if (phrases.length > 0)
         return yield* new MessageRefused({ phrases });
-      if (cleaned !== above.trim())
+      if (cleaned !== above.trim() || cleanedBelow !== below.trim())
         yield* io(file, () => Bun.write(file, below === "" ? `${cleaned}
 ` : `${cleaned}
 
-${below}`));
+${cleanedBelow}
+`));
       return NOTHING;
     })
   },
