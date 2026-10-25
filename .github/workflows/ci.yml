@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Installs the tools in mise.toml. mise runs its postinstall hook after `mise install`, which
+      # upgrades the stable Bun to the canary build that `bun check`, `bun lint` and `bun fmt` need.
+      - name: Set up tools
+        uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
+
+      - name: Check the toolchain
+        run: mise run toolchain
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Verify
+        run: mise run verify
+
+      - name: Check the generated plugin is current
+        run: |
+          mise run build
+          # Porcelain output lists modified, deleted and untracked files; these are the paths
+          # packages/integrations/claude/build.ts generates (its GENERATED_PATHS).
+          status="$(git status --porcelain --ignored -- \
+            .claude-plugin/marketplace.json \
+            packages/integrations/claude/.claude-plugin/plugin.json \
+            packages/integrations/claude/settings.json \
+            packages/integrations/claude/agents \
+            packages/integrations/claude/skills \
+            packages/integrations/claude/hooks/hooks.json \
+            packages/integrations/claude/workflows \
+            packages/integrations/claude/scripts)"
+          if [ -n "$status" ]; then
+            echo "$status"
+            echo "::error::The generated plugin is stale. Run 'mise run build' and commit the files it writes."
+            exit 1
+          fi
+
+      - name: Validate the plugin and the marketplace
+        env:
+          DISABLE_AUTOUPDATER: "1"
+        run: |
+          # Claude Code is a locked devDependency, so a new release cannot turn the job red on its
+          # own and the binary is integrity-checked; validation needs no credentials.
+          bun run claude plugin validate --strict packages/integrations/claude
+          bun run claude plugin validate --strict .
+
+      - name: Lint the install script
+        run: |
+          if [ -f install/wsl-install.sh ]; then
+            shellcheck install/wsl-install.sh
+          fi

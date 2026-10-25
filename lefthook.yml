@@ -12,6 +12,16 @@ pre-commit:
     - name: fmt
       run: mise run fmt -- --staged
       stage_fixed: true
-    # The build job will stage its generated plugin paths once the integration defines them.
+    # Stages exactly the paths build.ts generates (its GENERATED_PATHS), deletions included, so a
+    # commit always carries a plugin in step with its sources.
     - name: build
-      run: mise run build
+      run: >-
+        mise run build && git add -A --
+        .claude-plugin/marketplace.json
+        packages/integrations/claude/.claude-plugin/plugin.json
+        packages/integrations/claude/settings.json
+        packages/integrations/claude/agents
+        packages/integrations/claude/skills
+        packages/integrations/claude/hooks/hooks.json
+        packages/integrations/claude/workflows
+        packages/integrations/claude/scripts
