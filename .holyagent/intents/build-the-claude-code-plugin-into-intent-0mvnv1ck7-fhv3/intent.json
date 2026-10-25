@@ -9,7 +9,8 @@
     "me responda como funciona os workflows no claude code como o holyagent está fazendo aqui",
     "The marketplace file stays at the repository root (.claude-plugin/marketplace.json) and its plugin source points at ./packages/integrations/claude/dist.",
     "Prebuilt workflows are not removed or changed in this Intent; their removal is handled by intent-0mvnv553v-zwx8.",
-    "isso vai ser o 0.1.2"
+    "isso vai ser o 0.1.2",
+    "Status (paused at the user request after hotfix 0.1.1-2): the relocation is committed locally as 9fa5418 on release/0.1.2/build/plugin-dist, reviewed by Reviewer.code and Reviewer.security and accepted, not pushed; it needs a merge forward of main (ba1bb8d, 0.1.1-2) before its PR. assignment-0mvnv1slw-hyl7 stays unaccepted only because its stored report lacked the evidence block (CLI cannot re-close a Succeeded Assignment); the follow-up and both reviews are accepted. The skill-duplication and workflow questions were answered to the user."
   ],
   "revision": 1,
   "state": "Open",

@@ -27,3 +27,5 @@ These rules apply to everyone and every agent working on this codebase.
 ## This file
 
 Change this file only with the maintainer's permission.
+
+@../AGENTS.md

@@ -1,0 +1,1 @@
+After three failed fixes, stop and question the design instead of trying a fourth: report what the attempts showed and why the approach keeps failing. If the cause stays unresolved, report what is confirmed and what is hypothesis, separately, with the evidence for each and the next check that would decide between them.

@@ -1,0 +1,9 @@
+### Stack plan
+
+- One branch and one PR per reviewable change. Every PR of one delivery stacks in work order by default, so each change is reviewed and merged on top of the one before it; the target repository's own conventions come first, and where they ask for independent PRs from the base, branch each from the base. Work that is not part of the delivery branches from the base.
+- When the work adds CI, its PR comes first, from the base, so every later PR runs it.
+- Parallel writers get disjoint paths, shared types and files included; overlap costs conflicts and a second review.
+- The first PR of a stack targets the base and each later one its immediate predecessor; verify real PR bases rather than inferring them from names. No aggregate PR.
+- Writers start from the current stack head. When lower PRs change, merge forward with merge commits, once per batch of repairs, and push the affected branches together. Published history is never rewritten and a force-push needs the user's approval. Rebuild a conflicted generated file with the project's build task; a conflicted state record keeps the side the later CLI write produced.
+- Commit the writer's work locally first and review that commit; repairs are new local commits. Push only after the reviews accept, when authorized, and in the same step open each pushed branch's PR ready for review (or update it with `vcs pr --update <n>`), so nothing stays only local or unlisted. Each PR's head passes the gates alone, and a PR is finished and reviewed before the next stacks on it.
+- Branch names follow the repository's convention. Without one and when the version workflow fits, use `release/<version>/<type>/<change>` for release work and `exp/<experiment>/<type>/<change>` for experiments, keeping the project's real version string. A name grants no merge, release or deploy authority.

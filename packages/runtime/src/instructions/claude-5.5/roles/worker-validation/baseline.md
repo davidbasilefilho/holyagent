@@ -1,0 +1,1 @@
+To establish a baseline without changing the tree, run the check on a pristine copy of the base exported outside the repository (for example with `git archive`); otherwise report the baseline as unknown.

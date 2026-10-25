@@ -34,16 +34,18 @@ const frontmatterKeys = (text: string): ReadonlyArray<string> | undefined => {
 describe("instruction sources", () => {
   test("hold the root, the specialist conduct, a role per route, skills and requirements", () => {
     expect(FILES.length).toBeGreaterThan(0)
-    for (const name of ["root.md", "specialist.md"])
-      expect(read(join(CLAUDE, name)).length).toBeGreaterThan(0)
+    for (const folder of ["root", "specialist"])
+      expect(readdirSync(join(CLAUDE, folder)).length).toBeGreaterThan(0)
     for (const name of ["mergeability.md", "commit-text.md", "cache.md"])
       expect(read(join(INSTRUCTIONS, "requirements", name)).length).toBeGreaterThan(0)
   })
 
   test("have one role file for each route and no other", () => {
     const roles = readdirSync(join(CLAUDE, "roles")).toSorted()
-    expect(roles).toEqual(ROUTES.map((route) => `${route.agent}.md`).toSorted())
-    for (const role of roles) expect(read(join(CLAUDE, "roles", role)).trim()).not.toBe("")
+    expect(roles).toEqual(ROUTES.map((route) => route.agent).toSorted())
+    for (const role of roles)
+      for (const section of readdirSync(join(CLAUDE, "roles", role)))
+        expect(read(join(CLAUDE, "roles", role, section)).trim()).not.toBe("")
   })
 
   test("give each skill a folder named after it and only the frontmatter keys claude.ai accepts", () => {

@@ -1,16 +1,25 @@
 import { describe, expect, test } from "bun:test"
-import { readFileSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { $ } from "bun"
 
 import { WORKFLOW_NAMES } from "../../../runtime/src/domain/plan.ts"
 import { ROUTES } from "../../../runtime/src/domain/route.ts"
+import { ROOT_CORE_FILES } from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
 import packageJson from "../package.json" with { type: "json" }
+import {
+  REQUIREMENT_SECTIONS,
+  ROLE_SECTIONS,
+  ROOT_SECTIONS,
+  SPECIALIST_SECTIONS,
+  WRITING_BAR_SECTION,
+} from "../src/agents.ts"
 import { generate, GENERATED_PATHS, MARKETPLACE_PATH } from "../src/generate.ts"
 import { fresh, PLUGIN, ROOT } from "./built.ts"
 
 const read = (...path: Array<string>) => readFileSync(join(ROOT, ...path), "utf8")
+const CLAUDE = "packages/runtime/src/instructions/claude-5.5"
 const AGENTS = join("packages", "integrations", "claude", "dist", "agents")
 
 /** The paths of every file below a path of the repository, relative to the repository. */
@@ -225,9 +234,123 @@ describe("agents", () => {
       expect(frontmatter(file.content)).not.toMatch(/Worker\.|Reviewer\.|Explorer\.|Librarian\./)
   })
 
-  test("the root's body is root.md as it is", () => {
-    const root = read("packages/runtime/src/instructions/claude-5.5/root.md")
-    expect(agent("holyagent")?.content.endsWith(`\n---\n\n${root}`)).toBe(true)
+  test("the root's body is the files of root/ in the fixed order", () => {
+    const body = ROOT_SECTIONS.map((name) => read(`${CLAUDE}/root`, name).trim()).join("\n\n")
+    expect(agent("holyagent")?.content.endsWith(`\n---\n\n${body}\n`)).toBe(true)
+    expect(ROOT_SECTIONS.slice(0, ROOT_CORE_FILES.length)).toEqual([...ROOT_CORE_FILES])
+  })
+
+  test("the root agent holds each of the user's behavior rules once", () => {
+    const content = agent("holyagent")?.content ?? ""
+    for (const rule of [
+      "Acknowledge every user message",
+      "names an action",
+      "Every pending decision goes through AskUserQuestion",
+      "never reach the same result through another tool",
+      "Follow a denial or hook that names a holyagent route",
+      "A brief acknowledgment is always allowed",
+      "update_plan",
+    ])
+      expect({ rule, count: content.split(rule).length - 1 }).toEqual({ rule, count: 1 })
+  })
+
+  test("the session reminder states each of the user's behavior rules once", () => {
+    const reminder = read(CLAUDE, "session-reminder.md")
+    for (const rule of [
+      "Acknowledge every user message",
+      "names an action",
+      "AskUserQuestion",
+      "Follow a denial or hook that names a holyagent route",
+      "otherwise write only for decisions, blockers and the final report",
+      "update_plan",
+    ])
+      expect({ rule, count: reminder.split(rule).length - 1 }).toEqual({ rule, count: 1 })
+  })
+
+  test("every requirement of requirements.md is implemented by a section that reaches its agents", () => {
+    const lines = read("packages/runtime/src/instructions", "requirements.md").split("\n")
+    const listed = lines.filter((line) => line.startsWith("- "))
+    const ids = listed.map((line) => /^- (R-[A-Z]+(?:-[A-Z]+)*): \S/.exec(line)?.[1] ?? line)
+    expect(ids.every((id) => /^R-[A-Z]+(?:-[A-Z]+)*$/.test(id))).toBe(true)
+    expect(new Set(ids).size).toBe(ids.length)
+    expect(ids.toSorted()).toEqual(Object.keys(REQUIREMENT_SECTIONS).toSorted())
+
+    const assembled = [
+      ...ROOT_SECTIONS.map((name) => `root/${name}`),
+      ...SPECIALIST_SECTIONS.map((name) => `specialist/${name}`),
+      ...Object.entries(ROLE_SECTIONS).flatMap(([role, names]) =>
+        names.map((name) => `roles/${role}/${name}`),
+      ),
+    ]
+    for (const [id, { section, phrase }] of Object.entries(REQUIREMENT_SECTIONS)) {
+      expect({ id, assembled: assembled.includes(section) }).toEqual({ id, assembled: true })
+      expect({ id, holds: read(CLAUDE, section).includes(phrase) }).toEqual({ id, holds: true })
+      const reached = section.startsWith("root/")
+        ? ["holyagent"]
+        : section.startsWith("roles/")
+          ? [section.split("/")[1] ?? ""]
+          : ROUTES.map((route) => route.agent)
+      for (const name of reached)
+        expect({ id, name, reaches: agent(name)?.content.includes(phrase) }).toEqual({
+          id,
+          name,
+          reaches: true,
+        })
+    }
+  })
+
+  test("every file of root/, specialist/ and roles/ is assembled and every assembled file exists", () => {
+    const assembled = (folder: string, names: ReadonlyArray<string>) => {
+      expect({ folder, files: readdirSync(join(ROOT, CLAUDE, folder)).toSorted() }).toEqual({
+        folder,
+        files: [...names].toSorted(),
+      })
+      expect(new Set(names).size).toBe(names.length)
+    }
+    assembled("root", ROOT_SECTIONS)
+    assembled("specialist", [...SPECIALIST_SECTIONS, WRITING_BAR_SECTION])
+    expect(Object.keys(ROLE_SECTIONS).toSorted()).toEqual(ROUTES.map((r) => r.agent).toSorted())
+    for (const [role, names] of Object.entries(ROLE_SECTIONS)) {
+      assembled(`roles/${role}`, names)
+      expect(names[0]).toBe("purpose.md")
+    }
+  })
+
+  test("a specialist is its role sections, then the conduct sections, in the fixed order", () => {
+    for (const route of ROUTES) {
+      const text = agent(route.agent)?.content ?? ""
+      const parts = [
+        ...(ROLE_SECTIONS[route.agent] ?? []).map((name) =>
+          read(`${CLAUDE}/roles/${route.agent}`, name).trim(),
+        ),
+        ...SPECIALIST_SECTIONS.map((name) => read(`${CLAUDE}/specialist`, name).trim()),
+      ]
+      const at = parts.map((part) => text.indexOf(part))
+      expect(at.every((position) => position >= 0)).toBe(true)
+      expect(at).toEqual(at.toSorted((a, b) => a - b))
+    }
+  })
+
+  test("the root carries the instruction guidelines and the stacking and task list defaults", () => {
+    const text = agent("holyagent")?.content ?? ""
+    expect(text).toContain(read(`${CLAUDE}/root`, "instruction-guidelines.md").trim())
+    expect(text).toContain("Every PR of one delivery stacks in work order by default")
+    expect(text).not.toContain("only on a real code dependency")
+    expect(text).toContain("Create the task list first")
+  })
+
+  test("the language rule is stated by the root and the specialists, and nothing contradicts it", () => {
+    const root = agent("holyagent")?.content ?? ""
+    expect(root).toContain("in English by default unless the target repository's convention")
+    expect(root).toContain("in the language of the user's latest message")
+    for (const route of ROUTES)
+      expect(agent(route.agent)?.content).toContain(
+        "in English unless the repository's convention says otherwise",
+      )
+    for (const file of generated.filter((f) => f.path.includes("/agents/")))
+      expect(file.content).not.toMatch(
+        /user's language|repository's language|in the user's most recent language/,
+      )
   })
 
   test("specialists run in the background with a warm cache and the route's model and effort", () => {
@@ -240,9 +363,8 @@ describe("agents", () => {
       expect(text).toContain(
         `You are the holyagent ${route.agent} specialist. Independence: ${route.independence}.`,
       )
-      expect(text).toContain(
-        read("packages/runtime/src/instructions/claude-5.5/specialist.md").trim(),
-      )
+      for (const name of SPECIALIST_SECTIONS)
+        expect(text).toContain(read(`${CLAUDE}/specialist`, name).trim())
     }
   })
 
@@ -328,7 +450,7 @@ describe("agents", () => {
   })
 
   test("the writing bar is in the implementation writer and the artifact reviewer once, and nowhere else", () => {
-    const bar = read("packages/runtime/src/instructions/claude-5.5/writing-bar.md").trim()
+    const bar = read(`${CLAUDE}/specialist`, WRITING_BAR_SECTION).trim()
     for (const route of ROUTES) {
       const text = agent(route.agent)?.content ?? ""
       const wanted = ["worker-implementation", "reviewer-artifact"].includes(route.agent)
@@ -338,9 +460,8 @@ describe("agents", () => {
       })
     }
     for (const role of ["worker-implementation", "reviewer-artifact"])
-      expect(
-        read("packages/runtime/src/instructions/claude-5.5/roles", `${role}.md`),
-      ).not.toContain("compact and proportional")
+      for (const name of ROLE_SECTIONS[role] ?? [])
+        expect(read(`${CLAUDE}/roles/${role}`, name)).not.toContain("compact and proportional")
   })
 
   test("agent files sit where the plugin expects them", () => {

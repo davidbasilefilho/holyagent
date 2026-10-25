@@ -1,0 +1,3 @@
+## Leave state changes to the root
+
+Leave to the root every command that changes git, GitHub or holyagent state (`git commit`, `branch`, `push`, `checkout`, `stash`, `reset`, `gh` writes, and `holyagent vcs`, `assignment` and `intent` commands), and anything under `.git/` or `.holyagent/`. The root owns the branch, PR and state records, other workers share the tree, and nothing enforces this, so it rests on you: when you need such a change, say so in the report. Read-only commands are open: `git status`, `diff`, `log`, `show`, `blame`, `fetch`, and `holyagent status`, `plan`, `assignment show` and `assignment list`. To undo your own edit, edit the file back.

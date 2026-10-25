@@ -34,16 +34,22 @@ Standing decisions and their reasons. Many come from an audit of one long sessio
 
 **A small, bounded session-start hook.** The predecessor loaded every record on every start. With 326 Assignments its resume hook took 11.6 and 11.9 seconds against a 10-second budget and twice injected a 77-character message instead of state (that the load time grew with state size is an inference), and it re-injected 8.4 to 9.9 thousand characters of rules at each of four compactions. The hook now reads only open Intents, caps its context and adds the rules only when the root is not the main agent; after a resume or compaction it also adds the Running rows of `reconcile` ([hooks.md](hooks.md)). (`mechanisms-7`)
 
+**Prompts are one file per section.** The root, the specialist conduct and each role are folders of section files whose order is fixed in `agents.ts`, so a change touches one section and a test catches a file left out. The root carries `instruction-guidelines.md`, which turns Anthropic's Claude 5.5 prompting guidance into rules for the text it writes (effort through the route, keep working versus stop and report, a real check before done).
+
+**Language follows the artifact.** PRs, commits, docs and instruction text are in English unless the target repository's convention says otherwise; the task list and the root's messages to you are in the language of your latest message.
+
+**Progress lives in the task list.** The root creates the list first, updates it at every dispatch, close and verdict, and writes to you only for a decision, a blocker and the final report, with one exception: a brief acknowledgment of each user message.
+
 ## Kept
 
 - **Static-first prompts and a session-start status.** The layout and the re-injection after compaction cost nothing measurable; HolyAgent adds nothing dynamic to the system prompt, tools, skills or roster mid-session. (`cache-reuse-9`)
 - **Models do not reason about cache, TTL or cost.** The predecessor's root text did not either, apart from the prompt lines removed above. (`root-conduct-11`)
 - **Narrow, matcher-scoped hooks.** The cheap ones were worth keeping; the broad one was not. (`mechanisms-11`)
 - **Warm continuation where it worked.** One agent carried five or six merge-conflict resolutions at about a 0.98 cache ratio. (`cache-reuse-10`)
-- **The root plans and judges; specialists do the work.** The root owns the user relationship, acceptance and version control, runs no gates itself and does not poll: completion notices are its only wake-ups. It speaks to the user only for a decision, a blocker only the user can clear and the final report; everything else lives in its task list.
+- **The root plans and judges; specialists do the work.** The root owns the user relationship, acceptance and version control, runs no gates itself and does not poll: completion notices are its only wake-ups. It speaks to the user only for a decision, a blocker only the user can clear and the final report, with one exception: a brief acknowledgment of each user message; everything else lives in its task list.
 - **Eighteen specialists with pinned model and effort**, writers confined to disjoint ownership paths, and independent review of every change to code or artifacts, with a security review for trust boundaries.
 - **Mergeability as the bar**, in six dimensions with blocking and non-blocking criteria, the repository's own conventions first.
-- **One PR per reviewable change**, independent changes branched from the base, stacked only on a real code dependency, with a CI PR first when the work adds CI, disjoint paths for parallel writers, a PR opened or updated in the same step as every push, merge-forward with merge commits, no force-push without your approval.
+- **One PR per reviewable change**, every PR of one delivery stacked in work order by default (the target repository's conventions first, other work branched from the base), with a CI PR first when the work adds CI, disjoint paths for parallel writers, a PR opened or updated in the same step as every push, merge-forward with merge commits, no force-push without your approval.
 - **Compact interfaces.** JSON in, TOON out, long logs in files, fixed report shape.
 - **Effect and Bun.** Failures are tagged errors and the toolchain is Bun's own ([development.md](development.md)).
 - **State in the repository.** Versioned state in `.holyagent/` is inherited from the predecessor; the audit changed how it is committed (see above). Moving it outside the project tree was proposed (`mechanisms-8`). It stays versioned in `.holyagent/`; the costs behind the proposal are met differently: `status`, `plan`, `reconcile` and the session-start hook read only open Intents, and state travels in the work commits rather than in commits of its own.

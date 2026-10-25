@@ -1,0 +1,1 @@
+Locate with Grep and Glob, then Read the exact lines, so you report what the file says rather than what a search hit suggests. Quote the smallest useful excerpt with its path and line. When several candidates match, list them with what distinguishes each. When nothing matches, say so and list what you searched, which lets the root tell absence from a weak search.

@@ -1,0 +1,1 @@
+For a TUI or desktop GUI you have no shell to run it: review the captures Worker.visual saved (terminal output, or screenshots that Read opens as images) and the Assignment names, and report the inspection as blocked when none are supplied.

@@ -1,0 +1,112 @@
+{
+  "id": "assignment-0mvnvk9zp-iu8i",
+  "intentId": "intent-0mvnv553v-zwx8",
+  "intentRevision": 5,
+  "roleTask": "Worker.integration",
+  "slug": "prepare-hotfix-0-1-1-2-in-the-worktree",
+  "objective": "Prepare hotfix 0.1.1-2 in the worktree /home/davidbasile/dev/holyagent-hotfix (detached at main 42b4a9b): this repository's project settings enable its own plugin, and the version is bumped to 0.1.1-2.",
+  "state": "Succeeded",
+  "scope": [
+    "Work only in the separate worktree /home/davidbasile/dev/holyagent-hotfix; the ownership paths below are relative to that worktree. bump:hotfix also rewrites .claude-plugin/marketplace.json there, which is allowed. Apply the .claude/settings.json and docs/usage.md changes from /tmp/claude-1000/-home-davidbasile-dev-holyagent/76e01786-4530-4059-a4a5-d22da17918ee/scratchpad/integration.diff, adjusted to main's layout: on main the marketplace source is ./packages/integrations/claude (no dist).",
+    "Fix the docs paragraph: do not tell readers to run `claude plugin marketplace add ./`, which writes an absolute path into the project settings. Say what is true and verified: the settings already declare the marketplaces, and name the minimal steps for a new machine (for example trusting the folder and `claude plugin install holyagent@holyagent --scope project`, plus `claude plugin marketplace add anthropics/claude-plugins-official` when exa cannot resolve). Verify each command you name against the installed Claude Code without writing an absolute path into the worktree's settings.",
+    "Keep the attribution object on one line as it was, unless the formatter requires otherwise.",
+    "Run `bun install --frozen-lockfile`, then `mise run bump:hotfix` (0.1.1-1 to 0.1.1-2; it rewrites package.json files and bun.lock and rebuilds the plugin manifests), then `mise run verify`, `bun run claude plugin validate --strict packages/integrations/claude` and `bun run claude plugin validate --strict .` in the worktree."
+  ],
+  "constraints": [
+    "Do not commit, push, branch or run git writes; never touch /home/davidbasile/dev/holyagent (the main tree) or any .holyagent folder.",
+    "Do not edit .claude/CLAUDE.md."
+  ],
+  "criteria": [
+    {
+      "text": "In the worktree, .claude/settings.json declares the holyagent directory marketplace with a relative path, the billion-context marketplace, and enables holyagent@holyagent, keeping the existing keys and no absolute path.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Every version string reads 0.1.1-2 (package.json files, bun.lock, plugin.json, marketplace.json).",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "`mise run verify` and both strict validations pass in the worktree.",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "Every command the docs paragraph names was checked against the installed Claude Code and writes no absolute path into project settings.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Only .claude/settings.json, docs/usage.md and the files bump:hotfix rewrites change.",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    ".claude/settings.json",
+    "docs/usage.md",
+    "package.json",
+    "bun.lock",
+    "packages/cli/package.json",
+    "packages/runtime/package.json",
+    "packages/integrations/claude/package.json",
+    "packages/integrations/claude/.claude-plugin/plugin.json"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "a49f62c6779733d37",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-25T13:39:58.741Z",
+    "finishedAt": "2026-10-25T13:41:58.565Z"
+  },
+  "result": "result: Hotfix 0.1.1-2 prepared in /home/davidbasile/dev/holyagent-hotfix; verify and both strict validations pass. Diff /home/davidbasile/dev/holyagent-reviews/hotfix.diff.\nevidence:\nIn the worktree, .claude/settings.json declares the holyagent directory marketplace with a relative path, the billion-context marketplace, and enables holyagent@holyagent, keeping the existing keys and no absolute path.: directory source path \".\", github ranxianglei/billion-context, enabledPlugins holyagent@holyagent, original keys kept.\nEvery version string reads 0.1.1-2 (package.json files, bun.lock, plugin.json, marketplace.json).: bump:hotfix 0.1.1-1 -> 0.1.1-2; grep for 0.1.1-1 in json files and bun.lock finds nothing.\n`mise run verify` and both strict validations pass in the worktree.: verify exit 0 (547 pass, 0 fail); both validate --strict passed.\nEvery command the docs paragraph names was checked against the installed Claude Code and writes no absolute path into project settings.: each run in a scratch CLAUDE_CONFIG_DIR; settings path stayed \".\"; interactive trust not exercised.\nOnly .claude/settings.json, docs/usage.md and the files bump:hotfix rewrites change.: git status shows the 10 paths: settings, usage.md, marketplace.json, bun.lock, 4 package.json, plugin.json, scripts/holyagent.js.\nchanged-paths: the 10 paths above.\nchecks-run: bun install, bump:hotfix, verify exit 0, two validate --strict, scratch-config CLI checks.\ndiff-file: /home/davidbasile/dev/holyagent-reviews/hotfix.diff\n",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "verify exit 0 and both strict validations in the worktree; settings relative; no 0.1.1-1 left",
+    "criteria": [
+      {
+        "criterion": "In the worktree, .claude/settings.json declares the holyagent directory marketplace with a relative path, the billion-context marketplace, and enables holyagent@holyagent, keeping the existing keys and no absolute path.",
+        "support": "directory source path \".\", github ranxianglei/billion-context, enabledPlugins holyagent@holyagent, original keys kept."
+      },
+      {
+        "criterion": "Every version string reads 0.1.1-2 (package.json files, bun.lock, plugin.json, marketplace.json).",
+        "support": "bump:hotfix 0.1.1-1 -> 0.1.1-2; grep for 0.1.1-1 in json files and bun.lock finds nothing."
+      },
+      {
+        "criterion": "`mise run verify` and both strict validations pass in the worktree.",
+        "support": "verify exit 0 (547 pass, 0 fail); both validate --strict passed."
+      },
+      {
+        "criterion": "Every command the docs paragraph names was checked against the installed Claude Code and writes no absolute path into project settings.",
+        "support": "each run in a scratch CLAUDE_CONFIG_DIR; settings path stayed \".\"; interactive trust not exercised."
+      },
+      {
+        "criterion": "Only .claude/settings.json, docs/usage.md and the files bump:hotfix rewrites change.",
+        "support": "git status shows the 10 paths: settings, usage.md, marketplace.json, bun.lock, 4 package.json, plugin.json, scripts/holyagent.js."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "the 10 paths above."
+      },
+      {
+        "label": "checks-run",
+        "support": "bun install, bump:hotfix, verify exit 0, two validate --strict, scratch-config CLI checks."
+      },
+      {
+        "label": "diff-file",
+        "support": "/home/davidbasile/dev/holyagent-reviews/hotfix.diff"
+      }
+    ]
+  },
+  "createdAt": "2026-10-25T13:39:58.741Z"
+}

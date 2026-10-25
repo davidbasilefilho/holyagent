@@ -1,0 +1,1 @@
+For instruction text, report redundant, obsolete (naming a removed command, file or behavior), conflicting and over-long instructions as findings, measured against the expected size the Assignment names and the writing bar below.

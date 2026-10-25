@@ -5,15 +5,17 @@ import { Effect, Schema } from "effect"
 
 import { WORKFLOW_NAMES } from "../domain/plan.ts"
 import { ROUTES } from "../domain/route.ts"
-import root from "../instructions/claude-5.5/root.md" with { type: "text" }
+import { ROOT_CORE } from "../instructions/claude-5.5/root-core.ts"
 import { hasCode, io } from "../state/files.ts"
 import { STATE_DIRECTORY } from "../state/layout.ts"
+import { readOpenState } from "../state/store.ts"
 import { PLUGIN_NAMESPACE, recordLaunch } from "./assignment.ts"
 import { stateRoot } from "./context.ts"
 import { AgentIdMissing, describeFailure, StateFolderMissing } from "./errors.ts"
+import { resolveIntent } from "./intent.ts"
 import { resumeOf, statusOf } from "./overview.ts"
 import { dispatchedAssignment } from "./report.ts"
-import { rootCore, sessionContext } from "./sessioncontext.ts"
+import { type IntentRequirements, sessionContext } from "./sessioncontext.ts"
 import { type GitWrite, gitWrites } from "./shell.ts"
 import { type Call, type Command, Verbatim } from "./types.ts"
 
@@ -83,6 +85,19 @@ const hasStateFolder = (directory: string) =>
 
 /** The SessionStart sources after which pending notices are lost and the Running rows need a check. */
 const RESUMED: ReadonlySet<string | undefined> = new Set(["resume", "compact"])
+
+/**
+ * The requirements of the Intent in use, as `intent show` resolves it, for a session that lost
+ * them; nothing when no Intent is in use.
+ */
+const requirementsOf = (
+  directory: string,
+): Effect.Effect<IntentRequirements | undefined, unknown> =>
+  readOpenState(directory).pipe(
+    Effect.flatMap(resolveIntent),
+    Effect.map(({ id, revision, requirements }) => ({ id, revision, requirements })),
+    Effect.catchTag("NoActiveIntent", () => Effect.succeed(undefined)),
+  )
 
 /** Ids the host makes are short words; anything else is not echoed into a command to run. */
 const SAFE_ID = /^[\w.:-]{1,80}$/
@@ -214,13 +229,13 @@ const shadowed = (call: Call) =>
 export const HOOK_COMMANDS: ReadonlyArray<Command> = [
   hook(
     "session-start",
-    "SessionStart: add the status of the open Intents as context, with the reconcile result after a resume or compaction (and the core root rules when the root agent is not the main thread); nothing without a .holyagent folder",
+    "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules when the root agent is not the main thread), always ending with a short block of the root rules most often missed; nothing without a .holyagent folder",
     (payload, call) =>
       Effect.gen(function* () {
         if (!(yield* hasStateFolder(call.directory))) return NOTHING
         const pluginRoot = call.env.CLAUDE_PLUGIN_ROOT
         // The host fills in ${CLAUDE_PLUGIN_ROOT} in agent text only, and this text is context.
-        const core = rootCore(root).replaceAll(
+        const core = ROOT_CORE.replaceAll(
           "${CLAUDE_PLUGIN_ROOT}",
           pluginRoot ?? "${CLAUDE_PLUGIN_ROOT}",
         )
@@ -233,6 +248,7 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
             status,
             ROOT_AGENTS.has(payload.agent_type) ? undefined : core,
             reconcile,
+            RESUMED.has(payload.source) ? yield* requirementsOf(call.directory) : undefined,
           ),
         })
       }),

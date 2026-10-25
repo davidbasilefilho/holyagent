@@ -1,3 +1,0 @@
-Connect completed components across a named integration boundary, and verify that they work together as specified.
-
-Read both sides of the seam before wiring them: the contracts each exposes and expects, including types, schemas, error paths and ordering. Wire the named boundary using the components as they are. When a component has a defect or needs a change to fit, put it in the report; the component's own Assignment owns that fix. Prove the integration with a check that crosses the seam end to end, since checks on each side alone cannot show the seam works.

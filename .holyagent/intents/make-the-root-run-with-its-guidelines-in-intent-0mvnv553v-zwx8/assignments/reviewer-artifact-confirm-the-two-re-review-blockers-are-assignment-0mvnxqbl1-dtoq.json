@@ -1,0 +1,46 @@
+{
+  "id": "assignment-0mvnxqbl1-dtoq",
+  "intentId": "intent-0mvnv553v-zwx8",
+  "intentRevision": 10,
+  "roleTask": "Reviewer.artifact",
+  "slug": "confirm-the-two-re-review-blockers-are",
+  "objective": "Confirm the two re-review blockers are closed in the PR3 repair 5a8129c..f89995c and that the repair adds no new conflict.",
+  "state": "Succeeded",
+  "scope": [
+    "Diff file /home/davidbasile/dev/holyagent-reviews/pr3-repair2.diff; read files in the worktree /home/davidbasile/dev/holyagent-0.1.2 for context.",
+    "Previous blockers: (1) acknowledging every user message conflicted with writing only for decisions, blockers and the final report (requirements.md R-ACK/R-TASKLIST, root/user-messages.md, root/task-list.md, claude-5.5/session-reminder.md, docs/usage.md:65); (2) the stop-on-blocking-hook rule forbade the route a deny names, such as the vcs-redirect hook naming holyagent vcs commit/push (identity.md:5, AGENTS.md, session-reminder.md, R-NOBYPASS). Also judge the core wording trims the writer made to fit ROOT_CORE at 4000 characters (dispatch.md, delegating.md, identity.md) for lost meaning."
+  ],
+  "constraints": [
+    "Read-only: do not edit, commit, or touch .git or .holyagent.",
+    "Judge only this diff."
+  ],
+  "criteria": [
+    {
+      "text": "Each previous blocker is confirmed closed or reported still open, with file and line.",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Every new blocking finding cites file and line with the rule it breaks, or the review states there is none.",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvnxhcxk-ddta"
+  ],
+  "specialist": {
+    "agentId": "workflow:wf_e20f21b8-26a/assignment-0mvnxqbl1-dtoq",
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-25T14:40:39.974Z",
+    "finishedAt": "2026-10-25T14:45:31.548Z"
+  },
+  "result": "result: Blocker 1 is closed at every location the Assignment lists. Blocker 2 is closed at its four listed locations but still open in the user-busy skill and docs/hooks.md, and the repair adds one new conflict in AGENTS.md:18. Not ready to accept.\nchanged: none (read-only review of /home/davidbasile/dev/holyagent-reviews/pr3-repair2.diff against the worktree /home/davidbasile/dev/holyagent-0.1.2, which already holds the repaired text).\nchecks: no shell in this session, so none of mise run verify, mise run build, bun test or claude plugin validate was run. rg count of \".\" over root/{identity,delegating,dispatch,task-list}.md gave 3978 matched characters, so ROOT_CORE is 3984 with the three joins, within the 4000 limit at sessioncontext.test.ts:34. dist text was compared to source by reading only, for the changed sections.\nblockers:\n1. Blocker 2 still open, skill: packages/runtime/src/instructions/claude-5.5/skills/user-busy/SKILL.md:12 says \"A permission denial, or an action the user's rules refuse, is never retried another way.\" That forbids the route that root/identity.md:5 now requires following. The same line also says \"A blocker that is not a denial is worked around where a safe path exists\", which breaks R-NOBYPASS (requirements.md:13) for a blocking hook that names no route. The dist copy is packages/integrations/claude/dist/skills/user-busy/SKILL.md:13. Fix: restate line 12 as \"follow a denial or hook that names a holyagent route; stop on one that names none\", then rebuild dist.\n2. Blocker 2 still open, docs: docs/hooks.md:17 describes session-reminder.md as \"a block of six rules\" including \"never work around a blocking hook or a denial\". The reminder has five bullets (session-reminder.md:3-7; sessioncontext.test.ts:178-190), and its denial bullet now reads \"Follow a denial or hook that names a holyagent route\". Fix the description to match.\n3. New conflict from the repair: AGENTS.md:18 says \"When a denial or a blocking hook names a holyagent route, follow it\" with no limit to the root. The shared specialist conduct leaves every `holyagent vcs` write to the root (specialist/state-changes.md:3), and root/version-control.md:3 makes VCS writes the root's alone. A specialist that hits the vcs-redirect deny and follows AGENTS.md:18 would run `holyagent vcs commit` or `push`. Fix: scope the line to the root, for example \"the root follows it; a specialist stops and reports, since VCS writes are the root's\".\nquestions: none.\nnotes:\n- docs/decisions.md:41 and :49, and docs/pi/claude-parity.md:34, summarize the root as writing \"only for a decision, a blocker and the final report\" with no acknowledgment exception. They are outside the listed locations and predate the repair; fix them in the same pass if convenient.\n- Trim review, meaning only: identity.md:5 drops the \"outward actions\" label and the \"a symlink\" example (requirements R-NOBYPASS still says \"link\"). delegating.md:3 drops \"`vcs` and such reads\" (the \"holyagent CLI\" wording still covers vcs). dispatch.md:4 no longer names SendMessage as the launch for a continued agent (it survives only in the record clause). task-list.md:3 changes \"under the governing rules\" to \"under the rules\". No rule is lost.\n- \"update_plan in the desktop app\" (task-list.md:3, session-reminder.md:3, and the task-list section of dist/agents/holyagent.md) cannot be confirmed from the repository. Confirm the name or drop it.\n- The \"## Gates\" section was removed from AGENTS.md. CLAUDE.md's \"Done\" section keeps the mise and canary Bun rule, so nothing is lost.\n- instruction-guidelines.md:8-9 changes the source tags to \"applied by inference\". The basis for that label is not in the diff, and I did not check it.\n- I checked the AGENTS.md:18 claim: hook.ts:132-136 REDIRECTS names `holyagent vcs commit` and `holyagent vcs push`, and docs/hooks.md:8-9 agrees.\nevidence:\nEach previous blocker is confirmed closed or reported still open, with file and line.: Blocker 1 closed at requirements.md:9-10, root/user-messages.md:3, root/task-list.md:3, session-reminder.md:4 and docs/usage.md:65 (read). Blocker 2 closed at root/identity.md:5, AGENTS.md:18, session-reminder.md:7 and requirements.md:13. Still open at skills/user-busy/SKILL.md:12 (dist line 13) and docs/hooks.md:17. Reviewed from the diff file and the worktree; no command was run.\nEvery new blocking finding cites file and line with the rule it breaks, or the review states there is none.: One new blocking finding: AGENTS.md:18 against specialist/state-changes.md:3 and root/version-control.md:3 (VCS writes are root-only). Blockers 1 and 2 above are the still-open ones.\nsources: /home/davidbasile/dev/holyagent-reviews/pr3-repair2.diff; /home/davidbasile/dev/holyagent-0.1.2/AGENTS.md; packages/runtime/src/instructions/requirements.md; packages/runtime/src/instructions/claude-5.5/root/{identity,delegating,dispatch,task-list,user-messages,version-control}.md; packages/runtime/src/instructions/claude-5.5/session-reminder.md; packages/runtime/src/instructions/claude-5.5/specialist/state-changes.md; packages/runtime/src/instructions/claude-5.5/skills/user-busy/SKILL.md; packages/runtime/src/cli/hook.ts:132-136; packages/integrations/claude/src/agents.ts:114-131; packages/integrations/claude/tests/plugin.test.ts:243-268; packages/runtime/tests/sessioncontext.test.ts:30-35 and 178-190; docs/usage.md:65; docs/hooks.md:17; docs/decisions.md:41,49; docs/pi/claude-parity.md:34; rg count output /home/davidbasile/.claude/projects/-home-davidbasile-dev-holyagent/e7f538f4-40ba-40c9-9aff-8bf7e8fc4874/tool-results/toolu_01B2ieJ4tr88GMT481JShpPf.txt (3978 lines).",
+  "createdAt": "2026-10-25T14:40:39.974Z"
+}

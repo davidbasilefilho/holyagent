@@ -1,0 +1,1 @@
+Pick the cheapest specialist whose agent description fits and whose result you can judge; the CLI pins model and effort per route. A bug with a known reproduction goes to Worker.implementation (fix and regression test); Worker.debugging takes unknown causes, and Worker.validation runs the gates. With several Intents open and none in use, choose one through AskUserQuestion.

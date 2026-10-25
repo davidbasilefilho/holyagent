@@ -1,0 +1,55 @@
+{
+  "id": "assignment-0mvnwuf1q-g9h7",
+  "intentId": "intent-0mvnv553v-zwx8",
+  "intentRevision": 9,
+  "roleTask": "Worker.implementation",
+  "slug": "add-a-project-agents-md-that-records-the",
+  "objective": "Add a project AGENTS.md that records the repository-specific pitfalls agents hit here, so they are not repeated, and have Claude Code load it.",
+  "state": "Succeeded",
+  "scope": [
+    "Work only in the git worktree /home/davidbasile/dev/holyagent-0.1.2; paths are relative to it.",
+    "Create AGENTS.md at the repository root (there is none; the project rules live in .claude/CLAUDE.md, which the maintainer asked to extend for this). Add one import line `@../AGENTS.md` (or the correct relative import, verify Claude Code's CLAUDE.md import syntax in its docs) at the end of .claude/CLAUDE.md so sessions load it; change nothing else in CLAUDE.md.",
+    "Content, repository-specific only (holyagent's general behavior belongs in the holyagent instructions, not here), each a short imperative with the reason: (1) Sessions here load the holyagent plugin from this checkout through the directory marketplace in .claude/settings.json, so checking out a branch that moves or deletes the plugin folder breaks the running session's hooks (every Bash call blocks) and its workflows: keep the main checkout on main and work on other branches in git worktrees (for example ../holyagent-<branch-slug>). (2) The Intent state in .holyagent/ is versioned; a branch that tracks older copies blocks a checkout while newer untracked copies exist, so with worktrees copy the newer state into the worktree before `holyagent vcs commit` there. (3) `holyagent vcs pr --body-file` takes only an unignored file inside the project, and vcs refuses process words in commit and PR text (for example 'Claude Code'): rephrase, or list a domain word in vcs.allowWords of .holyagent/config.json. (4) Evidence lines in a specialist report must repeat the criterion text exactly, trailing period included, or `assignment close --accept` rejects them. (5) Run gates through mise (`mise run verify`, `mise run build` after plugin source changes) because they check for the canary Bun first. (6) Never work around a blocking hook or a denied command through another tool; stop and report it. Keep it under about 60 lines, US English, follow the repository's Markdown style and formatter."
+  ],
+  "constraints": [
+    "Do not commit, push, branch, check out, or touch .git or .holyagent. Do not touch /home/davidbasile/dev/holyagent or /home/davidbasile/dev/holyagent-pr1.",
+    "Only AGENTS.md and the single import line in .claude/CLAUDE.md change."
+  ],
+  "criteria": [
+    {
+      "text": "AGENTS.md holds the six pitfalls, each with its reason, and nothing about holyagent's general behavior.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": ".claude/CLAUDE.md gains only an import line that Claude Code's documented import syntax resolves to AGENTS.md.",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "`mise run verify` passes in the worktree (format check included).",
+      "blocking": true,
+      "dimension": "style"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "AGENTS.md",
+    ".claude/CLAUDE.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "workflow:wf_06c00ff7-d06/assignment-0mvnwuf1q-g9h7",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-25T14:16:00.959Z",
+    "finishedAt": "2026-10-25T14:23:35.463Z"
+  },
+  "result": "result: Created AGENTS.md (22 lines) with the six pitfalls and their reasons. Appended `@../AGENTS.md` to .claude/CLAUDE.md. `mise run verify` passes.\nchanged: /home/davidbasile/dev/holyagent-0.1.2/AGENTS.md, /home/davidbasile/dev/holyagent-0.1.2/.claude/CLAUDE.md\nchecks: `mise run verify` -> exit 0 (type-check 104 files clean, lint 105 files clean, fmt:check \"All 210 files are formatted\", tests 552 pass, 1 skip, 0 fail). The first run failed only because the worktree had no node_modules. I ran `bun install --frozen-lockfile` (lockfile install, no changes to tracked files) and reran.\nblockers: none\nquestions: none\nnotes:\n- I did not check the import syntax against Claude Code's docs, which I couldn't reach. `@../AGENTS.md` follows the documented behavior as I know it: `@path` imports resolve relative to the file containing the import. Confirm that a new session actually loads AGENTS.md.\n- The user's request says \"altere o AGENTS.md\", but none existed, so I created it as the Assignment directed.\n- No other writer's files showed up in `git status` during my run, so `verify` was not affected by in-progress work.\n- Pitfall 3 states that `--body-file` rejects ignored files and files outside the project, from the Assignment text. I did not check this against the CLI source.\nevidence:\nAGENTS.md holds the six pitfalls, each with its reason, and nothing about holyagent's general behavior.: /home/davidbasile/dev/holyagent-0.1.2/AGENTS.md covers worktrees and the plugin checkout, versioned `.holyagent/` state, `--body-file` plus process words and `vcs.allowWords`, exact evidence criterion text, mise gates and canary Bun, and not working around blocks. Diff file below.\n.claude/CLAUDE.md gains only an import line that Claude Code's documented import syntax resolves to AGENTS.md.: the diff adds a blank line and `@../AGENTS.md` at the end of .claude/CLAUDE.md, which is `.claude/../AGENTS.md`, the repository-root AGENTS.md.\n`mise run verify` passes in the worktree (format check included).: exit 0, with fmt:check \"All 210 files are formatted\" and 552 tests passing.\nchanged-paths: /home/davidbasile/dev/holyagent-0.1.2/AGENTS.md (new), /home/davidbasile/dev/holyagent-0.1.2/.claude/CLAUDE.md (modified)\nchecks-run: `mise run verify` -> exit 0; `bun install --frozen-lockfile` -> exit 0, 128 packages.\ndiff-file: /tmp/claude-1000/-home-davidbasile-dev-holyagent/e7f538f4-40ba-40c9-9aff-8bf7e8fc4874/scratchpad/agents-md.diff\n",
+  "createdAt": "2026-10-25T14:15:51.470Z"
+}

@@ -1,5 +1,0 @@
-Review an artifact (a document, page, configuration, generated file, prompt or other deliverable) for correctness and completeness against its acceptance criteria, and report evidence-backed gaps.
-
-Read the whole artifact on a first review. On a re-review after a repair, read the previous findings, the repair's diff file and the sections it touches, and raise anything outside them only if it is a blocker, so the loop closes. Give each acceptance criterion a verdict (met, gap or unverified) with the location that decides it, and mark it met only once you have read the evidence. Check what the criteria imply: internal consistency, references, links and paths that resolve, names used the same way throughout, no placeholders or leftovers. A gap needs the criterion, the location and what is missing or wrong.
-
-For instruction text, report redundant, obsolete (naming a removed command, file or behavior), conflicting and over-long instructions as findings, measured against the expected size the Assignment names and the writing bar below.
