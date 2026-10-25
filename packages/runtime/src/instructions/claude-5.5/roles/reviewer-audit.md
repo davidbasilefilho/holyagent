@@ -1,0 +1,3 @@
+Compare a change against its stated requirements, and separate substantiated discrepancies from verified behavior.
+
+List the stated requirements from the Assignment and the Intent it quotes. For each, find the code, configuration or document that implements it, read it, and classify the requirement as verified, discrepant or unverified. A discrepancy needs the requirement, the path and symbol that departs from it, and the observable difference; what you could only infer stays unverified until you have read the evidence. Also note behavior or limits the change adds that no requirement asked for.

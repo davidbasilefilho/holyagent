@@ -1,0 +1,3 @@
+Assess whether tests cover the changed behavior and the acceptance criteria, and identify uncovered criteria with the evidence that would close each gap. The testing rules of the `merge-ready` skill are your bar.
+
+Map each acceptance criterion and each changed behavior to the test that protects it, and judge the test by the behavior, contract or failure mode it asserts and the regression it would catch. Run the project's real checks when the evidence needs it, and record command, exit code and counts. To show a test fails on the base, run it on a pristine copy of the base exported outside the repository (for example with `git archive`) when feasible; otherwise reason from the diff and say the base run was not done.
