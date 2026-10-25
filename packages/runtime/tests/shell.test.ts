@@ -232,6 +232,11 @@ describe("gitWrites", () => {
     '"${CLAUDE_PLUGIN_ROOT}x/scripts/holyagent" vcs commit -m x',
     '"${CLAUDE_PLUGIN_ROOT}/scripts/cat" # git commit',
     '"${CLAUDE_PLUGIN_ROOTS}/scripts/holyagent" vcs commit -m x',
+    // A path to a program named holyagent is not the wrapper unless it is the hook's own.
+    "/home/u/plugin/scripts/holyagent vcs commit -m x -- a.ts",
+    "./scripts/holyagent vcs commit -m x -- a.ts",
+    "scripts/holyagent vcs commit -m x -- a.ts",
+    "/opt/plugin/scripts/holyagent vcs commit -m x -- a.ts",
     "HOME=/tmp/x git status # git commit",
     // A git command without a known subcommand, or one that starts a program.
     "git # git commit",
@@ -308,7 +313,6 @@ describe("gitWrites", () => {
     "holyagent vcs commit -m x -- a.ts",
     '"${CLAUDE_PLUGIN_ROOT}/scripts/holyagent" vcs commit -m "fix: git commit hook" -- a.ts',
     "$CLAUDE_PLUGIN_ROOT/scripts/holyagent vcs pr --body-file pr.md",
-    "/home/u/plugin/scripts/holyagent vcs commit -m x -- a.ts",
     "for b in a b; do git log --oneline -1 main; done",
     "for f in a.ts b.ts; do git log --oneline -1 -- $f; done",
     "for w in git commit push; do echo $w; done",
@@ -378,5 +382,34 @@ describe("gitWrites", () => {
       ).join(next() % 2 === 0 ? " " : "")
       expect(() => gitWrites(line)).not.toThrow()
     }
+  })
+})
+
+describe("gitWrites with the hook's own wrapper", () => {
+  const own = (path: string) => path === "/opt/plugin/scripts/holyagent"
+
+  test.each([
+    "/opt/plugin/scripts/holyagent vcs commit -m 'fix: git commit hook' -- a.ts",
+    "cd a && /opt/plugin/scripts/holyagent vcs pr --body-file pr.md && git push",
+  ])("passes %j", (line) => {
+    expect(gitWrites(line, own)).toEqual([])
+  })
+
+  test.each([
+    "/home/u/plugin/scripts/holyagent vcs commit -m x -- a.ts",
+    "/opt/plugin/scripts/holyagent2 vcs commit -m x",
+    "/opt/plugin/scripts/cat # git commit",
+    "/opt/other/scripts/holyagent vcs commit -m x -- a.ts",
+    "./scripts/holyagent vcs commit -m x -- a.ts",
+    "$HOME/scripts/holyagent vcs commit -m x -- a.ts",
+    "/opt/plugin/*/holyagent vcs commit -m x -- a.ts",
+  ])("keeps %j unclear", (line) => {
+    expect(gitWrites(line, own)).toEqual(["unclear"])
+  })
+
+  test("a git write behind the own wrapper path is still read", () => {
+    expect(gitWrites("/opt/plugin/scripts/holyagent status && git commit -m x", own)).toEqual([
+      "commit",
+    ])
   })
 })

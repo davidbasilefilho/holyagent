@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mvob5bk9-uu2d",
+  "intentId": "intent-0mvnv553v-zwx8",
+  "intentRevision": 12,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-the-plugin-install-and-update",
+  "objective": "Review the plugin install and update docs in ebb6e7b (docs/usage.md, docs/development.md) for correctness and completeness against the established facts.",
+  "state": "Running",
+  "scope": [
+    "Diff: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/desk-review.diff; full files in /home/davidbasile/dev/holyagent-docs-desktop-plugin-install/docs. Experiment results: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/plugin-exp/results/results.txt.",
+    "Facts the docs must match: directory-marketplace plugins load from the source folder at session start (no update command; next session or /reload-plugins); cache and installed_plugins.json go stale harmlessly; plugin update rewrites them only on a version change; the desktop app lists its own account-store copy (installedBy user) and never shows the WSL project install; remove that copy in the desktop Settings > Plugins."
+  ],
+  "constraints": [
+    "Read-only."
+  ],
+  "criteria": [
+    {
+      "text": "Every blocking finding names file, line and the error or gap; non-blocking findings are marked as such.",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvob31z0-4oip"
+  ],
+  "specialist": {
+    "agentId": "workflow:wf_af2674a5-0b7/assignment-0mvob5bk9-uu2d",
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-25T20:56:14.794Z"
+  },
+  "createdAt": "2026-10-25T20:56:14.794Z"
+}

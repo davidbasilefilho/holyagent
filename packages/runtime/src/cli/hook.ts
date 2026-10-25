@@ -1,3 +1,4 @@
+import { existsSync, realpathSync } from "node:fs"
 import { stat } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
@@ -18,7 +19,7 @@ import { resolveIntent } from "./intent.ts"
 import { resumeOf, statusOf } from "./overview.ts"
 import { dispatchedAssignment } from "./report.ts"
 import { type IntentRequirements, sessionContext } from "./sessioncontext.ts"
-import { type GitWrite, gitWrites } from "./shell.ts"
+import { type GitWrite, gitWrites, type OwnWrapper } from "./shell.ts"
 import { type Call, type Command, Verbatim } from "./types.ts"
 import { workflowRefusal } from "./workflow-check.ts"
 
@@ -171,6 +172,21 @@ const commentPrefix = Effect.gen(function* () {
   return configured === undefined || configured === "" || configured === "auto" ? "#" : configured
 })
 
+/**
+ * Tells whether a path is the wrapper this hook runs from: `scripts/holyagent` of the plugin folder
+ * the host names in `CLAUDE_PLUGIN_ROOT`, else the one next to the running bundle. The paths are
+ * compared after links resolve, so only the wrapper itself passes and a file of the same name
+ * elsewhere does not. A path that does not exist, or whose links cannot resolve, is not it.
+ */
+const ownWrapperOf = (pluginRoot: string | undefined): OwnWrapper => {
+  const wrapper =
+    pluginRoot === undefined || pluginRoot === ""
+      ? join(dirname(Bun.main), "holyagent")
+      : join(pluginRoot, "scripts", "holyagent")
+  return (path) =>
+    existsSync(path) && existsSync(wrapper) && realpathSync(path) === realpathSync(wrapper)
+}
+
 /** The Workflow inputs an inline run may carry; a script path, name or resume would run other code. */
 const INLINE_INPUTS: ReadonlySet<string> = new Set(["script", "args"])
 
@@ -245,7 +261,7 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
   hook(
     "vcs-redirect",
     "PreToolUse for Bash: for a command that mentions git and then commit or push, deny git commit (and point to holyagent vcs commit), a force git push, and whatever runs a program outside the allowlist or cannot be read with certainty; say nothing otherwise, a plain git push included",
-    (payload) => {
+    (payload, call) => {
       const command = payload.tool_name === "Bash" ? payload.tool_input?.command : undefined
       // Whatever the command looks like, this hook decides and never fails, since its onFailure
       // block would then stop a call that has no git write in it. A command it cannot read at all
@@ -253,7 +269,9 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
       // the text has git and then commit or push in it.
       return Effect.try({
         try: () =>
-          typeof command === "string" && MENTIONS_GIT_WRITE.test(command) ? gitWrites(command) : [],
+          typeof command === "string" && MENTIONS_GIT_WRITE.test(command)
+            ? gitWrites(command, ownWrapperOf(call.env.CLAUDE_PLUGIN_ROOT))
+            : [],
         catch: (cause) => cause,
       }).pipe(
         Effect.orElseSucceed((): ReadonlyArray<GitWrite> => ["unclear"]),

@@ -498,8 +498,20 @@ const READERS = new Set(["echo", "printf", "grep", "rg"])
 const PLAIN_PROGRAM = /^(?:[\w./+\uE001-]+|\[)$/
 
 const isGit = (word: string): boolean => /(?:^|\/)git$/i.test(word)
-/** The `holyagent` wrapper: by name, by any path, or as the root writes it from the plugin folder. */
-const isHolyagent = (word: string): boolean => /(?:^|\/)holyagent$/.test(word)
+/**
+ * Tells whether a literal absolute path is the wrapper the hook itself runs from. The scan reads
+ * text only, so the caller supplies the file system check.
+ */
+export type OwnWrapper = (path: string) => boolean
+
+/**
+ * The `holyagent` wrapper: by name, as the root writes it from the plugin folder, or by the
+ * absolute path of the hook's own wrapper. Any other path is a program the scan does not know.
+ */
+const isHolyagent = (word: string, ownWrapper: OwnWrapper): boolean =>
+  word === "holyagent" ||
+  word === `${PLUGIN_ROOT}/scripts/holyagent` ||
+  (word.startsWith("/") && ownWrapper(word))
 
 /** `gh` commands that run shell text or other programs: aliases (`!cmd`), extensions, codespaces. */
 const GH_RUNNERS: ReadonlySet<string> = new Set(["alias", "extension", "ext", "codespace", "cs"])
@@ -744,11 +756,14 @@ const gitVerdict = (words: ReadonlyArray<string>, start: number): ReadonlyArray<
  * What one simple command runs. Only a command made of a plain, known program with words the scan
  * reads exactly passes: assignments and grammar words before it are skipped (an assignment to a
  * variable that changes how programs run is not), `env` only with assignments, and the program must
- * be in {@link PROGRAMS} (a path only for `git` and `holyagent`). A `git` word among the arguments
- * of a program that does not merely print or search text is the program run by another, so it is
- * not read. Git is judged by {@link gitVerdict}.
+ * be in {@link PROGRAMS} (a path only for `git` and the hook's own `holyagent` wrapper). A `git`
+ * word among the arguments of a program that does not merely print or search text is the program
+ * run by another, so it is not read. Git is judged by {@link gitVerdict}.
  */
-const writesOf = (words: ReadonlyArray<string>): ReadonlyArray<GitWrite> => {
+const writesOf = (
+  words: ReadonlyArray<string>,
+  ownWrapper: OwnWrapper,
+): ReadonlyArray<GitWrite> => {
   let start = 0
   while (start < words.length) {
     const word = words[start] ?? ""
@@ -775,7 +790,7 @@ const writesOf = (words: ReadonlyArray<string>): ReadonlyArray<GitWrite> => {
   // The plugin folder stands for the wrapper only: `"${CLAUDE_PLUGIN_ROOT}/scripts/holyagent"`.
   if (first.includes(PLUGIN_ROOT) && first !== `${PLUGIN_ROOT}/scripts/holyagent`)
     return ["unclear"]
-  const program = isGit(first) ? "git" : isHolyagent(first) ? "holyagent" : first
+  const program = isGit(first) ? "git" : isHolyagent(first, ownWrapper) ? "holyagent" : first
   if (!PROGRAMS.has(program) || (first !== program && !first.endsWith(`/${program}`)))
     return ["unclear"]
   const args = words.slice(start + 1)
@@ -784,10 +799,10 @@ const writesOf = (words: ReadonlyArray<string>): ReadonlyArray<GitWrite> => {
   return program === "git" ? gitVerdict(words, start) : []
 }
 
-const writesIn = (line: string): ReadonlyArray<GitWrite> => {
+const writesIn = (line: string, ownWrapper: OwnWrapper): ReadonlyArray<GitWrite> => {
   const scan = scanLine(line)
   return [
-    ...scan.commands.flatMap(writesOf),
+    ...scan.commands.flatMap((words) => writesOf(words, ownWrapper)),
     ...(scan.overflow || scan.unclear ? (["unclear"] as const) : []),
   ]
 }
@@ -797,6 +812,11 @@ const writesIn = (line: string): ReadonlyArray<GitWrite> => {
  * command of the line (found behind `cd a &&`, a pipe, a subshell, a substitution, a loop or an
  * assignment) must be read with certainty and run a known program, or the result holds `unclear`:
  * `commit` for `git commit`, `force-push` for a `git push` that force-updates or deletes remote
- * refs. A line with no such command is empty. In order of appearance, each once.
+ * refs. A line with no such command is empty. In order of appearance, each once. `ownWrapper`
+ * accepts the absolute path of the hook's own `holyagent` wrapper as a program word; with the
+ * default, no path does.
  */
-export const gitWrites = (line: string): ReadonlyArray<GitWrite> => [...new Set(writesIn(line))]
+export const gitWrites = (
+  line: string,
+  ownWrapper: OwnWrapper = () => false,
+): ReadonlyArray<GitWrite> => [...new Set(writesIn(line, ownWrapper))]

@@ -9848,6 +9848,7 @@ var ASSIGNMENT_COMMANDS = [
   }
 ];
 
+import { existsSync, realpathSync } from "fs";
 import { stat } from "fs/promises";
 import { dirname as dirname2, join as join6 } from "path";
 
@@ -10531,7 +10532,7 @@ var PROGRAMS = new Set([
 var READERS = new Set(["echo", "printf", "grep", "rg"]);
 var PLAIN_PROGRAM = /^(?:[\w./+\uE001-]+|\[)$/;
 var isGit = (word) => /(?:^|\/)git$/i.test(word);
-var isHolyagent = (word) => /(?:^|\/)holyagent$/.test(word);
+var isHolyagent = (word, ownWrapper) => word === "holyagent" || word === `${PLUGIN_ROOT}/scripts/holyagent` || word.startsWith("/") && ownWrapper(word);
 var GH_RUNNERS = new Set(["alias", "extension", "ext", "codespace", "cs"]);
 var GUARDS = {
   find: (args) => args.some((arg) => isDynamic(arg) || /^-(?:exec|execdir|ok|okdir|delete)$/.test(arg)),
@@ -10701,7 +10702,7 @@ var gitVerdict = (words, start) => {
     return ["unclear"];
   return subcommand === "push" ? pushVerdict(args) : [];
 };
-var writesOf = (words) => {
+var writesOf = (words, ownWrapper) => {
   let start = 0;
   while (start < words.length) {
     const word = words[start] ?? "";
@@ -10729,7 +10730,7 @@ var writesOf = (words) => {
     return ["unclear"];
   if (first.includes(PLUGIN_ROOT) && first !== `${PLUGIN_ROOT}/scripts/holyagent`)
     return ["unclear"];
-  const program = isGit(first) ? "git" : isHolyagent(first) ? "holyagent" : first;
+  const program = isGit(first) ? "git" : isHolyagent(first, ownWrapper) ? "holyagent" : first;
   if (!PROGRAMS.has(program) || first !== program && !first.endsWith(`/${program}`))
     return ["unclear"];
   const args = words.slice(start + 1);
@@ -10739,14 +10740,14 @@ var writesOf = (words) => {
     return ["unclear"];
   return program === "git" ? gitVerdict(words, start) : [];
 };
-var writesIn = (line) => {
+var writesIn = (line, ownWrapper) => {
   const scan = scanLine(line);
   return [
-    ...scan.commands.flatMap(writesOf),
+    ...scan.commands.flatMap((words) => writesOf(words, ownWrapper)),
     ...scan.overflow || scan.unclear ? ["unclear"] : []
   ];
 };
-var gitWrites = (line) => [...new Set(writesIn(line))];
+var gitWrites = (line, ownWrapper = () => false) => [...new Set(writesIn(line, ownWrapper))];
 
 var astralIdentifierCodes = [509, 0, 227, 0, 150, 4, 294, 9, 1368, 2, 2, 1, 6, 3, 41, 2, 5, 0, 166, 1, 574, 3, 9, 9, 7, 9, 32, 4, 318, 1, 31, 4, 33, 15, 71, 10, 50, 3, 123, 2, 54, 14, 32, 10, 3, 1, 11, 3, 46, 10, 8, 0, 46, 9, 7, 2, 37, 13, 2, 9, 6, 1, 45, 0, 13, 2, 49, 13, 9, 3, 2, 11, 83, 11, 7, 0, 3, 0, 158, 11, 6, 9, 7, 3, 56, 1, 2, 6, 3, 1, 3, 2, 10, 0, 11, 1, 3, 6, 4, 4, 68, 8, 2, 0, 3, 0, 2, 3, 2, 4, 2, 0, 15, 1, 83, 17, 10, 9, 5, 0, 82, 19, 13, 9, 214, 6, 3, 8, 28, 1, 83, 16, 16, 9, 82, 12, 9, 9, 7, 19, 58, 14, 5, 9, 243, 14, 166, 9, 71, 5, 2, 1, 3, 3, 2, 0, 2, 1, 13, 9, 120, 6, 3, 6, 4, 0, 29, 9, 41, 6, 2, 3, 9, 0, 10, 10, 47, 15, 199, 7, 137, 9, 54, 7, 2, 7, 17, 9, 57, 21, 2, 13, 123, 5, 4, 0, 2, 1, 2, 6, 2, 0, 9, 9, 49, 4, 2, 1, 2, 4, 9, 9, 55, 9, 7, 0, 259, 3, 10, 1, 2, 0, 49, 6, 4, 4, 14, 10, 5350, 0, 7, 14, 11465, 27, 2343, 9, 87, 9, 39, 4, 60, 6, 26, 9, 535, 9, 470, 0, 2, 54, 8, 3, 82, 0, 12, 1, 19628, 1, 4178, 9, 519, 45, 3, 22, 481, 1, 61, 4, 4, 5, 9, 7, 3, 6, 31, 3, 149, 2, 12, 2, 9, 1, 3, 0, 33, 1, 1357, 49, 513, 54, 5, 49, 9, 0, 15, 0, 23, 4, 2, 14, 1361, 6, 2, 16, 3, 6, 2, 1, 2, 4, 101, 0, 161, 6, 10, 9, 357, 0, 62, 13, 499, 13, 245, 1, 2, 9, 233, 0, 3, 0, 8, 1, 6, 0, 475, 6, 110, 6, 6, 9, 4759, 9, 787719, 239];
 var astralIdentifierStartCodes = [0, 11, 2, 25, 2, 18, 2, 1, 2, 14, 3, 13, 35, 122, 70, 52, 268, 28, 4, 48, 48, 31, 14, 29, 6, 37, 11, 29, 3, 35, 5, 7, 2, 4, 43, 157, 19, 35, 5, 35, 5, 39, 9, 51, 13, 10, 2, 14, 2, 6, 2, 1, 2, 10, 2, 14, 2, 6, 2, 1, 4, 51, 13, 310, 10, 21, 11, 7, 25, 5, 2, 41, 2, 13, 65, 5, 3, 0, 2, 43, 2, 1, 4, 0, 3, 22, 11, 22, 10, 30, 66, 18, 2, 1, 11, 21, 11, 25, 7, 25, 39, 55, 7, 1, 65, 0, 16, 3, 2, 2, 2, 28, 43, 28, 4, 28, 36, 7, 2, 27, 28, 53, 11, 21, 11, 18, 14, 17, 111, 72, 56, 50, 14, 50, 14, 35, 39, 27, 10, 22, 251, 41, 7, 1, 17, 5, 18, 21, 18, 28, 11, 0, 9, 21, 43, 17, 47, 20, 28, 22, 13, 52, 58, 1, 3, 0, 14, 44, 33, 24, 27, 35, 30, 0, 3, 0, 9, 34, 4, 0, 13, 47, 15, 3, 22, 0, 2, 0, 36, 17, 2, 24, 20, 1, 64, 6, 2, 0, 2, 3, 2, 14, 2, 9, 8, 46, 39, 7, 3, 1, 3, 21, 2, 6, 2, 1, 2, 4, 4, 0, 19, 0, 13, 4, 31, 9, 2, 0, 3, 0, 2, 37, 2, 0, 26, 0, 2, 0, 45, 52, 19, 3, 21, 2, 31, 47, 21, 1, 2, 0, 185, 46, 42, 3, 37, 47, 21, 0, 60, 42, 14, 0, 72, 26, 38, 6, 186, 43, 117, 63, 32, 7, 3, 0, 3, 7, 2, 1, 2, 23, 16, 0, 2, 0, 95, 7, 3, 38, 17, 0, 2, 0, 29, 0, 11, 39, 8, 0, 22, 0, 12, 45, 20, 0, 19, 72, 18, 0, 182, 32, 32, 8, 2, 36, 18, 0, 50, 29, 113, 6, 2, 1, 2, 37, 22, 0, 26, 5, 2, 1, 2, 31, 15, 0, 24, 43, 22, 0, 239, 18, 16, 0, 2, 12, 2, 33, 125, 0, 80, 921, 103, 111, 6, 206, 13, 310, 2314, 96, 16, 1071, 18, 5, 26, 3994, 6, 582, 6842, 29, 1763, 568, 8, 30, 18, 78, 18, 29, 19, 47, 17, 3, 32, 20, 6, 18, 433, 44, 212, 63, 33, 24, 3, 24, 45, 74, 6, 0, 67, 12, 65, 1, 2, 0, 15, 4, 10, 7386, 37, 33, 96, 114, 14, 913, 15, 50, 7710, 3, 2, 6, 2, 1, 2, 296, 10, 0, 30, 2, 3, 0, 15, 4, 8, 395, 2309, 106, 6, 12, 4, 8, 8, 9, 5991, 84, 2, 70, 2, 1, 3, 0, 3, 1, 3, 3, 2, 11, 2, 0, 2, 6, 2, 64, 2, 3, 3, 7, 2, 6, 2, 27, 2, 3, 2, 4, 2, 0, 4, 6, 2, 340, 2, 24, 2, 24, 2, 30, 2, 24, 2, 30, 2, 24, 2, 30, 2, 24, 2, 30, 2, 24, 2, 7, 1845, 129, 15, 6, 55, 50, 49, 61, 147, 44, 11, 6, 17, 0, 322, 29, 19, 43, 485, 27, 229, 29, 3, 0, 208, 30, 2, 2, 2, 1, 2, 6, 3, 4, 10, 1, 225, 6, 2, 3, 2, 1, 2, 14, 2, 196, 60, 67, 8, 0, 1205, 3, 2, 26, 2, 1, 2, 0, 3, 0, 2, 9, 2, 3, 2, 0, 2, 0, 7, 0, 5, 0, 2, 0, 2, 0, 2, 2, 2, 1, 2, 0, 3, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 1, 2, 0, 3, 3, 2, 6, 2, 3, 2, 3, 2, 0, 2, 9, 2, 16, 6, 2, 2, 4, 2, 16, 4421, 42719, 33, 4382, 2, 5773, 3, 7472, 16, 621, 2467, 541, 1507, 4938, 6, 8489, 39815, 11327];
@@ -16825,6 +16826,10 @@ var commentPrefix = gen2(function* () {
   const configured = (yield* fileSetting("core.commentString")) ?? (yield* fileSetting("core.commentChar"));
   return configured === undefined || configured === "" || configured === "auto" ? "#" : configured;
 });
+var ownWrapperOf = (pluginRoot) => {
+  const wrapper = pluginRoot === undefined || pluginRoot === "" ? join6(dirname2(Bun.main), "holyagent") : join6(pluginRoot, "scripts", "holyagent");
+  return (path) => existsSync(path) && existsSync(wrapper) && realpathSync(path) === realpathSync(wrapper);
+};
 var INLINE_INPUTS = new Set(["script", "args"]);
 var HOOK_COMMANDS = [
   hook("session-start", "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules when the root agent is not the main thread), always ending with a short block of the root rules most often missed; nothing without a .holyagent folder", (payload, call) => gen2(function* () {
@@ -16861,10 +16866,10 @@ var HOOK_COMMANDS = [
       return succeed6(postToolUse(`holyagent: could not record the launch of ${id} (${tag}). ${next}`));
     }));
   }, true),
-  hook("vcs-redirect", "PreToolUse for Bash: for a command that mentions git and then commit or push, deny git commit (and point to holyagent vcs commit), a force git push, and whatever runs a program outside the allowlist or cannot be read with certainty; say nothing otherwise, a plain git push included", (payload) => {
+  hook("vcs-redirect", "PreToolUse for Bash: for a command that mentions git and then commit or push, deny git commit (and point to holyagent vcs commit), a force git push, and whatever runs a program outside the allowlist or cannot be read with certainty; say nothing otherwise, a plain git push included", (payload, call) => {
     const command = payload.tool_name === "Bash" ? payload.tool_input?.command : undefined;
     return try_2({
-      try: () => typeof command === "string" && MENTIONS_GIT_WRITE.test(command) ? gitWrites(command) : [],
+      try: () => typeof command === "string" && MENTIONS_GIT_WRITE.test(command) ? gitWrites(command, ownWrapperOf(call.env.CLAUDE_PLUGIN_ROOT)) : [],
       catch: (cause) => cause
     }).pipe(orElseSucceed2(() => ["unclear"]), map4((writes) => writes.length === 0 ? NOTHING : decision("deny", writes.map((write) => REDIRECTS[write]).join(" "))));
   }, true),

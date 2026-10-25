@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
@@ -343,6 +343,49 @@ describe("hook vcs-redirect", () => {
     "echo $((1 + 2)) && git push",
   ])("passes %j", async (command) => {
     expect(await hook("vcs-redirect", bash(command))).toEqual({ stdout: "", stderr: "", code: 0 })
+  })
+
+  describe("the wrapper by its absolute path", () => {
+    const wrapper = join(dirname(bundle), "holyagent")
+    const call = `vcs commit -m "fix: git commit hook" -- a.ts`
+    const passes = { stdout: "", stderr: "", code: 0 }
+    const unclear = {
+      stdout: preToolUse("deny", UNCLEAR),
+      stderr: "",
+      code: 0,
+    }
+
+    test("passes the hook's own wrapper, found from the running bundle", async () => {
+      expect(await hook("vcs-redirect", bash(`${wrapper} ${call}`))).toEqual(passes)
+    })
+
+    test("passes it when CLAUDE_PLUGIN_ROOT names its plugin folder", async () => {
+      const env = { CLAUDE_PLUGIN_ROOT: dirname(dirname(bundle)) }
+      expect(await hook("vcs-redirect", bash(`${wrapper} ${call}`), project, env)).toEqual(passes)
+    })
+
+    test("passes a link to it, since the real paths are equal", async () => {
+      const folder = await mkdtemp(join(project, "link-"))
+      const link = join(folder, "holyagent")
+      await symlink(wrapper, link)
+      expect(await hook("vcs-redirect", bash(`${link} ${call}`))).toEqual(passes)
+    })
+
+    test("keeps another path that ends in scripts/holyagent unclear", async () => {
+      const folder = await mkdtemp(join(project, "other-"))
+      await mkdir(join(folder, "scripts"))
+      const copy = join(folder, "scripts", "holyagent")
+      await writeFile(copy, await readFile(wrapper))
+      for (const path of [copy, join(folder, "scripts", "missing", "holyagent")])
+        expect(await hook("vcs-redirect", bash(`${path} ${call}`))).toEqual(unclear)
+    })
+
+    test("takes the wrapper from CLAUDE_PLUGIN_ROOT when it is set", async () => {
+      const folder = await mkdtemp(join(project, "root-"))
+      const env = { CLAUDE_PLUGIN_ROOT: folder }
+      // The running bundle's wrapper is no longer the plugin's, and a folder with none matches nothing.
+      expect(await hook("vcs-redirect", bash(`${wrapper} ${call}`), project, env)).toEqual(unclear)
+    })
   })
 
   test("ignores a command that is not Bash, or has no command text", async () => {
