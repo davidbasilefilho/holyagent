@@ -1,0 +1,58 @@
+{
+  "id": "assignment-0mvo8xxf9-5qgs",
+  "intentId": "intent-0mvnv553v-zwx8",
+  "intentRevision": 12,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-the-instruction-text-and-docs",
+  "objective": "Review the instruction text and docs changed in bf31fac..841ef47 (root delegating, version-control, ci, stack-plan, user-messages, identity, dispatch, task-list, requirements.md, requirements/commit-text.md, AGENTS.md, docs) for correctness, completeness and consistency.",
+  "state": "Succeeded",
+  "scope": [
+    "Read /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/pr6-review.diff and the full files under /home/davidbasile/dev/holyagent-fix-cli-and-vcs/packages/runtime/src/instructions and /home/davidbasile/dev/holyagent-fix-cli-and-vcs/AGENTS.md.",
+    "Check: no text names vcs push, vcs branch, vcs ci or vcs detect; the root has a clear route for branches, push, merge-forward, CI watch with gh, Git identity, stash and .holyagent state repair; audit gaps covered: unresolved holyagent agent types stop and report, a narration nudge gets at most one short line, a merge made outside review gets a review before push, reports go verbatim to assignment close; trims to fit the core cap lost no needed rule (US English, waits and repairs in the task list, launch as printed); requirements.md and the claude-5.5 text agree."
+  ],
+  "constraints": [
+    "User: the model-agnostic requirements file is the base each model instruction set is written from; every behavior requirement appears there and in the instructions.",
+    "User (verbatim): o padrão de prs, commits, docs, instruções, etc deve ser em ingles, com o padrão do repo como prioridade",
+    "Read-only."
+  ],
+  "criteria": [
+    {
+      "text": "Every blocking finding names file, line and the conflict or gap; non-blocking findings are marked as such.",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvo0nda7-dpfc"
+  ],
+  "specialist": {
+    "agentId": "workflow:wf_9c8e300b-4a9/assignment-0mvo8xxf9-5qgs",
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-25T19:54:30.646Z",
+    "finishedAt": "2026-10-25T19:58:56.015Z"
+  },
+  "result": "status: done\nchecks:\n- Read pr6-review.diff, lines 1-362 and 1259-1407 (instruction and docs hunks) -> exit 0\n- Read packages/runtime/src/instructions: identity, delegating, dispatch, task-list, user-messages, version-control, ci, stack-plan, workflows, specialist/state-changes, pr-text, root-core.ts, requirements.md, requirements/commit-text.md, requirements/mergeability.md; docs/commit-authorship.md lines 1-12; AGENTS.md -> exit 0\n- Grep 'vcs (push|branch|ci|detect)' over the repo, excluding node_modules, .holyagent and .git: hits in docs/commit-authorship.md:9, packages/runtime/src/state/local.ts:21, tests/vcs-pr.test.ts:189 (intentional absence check); docs/decisions.md:23 names the same commands without the vcs prefix; no hits in packages/runtime/src/instructions -> exit 0\n- Grep 'US English|as printed|waits|repairs' in packages/runtime/src/instructions: no US English anywhere; 'as printed' only in root/workflows.md:4 and :12 -> exit 0\n- Read packages/runtime/tests/sessioncontext.test.ts lines 28-79 (core cap 1000 to 4000 chars and required phrases) -> exit 0\n- Grep ROOT_CORE and ROOT_CORE_FILES references across packages -> exit 0\nblockers:\n- 1. identity.md:3 (criterion: trims kept US English). The old text (pr6-review.diff line 1306) read 'Write model-facing text in US English.'; the new text drops it and no file under packages/runtime/src/instructions contains 'US English'. Fix: restore 'in US English' in identity.md:3; sessioncontext.test.ts:76 still passes.\n- 2. task-list.md:3 (criterion: trims kept waits and repairs in the task list). The old text (diff line 1329) read 'updated at every dispatch, close and verdict, and for waits, repairs and blockers'; the new text (diff line 1330) stops at 'close and verdict'. No other root file restores it, and docs/usage.md:345 still says the list holds waits and repairs. Fix: restore the clause in task-list.md:3.\n- 3. dispatch.md:4 (criterion: trims kept launch as printed). The old text (diff line 1294) read 'launch it in the background as printed'; the new text (diff line 1295) reads 'launch it in the background.' The direct-launch path loses the rule. Fix: restore 'as printed' in dispatch.md:4.\n- 4. Removed command names remain in text (criterion: no text names vcs push, vcs branch, vcs ci or vcs detect). docs/commit-authorship.md:9 names `vcs detect`, `vcs push`, `vcs branch` and `vcs ci`; docs/decisions.md:23 lists 'detect, commit through GitHub's API, push, branch, pr, ci' as the removed chain; packages/runtime/src/state/local.ts:21 says 'the removed `vcs detect`'. Fix: describe the old design without the command names. tests/vcs-pr.test.ts:189 asserts their absence on purpose and is not a finding.\n- 5. Conflict on harness nudges. task-list.md:3 (in ROOT_CORE) says 'Handle hook and harness feedback silently, acting on it or declining it'; user-messages.md:3 and requirements.md:12 (R-NUDGE) require one short line at most in answer to a harness nudge to narrate progress. Both reach the root prompt, so the model gets two rules for one event. Fix: exempt a narration nudge from 'silently' in task-list.md:3, or name the one-line answer there.\n- 6. Not run: this role has no shell, so mise run verify and bun test packages/runtime/tests/sessioncontext.test.ts (core length and required phrases) were not run. The core size is estimated (about 3,400 to 3,600 characters), not measured.\nnotes:\n- Non-blocking: one owner per rule. Force-push and push-authorization are stated in version-control.md:11, stack-plan.md:7 and identity.md:5; merge-forward in version-control.md:12 and stack-plan.md:7. Keep one owner each, as the writing bar asks.\n- Non-blocking: version-control.md:12 merge-forward then push omits the review that stack-plan.md:7 requires before any push. A reader of version-control.md alone can push an unreviewed merge; add a pointer.\n- Non-blocking: version-control.md:9 says to set user.name and user.email with git config when missing but gives no source for the user's own identity; the root may invent one. Say to ask with AskUserQuestion or read the account from gh.\n- Non-blocking: version-control.md:11 force-push list omits --force-if-includes, which docs/hooks.md:196 and docs/commit-authorship.md:124 name.\n- Non-blocking: task-list.md:3 'declining it' lost 'under the rules' from the old text (diff line 1329), so a declined hook feedback has no rule behind it. dispatch.md:1 dropped 'labels' from the help description (trivial).\n- Non-blocking: packages/integrations/claude/dist/agents/holyagent.md already carries the trimmed text, but no dist file is in pr6-review.diff and .gitignore does not list dist. Whether dist is tracked is unverified; lefthook.yml:357 runs the dist wrapper at commit-msg.\n- Non-blocking, unverified: ci.md:3 relies on gh behavior (gh pr checks --watch exit 0 pass and 1 fail; gh run list --commit). Not checked, no gh run was possible.\n- Verdicts. Route for branches, push, merge-forward, CI with gh, Git identity, stash and state repair: met (version-control.md:9-13, ci.md:3). Audit gaps: unresolved holyagent types stop (delegating.md:3) met; narration nudge at most one line (user-messages.md:3) met but conflicting (finding 5); merge outside review gets review before push (stack-plan.md:7) met; reports verbatim to assignment close (dispatch.md:5) met. Trim kept rules: gap (findings 1 to 3). requirements.md and the claude-5.5 text agree for the changed IDs (R-VCS, R-GIT, R-CI, R-MERGEREVIEW, R-NUDGE, R-NORESOLVE, R-NAMED, R-ACK, R-TASKLIST) except the US English gap and the nudge conflict; unchanged IDs were not re-verified. AGENTS.md:13 matches report.ts normalization and assignment.ts:246; AGENTS.md:17 matches the hook's force-push rule.\n- Tree: read directly from /home/davidbasile/dev/holyagent-fix-cli-and-vcs; the diff's new side matched the files at the cited lines. The tree was not checked against 841ef47, and no shell was available to run checks.\nevidence:\n- Every blocking finding names file, line and the conflict or gap; non-blocking findings are marked as such.: Blockers 1 to 5 each give file, line, old and new text where relevant, and the conflict; blocker 6 names the checks not run. Every note is marked Non-blocking or unverified. Read from the instruction files, docs/commit-authorship.md, docs/decisions.md:23, state/local.ts:21 and pr6-review.diff lines 1294, 1306, 1329.\n- findings: Blocking: identity.md:3 (US English dropped), task-list.md:3 (waits and repairs dropped), dispatch.md:4 ('as printed' dropped), docs/commit-authorship.md:9 + docs/decisions.md:23 + state/local.ts:21 (removed command names), task-list.md:3 vs user-messages.md:3 and requirements.md:12 (nudge conflict). Not run: mise run verify and bun test sessioncontext.test.ts (no shell). Notes list the non-blocking items and the verdicts per criterion.",
+  "acceptance": {
+    "revision": 12,
+    "rationale": "Gaps cited with file and line against the stated criteria.",
+    "criteria": [
+      {
+        "criterion": "Every blocking finding names file, line and the conflict or gap; non-blocking findings are marked as such.",
+        "support": "Blockers 1 to 5 each give file, line, old and new text where relevant, and the conflict; blocker 6 names the checks not run. Every note is marked Non-blocking or unverified. Read from the instruction files, docs/commit-authorship.md, docs/decisions.md:23, state/local.ts:21 and pr6-review.diff lines 1294, 1306, 1329."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "Blocking: identity.md:3 (US English dropped), task-list.md:3 (waits and repairs dropped), dispatch.md:4 ('as printed' dropped), docs/commit-authorship.md:9 + docs/decisions.md:23 + state/local.ts:21 (removed command names), task-list.md:3 vs user-messages.md:3 and requirements.md:12 (nudge conflict). Not run: mise run verify and bun test sessioncontext.test.ts (no shell). Notes list the non-blocking items and the verdicts per criterion."
+      }
+    ]
+  },
+  "createdAt": "2026-10-25T19:54:30.646Z"
+}
