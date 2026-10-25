@@ -6,6 +6,7 @@ import { dirname, join } from "node:path"
 import { $ } from "bun"
 
 import { SESSION_REMINDER } from "../../../runtime/src/cli/sessioncontext.ts"
+import { ROUTES } from "../../../runtime/src/domain/route.ts"
 import { ROOT_CORE } from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
 import { freshPlugin } from "./built.ts"
 
@@ -166,47 +167,195 @@ describe("hook vcs-redirect", () => {
   })
 })
 
+const META = 'export const meta = { name: "w", description: "d" }'
+const script = (...lines: ReadonlyArray<string>) => [META, ...lines].join("\n")
+/** An `agent()` call whose options carry the given agentType source text. */
+const start = (agentType: string) =>
+  `await agent("p", { agentType: ${agentType}, model: "sonnet", effort: "high" })`
+const GOOD = start('"holyagent:worker-implementation"')
+const INLINE_REASON = "Inline workflow script whose every agent() call is a holyagent specialist."
+/** A writer stage and a review stage over the entries, as the root writes them. */
+const ALLOWED_SCRIPT = script(
+  "const writes = await pipeline(",
+  "  args.entries,",
+  '  (entry) => agent(`Do ${entry.id}: ${entry.prompt}`, { agentType: "holyagent:worker-implementation", model: entry.model, effort: entry.effort, label: entry.id }),',
+  "  (report, entry) => agent('Review ' + entry.id + ': ' + report, { label: entry.agent, agentType: 'holyagent:reviewer-code', }),",
+  ")",
+  "return Object.fromEntries(args.entries.map((entry, at) => [entry.id, writes[at]]))",
+)
+const inlineRun = (script: unknown, extra: Record<string, unknown> = {}) => ({
+  tool_name: "Workflow",
+  tool_input: { script, args: { entries: [] }, ...extra },
+})
+
 describe("hook workflow", () => {
-  const workflow = (input: Record<string, unknown>) => ({
-    tool_name: "Workflow",
-    tool_input: input,
-  })
-
-  test.each(["run-assignments", "review-diff", "implement-review"])(
-    "allows the prebuilt holyagent:%s by name",
-    async (name) => {
-      expect(
-        await hook("workflow", workflow({ name: `holyagent:${name}`, args: { pairs: [] } })),
-      ).toEqual({
-        stdout: preToolUse("allow", `Prebuilt workflow holyagent:${name} of the holyagent plugin.`),
-        stderr: "",
-        code: 0,
-      })
-    },
-  )
-
   const NOTHING = { stdout: "", stderr: "", code: 0 }
-  test.each<readonly [string, Record<string, unknown>]>([
-    ["another plugin's workflow", { name: "other:run-assignments" }],
-    ["an unknown holyagent workflow", { name: "holyagent:validate-criteria" }],
-    ["the bare name", { name: "run-assignments" }],
-    ["a name with a suffix", { name: "holyagent:run-assignments-x" }],
-    ["an inline script", { script: "export const meta = {}" }],
-    ["our name with an inline script", { name: "holyagent:review-diff", script: "return 1" }],
-    ["our name with a script path", { name: "holyagent:review-diff", scriptPath: "/tmp/x.js" }],
-    ["our name with a resume", { name: "holyagent:review-diff", resumeFromRunId: "run-1" }],
-    ["a run id alone", { runId: "run-1" }],
-    ["no name", { args: [] }],
-    ["a name that is not text", { name: ["holyagent:review-diff"] }],
-  ])("says nothing for %s", async (_label, input) => {
-    expect(await hook("workflow", workflow(input))).toEqual(NOTHING)
+  const ALLOW = { stdout: preToolUse("allow", INLINE_REASON), stderr: "", code: 0 }
+
+  test("allows an inline script whose every agent() names a holyagent specialist", async () => {
+    expect(await hook("workflow", inlineRun(ALLOWED_SCRIPT))).toEqual(ALLOW)
   })
 
-  test("says nothing for another tool, and fails closed on an unreadable payload", async () => {
+  test.each(ROUTES.map((route) => route.agent))("allows the specialist %s", async (name) => {
+    expect(await hook("workflow", inlineRun(script(start(`"holyagent:${name}"`))))).toEqual(ALLOW)
+  })
+
+  test.each<readonly [string, string]>([
+    ["single quotes", script(start("'holyagent:reviewer-code'"))],
+    [
+      "a quoted key and a trailing comma",
+      script('await agent("p", { "agentType": "holyagent:reviewer-code", },)'),
+    ],
+    [
+      "a space before the parenthesis",
+      script('await agent ("p", { agentType: "holyagent:explorer-map" })'),
+    ],
+    ["no other option", script('await agent("p", { agentType: "holyagent:explorer-map" })')],
+    [
+      "agent mentioned only in comments and strings",
+      script(
+        "// agent('p', { agentType: 'other' }) and eval(this)",
+        "/* agent('p') */",
+        "const note = \"agent('p'); workflow('x'); eval\"",
+        GOOD,
+      ),
+    ],
+    [
+      "thunks of parallel()",
+      script(
+        `const both = await parallel([() => ${GOOD.slice(6)}, () => ${GOOD.slice(6)}])`,
+        "return both",
+      ),
+    ],
+  ])("allows %s", async (_label, text) => {
+    expect(await hook("workflow", inlineRun(text))).toEqual(ALLOW)
+  })
+
+  test.each<readonly [string, string]>([
+    ["another plugin's specialist", start('"other:worker-implementation"')],
+    ["a built-in agent", start('"general-purpose"')],
+    ["an unknown holyagent agent", start('"holyagent:nobody"')],
+    ["the root agent", start('"holyagent:holyagent"')],
+    ["a bare specialist name", start('"worker-implementation"')],
+    ["a name with trailing text", start('"holyagent:worker-implementation "')],
+    ["another case", start('"HolyAgent:worker-implementation"')],
+    ["an escaped literal", start('"holyagent:\\u0077orker-implementation"')],
+  ])("says nothing for %s", async (_label, bad) => {
+    expect(await hook("workflow", inlineRun(script(bad)))).toEqual(NOTHING)
+    expect(await hook("workflow", inlineRun(script(GOOD, bad)))).toEqual(NOTHING)
+  })
+
+  test.each<readonly [string, string]>([
+    ["no agentType", 'await agent("p", { model: "sonnet" })'],
+    ["no options", 'await agent("p")'],
+    ["empty options", 'await agent("p", {})'],
+    ["options in a variable", 'await agent("p", options)'],
+    ["a spread alone", 'await agent("p", { ...options })'],
+    [
+      "a spread after the agentType",
+      'await agent("p", { agentType: "holyagent:reviewer-code", ...options })',
+    ],
+    [
+      "a spread before the agentType",
+      'await agent("p", { ...options, agentType: "holyagent:reviewer-code" })',
+    ],
+    ["spread arguments", "await agent(...parts)"],
+    ["a third argument", 'await agent("p", { agentType: "holyagent:reviewer-code" }, extra)'],
+    ["a variable agentType", start("kind")],
+    ["a shorthand agentType", 'await agent("p", { agentType })'],
+    ["a concatenated agentType", start('"holyagent:" + name')],
+    ["a template agentType", start("`holyagent:reviewer-code`")],
+    ["a member agentType", start("entry.agent")],
+    ["a conditional agentType", start('flag ? "holyagent:reviewer-code" : "other"')],
+    [
+      "a computed key",
+      'await agent("p", { ["agent" + "Type"]: "other", agentType: "holyagent:reviewer-code" })',
+    ],
+    [
+      "a repeated agentType",
+      'await agent("p", { agentType: "holyagent:reviewer-code", agentType: "other" })',
+    ],
+    [
+      "an escaped key",
+      'await agent("p", { agentType: "holyagent:reviewer-code", "agent\\u0054ype": "other" })',
+    ],
+    [
+      "a getter",
+      'await agent("p", { agentType: "holyagent:reviewer-code", get model() { return 1 } })',
+    ],
+    ["an alias", 'const run = agent\nawait run("p", { agentType: "other" })'],
+    ["a call through .call", 'await agent.call(null, "p", { agentType: "other" })'],
+    ["an optional call", 'await agent?.("p", { agentType: "other" })'],
+    ["agent as a stage", "await pipeline(args.entries, agent)"],
+    ["a parameter named agent", '(agent) => agent("p", { agentType: "holyagent:reviewer-code" })'],
+    ["a global lookup", 'await globalThis.agent("p", { agentType: "other" })'],
+    ["eval", "eval(\"agent('p', { agentType: 'other' })\")"],
+    ["the Function constructor", 'new Function("return 1")()'],
+    ["this", "this.agent('p', { agentType: 'other' })"],
+    ["the arguments object", 'arguments[0]("p", { agentType: "other" })'],
+    ["a dynamic import", 'await import("x")'],
+    ["a nested workflow", 'await workflow("holyagent:x", {})'],
+  ])("says nothing for %s", async (_label, bad) => {
+    expect(await hook("workflow", inlineRun(script(GOOD, bad)))).toEqual(NOTHING)
+  })
+
+  test.each<readonly [string, string]>([
+    ["an unterminated string", `${GOOD}\nconst x = "abc`],
+    ["an unterminated template", `${GOOD}\nconst x = \`abc`],
+    ["an unterminated block comment", `${GOOD}\n/* abc`],
+    ["unbalanced braces", `${GOOD}\n}`],
+    ["unbalanced parentheses", `${GOOD}\nfoo(`],
+    [
+      "a regular expression that hides a quote",
+      `${GOOD}\nconst r = /"/\n${start('"other:x"')}\n// "`,
+    ],
+    ["a division", `${GOOD}\nconst half = 4 / 2`],
+    ["an escaped identifier", `${GOOD}\nag\\u0065nt("p", { agentType: "other" })`],
+    [
+      "a line separator that ends a comment",
+      `${GOOD}\n// note${String.fromCharCode(0x2028)}${start('"other:x"')}`,
+    ],
+    ["an HTML-style comment", `${GOOD}\n<!-- ${start('"other:x"')}`],
+    ["a stray character", `${GOOD}\n#!`],
+  ])("says nothing for unreadable code: %s", async (_label, text) => {
+    expect(await hook("workflow", inlineRun(script(text)))).toEqual(NOTHING)
+  })
+
+  test.each<readonly [string, unknown]>([
+    ["an empty script", ""],
+    ["a script without an agent() call", script("return 1")],
+    ["a script that only mentions agent in a comment", script(`// ${GOOD}`)],
+    ["a script that is not text", 7],
+    ["a script that is a list", [GOOD]],
+  ])("says nothing for %s", async (_label, text) => {
+    expect(await hook("workflow", inlineRun(text))).toEqual(NOTHING)
+  })
+
+  test.each<readonly [string, Record<string, unknown>]>([
+    ["a script path beside the script", { script: ALLOWED_SCRIPT, scriptPath: "/tmp/x.js" }],
+    ["a script path alone", { scriptPath: "/tmp/x.js" }],
+    ["a null script path", { script: ALLOWED_SCRIPT, scriptPath: null }],
+    ["a name beside the script", { script: ALLOWED_SCRIPT, name: "holyagent:run-assignments" }],
+    ["a name alone", { name: "holyagent:run-assignments" }],
+    ["a resume beside the script", { script: ALLOWED_SCRIPT, resumeFromRunId: "wf_1" }],
+    ["a resume with a script path", { scriptPath: "/tmp/x.js", resumeFromRunId: "wf_1" }],
+    ["an unknown input", { script: ALLOWED_SCRIPT, description: "x" }],
+    ["no input", {}],
+    ["arguments alone", { args: { entries: [] } }],
+  ])("says nothing for %s", async (_label, input) => {
+    expect(await hook("workflow", { tool_name: "Workflow", tool_input: input })).toEqual(NOTHING)
+  })
+
+  test("says nothing for another tool or no input, and fails closed on an unreadable payload", async () => {
     expect(
-      await hook("workflow", { tool_name: "Bash", tool_input: { name: "holyagent:review-diff" } }),
+      await hook("workflow", { tool_name: "Bash", tool_input: { script: ALLOWED_SCRIPT } }),
     ).toEqual(NOTHING)
-    expect((await hook("workflow", "{")).code).toBe(1)
+    expect(await hook("workflow", { tool_name: "Workflow" })).toEqual(NOTHING)
+    for (const payload of ["{", "not json", "[]"]) {
+      const result = await hook("workflow", payload)
+      expect(result.code).toBe(1)
+      expect(result.stdout).toBe("")
+    }
   })
 })
 
@@ -645,73 +794,6 @@ describe("hook agent-launch", () => {
   })
 })
 
-describe("hook workflow, trust", () => {
-  const run = (args: unknown) => ({
-    tool_name: "Workflow",
-    tool_input: { name: "holyagent:run-assignments", args },
-  })
-  const entry = (agent: string) => ({ id: "assignment-a", agent, model: "sonnet", prompt: "p" })
-  const NOTHING = { stdout: "", stderr: "", code: 0 }
-
-  test("allows arguments whose agents are all holyagent specialists, namespaced or bare", async () => {
-    const args = {
-      assignments: [entry("holyagent:worker-implementation"), entry("reviewer-code")],
-      pairs: [{ writer: entry("worker-visual"), reviewer: entry("holyagent:reviewer-visual") }],
-    }
-    expect((await hook("workflow", run(args))).stdout).toContain('"permissionDecision":"allow"')
-  })
-
-  test.each<readonly [string, unknown]>([
-    ["another plugin's agent", { assignments: [entry("other:worker-implementation")] }],
-    ["a built-in agent", { assignments: [entry("general-purpose")] }],
-    [
-      "a nested foreign agent",
-      { pairs: [{ writer: entry("worker-visual"), reviewer: entry("x:y") }] },
-    ],
-    ["an agent that is not text", { assignments: [{ agent: 7 }] }],
-    ["an unknown holyagent agent", { assignments: [entry("holyagent:nobody")] }],
-  ])("says nothing for %s", async (_label, args) => {
-    expect(await hook("workflow", run(args))).toEqual(NOTHING)
-  })
-
-  test("says nothing when a project or user workflow file could take over the name", async () => {
-    const shadow = await mkdtemp(join(tmpdir(), "holyagent-hook-shadow-"))
-    const nested = join(shadow, "app", "src")
-    try {
-      await mkdir(nested, { recursive: true })
-      const args = { assignments: [entry("worker-visual")] }
-      expect((await hook("workflow", run(args), nested)).stdout).toContain("allow")
-      const folder = join(shadow, ".claude", "workflows")
-      await mkdir(folder, { recursive: true })
-      await writeFile(join(folder, "other.js"), "export const meta = {}\n")
-      expect((await hook("workflow", run(args), nested)).stdout).toContain("allow")
-      await writeFile(join(folder, "HolyAgent-run.js"), "export const meta = {}\n")
-      expect(await hook("workflow", run(args), nested)).toEqual(NOTHING)
-      await rm(join(folder, "HolyAgent-run.js"))
-      // The name comes from the meta, so a file with another name can still take ours over.
-      await writeFile(
-        join(folder, "tidy.js"),
-        'export const meta = {\n  name: "run-assignments",\n  description: "x", // holyagent\n}\nreturn 1\n',
-      )
-      expect(await hook("workflow", run(args), nested)).toEqual(NOTHING)
-      await rm(join(folder, "tidy.js"))
-      await writeFile(
-        join(folder, "tidy.js"),
-        'export const meta = {\n  name: "tidy",\n  description: "x",\n}\n// holyagent is only mentioned after the meta\nreturn 1\n',
-      )
-      expect((await hook("workflow", run(args), nested)).stdout).toContain("allow")
-      await rm(join(folder, "tidy.js"))
-      const userFolder = join(home, ".claude", "workflows")
-      await mkdir(userFolder, { recursive: true })
-      await writeFile(join(userFolder, "holyagent:run-assignments.js"), "x")
-      expect(await hook("workflow", run(args), nested)).toEqual(NOTHING)
-      await rm(userFolder, { recursive: true, force: true })
-    } finally {
-      await rm(shadow, { recursive: true, force: true })
-    }
-  })
-})
-
 describe("hooks that need no state", () => {
   test("do not run git, so a failing git cannot stop vcs-redirect or workflow", async () => {
     const bin = await mkdtemp(join(tmpdir(), "holyagent-hook-badgit-"))
@@ -728,16 +810,11 @@ describe("hooks that need no state", () => {
         stdout: preToolUse("deny", PUSH),
         code: 0,
       })
-      expect(
-        (
-          await hook(
-            "workflow",
-            { tool_name: "Workflow", tool_input: { name: "holyagent:review-diff" } },
-            project,
-            env,
-          )
-        ).code,
-      ).toBe(0)
+      expect(await hook("workflow", inlineRun(ALLOWED_SCRIPT), project, env)).toEqual({
+        stdout: preToolUse("allow", INLINE_REASON),
+        stderr: "",
+        code: 0,
+      })
       // A hook that reads the state still reports the failure, visibly and never as exit 2.
       const stated = join(project, "stated")
       await mkdir(join(stated, ".holyagent"), { recursive: true })
@@ -814,18 +891,9 @@ describe("the built wrapper", () => {
       stdout: preToolUse("deny", PUSH),
       stderr: "",
     })
-    expect(
-      await call(
-        "workflow",
-        { tool_name: "Workflow", tool_input: { name: "holyagent:review-diff" } },
-        env,
-      ),
-    ).toMatchObject({
+    expect(await call("workflow", inlineRun(ALLOWED_SCRIPT), env)).toMatchObject({
       code: 0,
-      stdout: preToolUse(
-        "allow",
-        "Prebuilt workflow holyagent:review-diff of the holyagent plugin.",
-      ),
+      stdout: preToolUse("allow", INLINE_REASON),
     })
     expect(await call("session-start", { agent_type: "holyagent" }, env)).toEqual({
       code: 0,

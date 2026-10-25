@@ -4,7 +4,6 @@ import { join } from "node:path"
 
 import { $ } from "bun"
 
-import { WORKFLOW_NAMES } from "../../../runtime/src/domain/plan.ts"
 import { ROUTES } from "../../../runtime/src/domain/route.ts"
 import { ROOT_CORE_FILES } from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
 import packageJson from "../package.json" with { type: "json" }
@@ -55,6 +54,10 @@ describe("the generated plugin is in step with its sources", () => {
   test("the generated paths hold no file the build does not make", async () => {
     const committed = (await Promise.all(GENERATED_PATHS.map(filesBelow))).flat().toSorted()
     expect(committed).toEqual(generated.map((file) => file.path))
+  })
+
+  test("the plugin ships no prebuilt workflow: the root writes each script on the spot", () => {
+    expect(generated.filter((file) => file.path.includes("/workflows/"))).toEqual([])
   })
 
   test("the build is deterministic", async () => {
@@ -216,13 +219,7 @@ describe("agents", () => {
       .filter((file) => !file.path.includes("/scripts/"))
       .flatMap((file) => file.content.match(/holyagent:[A-Za-z0-9._-]+/g) ?? [])
       .map((reference) => reference.slice("holyagent:".length))
-    const known = new Set([
-      ...agents,
-      "merge-ready",
-      "interface-inspection",
-      "user-busy",
-      ...WORKFLOW_NAMES,
-    ])
+    const known = new Set([...agents, "merge-ready", "interface-inspection", "user-busy"])
     for (const name of [...references, ...ROUTES.map((route) => route.agent)]) {
       expect(name).toMatch(/^[a-z]+(?:-[a-z]+)*$/)
       expect(known.has(name)).toBe(true)

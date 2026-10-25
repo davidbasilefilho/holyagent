@@ -1,0 +1,90 @@
+{
+  "id": "assignment-0mvo0nda7-dpfc",
+  "intentId": "intent-0mvnv553v-zwx8",
+  "intentRevision": 11,
+  "roleTask": "Worker.implementation",
+  "slug": "fix-the-holyagent-cli-defects-slim",
+  "objective": "Fix the holyagent CLI defects, slim holyagent vcs to commit and pr per the user decision, and close the root-instruction gaps the session audits found.",
+  "state": "Ready",
+  "scope": [
+    "Work only in the worktree /home/davidbasile/dev/holyagent-fix-cli-and-vcs (branch release/0.1.2/fix/cli-and-vcs, from main e299e75). Run every command there; ownership paths are relative to that worktree.",
+    "Defect 1: a Succeeded Assignment whose stored report lacks an evidence block cannot be accepted later (close again refuses with InvalidTransition and accept reads only the stored report), though the InsufficientAcceptance hint says to SendMessage and close again. Make the hinted path work: a Succeeded, unaccepted Assignment can take a corrected report (close again or accept with a report on stdin), and every hint names a command that works.",
+    "Defect 2: assignment close --accept matches evidence lines to criteria literally and rejects trivial differences. Match after normalizing whitespace, case and trailing punctuation (or by criterion index), still rejecting evidence for a different criterion; update the AGENTS.md line about repeating criterion text exactly.",
+    "Defect 3: the CLI prints an unhandled EPIPE stack trace when stdout closes early (for example piped into a reader that exits); exit quietly instead.",
+    "Defect 4: vcs commit run in a linked worktree does not add the Intent state folder; make it add the state of the worktree it runs in.",
+    "Defect 5 (seen in this session): the PreToolUse Bash hook vcs-redirect fails with an error instead of deciding, and its onFailure block then blocks the call, on commands such as a for/do/done loop, a heredoc, rm -rf, or a quoted argument whose text mentions Git followed by the word commit. It must parse such commands, deny only a real Git commit or push invocation, and never error; add tests for each of these shapes.",
+    "Slim vcs (user decision below): remove the GitHub API commit path and the commands vcs push, vcs branch and vcs ci (and vcs detect if nothing needs it); keep vcs commit (exact paths, Intent state, message check) and vcs pr (PR text check). The vcs-redirect hook keeps routing Git commit to vcs commit, lets a plain Git push through, and denies a force push (--force, -f, --force-with-lease, +refspec) with a reason. Provide the commit-msg attribution check as a holyagent hook command usable as a Git commit-msg hook and document how it is installed. Update help, tests, docs (docs/usage.md vcs parts) and plugin hook wiring.",
+    "Root instruction gaps (audits of sessions 76e01786 and e7f538f4), each also in packages/runtime/src/instructions/requirements.md: (a) root/delegating.md: when holyagent:* agent types do not resolve, the root stops and reports it instead of falling back to general-purpose agents; (b) root/version-control.md and root/ci.md: rewrite for the slimmed vcs (branches, push, merge-forward, CI watch with gh pr checks --watch through Monitor, Git identity, stash and .holyagent state repair with plain Git under the stated rules); (c) root/task-list.md or root/user-messages.md: a harness nudge to narrate progress does not override the quiet rule beyond one short line; (d) root/stack-plan.md: a merge made outside review gets a review of that head before any push. Find and update the root core text and the SessionStart reminder text where they name vcs push, vcs branch or vcs ci."
+  ],
+  "constraints": [
+    "Decision (user, verbatim): slim holyagent vcs. Remove the GitHub API commit path; push, branch and ci become plain Git and gh, with a commit-msg hook for attribution and a deny rule for force pushes. Keep only vcs commit (exact paths + Intent state + message check) and vcs pr (PR text check). Intent state stays versioned in Git.",
+    "User (verbatim): o padrão de prs, commits, docs, instruções, etc deve ser em ingles, com o padrão do repo como prioridade",
+    "User: the model-agnostic requirements file (packages/runtime/src/instructions/requirements.md) is the base each model instruction set is written from; every behavior change appears there and in the claude-5.5 text. Follow root/instruction-guidelines.md for instruction text.",
+    "Edit only the ownership paths. Other PRs edit hook workflow in hook.ts (touch only the vcs-redirect part and new hook commands there), root/workflows.md, root/dispatch.md, root/routing.md, root/skills.md, root/assignments.md, the skills and roles folders and packages/integrations/claude/src/workflows in parallel; keep requirements.md and docs edits local to your topics.",
+    "No version-control writes (no commits, checkouts, branches, stashes, merges or resets) and no edits under .holyagent or the repository metadata folder. Report the changed paths; the root records them.",
+    "Done means mise run verify passes in the worktree; run mise run build so dist is regenerated."
+  ],
+  "criteria": [
+    {
+      "text": "Each of defects 1 to 5 is fixed and has a regression test that fails without the fix.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "vcs exposes only commit and pr, the API commit path is gone, force pushes are denied by the hook, a plain push passes, and the commit-msg check exists as a hook command.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Root instructions, the core text, the SessionStart reminder and requirements.md cover audit gaps (a) to (d) and no longer name removed vcs commands.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Help, docs and tests match the new command surface.",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "mise run verify passes and dist is rebuilt with mise run build.",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Changes stay inside the ownership paths and follow .claude/CLAUDE.md (Effect, Schema, Bun Shell, JSDoc).",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/vcs",
+    "packages/runtime/src/cli",
+    "packages/runtime/src/state",
+    "packages/runtime/src/domain",
+    "packages/runtime/tests",
+    "packages/runtime/src/instructions/claude-5.5/root/delegating.md",
+    "packages/runtime/src/instructions/claude-5.5/root/version-control.md",
+    "packages/runtime/src/instructions/claude-5.5/root/ci.md",
+    "packages/runtime/src/instructions/claude-5.5/root/stack-plan.md",
+    "packages/runtime/src/instructions/claude-5.5/root/task-list.md",
+    "packages/runtime/src/instructions/claude-5.5/root/user-messages.md",
+    "packages/runtime/src/instructions/claude-5.5/root/identity.md",
+    "packages/runtime/src/instructions/claude-5.5/root/pr-text.md",
+    "packages/runtime/src/instructions",
+    "packages/integrations/claude/dist",
+    "packages/integrations/claude/src/agents.ts",
+    "packages/integrations/claude/tests",
+    "packages/cli",
+    "docs",
+    "AGENTS.md",
+    "lefthook.yml"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-10-25T16:02:21.055Z"
+}

@@ -24,7 +24,7 @@ Two commands are called `holyagent`, and they are different programs:
 | [requirements.md](requirements.md)               | What must be installed and which environments work                          |
 | [components.md](components.md)                   | What HolyAgent installs and configures, and why                             |
 | [commit-authorship.md](commit-authorship.md)     | How commits and PRs are made, why they can be unsigned, how text is cleaned |
-| [cache-and-workflows.md](cache-and-workflows.md) | How the design keeps the cache warm; the prebuilt workflows                 |
+| [cache-and-workflows.md](cache-and-workflows.md) | How the design keeps the cache warm; how workflows run                      |
 | [hooks.md](hooks.md)                             | The four hooks, what was removed and why                                    |
 | [development.md](development.md)                 | Repository layout, gates, the generated plugin, versioning                  |
 | [decisions.md](decisions.md)                     | Standing decisions and their reasons                                        |

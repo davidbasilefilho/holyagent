@@ -1,9 +1,8 @@
-import { readdir, stat } from "node:fs/promises"
-import { dirname, join } from "node:path"
+import { stat } from "node:fs/promises"
+import { join } from "node:path"
 
 import { Effect, Schema } from "effect"
 
-import { WORKFLOW_NAMES } from "../domain/plan.ts"
 import { ROUTES } from "../domain/route.ts"
 import { ROOT_CORE } from "../instructions/claude-5.5/root-core.ts"
 import { hasCode, io } from "../state/files.ts"
@@ -135,89 +134,270 @@ const REDIRECTS: Readonly<Record<GitWrite, string>> = {
   push: "Push with `holyagent vcs push [branches…]`.",
 }
 
-const OUR_WORKFLOWS: ReadonlySet<unknown> = new Set(
-  WORKFLOW_NAMES.map((name) => `${PLUGIN_NAMESPACE}:${name}`),
-)
-/** The Workflow inputs a named run may carry; a script, script path or resume would run other code. */
-const NAMED_RUN_INPUTS: ReadonlySet<string> = new Set(["name", "args", "description", "title"])
-
 const SPECIALISTS: ReadonlySet<string> = new Set(ROUTES.map((route) => route.agent))
 
+// An inline Workflow script is JavaScript the root writes on the spot, and the only way it starts an
+// agent is the global `agent()`. The hook allows it without a prompt when every start is lexically
+// visible and names one of our specialists, so it reads the script with a small lexer instead of
+// running it. Anything the lexer cannot place with certainty makes the script refused, and a
+// refusal only means the normal permission flow.
+
+/** One token of a script; `template` is a chunk of a template literal, whose text is dropped. */
+interface Token {
+  readonly kind: "ident" | "number" | "string" | "template" | "punct"
+  readonly text: string
+}
+
+const PUNCTUATION = "()[]{},;:?.=<>+-*%&|^!~@"
+// Identifier characters: ASCII word characters and `$`, and every non-ASCII character, which the
+// lexer reads as part of a name so that a lookalike never splits one.
+const IDENTIFIER = /[\w$]|\P{ASCII}/u
+// The characters that end a line comment; U+2028 and U+2029 end one in JavaScript too.
+const LINE_END = new RegExp(`[\\n\\r${String.fromCharCode(0x2028, 0x2029)}]`)
+const OPENERS: ReadonlyMap<string, string> = new Map([
+  ["(", ")"],
+  ["[", "]"],
+  ["{", "}"],
+  ["${", "}"],
+])
+const CLOSERS: ReadonlySet<string> = new Set(OPENERS.values())
+
 /**
- * True for `holyagent:<agent>` or a bare `<agent>` of the route table; any other namespace is not
- * ours.
+ * The tokens of a script, or undefined when it holds anything the lexer cannot place with
+ * certainty: an unterminated string or comment, a backslash outside a string (an escaped
+ * identifier), a `/` that is not a comment (division and a regular expression look alike, and a
+ * regular expression can hide a quote), a legacy HTML-style comment, or a character that starts no
+ * token.
  */
-const isOurAgent = (agent: unknown): boolean =>
-  typeof agent === "string" &&
-  SPECIALISTS.has(
-    agent.startsWith(`${PLUGIN_NAMESPACE}:`) ? agent.slice(PLUGIN_NAMESPACE.length + 1) : agent,
+const tokenize = (source: string): ReadonlyArray<Token> | undefined => {
+  const tokens: Array<Token> = []
+  const push = (kind: Token["kind"], text: string) => tokens.push({ kind, text })
+  const stringEnd = (from: number): number | undefined => {
+    const quote = source.charAt(from)
+    for (let at = from + 1; at < source.length; at += 1) {
+      const char = source.charAt(at)
+      if (char === "\\") at += 1
+      else if (char === quote) return at + 1
+      else if (char === "\n" || char === "\r") return undefined
+    }
+    return undefined
+  }
+  // Reads a template literal that opens at `from` and returns the index after it.
+  const template = (from: number): number | undefined => {
+    let at = from + 1
+    while (at < source.length) {
+      const char = source.charAt(at)
+      if (char === "\\") at += 2
+      else if (char === "`") {
+        push("template", "")
+        return at + 1
+      } else if (source.startsWith("${", at)) {
+        push("template", "")
+        push("punct", "${")
+        const end = code(at + 2, true)
+        if (end === undefined) return undefined
+        at = end
+      } else at += 1
+    }
+    return undefined
+  }
+  // Reads code from `from` to the end of the source, or inside a template substitution to the `}`
+  // that closes it, and returns the index after it.
+  const code = (from: number, substitution: boolean): number | undefined => {
+    let depth = 0
+    let at = from
+    while (at < source.length) {
+      const char = source.charAt(at)
+      if (/\s/.test(char)) at += 1
+      else if (source.startsWith("//", at)) {
+        const end = source.slice(at).search(LINE_END)
+        at = end === -1 ? source.length : at + end
+      } else if (source.startsWith("/*", at)) {
+        const end = source.indexOf("*/", at + 2)
+        if (end === -1) return undefined
+        at = end + 2
+      } else if (char === '"' || char === "'") {
+        const end = stringEnd(at)
+        if (end === undefined) return undefined
+        push("string", source.slice(at, end))
+        at = end
+      } else if (char === "`") {
+        const end = template(at)
+        if (end === undefined) return undefined
+        at = end
+      } else if (/\d/.test(char)) {
+        const length = source.slice(at).search(/[^\w.]/)
+        const end = length === -1 ? source.length : at + length
+        push("number", source.slice(at, end))
+        at = end
+      } else if (IDENTIFIER.test(char)) {
+        let end = at
+        while (end < source.length && IDENTIFIER.test(source.charAt(end))) end += 1
+        push("ident", source.slice(at, end))
+        at = end
+      } else if (char === "}" && depth === 0) {
+        if (!substitution) return undefined
+        push("punct", "}")
+        return at + 1
+      } else if (source.startsWith("<!--", at) || source.startsWith("-->", at)) {
+        return undefined
+      } else if (source.startsWith("...", at)) {
+        push("punct", "...")
+        at += 3
+      } else if (source.startsWith("?.", at) && !/\d/.test(source.charAt(at + 2))) {
+        push("punct", "?.")
+        at += 2
+      } else if (PUNCTUATION.includes(char)) {
+        if (char === "{") depth += 1
+        if (char === "}") depth -= 1
+        push("punct", char)
+        at += 1
+      } else return undefined
+    }
+    return substitution ? undefined : at
+  }
+  return code(0, false) === undefined ? undefined : tokens
+}
+
+/** The index of the token that closes the opener at `open`, or undefined when unbalanced. */
+const closeOf = (tokens: ReadonlyArray<Token>, open: number): number | undefined => {
+  const expected: Array<string> = []
+  for (let at = open; at < tokens.length; at += 1) {
+    const token = tokens[at]
+    if (token?.kind !== "punct") continue
+    const closer = OPENERS.get(token.text)
+    if (closer !== undefined) expected.push(closer)
+    else if (CLOSERS.has(token.text)) {
+      if (expected.pop() !== token.text) return undefined
+      if (expected.length === 0) return at
+    }
+  }
+  return undefined
+}
+
+/** True when every bracket of the script closes with its own kind, in order. */
+const balanced = (tokens: ReadonlyArray<Token>): boolean => {
+  const expected: Array<string> = []
+  for (const token of tokens) {
+    if (token.kind !== "punct") continue
+    const closer = OPENERS.get(token.text)
+    if (closer !== undefined) expected.push(closer)
+    else if (CLOSERS.has(token.text) && expected.pop() !== token.text) return false
+  }
+  return expected.length === 0
+}
+
+/** The tokens split at the commas outside every bracket; a trailing comma adds no part. */
+const splitTop = (tokens: ReadonlyArray<Token>): ReadonlyArray<ReadonlyArray<Token>> => {
+  const parts: Array<Array<Token>> = [[]]
+  let depth = 0
+  for (const token of tokens) {
+    if (token.kind === "punct") {
+      if (OPENERS.has(token.text)) depth += 1
+      else if (CLOSERS.has(token.text)) depth -= 1
+      else if (token.text === "," && depth === 0) {
+        parts.push([])
+        continue
+      }
+    }
+    parts.at(-1)?.push(token)
+  }
+  return parts.at(-1)?.length === 0 ? parts.slice(0, -1) : parts
+}
+
+/**
+ * True for a string-literal token that reads `holyagent:<agent>` with a specialist of the route
+ * table.
+ */
+const namesOurSpecialist = (token: Token | undefined): boolean => {
+  if (token?.kind !== "string") return false
+  const text = token.text.slice(1, -1)
+  const prefix = `${PLUGIN_NAMESPACE}:`
+  return (
+    !text.includes("\\") && text.startsWith(prefix) && SPECIALISTS.has(text.slice(prefix.length))
   )
-
-/** True when every `agent` anywhere in the arguments is one of ours; the arguments name who runs. */
-const agentsAreOurs = (value: unknown, depth = 0): boolean => {
-  if (depth > 8) return false
-  if (Array.isArray(value)) return value.every((item: unknown) => agentsAreOurs(item, depth + 1))
-  if (typeof value !== "object" || value === null) return true
-  return Object.entries(value).every(([key, item]) =>
-    key === "agent" ? isOurAgent(item) : agentsAreOurs(item, depth + 1),
-  )
 }
 
 /**
- * The folders a project or user workflow could be loaded from under the same name:
- * `.claude/workflows` of the working directory and each parent, of the home directory and of
- * CLAUDE_CONFIG_DIR.
+ * True when the arguments of one `agent(prompt, options)` call are two plain arguments, the second
+ * an object literal with exactly one `agentType` property whose value is a string literal naming
+ * one of our specialists. A spread, computed key, getter or escaped key could set another agent
+ * type, so each refuses the call.
  */
-const workflowFolders = (call: Call): ReadonlyArray<string> => {
-  const parents: Array<string> = []
-  for (let at = call.cwd; !parents.includes(at); at = dirname(at)) parents.push(at)
-  return [
-    ...parents.map((parent) => join(parent, ".claude", "workflows")),
-    ...(call.env.HOME === undefined ? [] : [join(call.env.HOME, ".claude", "workflows")]),
-    ...(call.env.CLAUDE_CONFIG_DIR === undefined
-      ? []
-      : [join(call.env.CLAUDE_CONFIG_DIR, "workflows")]),
-  ]
+const startsOurAgent = (args: ReadonlyArray<Token>): boolean => {
+  const [prompt, options, ...rest] = splitTop(args)
+  if (rest.length > 0 || prompt === undefined || prompt.length === 0) return false
+  if (prompt[0]?.text === "..." || options === undefined) return false
+  if (options[0]?.text !== "{" || closeOf(options, 0) !== options.length - 1) return false
+  let named = 0
+  for (const property of splitTop(options.slice(1, -1))) {
+    const [key, colon, ...value] = property
+    const name = key?.kind === "string" ? key.text.slice(1, -1) : key?.text
+    if (key === undefined || key.kind === "template" || key.kind === "punct") return false
+    if (name?.includes("\\")) return false
+    if (name === "agentType") {
+      if (colon?.text !== ":" || value.length !== 1 || !namesOurSpecialist(value[0])) return false
+      named += 1
+    } else if (colon === undefined ? key.kind !== "ident" : colon.text !== ":") return false
+  }
+  return named === 1
 }
 
-/** True when the `export const meta` literal of a script mentions our name, in any case. */
-const declaresOurName = (script: string): boolean => {
-  const start = script.search(/export\s+const\s+meta\b/)
-  if (start === -1) return false
-  const end = script.indexOf("\n}", start)
-  return script
-    .slice(start, end === -1 ? start + 4000 : end)
-    .toLowerCase()
-    .includes(PLUGIN_NAMESPACE)
-}
+/** Names that could reach `agent` or run code the lexer never sees; a script using one is refused. */
+const UNSAFE_NAMES: ReadonlySet<string> = new Set([
+  "arguments",
+  "constructor",
+  "eval",
+  "Function",
+  "global",
+  "globalThis",
+  "import",
+  "process",
+  "prototype",
+  "Proxy",
+  "Reflect",
+  "require",
+  "self",
+  "this",
+  "window",
+  "with",
+  "workflow",
+  "__proto__",
+])
+
+const CALL_PREFIXES: ReadonlySet<string> = new Set(["await", "return"])
 
 /**
- * True when a workflow file that could take over one of our names may exist: a file named
- * `holyagent…` in those folders, a script there whose meta mentions `holyagent` (the name comes
- * from the meta, not the file), or a folder or file that cannot be read, since then nobody can
- * say.
+ * True when the script starts agents and every start is a direct `agent(prompt, {…agentType:
+ * "holyagent:<specialist>"…})` call. A mention of `agent` that is not such a call (an alias, a
+ * parameter, `.call`, a key) refuses the script, as does `workflow`, which would run another
+ * script.
  */
-const shadowed = (call: Call) =>
-  Effect.forEach(workflowFolders(call), (folder) =>
-    io(folder, () => readdir(folder)).pipe(
-      Effect.flatMap((names) =>
-        names.some((name) => name.toLowerCase().startsWith(PLUGIN_NAMESPACE))
-          ? Effect.succeed(true)
-          : Effect.forEach(
-              names.filter((name) => name.endsWith(".js")),
-              (name) =>
-                io(join(folder, name), () => Bun.file(join(folder, name)).text()).pipe(
-                  Effect.map(declaresOurName),
-                ),
-            ).pipe(Effect.map((found) => found.includes(true))),
-      ),
-      Effect.catchIf(
-        (error) => hasCode(error.cause, "ENOENT") || hasCode(error.cause, "ENOTDIR"),
-        () => Effect.succeed(false),
-      ),
-      Effect.orElseSucceed(() => true),
-    ),
-  ).pipe(Effect.map((found) => found.includes(true)))
+const onlyOurAgents = (script: string): boolean => {
+  const tokens = tokenize(script)
+  if (tokens === undefined || !balanced(tokens)) return false
+  let starts = 0
+  for (const [at, token] of tokens.entries()) {
+    if (token.kind !== "ident") continue
+    if (UNSAFE_NAMES.has(token.text)) return false
+    if (token.text !== "agent") continue
+    const before = tokens[at - 1]
+    const member = before?.kind === "punct" && (before.text === "." || before.text === "?.")
+    const called = tokens[at + 1]?.kind === "punct" && tokens[at + 1]?.text === "("
+    // `entry.agent` reads a property; it starts nothing.
+    if (member && !called) continue
+    const close = called ? closeOf(tokens, at + 1) : undefined
+    // After a name other than `await` or `return`, `agent(` declares a function or constructs one.
+    if (before?.kind === "ident" && !CALL_PREFIXES.has(before.text)) return false
+    if (member || close === undefined) return false
+    if (!startsOurAgent(tokens.slice(at + 2, close))) return false
+    starts += 1
+  }
+  return starts > 0
+}
+
+/** The Workflow inputs an inline run may carry; a script path, name or resume would run other code. */
+const INLINE_INPUTS: ReadonlySet<string> = new Set(["script", "args"])
 
 // The vcs-redirect hook only sees what the `if` rules of hooks.json let through, and those match
 // the command text: `git` followed by `commit` or `push` anywhere in it. A command that hides the
@@ -302,19 +482,23 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
   ),
   hook(
     "workflow",
-    "PreToolUse for Workflow: allow a run of one of this plugin's prebuilt workflows by name, with only our specialists in its arguments and no file that could shadow it; say nothing otherwise",
-    (payload, call) =>
-      Effect.gen(function* () {
-        const input = payload.tool_input ?? {}
-        const prebuilt =
-          payload.tool_name === "Workflow" &&
-          OUR_WORKFLOWS.has(input.name) &&
-          Object.keys(input).every((key) => NAMED_RUN_INPUTS.has(key)) &&
-          agentsAreOurs(input.args)
-        return prebuilt && !(yield* shadowed(call))
-          ? decision("allow", `Prebuilt workflow ${String(input.name)} of the holyagent plugin.`)
-          : NOTHING
-      }),
+    "PreToolUse for Workflow: allow an inline script whose every agent() call names one of this plugin's specialists by a string-literal agentType, with no script path, name or resume; say nothing otherwise",
+    (payload) => {
+      const input = payload.tool_input ?? {}
+      const inline =
+        payload.tool_name === "Workflow" &&
+        typeof input.script === "string" &&
+        Object.keys(input).every((key) => INLINE_INPUTS.has(key)) &&
+        onlyOurAgents(input.script)
+      return Effect.succeed(
+        inline
+          ? decision(
+              "allow",
+              "Inline workflow script whose every agent() call is a holyagent specialist.",
+            )
+          : NOTHING,
+      )
+    },
     true,
   ),
 ]

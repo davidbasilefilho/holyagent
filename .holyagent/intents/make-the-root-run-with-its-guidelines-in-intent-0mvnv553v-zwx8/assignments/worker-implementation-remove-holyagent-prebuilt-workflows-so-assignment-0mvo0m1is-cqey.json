@@ -1,0 +1,89 @@
+{
+  "id": "assignment-0mvo0m1is-cqey",
+  "intentId": "intent-0mvnv553v-zwx8",
+  "intentRevision": 11,
+  "roleTask": "Worker.implementation",
+  "slug": "remove-holyagent-prebuilt-workflows-so",
+  "objective": "Remove holyagent prebuilt workflows so the root writes each workflow script on the spot, and make the Workflow PreToolUse hook allow, without a prompt, an inline script whose every agent() call uses a holyagent specialist.",
+  "state": "Succeeded",
+  "scope": [
+    "Work only in the worktree /home/davidbasile/dev/holyagent-feat-inline-workflows (branch release/0.1.2/feat/inline-workflows, from main e299e75). Run every command there; ownership paths are relative to that worktree.",
+    "Read /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/workflow-api.md first: it holds the Workflow tool input and script API facts.",
+    "Remove packages/integrations/claude/src/workflows/** and their generation into dist/workflows, every reference in build/generate code, the plan command output and help (packages/runtime/src/cli), tests, docs and instruction text that names holyagent:run-assignments, holyagent:review-diff or holyagent:implement-review.",
+    "plan keeps printing the entries {id, agent, model, effort, prompt} and the recording/closing steps, and states that the root writes an inline script where every agent() passes agentType holyagent:<agent> with the route model and effort.",
+    "Rewrite hook workflow (packages/runtime/src/cli/hook.ts and its tests): allow (permissionDecision allow) a Workflow call that has an inline script, no scriptPath, no name and no resumeFromRunId, and in which every agent( call passes a string-literal agentType naming one of this plugin specialists (holyagent:<known agent>); anything else (another or computed agentType, an agent() without agentType, workflow() calls, scriptPath, name, resume, unparsable input) prints nothing so the normal permission flow applies. Be conservative: when in doubt, do not allow.",
+    "Root instructions: packages/runtime/src/instructions/claude-5.5/root/workflows.md, dispatch.md and routing.md, plus the matching lines of packages/runtime/src/instructions/requirements.md. State how the root writes a workflow (meta literal, one agent() per Assignment with agentType holyagent:<agent>, model and effort from dispatch, pipeline by default, a review stage after its writers, returns reports keyed by Assignment id) and that inline holyagent-only scripts run without a prompt.",
+    "Also in dispatch.md and requirements.md: the root passes each specialist report to assignment close verbatim on stdin and never retypes or summarizes it (an audit finding)."
+  ],
+  "constraints": [
+    "User (verbatim): workflows prebuilds não devem existir, o root deve criar na hora porque é literalmente o ponto de workflows",
+    "User (verbatim): o workflow prebuilt foi removido, porque não deve ser utilizado. o root deve criar na hora. pesquise como workflows funcionam porque isso é importante",
+    "Decision (user, verbatim): the workflow PreToolUse hook allows, without a prompt, an inline script the root writes in which every agent() call uses a holyagent specialist (agentType holyagent:*); a script with any other agent type, a scriptPath or a resume keeps the normal permission flow.",
+    "User (verbatim): o padrão de prs, commits, docs, instruções, etc deve ser em ingles, com o padrão do repo como prioridade",
+    "User: the model-agnostic requirements file (packages/runtime/src/instructions/requirements.md) is the base each model instruction set is written from; every behavior change appears there and in the claude-5.5 text. Follow root/instruction-guidelines.md for instruction text.",
+    "Edit only the ownership paths. Other PRs edit root/skills.md, root/assignments.md, root/delegating.md, root/version-control.md, root/ci.md, root/stack-plan.md, root/task-list.md, root/user-messages.md, packages/runtime/src/vcs and the CLI assignment/report code in parallel; keep requirements.md and docs edits local to the workflow lines.",
+    "No version-control writes (no commits, checkouts, branches, stashes, merges or resets) and no edits under .holyagent or the repository metadata folder. Report the changed paths; the root records them.",
+    "Done means mise run verify passes in the worktree; run mise run build so dist is regenerated."
+  ],
+  "criteria": [
+    {
+      "text": "No prebuilt workflow remains in source, dist, plan output, help, tests, docs or instruction text.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The Workflow hook allows only inline scripts whose every agent() call names a known holyagent specialist by string-literal agentType, and prints nothing for every other case.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Tests cover allowed scripts and each refused case: other agentType, missing agentType, computed agentType, scriptPath, name, resumeFromRunId and unparsable input.",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Root instructions and requirements.md say the root writes each workflow inline with holyagent specialists and passes reports verbatim to assignment close.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify passes and dist is rebuilt with mise run build.",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Changes stay inside the ownership paths and follow the repository rules in .claude/CLAUDE.md (Effect, Schema, JSDoc).",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/claude",
+    "packages/runtime/src/cli/hook.ts",
+    "packages/runtime/src/cli/commands.ts",
+    "packages/runtime/src/cli/overview.ts",
+    "packages/runtime/tests",
+    "packages/runtime/src/instructions/claude-5.5/root/workflows.md",
+    "packages/runtime/src/instructions/claude-5.5/root/dispatch.md",
+    "packages/runtime/src/instructions/claude-5.5/root/routing.md",
+    "packages/runtime/src/instructions/requirements.md",
+    "docs",
+    "packages/cli"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "a2298564a5e785054",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-25T16:03:09.128Z",
+    "finishedAt": "2026-10-25T18:27:35.743Z"
+  },
+  "result": "result: Partly done. Prebuilt workflows are gone from the plugin source, dist, plan output and help, tests, docs and instruction text, and the Workflow hook is rewritten with tests. Residue is left only in `packages/runtime/src/domain/plan.ts` and `packages/runtime/tests/directive.test.ts`, which are outside my ownership. `mise run verify` and `mise run build` pass.\n\nchanged (all in /home/davidbasile/dev/holyagent-feat-inline-workflows):\n- Deleted `packages/integrations/claude/src/workflows/*` (4 files), `packages/integrations/claude/tests/workflows.test.ts` and `dist/workflows/*` (3 files).\n- `packages/integrations/claude/src/generate.ts`: removed the workflow generation and the `WORKFLOW_NAMES` import.\n- `packages/integrations/claude/src/agents.ts`: comment fix, plus `REQUIREMENT_SECTIONS` entries `R-WORKFLOW` and `R-REPORT`.\n- `packages/integrations/claude/tests/hooks.test.ts`: new Workflow hook suite; the old name and shadow-file tests are removed.\n- `packages/integrations/claude/tests/plugin.test.ts`: `WORKFLOW_NAMES` use removed; new test that no generated file lives under `/workflows/`.\n- `packages/integrations/claude/dist/**`: rebuilt (`dist/agents/holyagent.md`, `dist/scripts/holyagent.js`).\n- `packages/runtime/src/cli/hook.ts`: Workflow hook rewritten. The `OUR_WORKFLOWS`, `agentsAreOurs` and `shadowed` code is gone, and the hook stays `stateless`.\n- `packages/runtime/src/cli/overview.ts`: `PLAN_NOTES` rewritten, the `workflow:` key dropped from plan output, and the `PLUGIN_NAMESPACE` import removed.\n- `packages/runtime/tests/cli.test.ts`: plan and help assertions updated.\n- `packages/runtime/src/instructions/claude-5.5/root/workflows.md`, `dispatch.md` and `routing.md`.\n- `packages/runtime/src/instructions/requirements.md`: `R-DISPATCH` reworded, new `R-WORKFLOW` and `R-REPORT` lines.\n- Docs: `docs/hooks.md`, `cache-and-workflows.md`, `decisions.md`, `usage.md`, `components.md`, `README.md`, `development.md`, `requirements.md`, `pi/claude-parity.md`, `pi/orchestration.md`.\n\nHook behavior in `hook.ts`:\n- It allows only a call whose input keys are `script` and `args`, where `script` is a string.\n- A small lexer reads the script. It then requires at least one `agent(` call, and every `agent(` call must take exactly two arguments.\n- The second argument must be an object literal with exactly one `agentType` property, whose value is a string literal `holyagent:<route agent>`.\n- It prints nothing for anything else: another or computed agent type, a missing one, a spread, `scriptPath`, `name`, `resumeFromRunId`, an unknown input key, `workflow()`, aliasing of `agent`, `eval`, `this`, `arguments`, `import`, and code it cannot read with certainty (unterminated string or comment, unbalanced brackets, backslash outside a string, `/` that is not a comment, U+2028 hiding code).\n- A script that uses a regex or a division therefore gets the normal permission prompt.\n\nThe reports root passes to `assignment close` must be verbatim, so the plan note tells the root to close without `--report-json` and to write `agent()` without a `schema`.\n\nchecks:\n- `mise run fmt` -> exit 0.\n- `mise run build` -> exit 0, \"built 31 files\".\n- `mise run verify` -> exit 0: type-check \"No type errors in 103 files\", lint \"No problems in 104 files\", fmt \"All 212 files are formatted\", tests 625 pass, 1 skip, 0 fail across 626 tests in 25 files.\n- I ran `bun install --frozen-lockfile` in the worktree because `node_modules` was missing.\n- `ROOT_CORE` is under its 4000-character cap (4000 before, 3986 now). `dispatch.md` is part of the core and had zero headroom, so I tightened its wording.\n\nblockers:\n- Criterion \"No prebuilt workflow remains in source…\" is not fully met. `packages/runtime/src/domain/plan.ts` still exports `WORKFLOW_NAMES = [\"implement-review\",\"review-diff\",\"run-assignments\"]` and uses those names in the `WORKFLOWS` table and `Recommendation.name`. `packages/runtime/tests/directive.test.ts` asserts those names, and the names are still bundled into `dist/scripts/holyagent.js`. Neither path is in my ownership, so I left them.\n- Nothing prints the names any more: the plan output has no `workflow` key, and the hook and generator no longer import them.\n- To finish, add `plan.ts` and `directive.test.ts` to ownership and re-dispatch. The change is to drop the `name`/`WORKFLOW_NAMES` and keep two shapes (writer-then-review pairs, and parallel Assignments), keeping `reason` and the fallback.\n\nquestions: Should plan.ts and directive.test.ts be added to ownership (see blockers)?\n\nnotes (not done, outside ownership or not asked):\n- `.prettierignore` and `.eslintignore` at the repo root still list `/packages/integrations/claude/src/workflows`. The path no longer exists, so the lines are harmless but stale.\n- `packages/runtime/src/cli/assignment.ts` help text (around lines 172, 243 and 248) says \"A report from a workflow is closed with --report-json\". That is stale for inline scripts without a schema. The `--report-json` flag itself still works.\n- The `PLUGIN_NAMESPACE` doc comment in `assignment.ts` still says \"specialists and workflows\".\n- I added `R-WORKFLOW` and `R-REPORT` to `requirements.md`, because every requirement needs a `REQUIREMENT_SECTIONS` entry and a section that holds its phrase. Other PRs also edit `requirements.md`; my lines sit next to `R-DISPATCH`, which may conflict at merge.\n- The `PreToolUse` Bash hook (vcs-redirect) from the main-checkout plugin failed twice with \"blocking because onFailure is block\" during the session. Retrying with simpler commands worked, and the cause is not investigated.\n- The tool turned `\\uXXXX` escapes in my edits into literal characters, which broke a regex in `hook.ts`. I fixed it (`\\P{ASCII}/u` plus `String.fromCharCode`), and the final files contain no stray control or line-separator characters.\n\nevidence:\nchanged-paths: listed under \"changed\" above.\nchecks: `mise run verify` -> exit 0 (check, lint, fmt:check, test 625 pass, 0 fail); `mise run build` -> exit 0; `mise run fmt` -> exit 0.\ndiff-file: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/inline-workflows.diff (git diff of the changed paths including dist, 2416 lines; deletions only, no new untracked files).\nNo prebuilt workflow remains in source, dist, plan output, help, tests, docs or instruction text: Not met. All of these are clean except `domain/plan.ts` and `directive.test.ts`, as under blockers. Elsewhere only intentional negative mentions remain, in `requirements.md` R-WORKFLOW, `decisions.md` and the \"no prebuilt\" tests. Checked with grep for `run-assignments|review-diff|implement-review|prebuilt|shared.js`, and the `src/workflows` directory is deleted.\nThe Workflow hook allows only inline scripts whose every agent() call names a known holyagent specialist by string-literal agentType, and prints nothing for every other case: `packages/runtime/src/cli/hook.ts` (`tokenize`, `startsOurAgent`, `onlyOurAgents`, the `workflow` hook); behavior confirmed by `hooks.test.ts` through the built bundle.\nTests cover allowed scripts and each refused case: `packages/integrations/claude/tests/hooks.test.ts`, `describe(\"hook workflow\")`.\n- Allowed cases: a full pipeline and review script, each of the 18 route agents, single quotes, a quoted key with trailing commas, `agent (`, and `parallel` thunks.\n- Refused cases: another agent type (checked alone and beside a good call), missing agentType, computed agentType (variable, concatenation, template, member, conditional, computed key, repeated key, escaped key, getter, spread), `scriptPath`, `name`, `resumeFromRunId`, unknown input keys, unparsable or unreadable code (including the U+2028 and regex cases), aliasing and `eval`, another tool, and an unreadable payload (exit 1).\nRoot instructions and requirements.md say the root writes each workflow inline with holyagent specialists and passes reports verbatim to assignment close: `root/workflows.md`, `root/dispatch.md` (step 3, \"verbatim… never retyped or summarized\"), `root/routing.md`, `requirements.md` R-DISPATCH, R-WORKFLOW and R-REPORT, and the `agents.ts` `REQUIREMENT_SECTIONS` mapping. The `plugin.test.ts` requirement-mapping tests pass.\nmise run verify passes and dist is rebuilt with mise run build: both exit 0. `dist/workflows` is removed, and `plugin.test.ts` \"every committed generated file equals a fresh build\" passes.\nChanges stay inside the ownership paths and follow the repository rules in .claude/CLAUDE.md (Effect, Schema, JSDoc): changed files are all under the ownership paths. The new hook code is pure with no try/catch or Promise, the existing Schema decoding of the payload is kept, and the new interface and functions have JSDoc. Lint passes.",
+  "createdAt": "2026-10-25T16:01:19.156Z"
+}

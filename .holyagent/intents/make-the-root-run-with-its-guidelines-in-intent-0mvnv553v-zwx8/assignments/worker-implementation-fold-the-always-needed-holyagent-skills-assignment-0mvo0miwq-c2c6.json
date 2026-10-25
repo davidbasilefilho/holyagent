@@ -1,0 +1,92 @@
+{
+  "id": "assignment-0mvo0miwq-c2c6",
+  "intentId": "intent-0mvnv553v-zwx8",
+  "intentRevision": 11,
+  "roleTask": "Worker.implementation",
+  "slug": "fold-the-always-needed-holyagent-skills",
+  "objective": "Fold the always-needed holyagent skills into fixed agent instructions, embed frontend-design in the visual worker and reviewer, add root rules for judging visual work, and add a dev-server skill the root uses to start one dev server the specialists share.",
+  "state": "Ready",
+  "scope": [
+    "Work only in the worktree /home/davidbasile/dev/holyagent-feat-skills-into-instructions (branch release/0.1.2/feat/skills-into-instructions, from main e299e75). Run every command there; ownership paths are relative to that worktree.",
+    "Skills today: packages/runtime/src/instructions/claude-5.5/skills/{interface-inspection,merge-ready,user-busy} and packages/integrations/claude/vendor/frontend-design. For each, decide from who loads it and when: content an agent kind always needs becomes fixed text in that agent instructions (root, specialist shared sections or roles/<role>), the rest stays a skill. Report each skill with its decision and reason.",
+    "Embed the frontend-design guidance directly in roles/worker-visual and roles/reviewer-visual (keep the vendor license and attribution as the vendor folder requires) and stop listing it as a separate skill for them where it becomes fixed text.",
+    "Add a root section file (for example root/visual.md) with rules for how the root judges visual work: it reads screenshots in the main thread, accepts rendered work only from Reviewer.visual evidence against the visual criteria, and what makes a visual discrepancy material.",
+    "Add a dev-server skill for the root (packages/runtime/src/instructions/claude-5.5/skills/dev-server, wired into generation like the other skills): the root has Worker.operations start one dev server, records its URL and command, hands the URL to Worker.visual and Reviewer.visual so they share it instead of starting their own, and stops it when the visual work ends. Start its description with the situation, then what it does.",
+    "Update root/skills.md and root/assignments.md lines that point to skills that changed, and the generator/agents code (packages/integrations/claude/src) so skills and fixed text are assembled correctly.",
+    "Update packages/runtime/src/instructions/requirements.md for every behavior change, keeping edits local to the skills and visual lines."
+  ],
+  "constraints": [
+    "User (verbatim): veja quais skills são desnecessárias e podem se tornar instruções do root e/ou de especialistas, coisas que são sempre necessárias para algum tipo de agente",
+    "User (verbatim): worker visual e reviewer visual podem ter o frontend design direto neles, além de instruções para julgamento de visual pelo root",
+    "User (verbatim): quero uma skill de dev server para o root começar um dev server para os especialistas e eles compartilharem",
+    "User (verbatim): o padrão de prs, commits, docs, instruções, etc deve ser em ingles, com o padrão do repo como prioridade",
+    "User: the model-agnostic requirements file (packages/runtime/src/instructions/requirements.md) is the base each model instruction set is written from; every behavior change appears there and in the claude-5.5 text. Follow root/instruction-guidelines.md for instruction text. Decision (user): specialists follow the same layout as the root: shared specialist sections in claude-5.5/specialist/*.md and each role in claude-5.5/roles/<role>/*.md, one section per file, assembled in a fixed order.",
+    "Edit only the ownership paths. Other PRs edit root/workflows.md, root/dispatch.md, root/routing.md, root/delegating.md, root/version-control.md, root/ci.md, root/stack-plan.md, root/task-list.md, root/user-messages.md, packages/runtime/src/cli and packages/runtime/src/vcs in parallel; in packages/integrations/claude/src touch only skill and agent assembly, not the workflows folder.",
+    "No version-control writes (no commits, checkouts, branches, stashes, merges or resets) and no edits under .holyagent or the repository metadata folder. Report the changed paths; the root records them.",
+    "Done means mise run verify passes in the worktree; run mise run build so dist is regenerated."
+  ],
+  "criteria": [
+    {
+      "text": "Every existing skill has a stated keep-or-fold decision with its reason, and folded content appears as fixed text in the agents that always need it.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "worker-visual and reviewer-visual carry the frontend-design guidance in their own instructions, with the vendor license kept.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A root section states how the root judges visual work.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A dev-server skill exists, is generated into dist and tells the root how to start one shared dev server for the specialists and stop it.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "requirements.md reflects every behavior change made here.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Generator tests cover the new skill and the folded text, and mise run verify passes with dist rebuilt by mise run build.",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Changes stay inside the ownership paths and follow .claude/CLAUDE.md.",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks",
+    "diff-file",
+    "skill-decisions"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions/claude-5.5/skills",
+    "packages/runtime/src/instructions/claude-5.5/specialist",
+    "packages/runtime/src/instructions/claude-5.5/roles",
+    "packages/runtime/src/instructions/claude-5.5/root/skills.md",
+    "packages/runtime/src/instructions/claude-5.5/root/assignments.md",
+    "packages/runtime/src/instructions/claude-5.5/root/visual.md",
+    "packages/runtime/src/instructions/requirements.md",
+    "packages/integrations/claude/src/agents.ts",
+    "packages/integrations/claude/src/generate.ts",
+    "packages/integrations/claude/src/files.ts",
+    "packages/integrations/claude/build.ts",
+    "packages/integrations/claude/tests",
+    "packages/integrations/claude/vendor",
+    "packages/integrations/claude/dist",
+    "packages/runtime/src/instructions/claude-5.5/index.ts",
+    "packages/runtime/tests"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-10-25T16:01:41.690Z"
+}
