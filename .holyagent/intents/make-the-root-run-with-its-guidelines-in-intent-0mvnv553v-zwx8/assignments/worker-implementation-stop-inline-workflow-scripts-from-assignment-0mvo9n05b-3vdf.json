@@ -1,0 +1,65 @@
+{
+  "id": "assignment-0mvo9n05b-3vdf",
+  "intentId": "intent-0mvnv553v-zwx8",
+  "intentRevision": 12,
+  "roleTask": "Worker.implementation",
+  "slug": "stop-inline-workflow-scripts-from",
+  "objective": "Stop inline workflow scripts from mutating or aliasing built-ins while keeping normal root scripts prompt-free.",
+  "state": "Succeeded",
+  "scope": [
+    "Work only in the worktree /home/davidbasile/dev/holyagent-feat-inline-workflows (branch release/0.1.2/feat/inline-workflows, head 7e840ab). Ownership paths are relative to it.",
+    "Findings: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/r-souj.json (code blocker) and r-8gvd.json (security suspicions S1, S2 and the budget note). Allowed today and must be refused: Object.assign(Math, {...}), Object.freeze(JSON), const o = Math; o.max = ..., const O = Object; O.assign = ..., Object.assign(Object, {...}), Object.assign(JSON, {stringify: ...}), const f = Object.groupBy; f(...), const { assign } = Object, Object.assign(Error, Object.fromEntries([[\"prepareStackTrace\", ...]])), Object.assign(budget, ...), budget.x.y.z().",
+    "Rule set: a free global (including budget and args? args stays readable data) may appear only as the object of a direct member call or a member read, never as a value (no aliasing into a binding, argument, return, spread, array or object element, destructuring source); member assignment and update are allowed only on bindings the script initialized from an object or array literal, an agent() result, args-derived data or a call result of an allowed data method, never on a global or anything reached from one; remove mutating or reflective statics from the callable list (assign, freeze, seal, defineProperty, defineProperties, setPrototypeOf, preventExtensions, groupBy if not needed) and keep keys, values, entries, fromEntries, isArray, all, allSettled; budget allows only its documented reads (total, spent(), remaining()). Methods read off any object may only be called directly (no passing a method as a value, no map(obj.method, obj) thisArg). Keep everything the normal root scripts need allowed and tested.",
+    "Update docs/hooks.md so it states exactly these rules and add refusal tests for every listed shape."
+  ],
+  "constraints": [
+    "Decision (user, this session): the Workflow hook decides with a real JavaScript parser (add the acorn dependency) and allows only scripts whose syntax tree uses a closed set of constructs with correct scoping; normal root scripts run without a prompt and everything else gets the permission prompt.",
+    "No version-control writes and no edits under .holyagent or the repository metadata folder. Report the changed paths.",
+    "Done means mise run verify passes in the worktree; run mise run build so dist is regenerated."
+  ],
+  "criteria": [
+    {
+      "text": "Every listed mutation and aliasing shape is refused and covered by a test.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Normal root workflow scripts are still allowed, covered by tests.",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "docs/hooks.md matches the implemented rules.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify passes and dist is rebuilt with mise run build.",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli/workflow-check.ts",
+    "packages/integrations/claude/tests/hooks.test.ts",
+    "packages/integrations/claude/dist",
+    "docs/hooks.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvo8x9zp-a059",
+  "specialist": {
+    "agentId": "a2298564a5e785054",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-25T20:14:00.575Z",
+    "finishedAt": "2026-10-25T20:20:56.911Z"
+  },
+  "result": "result: Done in /home/davidbasile/dev/holyagent-feat-inline-workflows (head 7e840ab). Every shape from the two reviews is now refused, and the normal root scripts still run without a prompt. `mise run verify` passes and dist is rebuilt.\n\nchanged:\n- `packages/runtime/src/cli/workflow-check.ts`\n- `packages/integrations/claude/tests/hooks.test.ts`\n- `docs/hooks.md`\n- `packages/integrations/claude/dist/**` (rebuilt)\n\nThe new rules, all in `workflow-check.ts`:\n- **Globals as values.** A free global appears only as the callee of a direct call or as the object of a member call or read. It cannot be assigned, passed, returned, spread, put in an array or object, destructured, or used as an operand. Exceptions: `args` (plain readable data) and `undefined`, `NaN`, `Infinity`. Calling a global that is not a function (`Math()`, `Object(x)`) is refused.\n- **Per-global member lists.**\n  - Calls: `Object.keys|values|entries|fromEntries`, `Array.isArray|from|of`, `JSON.stringify|parse`, a short `Math` list, `Number.isInteger|isFinite|isNaN|parseFloat|parseInt`, and `Promise.all|allSettled|race|resolve|reject`.\n  - Reads: the `Math` and `Number` numeric constants.\n  - Not on any list: `assign`, `freeze`, `seal`, `defineProperty`, `defineProperties`, `setPrototypeOf`, `preventExtensions`, `create`, `groupBy`. No built-in can be rewritten, directly or through an alias.\n- **Budget.** Only `budget.total`, `budget.spent()` and `budget.remaining()`; the old \"any method of budget\" exemption is gone. `budget` as a value is refused.\n- **Methods.** A method (`map`, `push`, …) is called where it is read; reading one without calling it is refused (`const f = xs.push`, `[1].map(xs.push)`). The callback methods (`map`, `forEach`, `filter`, `find`, `findIndex`, `some`, `every`, `flatMap`) take one argument, so no `this` can be passed; `Array.from` takes at most two. `assign` and `freeze` left the instance list.\n- **Writes.** Member assignment or update, and `x.y++`, are allowed only on a name that holds nothing but data the script built. Every value it is set to must be an object or array literal, an `agent()` result, data read from `args`, a result of an allowed data method, or another such name. A parameter, loop variable, function, global or call result is refused. This is evaluated after the walk, so a write from a function to a module-level name declared later now works (one of the optional findings).\n\nBehavior changes to know:\n- `log`, `phase` and other function globals can no longer be passed as callbacks (`.then(log)`); call them inside an arrow instead.\n- Writing into a loop variable (`for (const row of args.entries) { row.done = true }`) or a parameter is refused.\n- `${budget}` in a template is refused; use `budget.remaining()`.\n- The `FULL_SCRIPT` test script was updated accordingly.\n\nchecks:\n- `mise run fmt` -> exit 0.\n- `mise run build` -> exit 0 (31 files).\n- `mise run verify` -> exit 0: type-check clean (104 files), lint clean (105 files), fmt clean (213 files), tests 823 pass, 1 skip, 0 fail across 824 tests in 25 files (`hooks.test.ts` alone: 380).\n- The reviewers' probes `probe.ts`, `probe2.ts` and `probe3.ts` re-run: every earlier bypass is still refused, and `budget.remaining()`, `all[0]`, `.then` chains, `Object.fromEntries`, destructuring, `Promise.all`, spread, try/catch and templates are still allowed.\n\nblockers: none\nquestions: none\nnotes: `root/workflows.md` (outside this ownership) says a script stays plain with \"no declaration that shadows a global\"; it could add \"and no global used as a value\" for the root's benefit.\n\nevidence:\nEvery listed mutation and aliasing shape is refused and covered by a test: `packages/integrations/claude/tests/hooks.test.ts`, the table \"A built-in may not be changed, frozen, aliased or handed on…\" (57 cases).\n- All ten listed shapes: `Object.assign(Math, …)`, `Object.freeze(JSON)`, `const o = Math; o.max = …`, `const O = Object; O.assign = …`, `Object.assign(Object, …)`, `Object.assign(JSON, …)`, `const f = Object.groupBy; f(…)`, `const { assign } = Object`, `Object.assign(Error, Object.fromEntries([[\"prepareStackTrace\", …]]))`, `Object.assign(budget, …)` and `budget.x.y.z()`.\n- Further shapes: globals as values, argument, element, spread and return; a method read and called later; a method passed as a callback; a `this` argument to `map`, `forEach` and `Array.from`; writes into `args`, parameters, loop variables, functions, call results and names set to a parameter or a built-in.\nNormal root workflow scripts are still allowed, covered by tests: `ALLOWED_SCRIPT` and `FULL_SCRIPT`, plus the new allowed cases \"writes into data the script built, an agent result and data read from args\", \"global statics a workflow needs…\" (including the budget reads and `Math.PI`), and \"methods called directly with a callback alone\". Together with the earlier allowed table, all assert the allow decision.\ndocs/hooks.md matches the implemented rules: the Scopes, Globals, Writes and Members-and-keys bullets of the `workflow` section, written from the tables in `workflow-check.ts` (`GLOBAL_CALLS`, `GLOBAL_FIELDS`, `VALUE_GLOBALS`, `GLOBAL_FUNCTIONS`, `CALLABLE_PROPERTIES`, `MAX_ARGUMENTS`).\nmise run verify passes and dist is rebuilt with mise run build: both exit 0 (counts above).\nchanged-paths: listed above.\nchecks: listed above.\ndiff-file: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/builtins.diff (source, tests and docs; the regenerated dist bundle is left out, 680 lines).",
+  "createdAt": "2026-10-25T20:14:00.575Z"
+}
