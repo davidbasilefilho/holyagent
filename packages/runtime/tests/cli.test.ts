@@ -306,6 +306,35 @@ describe("workflow runs", () => {
     ).toMatchObject({ state: "Succeeded", accepted: false })
   })
 
+  test("keeps a field a workflow report carries beyond the known ones, so it can be closed verbatim", async () => {
+    await createIntent()
+    const id = await dispatchWriter()
+    data(await cli(["assignment", "record", id, "--agent", `workflow:run-1/${id}`]))
+    const json = {
+      status: "done",
+      changed_paths: [],
+      checks: [],
+      blockers: [],
+      notes: [],
+      status_note: "n/a",
+      evidence: [
+        { key: "parses", support: "ran the parser" },
+        { key: "tests", support: "bun test passed" },
+      ],
+    }
+    expect(
+      data(
+        await cli(
+          ["assignment", "close", id, "--outcome", "success", "--accept", "ok", "--report-json"],
+          json,
+        ),
+      ),
+    ).toMatchObject({ state: "Succeeded", accepted: true })
+    const stored = String(data(await cli(["assignment", "show", id, "--full"])).result)
+    expect(stored).toContain("status_note: n/a")
+    expect(stored.indexOf("status_note: n/a")).toBeLessThan(stored.indexOf("evidence:"))
+  })
+
   test("refuses a JSON report that is not one, and closes nothing", async () => {
     await createIntent()
     const id = await dispatchWriter()
@@ -370,6 +399,114 @@ describe("report and prompt", () => {
     expect(
       data(await cli(["assignment", "accept", id, "--rationale", "reviewed the report"])),
     ).toMatchObject({ id, accepted: true, revision: 1 })
+  })
+
+  test("a Succeeded Assignment whose report lacks the evidence block takes a corrected report by close again", async () => {
+    await createIntent()
+    const id = await dispatchWriter()
+    expect(data(await closeWith(id, "all done, trust me"))).toMatchObject({ accepted: false })
+    // The stored report cannot be accepted, and the hint names a command that works.
+    const gap = await cli(["assignment", "accept", id, "--rationale", "reviewed"])
+    expect(gap.code).toBe(3)
+    expect(gap.stderr).toContain("error: InsufficientAcceptance:")
+    expect(gap.stderr).toContain("assignment close <id> --outcome success --accept")
+    expect(gap.stderr).toContain("assignment accept <id> --rationale <text> --report")
+    // A corrected report still short of the evidence stores nothing.
+    const still = await cli(
+      ["assignment", "close", id, "--outcome", "success", "--accept", "ok"],
+      report("parses: ran it"),
+    )
+    expect(still.code).toBe(3)
+    expect(data(await cli(["assignment", "show", id, "--full"])).result).toBe("all done, trust me")
+
+    expect(
+      data(
+        await cli(
+          ["assignment", "close", id, "--outcome", "success", "--accept", "ok"],
+          FULL_REPORT,
+        ),
+      ),
+    ).toMatchObject({ id, state: "Succeeded", accepted: true })
+    expect(data(await cli(["assignment", "show", id, "--full"]))).toMatchObject({
+      result: FULL_REPORT,
+    })
+    // An accepted Assignment is final: closing it again is refused.
+    const again = await cli(["assignment", "close", id, "--outcome", "success"], FULL_REPORT)
+    expect(again.code).toBe(3)
+    expect(again.stderr).toContain("error: InvalidTransition:")
+  })
+
+  test("a Succeeded Assignment takes a corrected report with accept --report", async () => {
+    await createIntent()
+    const id = await dispatchWriter()
+    data(await closeWith(id, "all done, trust me"))
+    const short = await cli(
+      ["assignment", "accept", id, "--rationale", "reviewed", "--report"],
+      report("parses: ran it"),
+    )
+    expect(short.code).toBe(3)
+    expect(data(await cli(["assignment", "show", id, "--full"])).result).toBe("all done, trust me")
+
+    expect(
+      data(
+        await cli(["assignment", "accept", id, "--rationale", "reviewed", "--report"], FULL_REPORT),
+      ),
+    ).toMatchObject({ id, state: "Succeeded", accepted: true, revision: 1 })
+    expect(data(await cli(["assignment", "show", id, "--full"]))).toMatchObject({
+      result: FULL_REPORT,
+    })
+  })
+
+  test("evidence lines match their criteria after normalizing, and a different criterion still fails", async () => {
+    await createIntent()
+    const id = await dispatchWriter()
+    const accept = ["assignment", "close", id, "--outcome", "success", "--accept", "ok"]
+    data(await cli(["assignment", "record", id, "--agent", "agent-1"]))
+
+    // Another criterion's text is not this criterion's, however close.
+    const wrong = await cli(accept, report("parse: ran it", "tests: passed"))
+    expect(wrong.code).toBe(3)
+    expect(wrong.stderr).toContain('criterion "parses"')
+
+    // Case, spacing, trailing punctuation, the prompt's `[blocking]` marker and `(dimension)`.
+    const closed = await cli(
+      accept,
+      report("[blocking] Parses  (behavior): ran it", "**Tests.**: bun test passed"),
+    )
+    expect(data(closed)).toMatchObject({ accepted: true })
+    expect(data(await cli(["assignment", "show", id, "--full"]))).toMatchObject({
+      acceptance: {
+        criteria: [{ criterion: "parses", support: "ran it" }],
+        evidence: [{ label: "tests", support: "bun test passed" }],
+      },
+    })
+  })
+
+  test("a support given as indented sub-bullets under its entry counts", async () => {
+    await createIntent()
+    const id = await dispatchWriter()
+    data(await cli(["assignment", "record", id, "--agent", "agent-1"]))
+    const nested = [
+      "Built it.",
+      "",
+      "evidence:",
+      "- [blocking] parses (behavior):",
+      "  - ran the parser on nested input",
+      "  - exit 0",
+      "- tests: bun test passed",
+      "  - 12 pass",
+    ].join("\n")
+    expect(
+      data(
+        await cli(["assignment", "close", id, "--outcome", "success", "--accept", "ok"], nested),
+      ),
+    ).toMatchObject({ accepted: true })
+    expect(data(await cli(["assignment", "show", id, "--full"]))).toMatchObject({
+      acceptance: {
+        criteria: [{ criterion: "parses", support: "ran the parser on nested input; exit 0" }],
+        evidence: [{ label: "tests", support: "bun test passed; 12 pass" }],
+      },
+    })
   })
 
   test("the prompt's first line names its Assignment, and nothing else is taken for a dispatch", async () => {

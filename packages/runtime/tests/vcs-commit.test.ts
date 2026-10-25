@@ -1,36 +1,20 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { chmod, writeFile } from "node:fs/promises"
+import { chmod, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
-import {
-  cleanup,
-  failure,
-  fakeGitHub,
-  initRepo,
-  put,
-  seed,
-  sh,
-  toon,
-  user,
-  vcs,
-} from "./vcs-fixtures.ts"
+import { cleanup, fakeGitHub, initRepo, put, scratch, seed, sh, toon, vcs } from "./vcs-fixtures.ts"
 
 afterEach(cleanup)
 
 const OWNER = { name: "Octo", email: "42+octo@users.noreply.github.com" }
 
-/** GitHub where the credential owner is octo and GraphQL is available or blocked. */
-const github = (graphql = true) =>
-  fakeGitHub({
-    rest: (request) => (request.path === "user" ? user() : undefined),
-    graphql: () => (graphql ? { viewer: { login: "octo" } } : failure(403, "not available")),
-  })
+const github = () => fakeGitHub()
 
 const filesOf = async (dir: string, rev = "HEAD") =>
   (await sh(dir, ["git", "show", "--name-only", "--format=", rev])).trim().split("\n").sort()
 
-describe("commit on the git path", () => {
-  test("only the named paths are committed", async () => {
+describe("vcs commit", () => {
+  test("only the named paths are committed, with the configured git identity", async () => {
     const dir = await initRepo(OWNER)
     await seed(dir, { "a.txt": "a\n", "b.txt": "b\n" })
     await put(dir, { "a.txt": "a2\n", "b.txt": "b2\n", "new.txt": "new\n" })
@@ -39,9 +23,30 @@ describe("commit on the git path", () => {
       await vcs(dir, ["vcs", "commit", "-m", "Change a", "--", "a.txt", "new.txt"], github().layer),
     )
 
-    expect(done).toMatchObject({ path: "git", branch: "main", files: 2 })
+    expect(done).toMatchObject({ branch: "main", files: 2 })
     expect(await filesOf(dir)).toEqual(["a.txt", "new.txt"])
     expect(await sh(dir, ["git", "status", "--porcelain"])).toBe(" M b.txt\n")
+    expect((await sh(dir, ["git", "log", "-1", "--format=%an <%ae>|%cn <%ce>"])).trim()).toBe(
+      "Octo <42+octo@users.noreply.github.com>|Octo <42+octo@users.noreply.github.com>",
+    )
+  })
+
+  test("an identity that looks like an agent's is refused and nothing is committed", async () => {
+    const dir = await initRepo({ name: "Claude", email: "noreply@anthropic.com" })
+    await seed(dir, { "a.txt": "a\n" })
+    await put(dir, { "a.txt": "a2\n" })
+    const before = (await sh(dir, ["git", "rev-parse", "HEAD"])).trim()
+
+    const result = await vcs(
+      dir,
+      ["vcs", "commit", "-m", "Change a", "--", "a.txt"],
+      github().layer,
+    )
+
+    expect(result.code).toBe(3)
+    expect(result.stderr).toContain("error: AgentIdentity")
+    expect(result.stderr).toContain("git config user.name")
+    expect((await sh(dir, ["git", "rev-parse", "HEAD"])).trim()).toBe(before)
   })
 
   test("a changed Intent state folder rides along with the work commit", async () => {
@@ -70,6 +75,38 @@ describe("commit on the git path", () => {
     )
     expect(await filesOf(dir)).toEqual(["a.txt"])
     expect(second).not.toHaveProperty("state")
+  })
+
+  test("in a linked worktree the Intent state of that worktree rides along, with no Intent in use there", async () => {
+    const dir = await initRepo(OWNER)
+    await seed(dir, { "a.txt": "a\n" })
+    for (const objective of ["Ship the parser", "Ship the printer"])
+      expect((await vcs(dir, ["intent", "create"], github().layer, { objective })).code).toBe(0)
+    await sh(dir, ["git", "add", "-A"])
+    await sh(dir, ["git", "commit", "-q", "-m", "state"])
+
+    // A new worktree has none of the per-clone state: two Intents are open and neither is in use.
+    const tree = join(await scratch("holyagent-worktree-"), "tree")
+    await sh(dir, ["git", "worktree", "add", "-q", "-b", "feature", tree])
+    const intents = (await sh(tree, ["git", "ls-files", ".holyagent/intents"]))
+      .trim()
+      .split("\n")
+      .filter((path) => path.endsWith("/intent.json"))
+    expect(intents).toHaveLength(2)
+    const target = join(tree, intents[0] ?? "")
+    const record = JSON.parse(await readFile(target, "utf8")) as Record<string, unknown>
+    await writeFile(
+      target,
+      `${JSON.stringify({ ...record, objective: "Ship the parser v2" }, null, 2)}\n`,
+    )
+    await put(tree, { "a.txt": "a2\n" })
+
+    const done = toon(
+      await vcs(tree, ["vcs", "commit", "-m", "Change a", "--", "a.txt"], github().layer),
+    )
+
+    expect(await filesOf(tree)).toEqual([intents[0] ?? "", "a.txt"].sort())
+    expect(String(done["state"])).toBe(".holyagent/intents")
   })
 
   test("changes staged outside the named paths refuse the commit and are left alone", async () => {
@@ -171,23 +208,21 @@ describe("commit on the git path", () => {
     toon(await vcs(dir, ["vcs", "commit", "-m", "Change a", "--", "a.txt"], github().layer))
     expect(await Bun.file(join(dir, "hook-ran")).text()).toBe("ran\n")
   })
-})
 
-describe("commit on the git-owner path", () => {
-  test("author and committer are the owner and the commit is unsigned even when signing is configured", async () => {
-    const dir = await initRepo({ name: "Claude", email: "noreply@anthropic.com" })
+  test("a commit-msg hook that refuses the message stops the commit", async () => {
+    const dir = await initRepo(OWNER)
     await seed(dir, { "a.txt": "a\n" })
-    await sh(dir, ["git", "config", "commit.gpgsign", "true"])
-    await sh(dir, ["git", "config", "gpg.program", "/nonexistent-gpg"])
+    const hook = join(dir, ".git/hooks/commit-msg")
+    await writeFile(hook, "#!/bin/sh\necho 'no way' >&2\nexit 1\n")
+    await chmod(hook, 0o755)
     await put(dir, { "a.txt": "a2\n" })
-
-    const done = toon(
-      await vcs(dir, ["vcs", "commit", "-m", "Change a", "--", "a.txt"], github(false).layer),
+    const result = await vcs(
+      dir,
+      ["vcs", "commit", "-m", "Change a", "--", "a.txt"],
+      github().layer,
     )
-
-    expect(done).toMatchObject({ path: "git-owner", signed: false })
-    expect((await sh(dir, ["git", "log", "-1", "--format=%an <%ae>|%cn <%ce>|%G?"])).trim()).toBe(
-      "Octo Cat <42+octo@users.noreply.github.com>|Octo Cat <42+octo@users.noreply.github.com>|N",
-    )
+    expect(result.code).toBe(4)
+    expect(result.stderr).toContain("no way")
+    expect(await sh(dir, ["git", "log", "--format=%s"])).toBe("seed\n")
   })
 })

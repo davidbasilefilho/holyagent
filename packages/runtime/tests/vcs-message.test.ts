@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
 import { cleanMessage, forbiddenPhrases } from "../src/vcs/message.ts"
-import { cleanup, fakeGitHub, initRepo, put, seed, sh, toon, user, vcs } from "./vcs-fixtures.ts"
+import { cleanup, fakeGitHub, initRepo, put, seed, sh, toon, vcs } from "./vcs-fixtures.ts"
 
 afterEach(cleanup)
 
@@ -79,12 +79,12 @@ describe("the check", () => {
   })
 })
 
-/** A repository with one file to commit and a GitHub where the git identity is the owner's. */
+/** A repository with one file to commit, committed to with the user's own git identity. */
 const ready = async () => {
   const dir = await initRepo({ name: "Octo", email: "42+octo@users.noreply.github.com" })
   await seed(dir, { "a.txt": "a\n" })
   await put(dir, { "a.txt": "changed\n" })
-  const gh = fakeGitHub({ rest: (request) => (request.path === "user" ? user() : undefined) })
+  const gh = fakeGitHub()
   return { dir, gh }
 }
 
@@ -114,7 +114,7 @@ describe("vcs commit messages", () => {
       ["vcs", "commit", "-m", "Route to a subagent", "--", "a.txt"],
       gh.layer,
     )
-    expect(toon(result)).toMatchObject({ path: "git" })
+    expect(toon(result)).toMatchObject({ branch: "main" })
   })
 
   test("attribution is cleaned off before the check and before git sees the message", async () => {

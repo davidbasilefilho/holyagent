@@ -1,5 +1,8 @@
-/** A git subcommand the plugin redirects to `holyagent vcs`. */
-export type GitWrite = "commit" | "push"
+/**
+ * A git write the plugin steps in on: `commit`, which `holyagent vcs commit` replaces, and
+ * `force-push`, which is denied. A plain push is not one of them.
+ */
+export type GitWrite = "commit" | "force-push"
 
 interface Heredoc {
   readonly delimiter: string
@@ -79,6 +82,21 @@ const scanDouble = (scan: Scan): string => {
   return value
 }
 
+/** Reads an ANSI-C string (`$'…'`) after its opening quote; a backslash escapes the next character. */
+const scanAnsiC = (scan: Scan): string => {
+  let value = ""
+  while (scan.index < scan.text.length) {
+    const char = scan.text[scan.index] ?? ""
+    scan.index += 1
+    if (char === "'") break
+    if (char === "\\") {
+      value += scan.text[scan.index] ?? ""
+      scan.index += 1
+    } else value += char
+  }
+  return value
+}
+
 /**
  * Reads commands until the closer of a substitution, or to the end of the text, adding each simple
  * command to the scan. A word is the text between separators with quotes removed; anything a
@@ -118,6 +136,9 @@ const scanCode = (scan: Scan, closer?: ")" | "`") => {
       const stop = end === -1 ? scan.text.length : end
       word = (word ?? "") + scan.text.slice(scan.index + 1, stop)
       scan.index = stop + 1
+    } else if (char === "$" && next === "'") {
+      scan.index += 2
+      word = (word ?? "") + scanAnsiC(scan)
     } else if (char === '"') {
       scan.index += 1
       word = (word ?? "") + scanDouble(scan)
@@ -210,6 +231,21 @@ const afterWrapper = (words: ReadonlyArray<string>, at: number, program: string)
   return program === "timeout" && /^\d/.test(words[index] ?? "") ? index + 1 : index
 }
 
+/**
+ * True when the words after `git push` ask to overwrite remote history: `--force`,
+ * `--force-with-lease` (with or without a value), `--force-if-includes`, a short option cluster
+ * with `f` (`-f`, `-fu`), or a refspec that starts with `+`.
+ */
+const forces = (args: ReadonlyArray<string>): boolean =>
+  args.some(
+    (arg) =>
+      arg === "--force" ||
+      arg.startsWith("--force-with-lease") ||
+      arg === "--force-if-includes" ||
+      /^-[A-Za-z]*f[A-Za-z]*$/.test(arg) ||
+      (arg.startsWith("+") && arg.length > 1),
+  )
+
 const writesOf = (words: ReadonlyArray<string>): ReadonlyArray<GitWrite> => {
   let start = 0
   while (start < words.length) {
@@ -229,13 +265,15 @@ const writesOf = (words: ReadonlyArray<string>): ReadonlyArray<GitWrite> => {
   let at = start + 1
   while (words[at]?.startsWith("-")) at += VALUE_OPTIONS.has(words[at] ?? "") ? 2 : 1
   const subcommand = words[at]
-  return subcommand === "commit" || subcommand === "push" ? [subcommand] : []
+  if (subcommand === "commit") return ["commit"]
+  return subcommand === "push" && forces(words.slice(at + 1)) ? ["force-push"] : []
 }
 
 /**
- * The git writes a command line runs: `git commit` and `git push`, found as commands of their own
- * (also behind `cd a &&`, a pipe, a subshell, an env prefix, global git options or `sh -c`), so
- * `git commitizen` and `echo "git commit"` are not among them. In order of appearance, each once.
+ * The git writes a command line runs: `git commit` and a force `git push`, found as commands of
+ * their own (also behind `cd a &&`, a pipe, a subshell, an env prefix, global git options or `sh
+ * -c`), so `git commitizen`, a plain `git push` and `echo "git commit"` are not among them. In
+ * order of appearance, each once.
  */
 export const gitWrites = (line: string): ReadonlyArray<GitWrite> => [
   ...new Set(simpleCommands(line).flatMap(writesOf)),

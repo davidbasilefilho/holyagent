@@ -1,5 +1,5 @@
 import { stat } from "node:fs/promises"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 
 import { Effect, Schema } from "effect"
 
@@ -8,6 +8,9 @@ import { ROOT_CORE } from "../instructions/claude-5.5/root-core.ts"
 import { hasCode, io } from "../state/files.ts"
 import { STATE_DIRECTORY } from "../state/layout.ts"
 import { readOpenState } from "../state/store.ts"
+import { MessageRefused } from "../vcs/errors.ts"
+import { cleanMessage, forbiddenPhrases } from "../vcs/message.ts"
+import { readSettings } from "../vcs/settings.ts"
 import { PLUGIN_NAMESPACE, recordLaunch } from "./assignment.ts"
 import { stateRoot } from "./context.ts"
 import { AgentIdMissing, describeFailure, StateFolderMissing } from "./errors.ts"
@@ -130,8 +133,9 @@ const postToolUse = (additionalContext: string) =>
 
 const REDIRECTS: Readonly<Record<GitWrite, string>> = {
   commit:
-    "Commit with `holyagent vcs commit -m <headline> -- <paths…>`, which commits as the account owner with the Intent's state.",
-  push: "Push with `holyagent vcs push [branches…]`.",
+    "Commit with `holyagent vcs commit -m <headline> -- <paths…>`, which adds the Intent's state and checks the message.",
+  "force-push":
+    "Force pushes are denied. Push without --force, --force-with-lease or a + refspec; rewriting published history needs the user's approval, and the user pushes it.",
 }
 
 const SPECIALISTS: ReadonlySet<string> = new Set(ROUTES.map((route) => route.agent))
@@ -709,18 +713,54 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
   ),
   hook(
     "vcs-redirect",
-    "PreToolUse for Bash: deny a command that runs git commit or git push and point to holyagent vcs; say nothing otherwise",
+    "PreToolUse for Bash: deny a command that runs git commit (and point to holyagent vcs commit) or a force git push; say nothing otherwise, a plain git push included",
     (payload) => {
       const command = payload.tool_name === "Bash" ? payload.tool_input?.command : undefined
-      const writes = typeof command === "string" ? gitWrites(command) : []
-      return Effect.succeed(
-        writes.length === 0
-          ? NOTHING
-          : decision("deny", writes.map((write) => REDIRECTS[write]).join(" ")),
+      // Whatever the command looks like, this hook decides or says nothing; it never fails, since
+      // its onFailure block would then stop a call that has no git write in it.
+      return Effect.try({
+        try: () => (typeof command === "string" ? gitWrites(command) : []),
+        catch: (cause) => cause,
+      }).pipe(
+        Effect.map((writes) =>
+          writes.length === 0
+            ? NOTHING
+            : decision("deny", writes.map((write) => REDIRECTS[write]).join(" ")),
+        ),
+        Effect.orElseSucceed(() => NOTHING),
       )
     },
     true,
   ),
+  {
+    path: ["hook", "commit-msg"],
+    usage: "hook commit-msg <message-file>",
+    summary:
+      "Git commit-msg hook: remove agent attribution from the message file and refuse a message that talks about the user or the agent; install it as .git/hooks/commit-msg or a commit-msg job of a hook manager",
+    notes: [
+      "git passes the path of the message file as the only argument, and a non-zero exit stops the commit",
+      "the phrases are the ones `vcs commit` checks; a project lists words its domain uses in vcs.allowWords of .holyagent/config.json",
+    ],
+    flags: {},
+    positionals: 1,
+    run: (call) =>
+      Effect.gen(function* () {
+        const file = call.args.positionals[0] ?? ""
+        const text = yield* io(file, () => Bun.file(file).text())
+        const cleaned = cleanMessage(text)
+        const message = cleaned
+          .split("\n")
+          .filter((line) => !line.startsWith("#"))
+          .join("\n")
+        const phrases = forbiddenPhrases(
+          message,
+          (yield* readSettings(dirname(call.directory))).allowWords,
+        )
+        if (phrases.length > 0) return yield* new MessageRefused({ phrases })
+        if (cleaned !== text.trim()) yield* io(file, () => Bun.write(file, `${cleaned}\n`))
+        return NOTHING
+      }),
+  },
   hook(
     "workflow",
     "PreToolUse for Workflow: allow an inline script whose every agent() call names one of this plugin's specialists by a string-literal agentType, with no script path, name or resume; say nothing otherwise",

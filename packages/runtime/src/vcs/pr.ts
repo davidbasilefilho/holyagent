@@ -6,13 +6,13 @@ import { Effect, Schema } from "effect"
 
 import { Usage } from "../cli/errors.ts"
 import { pathProblem } from "../domain/paths.ts"
-import { hasCode, io } from "../state/files.ts"
-import { detect, saveVcs } from "./detect.ts"
+import { commitFile, hasCode, io } from "../state/files.ts"
+import { encodeLocal, readLocal, type Vcs } from "../state/local.ts"
+import { withStateLock } from "../state/lock.ts"
 import { GitFailed, RemoteMismatch } from "./errors.ts"
-import { currentBranch, Git, repoSlug } from "./git.ts"
-import { decodeAnswer, GitHub } from "./github.ts"
+import { currentBranch, Git, originUrl, repoSlug } from "./git.ts"
+import { apiPath, decodeAnswer, GitHub } from "./github.ts"
 import { checkedText } from "./message.ts"
-import { apiPath } from "./repo.ts"
 
 const Created = Schema.Struct({ number: Schema.Int, html_url: Schema.String })
 
@@ -102,14 +102,24 @@ export interface PullRequested {
   readonly created: boolean
 }
 
+/** Rewrites the `vcs` part of the per-clone state under the state lock. */
+const saveVcs = (directory: string, change: (current: Vcs) => Vcs) =>
+  withStateLock(
+    directory,
+    Effect.gen(function* () {
+      const local = yield* readLocal(directory)
+      for (const file of yield* encodeLocal(directory, { vcs: change(local.vcs) }))
+        yield* commitFile(file.path, file.content)
+    }),
+  )
+
 /**
  * Creates a pull request from the current branch, or updates the one named by `update`, through the
  * REST API. Title and body are cleaned and checked like a commit message.
  */
 export const pullRequest = (request: PullRequestRequest) =>
   Effect.gen(function* () {
-    const { detection } = yield* detect(request.directory, request.root, false)
-    const repo = repoSlug(detection.remote)
+    const repo = repoSlug(yield* originUrl)
     if (repo === undefined)
       return yield* new RemoteMismatch({ reason: "origin does not name a GitHub repository" })
 

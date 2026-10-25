@@ -10,7 +10,7 @@ packages/
     src/domain/                 Intents, Assignments, routes, readiness, plan, warm-reuse directive
     src/state/                  records under .holyagent/, the lock, per-clone local state
     src/cli/                    the runtime CLI: intent, assignment, plan, status, reconcile, hook
-    src/vcs/                    the vcs commands (detect, commit, push, branch, pr, ci)
+    src/vcs/                    the vcs commands (commit, pr)
     src/instructions/
       claude-5.5/               root/, specialist/, roles/<role>/ (one file per section), root-core.ts, skills/
       requirements/             cache.md, commit-text.md, mergeability.md: inputs to the instructions, not behavior

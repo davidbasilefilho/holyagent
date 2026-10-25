@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
@@ -65,48 +65,49 @@ const preToolUse = (permissionDecision: string, permissionDecisionReason: string
   `${JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision, permissionDecisionReason } })}\n`
 
 const COMMIT =
-  "Commit with `holyagent vcs commit -m <headline> -- <paths…>`, which commits as the account owner with the Intent's state."
-const PUSH = "Push with `holyagent vcs push [branches…]`."
+  "Commit with `holyagent vcs commit -m <headline> -- <paths…>`, which adds the Intent's state and checks the message."
+const FORCE =
+  "Force pushes are denied. Push without --force, --force-with-lease or a + refspec; rewriting published history needs the user's approval, and the user pushes it."
 
 describe("hook vcs-redirect", () => {
   const denied: ReadonlyArray<readonly [string, string]> = [
     ["git commit -m x", COMMIT],
-    ["git push", PUSH],
-    ["cd a && git push", PUSH],
+    ["git push --force", FORCE],
+    ["cd a && git push --force", FORCE],
     ["git status && git commit -m 'a && b'", COMMIT],
     ["git -C repo commit --amend", COMMIT],
-    ["git -c user.name=x push origin main", PUSH],
-    ["FOO=1 git push origin main", PUSH],
+    ["git -c user.name=x push origin +main", FORCE],
+    ["FOO=1 git push --force origin main", FORCE],
     ["sudo -n git commit -m x", COMMIT],
     ["/usr/bin/git commit -m x", COMMIT],
-    ["(cd a; git push)", PUSH],
+    ["(cd a; git push --force)", FORCE],
     ["echo $(git commit -m x)", COMMIT],
-    ['echo "$(git push)"', PUSH],
-    ["echo `git push`", PUSH],
-    ["bash -c 'git push origin main'", PUSH],
+    ['echo "$(git push --force)"', FORCE],
+    ["echo `git push --force`", FORCE],
+    ["bash -c 'git push --force origin main'", FORCE],
     ['sh -lc "cd a && git commit -m x"', COMMIT],
     ["true | git commit -F -", COMMIT],
-    ["git commit -m x \\\n  && git push", `${COMMIT} ${PUSH}`],
-    ["git commit -m x; git commit -m y; git push", `${COMMIT} ${PUSH}`],
-    ["if true; then git push; fi", PUSH],
+    ["git commit -m x \\\n  && git push --force", `${COMMIT} ${FORCE}`],
+    ["git commit -m x; git commit -m y; git push --force", `${COMMIT} ${FORCE}`],
+    ["if true; then git push --force; fi", FORCE],
     ["cat <<EOF\nnotes\nEOF\ngit commit -m x", COMMIT],
-    ["env -u HOME git push", PUSH],
+    ["env -u HOME git push --force", FORCE],
     ["sudo -u deploy git commit -m x", COMMIT],
-    ["nice -n 5 git push", PUSH],
-    ["timeout 5 git push", PUSH],
+    ["nice -n 5 git push --force", FORCE],
+    ["timeout 5 git push --force", FORCE],
     ["timeout -s KILL 5 git commit -m x", COMMIT],
     ["ls | xargs -I {} git commit -m {}", COMMIT],
-    ["xargs -n 1 git push", PUSH],
+    ["xargs -n 1 git push --force", FORCE],
     ["git commit -m x 2>&1", COMMIT],
-    ["git push >/dev/null 2>&1 && echo ok", PUSH],
-    ["echo ok &>/dev/null; git push", PUSH],
-    ["cat <<\\EOF\nx\nEOF\ngit push", PUSH],
-    ["git status\r\ngit push\r\n", PUSH],
+    ["git push --force >/dev/null 2>&1 && echo ok", FORCE],
+    ["echo ok &>/dev/null; git push --force", FORCE],
+    ["cat <<\\EOF\nx\nEOF\ngit push --force", FORCE],
+    ["git status\r\ngit push --force\r\n", FORCE],
     ["bash -c 'git -C d commit -m x'", COMMIT],
-    ["2>&1 git push", PUSH],
+    ["2>&1 git push --force", FORCE],
     [">/dev/null git commit -m x", COMMIT],
-    ["2>/dev/null git -C d push", PUSH],
-    ["</dev/null >out 2>&1 sudo git push", PUSH],
+    ["2>/dev/null git -C d push -f", FORCE],
+    ["</dev/null >out 2>&1 sudo git push --force", FORCE],
   ]
   test.each(denied)("denies %j", async (command, reason) => {
     expect(await hook("vcs-redirect", bash(command))).toEqual({
@@ -117,6 +118,15 @@ describe("hook vcs-redirect", () => {
   })
 
   const allowedThrough = [
+    "git push",
+    "git push -u origin feature/parser",
+    "cd a && git push origin main",
+    "git push origin main:other --follow-tags",
+    "git push --no-force",
+    "git -C repo push --set-upstream origin x",
+    "(cd a; git push)",
+    "bash -c 'git push origin main'",
+    "git push origin main 2>&1 | tail -3",
     "git commitizen",
     "git commit-tree abc",
     "git status",
@@ -147,6 +157,69 @@ describe("hook vcs-redirect", () => {
     expect(await hook("vcs-redirect", bash(command))).toEqual({ stdout: "", stderr: "", code: 0 })
   })
 
+  test.each<readonly [string, string]>([
+    ["git push --force", FORCE],
+    ["git push -f", FORCE],
+    ["git push origin main -f", FORCE],
+    ["git push -fu origin main", FORCE],
+    ["git push --force-with-lease", FORCE],
+    ["git push --force-with-lease=main:abc123 origin main", FORCE],
+    ["git push --force-if-includes --force-with-lease", FORCE],
+    ["git push origin +main", FORCE],
+    ["git push origin +HEAD:main", FORCE],
+    ["git push origin 'feature:+x'", ""],
+  ])("force pushes: %j", async (command, reason) => {
+    const result = await hook("vcs-redirect", bash(command))
+    expect(result).toEqual(
+      reason === ""
+        ? { stdout: "", stderr: "", code: 0 }
+        : { stdout: preToolUse("deny", reason), stderr: "", code: 0 },
+    )
+  })
+
+  // Shapes that once ended in an error instead of a decision: the hook parses each, denies only a
+  // real git commit or force push, and never fails.
+  test.each<readonly [string, string]>([
+    ["for f in a b; do echo $f; done", ""],
+    ["for f in a b; do rm -rf $f; done", ""],
+    ["for w in git commit; do echo $w; done", ""],
+    ["for b in a b; do git commit -m x; done", COMMIT],
+    ["while read l; do git push --force; done < list", FORCE],
+    ["cat <<EOF\nthe git commit step\nEOF", ""],
+    ["cat <<EOF > notes.md\nUse git push --force never\nEOF\ngit status", ""],
+    ["cat <<EOF\nnotes\nEOF\nrm -rf build && git commit -m x", COMMIT],
+    ["python3 - <<'PY'\nprint('git commit')\nPY", ""],
+    ["rm -rf dist node_modules && echo done", ""],
+    ["rm -rf /tmp/x; git commit -m x", COMMIT],
+    ['gh pr create --body "Uses Git a lot; each commit is small"', ""],
+    ["echo 'Git history: commit often'", ""],
+    ['git log --grep="git commit" --oneline', ""],
+    ['git commit -m "fix (parser) $(date)"', COMMIT],
+    ["case $x in a) git commit -m y ;; b) echo hi ;; esac", COMMIT],
+    ["f() { git commit -m x; }; f", COMMIT],
+    ["echo $((1 + 2)) && git commit -m x", COMMIT],
+    ["diff <(git show a) <(git show b)", ""],
+    ["echo $'it\\'s git commit'", ""],
+    ["{ echo a; echo b; } | tee out", ""],
+    ["git commit -m 'a'\\\n -m 'b'", COMMIT],
+    ["x=$(git rev-parse HEAD) && echo $x", ""],
+  ])("never errors on %j", async (command, reason) => {
+    const result = await hook("vcs-redirect", bash(command))
+    expect(result).toEqual(
+      reason === ""
+        ? { stdout: "", stderr: "", code: 0 }
+        : { stdout: preToolUse("deny", reason), stderr: "", code: 0 },
+    )
+  })
+
+  test("stays quiet about a very long or odd command", async () => {
+    const long = `echo ${"git commit ".repeat(5000)}`
+    expect(await hook("vcs-redirect", bash(long))).toEqual({ stdout: "", stderr: "", code: 0 })
+    const nested = `${"$(".repeat(300)}echo x${")".repeat(300)}`
+    expect((await hook("vcs-redirect", bash(nested))).code).toBe(0)
+    expect((await hook("vcs-redirect", bash("echo '\"\\`$(("))).code).toBe(0)
+  })
+
   test("ignores a command that is not Bash, or has no command text", async () => {
     const nothing = { stdout: "", stderr: "", code: 0 }
     expect(
@@ -163,6 +236,110 @@ describe("hook vcs-redirect", () => {
       expect(result.stdout).toBe("")
       expect(result.stderr).toStartWith("holyagent hook vcs-redirect: ")
       expect(result.stderr.trimEnd().split("\n")).toHaveLength(1)
+    }
+  })
+})
+
+describe("hook commit-msg", () => {
+  const messageFile = async (text: string) => {
+    const file = join(project, `message-${Math.random().toString(36).slice(2)}`)
+    await writeFile(file, text)
+    return file
+  }
+
+  test("removes agent attribution from the message file and exits 0", async () => {
+    const file = await messageFile(
+      "Fix the parser\n\nHandle nested input.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nCo-authored-by: Dana <dana@example.com>\n",
+    )
+    const result = await cli(["hook", "commit-msg", file], "", project)
+    expect(result).toEqual({ stdout: "", stderr: "", code: 0 })
+    expect(await readFile(file, "utf8")).toBe(
+      "Fix the parser\n\nHandle nested input.\n\nCo-authored-by: Dana <dana@example.com>\n",
+    )
+  })
+
+  test("leaves a clean message exactly as it is", async () => {
+    const text = "Fix the parser\n\n# notes for the editor\n"
+    const file = await messageFile(text)
+    expect((await cli(["hook", "commit-msg", file], "", project)).code).toBe(0)
+    expect(await readFile(file, "utf8")).toBe(text)
+  })
+
+  test("refuses a message about the user or the agent and leaves the file alone", async () => {
+    const text = "Rename the module as the user asked\n"
+    const file = await messageFile(text)
+    const result = await cli(["hook", "commit-msg", file], "", project)
+    expect(result.code).toBe(3)
+    expect(result.stderr).toContain("error: MessageRefused")
+    expect(result.stderr).toContain('"the user"')
+    expect(await readFile(file, "utf8")).toBe(text)
+  })
+
+  test("takes the words a project allows, and ignores git's comment lines", async () => {
+    const domain = await mkdtemp(join(tmpdir(), "holyagent-hook-domain-"))
+    try {
+      await mkdir(join(domain, ".holyagent"), { recursive: true })
+      await writeFile(
+        join(domain, ".holyagent", "config.json"),
+        JSON.stringify({ vcs: { allowWords: ["subagent"] } }),
+      )
+      const file = join(domain, "message")
+      await writeFile(file, "Route to a subagent\n\n# the user may edit this\n")
+      expect((await cli(["hook", "commit-msg", file], "", domain)).code).toBe(0)
+    } finally {
+      await rm(domain, { recursive: true, force: true })
+    }
+  })
+
+  test("a missing file is a state error, not a crash", async () => {
+    const result = await cli(["hook", "commit-msg", join(project, "nope")], "", project)
+    expect(result.code).toBe(4)
+    expect(result.stdout).toBe("")
+  })
+
+  test("works as a git commit-msg hook: attribution goes, a refused message stops the commit", async () => {
+    const repo = await mkdtemp(join(tmpdir(), "holyagent-hook-git-"))
+    try {
+      const git = (...args: Array<string>) =>
+        $`git ${args}`
+          .cwd(repo)
+          .env({
+            ...process.env,
+            HOME: home,
+            GIT_CONFIG_GLOBAL: "/dev/null",
+            GIT_CONFIG_NOSYSTEM: "1",
+            PATH: `${dirname(process.execPath)}:/usr/bin:/bin`,
+          })
+          .quiet()
+          .nothrow()
+      await git("init", "-q", "-b", "main", ".")
+      await git("config", "user.name", "Octo")
+      await git("config", "user.email", "octo@example.com")
+      const hook = join(repo, ".git", "hooks", "commit-msg")
+      await writeFile(
+        hook,
+        `#!/bin/sh\nexec "${join(await freshPlugin, "scripts", "holyagent")}" hook commit-msg "$1"\n`,
+        { mode: 0o755 },
+      )
+      await writeFile(join(repo, "a.txt"), "a\n")
+      await git("add", "a.txt")
+
+      const refused = await git("commit", "-m", "Change a as the user asked")
+      expect(refused.exitCode).not.toBe(0)
+      expect(refused.stderr.toString()).toContain("MessageRefused")
+      expect((await git("rev-parse", "-q", "--verify", "HEAD")).exitCode).not.toBe(0)
+
+      const done = await git(
+        "commit",
+        "-m",
+        "Change a",
+        "-m",
+        "Co-Authored-By: Claude <noreply@anthropic.com>",
+      )
+      expect(done.exitCode).toBe(0)
+      expect((await git("log", "-1", "--format=%B")).stdout.toString().trim()).toBe("Change a")
+    } finally {
+      await rm(repo, { recursive: true, force: true })
     }
   })
 })
@@ -943,8 +1120,8 @@ describe("hooks that need no state", () => {
         },
       )
       const env = { PATH: `${bin}:${dirname(process.execPath)}:/usr/bin:/bin` }
-      expect(await hook("vcs-redirect", bash("git push"), project, env)).toMatchObject({
-        stdout: preToolUse("deny", PUSH),
+      expect(await hook("vcs-redirect", bash("git push --force"), project, env)).toMatchObject({
+        stdout: preToolUse("deny", FORCE),
         code: 0,
       })
       expect(await hook("workflow", inlineRun(ALLOWED_SCRIPT), project, env)).toEqual({
@@ -1023,9 +1200,9 @@ describe("the built wrapper", () => {
 
   test("runs each hook through the bundle", async () => {
     const env = { PATH: `${BUN}:/usr/bin:/bin`, HOME: home }
-    expect(await call("vcs-redirect", bash("cd a && git push"), env)).toEqual({
+    expect(await call("vcs-redirect", bash("cd a && git push -f"), env)).toEqual({
       code: 0,
-      stdout: preToolUse("deny", PUSH),
+      stdout: preToolUse("deny", FORCE),
       stderr: "",
     })
     expect(await call("workflow", inlineRun(ALLOWED_SCRIPT), env)).toMatchObject({

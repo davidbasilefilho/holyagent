@@ -18,8 +18,8 @@ export const Vcs = Schema.Struct({
   base: Schema.optionalKey(Text),
   pullRequest: Schema.optionalKey(Text),
   /**
-   * What `vcs detect` keeps (see DetectionCache in vcs/model.ts). It is read as anything here and
-   * validated by its owner, so a file in an old shape never breaks the other commands.
+   * What the removed `vcs detect` kept. It is read as anything and kept as it was, so an older file
+   * never breaks the other commands.
    */
   detection: Schema.optionalKey(Schema.Unknown),
 })
