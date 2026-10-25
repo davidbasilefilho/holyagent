@@ -1,10 +1,9 @@
-import { Config, Console, Effect, FileSystem, Option, Path, Schema } from "effect"
-import { Command, Flag } from "effect/cli"
+import { Config, Effect, FileSystem, Option, Path, Schema } from "effect"
 
 import { applyDefaults, readJsonObject, writeJsonObject } from "../json-file.ts"
 import { CliFailure, type Report, show } from "../report.ts"
 import { Shell, type ShellResult } from "../shell.ts"
-import { MARKETPLACE, PLUGIN_ID } from "./setup.ts"
+import { MARKETPLACE, PLUGIN_ID } from "./project.ts"
 
 const InstalledPlugins = Schema.Array(Schema.Struct({ id: Schema.String }))
 const Marketplaces = Schema.Array(Schema.Struct({ name: Schema.String }))
@@ -54,7 +53,7 @@ const fileExists = (path: string) =>
   }).pipe(Effect.catch(() => Effect.succeed(false)))
 
 /** Installs the HolyAgent plugin through `claude plugin`, unless it is already installed. */
-const installPlugin = Effect.gen(function* () {
+const installPlugin = Effect.fn("installPlugin")(function* (dryRun: boolean) {
   const shell = yield* Shell
   if (Option.isNone(yield* shell.which("claude", { includeBunBin: true }))) {
     return [
@@ -71,6 +70,7 @@ const installPlugin = Effect.gen(function* () {
   if (installed.value.some((plugin) => plugin.id === PLUGIN_ID)) {
     return [present(`plugin ${PLUGIN_ID}: already installed`)]
   }
+  if (dryRun) return [added(`plugin ${PLUGIN_ID}: would install`)]
   // `marketplace add` is skipped when the marketplace is already registered; a listing that cannot
   // be read falls through to the add, which Claude Code also accepts for a known marketplace.
   const known = yield* shell.run("claude", ["plugin", "marketplace", "list", "--json"])
@@ -97,12 +97,22 @@ const installPlugin = Effect.gen(function* () {
 
 /**
  * Installs a command with `bun add -g` unless it is already available. Returns the report lines and
- * whether the command can be used afterwards.
+ * whether the command can be used afterwards (on a dry run, whether it would be).
  */
-const ensureGlobal = Effect.fn("ensureGlobal")(function* (command: string, packageName: string) {
+const ensureGlobal = Effect.fn("ensureGlobal")(function* (
+  command: string,
+  packageName: string,
+  dryRun: boolean,
+) {
   const shell = yield* Shell
   if (Option.isSome(yield* shell.which(command, { includeBunBin: true }))) {
     return { usable: true, lines: [present(`${command}: already installed`)] }
+  }
+  if (dryRun) {
+    return {
+      usable: true,
+      lines: [added(`${command}: would install with bun add -g ${packageName}`)],
+    }
   }
   const result = yield* shell.run("bun", ["add", "-g", packageName])
   if (result.exitCode !== 0)
@@ -117,11 +127,11 @@ const ensureGlobal = Effect.fn("ensureGlobal")(function* (command: string, packa
 })
 
 /** Billion Context: the package, its Claude Code native mode, and `compress.rules`. */
-const installBillionContext = Effect.gen(function* () {
+const installBillionContext = Effect.fn("installBillionContext")(function* (dryRun: boolean) {
   const shell = yield* Shell
   const path = yield* Path.Path
   const files = yield* userFiles
-  const global = yield* ensureGlobal("bili", "billion-context")
+  const global = yield* ensureGlobal("bili", "billion-context", dryRun)
   if (!global.usable) return global.lines
 
   // Native mode merges a proxy URL, a hook and an MCP server into Claude Code's settings, and every
@@ -132,15 +142,17 @@ const installBillionContext = Effect.gen(function* () {
     (yield* fileContains(files.claudeJson, '"bili"'))
   const native = nativeReady
     ? present("bili native mode: already configured")
-    : yield* shell
-        .run("bili", ["plugin", "install", "claude"])
-        .pipe(
-          Effect.map((result) =>
-            result.exitCode === 0
-              ? added("bili native mode: configured with bili plugin install claude")
-              : failed("bili plugin install claude", result),
-          ),
-        )
+    : dryRun
+      ? added("bili native mode: would configure with bili plugin install claude")
+      : yield* shell
+          .run("bili", ["plugin", "install", "claude"])
+          .pipe(
+            Effect.map((result) =>
+              result.exitCode === 0
+                ? added("bili native mode: configured with bili plugin install claude")
+                : failed("bili plugin install claude", result),
+            ),
+          )
 
   // compress.rules protects persistent reminders from being folded; it is set only when absent.
   const config = yield* readJsonObject(files.biliConfig).pipe(
@@ -156,6 +168,11 @@ const installBillionContext = Effect.gen(function* () {
           ),
         )
       }
+      if (dryRun) {
+        return Effect.succeed(
+          added(`bili config: would set compress.rules=true in ${files.biliConfig}`),
+        )
+      }
       return writeJsonObject(files.biliConfig, merged, { mode: 0o600 }).pipe(
         Effect.as(added(`bili config: set compress.rules=true in ${files.biliConfig}`)),
       )
@@ -166,11 +183,11 @@ const installBillionContext = Effect.gen(function* () {
 })
 
 /** Ctx7 and the Context7 skill; the skill is skipped, with a hint, when no login or key exists. */
-const installCtx7 = Effect.gen(function* () {
+const installCtx7 = Effect.fn("installCtx7")(function* (dryRun: boolean) {
   const shell = yield* Shell
   const path = yield* Path.Path
   const files = yield* userFiles
-  const global = yield* ensureGlobal("ctx7", "ctx7")
+  const global = yield* ensureGlobal("ctx7", "ctx7", dryRun)
   if (!global.usable) return global.lines
 
   const skillReady =
@@ -201,6 +218,9 @@ const installCtx7 = Effect.gen(function* () {
       ),
     ]
   }
+  if (dryRun) {
+    return [...global.lines, added("ctx7 skill: would install with ctx7 setup --cli --claude")]
+  }
   const result = yield* shell.run("ctx7", args)
   return [
     ...global.lines,
@@ -211,64 +231,32 @@ const installCtx7 = Effect.gen(function* () {
 })
 
 /** Turns a step that cannot start (unreadable environment) into a failed line, not an abort. */
-const asStep = <R>(label: string, step: Effect.Effect<ReadonlyArray<string>, CliFailure, R>) =>
+export const asStep = <R>(
+  label: string,
+  step: Effect.Effect<ReadonlyArray<string>, CliFailure, R>,
+) =>
   step.pipe(
     Effect.catchTag("CliFailure", (error) => Effect.succeed([`! ${label}: ${error.message}`])),
   )
 
 /**
  * Installs HolyAgent for the current user: the Claude Code plugin, Billion Context and ctx7. Every
- * step checks its own result first, and a step that fails does not stop the others.
+ * step checks its own result first, and a step that fails does not stop the others. On a dry run
+ * nothing is installed or written, and the lines say what would be.
  */
-export const install = Effect.fn("install")(function* (options: {
+export const setupUser = Effect.fn("setupUser")(function* (options: {
   readonly skipBillionContext: boolean
   readonly skipCtx7: boolean
+  readonly dryRun: boolean
 }) {
   const lines = [
-    ...(yield* installPlugin),
+    ...(yield* installPlugin(options.dryRun)),
     ...(options.skipBillionContext
       ? [skipped("billion-context: skipped by flag")]
-      : yield* asStep("billion-context", installBillionContext)),
-    ...(options.skipCtx7 ? [skipped("ctx7: skipped by flag")] : yield* asStep("ctx7", installCtx7)),
+      : yield* asStep("billion-context", installBillionContext(options.dryRun))),
+    ...(options.skipCtx7
+      ? [skipped("ctx7: skipped by flag")]
+      : yield* asStep("ctx7", installCtx7(options.dryRun))),
   ]
   return { lines, ok: !lines.some((line) => line.startsWith("! ")) } satisfies Report
 })
-
-/** The `holyagent install` command. */
-export const installCommand = Command.make(
-  "install",
-  {
-    skipBillionContext: Flag.Boolean("skip-billion-context").pipe(
-      Flag.withDescription("Do not install Billion Context"),
-      Flag.withDefault(false),
-    ),
-    skipCtx7: Flag.Boolean("skip-ctx7").pipe(
-      Flag.withDescription("Do not install ctx7 or its skill"),
-      Flag.withDefault(false),
-    ),
-  },
-  (options) =>
-    install(options).pipe(
-      Effect.flatMap((report) =>
-        Console.log(report.lines.join("\n")).pipe(
-          Effect.andThen(report.ok ? Effect.void : Effect.fail(new CliFailure({ message: "" }))),
-        ),
-      ),
-    ),
-)
-  .pipe(
-    Command.withDescription(
-      [
-        "Install HolyAgent for the current user and skip every step that is already done:",
-        "the Claude Code plugin (claude plugin marketplace add + install), Billion Context with Bun and its",
-        "Claude Code native mode (it routes Claude Code traffic through a local proxy and turns off",
-        "auto-compact) with compress.rules set only when absent, and ctx7 with the Context7 skill (needs",
-        "CONTEXT7_API_KEY or a saved login; the key is passed on the command line to ctx7 setup).",
-      ].join(" "),
-    ),
-  )
-  .pipe(
-    Command.withShortDescription(
-      "Install the HolyAgent plugin, Billion Context and ctx7 for your user",
-    ),
-  )

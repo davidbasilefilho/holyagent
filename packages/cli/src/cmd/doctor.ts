@@ -1,10 +1,10 @@
 import { Console, Effect, Option, Schema } from "effect"
 import { Command, Flag } from "effect/cli"
 
+import { PLUGIN_ID, projectDefaults, settingsPath } from "../claude/project.ts"
 import { applyDefaults, readJsonObject } from "../json-file.ts"
 import { CliFailure, type Report } from "../report.ts"
 import { Shell } from "../shell.ts"
-import { PLUGIN_ID, projectDefaults, settingsPath } from "./setup.ts"
 
 const InstalledPlugins = Schema.Array(Schema.Struct({ id: Schema.String }))
 
@@ -49,7 +49,7 @@ const checkSettings = (directory: string) =>
     const missing = entries.filter((entry) => entry.status === "added").map((entry) => entry.path)
     return missing.length === 0
       ? pass("settings", file)
-      : fail("settings", `${file} lacks ${missing.join(", ")}; run: holyagent setup`)
+      : fail("settings", `${file} lacks ${missing.join(", ")}; run: holyagent setup claude`)
   }).pipe(Effect.catchTag("CliFailure", (error) => Effect.succeed(fail("settings", error.message))))
 
 const checkPlugin = Effect.gen(function* () {
@@ -66,13 +66,13 @@ const checkPlugin = Effect.gen(function* () {
   if (Option.isNone(installed)) return fail("plugin", "claude plugin list failed")
   return installed.value.some((plugin) => plugin.id === PLUGIN_ID)
     ? pass("plugin", `${PLUGIN_ID} installed`)
-    : fail("plugin", `${PLUGIN_ID} not installed; run: holyagent install`)
+    : fail("plugin", `${PLUGIN_ID} not installed; run: holyagent setup claude`)
 })
 
 /**
  * Checks the environment HolyAgent needs, one line per check: a canary Bun, `claude`, `bili` and
- * `ctx7` on PATH, the project settings from `holyagent setup`, and the installed plugin. With
- * `fix`, a Bun that is not canary is upgraded.
+ * `ctx7` on PATH, the project settings from `holyagent setup claude`, and the installed plugin.
+ * With `fix`, a Bun that is not canary is upgraded.
  */
 export const doctor = Effect.fn("doctor")(function* (options: {
   readonly directory: string

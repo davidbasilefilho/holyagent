@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test"
 
 import { Effect, FileSystem, Path } from "effect"
 
+import { setupProject } from "../src/claude/project.ts"
 import { doctor } from "../src/cmd/doctor.ts"
-import { setup } from "../src/cmd/setup.ts"
 import { fakeShell, run, tempDir } from "./support.ts"
 
 const CANARY = "1.4.4-canary.1+a8fcd319b"
@@ -19,7 +19,7 @@ const answers = (bun: () => string, plugins: ReadonlyArray<string>) => (line: st
 
 const configuredProject = Effect.gen(function* () {
   const directory = yield* tempDir
-  yield* setup({ directory, subagentCacheTtl: "1h", dryRun: false })
+  yield* setupProject({ directory, subagentCacheTtl: "1h", dryRun: false })
   return directory
 })
 
@@ -118,9 +118,9 @@ describe("holyagent doctor", () => {
         const settings = report.lines.find((line) => line.startsWith("FAIL settings"))
         expect(settings).toContain("attribution.commit")
         expect(settings).not.toContain("includeGitInstructions")
-        expect(settings).toEndWith("run: holyagent setup")
+        expect(settings).toEndWith("run: holyagent setup claude")
         expect(report.lines.at(-1)).toBe(
-          "FAIL plugin: holyagent@holyagent not installed; run: holyagent install",
+          "FAIL plugin: holyagent@holyagent not installed; run: holyagent setup claude",
         )
       }),
     ))
@@ -137,7 +137,7 @@ describe("holyagent doctor", () => {
           Effect.provide(shell.layer),
         )
         expect(report.lines.find((line) => line.startsWith("FAIL settings"))).toContain(
-          "run: holyagent setup",
+          "run: holyagent setup claude",
         )
       }),
     ))

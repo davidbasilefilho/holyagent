@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import { Effect, FileSystem, Path } from "effect"
 
-import { setup } from "../src/cmd/setup.ts"
+import { setupProject } from "../src/claude/project.ts"
 import { parseJson, run, tempDir } from "./support.ts"
 
 const defaults = { subagentCacheTtl: "1h", dryRun: false } as const
@@ -20,12 +20,12 @@ const project = (existing?: string) =>
     return { directory, file, read: fs.readFileString(file), exists: fs.exists(file) }
   })
 
-describe("holyagent setup", () => {
+describe("holyagent setup claude: project settings", () => {
   test("creates the settings file in an empty project", () =>
     run(
       Effect.gen(function* () {
         const { directory, file, read } = yield* project()
-        const report = yield* setup({ directory, ...defaults })
+        const report = yield* setupProject({ directory, ...defaults })
         const text = yield* read
         expect(report.ok).toBe(true)
         expect(report.lines.at(-1)).toBe("added 7")
@@ -48,7 +48,7 @@ describe("holyagent setup", () => {
     run(
       Effect.gen(function* () {
         const { directory, read } = yield* project()
-        yield* setup({ directory, subagentCacheTtl: "5m", dryRun: false })
+        yield* setupProject({ directory, subagentCacheTtl: "5m", dryRun: false })
         expect(parseJson(yield* read).subagentPromptCacheTtl).toBe("5m")
       }),
     ))
@@ -65,7 +65,7 @@ describe("holyagent setup", () => {
           enabledPlugins: { "holyagent@holyagent": false, "x@y": true },
         }
         const { directory, read } = yield* project(JSON.stringify(existing))
-        const report = yield* setup({ directory, ...defaults })
+        const report = yield* setupProject({ directory, ...defaults })
         const result = parseJson(yield* read)
         expect(result).toEqual({
           ...existing,
@@ -90,7 +90,7 @@ describe("holyagent setup", () => {
         const { directory, read } = yield* project(
           JSON.stringify({ attribution: { commit: "Co-Authored-By: me", extra: 1 } }),
         )
-        const report = yield* setup({ directory, ...defaults })
+        const report = yield* setupProject({ directory, ...defaults })
         expect(parseJson(yield* read).attribution).toEqual({
           commit: "Co-Authored-By: me",
           extra: 1,
@@ -108,9 +108,9 @@ describe("holyagent setup", () => {
     run(
       Effect.gen(function* () {
         const { directory, read } = yield* project()
-        yield* setup({ directory, ...defaults })
+        yield* setupProject({ directory, ...defaults })
         const first = yield* read
-        const report = yield* setup({ directory, ...defaults })
+        const report = yield* setupProject({ directory, ...defaults })
         expect(report.lines.at(-1)).toBe("no changes")
         expect(report.lines.some((line) => line.startsWith("+ "))).toBe(false)
         expect(yield* read).toBe(first)
@@ -121,12 +121,12 @@ describe("holyagent setup", () => {
     run(
       Effect.gen(function* () {
         const { directory, read } = yield* project()
-        yield* setup({ directory, ...defaults })
+        yield* setupProject({ directory, ...defaults })
         const compact = JSON.stringify(parseJson(yield* read))
         const fs = yield* FileSystem.FileSystem
         const path = yield* Path.Path
         yield* fs.writeFileString(path.join(directory, ".claude", "settings.json"), compact)
-        yield* setup({ directory, ...defaults })
+        yield* setupProject({ directory, ...defaults })
         expect(yield* read).toBe(compact)
       }),
     ))
@@ -135,7 +135,7 @@ describe("holyagent setup", () => {
     run(
       Effect.gen(function* () {
         const empty = yield* project()
-        const dry = yield* setup({
+        const dry = yield* setupProject({
           directory: empty.directory,
           subagentCacheTtl: "1h",
           dryRun: true,
@@ -144,7 +144,7 @@ describe("holyagent setup", () => {
         expect(yield* empty.exists).toBe(false)
 
         const existing = yield* project('{"model":"opus"}')
-        yield* setup({ directory: existing.directory, subagentCacheTtl: "1h", dryRun: true })
+        yield* setupProject({ directory: existing.directory, subagentCacheTtl: "1h", dryRun: true })
         expect(yield* existing.read).toBe('{"model":"opus"}')
       }),
     ))
@@ -154,7 +154,7 @@ describe("holyagent setup", () => {
       Effect.gen(function* () {
         for (const content of ["[1]", '{"a":', ""]) {
           const { directory, read } = yield* project(content)
-          const error = yield* setup({ directory, ...defaults }).pipe(Effect.flip)
+          const error = yield* setupProject({ directory, ...defaults }).pipe(Effect.flip)
           expect(error._tag).toBe("CliFailure")
           expect(error.message).toContain("is not a JSON object")
           expect(yield* read).toBe(content)
@@ -168,7 +168,7 @@ describe("holyagent setup", () => {
         const fs = yield* FileSystem.FileSystem
         const { directory, file } = yield* project('{"model":"opus"}')
         yield* fs.chmod(file, 0o600)
-        yield* setup({ directory, ...defaults })
+        yield* setupProject({ directory, ...defaults })
         expect((yield* fs.stat(file)).mode & 0o777).toBe(0o600)
       }),
     ))
@@ -183,7 +183,7 @@ describe("holyagent setup", () => {
         yield* fs.writeFileString(shared, '{"model":"opus"}')
         yield* fs.makeDirectory(path.dirname(file), { recursive: true })
         yield* fs.symlink(shared, file)
-        yield* setup({ directory, ...defaults })
+        yield* setupProject({ directory, ...defaults })
         expect((yield* fs.lstat(file)).type).toBe("SymbolicLink")
         expect(parseJson(yield* fs.readFileString(shared))).toMatchObject({
           model: "opus",
@@ -200,7 +200,7 @@ describe("holyagent setup", () => {
         const { directory, file, read } = yield* project('{"model":"opus"}')
         const temporary = path.join(path.dirname(file), `.settings.json.${process.pid}.tmp`)
         yield* fs.writeFileString(temporary, "keep")
-        const error = yield* setup({ directory, ...defaults }).pipe(Effect.flip)
+        const error = yield* setupProject({ directory, ...defaults }).pipe(Effect.flip)
         expect(error.message).toContain("cannot write")
         expect(yield* fs.readFileString(temporary)).toBe("keep")
         expect(yield* read).toBe('{"model":"opus"}')

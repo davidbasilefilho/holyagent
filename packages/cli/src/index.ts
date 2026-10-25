@@ -5,13 +5,12 @@ import { Command } from "effect/cli"
 
 import packageJson from "../package.json" with { type: "json" }
 import { doctorCommand } from "./cmd/doctor.ts"
-import { installCommand } from "./cmd/install.ts"
 import { setupCommand } from "./cmd/setup.ts"
 import { Shell } from "./shell.ts"
 
 const holyagent = Command.make("holyagent").pipe(
   Command.withDescription("Install and configure HolyAgent for your user and your projects."),
-  Command.withSubcommands([setupCommand, installCommand, doctorCommand]),
+  Command.withSubcommands([setupCommand, doctorCommand]),
 )
 
 const program = holyagent.pipe(

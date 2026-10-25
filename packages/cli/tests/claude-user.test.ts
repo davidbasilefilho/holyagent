@@ -2,10 +2,10 @@ import { describe, expect, test } from "bun:test"
 
 import { Effect, FileSystem, Path } from "effect"
 
-import { install } from "../src/cmd/install.ts"
+import { setupUser } from "../src/claude/user.ts"
 import { envLayer, fakeShell, parseJson, run, tempDir } from "./support.ts"
 
-const both = { skipBillionContext: false, skipCtx7: false }
+const both = { skipBillionContext: false, skipCtx7: false, dryRun: false }
 const pluginList = (ids: ReadonlyArray<string>) => (line: string) =>
   line === "claude plugin list --json"
     ? { stdout: JSON.stringify(ids.map((id) => ({ id, scope: "user" }))) }
@@ -43,13 +43,13 @@ const home = Effect.gen(function* () {
   }
 })
 
-describe("holyagent install", () => {
+describe("holyagent setup claude: user installs", () => {
   test("on a fresh machine installs everything in order and skips the unauthenticated ctx7 skill", () =>
     run(
       Effect.gen(function* () {
         const h = yield* home
         const shell = fakeShell({ commands: ["claude", "bun"], respond: pluginList([]) })
-        const report = yield* install(both).pipe(
+        const report = yield* setupUser(both).pipe(
           Effect.provide(shell.layer),
           Effect.provide(envLayer({ HOME: h.root })),
         )
@@ -83,7 +83,7 @@ describe("holyagent install", () => {
           commands: ["claude", "bun", "bili", "ctx7"],
           respond: pluginList(["holyagent@holyagent", "other@market"]),
         })
-        const report = yield* install(both).pipe(
+        const report = yield* setupUser(both).pipe(
           Effect.provide(shell.layer),
           Effect.provide(envLayer({ HOME: h.root })),
         )
@@ -104,7 +104,7 @@ describe("holyagent install", () => {
           commands: ["claude", "bili"],
           respond: pluginList(["other@market"]),
         })
-        yield* install({ skipBillionContext: false, skipCtx7: true }).pipe(
+        yield* setupUser({ skipBillionContext: false, skipCtx7: true, dryRun: false }).pipe(
           Effect.provide(shell.layer),
           Effect.provide(envLayer({ HOME: h.root })),
         )
@@ -132,10 +132,11 @@ describe("holyagent install", () => {
               ? { stdout: JSON.stringify([{ name: "holyagent", source: "github" }]) }
               : pluginList([])(line),
         })
-        const report = yield* install({ skipBillionContext: true, skipCtx7: true }).pipe(
-          Effect.provide(shell.layer),
-          Effect.provide(envLayer({ HOME: h.root })),
-        )
+        const report = yield* setupUser({
+          skipBillionContext: true,
+          skipCtx7: true,
+          dryRun: false,
+        }).pipe(Effect.provide(shell.layer), Effect.provide(envLayer({ HOME: h.root })))
         expect(report.ok).toBe(true)
         expect(shell.lines()).toEqual([
           "claude plugin list --json",
@@ -154,7 +155,7 @@ describe("holyagent install", () => {
           commands: ["claude", "ctx7"],
           respond: pluginList(["holyagent@holyagent"]),
         })
-        const noHome = yield* install(both).pipe(
+        const noHome = yield* setupUser(both).pipe(
           Effect.provide(shell.layer),
           Effect.provide(envLayer({})),
         )
@@ -166,7 +167,11 @@ describe("holyagent install", () => {
           commands: ["claude", "ctx7"],
           respond: pluginList(["holyagent@holyagent"]),
         })
-        const emptyKey = yield* install({ skipBillionContext: true, skipCtx7: false }).pipe(
+        const emptyKey = yield* setupUser({
+          skipBillionContext: true,
+          skipCtx7: false,
+          dryRun: false,
+        }).pipe(
           Effect.provide(emptyKeyShell.layer),
           Effect.provide(envLayer({ HOME: (yield* home).root, CONTEXT7_API_KEY: "" })),
         )
@@ -184,10 +189,11 @@ describe("holyagent install", () => {
           commands: ["claude"],
           respond: pluginList(["holyagent@holyagent"]),
         })
-        const report = yield* install({ skipBillionContext: true, skipCtx7: true }).pipe(
-          Effect.provide(shell.layer),
-          Effect.provide(envLayer({ HOME: h.root })),
-        )
+        const report = yield* setupUser({
+          skipBillionContext: true,
+          skipCtx7: true,
+          dryRun: false,
+        }).pipe(Effect.provide(shell.layer), Effect.provide(envLayer({ HOME: h.root })))
         expect(shell.lines()).toEqual(["claude plugin list --json"])
         expect(report.lines).toContain("- billion-context: skipped by flag")
         expect(report.lines).toContain("- ctx7: skipped by flag")
@@ -199,13 +205,13 @@ describe("holyagent install", () => {
       Effect.gen(function* () {
         const setupLine = (calls: ReadonlyArray<string>) =>
           calls.find((line) => line.startsWith("ctx7 setup"))
-        const options = { skipBillionContext: true, skipCtx7: false }
+        const options = { skipBillionContext: true, skipCtx7: false, dryRun: false }
         const withKey = yield* home
         const keyShell = fakeShell({
           commands: ["claude", "ctx7"],
           respond: pluginList(["holyagent@holyagent"]),
         })
-        yield* install(options).pipe(
+        yield* setupUser(options).pipe(
           Effect.provide(keyShell.layer),
           Effect.provide(envLayer({ HOME: withKey.root, CONTEXT7_API_KEY: "ctx7sk-test" })),
         )
@@ -219,7 +225,7 @@ describe("holyagent install", () => {
           commands: ["claude", "ctx7"],
           respond: pluginList(["holyagent@holyagent"]),
         })
-        yield* install(options).pipe(
+        yield* setupUser(options).pipe(
           Effect.provide(loginShell.layer),
           Effect.provide(envLayer({ HOME: withLogin.root })),
         )
@@ -230,7 +236,7 @@ describe("holyagent install", () => {
           commands: ["claude", "ctx7"],
           respond: pluginList(["holyagent@holyagent"]),
         })
-        yield* install(options).pipe(
+        yield* setupUser(options).pipe(
           Effect.provide(bareShell.layer),
           Effect.provide(envLayer({ HOME: bare.root })),
         )
@@ -249,10 +255,11 @@ describe("holyagent install", () => {
               ? { exitCode: 1, stderr: "network down\nmore" }
               : pluginList([])(line),
         })
-        const report = yield* install({ skipBillionContext: true, skipCtx7: false }).pipe(
-          Effect.provide(shell.layer),
-          Effect.provide(envLayer({ HOME: h.root })),
-        )
+        const report = yield* setupUser({
+          skipBillionContext: true,
+          skipCtx7: false,
+          dryRun: false,
+        }).pipe(Effect.provide(shell.layer), Effect.provide(envLayer({ HOME: h.root })))
         expect(report.ok).toBe(false)
         expect(report.lines[0]).toBe(
           "! claude plugin marketplace add: failed (exit 1): network down",
@@ -267,10 +274,11 @@ describe("holyagent install", () => {
       Effect.gen(function* () {
         const h = yield* home
         const shell = fakeShell({ commands: [] })
-        const report = yield* install({ skipBillionContext: true, skipCtx7: true }).pipe(
-          Effect.provide(shell.layer),
-          Effect.provide(envLayer({ HOME: h.root })),
-        )
+        const report = yield* setupUser({
+          skipBillionContext: true,
+          skipCtx7: true,
+          dryRun: false,
+        }).pipe(Effect.provide(shell.layer), Effect.provide(envLayer({ HOME: h.root })))
         expect(report.ok).toBe(false)
         expect(report.lines[0]).toContain("`claude` not found")
         expect(shell.lines()).toEqual([])
@@ -287,15 +295,65 @@ describe("holyagent install", () => {
           commands: ["claude", "bili"],
           respond: pluginList(["holyagent@holyagent"]),
         })
-        const report = yield* install({ skipBillionContext: false, skipCtx7: true }).pipe(
-          Effect.provide(shell.layer),
-          Effect.provide(envLayer({ HOME: h.root })),
-        )
+        const report = yield* setupUser({
+          skipBillionContext: false,
+          skipCtx7: true,
+          dryRun: false,
+        }).pipe(Effect.provide(shell.layer), Effect.provide(envLayer({ HOME: h.root })))
         expect(report.ok).toBe(false)
         expect(report.lines.find((line) => line.startsWith("! bili config"))).toContain(
           "is not a JSON object",
         )
         expect(yield* h.read(h.biliConfig)).toBe("[1]")
+      }),
+    ))
+
+  test("--dry-run says what it would install and runs nothing that changes the machine", () =>
+    run(
+      Effect.gen(function* () {
+        const h = yield* home
+        yield* h.markCtx7Skill
+        const shell = fakeShell({ commands: ["claude", "bun"], respond: pluginList([]) })
+        const report = yield* setupUser({ ...both, dryRun: true }).pipe(
+          Effect.provide(shell.layer),
+          Effect.provide(envLayer({ HOME: h.root })),
+        )
+        expect(shell.lines()).toEqual(["claude plugin list --json"])
+        expect(report.ok).toBe(true)
+        expect(report.lines).toEqual([
+          "+ plugin holyagent@holyagent: would install",
+          "+ bili: would install with bun add -g billion-context",
+          "+ bili native mode: would configure with bili plugin install claude",
+          `+ bili config: would set compress.rules=true in ${h.biliConfig}`,
+          "+ ctx7: would install with bun add -g ctx7",
+          "= ctx7 skill: already installed",
+        ])
+        expect(yield* h.fs.exists(h.biliConfig)).toBe(false)
+      }),
+    ))
+
+  test("--dry-run would install the ctx7 skill only when a key or login exists", () =>
+    run(
+      Effect.gen(function* () {
+        const h = yield* home
+        const shell = fakeShell({
+          commands: ["claude", "ctx7"],
+          respond: pluginList(["holyagent@holyagent"]),
+        })
+        const options = { skipBillionContext: true, skipCtx7: false, dryRun: true }
+        const keyed = yield* setupUser(options).pipe(
+          Effect.provide(shell.layer),
+          Effect.provide(envLayer({ HOME: h.root, CONTEXT7_API_KEY: "ctx7sk-test" })),
+        )
+        expect(keyed.lines.at(-1)).toBe(
+          "+ ctx7 skill: would install with ctx7 setup --cli --claude",
+        )
+        const bare = yield* setupUser(options).pipe(
+          Effect.provide(shell.layer),
+          Effect.provide(envLayer({ HOME: h.root })),
+        )
+        expect(bare.lines.at(-1)).toStartWith("- ctx7 skill: no CONTEXT7_API_KEY")
+        expect(shell.lines().every((line) => line === "claude plugin list --json")).toBe(true)
       }),
     ))
 })
