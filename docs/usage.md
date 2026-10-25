@@ -12,7 +12,7 @@ claude plugin marketplace add ranxianglei/billion-context
 claude plugin install holyagent@holyagent
 ```
 
-Inside Claude Code the same steps are `/plugin marketplace add davidbasilefilho/holyagent`, `/plugin marketplace add ranxianglei/billion-context` and `/plugin install holyagent@holyagent`. The plugin declares Billion Context's Claude Code plugin (`billion-context@billion-context`) as a dependency, so the install pulls it in, and Claude Code resolves a dependency only from a marketplace that is already added. That plugin carries only the `/billion-context:bili-setup` command, which installs nothing by itself; run it, or `holyagent setup claude`, to set up Billion Context. This route installs only the plugins. The plugin's own `settings.json` makes the main thread the root agent (`agent: holyagent`) while the plugin is enabled.
+Inside Claude Code the same steps are `/plugin marketplace add davidbasilefilho/holyagent`, `/plugin marketplace add ranxianglei/billion-context` and `/plugin install holyagent@holyagent`. The plugin declares two dependencies, so the install pulls them in: Billion Context's Claude Code plugin (`billion-context@billion-context`) and Exa's (`exa@claude-plugins-official`, from the official marketplace, which Claude Code adds by default). Claude Code resolves a dependency only from a marketplace that is already added. Exa's MCP server gives the Search specialists their web tools; it works without an account under a rate limit, and signing in to Exa raises the limit and adds `agent_run`. That plugin carries only the `/billion-context:bili-setup` command, which installs nothing by itself; run it, or `holyagent setup claude`, to set up Billion Context. This route installs only the plugins. The plugin's own `settings.json` makes the main thread the root agent (`agent: holyagent`) while the plugin is enabled.
 
 **`holyagent setup claude`.** The public CLI adds both marketplaces and installs the plugin the same way, then Billion Context and ctx7, then configures the project you run it in (see [Set up a project](#set-up-a-project)). Use it when you also want the project settings and the two tools; it is the only route that writes them.
 
@@ -41,6 +41,7 @@ Restart Claude Code after installing so the plugin and Billion Context's native 
 | `extraKnownMarketplaces.holyagent`       | GitHub `davidbasilefilho/holyagent`  | Offers the marketplace to teammates                                                                    |
 | `extraKnownMarketplaces.billion-context` | GitHub `ranxianglei/billion-context` | Offers the marketplace of the plugin's Billion Context dependency                                      |
 | `enabledPlugins["holyagent@holyagent"]`  | `true`                               | Turns the plugin on for the project                                                                    |
+| `permissions.deny`                       | `["WebSearch", "WebFetch"]`          | Turns off Claude Code's own web tools, so web work goes through Exa; an existing list is kept          |
 
 `attribution` is written as an object (`commit`, `pr`, `sessionUrl`), the form earlier Claude Code versions also read; the shorter `attribution: false` needs 2.1.281 or later.
 

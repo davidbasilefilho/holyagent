@@ -11,6 +11,7 @@ What HolyAgent installs or configures, and why. The WSL installer (`install/wsl-
 | HolyAgent plugin | Marketplace, `holyagent setup claude`                      | The root agent, specialists, skills, workflows, hooks and runtime CLI       |
 | Billion Context  | WSL installer, `holyagent setup claude`, plugin dependency | Compresses the conversation so long sessions stay inside the context window |
 | ctx7 and skill   | WSL installer, `holyagent setup claude`                    | Current library documentation for the agents                                |
+| Exa plugin       | Plugin dependency                                          | Web search and page reading for the Search specialists                      |
 
 Pi is not installed: 0.1.0 has no Pi integration ([pi/README.md](pi/README.md)).
 
@@ -53,6 +54,12 @@ Settings HolyAgent relies on:
 - Cloud sessions (Claude Code on the web) do not run the proxy: the host manages the provider, so Claude Code ignores a settings `ANTHROPIC_BASE_URL`.
 - By default it auto-updates itself from npm in a staggered rollout, and the proxy has no authentication (it listens on `127.0.0.1`). It requires Node 20 or later.
 - `bili plugin remove claude` undoes native mode.
+
+## Exa
+
+The HolyAgent plugin depends on Exa's Claude Code plugin, `exa@claude-plugins-official`. It brings a hosted MCP server (`https://mcp.exa.ai/mcp`) and two skills. The Search specialists (Librarian.lookup and Librarian.research) get its `web_search_exa`, `web_fetch_exa` and `agent_run` tools in place of Claude Code's `WebSearch` and `WebFetch`, and their role text says when to use each. The server works anonymously under a rate limit; `agent_run` appears only after signing in to Exa (OAuth) or with an API key.
+
+`holyagent setup claude` also adds `WebSearch` and `WebFetch` to the project's `permissions.deny`, so agents outside HolyAgent's lists do not fall back to them either. A project that already has a `permissions.deny` list keeps it unchanged; add the two entries by hand there. A plugin cannot set permissions, so the marketplace route alone leaves the built-in tools on for agents other than the Search specialists.
 
 ## ctx7 and the Context7 skill
 

@@ -41,11 +41,17 @@ const DESCRIPTION =
   "A root agent that plans work as Intents and Assignments and eighteen specialists it dispatches, with a CLI that keeps their state."
 
 /**
- * Billion Context's Claude Code plugin, a dependency of this one. Its marketplace is allowed for
- * cross-marketplace dependencies, and Claude Code installs it only once that marketplace is added.
+ * The plugins this one depends on, and their marketplaces, which are allowed for cross-marketplace
+ * dependencies. Claude Code installs a dependency only from a marketplace that is already added;
+ * the official one is added by default. Billion Context compresses the conversation, and Exa
+ * provides the web tools of the Search roles.
  */
 const BILLION_CONTEXT_MARKETPLACE = "billion-context"
-const BILLION_CONTEXT_PLUGIN = `billion-context@${BILLION_CONTEXT_MARKETPLACE}`
+const OFFICIAL_MARKETPLACE = "claude-plugins-official"
+const DEPENDENCIES = [
+  `billion-context@${BILLION_CONTEXT_MARKETPLACE}`,
+  `exa@${OFFICIAL_MARKETPLACE}`,
+]
 
 const inPlugin = (path: string) => `${PLUGIN_DIRECTORY}/${path}`
 
@@ -57,7 +63,7 @@ const manifests = (): ReadonlyArray<GeneratedFile> => [
       version: packageJson.version,
       description: DESCRIPTION,
       author: { name: "davidbasilefilho" },
-      dependencies: [BILLION_CONTEXT_PLUGIN],
+      dependencies: DEPENDENCIES,
     }),
   },
   { path: inPlugin("settings.json"), content: jsonText({ agent: PLUGIN_NAME }) },
@@ -67,7 +73,7 @@ const manifests = (): ReadonlyArray<GeneratedFile> => [
       name: PLUGIN_NAME,
       owner: { name: "davidbasilefilho" },
       description: DESCRIPTION,
-      allowCrossMarketplaceDependenciesOn: [BILLION_CONTEXT_MARKETPLACE],
+      allowCrossMarketplaceDependenciesOn: [BILLION_CONTEXT_MARKETPLACE, OFFICIAL_MARKETPLACE],
       plugins: [
         {
           name: PLUGIN_NAME,

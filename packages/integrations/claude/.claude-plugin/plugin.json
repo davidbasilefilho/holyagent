@@ -6,6 +6,7 @@
     "name": "davidbasilefilho"
   },
   "dependencies": [
-    "billion-context@billion-context"
+    "billion-context@billion-context",
+    "exa@claude-plugins-official"
   ]
 }

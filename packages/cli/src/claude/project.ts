@@ -44,6 +44,7 @@ export const projectDefaults = (
     value: { source: { source: "github", repo: BILLION_CONTEXT_MARKETPLACE.repo } },
   },
   { path: ["enabledPlugins", PLUGIN_ID], value: true },
+  { path: ["permissions", "deny"], value: ["WebSearch", "WebFetch"] },
 ]
 
 /** Where a project keeps its shared Claude Code settings. */
