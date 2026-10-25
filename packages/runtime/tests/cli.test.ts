@@ -679,6 +679,27 @@ describe("plan", () => {
     })
   })
 
+  test("work that continues a warm specialist is listed beside the workflow", async () => {
+    await createIntent()
+    const first = await runToClose(writer(), "agent-1", true)
+    const follow = String(
+      data(await cli(["assignment", "create"], writer({ objective: "Fix it", followUpOf: first })))
+        .id,
+    )
+    const other = String(
+      data(await cli(["assignment", "create"], writer({ ownershipPaths: ["src/other.ts"] }))).id,
+    )
+    const plan = data(await cli(["plan"]))
+    expect(plan).toMatchObject({
+      action: "workflow",
+      workflow: "holyagent:run-assignments",
+      assignments: [other],
+      continues: [{ assignment: follow, agent: "agent-1" }],
+    })
+    expect(String(plan.reason)).toContain("SendMessage")
+    expect(plan.fallback).toMatchObject({ assignments: [other] })
+  })
+
   test("a single Ready Assignment with a warm specialist is a continue", async () => {
     await createIntent()
     const first = await runToClose(writer(), "agent-1", true)

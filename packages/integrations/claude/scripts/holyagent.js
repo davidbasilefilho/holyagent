@@ -10297,10 +10297,11 @@ var OUTCOMES = {
 var RECORD_USAGE = "assignment record <id> (--agent <agentId> | --failed)";
 var CLOSE_USAGE = "assignment close <id> --outcome success|failure|errored|interrupted|stopped [--accept <rationale>] [--report-json]";
 var LIST_USAGE = "assignment list [--state <state>] [--all] [--full]";
+var withoutNamespace = (type) => type?.startsWith(`${PLUGIN_NAMESPACE}:`) === true ? type.slice(PLUGIN_NAMESPACE.length + 1) : type;
 var recordLaunch = (directory, id, agentId, launchedAs) => updateState(directory, (snapshot) => gen2(function* () {
   const route = routeFor((yield* findAssignment(snapshot.project, id)).roleTask);
   const { model, effort } = route;
-  if (launchedAs !== undefined && launchedAs.type?.replace(`${PLUGIN_NAMESPACE}:`, "") !== route.agent)
+  if (launchedAs !== undefined && withoutNamespace(launchedAs.type) !== route.agent)
     return yield* new AgentMismatch({ expected: route.agent, launched: launchedAs.type });
   return yield* record2(snapshot.project, snapshot.specialists, id, agentId === undefined ? { launched: false } : { launched: true, agentId, model, effort });
 })).pipe(map4(({ assignment }) => assignment));
@@ -10333,7 +10334,7 @@ var ASSIGNMENT_COMMANDS = [
     usage: "assignment dispatch",
     summary: "Start an Assignment and say how to run it: spawn an agent or continue a warm one. A new draft is created and started in one step",
     input: `{id} for a Ready Assignment, or a new draft ${DRAFT_SHAPE}`,
-    output: "TOON fields (id, state, agent/model/effort or continue, reason), then a line `prompt:` alone, then the specialist prompt verbatim to the end; pass that text to the Agent tool or SendMessage as it is",
+    output: "TOON fields (id, state, agent/model/effort or continue, reason), then a line `prompt:` alone, then the specialist prompt verbatim to the end; pass that text as it is: as the prompt of a workflow entry first, to the Agent tool only when the Workflow tool is disabled or unavailable, and by SendMessage only for a warm continuation",
     notes: [...DRAFT_NOTES, 'dispatching a Ready Assignment takes {"id": "<id>"}'],
     flags: {},
     positionals: 0,
@@ -10517,6 +10518,10 @@ var WORKFLOWS = [
     ({ dispatchable }) => parallelSet(dispatchable, () => true)
   ]
 ];
+var continuations = (rows, beside, registry, now, config) => parallelSet(rows.filter((row) => beside.every((other) => independent(other, row))), () => true).flatMap((row) => {
+  const directive = directiveFor(row, registry, now, config);
+  return directive.action === "continue" ? [{ assignmentId: row.id, agentId: directive.agentId }] : [];
+});
 var recommend = (project, registry, now, config) => {
   const ready = project.assignments.filter((row) => row.state === "Ready");
   const dispatchable = ready.filter((row) => dispatchBlock(project, row) === undefined && awaited(project, row).length === 0);
@@ -10529,31 +10534,54 @@ var recommend = (project, registry, now, config) => {
     };
     for (const [name, reason, pick] of WORKFLOWS) {
       const chosen = pick(pool);
-      const minimum = name === "run-assignments" && pool.dispatchable.length === dispatchable.length ? 1 : 2;
-      if (chosen.length >= minimum) {
+      if (chosen.length >= (name === "run-assignments" ? 1 : 2)) {
         const assignmentIds = chosen.map((row) => row.id);
         const reviews = name === "implement-review" ? assignmentIds.filter((_, at) => at % 2 === 1) : [];
         const fallback = {
           assignmentIds: assignmentIds.filter((id) => !reviews.includes(id)),
           afterwards: reviews
         };
-        return { action: "workflow", name, assignmentIds, fallback, reason };
+        const continues = continuations(dispatchable.filter((row) => !spawns(row)), chosen, registry, now, config);
+        return {
+          action: "workflow",
+          name,
+          assignmentIds,
+          fallback,
+          continues,
+          reason: continues.length === 0 ? reason : `${reason}; the Assignments in continues go by SendMessage to their warm specialists`
+        };
       }
     }
   }
   const chosen = parallelSet(dispatchable, () => true);
-  const [first] = chosen;
-  if (first === undefined)
+  if (chosen.length === 0)
     return;
   const assignmentIds = chosen.map((row) => row.id);
+  if (config.workflowsAvailable) {
+    const continues = continuations(chosen, [], registry, now, config);
+    return {
+      action: "continue",
+      assignmentIds: continues.map((row) => row.assignmentId),
+      continues,
+      reason: "each continues a warm specialist by SendMessage"
+    };
+  }
   if (chosen.length > 1)
     return {
       action: "subagent",
       assignmentIds,
-      reason: config.workflowsAvailable ? "part of the set continues a warm specialist by SendMessage; run the rest as a workflow" : "the Workflow tool is disabled or unavailable"
+      reason: "the Workflow tool is disabled or unavailable"
     };
+  const [first] = chosen;
+  if (first === undefined)
+    return;
   const directive = directiveFor(first, registry, now, config);
-  return directive.action === "continue" ? { action: "continue", assignmentIds, agentId: directive.agentId, reason: directive.reason } : { action: "subagent", assignmentIds, reason: directive.reason };
+  return directive.action === "continue" ? {
+    action: "continue",
+    assignmentIds,
+    continues: [{ assignmentId: first.id, agentId: directive.agentId }],
+    reason: directive.reason
+  } : { action: "subagent", assignmentIds, reason: directive.reason };
 };
 
 var root_default = `<!-- core:start -->
@@ -10576,15 +10604,15 @@ Edits, runs, checks, reviews, research and broad investigation go to specialists
 
 An evidence gap goes back by SendMessage to the subagent, then \`assignment close\` again. A workflow agent cannot be messaged, so its gap, like any repair, is a new draft with \`followUpOf\`.
 
-Start all ready independent work together and end the turn. Completion notices are the only wake-ups: no polling, steering or stopping, so running work keeps its context. A new user message leaves running specialists alone. A resumed or compacted session starts with \`reconcile\` in its context: close a Running Assignment as \`interrupted\` only once its agent is confirmed gone (SendMessage or transcript; an exited parent session proves nothing); otherwise it stays reserved.
+Start all ready independent work together and end the turn. Completion notices are the only wake-ups: no polling, steering or stopping, so running work keeps its context. A new user message leaves running specialists alone. A resumed or compacted session starts with \`reconcile\` in its context: close a Running Assignment as \`interrupted\` only once its agent is confirmed gone (SendMessage or transcript; an exited parent session proves nothing); otherwise it stays Running.
 
-Create the task list at the start and keep everything else there: PRs, tasks, subtasks, dispatches, waiting, verdicts and repairs. Messages cost attention and the list shows state, so none is mentioned. Write to the user only for a decision, a blocker only they can clear, and the final report. A decision goes through AskUserQuestion (options, a recommended default, never plain text), and only when it materially changes the result (requirements, user-visible behavior, architecture, trust boundaries, security, contracts, dependencies, deployment) and neither the repository nor the user's words settle it. Handle hook and harness feedback silently, acting on it or declining under the governing rules.
+Create the task list at the start and keep everything else there: PRs, tasks, subtasks, dispatches, waiting, verdicts and repairs. Messages cost attention and the list shows state, so none is mentioned. Write to the user only for a decision, a blocker only they can clear, and the final report. A decision goes through AskUserQuestion (options, a recommended default, never plain text), and only when it materially changes the result (requirements, user-visible behavior, architecture, trust boundaries, security, persistent contracts, dependencies, deployment) and neither the repository nor the user's words settle it. Handle hook and harness feedback silently, acting on it or declining under the governing rules.
 
 <!-- core:end -->
 
 Pick the cheapest specialist whose agent description fits and whose result you can judge; the CLI pins model and effort per route. A bug with a known reproduction goes to Worker.implementation (fix and regression test); Worker.debugging takes unknown causes. With several Intents open and none in use, choose one through AskUserQuestion.
 
-Workflows run all new work, in parallel or in sequence, a single Assignment as a one-entry workflow, and choosing this agent is the user's opt-in to the Workflow tool. \`assignment create\` each Assignment, run \`plan\` and run what it names: the prebuilt workflow (\`holyagent:<name>\` with the Assignment ids; \`plan --help\` has the arguments and how its reports close) or, when none fits, a custom script. Direct subagents are the fallback only when the Workflow tool is disabled or unavailable: launch the \`fallback\` writers together, and each review once the writers it depends on are terminal. Work that \`dispatch\` prints as a continuation of a warm specialist goes by SendMessage; take reuse as printed. Every workflow agent is a holyagent specialist (\`agentType: "holyagent:<agent>"\`) on the route's model and effort, identical within a phase so the cache prefix holds; the prebuilt workflows run without a permission prompt and a custom script goes through the normal flow, so prefer a prebuilt one.
+Workflows run all new work, in parallel or in sequence, a single Assignment as a one-entry workflow, and choosing this agent is the user's opt-in to the Workflow tool. \`assignment create\` each Assignment, run \`plan\` and run what it names: the prebuilt workflow (\`holyagent:<name>\` with the Assignment ids; \`plan --help\` has the arguments and how its reports close) or, when none fits, a custom script. Direct subagents are the fallback only when the Workflow tool is disabled or unavailable: launch the \`fallback\` writers together, and each review once the writers it depends on are terminal. Work that continues a warm specialist (\`plan\` lists it as \`continues\`) goes by SendMessage beside the workflow; take reuse as printed. Every workflow agent is a holyagent specialist (\`agentType: "holyagent:<agent>"\`) on the route's model and effort, identical within a phase so the cache prefix holds; the prebuilt workflows run without a permission prompt and a custom script goes through the normal flow, so prefer a prebuilt one.
 
 ## Assignments and acceptance
 
@@ -10608,7 +10636,7 @@ Judge the compact reports: proof arrives as command, exit code and counts, and l
 
 Version control and state records are yours alone, through \`holyagent vcs\`: \`detect\`, \`commit\`, \`push\`, \`branch\`, \`pr\` and \`ci\` (\`holyagent vcs --help\` has the flags). Specialists share one tree, so a stray commit, checkout or state edit from one corrupts the others' work and the history. A hook redirects \`git commit\` and \`git push\` to \`vcs\`, but nothing stops other git and gh writes or edits under \`.git/\` and \`.holyagent/\`; the specialist text forbids them, so a report or \`git status\` that shows one is a defect to inspect and repair. Commits read as the account owner wrote them, in the target repository's language and format, and name no agent, Claude, Assignment, review round or "the user"; they carry no attribution trailer, and PR text follows the same rule. \`vcs commit\` adds the Intent's state to the same commit, so state never gets commits of its own.
 
-The target repository's conventions (CONTRIBUTING, AGENTS.md, CLAUDE.md, its branch and PR history) come first; \`vcs detect\` reports its remote, base branch, account owner and CI. \`vcs commit\` stages exactly the paths given, so name the accepted Assignments' paths only and keep unrelated work apart.
+The target repository's conventions (CONTRIBUTING, AGENTS.md, CLAUDE.md, its branch and PR history) come first; \`vcs detect\` reports its remote, base branch, account owner and CI. \`vcs commit\` stages exactly the paths given, so name the paths of the Assignments being committed only and keep unrelated work apart.
 
 ### Stack plan
 
@@ -10699,7 +10727,7 @@ var resumeOf = (directory) => readOpenState(directory).pipe(map4((snapshot) => (
   reconcile: reconcileFrom(snapshot)
 })));
 var PLAN_NOTES = [
-  "workflow first: `assignment dispatch` each id for its agent, model, effort and prompt, then run the Workflow tool with `name` and `args` built from them; an entry is {id, agent, model, effort, prompt}. a single Assignment is a one-entry workflow. `fallback` is for a session where the Workflow tool is disabled or unavailable: its writers launch together, and `afterwards` launch once the writers they depend on are terminal",
+  "workflow first: `assignment dispatch` each id for its agent, model, effort and prompt, then run the Workflow tool with `name` and `args` built from them; an entry is {id, agent, model, effort, prompt}. a single Assignment is a one-entry workflow, and `continues` lists work that continues a warm specialist by SendMessage beside it. `fallback` is for a session where the Workflow tool is disabled or unavailable: its writers launch together, and `afterwards` launch once the writers they depend on are terminal",
   "holyagent:run-assignments  {assignments: [entry\u2026]} returns [{id, report}]",
   "holyagent:review-diff  {change, reviewers: [entry\u2026]}; change names what is reviewed (a committed range, base..head); returns each reviewer's report and the deduplicated blockers",
   "holyagent:implement-review  {pairs: [{writer: entry, reviewer: entry}\u2026]}; the reviewer's prompt gets the writer's changed paths and checks; returns both reports per pair",
@@ -10728,7 +10756,11 @@ var OVERVIEW_COMMANDS = [
       return present({
         action: recommendation.action,
         workflow: recommendation.action === "workflow" ? `${PLUGIN_NAMESPACE}:${recommendation.name}` : undefined,
-        continue: recommendation.action === "continue" ? recommendation.agentId : undefined,
+        continue: recommendation.action === "continue" && recommendation.continues.length === 1 ? recommendation.continues[0]?.agentId : undefined,
+        continues: recommendation.action === "subagent" || recommendation.continues.length === 0 || recommendation.action === "continue" && recommendation.continues.length === 1 ? undefined : recommendation.continues.map(({ assignmentId, agentId }) => ({
+          assignment: assignmentId,
+          agent: agentId
+        })),
         assignments: recommendation.assignmentIds,
         parallel: recommendation.assignmentIds.length > 1 ? true : undefined,
         fallback: recommendation.action === "workflow" ? present({
@@ -11046,6 +11078,12 @@ var launchedAgent = (response) => {
   const agentId = typeof response === "object" && response !== null && "agentId" in response ? response.agentId : undefined;
   return typeof agentId === "string" && SAFE_ID.test(agentId) ? agentId : undefined;
 };
+var HAND_BACK = {
+  AgentMismatch: "The wrong agent was launched: dispatch the Assignment again with the printed agent.",
+  StateFolderMissing: "Run the command from the project that holds the Assignment.",
+  InvalidTransition: "Check the Assignment with `holyagent assignment show`; it is not Running.",
+  UnknownRecord: "Check the id with `holyagent assignment list --all`."
+};
 var postToolUse = (additionalContext) => output({ hookEventName: "PostToolUse", additionalContext });
 var REDIRECTS = {
   commit: "Commit with `holyagent vcs commit -m <headline> -- <paths\u2026>`, which commits as the account owner with the Intent's state.",
@@ -11112,7 +11150,11 @@ var HOOK_COMMANDS = [
         type: typeof type === "string" ? type : undefined
       });
       return postToolUse(`holyagent: recorded agent ${agentId} for ${id}.`);
-    }).pipe(catch_2((error) => succeed6(postToolUse(`holyagent: could not record the launch of ${id} (${describeFailure(error).tag}). Run \`holyagent assignment record ${id} --agent ${agentId ?? "<agentId>"}\` yourself.`))));
+    }).pipe(catch_2((error) => {
+      const { tag } = describeFailure(error);
+      const next = HAND_BACK[tag] ?? `Run \`holyagent assignment record ${id} --agent ${agentId ?? "<agentId>"}\` yourself.`;
+      return succeed6(postToolUse(`holyagent: could not record the launch of ${id} (${tag}). ${next}`));
+    }));
   }, true),
   hook("vcs-redirect", "PreToolUse for Bash: deny a command that runs git commit or git push and point to holyagent vcs; say nothing otherwise", (payload) => {
     const command = payload.tool_name === "Bash" ? payload.tool_input?.command : undefined;

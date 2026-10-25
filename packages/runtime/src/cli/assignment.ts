@@ -98,6 +98,9 @@ const CLOSE_USAGE =
   "assignment close <id> --outcome success|failure|errored|interrupted|stopped [--accept <rationale>] [--report-json]"
 const LIST_USAGE = "assignment list [--state <state>] [--all] [--full]"
 
+const withoutNamespace = (type: string | undefined): string | undefined =>
+  type?.startsWith(`${PLUGIN_NAMESPACE}:`) === true ? type.slice(PLUGIN_NAMESPACE.length + 1) : type
+
 /**
  * Records the launch of a Running Assignment: binds the agent id, or with none returns the
  * Assignment to Ready because the launch failed. The `record` command and the launch hook both come
@@ -114,10 +117,7 @@ export const recordLaunch = (
     Effect.gen(function* () {
       const route = routeFor((yield* findAssignment(snapshot.project, id)).roleTask)
       const { model, effort } = route
-      if (
-        launchedAs !== undefined &&
-        launchedAs.type?.replace(`${PLUGIN_NAMESPACE}:`, "") !== route.agent
-      )
+      if (launchedAs !== undefined && withoutNamespace(launchedAs.type) !== route.agent)
         return yield* new AgentMismatch({ expected: route.agent, launched: launchedAs.type })
       return yield* record(
         snapshot.project,
@@ -169,7 +169,7 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
       "Start an Assignment and say how to run it: spawn an agent or continue a warm one. A new draft is created and started in one step",
     input: `{id} for a Ready Assignment, or a new draft ${DRAFT_SHAPE}`,
     output:
-      "TOON fields (id, state, agent/model/effort or continue, reason), then a line `prompt:` alone, then the specialist prompt verbatim to the end; pass that text to the Agent tool or SendMessage as it is",
+      "TOON fields (id, state, agent/model/effort or continue, reason), then a line `prompt:` alone, then the specialist prompt verbatim to the end; pass that text as it is: as the prompt of a workflow entry first, to the Agent tool only when the Workflow tool is disabled or unavailable, and by SendMessage only for a warm continuation",
     notes: [...DRAFT_NOTES, 'dispatching a Ready Assignment takes {"id": "<id>"}'],
     flags: {},
     positionals: 0,

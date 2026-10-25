@@ -79,7 +79,7 @@ export const resumeOf = (directory: string) =>
 
 /** What the root does with a workflow recommendation, for the `plan` help. */
 const PLAN_NOTES: ReadonlyArray<string> = [
-  "workflow first: `assignment dispatch` each id for its agent, model, effort and prompt, then run the Workflow tool with `name` and `args` built from them; an entry is {id, agent, model, effort, prompt}. a single Assignment is a one-entry workflow. `fallback` is for a session where the Workflow tool is disabled or unavailable: its writers launch together, and `afterwards` launch once the writers they depend on are terminal",
+  "workflow first: `assignment dispatch` each id for its agent, model, effort and prompt, then run the Workflow tool with `name` and `args` built from them; an entry is {id, agent, model, effort, prompt}. a single Assignment is a one-entry workflow, and `continues` lists work that continues a warm specialist by SendMessage beside it. `fallback` is for a session where the Workflow tool is disabled or unavailable: its writers launch together, and `afterwards` launch once the writers they depend on are terminal",
   "holyagent:run-assignments  {assignments: [entry…]} returns [{id, report}]",
   "holyagent:review-diff  {change, reviewers: [entry…]}; change names what is reviewed (a committed range, base..head); returns each reviewer's report and the deduplicated blockers",
   "holyagent:implement-review  {pairs: [{writer: entry, reviewer: entry}…]}; the reviewer's prompt gets the writer's changed paths and checks; returns both reports per pair",
@@ -120,7 +120,19 @@ export const OVERVIEW_COMMANDS: ReadonlyArray<Command> = [
             recommendation.action === "workflow"
               ? `${PLUGIN_NAMESPACE}:${recommendation.name}`
               : undefined,
-          continue: recommendation.action === "continue" ? recommendation.agentId : undefined,
+          continue:
+            recommendation.action === "continue" && recommendation.continues.length === 1
+              ? recommendation.continues[0]?.agentId
+              : undefined,
+          continues:
+            recommendation.action === "subagent" ||
+            recommendation.continues.length === 0 ||
+            (recommendation.action === "continue" && recommendation.continues.length === 1)
+              ? undefined
+              : recommendation.continues.map(({ assignmentId, agentId }) => ({
+                  assignment: assignmentId,
+                  agent: agentId,
+                })),
           assignments: recommendation.assignmentIds,
           parallel: recommendation.assignmentIds.length > 1 ? true : undefined,
           fallback:

@@ -99,6 +99,18 @@ const launchedAgent = (response: unknown): string | undefined => {
   return typeof agentId === "string" && SAFE_ID.test(agentId) ? agentId : undefined
 }
 
+/**
+ * What the root does about a launch the hook could not record, for the failures where recording by
+ * hand cannot succeed; any other failure may pass on a retry, so it gets the record command.
+ */
+const HAND_BACK: Readonly<Record<string, string>> = {
+  AgentMismatch:
+    "The wrong agent was launched: dispatch the Assignment again with the printed agent.",
+  StateFolderMissing: "Run the command from the project that holds the Assignment.",
+  InvalidTransition: "Check the Assignment with `holyagent assignment show`; it is not Running.",
+  UnknownRecord: "Check the id with `holyagent assignment list --all`.",
+}
+
 const postToolUse = (additionalContext: string) =>
   output({ hookEventName: "PostToolUse", additionalContext })
 
@@ -245,13 +257,15 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
         })
         return postToolUse(`holyagent: recorded agent ${agentId} for ${id}.`)
       }).pipe(
-        Effect.catch((error) =>
-          Effect.succeed(
-            postToolUse(
-              `holyagent: could not record the launch of ${id} (${describeFailure(error).tag}). Run \`holyagent assignment record ${id} --agent ${agentId ?? "<agentId>"}\` yourself.`,
-            ),
-          ),
-        ),
+        Effect.catch((error) => {
+          const { tag } = describeFailure(error)
+          const next =
+            HAND_BACK[tag] ??
+            `Run \`holyagent assignment record ${id} --agent ${agentId ?? "<agentId>"}\` yourself.`
+          return Effect.succeed(
+            postToolUse(`holyagent: could not record the launch of ${id} (${tag}). ${next}`),
+          )
+        }),
       )
     },
     true,

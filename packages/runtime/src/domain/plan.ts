@@ -11,6 +11,12 @@ export const WORKFLOW_NAMES = ["implement-review", "review-diff", "run-assignmen
 /** One workflow name. */
 export type WorkflowName = (typeof WORKFLOW_NAMES)[number]
 
+/** An Assignment that continues a warm specialist, which only SendMessage can reach. */
+export interface Continuation {
+  readonly assignmentId: string
+  readonly agentId: string
+}
+
 /** How the root should run a set of Ready Assignments. */
 export type Recommendation =
   | {
@@ -26,12 +32,14 @@ export type Recommendation =
         readonly assignmentIds: ReadonlyArray<string>
         readonly afterwards: ReadonlyArray<string>
       }
+      /** Ready work beside the workflow that continues a warm specialist, by SendMessage. */
+      readonly continues: ReadonlyArray<Continuation>
       readonly reason: string
     }
   | {
       readonly action: "continue"
       readonly assignmentIds: ReadonlyArray<string>
-      readonly agentId: string
+      readonly continues: ReadonlyArray<Continuation>
       readonly reason: string
     }
   | {
@@ -124,15 +132,36 @@ const WORKFLOWS: ReadonlyArray<
 ]
 
 /**
+ * The Assignments among `rows` that continue a warm specialist and can run beside `beside` and each
+ * other, with the agent to message.
+ */
+const continuations = (
+  rows: ReadonlyArray<Assignment>,
+  beside: ReadonlyArray<Assignment>,
+  registry: Registry,
+  now: string,
+  config: ExecutionConfig,
+): ReadonlyArray<Continuation> =>
+  parallelSet(
+    rows.filter((row) => beside.every((other) => independent(other, row))),
+    () => true,
+  ).flatMap((row) => {
+    const directive = directiveFor(row, registry, now, config)
+    return directive.action === "continue"
+      ? [{ assignmentId: row.id, agentId: directive.agentId }]
+      : []
+  })
+
+/**
  * Recommends how to run the project's Ready Assignments that can start now (the others are left
  * out, see {@link dispatchBlock}; a review waits for the unfinished work it names in
  * independentFrom), or undefined when none can. With workflows available it names the first
  * workflow the set fits: writers with the reviews of their work, as writer and review ids in turn
  * (`implement-review`), at least two independent reviews (`review-diff`) or independent Assignments
- * (`run-assignments`, which takes a single one when nothing is left out), each with its
- * direct-subagent fallback, leaving out any that would continue a warm specialist, which a workflow
- * cannot message. Otherwise it takes the Assignments that can run side by side: one that can
- * continue a warm specialist is `continue`, and anything else is `subagent` work.
+ * (`run-assignments`, which takes a single one), each with its direct-subagent fallback. Work that
+ * would continue a warm specialist, which a workflow cannot message, is listed beside it as
+ * `continues`, or is the whole `continue` recommendation when nothing else is ready. Without
+ * workflows it takes the Assignments that can run side by side as `subagent` work.
  */
 export const recommend = (
   project: Project,
@@ -155,10 +184,8 @@ export const recommend = (
     }
     for (const [name, reason, pick] of WORKFLOWS) {
       const chosen = pick(pool)
-      // A single Assignment is a one-entry run-assignments, unless a warm specialist is left out.
-      const minimum =
-        name === "run-assignments" && pool.dispatchable.length === dispatchable.length ? 1 : 2
-      if (chosen.length >= minimum) {
+      // A single Assignment is a one-entry run-assignments; the other workflows need a pair.
+      if (chosen.length >= (name === "run-assignments" ? 1 : 2)) {
         const assignmentIds = chosen.map((row) => row.id)
         // The pairs of implement-review run as writer then review, so without the workflow the
         // reviews wait for their writers.
@@ -168,24 +195,56 @@ export const recommend = (
           assignmentIds: assignmentIds.filter((id) => !reviews.includes(id)),
           afterwards: reviews,
         }
-        return { action: "workflow", name, assignmentIds, fallback, reason }
+        // The warm work a workflow cannot message goes beside it, as long as it does not collide.
+        const continues = continuations(
+          dispatchable.filter((row) => !spawns(row)),
+          chosen,
+          registry,
+          now,
+          config,
+        )
+        return {
+          action: "workflow",
+          name,
+          assignmentIds,
+          fallback,
+          continues,
+          reason:
+            continues.length === 0
+              ? reason
+              : `${reason}; the Assignments in continues go by SendMessage to their warm specialists`,
+        }
       }
     }
   }
   const chosen = parallelSet(dispatchable, () => true)
-  const [first] = chosen
-  if (first === undefined) return undefined
+  if (chosen.length === 0) return undefined
   const assignmentIds = chosen.map((row) => row.id)
+  if (config.workflowsAvailable) {
+    // Every spawnable Assignment went into a workflow above, so what is left continues warm ones.
+    const continues = continuations(chosen, [], registry, now, config)
+    return {
+      action: "continue",
+      assignmentIds: continues.map((row) => row.assignmentId),
+      continues,
+      reason: "each continues a warm specialist by SendMessage",
+    }
+  }
   if (chosen.length > 1)
     return {
       action: "subagent",
       assignmentIds,
-      reason: config.workflowsAvailable
-        ? "part of the set continues a warm specialist by SendMessage; run the rest as a workflow"
-        : "the Workflow tool is disabled or unavailable",
+      reason: "the Workflow tool is disabled or unavailable",
     }
+  const [first] = chosen
+  if (first === undefined) return undefined
   const directive = directiveFor(first, registry, now, config)
   return directive.action === "continue"
-    ? { action: "continue", assignmentIds, agentId: directive.agentId, reason: directive.reason }
+    ? {
+        action: "continue",
+        assignmentIds,
+        continues: [{ assignmentId: first.id, agentId: directive.agentId }],
+        reason: directive.reason,
+      }
     : { action: "subagent", assignmentIds, reason: directive.reason }
 }

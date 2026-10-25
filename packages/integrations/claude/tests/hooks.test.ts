@@ -491,9 +491,9 @@ describe("hook agent-launch", () => {
       const result = await hook("agent-launch", launch(prompt, background("agent-9", prompt)), dir)
       expect(result.code).toBe(0)
       expect(result.stdout).toContain(`could not record the launch of ${id} (InvalidTransition)`)
-      expect(result.stdout).toContain(
-        `holyagent assignment record ${id} --agent agent-9\` yourself.`,
-      )
+      // It cannot succeed on a retry, so the note sends the root to the state instead.
+      expect(result.stdout).not.toContain("assignment record")
+      expect(result.stdout).toContain("assignment show")
       // A prompt for an Assignment this project does not know fails the same way.
       const unknown = prompt.replace(id, "assignment-0000000000-zzzz")
       const lost = await hook("agent-launch", launch(unknown, background("agent-9", unknown)), dir)
@@ -501,6 +501,7 @@ describe("hook agent-launch", () => {
       expect(lost.stdout).toContain(
         "could not record the launch of assignment-0000000000-zzzz (UnknownRecord)",
       )
+      expect(lost.stdout).not.toContain("assignment record")
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
@@ -518,7 +519,9 @@ describe("hook agent-launch", () => {
       for (const wrong of ["holyagent:reviewer-code", "general-purpose", undefined]) {
         const result = await hook("agent-launch", as(wrong), dir)
         expect(result.stdout).toContain(`could not record the launch of ${id} (AgentMismatch)`)
-        expect(result.stdout).toContain(`--agent agent-5\` yourself.`)
+        // Recording by hand would bind the wrong agent, so the note says to dispatch again.
+        expect(result.stdout).not.toContain("assignment record")
+        expect(result.stdout).toContain("dispatch the Assignment again")
         expect(await agentRow(dir, id)).not.toContain("agent-5")
       }
       // The namespace is optional, as a workflow's agentType may omit it.
@@ -538,7 +541,7 @@ describe("hook agent-launch", () => {
       const result = await hook("agent-launch", launch(prompt, { agentId: "agent-3" }), bare)
       expect(result.code).toBe(0)
       expect(result.stdout).toContain("(StateFolderMissing)")
-      expect(result.stdout).toContain("--agent agent-3")
+      expect(result.stdout).not.toContain("assignment record")
       expect(await Bun.file(join(bare, ".holyagent")).exists()).toBe(false)
       expect(await readdir(bare)).toEqual([])
     } finally {

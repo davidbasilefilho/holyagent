@@ -246,17 +246,51 @@ describe("workflow recommendation", () => {
     })
   })
 
-  test("work that would continue a warm specialist stays out of a workflow", () => {
+  test("work that would continue a warm specialist is messaged beside the workflow, never a subagent", () => {
     const follow = writer("w2", { followUpOf: "assignment-old" })
+    const warm = [{ assignmentId: "w2", agentId: "agent-1" }]
     expect(plan([writer("w1"), follow], [warmFor()])).toMatchObject({
-      action: "subagent",
-      assignmentIds: ["w1", "w2"],
-      reason:
-        "part of the set continues a warm specialist by SendMessage; run the rest as a workflow",
+      action: "workflow",
+      name: "run-assignments",
+      assignmentIds: ["w1"],
+      continues: warm,
     })
+    expect(plan([writer("w1"), follow], [warmFor()])).toHaveProperty(
+      "reason",
+      "independent Assignments can start together; the Assignments in continues go by SendMessage to their warm specialists",
+    )
     expect(plan([writer("w1"), follow, writer("w3")], [warmFor()])).toMatchObject({
       name: "run-assignments",
       assignmentIds: ["w1", "w3"],
+      continues: warm,
+    })
+    // Without the tool the same set is plain subagent work, warm one included.
+    expect(plan([writer("w1"), follow], [warmFor()], DEFAULT_CONFIG)).toMatchObject({
+      action: "subagent",
+      assignmentIds: ["w1", "w2"],
+    })
+  })
+
+  test("only warm work is a continue, several at once when they do not collide", () => {
+    const one = writer("w2", { followUpOf: "assignment-old", ownershipPaths: ["src/a.ts"] })
+    const two = writer("w3", { followUpOf: "assignment-old3", ownershipPaths: ["lib/b.ts"] })
+    const registry = [
+      warmFor(),
+      warmFor({
+        agentId: "agent-2",
+        assignments: ["assignment-old3"],
+        paths: ["lib/b.ts"],
+        domains: ["lib"],
+      }),
+    ]
+    expect(plan([one, two], registry)).toMatchObject({
+      action: "continue",
+      assignmentIds: ["w2", "w3"],
+      continues: [
+        { assignmentId: "w2", agentId: "agent-1" },
+        { assignmentId: "w3", agentId: "agent-2" },
+      ],
+      reason: "each continues a warm specialist by SendMessage",
     })
   })
 
@@ -293,7 +327,11 @@ describe("workflow recommendation", () => {
 
   test("a single startable Assignment with a warm specialist is continue, otherwise a one-entry workflow (a subagent without workflows)", () => {
     const row = writer("w", { followUpOf: "assignment-old" })
-    expect(plan([row], [warmFor()])).toMatchObject({ action: "continue", agentId: "agent-1" })
+    expect(plan([row], [warmFor()])).toMatchObject({
+      action: "continue",
+      continues: [{ assignmentId: "w", agentId: "agent-1" }],
+    })
+    expect(plan([row], [warmFor()], DEFAULT_CONFIG)).toMatchObject({ action: "continue" })
     expect(plan([row])).toMatchObject({ name: "run-assignments", assignmentIds: ["w"] })
     expect(plan([row], [], DEFAULT_CONFIG)).toMatchObject({
       action: "subagent",
