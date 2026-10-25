@@ -5,12 +5,13 @@ import { Cause, Effect } from "effect"
 
 import packageJson from "../../package.json" with { type: "json" }
 import { STATE_DIRECTORY } from "../state/layout.ts"
+import { vcsLive } from "../vcs/live.ts"
 import { parseArgs } from "./args.ts"
 import { COMMANDS } from "./commands.ts"
 import { loadConfig } from "./config.ts"
 import { readInput, readInputBy, readReport, stateRoot } from "./context.ts"
 import { describeFailure, Usage } from "./errors.ts"
-import { type Call, type Command, type Host, WithTrailer } from "./types.ts"
+import { type Call, type Command, type Host, Streamed, Verbatim, WithTrailer } from "./types.ts"
 
 /** What one run prints and the exit code it ends with. */
 export interface Result {
@@ -24,31 +25,45 @@ const help = (command: Command): string =>
     `${command.usage}  ${command.summary}`,
     ...(command.input === undefined ? [] : [`stdin: ${command.input}`]),
     ...(command.output === undefined ? [] : [`stdout: ${command.output}`]),
+    ...(command.notes ?? []).map((note) => `note: ${note}`),
   ].join("\n")
 
 const topHelp = (): string =>
   [
     "holyagent <command> [args]; JSON on stdin, TOON on stdout; errors go to stderr as `error:` and `hint:` lines",
-    "exit codes: 2 usage, 3 refused by the current state, 4 state or I/O failure",
+    "exit codes: 2 usage, 3 refused by the current state, 4 state or I/O failure; every error's `hint:` says what to do next",
     ...COMMANDS.map((command) => `${command.usage}  ${command.summary}`),
-    "<command> --help shows the shape of its stdin",
+    "help [command] or <command> --help shows a command's stdin shape, stdout and rules",
   ].join("\n")
 
-const callFor = (command: Command, args: Call["args"], host: Host) =>
+const callFor = (args: Call["args"], host: Host, emit: Call["emit"], stateless: boolean) =>
   Effect.gen(function* () {
-    const root = yield* stateRoot(host.cwd)
+    // A stateless command never reads the state, so a git failure must not stop it.
+    const root = stateless ? host.cwd : yield* stateRoot(host.cwd)
     return {
       args,
+      cwd: host.cwd,
+      env: host.env,
       directory: join(root, STATE_DIRECTORY),
       config: loadConfig(host.env, root),
       text: readReport(host),
+      emit,
+      vcs: host.vcs ?? vcsLive(root, host.env),
       input: (schema) => readInput(host, schema),
       inputBy: (pick) => readInputBy(host, pick),
     } satisfies Call
   })
 
-const execute = (argv: ReadonlyArray<string>, host: Host) =>
+/**
+ * `help` is `--help` as a word: alone it is the top help, and `help assignment close` is that
+ * command's.
+ */
+const asFlag = (argv: ReadonlyArray<string>): ReadonlyArray<string> =>
+  argv[0] === "help" ? (argv.length === 1 ? ["--help"] : [...argv.slice(1), "--help"]) : argv
+
+const execute = (given: ReadonlyArray<string>, host: Host) =>
   Effect.gen(function* () {
+    const argv = asFlag(given)
     const [first] = argv
     if (first === undefined || first === "--help" || first === "-h")
       return { stdout: `${topHelp()}\n`, stderr: "", code: 0 }
@@ -71,14 +86,26 @@ const execute = (argv: ReadonlyArray<string>, host: Host) =>
     const rest = argv.slice(command.path.length)
     if (rest.includes("--help") || rest.includes("-h"))
       return { stdout: `${help(command)}\n`, stderr: "", code: 0 }
-    const args = yield* parseArgs(rest, command.flags, command.usage)
+    const args =
+      command.raw === true
+        ? { positionals: rest, flags: {} }
+        : yield* parseArgs(rest, command.flags, command.usage)
     const count = args.positionals.length
-    if (count !== command.positionals && !(command.optional && count === command.positionals - 1))
+    if (
+      command.raw !== true &&
+      count !== command.positionals &&
+      !(command.optional && count === command.positionals - 1)
+    )
       return yield* new Usage({
         message: `Expected ${command.positionals} argument(s), got ${count}`,
         hint: `Usage: holyagent ${command.usage}`,
       })
-    const output = yield* command.run(yield* callFor(command, args, host))
+    const emitted: Array<string> = []
+    const emit = host.emit ?? ((text: string) => Effect.sync(() => void emitted.push(text)))
+    const output = yield* command.run(yield* callFor(args, host, emit, command.stateless === true))
+    if (output instanceof Verbatim) return output
+    if (output instanceof Streamed)
+      return { stdout: emitted.join(""), stderr: "", code: output.code }
     const stdout =
       output instanceof WithTrailer
         ? `${encode(output.fields)}\n${output.label}:\n${output.text}\n`

@@ -63,6 +63,15 @@ describe("execution directive", () => {
     expect(DEFAULT_CONFIG.ttlMinutes).toBe(55)
   })
 
+  test("never continues a specialist a workflow launched, however warm and relevant", () => {
+    const launched = warmFor({ agentId: "workflow:run-1/assignment-old" })
+    expect(directive([launched]).action).toBe("spawn")
+    expect(directive([launched, warmFor({ agentId: "agent-2" })])).toMatchObject({
+      action: "continue",
+      agentId: "agent-2",
+    })
+  })
+
   test("a specialist that never finished is not warm", () => {
     const { lastFinishedAt: _gone, ...unfinished } = warmFor()
     expect(directive([unfinished]).action).toBe("spawn")
@@ -139,7 +148,7 @@ describe("workflow recommendation", () => {
   })
 
   test("a ready writer with the review of its work is implement-review", () => {
-    const pair = [writer("w"), review("r", { dependencies: ["w"] })]
+    const pair = [writer("w"), review("r", { independentFrom: ["w"] })]
     expect(plan(pair)).toMatchObject({
       action: "workflow",
       name: "implement-review",
@@ -147,9 +156,70 @@ describe("workflow recommendation", () => {
     })
   })
 
-  test("a review waiting on anything but the writer is not paired with it", () => {
-    const pair = [writer("w"), review("r", { dependencies: ["w", "assignment-other"] })]
-    expect(plan([...pair, assignment({ id: "assignment-other" })])?.action).not.toBe("workflow")
+  test("a workflow comes with the direct-subagent fallback for the same work", () => {
+    expect(plan([review("r1"), review("r2")])).toMatchObject({
+      fallback: { assignmentIds: ["r1", "r2"], afterwards: [] },
+    })
+    // The reviews of implement-review wait for their writers, so the fallback launches them after.
+    const rows = [
+      writer("w1"),
+      writer("w2"),
+      review("r1", { independentFrom: ["w1"] }),
+      review("r2", { independentFrom: ["w2"] }),
+    ]
+    expect(plan(rows)).toMatchObject({
+      assignmentIds: ["w1", "r1", "w2", "r2"],
+      fallback: { assignmentIds: ["w1", "w2"], afterwards: ["r1", "r2"] },
+    })
+  })
+
+  test("several writers with their reviews are pairs in turn, unless their paths collide", () => {
+    const rows = [
+      writer("w1"),
+      writer("w2"),
+      review("r2", { independentFrom: ["w2"] }),
+      review("r1", { independentFrom: ["w1"] }),
+    ]
+    expect(plan(rows)).toMatchObject({
+      name: "implement-review",
+      assignmentIds: ["w1", "r1", "w2", "r2"],
+    })
+    const colliding = [
+      writer("w1"),
+      writer("w2", { ownershipPaths: ["src/w1.ts"] }),
+      ...rows.slice(2),
+    ]
+    expect(plan(colliding)).toMatchObject({ assignmentIds: ["w1", "r1"] })
+  })
+
+  test("a review that depends on the writer waits for its acceptance and is not paired", () => {
+    const rows = [writer("w"), review("r", { dependencies: ["w"], independentFrom: ["w"] })]
+    expect(plan(rows)).toMatchObject({
+      action: "workflow",
+      name: "run-assignments",
+      assignmentIds: ["w"],
+    })
+  })
+
+  test("a review waits for any unfinished work it names, and is not paired with just one of them", () => {
+    const rows = [writer("w"), writer("other"), review("r", { independentFrom: ["w", "other"] })]
+    expect(plan(rows)).toMatchObject({ name: "run-assignments", assignmentIds: ["w", "other"] })
+    expect(plan(rows, [], DEFAULT_CONFIG)).toMatchObject({ action: "subagent" })
+    const finished = succeeded({ id: "other" }, 1)
+    expect(
+      plan([writer("w"), finished, review("r", { independentFrom: ["w", "other"] })]),
+    ).toMatchObject({ name: "implement-review", assignmentIds: ["w", "r"] })
+  })
+
+  test("a review of work still running starts after it finishes, not before", () => {
+    const rows = [running({ id: "w", ownershipPaths: ["src/w.ts"] })]
+    const check = review("r", { independentFrom: ["w"] })
+    expect(plan([...rows, check])).toBeUndefined()
+    expect(plan([succeeded({ id: "w" }), check])).toMatchObject({
+      action: "workflow",
+      name: "run-assignments",
+      assignmentIds: ["r"],
+    })
   })
 
   test("independent reviews are review-diff; dependent ones are not", () => {
@@ -157,12 +227,70 @@ describe("workflow recommendation", () => {
       name: "review-diff",
       assignmentIds: ["r1", "r2"],
     })
-    expect(plan([review("r1"), review("r2", { dependencies: ["r1"] })])?.action).toBe("subagent")
+    expect(plan([review("r1"), review("r2", { dependencies: ["r1"] })])).toMatchObject({
+      name: "run-assignments",
+      assignmentIds: ["r1"],
+    })
   })
 
-  test("independent validations are validate-criteria", () => {
+  test("other independent Assignments are run-assignments", () => {
     expect(plan([validation("v1"), validation("v2")])).toMatchObject({
-      name: "validate-criteria",
+      action: "workflow",
+      name: "run-assignments",
+      assignmentIds: ["v1", "v2"],
+    })
+    expect(plan([writer("w"), validation("v")])).toMatchObject({ name: "run-assignments" })
+    expect(plan([validation("v1"), validation("v2", { dependencies: ["v1"] })])).toMatchObject({
+      name: "run-assignments",
+      assignmentIds: ["v1"],
+    })
+  })
+
+  test("work that would continue a warm specialist is messaged beside the workflow, never a subagent", () => {
+    const follow = writer("w2", { followUpOf: "assignment-old" })
+    const warm = [{ assignmentId: "w2", agentId: "agent-1" }]
+    expect(plan([writer("w1"), follow], [warmFor()])).toMatchObject({
+      action: "workflow",
+      name: "run-assignments",
+      assignmentIds: ["w1"],
+      continues: warm,
+    })
+    expect(plan([writer("w1"), follow], [warmFor()])).toHaveProperty(
+      "reason",
+      "independent Assignments can start together; the Assignments in continues go by SendMessage to their warm specialists",
+    )
+    expect(plan([writer("w1"), follow, writer("w3")], [warmFor()])).toMatchObject({
+      name: "run-assignments",
+      assignmentIds: ["w1", "w3"],
+      continues: warm,
+    })
+    // Without the tool the same set is plain subagent work, warm one included.
+    expect(plan([writer("w1"), follow], [warmFor()], DEFAULT_CONFIG)).toMatchObject({
+      action: "subagent",
+      assignmentIds: ["w1", "w2"],
+    })
+  })
+
+  test("only warm work is a continue, several at once when they do not collide", () => {
+    const one = writer("w2", { followUpOf: "assignment-old", ownershipPaths: ["src/a.ts"] })
+    const two = writer("w3", { followUpOf: "assignment-old3", ownershipPaths: ["lib/b.ts"] })
+    const registry = [
+      warmFor(),
+      warmFor({
+        agentId: "agent-2",
+        assignments: ["assignment-old3"],
+        paths: ["lib/b.ts"],
+        domains: ["lib"],
+      }),
+    ]
+    expect(plan([one, two], registry)).toMatchObject({
+      action: "continue",
+      assignmentIds: ["w2", "w3"],
+      continues: [
+        { assignmentId: "w2", agentId: "agent-1" },
+        { assignmentId: "w3", agentId: "agent-2" },
+      ],
+      reason: "each continues a warm specialist by SendMessage",
     })
   })
 
@@ -171,14 +299,14 @@ describe("workflow recommendation", () => {
       writer("a", { ownershipPaths: ["src"] }),
       writer("b", { ownershipPaths: ["src/b.ts"] }),
     ]
-    expect(plan(rows)).toMatchObject({ action: "subagent", assignmentIds: ["a"] })
+    expect(plan(rows)).toMatchObject({ name: "run-assignments", assignmentIds: ["a"] })
   })
 
   test("Assignments that cannot start now are left out", () => {
     const blockedByDependency = review("r1", { dependencies: ["assignment-dep"] })
     const dep = succeeded({ id: "assignment-dep" })
     expect(plan([blockedByDependency, review("r2"), dep])).toMatchObject({
-      action: "subagent",
+      name: "run-assignments",
       assignmentIds: ["r2"],
     })
     const accepted = succeeded({ id: "assignment-dep" }, 1)
@@ -193,13 +321,22 @@ describe("workflow recommendation", () => {
     expect(plan([review("r1"), review("r2")], [], DEFAULT_CONFIG)).toMatchObject({
       action: "subagent",
       assignmentIds: ["r1", "r2"],
+      reason: "the Workflow tool is disabled or unavailable",
     })
   })
 
-  test("a single startable Assignment with a warm specialist is continue, otherwise subagent", () => {
+  test("a single startable Assignment with a warm specialist is continue, otherwise a one-entry workflow (a subagent without workflows)", () => {
     const row = writer("w", { followUpOf: "assignment-old" })
-    expect(plan([row], [warmFor()])).toMatchObject({ action: "continue", agentId: "agent-1" })
-    expect(plan([row])).toMatchObject({ action: "subagent", assignmentIds: ["w"] })
+    expect(plan([row], [warmFor()])).toMatchObject({
+      action: "continue",
+      continues: [{ assignmentId: "w", agentId: "agent-1" }],
+    })
+    expect(plan([row], [warmFor()], DEFAULT_CONFIG)).toMatchObject({ action: "continue" })
+    expect(plan([row])).toMatchObject({ name: "run-assignments", assignmentIds: ["w"] })
+    expect(plan([row], [], DEFAULT_CONFIG)).toMatchObject({
+      action: "subagent",
+      assignmentIds: ["w"],
+    })
     const blocker = running({ id: "assignment-holder", ownershipPaths: ["src/w.ts"] })
     expect(plan([row, blocker], [warmFor()])).toBeUndefined()
   })

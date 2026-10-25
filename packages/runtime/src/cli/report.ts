@@ -82,10 +82,21 @@ export const acceptanceFrom = (
 const section = (heading: string, items: ReadonlyArray<string>): ReadonlyArray<string> =>
   items.length === 0 ? [] : [`${heading}:`, ...items.map((item) => `- ${item}`)]
 
+const PROMPT_LINE = /^Role: \S+ \(\S+\)\. Assignment: (assignment-[a-z0-9]+(?:-[a-z0-9]+)*)\.$/
+
+/**
+ * The Assignment a specialist prompt came from, read from the first line {@link renderPrompt}
+ * writes; undefined for any other text. Only that line counts, so a prompt that merely mentions an
+ * Assignment is not taken for a dispatched one.
+ */
+export const dispatchedAssignment = (prompt: string): string | undefined =>
+  PROMPT_LINE.exec(prompt.split("\n", 1)[0] ?? "")?.[1]
+
 /**
  * The Assignment as the specialist reads it, in a fixed order, so the root sends it as it is: the
- * role line, objective, scope, constraints, ownership paths, acceptance criteria, required evidence
- * and the closing line that asks for the `evidence:` block {@link acceptanceFrom} reads.
+ * role line (the marker {@link dispatchedAssignment} reads back), objective, scope, constraints,
+ * ownership paths, acceptance criteria, required evidence and the closing line that asks for the
+ * `evidence:` block {@link acceptanceFrom} reads.
  */
 export const renderPrompt = (assignment: Assignment, agent: string): string =>
   [

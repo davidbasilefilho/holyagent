@@ -12,6 +12,6 @@
     "exactOptionalPropertyTypes": true,
     "noUncheckedIndexedAccess": true
   },
-  "include": ["packages"],
+  "include": ["packages", "scripts"],
   "exclude": ["**/node_modules"]
 }

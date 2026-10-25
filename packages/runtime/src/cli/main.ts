@@ -15,7 +15,12 @@ const stdin = Effect.suspend(() =>
 )
 
 Effect.runFork(
-  run(Bun.argv.slice(2), { cwd: process.cwd(), env: process.env, stdin }).pipe(
+  run(Bun.argv.slice(2), {
+    cwd: process.cwd(),
+    env: process.env,
+    stdin,
+    emit: (text) => Effect.sync(() => void process.stdout.write(text)),
+  }).pipe(
     Effect.tap((result) =>
       Effect.sync(() => {
         process.stdout.write(result.stdout)

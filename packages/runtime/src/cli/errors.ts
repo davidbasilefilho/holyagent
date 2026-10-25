@@ -1,5 +1,7 @@
 import { Data } from "effect"
 
+import { VCS_HINTS, VCS_REFUSED_ERRORS } from "../vcs/errors.ts"
+
 /** The command line does not match the command's usage. */
 export class Usage extends Data.TaggedError("Usage")<{
   readonly message: string
@@ -13,6 +15,35 @@ export class StdinMissing extends Data.TaggedError("StdinMissing")<{
   /** The description shown to the user. */
   override get message() {
     return `This command needs input on stdin: ${this.reason}`
+  }
+}
+
+/** The Agent result named no agent id that could be recorded. */
+export class AgentIdMissing extends Data.TaggedError("AgentIdMissing")<Record<never, never>> {
+  /** The description shown to the user. */
+  override get message() {
+    return "The tool response has no usable agent id"
+  }
+}
+
+/** A launch cannot be recorded because the project has no state folder. */
+export class StateFolderMissing extends Data.TaggedError("StateFolderMissing")<
+  Record<never, never>
+> {
+  /** The description shown to the user. */
+  override get message() {
+    return "This project has no .holyagent folder"
+  }
+}
+
+/** The agent that was launched is not the one the Assignment was dispatched to. */
+export class AgentMismatch extends Data.TaggedError("AgentMismatch")<{
+  readonly expected: string
+  readonly launched: string | undefined
+}> {
+  /** The description shown to the user. */
+  override get message() {
+    return `The Assignment was dispatched to ${this.expected}, but ${this.launched ?? "no agent type"} was launched`
   }
 }
 
@@ -54,6 +85,7 @@ const REFUSED_ERRORS = new Set([
   "InsufficientAcceptance",
   "SpecialistMismatch",
   "SpecialistNotRecorded",
+  ...VCS_REFUSED_ERRORS,
 ])
 
 const HINTS: Readonly<Record<string, string>> = {
@@ -77,13 +109,14 @@ const HINTS: Readonly<Record<string, string>> = {
   DependencyNotAccepted:
     "Close and accept the dependency first (`holyagent assignment accept <id>`), then dispatch.",
   InsufficientAcceptance:
-    "Support every blocking criterion and every evidence label the Assignment declares.",
+    "Nothing was recorded. SendMessage the subagent for the missing support the message names, then close or accept again; a workflow agent cannot be messaged, so draft a follow-up with followUpOf.",
   SpecialistMismatch: "Record the agent that was actually launched, or dispatch again.",
   SpecialistNotRecorded:
     "Run `holyagent assignment record <id> --agent <agentId>` first, or close with another outcome.",
   StateLocked: "Another process holds the state lock; retry in a moment.",
   StateIo: "Check the permissions of the .holyagent folder in the project root.",
   CorruptRecord: "Fix or delete the file the message names, or restore it from version control.",
+  ...VCS_HINTS,
 }
 
 /** What the caller prints for a failed command: the tag, message, hint and exit code. */
