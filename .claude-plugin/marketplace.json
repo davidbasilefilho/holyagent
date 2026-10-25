@@ -13,7 +13,7 @@
       "name": "holyagent",
       "source": "./packages/integrations/claude/dist",
       "description": "A root agent that plans work as Intents and Assignments and eighteen specialists it dispatches, with a CLI that keeps their state.",
-      "version": "0.1.1-1"
+      "version": "0.1.1-2"
     }
   ]
 }
