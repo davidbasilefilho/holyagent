@@ -1,0 +1,71 @@
+{
+  "id": "assignment-0mvo9mky8-s54y",
+  "intentId": "intent-0mvnv553v-zwx8",
+  "intentRevision": 12,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-pr6-repair-and-merge-at",
+  "objective": "Re-review the PR6 repair and merge at 5f8ef35 on release/0.1.2/fix/cli-and-vcs and confirm the earlier code and artifact blockers are closed without regressions.",
+  "state": "Succeeded",
+  "scope": [
+    "Worktree /home/davidbasile/dev/holyagent-fix-cli-and-vcs; run commands there. 5f8ef35 merges the PR5 head a380bf4 (which carries the PR4 acorn hook) into 841ef47 and also holds the repair. Repair-relevant diff against 841ef47: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/pr6-repair.diff (it also shows PR4 changes to hook.ts). Earlier findings: r-65cw.json (code) and r-5qgs.json (artifact) in that folder.",
+    "Judge closure of each earlier blocker, the hook.ts merge (acorn workflow hook and PR6 vcs-redirect and commit-msg both intact), the new unclear deny for push arguments with $ (git push origin $branch now denied) as acceptable behavior, ROOT_CORE under 4000 characters with no lost rule, and run mise run verify."
+  ],
+  "constraints": [
+    "Read-only: no edits and no version-control writes."
+  ],
+  "criteria": [
+    {
+      "text": "Each earlier blocker is marked closed or open with evidence, and any new blocking finding has file, line and a concrete failure.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify is run on 5f8ef35 and its result reported.",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "checks"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvo9b7xm-kmqu"
+  ],
+  "followUpOf": "assignment-0mvo8xxaw-65cw",
+  "specialist": {
+    "agentId": "workflow:wf_61b21008-45f/assignment-0mvo9mky8-s54y",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-25T20:13:40.881Z",
+    "finishedAt": "2026-10-25T20:20:57.019Z"
+  },
+  "result": "status: done\nchecks:\n- mise run verify (worktree /home/davidbasile/dev/holyagent-fix-cli-and-vcs, HEAD 5f8ef35, clean tree) -> exit 0\n- Skill code-review 841ef47...5f8ef35 (built-in; forked, returned no findings text) -> exit 0\n- dist hook commit-msg on temp repo: scissors diff with 'the user' (exit 0), attribution above scissors cleaned (exit 0), 'the user' above scissors (exit 3), core.commentChar=';' scissors (exit 0) -> exit 0\n- bun scratchpad/rc6b-probe.ts (gitWrites over 16 push forms) -> exit 0\n- bun -e ROOT_CORE.length -> 3999 -> exit 0\nnotes:\n- Built-in /code-review ran through the Skill tool on 841ef47...5f8ef35 but returned only 'Skill execution completed' with no findings text, so there were no claims to classify. The review below is my own.\n- Closure of earlier code blockers. Blocker 1 (report.ts ownerOf accepts `**Key:**` with no support): CLOSED. ownerOf now requires a letter or digit in the support (/[\\p{L}\\p{N}]/u). cli.test.ts adds a test for `**parses:**`, `parses: **`, ``parses: ` ` .`` and `- parses: ---`; each is refused with InsufficientAcceptance, and `**parses:** ran it` is accepted. Blocker 2 (hook commit-msg refuses a clean message on a `git commit -v` scissors diff): CLOSED. hook.ts cuts at the scissors line, honours core.commentString and core.commentChar, checks and cleans only the part above it, and writes the rest back unchanged. hooks.test.ts adds four tests (check above only, clean above and keep below, still refuse above, commentChar). I ran the built dist hook on a temp repo and got the expected results listed in checks.\n- Closure of earlier artifact blockers. 1 US English: CLOSED (identity.md:3 'Model-facing text is in US English.'). 2 waits and repairs: CLOSED (task-list.md:3 'and for waits, repairs and blockers'). 3 'as printed': CLOSED (dispatch.md:4). 4 removed command names: CLOSED for `vcs detect`, `vcs push`, `vcs branch` and `vcs ci`. The grep over docs and src finds none, and commit-authorship.md:9 and state/local.ts:21 are reworded. Residual, optional: docs/decisions.md:23 still lists 'detect, commit through GitHub's API, push, branch, pr, ci' as the old chain, without the `vcs` prefix, in a decision log. 5 nudge conflict: CLOSED. task-list.md:3 now says 'a nudge to narrate gets one short line', which matches user-messages.md:3.\n- hook.ts merge: intact. HOOK_COMMANDS holds session-start, agent-launch, vcs-redirect, the commit-msg command and the acorn-backed `workflow` hook. dist/hooks/hooks.json wires vcs-redirect (twice) and workflow. There are no conflict markers. lefthook.yml runs commit-msg through the dist wrapper. All of this is covered by the full suite (839 pass).\n- New unclear deny for push arguments with `$` (`git push origin $branch`, `\"$(git branch --show-current)\"`, braces, globs, backticks, unreadable escapes): acceptable. It fails closed on a security gate, the deny message tells the root to write literal branch names, and hooks.md and commit-authorship.md document it. I probed 16 ordinary pushes (redirects, pipes, `&& echo $?`, a `$x` in a later command or comment, tags, `--follow-tags`, `HEAD`, `-u`). Only the argument that held a variable was denied, and none of the others were false positives. Cost: any push using a shell variable needs rewriting with a literal name. A root decision, not a defect.\n- ROOT_CORE is 3999 characters, under the 4000 cap but with one character to spare. The next edit to any core file fails the test. Rules dropped or moved to fit, none blocking: (a) 'Be terse: answer first.' moved from identity.md to user-messages.md. The full root prompt still has it, but a session that gets only the core (non-root main thread) no longer does. (b) delegating.md lost 'and review independent' and the `status` example. (c) The push-approval clause went from 'the base, default or a protected branch' to 'a protected branch'. Root decision whether (a) matters for core-only sessions.\n- Not run: mise run build (dist matches the sources only as far as the scissors code is present in dist and behaves correctly), lefthook itself, and anything against GitHub. Verify log: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/verify-rc6b.log. Tree stayed clean at 5f8ef35 during the review.\nevidence:\n- Each earlier blocker is marked closed or open with evidence, and any new blocking finding has file, line and a concrete failure.: All 2 code blockers and all 5 artifact blockers are closed; no blocker is open and I found no new blocker. Evidence: packages/runtime/src/cli/report.ts ownerOf (letter-or-digit check) plus the new test in packages/runtime/tests/cli.test.ts; packages/runtime/src/cli/hook.ts lines 250-285 (scissors cut) plus 4 tests in packages/integrations/claude/tests/hooks.test.ts, and the dist hook run on a temp repo; identity.md:3, task-list.md:3 and dispatch.md:4 restored; docs/commit-authorship.md:9 and packages/runtime/src/state/local.ts:21 reworded; the nudge line in task-list.md:3. Residual optional: docs/decisions.md:23.\n- mise run verify is run on 5f8ef35 and its result reported.: `mise run verify` in /home/davidbasile/dev/holyagent-fix-cli-and-vcs at HEAD 5f8ef35 with a clean tree, exit 0: type-check 'No type errors in 95 files', lint 'No problems in 96 files', fmt 'All 208 files are formatted', bun test 839 pass, 1 skip, 0 fail, 6975 expect() calls across 24 files. Log: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/verify-rc6b.log\n- findings: No open or new blockers; closure per earlier blocker is in notes. The hook.ts merge is intact (acorn workflow hook, vcs-redirect and commit-msg all present and wired). The `$` unclear deny is acceptable. ROOT_CORE is 3999 characters, under 4000, and 'Be terse' left the core (non-blocking). Built-in /code-review returned no findings text.\n- checks: mise run verify -> exit 0 (839 pass, 1 skip, 0 fail); dist hook commit-msg temp-repo runs -> expected exits 0, 0, 3, 0; gitWrites probe over 16 push forms -> only the `$branch` form denied as unclear; ROOT_CORE.length -> 3999. Not run: mise run build, lefthook, gh.",
+  "acceptance": {
+    "revision": 12,
+    "rationale": "All earlier blockers closed with evidence; verify exit 0 on 5f8ef35.",
+    "criteria": [
+      {
+        "criterion": "Each earlier blocker is marked closed or open with evidence, and any new blocking finding has file, line and a concrete failure.",
+        "support": "All 2 code blockers and all 5 artifact blockers are closed; no blocker is open and I found no new blocker. Evidence: packages/runtime/src/cli/report.ts ownerOf (letter-or-digit check) plus the new test in packages/runtime/tests/cli.test.ts; packages/runtime/src/cli/hook.ts lines 250-285 (scissors cut) plus 4 tests in packages/integrations/claude/tests/hooks.test.ts, and the dist hook run on a temp repo; identity.md:3, task-list.md:3 and dispatch.md:4 restored; docs/commit-authorship.md:9 and packages/runtime/src/state/local.ts:21 reworded; the nudge line in task-list.md:3. Residual optional: docs/decisions.md:23."
+      },
+      {
+        "criterion": "mise run verify is run on 5f8ef35 and its result reported.",
+        "support": "`mise run verify` in /home/davidbasile/dev/holyagent-fix-cli-and-vcs at HEAD 5f8ef35 with a clean tree, exit 0: type-check 'No type errors in 95 files', lint 'No problems in 96 files', fmt 'All 208 files are formatted', bun test 839 pass, 1 skip, 0 fail, 6975 expect() calls across 24 files. Log: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/verify-rc6b.log"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "No open or new blockers; closure per earlier blocker is in notes. The hook.ts merge is intact (acorn workflow hook, vcs-redirect and commit-msg all present and wired). The `$` unclear deny is acceptable. ROOT_CORE is 3999 characters, under 4000, and 'Be terse' left the core (non-blocking). Built-in /code-review returned no findings text."
+      },
+      {
+        "label": "checks",
+        "support": "mise run verify -> exit 0 (839 pass, 1 skip, 0 fail); dist hook commit-msg temp-repo runs -> expected exits 0, 0, 3, 0; gitWrites probe over 16 push forms -> only the `$branch` form denied as unclear; ROOT_CORE.length -> 3999. Not run: mise run build, lefthook, gh."
+      }
+    ]
+  },
+  "createdAt": "2026-10-25T20:13:40.881Z"
+}

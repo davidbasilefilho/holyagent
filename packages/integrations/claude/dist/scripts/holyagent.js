@@ -16507,33 +16507,6 @@ var CALLABLE_PROPERTIES = new Set([
   "then",
   "catch",
   "finally",
-  "all",
-  "allSettled",
-  "race",
-  "resolve",
-  "reject",
-  "keys",
-  "values",
-  "entries",
-  "fromEntries",
-  "assign",
-  "freeze",
-  "from",
-  "of",
-  "isArray",
-  "isInteger",
-  "stringify",
-  "parse",
-  "max",
-  "min",
-  "abs",
-  "floor",
-  "ceil",
-  "round",
-  "trunc",
-  "sqrt",
-  "pow",
-  "sign",
   "trim",
   "trimStart",
   "trimEnd",
@@ -16553,6 +16526,55 @@ var CALLABLE_PROPERTIES = new Set([
   "toFixed",
   "toString"
 ]);
+var GLOBAL_CALLS = {
+  Object: new Set(["keys", "values", "entries", "fromEntries"]),
+  Array: new Set(["isArray", "from", "of"]),
+  JSON: new Set(["stringify", "parse"]),
+  Math: new Set(["max", "min", "abs", "floor", "ceil", "round", "trunc", "sqrt", "pow", "sign"]),
+  Number: new Set(["isInteger", "isFinite", "isNaN", "parseFloat", "parseInt"]),
+  Promise: new Set(["all", "allSettled", "race", "resolve", "reject"]),
+  budget: new Set(["spent", "remaining"])
+};
+var GLOBAL_FIELDS = {
+  Math: new Set(["PI", "E", "LN2", "LN10", "LOG2E", "LOG10E", "SQRT2", "SQRT1_2"]),
+  Number: new Set([
+    "MAX_SAFE_INTEGER",
+    "MIN_SAFE_INTEGER",
+    "MAX_VALUE",
+    "MIN_VALUE",
+    "EPSILON",
+    "POSITIVE_INFINITY",
+    "NEGATIVE_INFINITY",
+    "NaN"
+  ]),
+  budget: new Set(["total"])
+};
+var MAX_ARGUMENTS = {
+  map: 1,
+  forEach: 1,
+  filter: 1,
+  find: 1,
+  findIndex: 1,
+  some: 1,
+  every: 1,
+  flatMap: 1,
+  from: 2
+};
+var VALUE_GLOBALS = new Set(["args", "undefined", "NaN", "Infinity"]);
+var GLOBAL_FUNCTIONS = new Set([
+  "parallel",
+  "pipeline",
+  "phase",
+  "log",
+  "String",
+  "Number",
+  "Boolean",
+  "Error",
+  "parseInt",
+  "parseFloat",
+  "isNaN",
+  "isFinite"
+]);
 var AGENT_OPTIONS = new Set([
   "agentType",
   "model",
@@ -16564,10 +16586,10 @@ var SPECIALISTS = new Set(ROUTES.map((route) => `${PLUGIN_NAMESPACE}:${route.age
 var UNARY = new Set(["!", "-", "+", "~", "typeof", "void"]);
 var childScope = (parent, isFunction) => ({
   parent,
-  names: new Set,
+  names: new Map,
   isFunction
 });
-var bound = (scope, name) => scope !== undefined && (scope.names.has(name) || bound(scope.parent, name));
+var binding = (scope, name) => scope === undefined ? undefined : scope.names.get(name) ?? binding(scope.parent, name);
 var varScope = (scope) => scope.isFunction || scope.parent === undefined ? scope : varScope(scope.parent);
 var rootName = (node) => node?.type === "MemberExpression" ? rootName(nodeAt(node, "object")) : nameOf(node);
 var inspect = (script) => {
@@ -16584,41 +16606,89 @@ var inspect = (script) => {
     refusal ??= why;
   };
   const references = [];
+  const assignments = [];
+  const memberWrites = [];
   let agentCalls = 0;
-  const declare = (scope, name) => {
+  const declare = (scope, name, origin) => {
     if (GLOBALS.has(name) || HOST_GLOBALS.has(name) || DENIED_NAMES.has(name) || name === "agent")
       refuse(`declares ${name}, a name of the host`);
-    scope.names.add(name);
+    const held = scope.names.get(name) ?? { unsafe: false, inits: [] };
+    if (origin === "unsafe")
+      held.unsafe = true;
+    else if (origin !== undefined)
+      held.inits.push(origin);
+    scope.names.set(name, held);
   };
-  const refer = (node, scope, write) => {
+  const refer = (node, scope, use) => {
     const name = nameOf(node);
     if (name === undefined)
       refuse("reads a name it cannot read");
     else
-      references.push({ name, scope, write });
+      references.push({ name, scope, use });
   };
-  const declarePattern = (node, scope, target, depth) => {
+  const evaluating = new Set;
+  const builtBinding = (held) => {
+    if (evaluating.has(held) || held.unsafe || held.inits.length === 0)
+      return false;
+    evaluating.add(held);
+    const built = held.inits.every((init) => init());
+    evaluating.delete(held);
+    return built;
+  };
+  const builtHere = (node, scope) => {
+    switch (node?.type) {
+      case "ObjectExpression":
+      case "ArrayExpression":
+      case "Literal":
+      case "TemplateLiteral":
+        return true;
+      case "AwaitExpression":
+        return builtHere(nodeAt(node, "argument"), scope);
+      case "ChainExpression":
+        return builtHere(nodeAt(node, "expression"), scope);
+      case "MemberExpression":
+        return builtHere(nodeAt(node, "object"), scope);
+      case "ConditionalExpression":
+        return builtHere(nodeAt(node, "consequent"), scope) && builtHere(nodeAt(node, "alternate"), scope);
+      case "CallExpression": {
+        const callee = nodeAt(node, "callee");
+        if (nameOf(callee) === "agent")
+          return true;
+        const object = callee?.type === "MemberExpression" ? nodeAt(callee, "object") : undefined;
+        const global = nameOf(object);
+        return object !== undefined && (global !== undefined && GLOBAL_CALLS[global] !== undefined ? binding(scope, global) === undefined : builtHere(object, scope));
+      }
+      case "Identifier": {
+        const name = nameOf(node) ?? "";
+        const held = binding(scope, name);
+        return held === undefined ? VALUE_GLOBALS.has(name) : builtBinding(held);
+      }
+      default:
+        return false;
+    }
+  };
+  const declarePattern = (node, scope, target, depth, origin) => {
     if (node === undefined || depth > MAX_DEPTH)
       return refuse("nests too deep");
     switch (node.type) {
       case "Identifier":
-        return declare(target, nameOf(node) ?? "");
+        return declare(target, nameOf(node) ?? "", origin);
       case "RestElement":
-        return declarePattern(nodeAt(node, "argument"), scope, target, depth + 1);
+        return declarePattern(nodeAt(node, "argument"), scope, target, depth + 1, origin);
       case "AssignmentPattern":
-        declarePattern(nodeAt(node, "left"), scope, target, depth + 1);
+        declarePattern(nodeAt(node, "left"), scope, target, depth + 1, origin);
         return expression(nodeAt(node, "right"), scope, depth + 1);
       case "ArrayPattern":
         for (const element of nodesAt(node, "elements"))
           if (element !== undefined)
-            declarePattern(element, scope, target, depth + 1);
+            declarePattern(element, scope, target, depth + 1, origin);
         return;
       case "ObjectPattern":
         for (const property of nodesAt(node, "properties")) {
           if (property?.type === "RestElement")
-            declarePattern(property, scope, target, depth + 1);
+            declarePattern(property, scope, target, depth + 1, origin);
           else if (property?.type === "Property" && property["computed"] === false && property["kind"] === "init" && nameOf(nodeAt(property, "key")) !== undefined && !DENIED_NAMES.has(nameOf(nodeAt(property, "key")) ?? ""))
-            declarePattern(nodeAt(property, "value"), scope, target, depth + 1);
+            declarePattern(nodeAt(property, "value"), scope, target, depth + 1, origin);
           else
             refuse("destructures with a key that is not a plain name");
         }
@@ -16627,15 +16697,16 @@ var inspect = (script) => {
         return refuse(`binds with ${node.type}`);
     }
   };
-  const variableDeclaration = (node, scope, depth) => {
+  const variableDeclaration = (node, scope, depth, loop) => {
     const kind = node["kind"];
     if (kind !== "var" && kind !== "let" && kind !== "const")
       return refuse(`declares with ${String(kind)}`);
     for (const declarator of nodesAt(node, "declarations")) {
       if (declarator?.type !== "VariableDeclarator")
         return refuse("declares oddly");
-      declarePattern(nodeAt(declarator, "id"), scope, kind === "var" ? varScope(scope) : scope, depth + 1);
-      expression(nodeAt(declarator, "init"), scope, depth + 1);
+      const init = nodeAt(declarator, "init");
+      declarePattern(nodeAt(declarator, "id"), scope, kind === "var" ? varScope(scope) : scope, depth + 1, loop ?? (init === undefined ? undefined : () => builtHere(init, scope)));
+      expression(init, scope, depth + 1);
     }
   };
   const functionNode = (node, scope, depth) => {
@@ -16644,9 +16715,9 @@ var inspect = (script) => {
     const inner = childScope(scope, true);
     const own = nameOf(nodeAt(node, "id"));
     if (node.type === "FunctionExpression" && own !== undefined)
-      declare(inner, own);
+      declare(inner, own, "unsafe");
     for (const parameter of nodesAt(node, "params"))
-      declarePattern(parameter, inner, inner, depth + 1);
+      declarePattern(parameter, inner, inner, depth + 1, "unsafe");
     const body = nodeAt(node, "body");
     if (body?.type === "BlockStatement")
       statements(nodesAt(body, "body"), inner, depth + 1);
@@ -16663,7 +16734,11 @@ var inspect = (script) => {
     expression(nodeAt(property, "value"), scope, depth + 1);
   };
   const memberExpression = (node, scope, depth, called) => {
-    expression(nodeAt(node, "object"), scope, depth + 1);
+    const object = nodeAt(node, "object");
+    if (object?.type === "Identifier")
+      refer(object, scope, "object");
+    else
+      expression(object, scope, depth + 1);
     const property = nodeAt(node, "property");
     if (node["computed"] === true) {
       const index = property?.type === "Literal" ? property["value"] : undefined;
@@ -16674,8 +16749,15 @@ var inspect = (script) => {
     const name = nameOf(property);
     if (name === undefined || DENIED_NAMES.has(name))
       return refuse(`reads .${name ?? "?"}`);
-    if (called && !CALLABLE_PROPERTIES.has(name) && rootName(node) !== "budget")
-      refuse(`calls .${name}`);
+    const owner = nameOf(object);
+    if (owner !== undefined && GLOBALS.has(owner) && owner !== "args") {
+      const allowed = (called ? GLOBAL_CALLS : GLOBAL_FIELDS)[owner];
+      if (allowed === undefined || !allowed.has(name))
+        refuse(`${called ? "calls" : "reads"} ${owner}.${name}`);
+      return;
+    }
+    if (called !== CALLABLE_PROPERTIES.has(name))
+      refuse(called ? `calls .${name}` : `reads the method .${name} without calling it`);
   };
   const agentCall = (node, scope, depth) => {
     agentCalls += 1;
@@ -16708,23 +16790,28 @@ var inspect = (script) => {
     if (node["optional"] === true)
       return refuse("makes an optional call");
     if (callee?.type === "Identifier")
-      refer(callee, scope, false);
-    else if (callee?.type === "MemberExpression")
+      refer(callee, scope, "callee");
+    else if (callee?.type === "MemberExpression") {
       memberExpression(callee, scope, depth + 1, true);
-    else if (callee?.type === "ArrowFunctionExpression" || callee?.type === "FunctionExpression")
+      const limit = MAX_ARGUMENTS[nameOf(nodeAt(callee, "property")) ?? ""];
+      const given = nodesAt(node, "arguments");
+      if (callee["computed"] !== true && limit !== undefined && (given.length > limit || given.some((argument) => argument?.type === "SpreadElement")))
+        refuse("passes a method more arguments than its callback (a this value)");
+    } else if (callee?.type === "ArrowFunctionExpression" || callee?.type === "FunctionExpression")
       functionNode(callee, scope, depth + 1);
     else
       return refuse("calls something it cannot vet");
     for (const argument of nodesAt(node, "arguments"))
       expression(argument?.type === "SpreadElement" ? nodeAt(argument, "argument") : argument, scope, depth + 1);
   };
-  const writeTarget = (node, scope, depth) => {
-    if (node?.type === "Identifier")
-      return refer(node, scope, true);
+  const writeTarget = (node, scope, depth, builtValue) => {
+    if (node?.type === "Identifier") {
+      refer(node, scope, "write");
+      assignments.push({ name: nameOf(node) ?? "", scope, builtHere: builtValue });
+      return;
+    }
     if (node?.type === "MemberExpression") {
-      const root = rootName(node);
-      if (root === undefined || !bound(scope, root))
-        return refuse("assigns into a global");
+      memberWrites.push({ root: rootName(node), scope });
       return memberExpression(node, scope, depth + 1, false);
     }
     refuse("assigns to something that is not a name or a member");
@@ -16736,7 +16823,7 @@ var inspect = (script) => {
       return refuse("nests too deep");
     switch (node.type) {
       case "Identifier":
-        return refer(node, scope, false);
+        return refer(node, scope, "value");
       case "Literal":
         if ("regex" in node || "bigint" in node)
           refuse("uses a regular expression or a bigint");
@@ -16761,14 +16848,16 @@ var inspect = (script) => {
           return refuse("uses delete");
         return expression(nodeAt(node, "argument"), scope, depth + 1);
       case "UpdateExpression":
-        return writeTarget(nodeAt(node, "argument"), scope, depth);
+        return writeTarget(nodeAt(node, "argument"), scope, depth, () => true);
       case "BinaryExpression":
       case "LogicalExpression":
         expression(nodeAt(node, "left"), scope, depth + 1);
         return expression(nodeAt(node, "right"), scope, depth + 1);
-      case "AssignmentExpression":
-        writeTarget(nodeAt(node, "left"), scope, depth);
-        return expression(nodeAt(node, "right"), scope, depth + 1);
+      case "AssignmentExpression": {
+        const right = nodeAt(node, "right");
+        writeTarget(nodeAt(node, "left"), scope, depth, node["operator"] === "=" ? () => builtHere(right, scope) : () => true);
+        return expression(right, scope, depth + 1);
+      }
       case "ConditionalExpression":
         expression(nodeAt(node, "test"), scope, depth + 1);
         expression(nodeAt(node, "consequent"), scope, depth + 1);
@@ -16803,7 +16892,7 @@ var inspect = (script) => {
       case "VariableDeclaration":
         return variableDeclaration(node, scope, depth);
       case "FunctionDeclaration":
-        declare(scope, nameOf(nodeAt(node, "id")) ?? "");
+        declare(scope, nameOf(nodeAt(node, "id")) ?? "", "unsafe");
         return functionNode(node, scope, depth);
       case "ReturnStatement":
       case "ThrowStatement":
@@ -16830,9 +16919,9 @@ var inspect = (script) => {
         const loop = inner();
         const left = nodeAt(node, "left");
         if (left?.type === "VariableDeclaration")
-          variableDeclaration(left, loop, depth + 1);
+          variableDeclaration(left, loop, depth + 1, "unsafe");
         else
-          writeTarget(left, loop, depth + 1);
+          writeTarget(left, loop, depth + 1, () => false);
         expression(nodeAt(node, "right"), loop, depth + 1);
         return statement(nodeAt(node, "body"), loop, depth + 1);
       }
@@ -16852,7 +16941,7 @@ var inspect = (script) => {
           const catching = inner();
           const parameter = nodeAt(handler, "param");
           if (parameter !== undefined)
-            declarePattern(parameter, catching, catching, depth + 1);
+            declarePattern(parameter, catching, catching, depth + 1, "unsafe");
           statements(nodesAt(nodeAt(handler, "body") ?? handler, "body"), catching, depth);
         }
         return statement(nodeAt(node, "finalizer"), scope, depth + 1);
@@ -16885,7 +16974,7 @@ var inspect = (script) => {
       return property?.type === "Property" && property["computed"] === false && property["kind"] === "init" && property["method"] !== true && name !== undefined && !DENIED_NAMES.has(name) && literalOnly(nodeAt(property, "value"), depth + 1);
     });
   };
-  const moduleScope = { parent: undefined, names: new Set, isFunction: true };
+  const moduleScope = { parent: undefined, names: new Map, isFunction: true };
   let exported = 0;
   for (const node of nodesAt(program, "body")) {
     if (node?.type !== "ExportNamedDeclaration") {
@@ -16898,15 +16987,27 @@ var inspect = (script) => {
     const meta = declarators[0];
     if (exported > 1 || declaration?.type !== "VariableDeclaration" || declaration["kind"] !== "const" || declarators.length !== 1 || nameOf(nodeAt(meta ?? node, "id")) !== "meta" || nodeAt(meta ?? node, "init")?.type !== "ObjectExpression" || !literalOnly(nodeAt(meta ?? node, "init"), 1))
       refuse("exports anything but `export const meta = { \u2026 }` of literals");
-    moduleScope.names.add("meta");
+    moduleScope.names.set("meta", { unsafe: true, inits: [] });
   }
   for (const reference of references) {
-    if (bound(reference.scope, reference.name))
+    if (binding(reference.scope, reference.name) !== undefined)
       continue;
-    if (reference.write)
-      refuse(`assigns to ${reference.name}, which it did not declare`);
-    else if (!GLOBALS.has(reference.name))
-      refuse(`uses ${reference.name}, which it did not declare`);
+    const { name, use } = reference;
+    if (use === "write")
+      refuse(`assigns to ${name}, which it did not declare`);
+    else if (!GLOBALS.has(name))
+      refuse(`uses ${name}, which it did not declare`);
+    else if (use === "value" && !VALUE_GLOBALS.has(name))
+      refuse(`uses ${name} as a value; a global is only called or read from`);
+    else if (use === "callee" && !GLOBAL_FUNCTIONS.has(name))
+      refuse(`calls ${name}`);
+  }
+  for (const assignment of assignments)
+    binding(assignment.scope, assignment.name)?.inits.push(assignment.builtHere);
+  for (const write of memberWrites) {
+    const held = write.root === undefined ? undefined : binding(write.scope, write.root);
+    if (held === undefined || !builtBinding(held))
+      refuse("writes into something the script did not build");
   }
   if (refusal === undefined && agentCalls === 0)
     refuse("starts no agent");
