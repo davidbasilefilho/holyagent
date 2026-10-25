@@ -11040,8 +11040,10 @@ var REDIRECTS = {
 };
 var SPECIALISTS = new Set(ROUTES.map((route) => route.agent));
 var PUNCTUATION = "()[]{},;:?.=<>+-*%&|^!~@";
-var IDENTIFIER = /[\w$]|\P{ASCII}/u;
-var LINE_END = new RegExp(`[\\n\\r${String.fromCharCode(8232, 8233)}]`);
+var IDENTIFIER = /[\w$]/;
+var DIGIT = /\d/;
+var MAX_SCRIPT = 1e6;
+var MAX_NESTING = 32;
 var OPENERS = new Map([
   ["(", ")"],
   ["[", "]"],
@@ -11049,7 +11051,36 @@ var OPENERS = new Map([
   ["${", "}"]
 ]);
 var CLOSERS = new Set(OPENERS.values());
+var lineEnd = (source, from) => {
+  for (let at = from;at < source.length; at += 1) {
+    const code = source.charCodeAt(at);
+    if (code === 10 || code === 13 || code === 8232 || code === 8233)
+      return at;
+  }
+  return source.length;
+};
+var numberEnd = (source, from) => {
+  let at = from;
+  while (DIGIT.test(source.charAt(at)))
+    at += 1;
+  if (source.charAt(at) === "." && DIGIT.test(source.charAt(at + 1))) {
+    at += 1;
+    while (DIGIT.test(source.charAt(at)))
+      at += 1;
+  }
+  if (source.charAt(at) === "e" || source.charAt(at) === "E") {
+    const sign = source.charAt(at + 1) === "+" || source.charAt(at + 1) === "-" ? 1 : 0;
+    if (DIGIT.test(source.charAt(at + 1 + sign))) {
+      at += 1 + sign;
+      while (DIGIT.test(source.charAt(at)))
+        at += 1;
+    }
+  }
+  return at;
+};
 var tokenize = (source) => {
+  if (source.length > MAX_SCRIPT)
+    return;
   const tokens = [];
   const push = (kind, text) => tokens.push({ kind, text });
   const stringEnd = (from) => {
@@ -11066,7 +11097,9 @@ var tokenize = (source) => {
     }
     return;
   };
-  const template = (from) => {
+  const template = (from, nesting) => {
+    if (nesting > MAX_NESTING)
+      return;
     let at = from + 1;
     while (at < source.length) {
       const char = source.charAt(at);
@@ -11078,7 +11111,7 @@ var tokenize = (source) => {
       } else if (source.startsWith("${", at)) {
         push("template", "");
         push("punct", "${");
-        const end = code(at + 2, true);
+        const end = code(at + 2, true, nesting + 1);
         if (end === undefined)
           return;
         at = end;
@@ -11087,17 +11120,17 @@ var tokenize = (source) => {
     }
     return;
   };
-  const code = (from, substitution) => {
+  const code = (from, substitution, nesting) => {
     let depth = 0;
     let at = from;
     while (at < source.length) {
       const char = source.charAt(at);
-      if (/\s/.test(char))
+      if (char === " " || char === "\t" || char === `
+` || char === "\r")
         at += 1;
-      else if (source.startsWith("//", at)) {
-        const end = source.slice(at).search(LINE_END);
-        at = end === -1 ? source.length : at + end;
-      } else if (source.startsWith("/*", at)) {
+      else if (source.startsWith("//", at))
+        at = lineEnd(source, at);
+      else if (source.startsWith("/*", at)) {
         const end = source.indexOf("*/", at + 2);
         if (end === -1)
           return;
@@ -11109,13 +11142,15 @@ var tokenize = (source) => {
         push("string", source.slice(at, end));
         at = end;
       } else if (char === "`") {
-        const end = template(at);
+        const end = template(at, nesting);
         if (end === undefined)
           return;
         at = end;
-      } else if (/\d/.test(char)) {
-        const length = source.slice(at).search(/[^\w.]/);
-        const end = length === -1 ? source.length : at + length;
+      } else if (DIGIT.test(char)) {
+        const end = numberEnd(source, at);
+        const next = source.charAt(end);
+        if (next === "." || IDENTIFIER.test(next))
+          return;
         push("number", source.slice(at, end));
         at = end;
       } else if (IDENTIFIER.test(char)) {
@@ -11134,7 +11169,7 @@ var tokenize = (source) => {
       } else if (source.startsWith("...", at)) {
         push("punct", "...");
         at += 3;
-      } else if (source.startsWith("?.", at) && !/\d/.test(source.charAt(at + 2))) {
+      } else if (source.startsWith("?.", at) && !DIGIT.test(source.charAt(at + 2))) {
         push("punct", "?.");
         at += 2;
       } else if (PUNCTUATION.includes(char)) {
@@ -11149,7 +11184,7 @@ var tokenize = (source) => {
     }
     return substitution ? undefined : at;
   };
-  return code(0, false) === undefined ? undefined : tokens;
+  return code(0, false, 0) === undefined ? undefined : tokens;
 };
 var closeOf = (tokens, open) => {
   const expected = [];
@@ -11166,6 +11201,21 @@ var closeOf = (tokens, open) => {
       if (expected.length === 0)
         return at;
     }
+  }
+  return;
+};
+var openOf = (tokens, close) => {
+  let depth = 0;
+  for (let at = close;at >= 0; at -= 1) {
+    const token = tokens[at];
+    if (token?.kind !== "punct")
+      continue;
+    if (CLOSERS.has(token.text))
+      depth += 1;
+    else if (OPENERS.has(token.text))
+      depth -= 1;
+    if (depth === 0)
+      return at;
   }
   return;
 };
@@ -11207,6 +11257,13 @@ var namesOurSpecialist = (token) => {
   const prefix = `${PLUGIN_NAMESPACE}:`;
   return !text.includes("\\") && text.startsWith(prefix) && SPECIALISTS.has(text.slice(prefix.length));
 };
+var AGENT_OPTIONS = new Set([
+  "agentType",
+  "model",
+  "effort",
+  "label",
+  "phase"
+]);
 var startsOurAgent = (args) => {
   const [prompt, options, ...rest] = splitTop(args);
   if (rest.length > 0 || prompt === undefined || prompt.length === 0)
@@ -11219,9 +11276,9 @@ var startsOurAgent = (args) => {
   for (const property of splitTop(options.slice(1, -1))) {
     const [key, colon, ...value] = property;
     const name = key?.kind === "string" ? key.text.slice(1, -1) : key?.text;
-    if (key === undefined || key.kind === "template" || key.kind === "punct")
+    if (key === undefined || key.kind !== "ident" && key.kind !== "string")
       return false;
-    if (name?.includes("\\"))
+    if (name === undefined || !AGENT_OPTIONS.has(name))
       return false;
     if (name === "agentType") {
       if (colon?.text !== ":" || value.length !== 1 || !namesOurSpecialist(value[0]))
@@ -11232,11 +11289,22 @@ var startsOurAgent = (args) => {
   }
   return named === 1;
 };
-var UNSAFE_NAMES = new Set([
+var DENIED_NAMES = new Set([
   "arguments",
+  "apply",
+  "bind",
+  "call",
+  "callee",
+  "caller",
   "constructor",
+  "defineProperties",
+  "defineProperty",
   "eval",
   "Function",
+  "getOwnPropertyDescriptor",
+  "getOwnPropertyDescriptors",
+  "getOwnPropertyNames",
+  "getPrototypeOf",
   "global",
   "globalThis",
   "import",
@@ -11246,30 +11314,166 @@ var UNSAFE_NAMES = new Set([
   "Reflect",
   "require",
   "self",
+  "setPrototypeOf",
   "this",
   "window",
   "with",
   "workflow",
+  "__defineGetter__",
+  "__defineSetter__",
+  "__lookupGetter__",
+  "__lookupSetter__",
   "__proto__"
 ]);
+var ALLOWED_NAMES = new Set([
+  "agent",
+  "args",
+  "budget",
+  "log",
+  "parallel",
+  "phase",
+  "pipeline",
+  "Array",
+  "Boolean",
+  "Error",
+  "Infinity",
+  "isFinite",
+  "isNaN",
+  "JSON",
+  "Map",
+  "Math",
+  "NaN",
+  "Number",
+  "Object",
+  "parseFloat",
+  "parseInt",
+  "Promise",
+  "Set",
+  "String",
+  "undefined",
+  "async",
+  "await",
+  "break",
+  "case",
+  "catch",
+  "const",
+  "continue",
+  "default",
+  "do",
+  "else",
+  "export",
+  "false",
+  "finally",
+  "for",
+  "function",
+  "if",
+  "in",
+  "instanceof",
+  "let",
+  "new",
+  "null",
+  "of",
+  "return",
+  "switch",
+  "throw",
+  "true",
+  "try",
+  "typeof",
+  "var",
+  "void",
+  "while"
+]);
+var ARRAY_AFTER = new Set([
+  "await",
+  "case",
+  "const",
+  "else",
+  "in",
+  "instanceof",
+  "let",
+  "of",
+  "return",
+  "throw",
+  "typeof",
+  "var",
+  "void",
+  "yield"
+]);
+var hasComputedAccess = (tokens) => tokens.some((token, at) => {
+  const before = tokens[at - 1];
+  if (token.kind !== "punct" || token.text !== "[" || before === undefined)
+    return false;
+  if (before.kind === "punct")
+    return [")", "]", "}", "?."].includes(before.text);
+  return before.kind !== "ident" || !ARRAY_AFTER.has(before.text);
+});
+var bindingsIn = (region) => region.some((token) => token.kind === "punct" && token.text === "=") ? [] : region.flatMap((token, at) => {
+  const before = region[at - 1];
+  const after = region[at + 1];
+  return token.kind === "ident" && before?.kind === "punct" && ["(", "[", "{", ",", "...", ":"].includes(before.text) && after?.kind === "punct" && [",", ")", "]", "}"].includes(after.text) ? [token.text] : [];
+});
+var declaredNames = (tokens) => {
+  const names = new Set;
+  const region = (open) => {
+    const close = closeOf(tokens, open);
+    return close === undefined ? [] : tokens.slice(open, close + 1);
+  };
+  for (const [at, token] of tokens.entries()) {
+    const next = tokens[at + 1];
+    if (token.kind === "ident" && ["const", "let", "var"].includes(token.text)) {
+      if (next?.kind === "ident")
+        names.add(next.text);
+      else if (next?.kind === "punct" && (next.text === "[" || next.text === "{"))
+        for (const name of bindingsIn(region(at + 1)))
+          names.add(name);
+    } else if (token.kind === "ident" && token.text === "function") {
+      const open = next?.kind === "ident" ? at + 2 : at + 1;
+      if (next?.kind === "ident")
+        names.add(next.text);
+      if (tokens[open]?.text === "(")
+        for (const name of bindingsIn(region(open)))
+          names.add(name);
+    } else if (token.kind === "ident" && token.text === "catch" && next?.text === "(") {
+      for (const name of bindingsIn(region(at + 1)))
+        names.add(name);
+    } else if (token.kind === "punct" && token.text === "=" && next?.text === ">") {
+      const before = tokens[at - 1];
+      if (before?.kind === "ident")
+        names.add(before.text);
+      else if (before?.text === ")") {
+        const open = openOf(tokens, at - 1);
+        if (open !== undefined)
+          for (const name of bindingsIn(region(open)))
+            names.add(name);
+      }
+    }
+  }
+  return names;
+};
 var CALL_PREFIXES = new Set(["await", "return"]);
 var onlyOurAgents = (script) => {
   const tokens = tokenize(script);
-  if (tokens === undefined || !balanced(tokens))
+  if (tokens === undefined || !balanced(tokens) || hasComputedAccess(tokens))
     return false;
+  const declared = declaredNames(tokens);
   let starts = 0;
   for (const [at, token] of tokens.entries()) {
     if (token.kind !== "ident")
       continue;
-    if (UNSAFE_NAMES.has(token.text))
+    if (DENIED_NAMES.has(token.text))
       return false;
-    if (token.text !== "agent")
-      continue;
     const before = tokens[at - 1];
+    const after = tokens[at + 1];
     const member = before?.kind === "punct" && (before.text === "." || before.text === "?.");
-    const called = tokens[at + 1]?.kind === "punct" && tokens[at + 1]?.text === "(";
-    if (member && !called)
+    const called = after?.kind === "punct" && after.text === "(";
+    const key = before?.kind === "punct" && (before.text === "{" || before.text === ",") && after?.kind === "punct" && after.text === ":";
+    if (member && !(token.text === "agent" && called) || key)
       continue;
+    if (token.text !== "agent") {
+      if (!ALLOWED_NAMES.has(token.text) && !declared.has(token.text))
+        return false;
+      continue;
+    }
     const close = called ? closeOf(tokens, at + 1) : undefined;
     if (before?.kind === "ident" && !CALL_PREFIXES.has(before.text))
       return false;

@@ -1,0 +1,77 @@
+{
+  "id": "assignment-0mvo6bk89-je3k",
+  "intentId": "intent-0mvnv553v-zwx8",
+  "intentRevision": 11,
+  "roleTask": "Worker.implementation",
+  "slug": "close-the-pr4-review-blockers-make-the",
+  "objective": "Close the PR4 review blockers: make the Workflow hook lexer refuse every known bypass, and fill the two instruction and docs gaps.",
+  "state": "Succeeded",
+  "scope": [
+    "Work only in the worktree /home/davidbasile/dev/holyagent-feat-inline-workflows (branch release/0.1.2/feat/inline-workflows, head ce0bd66). Ownership paths are relative to it. The PR5 branch is worked in another worktree; do not touch it.",
+    "Full review reports (read them): /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/r-gcrq.json (code), r-eof0.json (security), r-0ej3.json (artifact) in the same folder. The code reviewer probe script is /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/probe.ts.",
+    "Hook (packages/runtime/src/cli/hook.ts) blockers: (1) non-ASCII whitespace lookalikes (U+00A0, U+FEFF, U+1680, U+2000-200A, U+202F, U+205F, U+3000) fuse into identifiers and hide agent( calls; (2) number tokens swallow names (5..constructor.constructor); (3) computed member access with string or template keys reaches constructor and Function (for example [].at with a quoted constructor key, a template key, or a concatenated key); also Bun.$ and fetch are allowed. Design without a new dependency: refuse any non-ASCII character outside string, comment and template text; lex numbers strictly; refuse any computed member access (a [ right after an identifier, ), ], number, string or template) while keeping array literals after operators and at statement starts; switch the name check from a denylist to an allowlist of identifiers (the workflow globals agent, parallel, pipeline, phase, log, args, budget, the JS keywords and safe built-ins a workflow needs such as JSON, Math, Array, Object, String, Number, Boolean and plain array methods, plus names the script itself declares with const, let, function parameters or destructuring); refuse a quoted __proto__ key; restrict agent() option keys to agentType, model, effort, label and phase; cap recursion depth so deep nesting returns no decision instead of throwing. Add a test for every probe in both reports (each bypass refused, the normal pipeline-and-review script still allowed).",
+    "Instructions: root/dispatch.md or root/workflows.md states once that each workflow entry is recorded with assignment record <id> --agent workflow:<run-id>/<id>, the run id coming from the Workflow tool result, right after launch. Keep ROOT_CORE under its 4000-character cap. Mirror it in requirements.md if R-DISPATCH needs it.",
+    "Docs: docs/pi/claude-parity.md around lines 101-105 and docs/pi/orchestration.md around lines 71-72 restate the Pi Workflows mapping as model-written inline scripts, with no named prebuilt workflow tool."
+  ],
+  "constraints": [
+    "Decision (user, verbatim): the workflow PreToolUse hook allows, without a prompt, an inline script the root writes in which every agent() call uses a holyagent specialist (agentType holyagent:*); a script with any other agent type, a scriptPath or a resume keeps the normal permission flow.",
+    "User (verbatim): workflows prebuilds não devem existir, o root deve criar na hora porque é literalmente o ponto de workflows",
+    "Add no new dependency.",
+    "No version-control writes and no edits under .holyagent or the repository metadata folder. Report the changed paths.",
+    "Done means mise run verify passes in the worktree; run mise run build so dist is regenerated."
+  ],
+  "criteria": [
+    {
+      "text": "Every bypass named in the code and security reports is refused by the hook and covered by a test.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A normal inline script with holyagent agents, pipeline, parallel, log, phase and args is still allowed.",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The root text states the workflow record step with its run-id source and timing, and ROOT_CORE stays under its cap.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The Pi docs no longer describe a named prebuilt workflow tool.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify passes and dist is rebuilt with mise run build.",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli/hook.ts",
+    "packages/integrations/claude/tests/hooks.test.ts",
+    "packages/runtime/src/instructions/claude-5.5/root/dispatch.md",
+    "packages/runtime/src/instructions/claude-5.5/root/workflows.md",
+    "packages/runtime/src/instructions/requirements.md",
+    "docs/pi",
+    "docs/hooks.md",
+    "packages/integrations/claude/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvo0m1is-cqey",
+  "specialist": {
+    "agentId": "a2298564a5e785054",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-25T18:41:07.882Z",
+    "finishedAt": "2026-10-25T18:50:03.992Z"
+  },
+  "result": "result: Done in /home/davidbasile/dev/holyagent-feat-inline-workflows (head ce0bd66). The Workflow hook now refuses every bypass in the code and security reports and still allows a normal pipeline-and-review script. The workflow record step is stated once in the root text, and the Pi docs no longer describe a named workflow tool. `mise run verify` passes and dist is rebuilt.\n\nchanged:\n- `packages/runtime/src/cli/hook.ts`\n- `packages/integrations/claude/tests/hooks.test.ts`\n- `packages/runtime/src/instructions/claude-5.5/root/workflows.md`\n- `packages/runtime/src/instructions/requirements.md`\n- `docs/hooks.md`, `docs/pi/claude-parity.md`, `docs/pi/orchestration.md`\n- `packages/integrations/claude/dist/agents/holyagent.md` and `dist/scripts/holyagent.js` (regenerated)\n- `dispatch.md` is untouched.\n\nHook changes (no new dependency):\n- Non-ASCII outside string, comment and template text is refused. Whitespace outside strings is only space, tab, LF and CR. This closes the NBSP, U+FEFF, U+1680, U+2000-200A, U+2028/9, U+202F, U+205F and U+3000 fusing.\n- Numbers are lexed strictly: decimals with an optional fraction and exponent only. A number followed by a name or dot (`5..constructor`, `0x1f`, `1_000`, `10n`) is refused.\n- Any computed member access is refused: a `[` right after a name, `)`, `]`, `}`, a number, a string, a template or `?.`.\n  - Array literals after operators, opening brackets and keywords are kept, and I added `const`, `let` and `var` so destructuring patterns work.\n  - This refuses indexing like `a[0]` too, per your brief.\n- Names: the old denylist is now an allowlist plus a reflective denylist that applies everywhere (name, property, key, declaration).\n  - Allowed bare names: the workflow globals (`agent`, `parallel`, `pipeline`, `phase`, `log`, `args`, `budget`), keywords, `JSON`, `Math`, `Array`, `Object`, `String`, `Number`, `Boolean`, `Promise`, `Map`, `Set`, `Error`, `parseInt`, `parseFloat`, `isNaN`, `isFinite`, `NaN`, `Infinity` and `undefined`.\n  - Also allowed are names the script declares: `const`, `let`, `var` (a name or simple pattern), function names and parameters, arrow parameters, and `catch`.\n  - Property names after `.` are checked against the denylist only, so `entry.prompt` and `args.entries` work.\n  - Denied everywhere: `constructor`, `prototype`, `__proto__`, `Function`, `eval`, `Reflect`, `globalThis`, `this`, `arguments`, `import`, `workflow`, `call`, `apply`, `bind`, and the `getPrototypeOf`-style reflection names. `Bun`, `fetch`, timers, `Date` and `Symbol` are refused as undeclared names.\n- `agent()` options are limited to `agentType`, `model`, `effort`, `label` and `phase`, so a quoted or unquoted `__proto__`, `isolation` and `permissionMode` are refused.\n- Over-refusal fix: an `agent:` object key is now allowed, such as the `{id, agent, model, …}` entry shape.\n- Depth: template nesting past 32 and scripts over 1,000,000 characters return no decision, with no throw.\n\nLimits worth knowing: comma-separated declarators (`const a = 1, b = 2`) declare only the first name, so `b` is refused when used. Declarations with default values declare nothing. Both fail closed, and the happy path is unaffected.\n\nInstruction text: `root/workflows.md` now states the record step once. Right after launch, take the run id from the Workflow tool result and record each entry with `assignment record <id> --agent workflow:<run-id>/<id>`; no hook records workflow agents. It also lists what keeps a script prompt-free (only `script` and `args`, a plain script, the five option keys). The same record step is mirrored in the R-WORKFLOW line of `requirements.md`; R-DISPATCH is unchanged. `ROOT_CORE` is 3985 characters against the 4000 cap.\n\nPi docs:\n- `claude-parity.md` and `orchestration.md` now describe the inline-script mapping. The root writes the script and runs it in `codemode` over a `holy_assign({agent, prompt, model, effort})` tool. A `tool_call` gate lets through scripts that call only `holy_assign` with the 18 agent names and asks otherwise.\n- Architecture 2 is now an assignment tool, not a workflow tool. `grep holy_workflow docs` finds nothing.\n- `docs/hooks.md`: the refusal list is rewritten to match.\n\nchecks:\n- `mise run fmt` -> exit 0.\n- `mise run build` -> exit 0 (31 files).\n- `mise run verify` -> exit 0: type-check clean (103 files), lint clean (104 files), fmt clean (212 files), tests 683 pass, 1 skip, 0 fail across 684 tests in 25 files.\n- Reviewer probe script `scratchpad/probe.ts` re-run against the new hook:\n  - Refused: ctor, ctorTpl, bun, fetch, extraKey, isolation, fnshadow, reassign, comma, optcall, tagged, newagent, dupe, proto, protoI, regex, nest (no throw), deep.\n  - Allowed: ok, arrowBody, big.\n  - Now allowed by design (the optional over-refusal findings): agentKey (`agent:` key) and shadow (`const agent2`).\n  - elseAgent is refused only because its test uses an undeclared `a`; the same shape with a declared variable is allowed (test \"an else branch\").\n- I used a one-off python replace once to add `const`, `let` and `var` to `ARRAY_AFTER` in `hook.ts`; nothing else was edited that way.\n\nblockers: none\nquestions: none\nnotes: none\n\nevidence:\nEvery bypass named in the code and security reports is refused by the hook and covered by a test: in `packages/integrations/claude/tests/hooks.test.ts`, \"hook workflow\".\n- The Function-constructor family: quoted, template, concatenated and escaped constructor subscripts; the dotted constructor; the arrow-function constructor; a destructured `constructor`.\n- Numbers: `5..constructor.constructor`, `5.constructor`, hex, separator and suffix numbers.\n- Computed access: plain, by variable, optional and after a call or string.\n- Names: `Bun`, `fetch`, timers, `Date`, `Symbol`, undeclared names, a default-value parameter naming `fetch`, a reflective `getPrototypeOf` call, `__proto__` and `Reflect`.\n- `agent()` options: permissionMode, isolation, and quoted and unquoted `__proto__`.\n- All 19 whitespace and line-end lookalikes (U+00A0, U+1680, U+2000-200A, U+2028/9, U+202F, U+205F, U+3000, U+FEFF) between and around `agent(`, `await`, `return` and a declaration.\n- Depth: template nesting at 40 and 20000, and 100000 nested parentheses, each with no throw.\nA normal inline script with holyagent agents, pipeline, parallel, log, phase and args is still allowed: `ALLOWED_SCRIPT` (pipeline of writer and review stages with args, `.then`, `Object.fromEntries`) and `FULL_SCRIPT` (phase, log, parallel, pipeline, async stage, budget, destructuring, `JSON`, `Math` and number parsing) are both asserted to produce the allow decision. Further allowed cases cover non-ASCII text in strings, comments and templates, an `agent:` key, an else branch, array literals, decimals and names resembling globals.\nThe root text states the workflow record step with its run-id source and timing, and ROOT_CORE stays under its cap: `root/workflows.md` (\"Right after launching the script, take the run id from the Workflow tool result and record each entry with `assignment record <id> --agent workflow:<run-id>/<id>`\"); `requirements.md` R-WORKFLOW; `ROOT_CORE` length 3985 (cap 4000); `plugin.test.ts` requirement-mapping tests pass.\nThe Pi docs no longer describe a named prebuilt workflow tool: `docs/pi/claude-parity.md` (the Workflow row and the section 5 rows) and `docs/pi/orchestration.md` architectures 1 and 2; grep for `holy_workflow` in `docs` returns nothing.\nmise run verify passes and dist is rebuilt with mise run build: both exit 0 (counts above).\nchanged-paths: listed above.\nchecks: listed above.\ndiff-file: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/pr4fix2.diff (tracked changes in `packages` and `docs`, 1145 lines; no new untracked files).",
+  "createdAt": "2026-10-25T18:41:07.882Z"
+}
