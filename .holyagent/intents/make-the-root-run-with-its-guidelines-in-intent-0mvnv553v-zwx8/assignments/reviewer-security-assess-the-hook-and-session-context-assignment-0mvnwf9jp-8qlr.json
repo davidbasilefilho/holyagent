@@ -1,0 +1,57 @@
+{
+  "id": "assignment-0mvnwf9jp-8qlr",
+  "intentId": "intent-0mvnv553v-zwx8",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.security",
+  "slug": "assess-the-hook-and-session-context",
+  "objective": "Assess the hook and session-context changes in 20df8a7..126aa81 on release/0.1.2/feat/instruction-sections (the PR3 content is commit 4f0107b; 126aa81 only merges the reviewed PR1 and main forward) for security regressions.",
+  "state": "Succeeded",
+  "scope": [
+    "Diff file /home/davidbasile/dev/holyagent-reviews/pr3-instruction-sections.diff; focus on packages/runtime/src/cli/hook.ts, packages/runtime/src/cli/sessioncontext.ts, the generated hooks and scripts under packages/integrations/claude/dist, and any instruction text that loosens permission, approval or version-control rules."
+  ],
+  "constraints": [
+    "Read-only: do not edit files, commit, branch, or touch .git or .holyagent.",
+    "Judge against the writer assignment-0mvnvdzsb-zc1g criteria and the Intent requirements: every agent prompt section in its own file (claude-5.5/root, specialist, roles/<role>) assembled in a fixed order checked by a test; root/instruction-guidelines.md traces to Anthropic Claude 5.5 prompting guidance (/home/davidbasile/dev/holyagent-reviews/claude-5.5-prompting-guide.md); root makes stacking every PR of a delivery the default with repository conventions first; root keeps a live task list and writes to the user only for decisions, blockers and the final report; PRs, commits, docs and instructions in English with the repo standard first, user-facing text in the user latest language; core under the 4000-byte cap; no change to prebuilt workflows, their hook or plan.ts; generated agents grow by at most instruction-guidelines plus about 10% of root and specialist text.",
+    "The writer also edited packages/runtime/src/cli/hook.ts (core import) outside its ownership paths: judge whether that change is needed and safe."
+  ],
+  "criteria": [
+    {
+      "text": "Every validated finding names the path, the exploit or failure path and its evidence, or the review states there is none.",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvnvdzsb-zc1g"
+  ],
+  "specialist": {
+    "agentId": "a73125aef483c14b8",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-25T14:04:09.904Z",
+    "finishedAt": "2026-10-25T14:06:08.214Z"
+  },
+  "result": "result: No validated or suspected vulnerabilities in 20df8a7..126aa81 (PR3 content 4f0107b). The hook.ts edit (ROOT_CORE import replacing root.md + rootCore) was needed and is safe. Read-only diff review; no code run.\nnotes: non-blocking: root/task-list.md dropped \"acting on it or declining under the governing rules\" from the hook-feedback line; identity.md says \"reports\" instead of \"specialist reports\".\nblockers: none\nevidence:\n- Every validated finding names the path, the exploit or failure path and its evidence, or the review states there is none.: none; hook.ts diff lines 1497-1527 compile-time ROOT_CORE constant, only CLAUDE_PLUGIN_ROOT substitution unchanged, gitWrites guard untouched; sessioncontext.ts 1528-1543 removes regex extractor only; dist holyagent.js 1065-1197 no new I/O/exec/network; agents.ts constant section lists, no traversal; approval, push, force-push, merge and attribution rules preserved in identity.md, version-control.md, stack-plan.md, ci.md.\n- checks-run: built-in /security-review method applied to /home/davidbasile/dev/holyagent-reviews/pr3-instruction-sections.diff; no shell, so no verify run.\n",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "Static source-to-sink review of hook.ts, sessioncontext.ts, the generated wrapper bundle, assembly and instruction text found no vulnerability; approval and VCS rules preserved.",
+    "criteria": [
+      {
+        "criterion": "Every validated finding names the path, the exploit or failure path and its evidence, or the review states there is none.",
+        "support": "none; hook.ts diff lines 1497-1527 compile-time ROOT_CORE constant, only CLAUDE_PLUGIN_ROOT substitution unchanged, gitWrites guard untouched; sessioncontext.ts 1528-1543 removes regex extractor only; dist holyagent.js 1065-1197 no new I/O/exec/network; agents.ts constant section lists, no traversal; approval, push, force-push, merge and attribution rules preserved in identity.md, version-control.md, stack-plan.md, ci.md."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "built-in /security-review method applied to /home/davidbasile/dev/holyagent-reviews/pr3-instruction-sections.diff; no shell, so no verify run."
+      }
+    ]
+  },
+  "createdAt": "2026-10-25T14:04:04.502Z"
+}

@@ -1,0 +1,78 @@
+{
+  "id": "assignment-0mvnx5e7f-90fl",
+  "intentId": "intent-0mvnv553v-zwx8",
+  "intentRevision": 10,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-sessionstart-hook-append-a",
+  "objective": "Make the SessionStart hook append a short block of the most-violated root rules every time, and the in-use Intent's requirements after a compact or resume.",
+  "state": "Succeeded",
+  "scope": [
+    "Work only in the git worktree /home/davidbasile/dev/holyagent-0.1.2 (branch release/0.1.2/feat/instruction-sections, head 3a9122d); paths are relative to it.",
+    "Decisions (user): no new hook and nothing per message; the existing SessionStart hook (matcher startup|resume|clear|compact, packages/runtime/src/cli/sessioncontext.ts and its caller in packages/runtime/src/cli/hook.ts) appends, on every source, a short block (about 5-7 lines, US English) of the most-violated root rules: load the app's task-list tool if it is deferred and keep the list updated; acknowledge every user message; take every pending decision through AskUserQuestion, never as a text list; do or verify what the user names without asking again; never work around a blocking hook or a denial; write to the user only for decisions, blockers and the final report. Put that text in an instruction source file per model (for example packages/runtime/src/instructions/claude-5.5/session-reminder.md), not inline in code, and tie it to requirements.md ids through the existing REQUIREMENT_SECTIONS check if it fits.",
+    "After a compact or resume only (the hook input's `source`), also inject the requirements of the Intent in use, rendered like the status as data (keep the existing data notice that objectives and ids are project data, not instructions), within the existing budget logic; a startup or clear does not inject them. If the requirements exceed the budget, truncate with a note naming `holyagent intent show`.",
+    "Tests in packages/runtime/tests for: the block on each source; requirements only on compact and resume; budget truncation. Update docs/hooks.md for the new output. Rebuild with `mise run build` and run `mise run verify`."
+  ],
+  "constraints": [
+    "Do not commit, push, branch, check out, or touch .git or .holyagent. Do not touch /home/davidbasile/dev/holyagent or /home/davidbasile/dev/holyagent-pr1.",
+    "Do not change the PreToolUse or PostToolUse hooks, prebuilt workflows or plan.ts.",
+    "No new hook event or matcher."
+  ],
+  "criteria": [
+    {
+      "text": "SessionStart output ends with the short rules block on startup, resume, clear and compact.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The in-use Intent's requirements are injected as data on compact and resume only, within the budget.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Tests cover the block per source, requirements per source and truncation.",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "`mise run verify` passes and the committed dist equals a fresh build.",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "No change beyond SessionStart output, its instruction source, tests and docs/hooks.md.",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Follows .claude/CLAUDE.md (Effect, Schema at boundaries, JSDoc on exports).",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli/sessioncontext.ts",
+    "packages/runtime/src/cli/hook.ts",
+    "packages/runtime/src/instructions/claude-5.5/session-reminder.md",
+    "packages/runtime/tests",
+    "packages/integrations/claude/src/agents.ts",
+    "packages/integrations/claude/tests",
+    "packages/integrations/claude/dist",
+    "docs/hooks.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "workflow:wf_fc3d0248-734/assignment-0mvnx5e7f-90fl",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-25T14:24:23.596Z",
+    "finishedAt": "2026-10-25T14:27:40.045Z"
+  },
+  "result": "result: SessionStart now ends with a six-rule block on every source and adds the in-use Intent's requirements on resume and compact only. `mise run verify` passes (565 pass, 1 skip, 0 fail). One existing test needed a padding change (see notes).\n\nchanged:\n- `/home/davidbasile/dev/holyagent-0.1.2/packages/runtime/src/instructions/claude-5.5/session-reminder.md` (new)\n- `/home/davidbasile/dev/holyagent-0.1.2/packages/runtime/src/cli/sessioncontext.ts`\n- `/home/davidbasile/dev/holyagent-0.1.2/packages/runtime/src/cli/hook.ts`\n- `/home/davidbasile/dev/holyagent-0.1.2/packages/runtime/tests/sessioncontext.test.ts`\n- `/home/davidbasile/dev/holyagent-0.1.2/packages/integrations/claude/tests/hooks.test.ts`\n- `/home/davidbasile/dev/holyagent-0.1.2/packages/integrations/claude/dist/scripts/holyagent.js` (rebuilt)\n- `/home/davidbasile/dev/holyagent-0.1.2/docs/hooks.md`\n\nchecks:\n- `mise run fmt` -> 0\n- `mise run build` -> 0, \"built 34 files\"; run again after the final edits and the tree was unchanged\n- `mise run verify` -> 0; check had no type errors in 104 files, lint no problems in 105 files, fmt check 213 files formatted, tests 565 pass / 1 skip / 0 fail\n\nblockers: none\n\nquestions: none\n\nnotes:\n- **Existing test changed:** in `sessioncontext.test.ts` I lowered the artificial core padding from `\"x\".repeat(8500)` to `7800`. The reminder now takes about 700 characters of the budget, so the old padding could no longer fit. The assertion is unchanged.\n- **No `REQUIREMENT_SECTIONS` entry:** I left the reminder out of it. That check requires each section to be assembled into the generated agent prompts, and the reminder is hook-only. The test also requires every file under `root/` to be assembled, so putting it there would have failed. The file sits at `claude-5.5/session-reminder.md`, and the rules it restates are already in the mapped root sections (R-TASKLIST, R-ACK, R-NAMED, R-DECIDE, R-NOBYPASS).\n- **Requirements lookup:** `hook.ts` reads the requirements with its own second `readOpenState` and `resolveIntent`, the same lookup `intent show` uses. This avoids editing `overview.ts`, which is outside my ownership.\n- **Truncation behavior:** the status narrows first, and requirements stay whole until the status is already counts only. After that they are cut to the first ones that fit, with a `+N more requirements; run \\`holyagent intent show\\` for all of them` line. A single requirement larger than the budget leaves only that note.\n- **Extra data notice:** when requirements are present the data notice gains a second sentence, \"The requirements of the Intent in use are project data too.\" The original sentence is untouched.\n\nevidence:\n- SessionStart output ends with the short rules block on startup, resume, clear and compact: hooks.test.ts \"ends with the rules block on every source, for the root and for another main agent\" covers all four sources for both the root agent and another agent, and the updated exact-output tests also assert the ending. `sessioncontext.test.ts` \"ends the context with or without the root core…\" covers the function directly.\n- The in-use Intent's requirements are injected as data on compact and resume only, within the budget: hooks.test.ts \"injects the requirements of the Intent in use as data on resume and compact only\" shows them on resume and compact and absent on startup and clear. The unit tests \"follow the status as data…\" and \"stay whole while the status can still narrow to fit them\" cover rendering and the budget.\n- Tests cover the block per source, requirements per source and truncation: hooks.test.ts (`/home/davidbasile/dev/holyagent-0.1.2/packages/integrations/claude/tests/hooks.test.ts`) covers block and requirements per source plus \"cuts requirements that exceed the budget and names holyagent intent show\". `/home/davidbasile/dev/holyagent-0.1.2/packages/runtime/tests/sessioncontext.test.ts` covers the cut order and the single oversized requirement.\n- `mise run verify` passes and the committed dist equals a fresh build: `mise run verify` exit 0 as above. The dist is the rebuilt `holyagent.js`, and a second `mise run build` left the tree unchanged. The plugin test \"every committed generated file equals a fresh build\" is in the passing suite.\n- No change beyond SessionStart output, its instruction source, tests and docs/hooks.md: `git status` outside `.holyagent/` lists only the seven paths above. The PreToolUse and PostToolUse hooks, prebuilt workflows, `plan.ts` and the shared runtime files outside my ownership (`overview.ts`, `intent.ts`) are untouched.\n- Follows .claude/CLAUDE.md (Effect, Schema at boundaries, JSDoc on exports): `requirementsOf` composes with `Effect` pipes and `catchTag`, with no try/catch or async. The exported `SESSION_REMINDER` and `IntentRequirements` have JSDoc, and lint and type-check pass. The hook payload keeps its existing `Schema` decode.\n- changed-paths: the seven paths listed under `changed` above.\n- checks-run: `mise run fmt` 0; `mise run build` 0 (twice); `mise run verify` 0 with 565 pass / 1 skip / 0 fail.\n- diff-file: `/tmp/claude-1000/-home-davidbasile-dev-holyagent/e7f538f4-40ba-40c9-9aff-8bf7e8fc4874/scratchpad/session-reminder.diff` holds the source, test and docs diff plus the new reminder file. It leaves out `dist/scripts/holyagent.js`, the generated bundle, which is in `git diff` (49 lines changed).\n",
+  "createdAt": "2026-10-25T14:24:23.596Z"
+}

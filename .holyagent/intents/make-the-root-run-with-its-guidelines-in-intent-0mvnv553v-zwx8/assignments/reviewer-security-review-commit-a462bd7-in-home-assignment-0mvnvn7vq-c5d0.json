@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "review-commit-a462bd7-in-home",
   "objective": "Review commit a462bd7 in /home/davidbasile/dev/holyagent-hotfix for the trust it adds: project settings that declare marketplaces and enable plugins with hooks for everyone who opens this repository.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Diff: /home/davidbasile/dev/holyagent-reviews/hotfix-commit.diff; settings at /home/davidbasile/dev/holyagent-hotfix/.claude/settings.json.",
     "Judge: what a contributor's Claude Code does on opening the folder (trust prompt, auto-install or not), whether the directory marketplace makes sessions run hooks and a CLI from the checkout without consent, whether the third-party billion-context github source is pinned or floating and what that exposes, and whether the docs paragraph's commands widen trust (for example user-scope marketplace registration)."
@@ -30,9 +30,28 @@
     "assignment-0mvnvdzqs-kmno"
   ],
   "specialist": {
+    "agentId": "a5482e0a3da4bd086",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-10-25T13:42:15.975Z"
+    "startedAt": "2026-10-25T13:42:15.975Z",
+    "finishedAt": "2026-10-25T13:44:00.576Z"
+  },
+  "result": "result: No blocking vulnerability in a462bd7. Suspicions: billion-context github source has no ref (same as packages/cli/src/claude/project.ts writes); the directory marketplace runs the checkout's hooks and bundle after folder trust, by design, with Bun env/bunfig isolation. Docs commands do not widen trust.\nevidence:\nEvery validated security finding names the path, the exploit or failure path and its evidence, or the review states there is none.: no validated vulnerability; suspicions labeled with paths .claude/settings.json line 8, hooks/hooks.json, scripts/holyagent.js and exploit paths.\nfindings: floating billion-context source (non-blocking, pre-existing in setup claude); checkout code runs after folder trust (by design); docs do not widen trust; version bumps sound.\n",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "no validated vulnerability; floating billion-context source matches what holyagent setup claude already writes for every project",
+    "criteria": [
+      {
+        "criterion": "Every validated security finding names the path, the exploit or failure path and its evidence, or the review states there is none.",
+        "support": "no validated vulnerability; suspicions labeled with paths .claude/settings.json line 8, hooks/hooks.json, scripts/holyagent.js and exploit paths."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "floating billion-context source (non-blocking, pre-existing in setup claude); checkout code runs after folder trust (by design); docs do not widen trust; version bumps sound."
+      }
+    ]
   },
   "createdAt": "2026-10-25T13:42:15.975Z"
 }

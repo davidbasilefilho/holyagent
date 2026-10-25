@@ -1,0 +1,72 @@
+{
+  "id": "assignment-0mvnva88q-z3sx",
+  "intentId": "intent-0mvnv1ck7-fhv3",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.code",
+  "slug": "review-commit-9fa5418-main-release-0-1-2",
+  "objective": "Review commit 9fa5418 (main..release/0.1.2/build/plugin-dist), which moves the generated Claude Code plugin into packages/integrations/claude/dist, for mergeability.",
+  "state": "Succeeded",
+  "scope": [
+    "Judge the committed range main..HEAD on branch release/0.1.2/build/plugin-dist. The source diff without dist/ and .holyagent/ is at /home/davidbasile/dev/holyagent-reviews/pr1-source.diff; dist/ is generated and checked by the sync test.",
+    "Confirm: the marketplace source ./packages/integrations/claude/dist resolves to a valid plugin; ${CLAUDE_PLUGIN_ROOT}-relative paths in hooks.json and the wrapper still hold inside dist; no stale reference to the old generated locations remains anywhere in the repository (code, tests, docs, CI, lefthook, ignore files, packages/cli); `holyagent setup claude` and the docs on installing still describe a working install; the .holyagent ignore entries are correct.",
+    "Run `mise run verify` and `bun run claude plugin validate --strict packages/integrations/claude/dist` on the current head."
+  ],
+  "constraints": [
+    "Read only: no edits, commits, branches, or writes under .git or .holyagent."
+  ],
+  "criteria": [
+    {
+      "text": "Every blocking mergeability finding (behavior, regressions, tests, scope, style, repo-standards) is reported with path, symbol and evidence, or the review states there is none.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The verdict rests on gates run now on the current head.",
+      "blocking": true,
+      "dimension": "style"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvnv1slw-hyl7",
+    "assignment-0mvnv4bgo-5qkl"
+  ],
+  "specialist": {
+    "agentId": "ad69688db891dfde3",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-25T13:32:09.914Z",
+    "finishedAt": "2026-10-25T13:34:32.541Z"
+  },
+  "result": "result: Mergeable; no blocking defect on 9fa5418. Optional note on committed .holyagent state (intended: vcs commit carries the Intent state).\nevidence:\nEvery blocking mergeability finding (behavior, regressions, tests, scope, style, repo-standards) is reported with path, symbol and evidence, or the review states there is none.: none; stale-reference grep clean; range diff /home/davidbasile/dev/holyagent-reviews/pr1-source.diff.\nThe verdict rests on gates run now on the current head.: on 9fa5418 mise run verify exit 0 (547 pass, 1 skip, 0 fail); claude plugin validate --strict dist and . exit 0.\nchecks-run: mise run verify exit 0; two strict validations exit 0; /code-review main...HEAD; stale-path grep clean.\nfindings: no blockers; optional .holyagent state note; three code-review claims rejected with reasons.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "verify and both strict validations ran on 9fa5418; no blockers; committed .holyagent state is by design of vcs commit",
+    "criteria": [
+      {
+        "criterion": "Every blocking mergeability finding (behavior, regressions, tests, scope, style, repo-standards) is reported with path, symbol and evidence, or the review states there is none.",
+        "support": "none; stale-reference grep clean; range diff /home/davidbasile/dev/holyagent-reviews/pr1-source.diff."
+      },
+      {
+        "criterion": "The verdict rests on gates run now on the current head.",
+        "support": "on 9fa5418 mise run verify exit 0 (547 pass, 1 skip, 0 fail); claude plugin validate --strict dist and . exit 0."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "mise run verify exit 0; two strict validations exit 0; /code-review main...HEAD; stale-path grep clean."
+      },
+      {
+        "label": "findings",
+        "support": "no blockers; optional .holyagent state note; three code-review claims rejected with reasons."
+      }
+    ]
+  },
+  "createdAt": "2026-10-25T13:32:09.914Z"
+}

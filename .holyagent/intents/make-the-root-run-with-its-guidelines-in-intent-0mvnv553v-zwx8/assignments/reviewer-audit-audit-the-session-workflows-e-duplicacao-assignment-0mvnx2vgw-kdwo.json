@@ -1,0 +1,48 @@
+{
+  "id": "assignment-0mvnx2vgw-kdwo",
+  "intentId": "intent-0mvnv553v-zwx8",
+  "intentRevision": 10,
+  "roleTask": "Reviewer.audit",
+  "slug": "audit-the-session-workflows-e-duplicacao",
+  "objective": "Audit the session 'Workflows e duplicação de skills' for every place the main agent broke the holyagent root instructions, and identify which holyagent or holyclaude version it ran.",
+  "state": "Running",
+  "scope": [
+    "Condensed transcript: /home/davidbasile/dev/holyagent-reviews/audit/workflows-skills-01.txt ([USER], [ASSISTANT], [TOOL name] input, [RESULT] lines, truncated). Raw transcript for exact quotes and version strings: /home/davidbasile/.claude/projects/-home-davidbasile-dev-holyagent/76e01786-4530-4059-a4a5-d22da17918ee.jsonl (large; use Grep, not a full Read).",
+    "Instructions to audit against: the root agent prompt /home/davidbasile/dev/holyagent/packages/integrations/claude/agents/holyagent.md (version 0.1.1-2 on main) and the project rules /home/davidbasile/dev/holyagent/.claude/CLAUDE.md. Check at least: task list created first and kept; messages to the user only for decisions, blockers and the final report; every decision through AskUserQuestion, never a plain-text list; acknowledging each user message; acting on what the user named without asking for confirmation; root Bash limited to the holyagent CLI and vcs reads (no inspection loops, raw git writes, edits); delegation to specialists through assignment dispatch/record/close; workflows for new work; reviews before push; version control only through holyagent vcs; never working around a blocking hook or denial; language rules (user-facing text in the user's language, repo text in English); commits and PR text without agent/process words.",
+    "Version: find which holyagent or holyclaude version the session ran (plugin cache paths such as plugins/cache/<marketplace>/<plugin>/<version>, `--version` output, package.json versions read, the plugin name in agent types or hook commands). Name the evidence."
+  ],
+  "constraints": [
+    "Read-only. Do not edit files or touch .git or .holyagent.",
+    "Quote the transcript for each finding; separate violations from judgment calls the instructions allow."
+  ],
+  "criteria": [
+    {
+      "text": "Each violation names the rule broken, the transcript quote or tool call, and how often the pattern repeats.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The holyagent or holyclaude version the session ran is named with its evidence, or marked Unknown with what was searched.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The top three root-instruction gaps that made the violations likely (missing, buried or contradicted text) are named.",
+      "blocking": false,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "workflow:wf_56d5deb0-5e5/assignment-0mvnx2vgw-kdwo",
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-25T14:22:26.000Z"
+  },
+  "createdAt": "2026-10-25T14:22:26.000Z"
+}
