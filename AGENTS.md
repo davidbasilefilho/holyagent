@@ -9,10 +9,11 @@ Rules for working in this repository, each with the reason it exists. The contri
 
 ## Commits and pull requests
 
+- `holyagent vcs` has two commands, `commit` and `pr`; branches, pushes, merges and CI use plain Git and `gh`. The `commit-msg` hook (`holyagent hook commit-msg`, wired in `lefthook.yml`) keeps agent attribution out of commits made with plain Git too.
 - Pass `holyagent vcs pr --body-file` an unignored file inside the project. Files outside the project or ignored by git are rejected, so a scratch file will not work.
 - `holyagent vcs` refuses process words such as "Claude Code" in commit and PR text. Rephrase, or list a genuine domain word in `vcs.allowWords` of `.holyagent/config.json`.
-- Repeat the criterion text exactly in each evidence line of a specialist report, trailing period included. `assignment close --accept` matches evidence to criteria literally and rejects a paraphrase.
+- Start each evidence line of a specialist report with the criterion text or the evidence label, then a colon and the support. `assignment close --accept` matches the text before the colon after normalizing case, spacing, trailing punctuation, a leading `[blocking]` and a trailing `(dimension)`, so those differences are fine; a paraphrase or another criterion's text matches nothing. A support may continue on indented lines below its entry.
 
-## Blocked actions
+## Version-control rules
 
-- The root follows a route that a denial or blocking hook names: the `vcs-redirect` hook denies `git commit` and `git push` and names `holyagent vcs commit` and `holyagent vcs push`. When one names none, the root stops and reports it, and does not route around it through another tool, because the block is a deliberate boundary and a workaround defeats it. A specialist stops and reports instead, since version-control writes are the root's.
+- The root commits only with `holyagent vcs commit`, uses plain Git and `gh` for branches, pushes, merges and CI, and never force-pushes or pushes to a protected branch without the user's approval. After a denial it stops that line of work and reports a blocker, and does not reach the same result through another tool, because a workaround defeats the boundary the user set. A specialist makes no version-control writes and no edits under `.git/` or `.holyagent/`, and reports its changed paths for the root to record. Nothing blocks these writes: the rules are instruction text, restated by hooks that only add context (`docs/hooks.md`).

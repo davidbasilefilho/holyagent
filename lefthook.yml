@@ -1,3 +1,10 @@
+# Takes agent attribution out of every commit message, `git commit` by hand included, and refuses a
+# message that talks about the user or the agent. `{1}` is the message file git passes.
+commit-msg:
+  jobs:
+    - name: attribution
+      run: packages/integrations/claude/dist/scripts/holyagent hook commit-msg {1}
+
 # Hooks run the same mise tasks as CI; arguments after `--` go to the underlying Bun command.
 # `--staged` limits lint and fmt to the staged files, and Bun leaves a partly staged file unwritten
 # rather than committing its unstaged changes. `stage_fixed` re-stages what lint fixed, since the

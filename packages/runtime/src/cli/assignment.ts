@@ -240,11 +240,11 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
     summary:
       "Finish an Assignment with the specialist's report on stdin; --accept also accepts it from the report's evidence block",
     input:
-      "the specialist's report as raw text. Required for success; optional for the other outcomes, which store the outcome name when it is empty. With --accept it ends with `evidence:` and one `<criterion or evidence label>: <support>` line per blocking criterion and required label. With --report-json it is a JSON report object returned by an agent() that was given a schema ({status: done|partial|blocked, changed_paths, checks: [{command, exit}], blockers, notes, evidence: [{key, support}]}), which is stored as the text of such a report",
+      "the specialist's report as raw text. Required for success; optional for the other outcomes, which store the outcome name when it is empty. With --accept it ends with `evidence:` and one `<criterion or evidence label>: <support>` line per blocking criterion and required label. With --report-json it is a JSON report object returned by an agent() that was given a schema ({status: done|partial|blocked, changed_paths, checks: [{command, exit}], blockers, notes, evidence: [{key, support}]}), which is stored as the text of such a report (fields beyond these are kept in it)",
     notes: [
       "pass the report through a quoted heredoc so it stays intact",
-      "--accept applies to success only and reads the last `evidence:` block: one `<criterion text or evidence label>: <support>` line per blocking criterion and per required label, each starting with that text alone. Accept only support you judge true",
-      "an evidence gap (InsufficientAcceptance) records nothing: SendMessage the missing support to the same subagent, then close again; a workflow agent cannot be messaged, so draft a follow-up with followUpOf",
+      "--accept applies to success only and reads the last `evidence:` block: one `<criterion text or evidence label>: <support>` line per blocking criterion and per required label. The text before the colon matches the criterion ignoring case, spacing, trailing punctuation, a leading `[blocking]` and a trailing `(dimension)`; a support may continue on indented lines below its entry. Evidence for a different criterion matches nothing. Accept only support you judge true",
+      "an evidence gap (InsufficientAcceptance) records nothing: SendMessage the missing support to the same subagent, then close again with the corrected report, or when the Assignment is already Succeeded and not accepted, close it as success again or run `assignment accept <id> --rationale <text> --report` with the corrected report on stdin; a workflow agent cannot be messaged, so draft a follow-up with followUpOf",
       "outcomes: success; failure (the work failed); errored (the agent died or returned no report); interrupted (its agent is gone after a resume or compaction); stopped (you stopped it). A report from an inline workflow script is the specialist's own text: pass it verbatim on stdin, with --report-json only for a JSON report object",
     ],
     flags: { outcome: "string", accept: "string", "report-json": "boolean" },
@@ -312,16 +312,17 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
   },
   {
     path: ["assignment", "accept"],
-    usage: "assignment accept <id> --rationale <text> [--carry-forward]",
+    usage: "assignment accept <id> --rationale <text> [--carry-forward] [--report]",
     summary:
-      "Accept a Succeeded Assignment later from its stored report, or carry its acceptance forward to a newer revision",
+      "Accept a Succeeded Assignment later from its stored report, or from a corrected report on stdin with --report, or carry its acceptance forward to a newer revision",
     notes: [
+      "--report reads a corrected report from stdin (the same `evidence:` block `close --accept` reads) and stores it in place of the old one, for a Succeeded Assignment that was not accepted yet; nothing is stored if the evidence is still short",
       "--carry-forward accepts, at the live revision, work that finished at an earlier one and still holds; the rationale says why",
       "when a later change touched the files it established, a bounded validation Assignment reassesses it first",
     ],
-    flags: { rationale: "string", "carry-forward": "boolean" },
+    flags: { rationale: "string", "carry-forward": "boolean", report: "boolean" },
     positionals: 1,
-    run: ({ directory, args }) =>
+    run: ({ directory, args, text }) =>
       Effect.gen(function* () {
         const id = idArgument(args.positionals)
         const rationale = yield* requiredFlag(
@@ -329,16 +330,26 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
           "rationale",
           "assignment accept <id> --rationale <text>",
         )
-        const { assignment } = yield* updateState(directory, ({ project }) =>
+        const corrected = booleanFlag(args, "report") ? yield* text : undefined
+        const now = yield* nowIso
+        const { assignment } = yield* updateState(directory, (snapshot) =>
           Effect.gen(function* () {
-            const found = yield* findAssignment(project, id)
+            const found = yield* findAssignment(snapshot.project, id)
             const acceptance = yield* acceptanceFrom(
               found,
-              found.result ?? "",
+              corrected ?? found.result ?? "",
               rationale,
               booleanFlag(args, "carry-forward"),
             )
-            return yield* accept(project, id, acceptance)
+            return corrected === undefined
+              ? yield* accept(snapshot.project, id, acceptance)
+              : yield* closeAssignment(
+                  snapshot.project,
+                  snapshot.specialists,
+                  id,
+                  { outcome: "Succeeded", result: corrected, accept: acceptance },
+                  now,
+                )
           }),
         )
         return present({

@@ -11,25 +11,19 @@ export interface RestRequest {
   readonly body?: unknown
 }
 
-/** The GitHub API as the credential owner sees it. Answers are untyped JSON until decoded. */
+/** The GitHub REST API as the credential of `gh` sees it. Answers are untyped JSON until decoded. */
 export class GitHub extends Context.Service<
   GitHub,
   {
     readonly rest: (request: RestRequest) => Effect.Effect<unknown, GitHubFailed>
-    /** Runs a GraphQL document and returns its `data`. */
-    readonly graphql: (
-      query: string,
-      variables: Readonly<Record<string, unknown>>,
-    ) => Effect.Effect<unknown, GitHubFailed>
   }
 >()("holyagent/vcs/GitHub") {}
 
+/** A path below the API root with each segment escaped, so `a/b c` stays two segments. */
+export const apiPath = (path: string): string => path.split("/").map(encodeURIComponent).join("/")
+
 const ErrorBody = Schema.fromJsonString(Schema.Struct({ message: Schema.String }))
 const Json = Schema.fromJsonString(Schema.Unknown)
-const GraphqlBody = Schema.Struct({
-  data: Schema.optionalKey(Schema.Unknown),
-  errors: Schema.optionalKey(Schema.Array(Schema.Struct({ message: Schema.String }))),
-})
 
 const gh = (cwd: string, env: Env, what: string, args: ReadonlyArray<string>, stdin?: string) =>
   spawn("gh", args, {
@@ -66,29 +60,6 @@ const parse = (what: string, text: string) =>
         ),
       )
 
-const decodeGraphql = (json: unknown) =>
-  Schema.decodeUnknownEffect(GraphqlBody)(json).pipe(
-    Effect.mapError(
-      () =>
-        new GitHubFailed({
-          what: "GraphQL request",
-          status: undefined,
-          reason: "unexpected answer",
-        }),
-    ),
-    Effect.flatMap(({ data, errors }) =>
-      errors === undefined || errors.length === 0
-        ? Effect.succeed(data)
-        : Effect.fail(
-            new GitHubFailed({
-              what: "GraphQL request",
-              status: undefined,
-              reason: errors.map((error) => error.message).join("; "),
-            }),
-          ),
-    ),
-  )
-
 /** GitHub through the `gh` CLI, which brings the credential; payloads travel on stdin. */
 export const githubLive = (cwd: string, env: Env) =>
   Layer.succeed(GitHub, {
@@ -102,17 +73,6 @@ export const githubLive = (cwd: string, env: Env) =>
         body === undefined ? undefined : JSON.stringify(body),
       ).pipe(Effect.flatMap((text) => parse(what, text)))
     },
-    graphql: (query, variables) =>
-      gh(
-        cwd,
-        env,
-        "GraphQL request",
-        ["api", "graphql", "--input", "-"],
-        JSON.stringify({ query, variables }),
-      ).pipe(
-        Effect.flatMap((text) => parse("GraphQL request", text)),
-        Effect.flatMap((json) => decodeGraphql(json)),
-      ),
   })
 
 /** Decodes an answer of the API, reporting a shape that does not match as a GitHubFailed. */

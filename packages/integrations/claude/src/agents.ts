@@ -147,6 +147,11 @@ export const REQUIREMENT_SECTIONS: Readonly<
   "R-STACK": { section: "root/stack-plan.md", phrase: "stacks in work order by default" },
   "R-TASKLIST": { section: "root/task-list.md", phrase: "Create the task list first" },
   "R-ACK": { section: "root/user-messages.md", phrase: "Acknowledge every user message" },
+  "R-NUDGE": { section: "root/user-messages.md", phrase: "one short line at most" },
+  "R-MERGEREVIEW": {
+    section: "root/stack-plan.md",
+    phrase: "gets a review of that head before any push",
+  },
   "R-NAMED": { section: "root/user-messages.md", phrase: "names an action" },
   "R-DECIDE": {
     section: "root/task-list.md",
@@ -159,6 +164,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
   "R-LANG": { section: "root/identity.md", phrase: "in the language of the user's latest message" },
   "R-OUTWARD": { section: "root/identity.md", phrase: "need the user's approval" },
   "R-DELEGATE": { section: "root/delegating.md", phrase: "go to specialists" },
+  "R-NORESOLVE": { section: "root/delegating.md", phrase: "stop and report it" },
   "R-ROUTE": { section: "root/routing.md", phrase: "cheapest specialist" },
   "R-DISPATCH": { section: "root/dispatch.md", phrase: "`assignment dispatch`" },
   "R-WORKFLOW": { section: "root/workflows.md", phrase: "no prebuilt script exists" },
@@ -180,7 +186,14 @@ export const REQUIREMENT_SECTIONS: Readonly<
     section: "root/version-control.md",
     phrase: "Version control and state records are yours alone",
   },
-  "R-CI": { section: "root/ci.md", phrase: "Aggregate Failed" },
+  "R-GIT": {
+    section: "root/version-control.md",
+    phrase: "Never force-push, and never push to the base, default or a protected branch",
+  },
+  "R-CI": {
+    section: "root/ci.md",
+    phrase: "Watch with Monitor running `gh pr checks <n> --watch`",
+  },
   "R-ASK": { section: "root/asking.md", phrase: "Ask one decision at a time" },
   "R-GUIDE": { section: "root/instruction-guidelines.md", phrase: "prompting guidance" },
   "R-SECTIONS": { section: "root/instruction-guidelines.md", phrase: "in its own file" },

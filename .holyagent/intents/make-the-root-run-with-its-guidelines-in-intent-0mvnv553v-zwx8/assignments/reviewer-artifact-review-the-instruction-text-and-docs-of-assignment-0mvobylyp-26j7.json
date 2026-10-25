@@ -1,0 +1,58 @@
+{
+  "id": "assignment-0mvobylyp-26j7",
+  "intentId": "intent-0mvnv553v-zwx8",
+  "intentRevision": 13,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-the-instruction-text-and-docs-of",
+  "objective": "Review the instruction text and docs of the final PR6 state ccb86f8..3f17ecb for correctness, completeness and consistency after the Bash guard was replaced by instructions and context hooks.",
+  "state": "Succeeded",
+  "scope": [
+    "Diff: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/pr6-final.diff; full files under /home/davidbasile/dev/holyagent-fix-cli-and-vcs/packages/runtime/src/instructions, AGENTS.md and docs there. Earlier artifact findings: r-5qgs.json in that folder.",
+    "Check: the rules are stated directly (commit only with holyagent vcs commit; plain Git and gh otherwise; never force-push or push to a protected branch without approval; specialists make no version-control writes; no workaround of a denial); no text still mentions a redirect or deny guard except the decision log entry; earlier artifact blockers stay closed (US English, waits and repairs, as printed, nudge one short line); the trims to fit ROOT_CORE lost no rule; requirements.md and the claude-5.5 text agree."
+  ],
+  "constraints": [
+    "Decision (user, this session, verbatim): eu tinha falado para um agente remover o guard por completo e só utilizar instruções mesmo ou hooks que colocam essas instruções no momento certo para os subagentes.",
+    "User: the model-agnostic requirements file is the base each model instruction set is written from; every behavior requirement appears there and in the instructions.",
+    "Read-only."
+  ],
+  "criteria": [
+    {
+      "text": "Every blocking finding names file, line and the conflict or gap; non-blocking findings are marked as such.",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvobhwqm-44dq"
+  ],
+  "specialist": {
+    "agentId": "workflow:wf_dc355f90-423/assignment-0mvobylyp-26j7",
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-25T21:19:01.297Z",
+    "finishedAt": "2026-10-25T21:24:31.992Z"
+  },
+  "result": "status: done\nchecks:\n- Read, Grep and Glob over /tmp/.../scratchpad/pr6-final.diff, /tmp/.../scratchpad/r-5qgs.json and /home/davidbasile/dev/holyagent-fix-cli-and-vcs (no shell tool; no git, mise or bun run) -> exit 0\nblockers:\n- B1. docs/hooks.md:18 (no text still mentions a redirect or deny route, check): the session-start paragraph says the last bullet of the five-rule block reads 'Follow a denial or hook that names a holyagent route ...'. The current bullet, session-reminder.md:7, reads 'After a denial, stop and report. Commit only with `holyagent vcs commit`; never force-push or push to a protected branch.' Fix: rewrite the parenthetical in docs/hooks.md:18 to match session-reminder.md:7.\n- B2. identity.md:5 (ROOT_CORE, root-core.ts:11-16; trim check): the old text (pr6-final.diff line 2031) read 'ask before pushing to the base, default or a protected branch'. The new text reads 'Never force-push or push to a protected branch without the user's approval', the same in version-control.md:11 and requirements.md:17 (R-OUTWARD). No file now asks before a push to the base or default branch that is not protected, and no decision in the diff records that narrowing. Fix: restore 'the base, default' in identity.md:5, version-control.md:11 and R-OUTWARD, or record the maintainer's decision that protection alone is the boundary.\n- B3. Generated plugin, unverified (CLAUDE.md: rebuild with mise run build when plugin sources change): packages/integrations/claude/dist is tracked (the worktree git index lists dist/hooks/hooks.json, and .gitignore has no dist entry). The worktree's dist already has the new text (dist/hooks/hooks.json:27, 43, 53; dist/agents/holyagent.md:13), but pr6-final.diff has no dist/ path, so the committed dist may still be the pre-PR build with vcs-redirect. Root: run `git show --stat 3f17ecb -- packages/integrations/claude/dist` and `git status` for dist, then commit the rebuilt plugin if it is missing. This review read a worktree that may have moved since 3f17ecb; no git was run.\nnotes:\n- Verdicts (non-blocking unless marked above): the five blockers in r-5qgs.json are closed: identity.md:3 says 'Model-facing text is in US English'; task-list.md:3 keeps 'plus waits, repairs and blockers'; dispatch.md:4 keeps 'as printed'; no command name of a removed vcs subcommand remains in docs or state/local.ts (the decisions.md entry excepted); task-list.md:3 and user-messages.md:4 give a nudge one short line.\n- Non-blocking, trim: 'Be terse: answer first.' was removed from identity.md (ROOT_CORE_FILES). It now sits only in root/user-messages.md:3 and the full root prompt (dist/agents/holyagent.md:35), so a non-root main agent that gets ROOT_CORE loses it. The requirements file has no terseness requirement. Restore it if the core stays under the 4,000-character cap (sessioncontext.test.ts:34; estimated 3.3k to 3.6k, not measured).\n- Non-blocking, trim: task-list.md:3 dropped 'acting on it or declining under the rules' from the hook-feedback sentence, so declined hook feedback has no rule behind it.\n- Non-blocking, guard wording: a literal reading of 'no text mentions a redirect or deny guard' catches negations and removal notes that are accurate: docs/hooks.md:3 ('No hook denies or redirects'), :39 ('It is a reminder, not a guard'), :73 (the removed Bash and write guard), commit-authorship.md:63 ('instruction text, not a guard'), docs/pi/claude-parity.md:20, :79, :136 and docs/pi/claude-parity.md:326 ('no-write-guard rule'). They match the design. Keep them or move the removal history into decisions.md, which already has it. Question for root: which reading does the maintainer want?\n- Non-blocking, R-MERGEREVIEW: version-control.md:12 (merge forward, then push the affected branches together) omits the review that stack-plan.md:7 requires before any push. Add a pointer to stack-plan.md:7 rather than a second copy.\n- Non-blocking, R-VCS: version-control.md:9 says to set the repository's user.name and user.email with git config when they are missing, but gives no source for the user's own identity, so the root may invent one. Say to ask the user with AskUserQuestion.\n- Non-blocking, writing bar: version-control.md:9-13 is a plain-Git command list (git switch -c, git remote -v, git push -u origin, git stash push -- .holyagent) that the model already knows. The push and force-push rule has three owners (identity.md:5, version-control.md:11, stack-plan.md:7). Keep the rules and drop the commands.\n- Non-blocking, one owner: commit-authorship.md:9 narrates the removed API design (the GraphQL endpoint and the signing story). decisions.md already holds that history; the user-facing doc only needs the current design.\n- Consistency verified: requirements.md and claude-5.5 agree for R-VCS, R-GIT, R-CI, R-MERGEREVIEW, R-NUDGE, R-NORESOLVE, R-NOBYPASS and R-S-VCS. The REQUIREMENT_SECTIONS phrases in packages/integrations/claude/src/agents.ts (diff lines 486-514) match ci.md:3, stack-plan.md:7, user-messages.md:4, delegating.md:3 and version-control.md:11. R-OUTWARD agrees with identity.md but is narrower than before (B2). No TODO, TBD, FIXME, XXX or placeholder text in docs or the instruction text. Hook text in hook.ts (VCS_REMINDER, SPECIALIST_RULES) matches docs/hooks.md and state-changes.md. Doc links were not checked one by one.\n- Not run: mise run verify, bun test (including sessioncontext.test.ts core length and phrases), and gh flags in ci.md:3 (gh pr checks --watch exit codes). No shell tool was available. Read-only: no files changed.\n- Question for root: is B2 (dropping the base and default branch push approval) intentional? If yes, the requirement and the identity text should say so.\nevidence:\n- Every blocking finding names file, line and the conflict or gap; non-blocking findings are marked as such.: Met for this report. B1 names docs/hooks.md:18 against session-reminder.md:7; B2 names identity.md:5 and pr6-final.diff line 2031 against version-control.md:11 and requirements.md:17; B3 names dist/hooks/hooks.json:27,43,53 and the absence of any dist/ path in pr6-final.diff. Every note is marked Non-blocking, Consistency verified, or Not run.\n- findings: Blocking: B1 docs/hooks.md:18 stale denial-route text; B2 identity.md:5 base and default push approval dropped in the ROOT_CORE trim; B3 dist/ rebuild not shown in the diff (unverified). Non-blocking: terse rule missing from ROOT_CORE (identity.md, user-messages.md:3); declining clause dropped (task-list.md:3); merge-forward lacks review pointer (version-control.md:12); identity source (version-control.md:9); procedure and triple owner (version-control.md:9-13); guard wording in hooks.md and claude-parity.md. Checks not run: mise run verify and bun test (no shell).",
+  "acceptance": {
+    "revision": 13,
+    "rationale": "Findings cited with file and line; checks reported.",
+    "criteria": [
+      {
+        "criterion": "Every blocking finding names file, line and the conflict or gap; non-blocking findings are marked as such.",
+        "support": "Met for this report. B1 names docs/hooks.md:18 against session-reminder.md:7; B2 names identity.md:5 and pr6-final.diff line 2031 against version-control.md:11 and requirements.md:17; B3 names dist/hooks/hooks.json:27,43,53 and the absence of any dist/ path in pr6-final.diff. Every note is marked Non-blocking, Consistency verified, or Not run."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "Blocking: B1 docs/hooks.md:18 stale denial-route text; B2 identity.md:5 base and default push approval dropped in the ROOT_CORE trim; B3 dist/ rebuild not shown in the diff (unverified). Non-blocking: terse rule missing from ROOT_CORE (identity.md, user-messages.md:3); declining clause dropped (task-list.md:3); merge-forward lacks review pointer (version-control.md:12); identity source (version-control.md:9); procedure and triple owner (version-control.md:9-13); guard wording in hooks.md and claude-parity.md. Checks not run: mise run verify and bun test (no shell)."
+      }
+    ]
+  },
+  "createdAt": "2026-10-25T21:19:01.297Z"
+}

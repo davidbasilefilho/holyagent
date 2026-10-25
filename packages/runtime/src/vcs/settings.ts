@@ -8,7 +8,7 @@ import { STATE_DIRECTORY } from "../state/layout.ts"
 
 /** The `vcs` section of `.holyagent/config.json`. */
 export const VcsSettings = Schema.Struct({
-  /** False keeps commits off the GitHub API, so identity mismatches fall back to git. */
+  /** No longer used: commits always go through git. Accepted so an older config file still reads. */
   api: Schema.optionalKey(Schema.Boolean),
   /** Phrases of the message check that this project's domain uses legitimately. */
   allowWords: Schema.optionalKey(Schema.Array(Schema.String)),

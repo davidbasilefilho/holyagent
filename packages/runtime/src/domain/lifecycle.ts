@@ -134,7 +134,10 @@ export type Closing = typeof Closing.Type
  * Finishes an Assignment with its outcome and result, frees its specialist (starting the cache
  * window), and, when asked, accepts it in the same step. A Running Assignment can end any way, but
  * Succeeded needs a specialist whose registry entry lists the Assignment; a Ready one can only be
- * Cancelled. If the acceptance is refused, nothing is closed.
+ * Cancelled. If the acceptance is refused, nothing is closed. A Succeeded Assignment that was not
+ * accepted yet can be closed as Succeeded again with a corrected report (the evidence gap that
+ * refused its acceptance is the usual reason): the report is replaced, the specialist is not
+ * touched again, and the acceptance may come with it.
  */
 export const closeAssignment = (
   project: Project,
@@ -147,15 +150,34 @@ export const closeAssignment = (
     const closing = yield* decodeInput(Closing, input)
     yield* decodeInput(Timestamp, now)
     const assignment = yield* findAssignment(project, assignmentId)
+    const corrects =
+      assignment.state === "Succeeded" &&
+      assignment.acceptance === undefined &&
+      closing.outcome === "Succeeded"
     const open =
       assignment.state === "Running" ||
-      (assignment.state === "Ready" && closing.outcome === "Cancelled")
+      (assignment.state === "Ready" && closing.outcome === "Cancelled") ||
+      corrects
     if (!open)
       return yield* new InvalidTransition({
         id: assignment.id,
         state: assignment.state,
         action: `close as ${closing.outcome}`,
       })
+    if (corrects) {
+      const corrected: Assignment = { ...assignment, result: closing.result }
+      const closed =
+        closing.accept === undefined
+          ? corrected
+          : yield* acceptOn(
+              corrected,
+              yield* findIntent(project, assignment.intentId),
+              closing.accept,
+            )
+      return { assignment: closed, assignments: [closed] } satisfies Change & {
+        assignment: Assignment
+      }
+    }
     const agentId = assignment.specialist?.agentId
     const listed = registry.some(
       (entry) => entry.agentId === agentId && entry.assignments.includes(assignment.id),

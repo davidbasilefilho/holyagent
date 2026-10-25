@@ -1,0 +1,90 @@
+{
+  "id": "assignment-0mvob31z0-4oip",
+  "intentId": "intent-0mvnv553v-zwx8",
+  "intentRevision": 12,
+  "roleTask": "Worker.implementation",
+  "slug": "document-how-the-holyagent-plugin-is",
+  "objective": "Document how the holyagent plugin is installed by this project and picks up new content by itself, and how to clear the duplicate copy the Claude desktop app lists.",
+  "state": "Succeeded",
+  "scope": [
+    "Worktree /home/davidbasile/dev/holyagent-docs-desktop-plugin-install (branch release/0.1.2/docs/desktop-plugin-install, stacked on the Exa branch 09a40ec); ownership paths relative to it.",
+    "Established facts (cite them as findings, not guesses): (1) .claude/settings.json declares the directory marketplace holyagent at path . and enables holyagent@holyagent; Claude Code in WSL installs it at project scope on first open. (2) A directory-marketplace plugin is read from its source folder at every session start: claude plugin list prints Read from <source> and the session init path is the source, so a rebuilt plugin (mise run build) loads in the next session or after /reload-plugins with no update command; the cache copy and installed_plugins.json record go stale and do not matter; claude plugin update only rewrites them when the version changes. (3) The Claude desktop app lists plugins from its own account store (AppData/Roaming/Claude/rpm), where holyagent appears as a user-added marketplace plugin (installedBy user) with a full copy of 0.1.1-2; that store never shows the WSL project install (Neste projeto: 0), so the desktop list is not evidence of what a Code-tab session on this WSL checkout loads. (4) To remove the duplicate, uninstall or remove the user-added holyagent marketplace from the desktop app Settings > Plugins; the project install keeps working.",
+    "Update docs/usage.md (install and update sections) and docs/development.md if it describes updating, plus AGENTS.md only if a line there contradicts these facts (AGENTS.md is a repository pitfall list; keep its style). English, repository style."
+  ],
+  "constraints": [
+    "User (verbatim): Tirar a instalação duplicada de projeto, fazer o Desktop instalar o plugin pelo próprio projeto e atualizá-lo sozinho quando o conteúdo mudar.",
+    "User clarified earlier: holyagent is installed on the user own PC from this local checkout (directory marketplace); no GitHub marketplace and no change to the repository .claude/settings.json is wanted.",
+    "No version-control writes and no edits under .holyagent or the repository metadata folder. Report the changed paths.",
+    "Done means mise run verify passes in the worktree."
+  ],
+  "criteria": [
+    {
+      "text": "The docs state how the project installs the plugin, that new content loads at the next session with no update command, and how to remove the desktop duplicate.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No doc still tells the user to run plugin update commands to pick up new content.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify passes.",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "docs/usage.md",
+    "docs/development.md",
+    "AGENTS.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "workflow:wf_31e60b52-306/assignment-0mvob31z0-4oip",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-25T20:54:29.053Z",
+    "finishedAt": "2026-10-25T20:56:02.212Z"
+  },
+  "result": "status: done\nchanged:\n- /home/davidbasile/dev/holyagent-docs-desktop-plugin-install/docs/usage.md\n- /home/davidbasile/dev/holyagent-docs-desktop-plugin-install/docs/development.md\nchecks:\n- bun install --frozen-lockfile (worktree had no node_modules) -> exit 0\n- mise run verify -> exit 0\nnotes:\n- AGENTS.md left unchanged: its worktree line already says sessions load the plugin from this checkout through the directory marketplace, which agrees with the facts.\n- The worktree had no node_modules, so the first verify run failed on missing packages; I ran bun install --frozen-lockfile from the existing lockfile, and verify then passed (1015 pass, 1 skip, 0 fail; type-check, lint and format clean).\n- The old sentence 'restart Claude Code or run /reload-plugins' was replaced by the Updates paragraph. No doc told the user to run plugin update or marketplace update to pick up content; grep for plugin update, marketplace update and update the plugin across docs, README and AGENTS.md found none outside the new text.\n- Verify log: /tmp/claude-1000/-home-davidbasile/dev/holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/verify.log (see evidence for the exact path).\nevidence:\n- The docs state how the project installs the plugin, that new content loads at the next session with no update command, and how to remove the desktop duplicate.: docs/usage.md Install section, 'This repository' paragraph now ends with 'Claude Code in WSL installs the plugin at project scope the first time you open the checkout.'; new 'Updates here.' paragraph (directory marketplace read from source at every session, claude plugin list prints Read from <source>, new session or /reload-plugins after mise run build, no plugin update or marketplace update needed, stale cache and installed_plugins.json irrelevant, plugin update rewrites them only on a version change); new 'The Claude desktop app lists a second copy.' paragraph (own account store AppData/Roaming/Claude/rpm, never shows WSL project install, remove via Settings > Plugins, project install keeps working). docs/development.md 'The generated plugin' gets a one-paragraph pointer. Diff: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/d-desk.diff\n- No doc still tells the user to run plugin update commands to pick up new content.: grep -rn -i -E 'plugin update|marketplace update|update the plugin' over docs, README.md and AGENTS.md matched only the new usage.md text that says no such command is needed (the grep run before the edit matched no instruction to run one).\n- mise run verify passes.: mise run verify in /home/davidbasile/dev/holyagent-docs-desktop-plugin-install -> exit 0; 1015 pass, 1 skip, 0 fail; 'No type errors in 95 files'; 'No problems in 96 files'; 'All 208 files are formatted'. Log: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/verify.log\n- changed-paths: /home/davidbasile/dev/holyagent-docs-desktop-plugin-install/docs/usage.md and /home/davidbasile/dev/holyagent-docs-desktop-plugin-install/docs/development.md (git status shows only these two modified).\n- checks: mise run verify -> exit 0 (1015 pass, 1 skip, 0 fail); bun install --frozen-lockfile -> exit 0.\n- diff-file: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/d-desk.diff",
+  "acceptance": {
+    "revision": 12,
+    "rationale": "Doc paragraphs cited; grep and verify exit 0 shown.",
+    "criteria": [
+      {
+        "criterion": "The docs state how the project installs the plugin, that new content loads at the next session with no update command, and how to remove the desktop duplicate.",
+        "support": "docs/usage.md Install section, 'This repository' paragraph now ends with 'Claude Code in WSL installs the plugin at project scope the first time you open the checkout.'; new 'Updates here.' paragraph (directory marketplace read from source at every session, claude plugin list prints Read from <source>, new session or /reload-plugins after mise run build, no plugin update or marketplace update needed, stale cache and installed_plugins.json irrelevant, plugin update rewrites them only on a version change); new 'The Claude desktop app lists a second copy.' paragraph (own account store AppData/Roaming/Claude/rpm, never shows WSL project install, remove via Settings > Plugins, project install keeps working). docs/development.md 'The generated plugin' gets a one-paragraph pointer. Diff: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/d-desk.diff"
+      },
+      {
+        "criterion": "No doc still tells the user to run plugin update commands to pick up new content.",
+        "support": "grep -rn -i -E 'plugin update|marketplace update|update the plugin' over docs, README.md and AGENTS.md matched only the new usage.md text that says no such command is needed (the grep run before the edit matched no instruction to run one)."
+      },
+      {
+        "criterion": "mise run verify passes.",
+        "support": "mise run verify in /home/davidbasile/dev/holyagent-docs-desktop-plugin-install -> exit 0; 1015 pass, 1 skip, 0 fail; 'No type errors in 95 files'; 'No problems in 96 files'; 'All 208 files are formatted'. Log: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/verify.log"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "/home/davidbasile/dev/holyagent-docs-desktop-plugin-install/docs/usage.md and /home/davidbasile/dev/holyagent-docs-desktop-plugin-install/docs/development.md (git status shows only these two modified)."
+      },
+      {
+        "label": "checks",
+        "support": "mise run verify -> exit 0 (1015 pass, 1 skip, 0 fail); bun install --frozen-lockfile -> exit 0."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/d-desk.diff"
+      }
+    ]
+  },
+  "createdAt": "2026-10-25T20:54:29.053Z"
+}

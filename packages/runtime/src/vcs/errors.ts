@@ -25,14 +25,13 @@ export class GitHubFailed extends Data.TaggedError("GitHubFailed")<{
   }
 }
 
-/** No GitHub credential works and the git identity belongs to an agent, so no commit is the user's. */
-export class NoCredential extends Data.TaggedError("NoCredential")<{
+/** The git identity belongs to an agent, so a commit with it would not be the user's. */
+export class AgentIdentity extends Data.TaggedError("AgentIdentity")<{
   readonly identity: string
-  readonly reason: string
 }> {
   /** The description shown to the user. */
   override get message() {
-    return `No GitHub credential works (${this.reason}) and the git identity ${this.identity} looks like an agent, so commits would not be the user's`
+    return `The git identity ${this.identity} looks like an agent's, so the commit would not be the user's`
   }
 }
 
@@ -66,46 +65,13 @@ export class StagedOutsideScope extends Data.TaggedError("StagedOutsideScope")<{
   }
 }
 
-/** A change the createCommitOnBranch mutation cannot carry faithfully. */
-export class UnsupportedChange extends Data.TaggedError("UnsupportedChange")<{
-  readonly path: string
-  readonly reason: string
-}> {
-  /** The description shown to the user. */
-  override get message() {
-    return `${this.path} cannot be committed through the GitHub API: ${this.reason}`
-  }
-}
-
-/** The repository's pre-commit hook failed. */
-export class HookFailed extends Data.TaggedError("HookFailed")<{
-  readonly output: string
-}> {
-  /** The description shown to the user. */
-  override get message() {
-    return `The pre-commit hook failed: ${this.output}`
-  }
-}
-
-/** The local branch and GitHub disagree about where the branch is, or the remote is unusable. */
+/** The remote is unusable for a pull request. */
 export class RemoteMismatch extends Data.TaggedError("RemoteMismatch")<{
   readonly reason: string
 }> {
   /** The description shown to the user. */
   override get message() {
     return this.reason
-  }
-}
-
-/** GitHub holds commits of this change, but the rest of the step failed. */
-export class PartialCommit extends Data.TaggedError("PartialCommit")<{
-  readonly commits: ReadonlyArray<string>
-  readonly branch: string
-  readonly reason: string
-}> {
-  /** The description shown to the user. */
-  override get message() {
-    return `${this.reason}. Already on GitHub: ${this.commits.join(", ")}. To bring the local branch there: git fetch origin ${this.branch} && git reset --soft origin/${this.branch}`
   }
 }
 
@@ -117,48 +83,28 @@ export class DetachedHead extends Data.TaggedError("DetachedHead") {
   }
 }
 
-/** The commit on GitHub does not show the author or signature the detected path promises. */
-export class VerificationMismatch extends Data.TaggedError("VerificationMismatch")<{
-  readonly commit: string
-  readonly problems: ReadonlyArray<string>
-}> {
-  /** The description shown to the user. */
-  override get message() {
-    return `GitHub shows commit ${this.commit.slice(0, 7)} differently than expected: ${this.problems.join("; ")}`
-  }
-}
-
 /** The tags of this module's failures that mean the current state refuses the step (exit 3). */
 export const VCS_REFUSED_ERRORS: ReadonlyArray<string> = [
-  "NoCredential",
+  "AgentIdentity",
   "MessageRefused",
   "NothingToCommit",
   "StagedOutsideScope",
-  "UnsupportedChange",
-  "HookFailed",
   "RemoteMismatch",
   "DetachedHead",
-  "VerificationMismatch",
 ]
 
 /** What to do about each failure of this module. */
 export const VCS_HINTS: Readonly<Record<string, string>> = {
-  GitFailed: "Fix what git reports above, then run the command again.",
+  GitFailed:
+    "Fix what git reports above (a failing commit hook included), then run the command again.",
   GitHubFailed:
-    "Check `gh api user`, the repository's access and that the branch is pushed; the message names the call.",
-  NoCredential:
-    "Run `gh auth login` or set GH_TOKEN, or set git user.name and user.email to the user's own, then `holyagent vcs detect --refresh`.",
+    "Check `gh auth status`, the repository's access and that the branch is pushed; the message names the call.",
+  AgentIdentity:
+    "Set the user's own identity for this repository: `git config user.name <name>` and `git config user.email <email>`, then commit again.",
   MessageRefused:
     "Reword the message to say what changed and why; a project whose domain uses the word can list it in vcs.allowWords of .holyagent/config.json.",
   NothingToCommit: "Check the paths; commit only after the files changed.",
   StagedOutsideScope: "Unstage them with `git restore --staged <path>` or name them in the commit.",
-  UnsupportedChange:
-    "Commit it with git by setting `vcs.api` to false in .holyagent/config.json, then `holyagent vcs detect --refresh`.",
-  HookFailed: "Fix what the hook reports, then run the command again.",
-  RemoteMismatch: "Bring the local branch level with GitHub (git pull --ff-only) and retry.",
-  PartialCommit:
-    "Run the git command from the message, then `git status`; the staged changes that are not on GitHub yet can be committed again.",
-  DetachedHead: "Check out or create a branch with `holyagent vcs branch <name>`.",
-  VerificationMismatch:
-    "The commit stays on GitHub. Fix the credential or git identity, then run `holyagent vcs detect --refresh`.",
+  RemoteMismatch: "Set origin to the GitHub repository (`git remote add origin <url>`) and retry.",
+  DetachedHead: "Check out or create a branch with `git switch -c <name>`.",
 }

@@ -39,7 +39,7 @@ The root sends you one bounded Assignment and reads one report from you. The Ass
 
 ## Leave state changes to the root
 
-Leave to the root every command that changes git, GitHub or holyagent state (`git commit`, `branch`, `push`, `checkout`, `stash`, `reset`, `gh` writes, and `holyagent vcs`, `assignment` and `intent` commands), and anything under `.git/` or `.holyagent/`. The root owns the branch, PR and state records, other workers share the tree, and nothing enforces this, so it rests on you: when you need such a change, say so in the report. Read-only commands are open: `git status`, `diff`, `log`, `show`, `blame`, `fetch`, and `holyagent status`, `plan`, `assignment show` and `assignment list`. To undo your own edit, edit the file back.
+Leave to the root every command that changes git, GitHub or holyagent state (`git commit`, `branch`, `push`, `checkout`, `stash`, `merge`, `reset`, `gh` writes, and `holyagent vcs`, `assignment` and `intent` commands), and anything under `.git/` or `.holyagent/`. The root owns the branch, PR and state records and records your changed paths from the report, and other workers share the tree, so a stray write corrupts their work; nothing blocks one, so it rests on you. When you need such a change, say so in the report. Read-only commands are open: `git status`, `diff`, `log`, `show`, `blame`, `fetch`, and `holyagent status`, `plan`, `assignment show` and `assignment list`. To undo your own edit, edit the file back.
 
 ## Working
 
