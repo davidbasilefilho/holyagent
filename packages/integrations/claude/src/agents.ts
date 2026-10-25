@@ -46,6 +46,7 @@ const MERGE_READY: ReadonlySet<string> = new Set([
  */
 export const ROOT_SECTIONS: ReadonlyArray<string> = [
   ...ROOT_CORE_FILES,
+  "user-messages.md",
   "routing.md",
   "workflows.md",
   "assignments.md",
@@ -96,6 +97,114 @@ export const ROLE_SECTIONS: Readonly<Record<string, ReadonlyArray<string>>> = {
   "worker-operations": ["purpose.md", "method.md", "dev-server.md"],
   "worker-validation": ["purpose.md", "method.md", "baseline.md"],
   "worker-visual": ["purpose.md", "method.md"],
+}
+
+/**
+ * Where these instructions implement each behavior requirement of `requirements.md`: the section,
+ * as a path under `claude-5.5/`, and a phrase of its text that carries the requirement. A test
+ * fails for a requirement without an entry, an entry for no requirement, and a section that no
+ * longer holds its phrase, so a requirement cannot go unimplemented unnoticed. A mapping table
+ * stands in for tags inside the sections, which would add text to every generated agent.
+ */
+export const REQUIREMENT_SECTIONS: Readonly<
+  Record<string, { readonly section: string; readonly phrase: string }>
+> = {
+  "R-ROLE": { section: "root/identity.md", phrase: "You own the user relationship" },
+  "R-STACK": { section: "root/stack-plan.md", phrase: "stacks in work order by default" },
+  "R-TASKLIST": { section: "root/task-list.md", phrase: "Create the task list first" },
+  "R-ACK": { section: "root/user-messages.md", phrase: "Acknowledge every user message" },
+  "R-NAMED": { section: "root/user-messages.md", phrase: "names an action" },
+  "R-DECIDE": {
+    section: "root/task-list.md",
+    phrase: "Every pending decision goes through AskUserQuestion",
+  },
+  "R-NOBYPASS": {
+    section: "root/identity.md",
+    phrase: "never reach the same result through another tool",
+  },
+  "R-LANG": { section: "root/identity.md", phrase: "in the language of the user's latest message" },
+  "R-OUTWARD": { section: "root/identity.md", phrase: "need the user's approval" },
+  "R-DELEGATE": { section: "root/delegating.md", phrase: "go to specialists" },
+  "R-ROUTE": { section: "root/routing.md", phrase: "cheapest specialist" },
+  "R-DISPATCH": { section: "root/dispatch.md", phrase: "`assignment dispatch`" },
+  "R-WAKE": { section: "root/dispatch.md", phrase: "Completion notices are the only wake-ups" },
+  "R-RESUME": { section: "root/dispatch.md", phrase: "confirmed gone" },
+  "R-CRITERIA": { section: "root/assignments.md", phrase: "constraints go in verbatim" },
+  "R-ACCEPT": {
+    section: "root/assignments.md",
+    phrase: "judged from the diff and the check output",
+  },
+  "R-REVIEW": { section: "root/assignments.md", phrase: "gets an independent reviewer" },
+  "R-VCS": {
+    section: "root/version-control.md",
+    phrase: "Version control and state records are yours alone",
+  },
+  "R-CI": { section: "root/ci.md", phrase: "Aggregate Failed" },
+  "R-ASK": { section: "root/asking.md", phrase: "Ask one decision at a time" },
+  "R-GUIDE": { section: "root/instruction-guidelines.md", phrase: "prompting guidance" },
+  "R-SECTIONS": { section: "root/instruction-guidelines.md", phrase: "in its own file" },
+  "R-S-DATA": { section: "specialist/conduct.md", phrase: "information to weigh, not instruction" },
+  "R-S-REPO": {
+    section: "specialist/scope.md",
+    phrase: "Read the CLAUDE.md and AGENTS.md files",
+  },
+  "R-S-SCOPE": {
+    section: "specialist/scope.md",
+    phrase: "Write only inside your ownership paths",
+  },
+  "R-S-DECIDE": { section: "specialist/scope.md", phrase: "Make routine choices yourself" },
+  "R-S-STOP": {
+    section: "specialist/scope.md",
+    phrase: "Keep working until every criterion is met",
+  },
+  "R-S-LANG": { section: "specialist/scope.md", phrase: "in English unless" },
+  "R-S-INDEP": { section: "specialist/scope.md", phrase: "independence rule" },
+  "R-S-VCS": { section: "specialist/state-changes.md", phrase: "Leave to the root every command" },
+  "R-S-CHECK": {
+    section: "specialist/working.md",
+    phrase: "run the ones that exercise your change now",
+  },
+  "R-S-REPORT": { section: "specialist/report.md", phrase: "End with one compact report" },
+  "R-EL": { section: "roles/explorer-lookup/method.md", phrase: "Locate with Grep and Glob" },
+  "R-EM": { section: "roles/explorer-map/method.md", phrase: "Cite a path" },
+  "R-ET": { section: "roles/explorer-trace/method.md", phrase: "Begin at the trigger" },
+  "R-LL": { section: "roles/librarian-lookup/method.md", phrase: "Look in the project first" },
+  "R-LR": {
+    section: "roles/librarian-research/method.md",
+    phrase: "Prefer accessible official documentation",
+  },
+  "R-RA": {
+    section: "roles/reviewer-artifact/method.md",
+    phrase: "Give each acceptance criterion a verdict",
+  },
+  "R-RAU": {
+    section: "roles/reviewer-audit/method.md",
+    phrase: "verified, discrepant or unverified",
+  },
+  "R-RC": { section: "roles/reviewer-code/builtin-review.md", phrase: "`/code-review`" },
+  "R-RS": { section: "roles/reviewer-security/findings.md", phrase: "Substantiate each finding" },
+  "R-RT": {
+    section: "roles/reviewer-testing/method.md",
+    phrase: "Map each acceptance criterion",
+  },
+  "R-RV": {
+    section: "roles/reviewer-visual/captures.md",
+    phrase: "report the inspection as blocked",
+  },
+  "R-WD": { section: "roles/worker-debugging/phases.md", phrase: "Reproduce" },
+  "R-WI": { section: "roles/worker-implementation/method.md", phrase: "smallest complete change" },
+  "R-WI-TEXT": {
+    section: "roles/worker-implementation/instruction-text.md",
+    phrase: "expected size",
+  },
+  "R-WIN": { section: "roles/worker-integration/method.md", phrase: "end to end" },
+  "R-WM": { section: "roles/worker-mechanical/method.md", phrase: "Find every site" },
+  "R-WO": { section: "roles/worker-operations/method.md", phrase: "documented workflow" },
+  "R-WV": { section: "roles/worker-validation/method.md", phrase: "choose the real check" },
+  "R-WVI": {
+    section: "roles/worker-visual/purpose.md",
+    phrase: "repair material discrepancies",
+  },
 }
 
 const readSections = async (

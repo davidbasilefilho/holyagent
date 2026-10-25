@@ -18,7 +18,7 @@ After a start, resume, clear or compaction the root has lost what is running. Th
 
 - It reads only the state of open Intents, so its cost follows open work, not the whole history ([decisions.md](decisions.md) has the predecessor's figures).
 - It stays small and deterministic. The whole context is capped at 9,000 characters, because the host cuts `additionalContext` at 10,000 and a cut would drop the tail unannounced. If the status does not fit, it is narrowed in steps (10 rows of 200 characters, 5 of 120, 3 of 80, 1 of 60, then counts only) with a `+N more` line for what was left out, and long objectives and agent ids are shortened.
-- When the payload's `agent_type` is the root (`holyagent` or `holyagent:holyagent`) the rules are already in the system prompt and only the status is added. When the main agent is anything else, the hook prepends a compact core of the root rules (the span of `root.md` between its core markers, with `${CLAUDE_PLUGIN_ROOT}` filled in) and a pointer to the full rules in the holyagent agent prompt.
+- When the payload's `agent_type` is the root (`holyagent` or `holyagent:holyagent`) the rules are already in the system prompt and only the status is added. When the main agent is anything else, the hook prepends a compact core of the root rules (`ROOT_CORE`, the files named in `ROOT_CORE_FILES` in `root-core.ts` joined as the root prompt joins them, with `${CLAUDE_PLUGIN_ROOT}` filled in) and a pointer to the full rules in the holyagent agent prompt.
 - A failure is loud on stderr, not silent.
 
 ## `vcs-redirect`

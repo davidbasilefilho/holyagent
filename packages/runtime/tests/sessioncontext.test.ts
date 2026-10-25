@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 
 import { CONTEXT_BUDGET, sessionContext } from "../src/cli/sessioncontext.ts"
 import { ROOT_CORE, ROOT_CORE_FILES } from "../src/instructions/claude-5.5/root-core.ts"
@@ -34,6 +36,16 @@ describe("the core of the root rules", () => {
     expect(core).toContain("assignment dispatch")
     expect(core).not.toContain("core:start")
     expect(ROOT_CORE_FILES.every((name) => /^[a-z-]+\.md$/.test(name))).toBe(true)
+  })
+
+  test("equals the text of its files joined as the root prompt joins them", () => {
+    const joined = ROOT_CORE_FILES.map((name) =>
+      readFileSync(
+        join(import.meta.dir, "../src/instructions/claude-5.5/root", name),
+        "utf8",
+      ).trim(),
+    ).join("\n\n")
+    expect(ROOT_CORE).toBe(joined)
   })
 
   test("stands alone for a root that gets only the core", () => {

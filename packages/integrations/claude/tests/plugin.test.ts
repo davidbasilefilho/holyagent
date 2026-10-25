@@ -9,6 +9,7 @@ import { ROUTES } from "../../../runtime/src/domain/route.ts"
 import { ROOT_CORE_FILES } from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
 import packageJson from "../package.json" with { type: "json" }
 import {
+  REQUIREMENT_SECTIONS,
   ROLE_SECTIONS,
   ROOT_SECTIONS,
   SPECIALIST_SECTIONS,
@@ -237,6 +238,49 @@ describe("agents", () => {
     const body = ROOT_SECTIONS.map((name) => read(`${CLAUDE}/root`, name).trim()).join("\n\n")
     expect(agent("holyagent")?.content.endsWith(`\n---\n\n${body}\n`)).toBe(true)
     expect(ROOT_SECTIONS.slice(0, ROOT_CORE_FILES.length)).toEqual([...ROOT_CORE_FILES])
+  })
+
+  test("the root agent holds each of the user's behavior rules once", () => {
+    const content = agent("holyagent")?.content ?? ""
+    for (const rule of [
+      "Acknowledge every user message",
+      "names an action",
+      "Every pending decision goes through AskUserQuestion",
+      "never reach the same result through another tool",
+    ])
+      expect({ rule, count: content.split(rule).length - 1 }).toEqual({ rule, count: 1 })
+  })
+
+  test("every requirement of requirements.md is implemented by a section that reaches its agents", () => {
+    const lines = read("packages/runtime/src/instructions", "requirements.md").split("\n")
+    const listed = lines.filter((line) => line.startsWith("- "))
+    const ids = listed.map((line) => /^- (R-[A-Z]+(?:-[A-Z]+)*): \S/.exec(line)?.[1] ?? line)
+    expect(ids.every((id) => /^R-[A-Z]+(?:-[A-Z]+)*$/.test(id))).toBe(true)
+    expect(new Set(ids).size).toBe(ids.length)
+    expect(ids.toSorted()).toEqual(Object.keys(REQUIREMENT_SECTIONS).toSorted())
+
+    const assembled = [
+      ...ROOT_SECTIONS.map((name) => `root/${name}`),
+      ...SPECIALIST_SECTIONS.map((name) => `specialist/${name}`),
+      ...Object.entries(ROLE_SECTIONS).flatMap(([role, names]) =>
+        names.map((name) => `roles/${role}/${name}`),
+      ),
+    ]
+    for (const [id, { section, phrase }] of Object.entries(REQUIREMENT_SECTIONS)) {
+      expect({ id, assembled: assembled.includes(section) }).toEqual({ id, assembled: true })
+      expect({ id, holds: read(CLAUDE, section).includes(phrase) }).toEqual({ id, holds: true })
+      const reached = section.startsWith("root/")
+        ? ["holyagent"]
+        : section.startsWith("roles/")
+          ? [section.split("/")[1] ?? ""]
+          : ROUTES.map((route) => route.agent)
+      for (const name of reached)
+        expect({ id, name, reaches: agent(name)?.content.includes(phrase) }).toEqual({
+          id,
+          name,
+          reaches: true,
+        })
+    }
   })
 
   test("every file of root/, specialist/ and roles/ is assembled and every assembled file exists", () => {
