@@ -7,9 +7,12 @@ import { WORKFLOW_NAMES } from "../domain/plan.ts"
 import { ROUTES } from "../domain/route.ts"
 import root from "../instructions/claude-5.5/root.md" with { type: "text" }
 import { hasCode, io } from "../state/files.ts"
-import { PLUGIN_NAMESPACE } from "./assignment.ts"
-import { describeFailure } from "./errors.ts"
-import { statusOf } from "./overview.ts"
+import { STATE_DIRECTORY } from "../state/layout.ts"
+import { PLUGIN_NAMESPACE, recordLaunch } from "./assignment.ts"
+import { stateRoot } from "./context.ts"
+import { AgentIdMissing, describeFailure, StateFolderMissing } from "./errors.ts"
+import { resumeOf, statusOf } from "./overview.ts"
+import { dispatchedAssignment } from "./report.ts"
 import { rootCore, sessionContext } from "./sessioncontext.ts"
 import { type GitWrite, gitWrites } from "./shell.ts"
 import { type Call, type Command, Verbatim } from "./types.ts"
@@ -23,6 +26,8 @@ const Payload = Schema.Struct({
   tool_name: Schema.optionalKey(Schema.String),
   tool_input: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
   agent_type: Schema.optionalKey(Schema.String),
+  source: Schema.optionalKey(Schema.String),
+  tool_response: Schema.optionalKey(Schema.Unknown),
 })
 
 const NOTHING = new Verbatim("", "", 0)
@@ -35,7 +40,8 @@ const decision = (permissionDecision: "allow" | "deny", permissionDecisionReason
 
 /**
  * Runs a hook: a failure becomes one stderr line and exit 1, a notice that authorizes nothing. A
- * `stateless` hook never looks for the state root, so a git failure cannot stop it.
+ * `stateless` hook never looks for the state root, so a git failure cannot stop it; `agent-launch`
+ * finds the root itself, inside its own failure handling, to report a git failure as context.
  */
 const hook = (
   name: string,
@@ -74,6 +80,27 @@ const hasStateFolder = (directory: string) =>
       () => Effect.succeed(false),
     ),
   )
+
+/** The SessionStart sources after which pending notices are lost and the Running rows need a check. */
+const RESUMED: ReadonlySet<string | undefined> = new Set(["resume", "compact"])
+
+/** Ids the host makes are short words; anything else is not echoed into a command to run. */
+const SAFE_ID = /^[\w.:-]{1,80}$/
+
+/**
+ * The agent id of an Agent launch: `agentId` of the tool response, which a background launch
+ * (`status: "async_launched"`) and a finished one (`status: "completed"`) both carry.
+ */
+const launchedAgent = (response: unknown): string | undefined => {
+  const agentId =
+    typeof response === "object" && response !== null && "agentId" in response
+      ? response.agentId
+      : undefined
+  return typeof agentId === "string" && SAFE_ID.test(agentId) ? agentId : undefined
+}
+
+const postToolUse = (additionalContext: string) =>
+  output({ hookEventName: "PostToolUse", additionalContext })
 
 const REDIRECTS: Readonly<Record<GitWrite, string>> = {
   commit:
@@ -175,7 +202,7 @@ const shadowed = (call: Call) =>
 export const HOOK_COMMANDS: ReadonlyArray<Command> = [
   hook(
     "session-start",
-    "SessionStart: add the status of the open Intents as context (and the core root rules when the root agent is not the main thread); nothing without a .holyagent folder",
+    "SessionStart: add the status of the open Intents as context, with the reconcile result after a resume or compaction (and the core root rules when the root agent is not the main thread); nothing without a .holyagent folder",
     (payload, call) =>
       Effect.gen(function* () {
         if (!(yield* hasStateFolder(call.directory))) return NOTHING
@@ -185,14 +212,49 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
           "${CLAUDE_PLUGIN_ROOT}",
           pluginRoot ?? "${CLAUDE_PLUGIN_ROOT}",
         )
+        const { status, reconcile } = RESUMED.has(payload.source)
+          ? yield* resumeOf(call.directory)
+          : { status: yield* statusOf(call.directory), reconcile: undefined }
         return output({
           hookEventName: "SessionStart",
           additionalContext: sessionContext(
-            yield* statusOf(call.directory),
+            status,
             ROOT_AGENTS.has(payload.agent_type) ? undefined : core,
+            reconcile,
           ),
         })
       }),
+  ),
+  hook(
+    "agent-launch",
+    "PostToolUse for Agent: when the prompt came from assignment dispatch, record the launched agent (assignment record <id> --agent <agentId>) and say so; on failure ask the root to record it; nothing for any other launch",
+    (payload, call) => {
+      const prompt = payload.tool_name === "Agent" ? payload.tool_input?.prompt : undefined
+      const id = typeof prompt === "string" ? dispatchedAssignment(prompt) : undefined
+      if (id === undefined) return Effect.succeed(NOTHING)
+      const agentId = launchedAgent(payload.tool_response)
+      // Recording is bookkeeping and authorizes nothing, so any failure only hands the step back.
+      return Effect.gen(function* () {
+        if (agentId === undefined) return yield* new AgentIdMissing()
+        const directory = join(yield* stateRoot(call.cwd), STATE_DIRECTORY)
+        // The state folder is not made here: a project without one has no Assignment to record.
+        if (!(yield* hasStateFolder(directory))) return yield* new StateFolderMissing()
+        const type = payload.tool_input?.subagent_type
+        yield* recordLaunch(directory, id, agentId, {
+          type: typeof type === "string" ? type : undefined,
+        })
+        return postToolUse(`holyagent: recorded agent ${agentId} for ${id}.`)
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.succeed(
+            postToolUse(
+              `holyagent: could not record the launch of ${id} (${describeFailure(error).tag}). Run \`holyagent assignment record ${id} --agent ${agentId ?? "<agentId>"}\` yourself.`,
+            ),
+          ),
+        ),
+      )
+    },
+    true,
   ),
   hook(
     "vcs-redirect",

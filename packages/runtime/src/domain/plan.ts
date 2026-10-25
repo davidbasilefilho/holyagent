@@ -18,9 +18,9 @@ export type Recommendation =
       readonly name: WorkflowName
       readonly assignmentIds: ReadonlyArray<string>
       /**
-       * The same work as direct subagents, for a session without the user's opt-in to workflows:
-       * the Assignments to launch together, and for `implement-review` the reviews to launch once
-       * those have closed.
+       * The same work as direct subagents, for a session where the Workflow tool is disabled or
+       * unavailable: the Assignments to launch together, and for `implement-review` the reviews to
+       * launch once those have closed.
        */
       readonly fallback: {
         readonly assignmentIds: ReadonlyArray<string>
@@ -128,11 +128,11 @@ const WORKFLOWS: ReadonlyArray<
  * out, see {@link dispatchBlock}; a review waits for the unfinished work it names in
  * independentFrom), or undefined when none can. With workflows available it names the first
  * workflow the set fits: writers with the reviews of their work, as writer and review ids in turn
- * (`implement-review`), at least two independent reviews (`review-diff`) or at least two
- * independent Assignments (`run-assignments`), each with its direct-subagent fallback, leaving out
- * any that would continue a warm specialist, which a workflow cannot message. Otherwise it takes
- * the Assignments that can run side by side: one that can continue a warm specialist is `continue`,
- * and anything else is `subagent` work.
+ * (`implement-review`), at least two independent reviews (`review-diff`) or independent Assignments
+ * (`run-assignments`, which takes a single one when nothing is left out), each with its
+ * direct-subagent fallback, leaving out any that would continue a warm specialist, which a workflow
+ * cannot message. Otherwise it takes the Assignments that can run side by side: one that can
+ * continue a warm specialist is `continue`, and anything else is `subagent` work.
  */
 export const recommend = (
   project: Project,
@@ -155,7 +155,10 @@ export const recommend = (
     }
     for (const [name, reason, pick] of WORKFLOWS) {
       const chosen = pick(pool)
-      if (chosen.length >= 2) {
+      // A single Assignment is a one-entry run-assignments, unless a warm specialist is left out.
+      const minimum =
+        name === "run-assignments" && pool.dispatchable.length === dispatchable.length ? 1 : 2
+      if (chosen.length >= minimum) {
         const assignmentIds = chosen.map((row) => row.id)
         // The pairs of implement-review run as writer then review, so without the workflow the
         // reviews wait for their writers.
@@ -178,8 +181,8 @@ export const recommend = (
       action: "subagent",
       assignmentIds,
       reason: config.workflowsAvailable
-        ? "no workflow fits the ready set"
-        : "workflows are not available",
+        ? "part of the set continues a warm specialist by SendMessage; run the rest as a workflow"
+        : "the Workflow tool is disabled or unavailable",
     }
   const directive = directiveFor(first, registry, now, config)
   return directive.action === "continue"

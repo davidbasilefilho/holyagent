@@ -91,6 +91,8 @@ export interface Command {
   readonly input?: string
   /** What stdout holds when it is more than TOON, such as a trailer after the fields. */
   readonly output?: string
+  /** Further help lines, for what the model must know to use the command without a manual. */
+  readonly notes?: ReadonlyArray<string>
   readonly flags: FlagSpec
   /** True when the command needs neither the state root nor git, so no git runs before it. */
   readonly stateless?: true

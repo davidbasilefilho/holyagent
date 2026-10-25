@@ -35,6 +35,13 @@ const MERGE_READY: ReadonlySet<string> = new Set([
 /** Roles that get the writing bar, for the instruction text they write or judge. */
 const WRITING_BAR: ReadonlySet<string> = new Set(["Worker.implementation", "Reviewer.artifact"])
 
+/**
+ * Roles that start with a built-in review of Claude Code, `/code-review` and `/security-review`.
+ * Both are prompt commands that only the Skill tool can run, and neither needs more: the shell
+ * reads of `/security-review` run through the host's own shell, whatever tools the agent lists.
+ */
+const BUILTIN_REVIEW: ReadonlySet<string> = new Set(["Reviewer.code", "Reviewer.security"])
+
 const t3 = (names: ReadonlyArray<string>) => names.map((name) => `mcp__t3-code__${name}`)
 
 /**
@@ -62,8 +69,8 @@ const capabilityTools = (
 
 /**
  * The tools of a specialist: reading for all, then what its capabilities call for. Reviewer.code
- * keeps Bash without a Shell capability, since it reads diffs with git. A role with Bash gets
- * Monitor for its long commands.
+ * keeps Bash without a Shell capability, since it reads diffs with git. The roles of
+ * {@link BUILTIN_REVIEW} get Skill, and a role with Bash gets Monitor for its long commands.
  */
 const toolsOf = (route: Route, inspection: ReadonlyArray<string>): ReadonlyArray<string> => {
   const granted = [
@@ -72,6 +79,7 @@ const toolsOf = (route: Route, inspection: ReadonlyArray<string>): ReadonlyArray
     "Glob",
     ...capabilityTools(route.capabilities, inspection),
     ...(route.roleTask === "Reviewer.code" ? ["Bash"] : []),
+    ...(BUILTIN_REVIEW.has(route.roleTask) ? ["Skill"] : []),
   ]
   const unique = [...new Set(granted)]
   return unique.includes("Bash") ? [...unique, "Monitor"] : unique

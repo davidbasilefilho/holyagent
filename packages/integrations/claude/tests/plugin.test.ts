@@ -141,7 +141,7 @@ describe("hooks", () => {
     ...extra,
   })
 
-  test("are exactly the session, redirect and workflow hooks, in exec form through the wrapper", () => {
+  test("are exactly the session, redirect, workflow and launch hooks, in exec form through the wrapper", () => {
     expect(hooks).toEqual({
       SessionStart: [
         { matcher: "startup|resume|clear|compact", hooks: [command("session-start")] },
@@ -156,7 +156,15 @@ describe("hooks", () => {
         },
         { matcher: "Workflow", hooks: [command("workflow", { onFailure: "block" })] },
       ],
+      PostToolUse: [{ matcher: "Agent", hooks: [command("agent-launch")] }],
     })
+  })
+
+  test("the launch hook runs only for the Agent tool and never blocks", () => {
+    const launch = hooks.PostToolUse ?? []
+    expect(launch.map((group) => group.matcher)).toEqual(["Agent"])
+    for (const hook of launch.flatMap((group) => group.hooks))
+      expect(hook).not.toHaveProperty("onFailure")
   })
 
   test("the redirect rules start on git with commit or push anywhere after it, and on nothing else", () => {
@@ -253,6 +261,15 @@ describe("agents", () => {
     ])
       expect(tools(bare)).not.toContain("Bash")
     expect(tools("reviewer-testing")).toEqual(["Read", "Grep", "Glob", "Bash", "Monitor"])
+    // The built-in reviews are prompt commands that only the Skill tool runs, and they need nothing
+    // more: /security-review reads through the host's own shell, so reviewer-security stays shell-free.
+    expect(tools("reviewer-security")).toEqual(["Read", "Grep", "Glob", "Skill"])
+    expect(tools("reviewer-code")).toEqual(["Read", "Grep", "Glob", "Bash", "Skill", "Monitor"])
+    for (const route of ROUTES)
+      expect({ agent: route.agent, skill: tools(route.agent).includes("Skill") }).toEqual({
+        agent: route.agent,
+        skill: ["reviewer-code", "reviewer-security"].includes(route.agent),
+      })
     expect(tools("reviewer-visual")).toContain("mcp__t3-code__device_screenshot")
     expect(tools("worker-visual")).toContain("mcp__t3-code__html_preview")
   })
@@ -266,6 +283,20 @@ describe("agents", () => {
       "SendMessage, AskUserQuestion, Skill, Monitor, Workflow, TaskCreate, TaskUpdate, TaskList, TaskGet, Read, Grep, Glob, Bash, mcp__t3-code__html_render, mcp__t3-code__html_preview, mcp__t3-code__watch_pull_request",
     )
     expect(field(agent("holyagent")?.content ?? "", "model")).toBe("opus")
+  })
+
+  test("the removed skills are gone from the plugin, and the roles start with the built-in reviews", () => {
+    const names = generated
+      .filter((file) => file.path.endsWith("SKILL.md"))
+      .map((file) => file.path.split("/").at(-2) ?? "")
+      .toSorted()
+    expect(names).toEqual(["frontend-design", "interface-inspection", "merge-ready"])
+    expect(agent("reviewer-code")?.content).toContain(
+      "Start every review, re-reviews included, with the built-in `/code-review`",
+    )
+    expect(agent("reviewer-security")?.content).toContain("built-in `/security-review`")
+    for (const text of generated.map((file) => file.content))
+      expect(text).not.toMatch(/`assignments` skill|grill-me|stacks-and-ci|continue-work/)
   })
 
   test("preloaded skills are the ones that exist", () => {

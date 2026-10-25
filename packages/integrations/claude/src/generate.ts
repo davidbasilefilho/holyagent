@@ -93,9 +93,11 @@ const GIT_COMMIT = "Bash(*git*commit*)"
 const GIT_PUSH = "Bash(*git*push*)"
 
 /**
- * The three hooks. The session hook adds the state of the project; the two PreToolUse hooks run
- * `onFailure: block`, because a failure there would let a raw git write or an unvetted workflow
- * through unexamined.
+ * The four hooks. The session hook adds the state of the project (and, after a resume or
+ * compaction, the reconcile result); the two PreToolUse hooks run `onFailure: block`, because a
+ * failure there would let a raw git write or an unvetted workflow through unexamined. The
+ * PostToolUse hook records the agent of a dispatched launch, runs only for the Agent tool, and
+ * reports its own failures to the root as context, since it authorizes nothing.
  */
 const hooks = (): GeneratedFile => ({
   path: inPlugin("hooks/hooks.json"),
@@ -117,6 +119,7 @@ const hooks = (): GeneratedFile => ({
         },
         { matcher: "Workflow", hooks: [hookCommand("workflow", { onFailure: "block" })] },
       ],
+      PostToolUse: [{ matcher: "Agent", hooks: [hookCommand("agent-launch")] }],
     },
   }),
 })

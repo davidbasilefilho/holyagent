@@ -194,7 +194,11 @@ describe("workflow recommendation", () => {
 
   test("a review that depends on the writer waits for its acceptance and is not paired", () => {
     const rows = [writer("w"), review("r", { dependencies: ["w"], independentFrom: ["w"] })]
-    expect(plan(rows)).toMatchObject({ action: "subagent", assignmentIds: ["w"] })
+    expect(plan(rows)).toMatchObject({
+      action: "workflow",
+      name: "run-assignments",
+      assignmentIds: ["w"],
+    })
   })
 
   test("a review waits for any unfinished work it names, and is not paired with just one of them", () => {
@@ -212,7 +216,8 @@ describe("workflow recommendation", () => {
     const check = review("r", { independentFrom: ["w"] })
     expect(plan([...rows, check])).toBeUndefined()
     expect(plan([succeeded({ id: "w" }), check])).toMatchObject({
-      action: "subagent",
+      action: "workflow",
+      name: "run-assignments",
       assignmentIds: ["r"],
     })
   })
@@ -222,7 +227,10 @@ describe("workflow recommendation", () => {
       name: "review-diff",
       assignmentIds: ["r1", "r2"],
     })
-    expect(plan([review("r1"), review("r2", { dependencies: ["r1"] })])?.action).toBe("subagent")
+    expect(plan([review("r1"), review("r2", { dependencies: ["r1"] })])).toMatchObject({
+      name: "run-assignments",
+      assignmentIds: ["r1"],
+    })
   })
 
   test("other independent Assignments are run-assignments", () => {
@@ -232,9 +240,10 @@ describe("workflow recommendation", () => {
       assignmentIds: ["v1", "v2"],
     })
     expect(plan([writer("w"), validation("v")])).toMatchObject({ name: "run-assignments" })
-    expect(plan([validation("v1"), validation("v2", { dependencies: ["v1"] })])?.action).toBe(
-      "subagent",
-    )
+    expect(plan([validation("v1"), validation("v2", { dependencies: ["v1"] })])).toMatchObject({
+      name: "run-assignments",
+      assignmentIds: ["v1"],
+    })
   })
 
   test("work that would continue a warm specialist stays out of a workflow", () => {
@@ -242,7 +251,8 @@ describe("workflow recommendation", () => {
     expect(plan([writer("w1"), follow], [warmFor()])).toMatchObject({
       action: "subagent",
       assignmentIds: ["w1", "w2"],
-      reason: "no workflow fits the ready set",
+      reason:
+        "part of the set continues a warm specialist by SendMessage; run the rest as a workflow",
     })
     expect(plan([writer("w1"), follow, writer("w3")], [warmFor()])).toMatchObject({
       name: "run-assignments",
@@ -255,14 +265,14 @@ describe("workflow recommendation", () => {
       writer("a", { ownershipPaths: ["src"] }),
       writer("b", { ownershipPaths: ["src/b.ts"] }),
     ]
-    expect(plan(rows)).toMatchObject({ action: "subagent", assignmentIds: ["a"] })
+    expect(plan(rows)).toMatchObject({ name: "run-assignments", assignmentIds: ["a"] })
   })
 
   test("Assignments that cannot start now are left out", () => {
     const blockedByDependency = review("r1", { dependencies: ["assignment-dep"] })
     const dep = succeeded({ id: "assignment-dep" })
     expect(plan([blockedByDependency, review("r2"), dep])).toMatchObject({
-      action: "subagent",
+      name: "run-assignments",
       assignmentIds: ["r2"],
     })
     const accepted = succeeded({ id: "assignment-dep" }, 1)
@@ -277,14 +287,18 @@ describe("workflow recommendation", () => {
     expect(plan([review("r1"), review("r2")], [], DEFAULT_CONFIG)).toMatchObject({
       action: "subagent",
       assignmentIds: ["r1", "r2"],
-      reason: "workflows are not available",
+      reason: "the Workflow tool is disabled or unavailable",
     })
   })
 
-  test("a single startable Assignment with a warm specialist is continue, otherwise subagent", () => {
+  test("a single startable Assignment with a warm specialist is continue, otherwise a one-entry workflow (a subagent without workflows)", () => {
     const row = writer("w", { followUpOf: "assignment-old" })
     expect(plan([row], [warmFor()])).toMatchObject({ action: "continue", agentId: "agent-1" })
-    expect(plan([row])).toMatchObject({ action: "subagent", assignmentIds: ["w"] })
+    expect(plan([row])).toMatchObject({ name: "run-assignments", assignmentIds: ["w"] })
+    expect(plan([row], [], DEFAULT_CONFIG)).toMatchObject({
+      action: "subagent",
+      assignmentIds: ["w"],
+    })
     const blocker = running({ id: "assignment-holder", ownershipPaths: ["src/w.ts"] })
     expect(plan([row, blocker], [warmFor()])).toBeUndefined()
   })

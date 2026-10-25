@@ -59,6 +59,22 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/holyagent",
+            "args": [
+              "hook",
+              "agent-launch"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
     ]
   }
 }
