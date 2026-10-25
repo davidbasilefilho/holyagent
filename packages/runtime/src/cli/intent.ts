@@ -117,6 +117,9 @@ export const INTENT_COMMANDS: ReadonlyArray<Command> = [
     usage: "intent update [--material]",
     summary: "Edit the Intent in use; --material moves its revision and makes open work stale",
     input: "{objective?, requirements?: [text]}",
+    notes: [
+      "--material when requirements, user-visible behavior, architecture, security, contracts, dependencies or deployment change; omit it for clarifications. Open work planned on the old revision is then stale",
+    ],
     flags: { material: "boolean" },
     positionals: 0,
     run: ({ directory, args, input }) =>
@@ -139,6 +142,7 @@ export const INTENT_COMMANDS: ReadonlyArray<Command> = [
     path: ["intent", "close"],
     usage: "intent close --reason <text> [--drop <reason>]",
     summary: "Close the Intent in use; --drop cancels its Ready and Running Assignments",
+    notes: ["pull before closing: another clone may hold work this one cannot see"],
     flags: { reason: "string", drop: "string" },
     positionals: 0,
     run: ({ directory, args }) =>

@@ -1,0 +1,42 @@
+// The report every specialist returns, and the call that runs one dispatched Assignment.
+const REPORT = {
+  type: "object",
+  properties: {
+    status: { type: "string", enum: ["done", "partial", "blocked"] },
+    changed_paths: { type: "array", items: { type: "string" } },
+    checks: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: { command: { type: "string" }, exit: { type: "integer" } },
+        required: ["command", "exit"],
+      },
+    },
+    blockers: { type: "array", items: { type: "string" } },
+    notes: { type: "array", items: { type: "string" } },
+    evidence: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: { key: { type: "string" }, support: { type: "string" } },
+        required: ["key", "support"],
+      },
+    },
+  },
+  required: ["status", "changed_paths", "checks", "blockers", "notes", "evidence"],
+}
+
+const REPORT_REQUEST =
+  "\n\nReturn your report as the structured output, not as text. Give each evidence line as an evidence entry: key is the criterion text or evidence label exactly as written, support is what shows it. List every check you ran in checks, and anything left undone in blockers."
+
+// An entry is {id, agent, model, effort, prompt} as `assignment dispatch` prints it. Whatever
+// namespace the agent carries is dropped: these workflows run holyagent specialists and no others.
+const runEntry = (entry, phase, addition = "") =>
+  agent(entry.prompt + addition + REPORT_REQUEST, {
+    agentType: "holyagent:" + entry.agent.slice(entry.agent.lastIndexOf(":") + 1),
+    model: entry.model,
+    effort: entry.effort,
+    schema: REPORT,
+    label: entry.id,
+    phase,
+  })

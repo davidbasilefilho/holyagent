@@ -21,6 +21,19 @@ export class WithTrailer {
 }
 
 /**
+ * A result printed exactly as it is, with its own exit code, for a caller that reads stdout as
+ * something other than TOON, such as a host hook.
+ */
+export class Verbatim {
+  /** Builds a result from the text of stdout and stderr and the exit code. */
+  constructor(
+    readonly stdout: string,
+    readonly stderr: string,
+    readonly code: number,
+  ) {}
+}
+
+/**
  * What a command returns after it printed its own lines through {@link Call.emit}: nothing is
  * encoded, and the run ends with this exit code.
  */
@@ -44,6 +57,10 @@ export interface Host {
 /** Everything a command may use while it runs. */
 export interface Call {
   readonly args: Parsed
+  /** The working directory of the process. */
+  readonly cwd: string
+  /** The environment of the process. */
+  readonly env: Host["env"]
   /** The `.holyagent` folder of the state root. */
   readonly directory: string
   /** The warm-reuse settings from the environment and the settings files. */
@@ -74,7 +91,11 @@ export interface Command {
   readonly input?: string
   /** What stdout holds when it is more than TOON, such as a trailer after the fields. */
   readonly output?: string
+  /** Further help lines, for what the model must know to use the command without a manual. */
+  readonly notes?: ReadonlyArray<string>
   readonly flags: FlagSpec
+  /** True when the command needs neither the state root nor git, so no git runs before it. */
+  readonly stateless?: true
   /** True when the command reads its own arguments: they arrive unparsed in `args.positionals`. */
   readonly raw?: true
   /** How many positional arguments the command takes. */
