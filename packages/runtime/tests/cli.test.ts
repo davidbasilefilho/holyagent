@@ -9,6 +9,7 @@ import { Effect } from "effect"
 
 import { StdinMissing } from "../src/cli/errors.ts"
 import { run } from "../src/cli/program.ts"
+import { dispatchedAssignment } from "../src/cli/report.ts"
 
 let project: string
 let home: string
@@ -371,6 +372,22 @@ describe("report and prompt", () => {
     ).toMatchObject({ id, accepted: true, revision: 1 })
   })
 
+  test("the prompt's first line names its Assignment, and nothing else is taken for a dispatch", async () => {
+    await createIntent()
+    const dispatched = data(await cli(["assignment", "dispatch"], writer()))
+    const prompt = String(dispatched.prompt)
+    expect(dispatchedAssignment(prompt)).toBe(String(dispatched.id))
+    expect(dispatchedAssignment(`${prompt}\nExtra`)).toBe(String(dispatched.id))
+    for (const other of [
+      "Fix the bug",
+      `Please run\n${prompt}`,
+      `Role: x. Assignment: ${String(dispatched.id)}.`,
+      prompt.replace("Assignment: assignment-", "Assignment: intent-"),
+      "",
+    ])
+      expect(dispatchedAssignment(other)).toBeUndefined()
+  })
+
   test("dispatch prints the Assignment as a prompt to send, for a spawn and for a continue", async () => {
     await createIntent()
     const draft = writer({ scope: ["the parser"], constraints: ["no deps"] })
@@ -497,6 +514,74 @@ describe("command line", () => {
     }
   })
 
+  test("help is --help as a word, for the top level, a group and a command", async () => {
+    for (const [word, flag] of [
+      [["help"], ["--help"]],
+      [
+        ["help", "assignment"],
+        ["assignment", "--help"],
+      ],
+      [
+        ["help", "assignment", "close"],
+        ["assignment", "close", "--help"],
+      ],
+      [
+        ["help", "plan"],
+        ["plan", "--help"],
+      ],
+    ] as const) {
+      const words = await cli(word)
+      expect(words.code).toBe(0)
+      expect(words).toEqual(await cli(flag))
+    }
+    expect((await cli(["help", "nothing"])).code).toBe(2)
+  })
+
+  test("the help carries what a model needs to run Assignments without a manual", async () => {
+    const help = async (...words: Array<string>) => (await cli(["help", ...words])).stdout
+    const dispatch = await help("assignment", "dispatch")
+    for (const part of [
+      "roleTask",
+      "criteria",
+      "dimension: behavior|regressions|tests|scope|style|repo-standards",
+      "ownershipPaths",
+      "dependencies",
+      "independentFrom",
+      "followUpOf",
+      "checks-run",
+      '{"id": "<id>"}',
+      "prompt:",
+    ])
+      expect(dispatch).toContain(part)
+    const close = await help("assignment", "close")
+    for (const part of [
+      "success|failure|errored|interrupted|stopped",
+      "evidence:",
+      "<criterion text or evidence label>: <support>",
+      "InsufficientAcceptance",
+      "--report-json",
+    ])
+      expect(close).toContain(part)
+    expect(await help("assignment", "record")).toContain("a hook records")
+    expect(close).toContain("a workflow agent cannot be messaged")
+    const accept = await help("assignment", "accept")
+    expect(accept).toContain("--carry-forward")
+    expect(accept).toContain("validation Assignment")
+    expect(await help("intent", "update")).toContain("--material")
+    const plan = await help("plan")
+    for (const part of [
+      "holyagent:run-assignments",
+      "holyagent:review-diff",
+      "holyagent:implement-review",
+      "fallback",
+      "Workflow tool is disabled or unavailable",
+      "workflow:<run-id>/<id>",
+      "agentType holyagent:<agent>",
+    ])
+      expect(plan).toContain(part)
+    expect(await help()).toContain("hint:")
+  })
+
   test("a group name with --help lists the group's commands", async () => {
     const help = await cli(["intent", "--help"])
     expect(help.code).toBe(0)
@@ -535,6 +620,17 @@ describe("plan", () => {
     })
   })
 
+  test("the workflow comes first and its subagent fallback says when to use it", async () => {
+    await readyPair()
+    const plan = data(await cli(["plan"]))
+    expect(Object.keys(plan).indexOf("workflow")).toBeLessThan(
+      Object.keys(plan).indexOf("fallback"),
+    )
+    expect(plan.fallback).toMatchObject({
+      when: "only if the Workflow tool is disabled or unavailable",
+    })
+  })
+
   test("a writer and the review that names it in independentFrom run as implement-review", async () => {
     await createIntent()
     const w = String(data(await cli(["assignment", "create"], writer())).id)
@@ -553,11 +649,55 @@ describe("plan", () => {
   test("without workflows the same set runs as parallel subagents", async () => {
     const ids = await readyPair()
     const disabled = data(await cli(["plan"], undefined, { CLAUDE_CODE_DISABLE_WORKFLOWS: "1" }))
-    expect(disabled).toMatchObject({ action: "subagent", assignments: ids, parallel: true })
+    expect(disabled).toMatchObject({
+      action: "subagent",
+      assignments: ids,
+      parallel: true,
+      reason: "the Workflow tool is disabled or unavailable",
+    })
+    expect(disabled).not.toHaveProperty("fallback")
 
     await mkdir(join(project, ".claude"))
     await Bun.write(join(project, ".claude", "settings.local.json"), '{"enableWorkflows": false}')
     expect(data(await cli(["plan"]))).toMatchObject({ action: "subagent", assignments: ids })
+  })
+
+  test("a single Ready Assignment is a one-entry workflow, and direct subagents only without the tool", async () => {
+    await createIntent()
+    const id = String(data(await cli(["assignment", "create"], writer())).id)
+    expect(data(await cli(["plan"]))).toMatchObject({
+      action: "workflow",
+      workflow: "holyagent:run-assignments",
+      assignments: [id],
+      fallback: { action: "subagent", assignments: [id] },
+    })
+    expect(
+      data(await cli(["plan"], undefined, { CLAUDE_CODE_DISABLE_WORKFLOWS: "1" })),
+    ).toMatchObject({
+      action: "subagent",
+      assignments: [id],
+    })
+  })
+
+  test("work that continues a warm specialist is listed beside the workflow", async () => {
+    await createIntent()
+    const first = await runToClose(writer(), "agent-1", true)
+    const follow = String(
+      data(await cli(["assignment", "create"], writer({ objective: "Fix it", followUpOf: first })))
+        .id,
+    )
+    const other = String(
+      data(await cli(["assignment", "create"], writer({ ownershipPaths: ["src/other.ts"] }))).id,
+    )
+    const plan = data(await cli(["plan"]))
+    expect(plan).toMatchObject({
+      action: "workflow",
+      workflow: "holyagent:run-assignments",
+      assignments: [other],
+      continues: [{ assignment: follow, agent: "agent-1" }],
+    })
+    expect(String(plan.reason)).toContain("SendMessage")
+    expect(plan.fallback).toMatchObject({ assignments: [other] })
   })
 
   test("a single Ready Assignment with a warm specialist is a continue", async () => {
