@@ -69,7 +69,7 @@ Everything is configured in `bunfig.toml`. Bun's own `check`, `lint` and `fmt` a
 `mise run build` runs `packages/integrations/claude/build.ts`. It removes the generated paths (`GENERATED_PATHS` in `src/generate.ts`) and writes them again from:
 
 - `packages/runtime/src/instructions/claude-5.5/`: the root agent (the body of `agents/holyagent.md` is `root.md`), the eighteen specialist agents (role text, `specialist.md` and, for some roles, the writing bar), the two skills of its own (`merge-ready` and `interface-inspection`; the vendored `frontend-design` comes from `packages/integrations/claude/vendor/`);
-- the route table in `packages/runtime/src/domain/route.ts`: model, effort, tools and skills of each agent;
+- the route table in `packages/runtime/src/domain/route.ts` (model, effort and tools of each agent) and `packages/integrations/claude/src/agents.ts` (the skills each agent loads);
 - `packages/integrations/claude/src/workflows/` (each script plus `shared.js`), `wrapper.sh` and `empty-bunfig.toml`;
 - `packages/runtime/src/cli/main.ts`, bundled for Bun into `scripts/holyagent.js`;
 - the hook table in `generate.ts`, and the version from `packages/integrations/claude/package.json`.

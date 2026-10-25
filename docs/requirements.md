@@ -11,7 +11,7 @@
 
 ## Why Bun canary
 
-The repository's toolchain is Bun's own `bun check`, `bun lint` and `bun fmt`, which exist only in canary builds. mise cannot install `bun@canary`, so it installs the stable base and `bun upgrade --canary` replaces the binary in place (mise's `postinstall` hook, the installer and `holyagent doctor --fix` do this). A later `mise upgrade bun` that installs a new stable version brings stable back, so every repository gate first runs the `toolchain` task and fails with the fix when Bun is not canary. A `--smol` in `BUN_OPTIONS` makes `bun upgrade` fail, so the `postinstall` hook in `mise.toml` and `holyagent doctor --fix` run the upgrade with `BUN_OPTIONS` unset; when you upgrade by hand, run `env -u BUN_OPTIONS bun upgrade --canary`.
+The repository's toolchain is Bun's own `bun check`, `bun lint` and `bun fmt`, which exist only in canary builds. mise cannot install `bun@canary`, so it installs the stable base and `bun upgrade --canary` replaces the binary in place (mise's `postinstall` hook, the installer and `holyagent doctor --fix` do this). A later `mise upgrade bun` that installs a new stable version brings stable back, so every repository gate first runs the `toolchain` task and fails with the fix when Bun is not canary. A `--smol` in `BUN_OPTIONS` makes `bun upgrade` fail, so the `postinstall` hook in `mise.toml` (from the CI pull request, #10) and `holyagent doctor --fix` (from the public CLI pull request, #6) run the upgrade with `BUN_OPTIONS` unset; when you upgrade by hand, run `env -u BUN_OPTIONS bun upgrade --canary`.
 
 The plugin's runtime only calls `bun` and does not check the build. Running the plugin needs Bun; developing HolyAgent needs the canary.
 
