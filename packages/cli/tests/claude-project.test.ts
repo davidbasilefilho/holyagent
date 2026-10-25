@@ -28,7 +28,7 @@ describe("holyagent setup claude: project settings", () => {
         const report = yield* setupProject({ directory, ...defaults })
         const text = yield* read
         expect(report.ok).toBe(true)
-        expect(report.lines.at(-1)).toBe("added 7")
+        expect(report.lines.at(-1)).toBe("added 9")
         expect(text.endsWith("}\n")).toBe(true)
         expect(text).toContain('\n  "attribution": {')
         expect(parseJson(text)).toEqual({
@@ -37,8 +37,12 @@ describe("holyagent setup claude: project settings", () => {
           subagentPromptCacheTtl: "1h",
           extraKnownMarketplaces: {
             holyagent: { source: { source: "github", repo: "davidbasilefilho/holyagent" } },
+            "billion-context": {
+              source: { source: "github", repo: "ranxianglei/billion-context" },
+            },
           },
           enabledPlugins: { "holyagent@holyagent": true },
+          permissions: { deny: ["WebSearch", "WebFetch"] },
         })
         expect(report.lines[0]).toBe(file)
       }),
@@ -72,7 +76,11 @@ describe("holyagent setup claude: project settings", () => {
           extraKnownMarketplaces: {
             ...existing.extraKnownMarketplaces,
             holyagent: { source: { source: "github", repo: "davidbasilefilho/holyagent" } },
+            "billion-context": {
+              source: { source: "github", repo: "ranxianglei/billion-context" },
+            },
           },
+          permissions: { deny: ["WebSearch", "WebFetch"] },
         })
         expect(report.lines).toContain("~ includeGitInstructions: kept true (recommended false)")
         expect(report.lines).toContain('~ subagentPromptCacheTtl: kept "5m" (recommended "1h")')
@@ -80,7 +88,7 @@ describe("holyagent setup claude: project settings", () => {
         expect(report.lines).toContain(
           "~ enabledPlugins.holyagent@holyagent: kept false (recommended true)",
         )
-        expect(report.lines.at(-1)).toBe("added 1")
+        expect(report.lines.at(-1)).toBe("added 3")
       }),
     ))
 
@@ -140,7 +148,7 @@ describe("holyagent setup claude: project settings", () => {
           subagentCacheTtl: "1h",
           dryRun: true,
         })
-        expect(dry.lines.at(-1)).toBe("dry run: would add 7, nothing written")
+        expect(dry.lines.at(-1)).toBe("dry run: would add 9, nothing written")
         expect(yield* empty.exists).toBe(false)
 
         const existing = yield* project('{"model":"opus"}')

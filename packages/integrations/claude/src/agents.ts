@@ -13,7 +13,14 @@ export const PLUGIN_NAME = "holyagent"
 const ROOT_DESCRIPTION =
   "Use as the main-thread agent: it plans the work as an Intent with Assignments, dispatches the holyagent specialists through the CLI, judges their reports, accepts work on evidence and owns version control."
 
-const WEB = ["WebSearch", "WebFetch"]
+/**
+ * The web tools of the Search roles: the MCP server of Exa's plugin, a dependency of this one, in
+ * place of Claude Code's WebSearch and WebFetch. `agent_run` is listed only when the user has
+ * signed in to Exa or set an API key.
+ */
+const WEB = ["web_search_exa", "web_fetch_exa", "agent_run"].map(
+  (name) => `mcp__plugin_exa_exa__${name}`,
+)
 const WRITING = ["Write", "Edit", "Bash"]
 /**
  * The T3 Code tools of the root; the visual roles take theirs from the `interface-inspection`

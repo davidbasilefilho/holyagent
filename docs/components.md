@@ -2,15 +2,16 @@
 
 What HolyAgent installs or configures, and why. The WSL installer (`install/wsl-install.sh`) and the public CLI (`holyagent setup claude`, `holyagent doctor`) both skip any step that is already right, so re-running changes nothing that is already set.
 
-| Component        | Installed by                                           | Why                                                                         |
-| ---------------- | ------------------------------------------------------ | --------------------------------------------------------------------------- |
-| mise             | WSL installer                                          | Version manager and the source of the repository's commands                 |
-| Node.js LTS      | WSL installer (`mise use -g node@lts`)                 | Billion Context and ctx7 run on Node                                        |
-| Bun (canary)     | WSL installer (`mise use -g bun`, then canary)         | Runs the plugin CLI and the repository toolchain                            |
-| Claude Code      | WSL installer (`bun add -g @anthropic-ai/claude-code`) | The harness                                                                 |
-| HolyAgent plugin | Marketplace, `holyagent setup claude`                  | The root agent, specialists, skills, workflows, hooks and runtime CLI       |
-| Billion Context  | WSL installer, `holyagent setup claude`                | Compresses the conversation so long sessions stay inside the context window |
-| ctx7 and skill   | WSL installer, `holyagent setup claude`                | Current library documentation for the agents                                |
+| Component        | Installed by                                               | Why                                                                         |
+| ---------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------- |
+| mise             | WSL installer                                              | Version manager and the source of the repository's commands                 |
+| Node.js LTS      | WSL installer (`mise use -g node@lts`)                     | Billion Context and ctx7 run on Node                                        |
+| Bun (canary)     | WSL installer (`mise use -g bun`, then canary)             | Runs the plugin CLI and the repository toolchain                            |
+| Claude Code      | WSL installer (`bun add -g @anthropic-ai/claude-code`)     | The harness                                                                 |
+| HolyAgent plugin | Marketplace, `holyagent setup claude`                      | The root agent, specialists, skills, workflows, hooks and runtime CLI       |
+| Billion Context  | WSL installer, `holyagent setup claude`, plugin dependency | Compresses the conversation so long sessions stay inside the context window |
+| ctx7 and skill   | WSL installer, `holyagent setup claude`                    | Current library documentation for the agents                                |
+| Exa plugin       | Plugin dependency                                          | Web search and page reading for the Search specialists                      |
 
 Pi is not installed: 0.1.0 has no Pi integration ([pi/README.md](pi/README.md)).
 
@@ -27,6 +28,8 @@ The installer installs `@anthropic-ai/claude-code` with Bun. Anthropic documents
 ## Billion Context
 
 [Billion Context](https://github.com/ranxianglei/billion-context) (`bili`) is a local HTTP proxy between Claude Code and the model API. It adds four tools (`compress`, `decompress`, `search_context`, `acp_status`) and a compression prompt to each request, and the model decides what to fold. See [attributions.md](attributions.md) for its license terms.
+
+The HolyAgent plugin declares Billion Context's own Claude Code plugin, `billion-context@billion-context` from the `ranxianglei/billion-context` marketplace, as a dependency, and its marketplace allows that marketplace for cross-marketplace dependencies. That plugin has no hooks or MCP server; it adds `/billion-context:bili-setup`, which runs `bili plugin install claude`, so the setup below still has to run once.
 
 `holyagent setup claude` and the installer run `bun add -g billion-context` (its README documents npm only; the commands run on Node through their shebang), then `bili plugin install claude`, the native mode. Native mode merges into `~/.claude/settings.json`:
 
@@ -48,9 +51,15 @@ Settings HolyAgent relies on:
 **Limits.**
 
 - Apps that set their own `ANTHROPIC_BASE_URL`, such as the Claude Desktop Code tab, bypass the proxy. `DISABLE_AUTO_COMPACT=1` still applies there, so neither compression runs.
-- Cloud sessions (Claude Code on the web) do not run the proxy.
+- Cloud sessions (Claude Code on the web) do not run the proxy: the host manages the provider, so Claude Code ignores a settings `ANTHROPIC_BASE_URL`.
 - By default it auto-updates itself from npm in a staggered rollout, and the proxy has no authentication (it listens on `127.0.0.1`). It requires Node 20 or later.
 - `bili plugin remove claude` undoes native mode.
+
+## Exa
+
+The HolyAgent plugin depends on Exa's Claude Code plugin, `exa@claude-plugins-official`. It brings a hosted MCP server (`https://mcp.exa.ai/mcp`) and two skills. The Search specialists (Librarian.lookup and Librarian.research) get its `web_search_exa`, `web_fetch_exa` and `agent_run` tools in place of Claude Code's `WebSearch` and `WebFetch`, and their role text says when to use each. The server works anonymously under a rate limit; `agent_run` appears only after signing in to Exa (OAuth) or with an API key.
+
+`holyagent setup claude` also adds `WebSearch` and `WebFetch` to the project's `permissions.deny`, so agents outside HolyAgent's lists do not fall back to them either. A project that already has a `permissions.deny` list keeps it unchanged; add the two entries by hand there. A plugin cannot set permissions, so the marketplace route alone leaves the built-in tools on for agents other than the Search specialists.
 
 ## ctx7 and the Context7 skill
 

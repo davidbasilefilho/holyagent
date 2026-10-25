@@ -1,6 +1,6 @@
 {
   "name": "@holyagent/runtime",
-  "version": "0.1.0",
+  "version": "0.1.1-1",
   "description": "The holyagent runtime: instructions and the shared command surface.",
   "bin": {
     "holyagent-runtime": "./src/cli/main.ts"

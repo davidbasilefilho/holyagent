@@ -34,6 +34,7 @@ describe("holyagent setup claude", () => {
           "claude plugin list --json",
           "claude plugin marketplace list --json",
           "claude plugin marketplace add davidbasilefilho/holyagent",
+          "claude plugin marketplace add ranxianglei/billion-context",
           "claude plugin install holyagent@holyagent",
           "bun add -g billion-context",
           "bili plugin install claude",
@@ -45,7 +46,7 @@ describe("holyagent setup claude", () => {
         expect(at("+ plugin")).toBeLessThan(at("+ bili:"))
         expect(at("+ bili config")).toBeLessThan(at("- ctx7 skill"))
         expect(at("- ctx7 skill")).toBeLessThan(at(directory))
-        expect(lines.at(-1)).toBe("added 7")
+        expect(lines.at(-1)).toBe("added 9")
         expect(
           parseJson(yield* fs.readFileString(path.join(directory, ".claude", "settings.json")))
             .enabledPlugins,
@@ -97,7 +98,7 @@ describe("holyagent setup claude", () => {
         expect(shell.lines()).toEqual(["claude plugin list --json"])
         expect(report.ok).toBe(true)
         expect(report.lines).toContain("+ plugin holyagent@holyagent: would install")
-        expect(report.lines.at(-1)).toBe("dry run: would add 7, nothing written")
+        expect(report.lines.at(-1)).toBe("dry run: would add 9, nothing written")
         expect(yield* fs.exists(`${directory}/.claude`)).toBe(false)
         expect(yield* fs.readDirectory(home)).toEqual([])
       }),
@@ -126,7 +127,7 @@ describe("holyagent setup claude", () => {
         expect(report.lines[0]).toBe(
           "! claude plugin install: failed (exit 1): marketplace not found",
         )
-        expect(report.lines.at(-1)).toBe("added 7")
+        expect(report.lines.at(-1)).toBe("added 9")
         expect(yield* fs.exists(`${directory}/.claude/settings.json`)).toBe(true)
       }),
     ))

@@ -57,6 +57,7 @@ describe("holyagent setup claude: user installs", () => {
           "claude plugin list --json",
           "claude plugin marketplace list --json",
           "claude plugin marketplace add davidbasilefilho/holyagent",
+          "claude plugin marketplace add ranxianglei/billion-context",
           "claude plugin install holyagent@holyagent",
           "bun add -g billion-context",
           "bili plugin install claude",
@@ -112,6 +113,7 @@ describe("holyagent setup claude: user installs", () => {
           "claude plugin list --json",
           "claude plugin marketplace list --json",
           "claude plugin marketplace add davidbasilefilho/holyagent",
+          "claude plugin marketplace add ranxianglei/billion-context",
           "claude plugin install holyagent@holyagent",
         ])
         expect(parseJson(yield* h.read(h.biliConfig))).toEqual({
@@ -121,7 +123,7 @@ describe("holyagent setup claude: user installs", () => {
       }),
     ))
 
-  test("an already registered marketplace is not added again", () =>
+  test("an already registered marketplace is not added again, a missing one is", () =>
     run(
       Effect.gen(function* () {
         const h = yield* home
@@ -141,6 +143,7 @@ describe("holyagent setup claude: user installs", () => {
         expect(shell.lines()).toEqual([
           "claude plugin list --json",
           "claude plugin marketplace list --json",
+          "claude plugin marketplace add ranxianglei/billion-context",
           "claude plugin install holyagent@holyagent",
         ])
       }),
@@ -262,7 +265,7 @@ describe("holyagent setup claude: user installs", () => {
         }).pipe(Effect.provide(shell.layer), Effect.provide(envLayer({ HOME: h.root })))
         expect(report.ok).toBe(false)
         expect(report.lines[0]).toBe(
-          "! claude plugin marketplace add: failed (exit 1): network down",
+          "! claude plugin marketplace add davidbasilefilho/holyagent: failed (exit 1): network down",
         )
         expect(shell.lines()).not.toContain("claude plugin install holyagent@holyagent")
         expect(shell.lines()).toContain("bun add -g ctx7")

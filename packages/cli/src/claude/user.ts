@@ -3,7 +3,7 @@ import { Config, Effect, FileSystem, Option, Path, Schema } from "effect"
 import { applyDefaults, readJsonObject, writeJsonObject } from "../json-file.ts"
 import { CliFailure, type Report, show } from "../report.ts"
 import { Shell, type ShellResult } from "../shell.ts"
-import { MARKETPLACE, PLUGIN_ID } from "./project.ts"
+import { BILLION_CONTEXT_MARKETPLACE, MARKETPLACE, PLUGIN_ID } from "./project.ts"
 
 const InstalledPlugins = Schema.Array(Schema.Struct({ id: Schema.String }))
 const Marketplaces = Schema.Array(Schema.Struct({ name: Schema.String }))
@@ -71,24 +71,22 @@ const installPlugin = Effect.fn("installPlugin")(function* (dryRun: boolean) {
     return [present(`plugin ${PLUGIN_ID}: already installed`)]
   }
   if (dryRun) return [added(`plugin ${PLUGIN_ID}: would install`)]
-  // `marketplace add` is skipped when the marketplace is already registered; a listing that cannot
-  // be read falls through to the add, which Claude Code also accepts for a known marketplace.
+  // The plugin's own marketplace and the one its Billion Context dependency comes from must both be
+  // registered before the install. `marketplace add` is skipped for a registered one; a listing that
+  // cannot be read falls through to the adds, which Claude Code also accepts for a known marketplace.
   const known = yield* shell.run("claude", ["plugin", "marketplace", "list", "--json"])
   const registered =
     known.exitCode === 0
       ? yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Marketplaces))(known.stdout).pipe(
-          Effect.map((list) => list.some((entry) => entry.name === MARKETPLACE.name)),
-          Effect.orElseSucceed(() => false),
+          Effect.map((list) => new Set(list.map((entry) => entry.name))),
+          Effect.orElseSucceed(() => new Set<string>()),
         )
-      : false
-  if (!registered) {
-    const marketplace = yield* shell.run("claude", [
-      "plugin",
-      "marketplace",
-      "add",
-      MARKETPLACE.repo,
-    ])
-    if (marketplace.exitCode !== 0) return [failed("claude plugin marketplace add", marketplace)]
+      : new Set<string>()
+  for (const marketplace of [MARKETPLACE, BILLION_CONTEXT_MARKETPLACE]) {
+    if (registered.has(marketplace.name)) continue
+    const result = yield* shell.run("claude", ["plugin", "marketplace", "add", marketplace.repo])
+    if (result.exitCode !== 0)
+      return [failed(`claude plugin marketplace add ${marketplace.repo}`, result)]
   }
   const install = yield* shell.run("claude", ["plugin", "install", PLUGIN_ID])
   if (install.exitCode !== 0) return [failed("claude plugin install", install)]

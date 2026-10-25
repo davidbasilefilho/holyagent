@@ -103,6 +103,7 @@ describe("manifests", () => {
       name: "holyagent",
       version: packageJson.version,
       author: { name: "davidbasilefilho" },
+      dependencies: ["billion-context@billion-context", "exa@claude-plugins-official"],
     })
     expect(manifest).not.toHaveProperty("license")
   })
@@ -111,6 +112,7 @@ describe("manifests", () => {
     expect(marketplace).toMatchObject({
       name: "holyagent",
       owner: { name: "davidbasilefilho" },
+      allowCrossMarketplaceDependenciesOn: ["billion-context", "claude-plugins-official"],
       plugins: [
         {
           name: "holyagent",
@@ -251,7 +253,10 @@ describe("agents", () => {
       expect(own.slice(0, 3)).toEqual(["Read", "Grep", "Glob"])
       expect(own.includes("Monitor")).toBe(own.includes("Bash"))
       expect(own.includes("Write")).toBe(route.capabilities.includes("Write"))
-      expect(own.includes("WebSearch")).toBe(route.capabilities.includes("Search"))
+      expect(own.includes("WebSearch") || own.includes("WebFetch")).toBe(false)
+      expect(own.includes("mcp__plugin_exa_exa__web_search_exa")).toBe(
+        route.capabilities.includes("Search"),
+      )
       expect(own.some((tool) => tool.startsWith("mcp__t3-code__"))).toBe(
         route.capabilities.includes("VisualInspection"),
       )
