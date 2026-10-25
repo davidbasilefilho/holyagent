@@ -109,7 +109,7 @@ const HINTS: Readonly<Record<string, string>> = {
   DependencyNotAccepted:
     "Close and accept the dependency first (`holyagent assignment accept <id>`), then dispatch.",
   InsufficientAcceptance:
-    "Nothing was recorded. SendMessage the subagent for the missing support the message names, then close or accept again; a workflow agent cannot be messaged, so draft a follow-up with followUpOf.",
+    "Nothing was recorded. SendMessage the subagent for the missing support the message names, then run `holyagent assignment close <id> --outcome success --accept <rationale>` again with the corrected report on stdin (also for a Succeeded Assignment that is not accepted yet), or `holyagent assignment accept <id> --rationale <text> --report` with it; a workflow agent cannot be messaged, so draft a follow-up with followUpOf.",
   SpecialistMismatch: "Record the agent that was actually launched, or dispatch again.",
   SpecialistNotRecorded:
     "Run `holyagent assignment record <id> --agent <agentId>` first, or close with another outcome.",

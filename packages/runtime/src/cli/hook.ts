@@ -1,12 +1,17 @@
 import { stat } from "node:fs/promises"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 
 import { Effect, Schema } from "effect"
 
 import { ROOT_CORE } from "../instructions/claude-5.5/root-core.ts"
+import stateChanges from "../instructions/claude-5.5/specialist/state-changes.md" with { type: "text" }
 import { hasCode, io } from "../state/files.ts"
 import { STATE_DIRECTORY } from "../state/layout.ts"
 import { readOpenState } from "../state/store.ts"
+import { MessageRefused } from "../vcs/errors.ts"
+import { gitMaybe } from "../vcs/git.ts"
+import { cleanMessage, forbiddenPhrases } from "../vcs/message.ts"
+import { readSettings } from "../vcs/settings.ts"
 import { recordLaunch } from "./assignment.ts"
 import { stateRoot } from "./context.ts"
 import { AgentIdMissing, describeFailure, StateFolderMissing } from "./errors.ts"
@@ -14,7 +19,6 @@ import { resolveIntent } from "./intent.ts"
 import { resumeOf, statusOf } from "./overview.ts"
 import { dispatchedAssignment } from "./report.ts"
 import { type IntentRequirements, sessionContext } from "./sessioncontext.ts"
-import { type GitWrite, gitWrites } from "./shell.ts"
 import { type Call, type Command, Verbatim } from "./types.ts"
 import { workflowRefusal } from "./workflow-check.ts"
 
@@ -128,20 +132,56 @@ const HAND_BACK: Readonly<Record<string, string>> = {
 const postToolUse = (additionalContext: string) =>
   output({ hookEventName: "PostToolUse", additionalContext })
 
-const REDIRECTS: Readonly<Record<GitWrite, string>> = {
-  commit:
-    "Commit with `holyagent vcs commit -m <headline> -- <paths…>`, which commits as the account owner with the Intent's state.",
-  push: "Push with `holyagent vcs push [branches…]`.",
-}
+/**
+ * The version-control rules of the specialist text, which a SubagentStart hook adds to the context
+ * of every holyagent specialist at its start; the text is the specialist section itself, so the
+ * rule has one owner.
+ */
+export const SPECIALIST_RULES: string = stateChanges.trim()
+
+/** The one-line reminder a PreToolUse hook adds to a Bash command that mentions git commit or push. */
+export const VCS_REMINDER =
+  "Version control is the root's: it commits with `holyagent vcs commit`, never force-pushes and pushes to a protected branch only with the user's approval; a specialist makes no version-control writes."
+
+/** The agent types of the plugin's specialists: namespaced by the plugin, the root excepted. */
+const isSpecialist = (type: string | undefined): boolean =>
+  type !== undefined && type.startsWith("holyagent:") && !ROOT_AGENTS.has(type)
+
+/**
+ * The text the host's `if` rules of the hook (`Bash(*git*commit*)`, `Bash(*git*push*)`) match:
+ * `git` followed somewhere by `commit` or `push`. A command without it gets no reminder.
+ */
+const MENTIONS_GIT_WRITE = /git[\s\S]*(?:commit|push)/i
+
+/**
+ * The value of a git setting from the repository's own files, not from a `-c` on the command line
+ * (or `GIT_CONFIG_PARAMETERS`), which the caller of `git commit` could set to hide text.
+ */
+const fileSetting = (key: string) =>
+  gitMaybe(["config", "--show-origin", "--get", key]).pipe(
+    Effect.map((line) => {
+      if (line === undefined) return undefined
+      const [origin = "", ...value] = line.split("\t")
+      return origin.startsWith("command line:") ? undefined : value.join("\t")
+    }),
+  )
+
+/**
+ * The text that starts a comment line in a commit message file: `core.commentString` or
+ * `core.commentChar` of the repository's files, else `#` (`auto` too, which only picks another
+ * character when the message already uses `#`).
+ */
+const commentPrefix = Effect.gen(function* () {
+  const configured =
+    (yield* fileSetting("core.commentString")) ?? (yield* fileSetting("core.commentChar"))
+  return configured === undefined || configured === "" || configured === "auto" ? "#" : configured
+})
 
 /** The Workflow inputs an inline run may carry; a script path, name or resume would run other code. */
 const INLINE_INPUTS: ReadonlySet<string> = new Set(["script", "args"])
 
-// The vcs-redirect hook only sees what the `if` rules of hooks.json let through, and those match
-// the command text: `git` followed by `commit` or `push` anywhere in it. A command that hides the
-// words escapes it: a variable (`g=git; $g commit`), a git alias (`git ci`), or a script, make
-// target or package script that runs git inside. Wrappers, `sh -c`, `xargs`, subshells and
-// substitutions that show the words reach the scanner and are denied.
+// Both version-control hooks only add context, so neither can deny, allow or block: they carry no
+// permission decision, and the plugin wires them without `onFailure: block`.
 
 /** The `hook` commands the plugin's hooks call. */
 export const HOOK_COMMANDS: ReadonlyArray<Command> = [
@@ -205,19 +245,71 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
     true,
   ),
   hook(
-    "vcs-redirect",
-    "PreToolUse for Bash: deny a command that runs git commit or git push and point to holyagent vcs; say nothing otherwise",
+    "subagent-start",
+    "SubagentStart: add the version-control rules of the specialist text to the context of a holyagent specialist at its start; nothing for the root or any other agent",
+    (payload) =>
+      Effect.succeed(
+        isSpecialist(payload.agent_type)
+          ? output({ hookEventName: "SubagentStart", additionalContext: SPECIALIST_RULES })
+          : NOTHING,
+      ),
+    true,
+  ),
+  hook(
+    "vcs-reminder",
+    "PreToolUse for Bash: for a command that mentions git and then commit or push, add a one-line reminder of the version-control rules as context; never a permission decision, and nothing for any other command",
     (payload) => {
       const command = payload.tool_name === "Bash" ? payload.tool_input?.command : undefined
-      const writes = typeof command === "string" ? gitWrites(command) : []
       return Effect.succeed(
-        writes.length === 0
-          ? NOTHING
-          : decision("deny", writes.map((write) => REDIRECTS[write]).join(" ")),
+        typeof command === "string" && MENTIONS_GIT_WRITE.test(command)
+          ? output({ hookEventName: "PreToolUse", additionalContext: VCS_REMINDER })
+          : NOTHING,
       )
     },
     true,
   ),
+  {
+    path: ["hook", "commit-msg"],
+    usage: "hook commit-msg <message-file>",
+    summary:
+      "Git commit-msg hook: remove agent attribution from the message file and refuse a message that talks about the user or the agent; install it as .git/hooks/commit-msg or a commit-msg job of a hook manager",
+    notes: [
+      "git passes the path of the message file as the only argument, and a non-zero exit stops the commit",
+      "the phrases are the ones `vcs commit` checks; a project lists words its domain uses in vcs.allowWords of .holyagent/config.json",
+    ],
+    flags: {},
+    positionals: 1,
+    run: (call) =>
+      Effect.gen(function* () {
+        const file = call.args.positionals[0] ?? ""
+        const text = yield* io(file, () => Bun.file(file).text())
+        const comment = yield* commentPrefix.pipe(Effect.provide(call.vcs))
+        // `git commit -v` appends the staged diff after a scissors line; none of it is the message.
+        const scissors = `${comment} ------------------------ >8 ------------------------`
+        const lines = text.split("\n")
+        const cut = lines.findIndex((line) => line.trimEnd() === scissors)
+        const above = (cut === -1 ? lines : lines.slice(0, cut)).join("\n")
+        const below = cut === -1 ? "" : lines.slice(cut).join("\n")
+        const cleaned = cleanMessage(above)
+        // Below the scissors line git itself keeps only a staged diff, but a message made by hand
+        // keeps everything: agent attribution goes from there too, and the phrase check stays above.
+        const cleanedBelow = below === "" ? "" : cleanMessage(below)
+        const message = cleaned
+          .split("\n")
+          .filter((line) => !line.startsWith(comment))
+          .join("\n")
+        const phrases = forbiddenPhrases(
+          message,
+          (yield* readSettings(dirname(call.directory))).allowWords,
+        )
+        if (phrases.length > 0) return yield* new MessageRefused({ phrases })
+        if (cleaned !== above.trim() || cleanedBelow !== below.trim())
+          yield* io(file, () =>
+            Bun.write(file, below === "" ? `${cleaned}\n` : `${cleaned}\n\n${cleanedBelow}\n`),
+          )
+        return NOTHING
+      }),
+  },
   hook(
     "workflow",
     "PreToolUse for Workflow: allow an inline script whose every agent() call names one of this plugin's specialists by a string-literal agentType, with no script path, name or resume; say nothing otherwise",

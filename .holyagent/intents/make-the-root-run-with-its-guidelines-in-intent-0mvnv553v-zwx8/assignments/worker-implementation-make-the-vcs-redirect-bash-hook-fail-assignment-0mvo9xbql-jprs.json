@@ -1,0 +1,63 @@
+{
+  "id": "assignment-0mvo9xbql-jprs",
+  "intentId": "intent-0mvnv553v-zwx8",
+  "intentRevision": 12,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-vcs-redirect-bash-hook-fail",
+  "objective": "Make the vcs-redirect Bash hook fail closed on every shell construct it cannot read with certainty, closing the remaining commit and force-push bypasses.",
+  "state": "Succeeded",
+  "scope": [
+    "Work only in the worktree /home/davidbasile/dev/holyagent-fix-cli-and-vcs (head 4a2cc0a, which now also carries the PR4 built-ins fix). Ownership paths are relative to it.",
+    "Findings: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/r-28nh.json (B1 to B5 and the non-blocking a to c). Approach: stop modeling more of bash; when the command text contains Git followed by commit or push anywhere (the hook if rule), deny as unclear any construct the scanner does not fully read: a decoded NUL in an ANSI-C word (or cut at it as bash does), an unquoted heredoc whose body holds $( or a backtick, any << that is not followed by a delimiter-shaped word or sits in any arithmetic context ($[ ], (( )) anywhere, C-style for), backslash-newline inside double quotes (drop it as bash does), command substitution inside skipped arithmetic, nested backticks, eval, sh/bash/zsh/fish reading from a pipe, heredoc or -c with non-literal text, wrappers not in the known list (setsid, stdbuf, ionice, flock, find -exec, ssh, env -S), a dynamic Git subcommand (git $p), git -c alias.*, -c remote.*.push, --config-env and --attr-source. The deny reason tells the root to write the command plainly. Keep plain everyday commands (git status, git log, a gh pr create with a quoted heredoc body that has no substitution, plain git push) passing, with tests.",
+    "Commit-msg (non-blocking, ride along): only honour a scissors line that git itself would add (the exact line with the configured comment string) and still check for attribution trailers below it; ignore core.commentString coming only from GIT_CONFIG_PARAMETERS if simple, else document it.",
+    "Then mise run build and mise run verify."
+  ],
+  "constraints": [
+    "Decision (user, verbatim): slim holyagent vcs. Remove the GitHub API commit path; push, branch and ci become plain Git and gh, with a commit-msg hook for attribution and a deny rule for force pushes. Keep only vcs commit (exact paths + Intent state + message check) and vcs pr (PR text check). Intent state stays versioned in Git.",
+    "No version-control writes and no edits under .holyagent or the repository metadata folder. Report the changed paths.",
+    "Done means mise run verify passes in the worktree; run mise run build so dist is regenerated."
+  ],
+  "criteria": [
+    {
+      "text": "B1 to B5 and the listed wrapper, alias and dynamic-subcommand shapes are denied, each with a test.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Everyday commands the root runs still pass, with tests.",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "mise run verify passes and dist is rebuilt with mise run build.",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli/shell.ts",
+    "packages/runtime/src/cli/hook.ts",
+    "packages/runtime/tests/shell.test.ts",
+    "packages/integrations/claude/tests/hooks.test.ts",
+    "packages/integrations/claude/dist",
+    "docs/hooks.md",
+    "docs/commit-authorship.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvo9b7xm-kmqu",
+  "specialist": {
+    "agentId": "a2298564a5e785054",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-25T20:22:02.157Z",
+    "finishedAt": "2026-10-25T20:30:45.751Z"
+  },
+  "result": "result: Done in /home/davidbasile/dev/holyagent-fix-cli-and-vcs (head 4a2cc0a). The vcs-redirect hook now denies as unclear every construct it cannot read with certainty. B1 to B5 and the wrapper, alias and dynamic-subcommand shapes are denied, everyday commands still pass, and `mise run verify` passes with dist rebuilt.\n\nchanged:\n- `packages/runtime/src/cli/shell.ts`\n- `packages/runtime/src/cli/hook.ts` (the `commit-msg` command only)\n- `packages/runtime/tests/shell.test.ts`\n- `packages/integrations/claude/tests/hooks.test.ts`\n- `docs/hooks.md`\n- `docs/commit-authorship.md`\n- `packages/integrations/claude/dist/**` (rebuilt)\n\nWhat now gives `unclear` (deny, with the reason telling the root to write the command plainly):\n- **B1:** a decoded NUL in a `$'…'` word.\n- **B2:** an unquoted heredoc whose body holds `$(` or a backtick. A quoted or backslash-quoted delimiter is plain text and passes.\n- **B3:**\n  - a `<<` with no delimiter-shaped word after it, or a heredoc whose terminator never comes;\n  - `$[ … ]`, also inside double quotes;\n  - `(( … ))` anywhere (after `if`/`while`, in `for ((…))`), skipped only when it is plain arithmetic: a `;` (C-style `for`), a quote, a backslash, a newline, no closing `))`, or a substitution in it is unclear. Text after such an arithmetic skip is still scanned, so `if ((1<<2)); then …` followed by a force push is read as a force push.\n- **B4:** a backslash-newline inside double quotes is dropped as bash does, so `git \"com\\<newline>mit\"` is read as `git commit`.\n- **B5:** a command substitution inside skipped arithmetic.\n- Nested backticks; `eval`.\n- `sh`, `bash`, `zsh`, `dash`, `ksh`, `ash`, `fish`, `csh` and `tcsh` reading a pipe, a heredoc or `-s`, or `-c` with a non-literal script. A literal `-c` script is read; a script file (`bash install/x.sh`) passes.\n- Runners it does not follow: `setsid`, `stdbuf`, `ionice`, `flock`, `ssh`, `su`, `runuser`, `chroot`, `script`, `watch`, `parallel`, `unbuffer`, `taskset`, `chrt`, `numactl`, `eatmydata`, `strace`, `ltrace`, `nsenter`, `unshare`, `systemd-run`, `busybox`, `caffeinate`, `env -S`, and `find -exec|-execdir|-ok|-okdir`.\n- A program or git subcommand named by a variable (`$g commit`, `git $p`), and `GIT_CONFIG*` / `GIT_ALIAS*` variables.\n- `git -c alias.*`, `-c remote.*.push`, `-c remote.*.mirror`, `-c push.*`, `--config-env` and `--attr-source`.\n\nA word with a variable in it now carries an internal marker, so `bash -c 'echo $HOME'` (single-quoted, literal) passes while `bash -c \"echo $HOME\"` (expanded by the outer shell) is unclear.\n\nPassing, with tests: `git status`, `git log`, `git show`, plain `git push` (with and without `-u`/`-C`), `gh pr create --body-file - <<'EOF'` with a quoted body that holds `$(…)` text, `gh pr checks --watch`, `gh pr view --json`, branch/merge/stash commands, `bash script.sh`, `bash -c 'literal'`, `find … | xargs grep`, `$((1 + 2))`, a `for` loop, a plain unquoted heredoc and a `mise run verify | tail`.\n\n`commit-msg` (non-blocking items):\n- The comment string is read with `git config --show-origin`; a value that comes only from the command line (`-c` or `GIT_CONFIG_*`) is ignored, so it cannot hide text.\n- The scissors line is still the exact line with the configured comment string; the phrase check stays above it.\n- Attribution lines are now removed from below it as well. A hand-made message keeps everything below such a line.\n- Fixed along the way: an unset `core.commentString` no longer hides `core.commentChar` (an empty string had short-circuited the fallback).\n\nDocumented limits in `docs/hooks.md`: aliases defined in the user's own git configuration (`git ci`, `git pf`) and scripts that run git inside still escape, and the host's multi-line `if` glob match is still unprobed.\n\nchecks:\n- `mise run fmt` -> exit 0.\n- `mise run build` -> exit 0 (29 files).\n- `mise run verify` -> exit 0: type-check clean (95 files), lint clean (96 files), fmt clean (208 files), tests 1015 pass, 1 skip, 0 fail across 1016 tests in 24 files (`shell.test.ts` 149, `hooks.test.ts` 503).\n- A direct run over the B1 to B5 and wrapper shapes printed `unclear` for each, and `[]` for the everyday commands.\n\nblockers: none\nquestions: none\nnotes: not done and not asked: bash aliases or functions defined in the user's shell, and git aliases from config files (see limits); the optional code-review items from earlier rounds.\n\nevidence:\nB1 to B5 and the listed wrapper, alias and dynamic-subcommand shapes are denied, each with a test:\n- `packages/runtime/tests/shell.test.ts` (rows for every shape, with the expected `unclear` or the code that is now read).\n- `packages/integrations/claude/tests/hooks.test.ts`, the tests \"denies as unclear: …\" (27 shapes through the hook CLI) and \"still reads …\".\n- B1: `$'--force\\0'`, `$'--force\\x00'` and `git $'commit\\0'`. B2: unquoted heredocs with `$(…)` and backticks. B3: `$[1<<2]`, `if ((1<<2))`, C-style `for`. B4: `git \"com\\<newline>mit\"` and `\"pu\\<newline>sh\"`. B5: `(( $(git commit …) ))`.\n- Wrappers, aliases and subcommands: `eval`, `setsid`, `stdbuf`, `ionice`, `flock`, `find -exec`, `ssh`, `env -S`, `bash`/`fish` heredocs and pipes, `bash -c \"$cmd\"`, `git $p`, `git -c alias.*`, `-c remote.*.push`, `--config-env`, `--attr-source`, `GIT_CONFIG_COUNT`.\nEveryday commands the root runs still pass, with tests: the `passes …` table in `hooks.test.ts` (19 commands, listed above) and the plain rows in `shell.test.ts`.\nmise run verify passes and dist is rebuilt with mise run build: both exit 0 (counts above).\nchanged-paths: listed above.\nchecks: listed above.\ndiff-file: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/bash.diff (source, tests and docs; the regenerated dist bundle is left out, 592 lines).",
+  "createdAt": "2026-10-25T20:22:02.157Z"
+}

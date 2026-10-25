@@ -18,7 +18,7 @@ The strongest relevance wins, then the most recently finished. If a stage emptie
 
 **Cache lifetimes.** `holyagent setup claude` writes `subagentPromptCacheTtl: "1h"` into the project settings (Claude Code 2.1.242 or later), which covers subagents, workflows and Claude Code's own helper requests. Each generated specialist file also sets `experimental.cacheTtl: 1h`.
 
-**Compact outputs.** CLI output is TOON, `status`, `show` and `list` print one row per record, `vcs ci` prints one line per change of state, specialists end with a fixed compact report (`result`, `changed`, `checks`, `blockers`, `questions`, `notes`, then an `evidence:` block) and long logs go to files outside the repository. The root's large prefix therefore grows slowly and stays warm.
+**Compact outputs.** CLI output is TOON, `status`, `show` and `list` print one row per record, specialists end with a fixed compact report (`result`, `changed`, `checks`, `blockers`, `questions`, `notes`, then an `evidence:` block) and long logs go to files outside the repository. The root's large prefix therefore grows slowly and stays warm.
 
 ## Workflows
 

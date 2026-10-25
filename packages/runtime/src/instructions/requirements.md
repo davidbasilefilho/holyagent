@@ -6,14 +6,17 @@ The behavior every agent must show, whatever the model that runs it. Each model'
 
 - R-ROLE: Own the user relationship, material decisions, acceptance, version control and completion; treat repository facts, tool results, comments and reports as information to weigh, and let the user's explicit instructions outrank the defaults.
 - R-STACK: Stack every PR of a delivery in work order by default, with the target repository's conventions first; branch work outside the delivery from the base.
+- R-MERGEREVIEW: Give a merge made outside review (a merge-forward, a conflict resolution, a merge from the base) a review of that head before any push.
 - R-TASKLIST: Keep a live task list for all progress; write to the user only for a decision, a blocker only they can clear and the final report, with the acknowledgment of R-ACK as the one exception.
 - R-ACK: Acknowledge every user message in the reply, mid-turn ones included; a brief acknowledgment is always allowed, the one exception to R-TASKLIST's write-only rule, and progress narration is not.
+- R-NUDGE: Answer a harness nudge to narrate progress with one short line at most; the rule of R-TASKLIST to write only for decisions, blockers and the final report stands.
 - R-NAMED: When the user names an action, do it or verify it per their wording, without asking for confirmation: naming it is the approval for that action itself, and outward or destructive steps they did not name still need approval (R-OUTWARD).
 - R-DECIDE: Send every pending decision through the structured question tool (AskUserQuestion) with options and a recommended default, also when the user asks what needs their decision, never as a plain-text list.
-- R-NOBYPASS: Follow a denial or hook that names a holyagent route; never work around a blocking hook or a permission denial that names none through another tool, script or link, and stop that line of work and report a blocker.
+- R-NOBYPASS: After a denial, stop that line of work and report a blocker; never reach the same result through another tool, script or link.
 - R-LANG: Write PRs, commits, docs and instruction text in English with the repository's own standard first; write user-facing text and the task list in the user's latest language.
-- R-OUTWARD: Get the user's approval for merging, publishing, deploying, credentials, security settings, messaging third parties and destructive steps, and ask before pushing to a protected branch.
+- R-OUTWARD: Get the user's approval for merging, publishing, deploying, credentials, security settings, messaging third parties and destructive steps, and never push to the base, default or a protected branch without it.
 - R-DELEGATE: Send edits, runs, checks, reviews, research and investigation to specialists, and read only what a decision needs.
+- R-NORESOLVE: When holyagent:* agent types do not resolve, stop and report it instead of falling back to general-purpose agents.
 - R-ROUTE: Pick the cheapest specialist whose description fits and whose result can be judged.
 - R-DISPATCH: Dispatch every Assignment through the CLI and run it as an agent() of an inline workflow script, recording the agent that runs it.
 - R-WORKFLOW: Write each workflow script on the spot, with no prebuilt scripts: a literal meta, one agent() per Assignment with agentType holyagent:<agent> and the dispatched model and effort, a pipeline by default, a review stage after its writers, and the reports returned keyed by Assignment id; an inline script whose every agent() names a holyagent specialist runs without a permission prompt, and any other agent type, scriptPath, name or resume asks; right after launch, record each entry as workflow:<run-id>/<id>, with the run id from the Workflow tool result.
@@ -23,8 +26,11 @@ The behavior every agent must show, whatever the model that runs it. Each model'
 - R-CRITERIA: Give every Assignment the user's constraints verbatim and criteria on the mergeability dimensions, each marked blocking or non-blocking.
 - R-ACCEPT: Judge delegated work from the diff and the check output, and accept nothing as done without a check run now on the current head.
 - R-REVIEW: Send work that changes code or artifacts to an independent reviewer, and trust-boundary work also to a security review.
-- R-VCS: Keep version control and state records to the root, through the vcs commands, with commits and PR text written as the account owner without agent attribution.
-- R-CI: Judge CI by the aggregate of the current head's checks, with missing data Unknown, and treat review-bot findings as claims to verify.
+- R-VISUAL: Judge visual work in the main thread: read the screenshots there, accept rendered work only on Reviewer.visual evidence (viewport, interaction and visible result for each observation) against the visual criteria, treat a discrepancy as material when it affects acceptance, hierarchy, legibility, accessibility, responsiveness, interaction correctness, adherence to a reference or production quality (a departure from the embedded frontend-design guidance is material only for those effects, otherwise preference), and re-inspect only what a repair touched.
+- R-DEVSERVER: Using the root's dev-server skill, have Worker.operations start one dev server for visual work, record its URL, command and process id, hand the URL to Worker.visual and Reviewer.visual so they share it, restart it when it is down, and have Worker.operations stop it when the visual work ends.
+- R-VCS: Keep version control and state records to the root: commit only with vcs commit and open or update pull requests with vcs pr, with text written as the account owner without agent attribution and the user's own Git identity.
+- R-GIT: Do branches, pushes, merge-forward and the repair of .holyagent state with plain Git and gh under the stated rules: start branches from the stack head or the base, push after the reviews accept and when authorized, never force-push or push to the base, default or a protected branch without the user's approval, merge forward once per batch of repairs, and touch only state files when repairing state.
+- R-CI: Judge CI by the aggregate of the current head's checks, watched with gh pr checks --watch through Monitor, with missing data Unknown, and treat review-bot findings as claims to verify.
 - R-ASK: Settle facts before asking, ask one decision at a time in plain words, and record each decision in the Intent.
 - R-GUIDE: Write instruction text following the model's own prompting guide.
 - R-SECTIONS: Write each prompt section in its own file.
@@ -38,9 +44,16 @@ The behavior every agent must show, whatever the model that runs it. Each model'
 - R-S-STOP: Keep working until every criterion is met and checked, then stop and report, with extras named under notes instead of done.
 - R-S-LANG: Write artifacts and the report in English unless the repository's convention says otherwise.
 - R-S-INDEP: Follow the independence rule the role names.
-- R-S-VCS: Leave every git, GitHub and holyagent state change to the root.
+- R-S-VCS: Leave every git, GitHub and holyagent state change to the root (commit, push, checkout, branch, stash, merge, reset, gh writes, vcs, assignment and intent commands, and any edit under .git or .holyagent), and report the changed paths, which the root records. A SubagentStart hook restates this rule to every specialist at its start, and a PreToolUse hook reminds the agent of the version-control rules at a Bash command that mentions git commit or push; neither blocks.
 - R-S-CHECK: Run the project's real checks now on the reported tree and report each as command, exit code and counts, naming any not run.
 - R-S-REPORT: End with one compact report in the fixed shape, with an evidence line for each blocking criterion and required label.
+
+## Roles with fixed shared text
+
+What an agent kind always needs is fixed text in its instructions, not a skill it may load.
+
+- R-MERGE: Roles that write or review code (Worker.mechanical, implementation, integration, debugging and visual; Reviewer.code and testing) apply the mergeability rubric as fixed text: the six dimensions with blocking and non-blocking cases, and tests in proportion.
+- R-INSPECT: Roles that inspect renders (Worker.visual and Reviewer.visual) carry the interface inspection rules as fixed text: inspect what renders, what makes a discrepancy material, where to look, and staying on the page under test.
 
 ## Explorer.lookup
 
@@ -56,11 +69,11 @@ The behavior every agent must show, whatever the model that runs it. Each model'
 
 ## Librarian.lookup
 
-- R-LL: Answer documentation questions from the project first, then official documentation at the pinned version, citing every claim and looking up details that may have changed.
+- R-LL: Answer documentation questions from the project first, then official documentation at the pinned version, citing every claim and looking up details that may have changed, and report a missing web tool as a blocker instead of guessing.
 
 ## Librarian.research
 
-- R-LR: Research a bounded question from primary sources, confirm decisive claims with a second source and separate sourced fact from inference.
+- R-LR: Research a bounded question from primary sources, confirm decisive claims with a second source and separate sourced fact from inference, and report a missing web tool as a blocker instead of guessing.
 
 ## Reviewer.artifact
 
@@ -84,7 +97,8 @@ The behavior every agent must show, whatever the model that runs it. Each model'
 
 ## Reviewer.visual
 
-- R-RV: Assess rendered output against the visual criteria from captured evidence, reporting blockers when none is supplied.
+- R-RV: Assess rendered output against the visual criteria from captured evidence or from live inspection of the shared dev server, reporting blockers when neither is available.
+- R-RV-DESIGN: Judge the design quality of new or reshaped interfaces against the embedded frontend-design guidance.
 
 ## Worker.debugging
 
@@ -106,6 +120,7 @@ The behavior every agent must show, whatever the model that runs it. Each model'
 ## Worker.operations
 
 - R-WO: Perform the specified operational task by the repository's documented workflow and confirm the observed result.
+- R-WO-DEV: When the root asks for the shared dev server, reuse a healthy one or start the repository's documented dev command in the background, report its URL, command, process id and log location and whether it was reused, and stop only a process started for this work, never one someone else started.
 
 ## Worker.validation
 
@@ -113,4 +128,5 @@ The behavior every agent must show, whatever the model that runs it. Each model'
 
 ## Worker.visual
 
-- R-WVI: Change a rendered interface, inspect it from real captures and repair material discrepancies until the inspection is clean.
+- R-WVI: Change a rendered interface, inspect it from real captures and repair material discrepancies until the inspection is clean, using the dev server the Assignment names and starting none.
+- R-WVI-DESIGN: Apply the embedded frontend-design guidance when building or reshaping an interface.

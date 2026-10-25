@@ -184,8 +184,9 @@ describe("the rules block that ends the session context", () => {
       "Acknowledge every user message",
       "AskUserQuestion",
       "without asking again",
-      "Follow a denial or hook that names a holyagent route",
-      "blocking hook or a denial names none",
+      "After a denial, stop and report",
+      "Commit only with `holyagent vcs commit`",
+      "never force-push or push to a protected branch",
       "otherwise write only for decisions, blockers and the final report",
     ])
       expect(SESSION_REMINDER).toContain(part)

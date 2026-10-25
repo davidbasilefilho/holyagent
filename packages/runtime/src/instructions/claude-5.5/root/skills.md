@@ -1,1 +1,1 @@
-The `interface-inspection` (rendered output, T3 Code visuals) and `merge-ready` skills load when their situation arises.
+The `dev-server` skill loads when visual work needs a running web app: it has Worker.operations start the one server the visual specialists share. The `user-busy` skill loads when the user says they are away (see Asking). The mergeability rubric and the interface inspection rules are fixed text in the specialists that need them, so no skill carries them.

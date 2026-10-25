@@ -90,9 +90,6 @@ export const currentBranch: Effect.Effect<string, DetachedHead | Usage, Git> = E
   },
 )
 
-/** The commit HEAD points at, or undefined on a branch without commits. */
-export const headCommit = gitMaybe(["rev-parse", "-q", "--verify", "HEAD"])
-
 /** The URL with any user name or password removed, so it is safe to keep and to print. */
 export const stripUserinfo = (url: string): string =>
   url.replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/@]*@/i, "$1")
@@ -106,16 +103,6 @@ export const originUrl = gitMaybe(["remote", "get-url", "origin"]).pipe(
   Effect.map((url) => stripUserinfo(url ?? "")),
 )
 
-/**
- * True for a remote whose host is github.com, in https, git, ssh or scp-like form, with or without
- * a user name. The host must end at the colon or slash, so `github.com.evil.io` and
- * `https://github.com@evil.io/` are not GitHub.
- */
-export const isGithubRemote = (url: string): boolean =>
-  /^(?:(?:https?|git|ssh):\/\/(?:[^/@]*@)?github\.com(?::\d+)?\/|(?:[\w.-]+@)?github\.com:)/i.test(
-    url.trim(),
-  )
-
 /** The `owner/repo` a remote URL names, in https, scp-like, ssh and local-proxy forms. */
 export const repoSlug = (url: string): string | undefined => {
   const match = /([^/:]+)\/([^/]+?)(?:\.git)?\/*$/.exec(url.trim())
@@ -126,9 +113,3 @@ export const repoSlug = (url: string): string | undefined => {
     ? undefined
     : `${owner}/${repo}`
 }
-
-/** True when `ancestor` is reachable from `descendant`. */
-export const isAncestor = (ancestor: string, descendant: string) =>
-  gitMaybe(["merge-base", "--is-ancestor", ancestor, descendant]).pipe(
-    Effect.map((out) => out !== undefined),
-  )

@@ -1,13 +1,6 @@
----
-name: merge-ready
-description: Use when writing criteria for an Assignment, writing code or tests for one, or judging whether a change and its tests are mergeable. Holds the mergeability rubric with blocking and non-blocking checks and the proportional testing bar.
----
-
-# Merge-ready
+## Merge-ready
 
 A change is merge-ready when the repository's maintainer would merge it. A blocker in any dimension fails the whole change; non-blocking findings are listed apart, marked optional. The target project's conventions, lint, formatter and commands come first.
-
-## Rubric
 
 Every Assignment's criteria cover the dimensions that apply, each marked blocking or non-blocking.
 
@@ -22,7 +15,7 @@ Every Assignment's criteria cover the dimensions that apply, each marked blockin
 
 Accidental complexity, speculative abstraction, duplicated logic and needless dependencies are findings; a maintainability concern stays open after tests pass.
 
-## Tests in proportion
+Tests in proportion:
 
 - A behavior change or bug fix gets a test that asserts the previously failing behavior: it fails on the base and passes after. A test that would pass without the change proves nothing and is a blocker; the finding says what it must assert.
 - Where the repository has no runnable test seam, say so and why; invent no test infrastructure.
@@ -33,7 +26,5 @@ Accidental complexity, speculative abstraction, duplicated logic and needless de
   - horizontal slicing: tests and code written layer by layer, instead of one vertical behavior at a time, from its test to the code that passes it.
 - Fix the code rather than weaken a test. A test that is itself wrong goes to the root in the report.
 - A writer runs the project's real checks that exercise the change and names any it did not run.
-
-## Findings
 
 Report each blocker with the affected behavior, the path and symbol, and the evidence. A failure already on the base is a baseline, not a regression.
