@@ -1,0 +1,65 @@
+{
+  "id": "assignment-0mvo9b7xm-kmqu",
+  "intentId": "intent-0mvnv553v-zwx8",
+  "intentRevision": 12,
+  "roleTask": "Worker.implementation",
+  "slug": "finish-the-merge-of-pr5-into-pr6-and",
+  "objective": "Finish the merge of PR5 into PR6 and close the PR6 review blockers.",
+  "state": "Succeeded",
+  "scope": [
+    "Work only in the worktree /home/davidbasile/dev/holyagent-fix-cli-and-vcs. A merge of release/0.1.2/feat/skills-into-instructions (a380bf4, which carries the PR4 acorn hook 7e840ab) into PR6 (841ef47) is in progress with a conflict in packages/runtime/src/cli/hook.ts. Resolve it by keeping both sides: PR4 workflow hook on workflow-check.ts (acorn) and PR6 vcs-redirect, force-push and commit-msg code. Remove every conflict marker, run bun install --frozen-lockfile, then fix the blockers below. Do not run any merge, commit or other version-control write; the root concludes the merge.",
+    "Review reports: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/r-65cw.json (code), r-5vov.json (security), r-5qgs.json (artifact).",
+    "Code blockers: (1) packages/runtime/src/cli/report.ts ownerOf: a key line whose support is empty after stripping emphasis marks, backticks and punctuation counts as no support; test it. (2) hook commit-msg: cut the message at the scissors line (honour core.commentChar) before cleaning and the phrase check, and write back only the part above; test with a verbose-commit file.",
+    "Security blockers: (3) force-push detection in packages/runtime/src/cli/shell.ts: also deny --mirror, --delete, -d, a :ref deletion refspec, --prune, unambiguous abbreviations of long force options (match by prefix of --force, --force-with-lease, --force-if-includes, --mirror, --delete, --prune), and deny when a push argument cannot be read with certainty (contains $, braces, globs, or an ANSI-C escape that is not decoded; decode \\x, octal and \\u escapes in $-quoted words if simple); (4) here-string <<< must be a redirect, not a heredoc, and $(( << )) must not open a heredoc; heredocs open only for exactly << or <<-. Tests for each.",
+    "Artifact blockers: restore in US English in root/identity.md, and waits, repairs and blockers in root/task-list.md, and as printed in root/dispatch.md, keeping ROOT_CORE under 4000 characters by trimming elsewhere without losing a rule; resolve the conflict between task-list.md handle harness feedback silently and the R-NUDGE one-short-line rule (name the exception); describe removed vcs commands in docs/commit-authorship.md and packages/runtime/src/state/local.ts without naming them as commands to run (history wording in docs/decisions.md may stay).",
+    "Also: add an acorn row (MIT) to docs/attributions.md. Then mise run build and mise run verify."
+  ],
+  "constraints": [
+    "Decision (user, verbatim): slim holyagent vcs. Remove the GitHub API commit path; push, branch and ci become plain Git and gh, with a commit-msg hook for attribution and a deny rule for force pushes. Keep only vcs commit (exact paths + Intent state + message check) and vcs pr (PR text check). Intent state stays versioned in Git.",
+    "Decision (user, this session): the Workflow hook decides with a real JavaScript parser (add the acorn dependency) and allows only scripts whose syntax tree uses a closed set of constructs with correct scoping.",
+    "No version-control writes and no edits under .holyagent or the repository metadata folder. Report the changed paths.",
+    "Done means mise run verify passes in the worktree; run mise run build so dist is regenerated."
+  ],
+  "criteria": [
+    {
+      "text": "The hook.ts conflict is resolved with both sides kept and no conflict marker remains in the tree.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Each code, security and artifact blocker listed is closed with a test where it is code.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify passes and dist is rebuilt with mise run build.",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src",
+    "packages/runtime/tests",
+    "packages/integrations/claude/tests",
+    "packages/integrations/claude/dist",
+    "docs",
+    "AGENTS.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvo0nda7-dpfc",
+  "specialist": {
+    "agentId": "a2298564a5e785054",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-25T20:04:50.794Z",
+    "finishedAt": "2026-10-25T20:13:03.926Z"
+  },
+  "result": "result: Done in /home/davidbasile/dev/holyagent-fix-cli-and-vcs. The `hook.ts` conflict is resolved with both sides kept, all code, security and artifact blockers are closed (with tests where it is code), and `mise run verify` passes with dist rebuilt. I ran no version-control command, so the merge is still open for the root to conclude (`hook.ts` is still marked unmerged in `git status`).\n\nMerge: the only conflict was the import block of `packages/runtime/src/cli/hook.ts`. I kept the PR6 imports (`MessageRefused`, `cleanMessage`, `forbiddenPhrases`, `readSettings`, plus `gitMaybe`) and dropped `PLUGIN_NAMESPACE`, since the acorn hook no longer needs it. The workflow hook on `workflow-check.ts` and the PR6 `vcs-redirect`, force-push and `commit-msg` code are both there. No conflict marker remains anywhere, and `bun install --frozen-lockfile` was a no-op.\n\nCode blockers:\n1. `report.ts` `ownerOf`: a key line counts only when its support has a letter or digit. `**Handles errors:**`, `parses: **`, `` `` . `` and `---` are no support. Test: \"a key line whose support is only emphasis marks and punctuation is no support\" in `cli.test.ts`.\n2. `hook commit-msg`:\n   - It cuts the text at the scissors line `<comment> ------------------------ >8 ------------------------`, honouring `core.commentString` / `core.commentChar` (`auto` or unset means `#`).\n   - It cleans, checks and writes back only the part above the scissors line; the diff below is left as it was.\n   - Four tests in `hooks.test.ts`: a verbose file, a clean-above-and-keep-below file, a refused message above, and a `;` comment char in a real repository.\n\nSecurity blockers:\n3. Push verdict in `shell.ts`:\n   - `force-push`: `--mirror`, `--delete`, `-d` (also in clusters), `--prune`, any prefix of the six dangerous long options (`--force-w`, `--mirr`, `--del`, …), `+` and `:` refspecs (also after `--`), and the same words written as `$'…'` strings. The ANSI-C decoder now handles `\\x`, octal, `\\u`, `\\U` and the simple escapes.\n   - `unclear` (a new deny kind): a push word with `$`, a backtick, braces, a glob or an escape that cannot be decoded; and a command nested past 64 levels, which no longer ends in silence. A scan that overflows the stack or throws is denied as unclear too (it used to be silent).\n   - **Behavior change to note:** `git push origin $branch` and `git push origin \"$(git branch --show-current)\"` are now denied with a reason telling the root to write the branch name out.\n4. Heredocs:\n   - `<<<` is a redirection whose target is the next word.\n   - `<<` inside `$((…))` and a leading `((…))` is a shift.\n   - Heredocs open only for exactly `<<` or `<<-`.\n   - Tests in `shell.test.ts` (82 cases) and the \"never errors\" table in `hooks.test.ts`.\n\nArtifact blockers (`ROOT_CORE` is 3999 characters):\n- Restored: \"US English\" in `identity.md`, \"and for waits, repairs and blockers\" in `task-list.md`, and \"as printed\" in `dispatch.md`.\n- The nudge conflict: `task-list.md` now says \"Handle hook and harness feedback silently, acting on it or declining it; a nudge to narrate gets one short line.\"\n- To make room I tightened wording:\n  - `identity.md`: the push-authorization sentence is shorter, \"repository\" is dropped from \"other repository artifacts\", and \"(Monitor, a script)\" became \"(Monitor, scripts)\".\n  - `delegating.md`: the reason clause is shorter and the `(status, …)` example is gone.\n  - `dispatch.md`: \"lists the fields, outcomes and errors\" became \"has the details\".\n  - `identity.md`: \"Be terse: answer first.\" moved to `user-messages.md`, so it no longer reaches a core-only agent. This is the one rule I relocated rather than kept in the core; say if you want it back in the core and something else cut.\n- The removed vcs commands are described without names in `docs/commit-authorship.md` and in `state/local.ts`. `docs/decisions.md` keeps its history wording, and `vcs-pr.test.ts` still asserts their absence on purpose.\n- `docs/attributions.md` has an acorn row (MIT).\n- `docs/hooks.md` and `docs/commit-authorship.md` document the new push rules and the scissors handling.\n\nchecks:\n- `mise run fmt` -> exit 0.\n- `mise run build` -> exit 0 (29 files).\n- `mise run verify` -> exit 0: type-check clean (95 files), lint clean (96 files), fmt clean (208 files), tests 839 pass, 1 skip, 0 fail across 840 tests in 24 files.\n- grep for conflict markers finds none. grep for the removed command names finds only the intentional test assertion.\n\nblockers: none\nquestions: none\nnotes: not done and not asked: wrappers the scanner does not follow (`eval`, `setsid`, `env -S`, a shell reading a heredoc or pipe); the glob concern about multi-line commands in Claude Code's `if` rule (unprobed); the optional code-review points (duplicate closes overwriting a report, `main.ts` exit code on EPIPE, extra JSON report fields).\n\nevidence:\nThe hook.ts conflict is resolved with both sides kept and no conflict marker remains in the tree: `packages/runtime/src/cli/hook.ts` imports and body (acorn `workflowRefusal`, `vcs-redirect`, `commit-msg`); grep for `^<<<<<<<`, `^>>>>>>>` finds nothing.\nEach code, security and artifact blocker listed is closed with a test where it is code:\n- Code 1: `cli.test.ts` \"a key line whose support is only emphasis marks and punctuation is no support\".\n- Code 2: `hooks.test.ts` commit-msg tests (scissors above/below, cleaning above, refusal above, `core.commentChar`).\n- Security 3: `shell.test.ts` and the `hooks.test.ts` \"pushes:\" table (force forms, abbreviations, `$'…'` escapes, unclear arguments, nesting).\n- Security 4: `shell.test.ts` here-string and arithmetic cases and the \"never errors\" rows in `hooks.test.ts`.\n- Artifact: restored phrases and the nudge exception in `identity.md`, `task-list.md`, `dispatch.md`; `ROOT_CORE` 3999 characters, checked by `sessioncontext.test.ts`; docs and comment wording in `commit-authorship.md` and `state/local.ts`; acorn row in `attributions.md`.\nmise run verify passes and dist is rebuilt with mise run build: both exit 0 (counts above).\nchanged-paths: `packages/runtime/src/cli/{hook,report,shell}.ts`; `packages/runtime/src/state/local.ts`; `packages/runtime/src/instructions/claude-5.5/root/{identity,delegating,dispatch,task-list,user-messages}.md`; `packages/runtime/tests/{cli,shell}.test.ts`; `packages/integrations/claude/tests/hooks.test.ts`; `docs/{hooks,commit-authorship,attributions}.md`; `packages/integrations/claude/dist/**` (rebuilt).\nchecks: listed above.\ndiff-file: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/pr6fix.diff (the working tree against HEAD, excluding dist, so it also holds the merge side; 2375 lines).",
+  "createdAt": "2026-10-25T20:04:50.794Z"
+}

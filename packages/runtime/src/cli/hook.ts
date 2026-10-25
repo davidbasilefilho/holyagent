@@ -1,15 +1,13 @@
-import { readdir, stat } from "node:fs/promises"
-import { dirname, join } from "node:path"
+import { stat } from "node:fs/promises"
+import { join } from "node:path"
 
 import { Effect, Schema } from "effect"
 
-import { WORKFLOW_NAMES } from "../domain/plan.ts"
-import { ROUTES } from "../domain/route.ts"
 import { ROOT_CORE } from "../instructions/claude-5.5/root-core.ts"
 import { hasCode, io } from "../state/files.ts"
 import { STATE_DIRECTORY } from "../state/layout.ts"
 import { readOpenState } from "../state/store.ts"
-import { PLUGIN_NAMESPACE, recordLaunch } from "./assignment.ts"
+import { recordLaunch } from "./assignment.ts"
 import { stateRoot } from "./context.ts"
 import { AgentIdMissing, describeFailure, StateFolderMissing } from "./errors.ts"
 import { resolveIntent } from "./intent.ts"
@@ -18,6 +16,7 @@ import { dispatchedAssignment } from "./report.ts"
 import { type IntentRequirements, sessionContext } from "./sessioncontext.ts"
 import { type GitWrite, gitWrites } from "./shell.ts"
 import { type Call, type Command, Verbatim } from "./types.ts"
+import { workflowRefusal } from "./workflow-check.ts"
 
 // The host reads a hook's stdout as JSON and treats exit 2 as a block, while any other failure
 // lets the call through unless the hook asks to block on failure. So every failure here is exit 1
@@ -135,89 +134,8 @@ const REDIRECTS: Readonly<Record<GitWrite, string>> = {
   push: "Push with `holyagent vcs push [branches…]`.",
 }
 
-const OUR_WORKFLOWS: ReadonlySet<unknown> = new Set(
-  WORKFLOW_NAMES.map((name) => `${PLUGIN_NAMESPACE}:${name}`),
-)
-/** The Workflow inputs a named run may carry; a script, script path or resume would run other code. */
-const NAMED_RUN_INPUTS: ReadonlySet<string> = new Set(["name", "args", "description", "title"])
-
-const SPECIALISTS: ReadonlySet<string> = new Set(ROUTES.map((route) => route.agent))
-
-/**
- * True for `holyagent:<agent>` or a bare `<agent>` of the route table; any other namespace is not
- * ours.
- */
-const isOurAgent = (agent: unknown): boolean =>
-  typeof agent === "string" &&
-  SPECIALISTS.has(
-    agent.startsWith(`${PLUGIN_NAMESPACE}:`) ? agent.slice(PLUGIN_NAMESPACE.length + 1) : agent,
-  )
-
-/** True when every `agent` anywhere in the arguments is one of ours; the arguments name who runs. */
-const agentsAreOurs = (value: unknown, depth = 0): boolean => {
-  if (depth > 8) return false
-  if (Array.isArray(value)) return value.every((item: unknown) => agentsAreOurs(item, depth + 1))
-  if (typeof value !== "object" || value === null) return true
-  return Object.entries(value).every(([key, item]) =>
-    key === "agent" ? isOurAgent(item) : agentsAreOurs(item, depth + 1),
-  )
-}
-
-/**
- * The folders a project or user workflow could be loaded from under the same name:
- * `.claude/workflows` of the working directory and each parent, of the home directory and of
- * CLAUDE_CONFIG_DIR.
- */
-const workflowFolders = (call: Call): ReadonlyArray<string> => {
-  const parents: Array<string> = []
-  for (let at = call.cwd; !parents.includes(at); at = dirname(at)) parents.push(at)
-  return [
-    ...parents.map((parent) => join(parent, ".claude", "workflows")),
-    ...(call.env.HOME === undefined ? [] : [join(call.env.HOME, ".claude", "workflows")]),
-    ...(call.env.CLAUDE_CONFIG_DIR === undefined
-      ? []
-      : [join(call.env.CLAUDE_CONFIG_DIR, "workflows")]),
-  ]
-}
-
-/** True when the `export const meta` literal of a script mentions our name, in any case. */
-const declaresOurName = (script: string): boolean => {
-  const start = script.search(/export\s+const\s+meta\b/)
-  if (start === -1) return false
-  const end = script.indexOf("\n}", start)
-  return script
-    .slice(start, end === -1 ? start + 4000 : end)
-    .toLowerCase()
-    .includes(PLUGIN_NAMESPACE)
-}
-
-/**
- * True when a workflow file that could take over one of our names may exist: a file named
- * `holyagent…` in those folders, a script there whose meta mentions `holyagent` (the name comes
- * from the meta, not the file), or a folder or file that cannot be read, since then nobody can
- * say.
- */
-const shadowed = (call: Call) =>
-  Effect.forEach(workflowFolders(call), (folder) =>
-    io(folder, () => readdir(folder)).pipe(
-      Effect.flatMap((names) =>
-        names.some((name) => name.toLowerCase().startsWith(PLUGIN_NAMESPACE))
-          ? Effect.succeed(true)
-          : Effect.forEach(
-              names.filter((name) => name.endsWith(".js")),
-              (name) =>
-                io(join(folder, name), () => Bun.file(join(folder, name)).text()).pipe(
-                  Effect.map(declaresOurName),
-                ),
-            ).pipe(Effect.map((found) => found.includes(true))),
-      ),
-      Effect.catchIf(
-        (error) => hasCode(error.cause, "ENOENT") || hasCode(error.cause, "ENOTDIR"),
-        () => Effect.succeed(false),
-      ),
-      Effect.orElseSucceed(() => true),
-    ),
-  ).pipe(Effect.map((found) => found.includes(true)))
+/** The Workflow inputs an inline run may carry; a script path, name or resume would run other code. */
+const INLINE_INPUTS: ReadonlySet<string> = new Set(["script", "args"])
 
 // The vcs-redirect hook only sees what the `if` rules of hooks.json let through, and those match
 // the command text: `git` followed by `commit` or `push` anywhere in it. A command that hides the
@@ -302,19 +220,27 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
   ),
   hook(
     "workflow",
-    "PreToolUse for Workflow: allow a run of one of this plugin's prebuilt workflows by name, with only our specialists in its arguments and no file that could shadow it; say nothing otherwise",
-    (payload, call) =>
-      Effect.gen(function* () {
-        const input = payload.tool_input ?? {}
-        const prebuilt =
-          payload.tool_name === "Workflow" &&
-          OUR_WORKFLOWS.has(input.name) &&
-          Object.keys(input).every((key) => NAMED_RUN_INPUTS.has(key)) &&
-          agentsAreOurs(input.args)
-        return prebuilt && !(yield* shadowed(call))
-          ? decision("allow", `Prebuilt workflow ${String(input.name)} of the holyagent plugin.`)
-          : NOTHING
-      }),
+    "PreToolUse for Workflow: allow an inline script whose every agent() call names one of this plugin's specialists by a string-literal agentType, with no script path, name or resume; say nothing otherwise",
+    (payload) => {
+      const input = payload.tool_input ?? {}
+      const script = input.script
+      if (
+        payload.tool_name !== "Workflow" ||
+        typeof script !== "string" ||
+        !Object.keys(input).every((key) => INLINE_INPUTS.has(key))
+      )
+        return Effect.succeed(NOTHING)
+      return workflowRefusal(script).pipe(
+        Effect.map((refusal) =>
+          refusal === undefined
+            ? decision(
+                "allow",
+                "Inline workflow script whose every agent() call is a holyagent specialist.",
+              )
+            : NOTHING,
+        ),
+      )
+    },
     true,
   ),
 ]

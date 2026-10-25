@@ -8,7 +8,7 @@ What HolyAgent installs or configures, and why. The WSL installer (`install/wsl-
 | Node.js LTS      | WSL installer (`mise use -g node@lts`)                     | Billion Context and ctx7 run on Node                                        |
 | Bun (canary)     | WSL installer (`mise use -g bun`, then canary)             | Runs the plugin CLI and the repository toolchain                            |
 | Claude Code      | WSL installer (`bun add -g @anthropic-ai/claude-code`)     | The harness                                                                 |
-| HolyAgent plugin | Marketplace, `holyagent setup claude`                      | The root agent, specialists, skills, workflows, hooks and runtime CLI       |
+| HolyAgent plugin | Marketplace, `holyagent setup claude`                      | The root agent, specialists, skills, hooks and runtime CLI                  |
 | Billion Context  | WSL installer, `holyagent setup claude`, plugin dependency | Compresses the conversation so long sessions stay inside the context window |
 | ctx7 and skill   | WSL installer, `holyagent setup claude`                    | Current library documentation for the agents                                |
 | Exa plugin       | Plugin dependency                                          | Web search and page reading for the Search specialists                      |

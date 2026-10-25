@@ -1,0 +1,72 @@
+{
+  "id": "assignment-0mvo8xxaw-65cw",
+  "intentId": "intent-0mvnv553v-zwx8",
+  "intentRevision": 12,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-pr6-range-bf31fac-841ef47-on",
+  "objective": "Review the PR6 range bf31fac..841ef47 on release/0.1.2/fix/cli-and-vcs for correctness and regressions against the merge-ready bar.",
+  "state": "Succeeded",
+  "scope": [
+    "Worktree /home/davidbasile/dev/holyagent-fix-cli-and-vcs; run commands there, not in /home/davidbasile/dev/holyagent.",
+    "The change: CLI defects (close again or accept --report for a Succeeded unaccepted Assignment, normalized evidence matching, extra report-json fields kept, quiet EPIPE, vcs commit adds worktree Intent state), slimmed vcs (only commit and pr; API path and push/branch/ci/detect removed), vcs-redirect hook (never errors, denies Git commit and force pushes, allows plain push), new hook commit-msg command and lefthook wiring, root instructions and docs.",
+    "Check that normalized evidence matching cannot accept evidence for a different criterion, that force-push detection has no easy false negative (for example git -C dir push -f, git push origin +main, env or sudo prefixes, git -c, aliases are out of scope), that vcs commit still stages exactly the named paths, and run mise run verify."
+  ],
+  "constraints": [
+    "Decision (user, verbatim): slim holyagent vcs. Remove the GitHub API commit path; push, branch and ci become plain Git and gh, with a commit-msg hook for attribution and a deny rule for force pushes. Keep only vcs commit (exact paths + Intent state + message check) and vcs pr (PR text check). Intent state stays versioned in Git.",
+    "Read-only: no edits and no version-control writes."
+  ],
+  "criteria": [
+    {
+      "text": "Every blocking finding has file, line, a concrete failure and why it blocks; non-blocking findings are marked as such.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify is run on the reviewed head and its result reported.",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "checks"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvo0nda7-dpfc"
+  ],
+  "specialist": {
+    "agentId": "workflow:wf_9c8e300b-4a9/assignment-0mvo8xxaw-65cw",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-25T19:54:30.488Z",
+    "finishedAt": "2026-10-25T19:58:55.863Z"
+  },
+  "result": "status: done\nchecks:\n- mise run verify (worktree /home/davidbasile/dev/holyagent-fix-cli-and-vcs, HEAD 841ef47) -> exit 0\n- Skill code-review bf31fac...841ef47 (built-in; forked, returned 9 findings) -> exit 0\n- bun scratchpad/rc6-shell.ts (gitWrites over 36 push command forms) -> exit 0\n- bun scratchpad/rc6-acc.ts (acceptanceFrom over 7 evidence blocks) -> exit 0\n- dist/scripts/holyagent hook commit-msg on temp repo: clean message, 'the user' message, scissors-diff message -> exit 0\nblockers:\n- BLOCKER 1 (behavior): packages/runtime/src/cli/report.ts, ownerOf (about line 63-68) with normalized. A bold key line with no support counts as evidence. Run on the head: the block `evidence:\\n**Handles errors:**\\n**Other thing:**\\nchecks: ok` is accepted for both blocking criteria, with support `**`. The cause is that `entry.slice(at+1).trim()` is only checked for non-empty and emphasis marks are not stripped from the support. `- Handles errors: **` is accepted the same way. The old code and the doc comment say an entry that is only a key claims nothing. This weakens the acceptance gate, whose job is to refuse a missing blocking criterion. Fix: treat a support that is empty after stripping emphasis marks, backticks and punctuation (the LEADING and TRAILING sets) as no support. Add a test for it.\n- BLOCKER 2 (behavior): packages/runtime/src/cli/hook.ts, the `hook commit-msg` command (about lines 735-762). It runs the phrase check over the whole message file. Under `git commit -v` or `commit.verbose=true` git puts the staged diff after the `# ---- >8 ----` scissors line, and the `#` filter does not drop diff lines. Run: a file holding `fix: x`, a scissors line and a diff line `+use the user setting` exits 3 with MessageRefused \"the user\". lefthook.yml wires this hook to every commit, and this repository's own instruction and doc text says \"the user\" often, so a clean message is refused. Fix: cut the text at the scissors line (and honour core.commentChar) before cleanMessage and forbiddenPhrases, and write back only the part above it. No test covers this.\nnotes:\n- Baseline: none; mise run verify passed on 841ef47 with 683 pass, 1 skip, 0 fail, and type-check, lint and format clean.\n- Claim 1, normalized matching cannot accept evidence for a different criterion: held. An entry head must equal a declared key after normalizing case, spacing, trailing punctuation, a leading [blocking] and a trailing (dimension). `Handles error: z` and `Other thing: Handles errors: x` do not credit 'Handles errors'. A nested `B: x` line under A merges into A's support and is not credited to B. Only residual: two criteria that differ only by case, punctuation or a (dimension) suffix collide in `known`, so the second can never be satisfied. That fails closed, so it is optional.\n- Claim 2, force-push detection: run over 36 forms. Denied: -f, -C dir, +main, +refs/..., env X=1, FOO=1, sudo, command, nice, xargs, time, exec, git -c, --no-pager, bash -c '...', (subshell), cd x &&, -uf, --force-with-lease=ref:sha, quoted '-f' and $'-f'. Allowed (correct): plain push, `HEAD:+main` (not a force in git), -o force. Misses are out of the stated scope or deletion-type pushes: `eval '...'`, `$G push -f`, `git push origin :main`, --delete, --mirror. Those last three rewrite remote history without a force flag. That follows the user's decision (only force pushes are denied), but the root should know. `git push -- -f` is a harmless false positive. No easy false negative inside scope.\n- Claim 3, vcs commit stages exactly the named paths: held. `gitPaths(['add','-A'], scope)` uses --literal-pathspecs, and anything already staged outside declared paths plus Intent state refuses with StagedOutsideScope. Only the Intent-state fallback widens it. With no Intent in use, `changedIntentState` stages the changed files of the whole .holyagent/intents folder, including other open Intents with Running work. That is a behavior change from the base, which added nothing. Optional, and a root decision whether it matches 'Intent state in Git'.\n- Optional, from the code-review run (read and confirmed in code): (a) `closeAssignment` accepts any `close --outcome success` on a Succeeded unaccepted Assignment and overwrites `result`, so an accidental duplicate close silently replaces the report. `assignment accept --report` also reaches the Running path and closes it as Succeeded. (b) `requireOwnIdentity` reads only `git config user.name/email`, not GIT_AUTHOR_*/EMAIL env, and `looksLikeAgent` duplicates `namesAgent` in vcs/message.ts with a narrower rule (exact noreply@anthropic.com versus any @anthropic.com). (c) `main.ts` calls process.exit(0) on EPIPE even when the run's result was a failure; the exit code is lost when a reader closes early. (d) `JsonReport` now accepts any extra field, which removes onExcessProperty strictness at that boundary. This is the requested behavior (extra fields kept), documented in the code, but it conflicts in letter with the CLAUDE.md schema rule. (e) `hook commit-msg` is not `stateless` and reads .holyagent/config.json through readSettings, so a malformed vcs section blocks every commit. Plain `git commit` already fails in the git-ownership cases, and I ran the hook in a temp repo without .holyagent: it works.\n- I did not run mise run build to check that dist matches the sources. I only grepped dist/scripts/holyagent.js for force-push and hook commit-msg (both present). Lefthook commit-msg wiring was read, not run through lefthook. Tree status was clean at HEAD 841ef47 and no files changed during the review.\n- Scratch scripts: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/rc6-shell.ts and rc6-acc.ts; verify log: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/verify-rc6.log.\nevidence:\n- Every blocking finding has file, line, a concrete failure and why it blocks; non-blocking findings are marked as such.: Two blockers. (1) packages/runtime/src/cli/report.ts, ownerOf near line 63-68: `**Handles errors:**` alone is accepted with support `**`, shown by running acceptanceFrom (rc6-acc.ts); it blocks because the acceptance gate admits a blocking criterion with no evidence. (2) packages/runtime/src/cli/hook.ts, hook commit-msg near lines 735-762: a scissors-line diff containing 'the user' is refused with exit 3, shown by running the dist hook on a temp repo; it blocks because lefthook wires it to every commit and `git commit -v` then refuses clean messages. All other findings are marked optional in notes.\n- findings: Built-in /code-review ran through the Skill tool on bf31fac...841ef47 (it returned 9 findings). Classified after reading the code: 2 confirmed blockers (the commit-msg scissors one, and the bold-support one, which I found myself); the rest optional (closeAssignment overwrite, identity env, looksLikeAgent duplication, EPIPE exit 0, StructWithRest, intents-folder fallback, commit-msg not stateless). Its stateless claim is partly rejected: the hook ran fine in a repo without .holyagent. Its claim that a plain `git push` should stay denied is rejected: the user's decision lets a plain push through. Force-push detection, normalized matching and vcs commit staging were checked as the Assignment asked (see notes).\n- checks: mise run verify on 841ef47 -> exit 0: type-check 'No type errors in 94 files', lint 'No problems in 95 files', fmt 'All 207 files are formatted', bun test 683 pass, 1 skip, 0 fail, 6808 expect() calls across 24 files. Log: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/verify-rc6.log. Not run: mise run build, lefthook itself.\n- mise run verify is run on the reviewed head and its result reported.: `mise run verify` in /home/davidbasile/dev/holyagent-fix-cli-and-vcs at HEAD 841ef47b9e9c50554ef63a65e6ac07e841bda016 with a clean tree, exit 0: 683 pass, 1 skip, 0 fail; check, lint and fmt:check clean.",
+  "acceptance": {
+    "revision": 12,
+    "rationale": "Two blockers reproduced by running code; verify exit 0 on 841ef47.",
+    "criteria": [
+      {
+        "criterion": "Every blocking finding has file, line, a concrete failure and why it blocks; non-blocking findings are marked as such.",
+        "support": "Two blockers. (1) packages/runtime/src/cli/report.ts, ownerOf near line 63-68: `**Handles errors:**` alone is accepted with support `**`, shown by running acceptanceFrom (rc6-acc.ts); it blocks because the acceptance gate admits a blocking criterion with no evidence. (2) packages/runtime/src/cli/hook.ts, hook commit-msg near lines 735-762: a scissors-line diff containing 'the user' is refused with exit 3, shown by running the dist hook on a temp repo; it blocks because lefthook wires it to every commit and `git commit -v` then refuses clean messages. All other findings are marked optional in notes."
+      },
+      {
+        "criterion": "mise run verify is run on the reviewed head and its result reported.",
+        "support": "`mise run verify` in /home/davidbasile/dev/holyagent-fix-cli-and-vcs at HEAD 841ef47b9e9c50554ef63a65e6ac07e841bda016 with a clean tree, exit 0: 683 pass, 1 skip, 0 fail; check, lint and fmt:check clean."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "Built-in /code-review ran through the Skill tool on bf31fac...841ef47 (it returned 9 findings). Classified after reading the code: 2 confirmed blockers (the commit-msg scissors one, and the bold-support one, which I found myself); the rest optional (closeAssignment overwrite, identity env, looksLikeAgent duplication, EPIPE exit 0, StructWithRest, intents-folder fallback, commit-msg not stateless). Its stateless claim is partly rejected: the hook ran fine in a repo without .holyagent. Its claim that a plain `git push` should stay denied is rejected: the user's decision lets a plain push through. Force-push detection, normalized matching and vcs commit staging were checked as the Assignment asked (see notes)."
+      },
+      {
+        "label": "checks",
+        "support": "mise run verify on 841ef47 -> exit 0: type-check 'No type errors in 94 files', lint 'No problems in 95 files', fmt 'All 207 files are formatted', bun test 683 pass, 1 skip, 0 fail, 6808 expect() calls across 24 files. Log: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/verify-rc6.log. Not run: mise run build, lefthook itself."
+      }
+    ]
+  },
+  "createdAt": "2026-10-25T19:54:30.488Z"
+}

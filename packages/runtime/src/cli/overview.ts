@@ -2,7 +2,6 @@ import { Effect } from "effect"
 
 import { recommend } from "../domain/plan.ts"
 import { readOpenState, type Snapshot } from "../state/store.ts"
-import { PLUGIN_NAMESPACE } from "./assignment.ts"
 import { nowIso } from "./context.ts"
 import { intentInUse, resolveIntent } from "./intent.ts"
 import type { Command } from "./types.ts"
@@ -79,12 +78,9 @@ export const resumeOf = (directory: string) =>
 
 /** What the root does with a workflow recommendation, for the `plan` help. */
 const PLAN_NOTES: ReadonlyArray<string> = [
-  "workflow first: `assignment dispatch` each id for its agent, model, effort and prompt, then run the Workflow tool with `name` and `args` built from them; an entry is {id, agent, model, effort, prompt}. a single Assignment is a one-entry workflow, and `continues` lists work that continues a warm specialist by SendMessage beside it. `fallback` is for a session where the Workflow tool is disabled or unavailable: its writers launch together, and `afterwards` launch once the writers they depend on are terminal",
-  "holyagent:run-assignments  {assignments: [entry…]} returns [{id, report}]",
-  "holyagent:review-diff  {change, reviewers: [entry…]}; change names what is reviewed (a committed range, base..head); returns each reviewer's report and the deduplicated blockers",
-  "holyagent:implement-review  {pairs: [{writer: entry, reviewer: entry}…]}; the reviewer's prompt gets the writer's changed paths and checks; returns both reports per pair",
-  "the run ends with a notice carrying the returned value, and the tool result has the run id. Per entry: `assignment record <id> --agent workflow:<run-id>/<id>`, then `assignment close <id> --outcome <o> [--accept <rationale>] --report-json` with the entry's report on stdin. A null report means the agent died: close it errored. A workflow's agents cannot be messaged, so a gap in a report, like any repair, is a new draft with followUpOf",
-  "a custom script, when no prebuilt workflow fits, uses the same entry shape, report schema and recording; its agents are holyagent specialists (agentType holyagent:<agent>)",
+  "workflow first: `assignment dispatch` each id for its agent, model, effort and prompt, then write the inline script yourself and run it with the Workflow tool; an entry is {id, agent, model, effort, prompt}. A single Assignment is a one-entry workflow, and `continues` lists work that continues a warm specialist by SendMessage beside it. `fallback` is for a session where the Workflow tool is disabled or unavailable: its writers launch together, and `afterwards` launch once the writers they depend on are terminal",
+  "the script opens with a literal `export const meta = {name, description}` and has one agent() per entry, every one with agentType holyagent:<agent> and the entry's model and effort. Run the entries through pipeline() and put a review stage after its writers; return an object of reports keyed by Assignment id. An inline script whose every agent() names a holyagent specialist runs without a permission prompt; any other agent type, a scriptPath or a resume goes through the normal flow",
+  "the run ends with a notice carrying the returned value, and the tool result has the run id. Per entry: `assignment record <id> --agent workflow:<run-id>/<id>`, then `assignment close <id> --outcome <o> [--accept <rationale>]` with the entry's report text on stdin, verbatim and never retyped or summarized (the script passes no `schema`, so agent() returns the specialist's own report). A null report means the agent died: close it errored. A workflow's agents cannot be messaged, so a gap in a report, like any repair, is a new draft with followUpOf",
 ]
 
 /** The `plan`, `status` and `reconcile` commands. */
@@ -116,10 +112,6 @@ export const OVERVIEW_COMMANDS: ReadonlyArray<Command> = [
           return { action: "none", reason: "no Ready Assignment can start now" }
         return present({
           action: recommendation.action,
-          workflow:
-            recommendation.action === "workflow"
-              ? `${PLUGIN_NAMESPACE}:${recommendation.name}`
-              : undefined,
           continue:
             recommendation.action === "continue" && recommendation.continues.length === 1
               ? recommendation.continues[0]?.agentId

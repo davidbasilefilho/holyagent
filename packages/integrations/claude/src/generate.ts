@@ -1,6 +1,5 @@
 import { join } from "node:path"
 
-import { WORKFLOW_NAMES } from "../../../runtime/src/domain/plan.ts"
 import packageJson from "../package.json" with { type: "json" }
 import { agentFiles, PLUGIN_NAME } from "./agents.ts"
 import {
@@ -132,24 +131,6 @@ const hooks = (): GeneratedFile => ({
   }),
 })
 
-const INCLUDE = "// @include shared.js\n"
-
-const workflows = async (): Promise<ReadonlyArray<GeneratedFile>> => {
-  const shared = await readSource(`${SOURCES}/workflows/shared.js`)
-  return Promise.all(
-    WORKFLOW_NAMES.map(async (name) => {
-      const source = `${SOURCES}/workflows/${name}.js`
-      const script = await readSource(source)
-      if (!script.includes(INCLUDE)) throw new Error(`${source} has no ${INCLUDE.trim()} line`)
-      const note = `// ${generatedNote(`${source} and ${SOURCES}/workflows/shared.js`)}\n`
-      return {
-        path: inPlugin(`workflows/${name}.js`),
-        content: script.replace(INCLUDE, `${note}${shared}`),
-      }
-    }),
-  )
-}
-
 const skills = async (): Promise<ReadonlyArray<GeneratedFile>> => {
   const root = `${INSTRUCTIONS_DIRECTORY}/skills`
   const own = (await listFiles(root)).map(async (path) => {
@@ -215,6 +196,5 @@ export const generate = async (): Promise<ReadonlyArray<GeneratedFile>> =>
     hooks(),
     ...(await agentFiles()),
     ...(await skills()),
-    ...(await workflows()),
     ...(await scripts()),
   ].toSorted((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))

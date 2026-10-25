@@ -15,7 +15,9 @@ The behavior every agent must show, whatever the model that runs it. Each model'
 - R-OUTWARD: Get the user's approval for merging, publishing, deploying, credentials, security settings, messaging third parties and destructive steps, and ask before pushing to a protected branch.
 - R-DELEGATE: Send edits, runs, checks, reviews, research and investigation to specialists, and read only what a decision needs.
 - R-ROUTE: Pick the cheapest specialist whose description fits and whose result can be judged.
-- R-DISPATCH: Dispatch every Assignment through the CLI and run it as a workflow entry, recording the agent that runs it.
+- R-DISPATCH: Dispatch every Assignment through the CLI and run it as an agent() of an inline workflow script, recording the agent that runs it.
+- R-WORKFLOW: Write each workflow script on the spot, with no prebuilt scripts: a literal meta, one agent() per Assignment with agentType holyagent:<agent> and the dispatched model and effort, a pipeline by default, a review stage after its writers, and the reports returned keyed by Assignment id; an inline script whose every agent() names a holyagent specialist runs without a permission prompt, and any other agent type, scriptPath, name or resume asks; right after launch, record each entry as workflow:<run-id>/<id>, with the run id from the Workflow tool result.
+- R-REPORT: Pass each specialist report to assignment close verbatim on stdin, never retyped or summarized.
 - R-WAKE: Wake only on completion notices: no polling, steering or stopping of running specialists.
 - R-RESUME: After a resume or compaction, reconcile and close a Running Assignment as interrupted only once its agent is confirmed gone.
 - R-CRITERIA: Give every Assignment the user's constraints verbatim and criteria on the mergeability dimensions, each marked blocking or non-blocking.

@@ -6,6 +6,7 @@ import { dirname, join } from "node:path"
 import { $ } from "bun"
 
 import { SESSION_REMINDER } from "../../../runtime/src/cli/sessioncontext.ts"
+import { ROUTES } from "../../../runtime/src/domain/route.ts"
 import { ROOT_CORE } from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
 import { freshPlugin } from "./built.ts"
 
@@ -166,47 +167,629 @@ describe("hook vcs-redirect", () => {
   })
 })
 
+const META = 'export const meta = { name: "w", description: "d" }'
+const script = (...lines: ReadonlyArray<string>) => [META, ...lines].join("\n")
+/** An `agent()` call whose options carry the given agentType source text. */
+const start = (agentType: string) =>
+  `await agent("p", { agentType: ${agentType}, model: "sonnet", effort: "high" })`
+const GOOD = start('"holyagent:worker-implementation"')
+const INLINE_REASON = "Inline workflow script whose every agent() call is a holyagent specialist."
+/** A writer stage and a review stage over the entries, as the root writes them. */
+const ALLOWED_SCRIPT = script(
+  "const results = await pipeline(",
+  "  args.entries,",
+  '  (entry) => agent(`Do ${entry.id}: ${entry.prompt}`, { agentType: "holyagent:worker-implementation", model: entry.model, effort: entry.effort, label: entry.id }),',
+  "  (report, entry) => agent('Review ' + entry.id + ': ' + report, { label: entry.agent, agentType: 'holyagent:reviewer-code', }).then((review) => ({ id: entry.id, report, review })),",
+  ")",
+  "return Object.fromEntries(results.map((result) => [result.id, result]))",
+)
+/** A script that also uses phase(), log(), parallel(), budget, destructuring and built-ins. */
+const FULL_SCRIPT = script(
+  "phase('Write')",
+  "const [first, ...others] = args.entries",
+  "const { id: firstId, prompt } = first",
+  "log(`writing ${firstId} of ${args.entries.length}, budget ${budget.remaining()} of ${budget.total}`)",
+  "const written = await parallel(others.map((entry) => () => agent(entry.prompt, { agentType: 'holyagent:worker-implementation', label: entry.id, phase: 'Write' })))",
+  "phase('Review')",
+  "const checked = await pipeline(written, async (report, at) => {",
+  "  const text = String(report ?? '').trim()",
+  "  if (text === '') return null",
+  "  return await agent(text, { agentType: 'holyagent:reviewer-code', model: 'sonnet', effort: 'high' })",
+  "})",
+  "const n = Math.max(1, Number(1.5e3) + parseInt('2', 10))",
+  "return { first: await agent(prompt, { agentType: 'holyagent:worker-implementation' }), checked, n, json: JSON.stringify(others) }",
+)
+/** Characters that JavaScript reads as whitespace or a line end, and that are not ASCII. */
+const LOOKALIKES = [
+  0x00a0, 0x1680, 0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2006, 0x2007, 0x2008, 0x2009,
+  0x200a, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000, 0xfeff,
+]
+const inlineRun = (script: unknown, extra: Record<string, unknown> = {}) => ({
+  tool_name: "Workflow",
+  tool_input: { script, args: { entries: [] }, ...extra },
+})
+
 describe("hook workflow", () => {
-  const workflow = (input: Record<string, unknown>) => ({
-    tool_name: "Workflow",
-    tool_input: input,
-  })
-
-  test.each(["run-assignments", "review-diff", "implement-review"])(
-    "allows the prebuilt holyagent:%s by name",
-    async (name) => {
-      expect(
-        await hook("workflow", workflow({ name: `holyagent:${name}`, args: { pairs: [] } })),
-      ).toEqual({
-        stdout: preToolUse("allow", `Prebuilt workflow holyagent:${name} of the holyagent plugin.`),
-        stderr: "",
-        code: 0,
-      })
-    },
-  )
-
   const NOTHING = { stdout: "", stderr: "", code: 0 }
-  test.each<readonly [string, Record<string, unknown>]>([
-    ["another plugin's workflow", { name: "other:run-assignments" }],
-    ["an unknown holyagent workflow", { name: "holyagent:validate-criteria" }],
-    ["the bare name", { name: "run-assignments" }],
-    ["a name with a suffix", { name: "holyagent:run-assignments-x" }],
-    ["an inline script", { script: "export const meta = {}" }],
-    ["our name with an inline script", { name: "holyagent:review-diff", script: "return 1" }],
-    ["our name with a script path", { name: "holyagent:review-diff", scriptPath: "/tmp/x.js" }],
-    ["our name with a resume", { name: "holyagent:review-diff", resumeFromRunId: "run-1" }],
-    ["a run id alone", { runId: "run-1" }],
-    ["no name", { args: [] }],
-    ["a name that is not text", { name: ["holyagent:review-diff"] }],
-  ])("says nothing for %s", async (_label, input) => {
-    expect(await hook("workflow", workflow(input))).toEqual(NOTHING)
+  const ALLOW = { stdout: preToolUse("allow", INLINE_REASON), stderr: "", code: 0 }
+
+  test("allows an inline script whose every agent() names a holyagent specialist", async () => {
+    expect(await hook("workflow", inlineRun(ALLOWED_SCRIPT))).toEqual(ALLOW)
   })
 
-  test("says nothing for another tool, and fails closed on an unreadable payload", async () => {
+  test.each(ROUTES.map((route) => route.agent))("allows the specialist %s", async (name) => {
+    expect(await hook("workflow", inlineRun(script(start(`"holyagent:${name}"`))))).toEqual(ALLOW)
+  })
+
+  test.each<readonly [string, string]>([
+    ["single quotes", script(start("'holyagent:reviewer-code'"))],
+    [
+      "a quoted key and a trailing comma",
+      script('await agent("p", { "agentType": "holyagent:reviewer-code", },)'),
+    ],
+    [
+      "a space before the parenthesis",
+      script('await agent ("p", { agentType: "holyagent:explorer-map" })'),
+    ],
+    ["no other option", script('await agent("p", { agentType: "holyagent:explorer-map" })')],
+    [
+      "agent mentioned only in comments and strings",
+      script(
+        "// agent('p', { agentType: 'other' }) and eval(this)",
+        "/* agent('p') */",
+        "const note = \"agent('p'); workflow('x'); eval\"",
+        GOOD,
+      ),
+    ],
+    [
+      "thunks of parallel()",
+      script(
+        `const both = await parallel([() => ${GOOD.slice(6)}, () => ${GOOD.slice(6)}])`,
+        "return both",
+      ),
+    ],
+    ["phase, log, parallel, pipeline, args and built-ins", FULL_SCRIPT],
+    ["an entry shape with an agent key", script("const entry = { id: 1, agent: 'x' }", GOOD)],
+    [
+      "an else branch with an agent call",
+      script("const ok = true", `if (ok) { log('a') } else ${GOOD}`),
+    ],
+    [
+      "names that merely resemble globals",
+      script("const fetchCount = 1", "const agent2 = 2", GOOD),
+    ],
+    ["decimal numbers", script("const n = 1.5e3 + 0.5 + 10", GOOD)],
+    [
+      "an agentType whose escapes spell a specialist",
+      script(start('"holyagent:\\u0077orker-implementation"')),
+    ],
+    [
+      "array literals after operators, keywords and brackets",
+      script(
+        GOOD,
+        "const a = [1, 2]",
+        "const b = [...a, [3]]",
+        "const c = a.map((x) => [x, x])",
+        "return [a, b, c]",
+      ),
+    ],
+    ["division, hexadecimal and separated numbers", script("const n = 4 / 2 + 0x1f + 1_000", GOOD)],
+    [
+      "a numeric index, an optional chain and a method call on the budget",
+      script(
+        GOOD,
+        "const a = [1, 2]",
+        "log(a[0], args?.entries, args.entries.map((x) => x)[0], 'abc'[0])",
+        "if (budget.remaining() < 10) return null",
+      ),
+    ],
+    [
+      "the same name in different scopes, a hoisted function and a closure",
+      script(
+        "const total = size(args)",
+        "function size(value) { const total = JSON.stringify(value).length; return total }",
+        "const run = (n, limit = n) => { let count = 0; for (const x of [1, 2]) { count += x } return count + limit }",
+        "try { log(run(1)) } catch (error) { log(error.message) } finally { log('done') }",
+        "{ const total = 2; log(total) }",
+        GOOD,
+      ),
+    ],
+    [
+      "destructuring of plain keys with defaults and a rest",
+      script(
+        "const { id, prompt = 'p', ...others } = args.entries[0]",
+        "const [first, , third = 3] = [1, 2]",
+        "log(id, prompt, others, first, third)",
+        GOOD,
+      ),
+    ],
+    [
+      "a loop with break and continue, a switch and a ternary",
+      script(
+        "let n = 0",
+        "while (n < 3) { n += 1; if (n === 2) continue; if (n > 5) break }",
+        "switch (n) { case 1: log('one'); break; default: log(n > 1 ? 'many' : 'none') }",
+        "for (let i = 0; i < 2; i++) { n += i }",
+        "for (const key in args) { log(key) }",
+        GOOD,
+      ),
+    ],
+    [
+      "writes into data the script built, an agent result and data read from args",
+      script(
+        "const rows = []",
+        "const state = { count: 0, seen: [] }",
+        "const result = await agent('p', { agentType: 'holyagent:reviewer-code' })",
+        "const entries = args.entries",
+        "const first = entries[0]",
+        "const copy = Object.fromEntries(Object.entries(args))",
+        "let total = { sum: 0 }",
+        "total = { sum: 1 }",
+        "rows.push(1)",
+        "state.count += 1",
+        "state.count++",
+        "state.seen.push(first)",
+        "result.note = 'x'",
+        "first.done = true",
+        "copy.extra = 1",
+        "total.sum = 2",
+        "function bump() { state.count = state.count + 1 }",
+        "bump()",
+      ),
+    ],
+    [
+      "global statics a workflow needs, and the numbers on Math and Number",
+      script(
+        GOOD,
+        "log(Object.keys(args), Object.values(args), Object.entries(args))",
+        "log(Array.isArray(args.entries), Array.from([1]), Array.of(1), JSON.parse(JSON.stringify(args)))",
+        "log(Math.max(1, 2), Math.min(1), Math.floor(1.5), Math.PI, Number.isInteger(1), Number.MAX_SAFE_INTEGER)",
+        "const all = await Promise.all([Promise.resolve(1)])",
+        "log(all, await Promise.allSettled([]), budget.total, budget.spent(), budget.remaining())",
+        "log(String(1), Number('2'), Boolean(0), parseInt('3', 10), parseFloat('4'), isNaN(5), Error('x').message)",
+        "log(undefined, NaN, Infinity, args)",
+      ),
+    ],
+    [
+      "methods called directly with a callback alone, and a second argument to reduce",
+      script(
+        GOOD,
+        "const xs = [3, 1, 2]",
+        "log(xs.map((x) => x * 2), xs.filter((x) => x > 1), xs.reduce((sum, x) => sum + x, 0))",
+        "log(xs.slice().sort((a, b) => a - b), xs.find((x) => x === 1), xs.join(','), xs.includes(1))",
+        "log('a,b'.split(',').map((part) => part.trim().toUpperCase()))",
+      ),
+    ],
+    [
+      "non-ASCII text in a string, a comment and a template",
+      script(
+        `// caf${String.fromCharCode(0xe9)}`,
+        `const word = "caf${String.fromCharCode(0xe9)}"`,
+        `const text = \`caf${String.fromCharCode(0xe9)} \${word}\``,
+        GOOD,
+      ),
+    ],
+  ])("allows %s", async (_label, text) => {
+    expect(await hook("workflow", inlineRun(text))).toEqual(ALLOW)
+  })
+
+  test.each<readonly [string, string]>([
+    ["another plugin's specialist", start('"other:worker-implementation"')],
+    ["a built-in agent", start('"general-purpose"')],
+    ["an unknown holyagent agent", start('"holyagent:nobody"')],
+    ["the root agent", start('"holyagent:holyagent"')],
+    ["a bare specialist name", start('"worker-implementation"')],
+    ["a name with trailing text", start('"holyagent:worker-implementation "')],
+    ["another case", start('"HolyAgent:worker-implementation"')],
+  ])("says nothing for %s", async (_label, bad) => {
+    expect(await hook("workflow", inlineRun(script(bad)))).toEqual(NOTHING)
+    expect(await hook("workflow", inlineRun(script(GOOD, bad)))).toEqual(NOTHING)
+  })
+
+  test.each<readonly [string, string]>([
+    ["no agentType", 'await agent("p", { model: "sonnet" })'],
+    ["no options", 'await agent("p")'],
+    ["empty options", 'await agent("p", {})'],
+    ["options in a variable", 'await agent("p", options)'],
+    ["a spread alone", 'await agent("p", { ...options })'],
+    [
+      "a spread after the agentType",
+      'await agent("p", { agentType: "holyagent:reviewer-code", ...options })',
+    ],
+    [
+      "a spread before the agentType",
+      'await agent("p", { ...options, agentType: "holyagent:reviewer-code" })',
+    ],
+    ["spread arguments", "await agent(...parts)"],
+    ["a third argument", 'await agent("p", { agentType: "holyagent:reviewer-code" }, extra)'],
+    ["a variable agentType", start("kind")],
+    ["a shorthand agentType", 'await agent("p", { agentType })'],
+    ["a concatenated agentType", start('"holyagent:" + name')],
+    ["a template agentType", start("`holyagent:reviewer-code`")],
+    ["a member agentType", start("entry.agent")],
+    ["a conditional agentType", start('flag ? "holyagent:reviewer-code" : "other"')],
+    [
+      "a computed key",
+      'await agent("p", { ["agent" + "Type"]: "other", agentType: "holyagent:reviewer-code" })',
+    ],
+    [
+      "a repeated agentType",
+      'await agent("p", { agentType: "holyagent:reviewer-code", agentType: "other" })',
+    ],
+    [
+      "an escaped key",
+      'await agent("p", { agentType: "holyagent:reviewer-code", "agent\\u0054ype": "other" })',
+    ],
+    [
+      "a getter",
+      'await agent("p", { agentType: "holyagent:reviewer-code", get model() { return 1 } })',
+    ],
+    ["an alias", 'const run = agent\nawait run("p", { agentType: "other" })'],
+    ["a call through .call", 'await agent.call(null, "p", { agentType: "other" })'],
+    ["an optional call", 'await agent?.("p", { agentType: "other" })'],
+    ["agent as a stage", "await pipeline(args.entries, agent)"],
+    ["a parameter named agent", '(agent) => agent("p", { agentType: "holyagent:reviewer-code" })'],
+    ["a global lookup", 'await globalThis.agent("p", { agentType: "other" })'],
+    ["eval", "eval(\"agent('p', { agentType: 'other' })\")"],
+    ["the Function constructor", 'new Function("return 1")()'],
+    ["this", "this.agent('p', { agentType: 'other' })"],
+    ["the arguments object", 'arguments[0]("p", { agentType: "other" })'],
+    ["a dynamic import", 'await import("x")'],
+    ["a nested workflow", 'await workflow("holyagent:x", {})'],
+  ])("says nothing for %s", async (_label, bad) => {
+    expect(await hook("workflow", inlineRun(script(GOOD, bad)))).toEqual(NOTHING)
+  })
+
+  // Each reaches the Function constructor, another scope or another agent type without writing
+  // `agent(` with a literal specialist, so it must be refused beside a legitimate call.
+  test.each<readonly [string, string]>([
+    [
+      "a quoted constructor subscript",
+      `[].at['constructor']('return agent("p",{agentType:"general-purpose"})')()`,
+    ],
+    ["a template constructor subscript", "[].at[`constructor`]('return 1')()"],
+    [
+      "a concatenated constructor subscript",
+      '({})["const" + "ructor"]["const" + "ructor"]("return agent")()',
+    ],
+    ["an escaped constructor subscript", '({})["\\x63onstructor"]("return 1")()'],
+    ["a dotted constructor", '[].at.constructor("return 1")()'],
+    ["the constructor of an arrow function", '(() => 1).constructor("return 1")()'],
+    ["a destructured constructor", "const { constructor } = () => 1"],
+    ["a number followed by member access", '5..constructor.constructor("return agent")()'],
+    ["a number with a single dot member", "5.constructor"],
+    ["a number with a suffix", "const n = 10n"],
+    ["an index by a variable", "const a = [1, 2]\nconst i = 0\nlog(a[i])"],
+    ["an optional subscript", "log(args?.['entries'])"],
+    ["Bun", "await Bun.$`echo hi`"],
+    ["fetch", "await fetch('http://x')"],
+    ["a timer", "setTimeout(() => 1, 1)"],
+    ["Date", "log(Date.now())"],
+    ["Symbol", "log(Symbol('x'))"],
+    ["an undeclared name", "log(undeclaredName)"],
+    ["a default parameter value that names fetch", "const f = (a = fetch) => a\nf()"],
+    ["a reflective call", "Object.getPrototypeOf(async () => 1)"],
+    ["a prototype link", "log(args.__proto__)"],
+    ["Reflect", "Reflect.ownKeys(args)"],
+    [
+      "an agent() option that is not allowed (permissionMode)",
+      `await agent("p", { agentType: "holyagent:reviewer-code", permissionMode: "bypassPermissions" })`,
+    ],
+    [
+      "an agent() option that is not allowed (isolation)",
+      `await agent("p", { agentType: "holyagent:reviewer-code", isolation: "worktree" })`,
+    ],
+    [
+      "a quoted __proto__ key in agent() options",
+      `await agent("p", { agentType: "holyagent:reviewer-code", "__proto__": { agentType: "general-purpose" } })`,
+    ],
+    [
+      "an unquoted __proto__ key in agent() options",
+      `await agent("p", { agentType: "holyagent:reviewer-code", __proto__: { agentType: "general-purpose" } })`,
+    ],
+  ])("says nothing for %s", async (_label, bad) => {
+    expect(await hook("workflow", inlineRun(script(GOOD, bad)))).toEqual(NOTHING)
+  })
+
+  // The bypasses of the hand-written lexer, each of which reached Function or a host global with a
+  // legitimate agent() call beside it.
+  test.each<readonly [string, string]>([
+    [
+      "a quoted constructor key in a pattern",
+      'const { "constructor": F } = Array\nF("return agent")()',
+    ],
+    [
+      "a computed constructor key in a pattern",
+      'const { ["constructor"]: F } = Math.max\nF("return process")()',
+    ],
+    [
+      "a concatenated key in a pattern",
+      'const { ["con" + "structor"]: F } = Math.max\nF("return 1")()',
+    ],
+    ["a plain constructor key in a pattern", "const { constructor: F } = Array\nF('return 1')()"],
+    [
+      "a shorthand constructor in a pattern",
+      "const { constructor } = Array\nconstructor('return 1')()",
+    ],
+    ["Array.of with a quoted constructor subscript", 'Array.of["constructor"]("return process")()'],
+    [
+      "a keyword-like name before a subscript",
+      'const of = Array\nconst F = of["constructor"]\nF("return 1")()',
+    ],
+    ["a parameter named fetch", "const f = (fetch) => 1\nawait fetch('http://x')"],
+    ["a parameter named Bun", "const f = (Bun) => 1\nawait Bun.$`echo hi`"],
+    ["a parameter named setTimeout", "const f = (setTimeout) => 1\nsetTimeout(() => 1, 1)"],
+    ["a block constant named fetch", "{ const fetch = 1 }\nawait fetch('http://x')"],
+    ["a catch binding named Bun", "try { log(1) } catch (Bun) { log(Bun) }\nBun.spawn(['ls'])"],
+    ["a function named process", "function process() { return 1 }\nprocess.exit(1)"],
+  ])("says nothing for %s", async (_label, bad) => {
+    expect(await hook("workflow", inlineRun(script(GOOD, bad)))).toEqual(NOTHING)
+  })
+
+  // Real scoping: a name is allowed only when the script declared it in an enclosing scope or it is
+  // one of the few free globals, and a script may not declare a name of the host.
+  test.each<readonly [string, string]>([
+    ["a use of a name declared in a sibling scope", "{ const hidden = 1 }\nlog(hidden)"],
+    ["a use of a name declared in a function", "function f() { const inner = 1 }\nlog(inner)"],
+    [
+      "a use outside the loop that declares it",
+      "for (const item of args.entries) { log(item) }\nlog(item)",
+    ],
+    ["a declared Math", "const Math = { max: () => 1 }"],
+    ["a declared JSON parameter", "const f = (JSON) => JSON"],
+    ["a declared args", "let args = 1"],
+    ["a declared agent", "function agent() { return 1 }"],
+    ["a declared undefined", "const undefined = 1"],
+    ["a declared Date", "const Date = 1"],
+    ["a declared constructor", "const constructor = 1"],
+    ["a declared name in a destructuring pattern", "const { fetch } = args"],
+    ["an assignment to a global", "budget = 1"],
+    ["an assignment into a global", "Math.max = () => 1"],
+    ["an update of a global", "args.count++"],
+    ["an assignment to a name that is not declared", "total = 1"],
+    ["a name that is only a global of the host", "log(process.env)"],
+    ["arguments", "function f() { return arguments }"],
+  ])("says nothing for %s", async (_label, bad) => {
+    expect(await hook("workflow", inlineRun(script(GOOD, bad)))).toEqual(NOTHING)
+  })
+
+  // A built-in may not be changed, frozen, aliased or handed on, whichever way the script reaches
+  // it, since the runtime may call it later with options of its own.
+  test.each<readonly [string, string]>([
+    ["Object.assign onto Math", "Object.assign(Math, { max: (a) => a })"],
+    ["Object.freeze on JSON", "Object.freeze(JSON)"],
+    ["an alias of Math written to", "const o = Math\no.max = () => 1"],
+    ["an alias of Object written to", "const O = Object\nO.assign = (t, s) => s"],
+    ["Object.assign onto Object", "Object.assign(Object, { assign: (t, s) => s })"],
+    ["Object.assign onto JSON", "Object.assign(JSON, { stringify: () => '' })"],
+    ["a static read as a value", "const f = Object.groupBy\nf([1], (x) => x)"],
+    ["Object.groupBy called", "log(Object.groupBy([1], (x) => x))"],
+    ["a static taken by destructuring", "const { assign } = Object\nassign(Math, {})"],
+    ["a global destructured as a source", "const { max } = Math\nlog(max(1))"],
+    [
+      "a prepareStackTrace key built from entries",
+      "Object.assign(Error, Object.fromEntries([['prepareStackTrace', (e, sites) => sites]]))",
+    ],
+    ["Object.assign onto the budget", "Object.assign(budget, { total: 1 })"],
+    ["a chain of unknown calls on the budget", "budget.x.y.z()"],
+    ["a budget method outside the documented reads", "budget.raise(10)"],
+    ["the budget as a value", "const b = budget\nlog(b.total)"],
+    ["the budget written to", "budget.total = 0"],
+    ["Object.defineProperty", "Object.defineProperty(Math, 'max', { value: 1 })"],
+    ["Object.seal", "Object.seal(args)"],
+    ["Object.setPrototypeOf", "Object.setPrototypeOf(args, null)"],
+    ["Object.create", "log(Object.create(null))"],
+    ["Math as a value", "log(Math)"],
+    ["Math as an argument", "log([Math])"],
+    ["Math as an element", "const xs = [Math]"],
+    ["Math as an object value", "const o = { math: Math }"],
+    ["Math returned", "const f = () => Math\nf()"],
+    ["Math in a spread", "log({ ...Math })"],
+    ["Math as an operand", "log(Math + 1)"],
+    ["JSON as a value", "const j = JSON\nlog(j.stringify(1))"],
+    ["Array as a value", "const A = Array\nlog(A.of(1))"],
+    ["Promise as a value", "const P = Promise\nlog(P.resolve(1))"],
+    ["a static function read as a value", "const stringify = JSON.stringify\nlog(stringify(1))"],
+    ["a static function passed on", "log(['1'].map(JSON.parse))"],
+    ["a function global as a value", "const l = log\nl(1)"],
+    ["a function global passed on", "Promise.resolve(1).then(log)"],
+    ["a field of a global that is not a number", "log(String.raw)"],
+    ["a global called that is not a function", "log(Math())"],
+    ["Object called", "log(Object(args))"],
+    ["a method read and called later", "const m = args.entries.map\nlog(m)"],
+    ["a method read of a built value", "const xs = [1]\nconst push = xs.push\npush(2)"],
+    ["a method passed as a callback", "const xs = [1]\nlog([2].map(xs.push))"],
+    ["a method with a this argument", "const xs = [1]\nlog([2].map((x) => x, xs))"],
+    ["forEach with a this argument", "const xs = [1]\n[2].forEach((x) => x, xs)"],
+    ["Array.from with a this argument", "log(Array.from([1], (x) => x, args))"],
+    ["a spread into a callback method", "log([1].map(...[(x) => x]))"],
+    ["a write into args", "args.entries = []"],
+    ["a write into a parameter", "const f = (row) => { row.done = true }\nf(args)"],
+    ["a write into a loop variable", "for (const row of args.entries) { row.done = true }"],
+    ["a write into a function", "function f() {}\nf.x = 1"],
+    [
+      "a write into a call result of a user function",
+      "const make = () => ({})\nconst o = make()\no.x = 1",
+    ],
+    [
+      "a write into a name set to a parameter",
+      "let o = {}\nconst f = (p) => { o = p }\nf(args)\no.x = 1",
+    ],
+    ["a write into a name set to a built-in", "let o = {}\no = Math\no.max = 1"],
+    ["a write into the result of a call", "args.entries.slice().x = 1"],
+    ["a write into the catch binding", "try { log(1) } catch (e) { e.stack = 'x' }"],
+  ])("says nothing for %s", async (_label, bad) => {
+    expect(await hook("workflow", inlineRun(script(GOOD, bad)))).toEqual(NOTHING)
+  })
+
+  // Only a closed set of syntax is read; any other construct asks.
+  test.each<readonly [string, string]>([
+    ["a regular expression", "const r = /a+/g\nlog(r)"],
+    ["a tagged template", "log`x`"],
+    ["new", "const m = new Map()"],
+    ["this", "log(this)"],
+    ["a class", "class A {}"],
+    ["a class expression", "const A = class {}"],
+    ["a getter", "const o = { get a() { return 1 } }"],
+    ["a setter", "const o = { set a(v) {} }"],
+    ["a method", "const o = { a() { return 1 } }"],
+    ["a generator", "function* g() { yield 1 }"],
+    ["an async generator", "async function* g() { yield 1 }"],
+    ["a label", "outer: for (const x of args.entries) { break outer }"],
+    ["a sequence", "log((1, 2))"],
+    ["a sequence naming agent", "const f = (0, agent)"],
+    ["a sequence calling agent", '(0, agent)("p", { agentType: "general-purpose" })'],
+    ["a reassigned agent", "agent = (prompt, options) => 1"],
+    [
+      "a call with the wrong shape after a good one",
+      'agent("p", { agentType: "holyagent:reviewer-code" }, 1)',
+    ],
+    ["delete", "delete args.entries"],
+    ["a computed key in an object", 'const o = { ["a"]: 1 }'],
+    ["a computed key from a variable", "const k = 'a'\nconst o = { [k]: 1 }"],
+    ["a computed member by a string", "log(args['entries'])"],
+    ["a computed member by a template", "log(args[`entries`])"],
+    ["a computed member by a negative number", "log(args.entries[-1])"],
+    ["a private name test", "class A { #p = 1; static has(o) { return #p in o } }"],
+    ["a dynamic import", "const m = await import('x')"],
+    ["a static import", "import fs from 'fs'"],
+    ["import.meta", "log(import.meta)"],
+    ["new.target", "function f() { return new.target }"],
+    ["super", "const o = { f() { return super.x } }"],
+    ["with", "with (args) { log(entries) }"],
+    ["debugger", "debugger"],
+    ["yield", "log(yield)"],
+    ["a default export", "export default 1"],
+    ["an export of a function", "export function f() {}"],
+    ["a second export", "export const other = 1"],
+    ["an export list", "export { GOOD }"],
+    ["a bigint", "log(10n)"],
+    ["a call of a call result", "log(args.entries.map((x) => x).at(0)())"],
+    ["a call of a method that is not a data method", "args.entries.run()"],
+    ["a call through call", "log.call(null, 1)"],
+    ["a call through apply", "log.apply(null, [1])"],
+    ["a call through bind", "log.bind(null)()"],
+    ["an optional call", "log?.(1)"],
+    ["a getter name as a property", "log(args.__lookupGetter__)"],
+    ["a prototype property", "log(Array.prototype)"],
+    ["Object.getOwnPropertyNames", "log(Object.getOwnPropertyNames(args))"],
+  ])("says nothing for %s", async (_label, bad) => {
+    expect(await hook("workflow", inlineRun(script(GOOD, bad)))).toEqual(NOTHING)
+  })
+
+  test.each<readonly [string, string]>([
+    ["no meta literal: a call in it", "export const meta = { name: String(1), description: 'd' }"],
+    [
+      "a meta that uses a variable",
+      "const label = 'x'\nexport const meta = { name: label, description: 'd' }",
+    ],
+    ["a meta with a spread", "export const meta = { ...args }"],
+    ["a meta with a template", "export const meta = { name: `a`, description: 'd' }"],
+    ["a meta with a computed key", "export const meta = { ['name']: 'w' }"],
+    ["a meta that is not an object", "export const meta = 1"],
+    ["a meta that is let", "export let meta = {}"],
+    ["another export name", "export const other = {}"],
+  ])("says nothing for a bad meta: %s", async (_label, text) => {
+    expect(await hook("workflow", inlineRun(`${text}\n${GOOD}`))).toEqual(NOTHING)
+  })
+
+  test("allows a meta of literals only, with phases", async () => {
+    const meta =
+      'export const meta = { name: "w", description: "d", phases: [{ title: "Write", model: "sonnet" }], whenToUse: "x" }'
+    expect(await hook("workflow", inlineRun(`${meta}\n${GOOD}`))).toEqual(ALLOW)
+    expect(await hook("workflow", inlineRun(GOOD))).toEqual(ALLOW)
+  })
+
+  test.each(LOOKALIKES)("says nothing for a call hidden behind the character %d", async (code) => {
+    const lookalike = String.fromCharCode(code)
+    const hidden = `agent${lookalike}("do anything", { agentType: "general-purpose" })`
+    for (const text of [
+      script(GOOD, `await ${hidden}`),
+      script(GOOD, `await${lookalike}agent("do anything", { agentType: "general-purpose" })`),
+      script(GOOD, `return${lookalike}${hidden}`),
+    ])
+      expect(await hook("workflow", inlineRun(text))).toEqual(NOTHING)
+  })
+
+  test("says nothing, and does not fail, for scripts that nest too deep", async () => {
+    const open = "`$" + "{"
+    const close = "}`"
+    for (const depth of [40, 20000])
+      expect(
+        await hook(
+          "workflow",
+          inlineRun(script(GOOD, `${open.repeat(depth)}x${close.repeat(depth)}`)),
+        ),
+      ).toEqual(NOTHING)
+    const arrows = await hook(
+      "workflow",
+      inlineRun(script(GOOD, `${"(".repeat(20000)}x${")=>".repeat(20000)}`)),
+    )
+    expect(arrows).toEqual(NOTHING)
+    const parens = await hook(
+      "workflow",
+      inlineRun(script(GOOD, `${"(".repeat(100000)}${")".repeat(100000)}`)),
+    )
+    expect(parens.code).toBe(0)
+    expect(parens.stderr).toBe("")
+  })
+
+  test.each<readonly [string, string]>([
+    ["an unterminated string", `${GOOD}\nconst x = "abc`],
+    ["an unterminated template", `${GOOD}\nconst x = \`abc`],
+    ["an unterminated block comment", `${GOOD}\n/* abc`],
+    ["unbalanced braces", `${GOOD}\n}`],
+    ["unbalanced parentheses", `${GOOD}\nfoo(`],
+    [
+      "a regular expression that hides a quote",
+      `${GOOD}\nconst r = /"/\n${start('"other:x"')}\n// "`,
+    ],
+    ["an escaped identifier", `${GOOD}\nag\\u0065nt("p", { agentType: "other" })`],
+    [
+      "a line separator that ends a comment",
+      `${GOOD}\n// note${String.fromCharCode(0x2028)}${start('"other:x"')}`,
+    ],
+    ["an HTML-style comment", `${GOOD}\n<!-- ${start('"other:x"')}`],
+    ["a stray character", `${GOOD}\n#!`],
+  ])("says nothing for unreadable code: %s", async (_label, text) => {
+    expect(await hook("workflow", inlineRun(script(text)))).toEqual(NOTHING)
+  })
+
+  test.each<readonly [string, unknown]>([
+    ["an empty script", ""],
+    ["a script without an agent() call", script("return 1")],
+    ["a script that only mentions agent in a comment", script(`// ${GOOD}`)],
+    ["a script that is not text", 7],
+    ["a script that is a list", [GOOD]],
+  ])("says nothing for %s", async (_label, text) => {
+    expect(await hook("workflow", inlineRun(text))).toEqual(NOTHING)
+  })
+
+  test.each<readonly [string, Record<string, unknown>]>([
+    ["a script path beside the script", { script: ALLOWED_SCRIPT, scriptPath: "/tmp/x.js" }],
+    ["a script path alone", { scriptPath: "/tmp/x.js" }],
+    ["a null script path", { script: ALLOWED_SCRIPT, scriptPath: null }],
+    ["a name beside the script", { script: ALLOWED_SCRIPT, name: "holyagent:run-assignments" }],
+    ["a name alone", { name: "holyagent:run-assignments" }],
+    ["a resume beside the script", { script: ALLOWED_SCRIPT, resumeFromRunId: "wf_1" }],
+    ["a resume with a script path", { scriptPath: "/tmp/x.js", resumeFromRunId: "wf_1" }],
+    ["an unknown input", { script: ALLOWED_SCRIPT, description: "x" }],
+    ["no input", {}],
+    ["arguments alone", { args: { entries: [] } }],
+  ])("says nothing for %s", async (_label, input) => {
+    expect(await hook("workflow", { tool_name: "Workflow", tool_input: input })).toEqual(NOTHING)
+  })
+
+  test("says nothing for another tool or no input, and fails closed on an unreadable payload", async () => {
     expect(
-      await hook("workflow", { tool_name: "Bash", tool_input: { name: "holyagent:review-diff" } }),
+      await hook("workflow", { tool_name: "Bash", tool_input: { script: ALLOWED_SCRIPT } }),
     ).toEqual(NOTHING)
-    expect((await hook("workflow", "{")).code).toBe(1)
+    expect(await hook("workflow", { tool_name: "Workflow" })).toEqual(NOTHING)
+    for (const payload of ["{", "not json", "[]"]) {
+      const result = await hook("workflow", payload)
+      expect(result.code).toBe(1)
+      expect(result.stdout).toBe("")
+    }
   })
 })
 
@@ -645,73 +1228,6 @@ describe("hook agent-launch", () => {
   })
 })
 
-describe("hook workflow, trust", () => {
-  const run = (args: unknown) => ({
-    tool_name: "Workflow",
-    tool_input: { name: "holyagent:run-assignments", args },
-  })
-  const entry = (agent: string) => ({ id: "assignment-a", agent, model: "sonnet", prompt: "p" })
-  const NOTHING = { stdout: "", stderr: "", code: 0 }
-
-  test("allows arguments whose agents are all holyagent specialists, namespaced or bare", async () => {
-    const args = {
-      assignments: [entry("holyagent:worker-implementation"), entry("reviewer-code")],
-      pairs: [{ writer: entry("worker-visual"), reviewer: entry("holyagent:reviewer-visual") }],
-    }
-    expect((await hook("workflow", run(args))).stdout).toContain('"permissionDecision":"allow"')
-  })
-
-  test.each<readonly [string, unknown]>([
-    ["another plugin's agent", { assignments: [entry("other:worker-implementation")] }],
-    ["a built-in agent", { assignments: [entry("general-purpose")] }],
-    [
-      "a nested foreign agent",
-      { pairs: [{ writer: entry("worker-visual"), reviewer: entry("x:y") }] },
-    ],
-    ["an agent that is not text", { assignments: [{ agent: 7 }] }],
-    ["an unknown holyagent agent", { assignments: [entry("holyagent:nobody")] }],
-  ])("says nothing for %s", async (_label, args) => {
-    expect(await hook("workflow", run(args))).toEqual(NOTHING)
-  })
-
-  test("says nothing when a project or user workflow file could take over the name", async () => {
-    const shadow = await mkdtemp(join(tmpdir(), "holyagent-hook-shadow-"))
-    const nested = join(shadow, "app", "src")
-    try {
-      await mkdir(nested, { recursive: true })
-      const args = { assignments: [entry("worker-visual")] }
-      expect((await hook("workflow", run(args), nested)).stdout).toContain("allow")
-      const folder = join(shadow, ".claude", "workflows")
-      await mkdir(folder, { recursive: true })
-      await writeFile(join(folder, "other.js"), "export const meta = {}\n")
-      expect((await hook("workflow", run(args), nested)).stdout).toContain("allow")
-      await writeFile(join(folder, "HolyAgent-run.js"), "export const meta = {}\n")
-      expect(await hook("workflow", run(args), nested)).toEqual(NOTHING)
-      await rm(join(folder, "HolyAgent-run.js"))
-      // The name comes from the meta, so a file with another name can still take ours over.
-      await writeFile(
-        join(folder, "tidy.js"),
-        'export const meta = {\n  name: "run-assignments",\n  description: "x", // holyagent\n}\nreturn 1\n',
-      )
-      expect(await hook("workflow", run(args), nested)).toEqual(NOTHING)
-      await rm(join(folder, "tidy.js"))
-      await writeFile(
-        join(folder, "tidy.js"),
-        'export const meta = {\n  name: "tidy",\n  description: "x",\n}\n// holyagent is only mentioned after the meta\nreturn 1\n',
-      )
-      expect((await hook("workflow", run(args), nested)).stdout).toContain("allow")
-      await rm(join(folder, "tidy.js"))
-      const userFolder = join(home, ".claude", "workflows")
-      await mkdir(userFolder, { recursive: true })
-      await writeFile(join(userFolder, "holyagent:run-assignments.js"), "x")
-      expect(await hook("workflow", run(args), nested)).toEqual(NOTHING)
-      await rm(userFolder, { recursive: true, force: true })
-    } finally {
-      await rm(shadow, { recursive: true, force: true })
-    }
-  })
-})
-
 describe("hooks that need no state", () => {
   test("do not run git, so a failing git cannot stop vcs-redirect or workflow", async () => {
     const bin = await mkdtemp(join(tmpdir(), "holyagent-hook-badgit-"))
@@ -728,16 +1244,11 @@ describe("hooks that need no state", () => {
         stdout: preToolUse("deny", PUSH),
         code: 0,
       })
-      expect(
-        (
-          await hook(
-            "workflow",
-            { tool_name: "Workflow", tool_input: { name: "holyagent:review-diff" } },
-            project,
-            env,
-          )
-        ).code,
-      ).toBe(0)
+      expect(await hook("workflow", inlineRun(ALLOWED_SCRIPT), project, env)).toEqual({
+        stdout: preToolUse("allow", INLINE_REASON),
+        stderr: "",
+        code: 0,
+      })
       // A hook that reads the state still reports the failure, visibly and never as exit 2.
       const stated = join(project, "stated")
       await mkdir(join(stated, ".holyagent"), { recursive: true })
@@ -814,18 +1325,9 @@ describe("the built wrapper", () => {
       stdout: preToolUse("deny", PUSH),
       stderr: "",
     })
-    expect(
-      await call(
-        "workflow",
-        { tool_name: "Workflow", tool_input: { name: "holyagent:review-diff" } },
-        env,
-      ),
-    ).toMatchObject({
+    expect(await call("workflow", inlineRun(ALLOWED_SCRIPT), env)).toMatchObject({
       code: 0,
-      stdout: preToolUse(
-        "allow",
-        "Prebuilt workflow holyagent:review-diff of the holyagent plugin.",
-      ),
+      stdout: preToolUse("allow", INLINE_REASON),
     })
     expect(await call("session-start", { agent_type: "holyagent" }, env)).toEqual({
       code: 0,

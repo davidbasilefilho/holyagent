@@ -570,15 +570,19 @@ describe("command line", () => {
     expect(await help("intent", "update")).toContain("--material")
     const plan = await help("plan")
     for (const part of [
-      "holyagent:run-assignments",
-      "holyagent:review-diff",
-      "holyagent:implement-review",
+      "write the inline script yourself",
+      "{id, agent, model, effort, prompt}",
+      "one agent() per entry",
+      "agentType holyagent:<agent>",
+      "runs without a permission prompt",
       "fallback",
       "Workflow tool is disabled or unavailable",
       "workflow:<run-id>/<id>",
-      "agentType holyagent:<agent>",
+      "verbatim",
     ])
       expect(plan).toContain(part)
+    for (const gone of ["holyagent:run-assignments", "holyagent:review-diff", "prebuilt"])
+      expect(plan).not.toContain(gone)
     expect(await help()).toContain("hint:")
   })
 
@@ -612,26 +616,26 @@ describe("plan", () => {
 
   test("two independent Ready reviews run as a workflow when workflows are available", async () => {
     const ids = await readyPair()
-    expect(data(await cli(["plan"]))).toMatchObject({
+    const plan = data(await cli(["plan"]))
+    expect(plan).toMatchObject({
       action: "workflow",
-      workflow: "holyagent:review-diff",
       assignments: ids,
       fallback: { action: "subagent", assignments: ids, parallel: true },
     })
+    // The root writes the script itself, so the plan names no prebuilt workflow.
+    expect(plan).not.toHaveProperty("workflow")
   })
 
   test("the workflow comes first and its subagent fallback says when to use it", async () => {
     await readyPair()
     const plan = data(await cli(["plan"]))
-    expect(Object.keys(plan).indexOf("workflow")).toBeLessThan(
-      Object.keys(plan).indexOf("fallback"),
-    )
+    expect(Object.keys(plan).indexOf("action")).toBeLessThan(Object.keys(plan).indexOf("fallback"))
     expect(plan.fallback).toMatchObject({
       when: "only if the Workflow tool is disabled or unavailable",
     })
   })
 
-  test("a writer and the review that names it in independentFrom run as implement-review", async () => {
+  test("a writer and the review that names it in independentFrom are planned as writer then review", async () => {
     await createIntent()
     const w = String(data(await cli(["assignment", "create"], writer())).id)
     const r = String(
@@ -640,7 +644,6 @@ describe("plan", () => {
     )
     expect(data(await cli(["plan"]))).toMatchObject({
       action: "workflow",
-      workflow: "holyagent:implement-review",
       assignments: [w, r],
       fallback: { action: "subagent", assignments: [w], afterwards: [r] },
     })
@@ -667,7 +670,6 @@ describe("plan", () => {
     const id = String(data(await cli(["assignment", "create"], writer())).id)
     expect(data(await cli(["plan"]))).toMatchObject({
       action: "workflow",
-      workflow: "holyagent:run-assignments",
       assignments: [id],
       fallback: { action: "subagent", assignments: [id] },
     })
@@ -692,7 +694,6 @@ describe("plan", () => {
     const plan = data(await cli(["plan"]))
     expect(plan).toMatchObject({
       action: "workflow",
-      workflow: "holyagent:run-assignments",
       assignments: [other],
       continues: [{ assignment: follow, agent: "agent-1" }],
     })

@@ -8,7 +8,7 @@ import {
   readSource,
 } from "./files.ts"
 
-/** The plugin's name, which namespaces its agents, skills and workflows. */
+/** The plugin's name, which namespaces its agents and skills. */
 export const PLUGIN_NAME = "holyagent"
 
 const ROOT_DESCRIPTION =
@@ -127,6 +127,8 @@ export const REQUIREMENT_SECTIONS: Readonly<
   "R-DELEGATE": { section: "root/delegating.md", phrase: "go to specialists" },
   "R-ROUTE": { section: "root/routing.md", phrase: "cheapest specialist" },
   "R-DISPATCH": { section: "root/dispatch.md", phrase: "`assignment dispatch`" },
+  "R-WORKFLOW": { section: "root/workflows.md", phrase: "no prebuilt script exists" },
+  "R-REPORT": { section: "root/dispatch.md", phrase: "never retyped or summarized" },
   "R-WAKE": { section: "root/dispatch.md", phrase: "Completion notices are the only wake-ups" },
   "R-RESUME": { section: "root/dispatch.md", phrase: "confirmed gone" },
   "R-CRITERIA": { section: "root/assignments.md", phrase: "constraints go in verbatim" },

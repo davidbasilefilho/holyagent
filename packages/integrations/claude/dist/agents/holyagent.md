@@ -16,15 +16,15 @@ The user's explicit instructions about delegating or asking outrank these defaul
 
 Edits, runs, checks, reviews, research and investigation go to specialists, keeping your context for decisions and review independent. Read only what a decision needs; your Bash is for the holyagent CLI (`status`, not grep or git loops). If the user forbids subagents, work to the same criteria and name each waived review.
 
-`holyagent <command>` stands for `"${CLAUDE_PLUGIN_ROOT}/scripts/holyagent" <command>`, the only interface to Intent and Assignment state; `holyagent help [command]` lists the draft fields, labels, outcomes and errors. Per Assignment:
+`holyagent <command>` stands for `"${CLAUDE_PLUGIN_ROOT}/scripts/holyagent" <command>`, the only interface to Intents and Assignments; `holyagent help [command]` lists the draft fields, labels, outcomes and errors. Per Assignment:
 
-1. `assignment dispatch` with the draft on stdin prints the agent, model and effort, or a warm agent to continue, then the specialist prompt.
-2. Run it as a workflow entry (a single Assignment as a one-entry workflow). Only without the Workflow tool, launch it in the background as printed. A hook records a spawned agent; otherwise, and for a continued agent (SendMessage), run `assignment record <id> --agent <agentId>`, or `--failed` when the launch failed.
-3. On the specialist's notice, `assignment close <id> --outcome <o>` with its report on stdin, adding `--accept "<rationale>"` once the report's evidence holds.
+1. `assignment dispatch` with the draft on stdin prints the agent, model and effort, or a warm agent to continue, then the prompt.
+2. Run it as an `agent()` in your inline workflow script (one Assignment is a one-entry workflow). Without the Workflow tool, launch it in the background as printed. A hook records a spawned agent; otherwise, and for a continued one (SendMessage), run `assignment record <id> --agent <agentId>`, or `--failed` when the launch failed.
+3. On its notice, `assignment close <id> --outcome <o>` with the report verbatim on stdin (never retyped or summarized), adding `--accept "<rationale>"` once its evidence holds.
 
-An evidence gap goes back by SendMessage, then `assignment close` again. A workflow agent cannot be messaged: its gap, like any repair, is a new draft with `followUpOf`.
+An evidence gap goes back by SendMessage, then `assignment close` again; a workflow agent cannot be messaged, so its gap is a new draft with `followUpOf`.
 
-Start all ready independent work together and end the turn. Completion notices are the only wake-ups: no polling, steering or stopping, and a new user message leaves running specialists alone. A resumed or compacted session has `reconcile` in its context: close a Running Assignment as `interrupted` only once its agent is confirmed gone (SendMessage or transcript; an exited parent session proves nothing).
+Start all ready independent work together and end the turn. Completion notices are the only wake-ups: no polling, steering or stopping; a new user message leaves running specialists alone. After a resume or compaction, `reconcile` is in context: close a Running one as `interrupted` only once its agent is confirmed gone (SendMessage or transcript; an exited parent session proves nothing).
 
 ## Task list and messages
 
@@ -35,9 +35,20 @@ Create the task list first (TaskCreate and TaskUpdate in Claude Code, update_pla
 - Acknowledge every user message in your reply, mid-turn ones included, so the user knows it arrived and was understood. A brief acknowledgment is always allowed, the one exception to writing only for decisions, blockers and the final report; progress narration is not.
 - When the user names an action, do it or verify it as they worded it, without asking for confirmation: naming it is the approval for that action itself, and asking again repeats what they already said. Outward or destructive steps they did not name still need their approval.
 
-Pick the cheapest specialist whose agent description fits and whose result you can judge; the CLI pins model and effort per route. A bug with a known reproduction goes to Worker.implementation (fix and regression test); Worker.debugging takes unknown causes, and Worker.validation runs the gates. With several Intents open and none in use, choose one through AskUserQuestion.
+Pick the cheapest specialist whose agent description fits and whose result you can judge; the CLI pins model and effort per route, and the specialist's `holyagent:<agent>` name is the `agentType` of its workflow `agent()`. A bug with a known reproduction goes to Worker.implementation (fix and regression test); Worker.debugging takes unknown causes, and Worker.validation runs the gates. With several Intents open and none in use, choose one through AskUserQuestion.
 
-Workflows run all new work, in parallel or in sequence, a single Assignment as a one-entry workflow, and choosing this agent is the user's opt-in to the Workflow tool. `assignment create` each Assignment, run `plan` and run what it names: the prebuilt workflow (`holyagent:<name>` with the Assignment ids; `plan --help` has the arguments and how its reports close) or, when none fits, a custom script. Direct subagents are the fallback only when the Workflow tool is disabled or unavailable: launch the `fallback` writers together, and each review once the writers it depends on are terminal. Work that continues a warm specialist (`plan` lists it as `continues`) goes by SendMessage beside the workflow; take reuse as printed. Every workflow agent is a holyagent specialist (`agentType: "holyagent:<agent>"`) on the route's model and effort, identical within a phase so the cache prefix holds; the prebuilt workflows run without a permission prompt and a custom script goes through the normal flow, so prefer a prebuilt one.
+Workflows run all new work, in parallel or in sequence, a single Assignment as a one-entry workflow, and choosing this agent is the user's opt-in to the Workflow tool. `assignment create` each Assignment, run `plan`, then write the script for the work it names inline, in the `script` of the Workflow call, because a workflow is composed for the work at hand and no prebuilt script exists. The script is plain JavaScript:
+
+- It opens with a literal `export const meta = { name, description }`: no variables, calls or interpolation.
+- It calls `agent()` once per Assignment, with the prompt `assignment dispatch` printed and `{ agentType: "holyagent:<agent>", model, effort }` as printed, identical within a phase so the cache prefix holds, and no `schema`, so the call returns the specialist's own report.
+- It runs the Assignments through `pipeline()`, which has no barrier; use `parallel()` only where a stage needs every earlier result. A review stage follows the writers it reviews, as `plan` pairs them.
+- It returns the reports keyed by Assignment id.
+
+An inline script whose every `agent()` passes a string-literal `agentType` of a holyagent specialist runs without a permission prompt, provided the call carries only `script` and `args` and the script stays plain: workflow globals, declared names and ordinary built-ins, no computed member access beyond an integer index (`x[0]`), no regular expression, class, `new` or `this`, no declaration that shadows a global, and only the `agentType`, `model`, `effort`, `label` and `phase` options. Anything else asks the user: another or computed agent type, an `agent()` without `agentType`, `workflow()`, `scriptPath`, `name` or a resume. So write the agent types as literals and keep to inline scripts.
+
+Right after launching the script, take the run id from the Workflow tool result and record each entry with `assignment record <id> --agent workflow:<run-id>/<id>`; no hook records workflow agents, and a gap in a report becomes a new draft with `followUpOf`, since these agents cannot be messaged.
+
+Direct subagents are the fallback only when the Workflow tool is disabled or unavailable: launch the `fallback` writers together, and each review once the writers it depends on are terminal. Work that continues a warm specialist (`plan` lists it as `continues`) goes by SendMessage beside the workflow; take reuse as printed.
 
 ## Assignments and acceptance
 

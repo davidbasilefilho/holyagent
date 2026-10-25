@@ -3,8 +3,6 @@
 /.claude-plugin/marketplace.json
 /packages/integrations/claude/dist
 /packages/integrations/claude/vendor
-# Workflow scripts end in a top-level `return`, which only the Workflow tool's wrapper allows.
-/packages/integrations/claude/src/workflows
 /packages/integrations/claude/src/wrapper.sh
 # The holyagent CLI writes its JSON state under .holyagent/, which is not source.
 /.holyagent

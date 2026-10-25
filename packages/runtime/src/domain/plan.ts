@@ -6,11 +6,6 @@ import { dispatchBlock } from "./readiness.ts"
 import { isReviewer, isWriter } from "./route.ts"
 import type { Registry } from "./specialists.ts"
 
-/** The prebuilt workflows the plugin offers, named without the plugin namespace. */
-export const WORKFLOW_NAMES = ["implement-review", "review-diff", "run-assignments"] as const
-/** One workflow name. */
-export type WorkflowName = (typeof WORKFLOW_NAMES)[number]
-
 /** An Assignment that continues a warm specialist, which only SendMessage can reach. */
 export interface Continuation {
   readonly assignmentId: string
@@ -21,12 +16,15 @@ export interface Continuation {
 export type Recommendation =
   | {
       readonly action: "workflow"
-      readonly name: WorkflowName
+      /**
+       * The Assignments the root puts in its inline workflow script; for writers with reviews they
+       * are writer and review ids in turn.
+       */
       readonly assignmentIds: ReadonlyArray<string>
       /**
        * The same work as direct subagents, for a session where the Workflow tool is disabled or
-       * unavailable: the Assignments to launch together, and for `implement-review` the reviews to
-       * launch once those have closed.
+       * unavailable: the Assignments to launch together, and for writer and review pairs the
+       * reviews to launch once those have closed.
        */
       readonly fallback: {
         readonly assignmentIds: ReadonlyArray<string>
@@ -114,20 +112,18 @@ const reviewedWriters = ({ project, dispatchable, ready }: Pool): ReadonlyArray<
   return pairs
 }
 
-/** Each workflow with the Assignments it would run, when the pool fits it. */
-const WORKFLOWS: ReadonlyArray<
-  readonly [WorkflowName, string, (pool: Pool) => ReadonlyArray<Assignment>]
+/**
+ * The two shapes of workflow script the root can write, tried in order: its reason, the Assignments
+ * the pool gives it, and whether those come as writer and review pairs.
+ */
+const SHAPES: ReadonlyArray<
+  readonly [reason: string, pick: (pool: Pool) => ReadonlyArray<Assignment>, paired: boolean]
 > = [
-  ["implement-review", "a writer and the review of its work are both ready", reviewedWriters],
+  ["a writer and the review of its work are both ready", reviewedWriters, true],
   [
-    "review-diff",
-    "independent reviews can start together",
-    ({ dispatchable }) => parallelSet(dispatchable, (row) => isReviewer(row.roleTask)),
-  ],
-  [
-    "run-assignments",
     "independent Assignments can start together",
     ({ dispatchable }) => parallelSet(dispatchable, () => true),
+    false,
   ],
 ]
 
@@ -155,13 +151,13 @@ const continuations = (
 /**
  * Recommends how to run the project's Ready Assignments that can start now (the others are left
  * out, see {@link dispatchBlock}; a review waits for the unfinished work it names in
- * independentFrom), or undefined when none can. With workflows available it names the first
- * workflow the set fits: writers with the reviews of their work, as writer and review ids in turn
- * (`implement-review`), at least two independent reviews (`review-diff`) or independent Assignments
- * (`run-assignments`, which takes a single one), each with its direct-subagent fallback. Work that
- * would continue a warm specialist, which a workflow cannot message, is listed beside it as
- * `continues`, or is the whole `continue` recommendation when nothing else is ready. Without
- * workflows it takes the Assignments that can run side by side as `subagent` work.
+ * independentFrom), or undefined when none can. With workflows available it names the first shape
+ * the set fits for the root's inline script: writers with the reviews of their work, as writer and
+ * review ids in turn, or independent Assignments (a single one is a one-entry workflow), each with
+ * its direct-subagent fallback. Work that would continue a warm specialist, which a workflow cannot
+ * message, is listed beside it as `continues`, or is the whole `continue` recommendation when
+ * nothing else is ready. Without workflows it takes the Assignments that can run side by side as
+ * `subagent` work.
  */
 export const recommend = (
   project: Project,
@@ -182,15 +178,14 @@ export const recommend = (
       dispatchable: dispatchable.filter(spawns),
       ready: ready.filter(spawns),
     }
-    for (const [name, reason, pick] of WORKFLOWS) {
+    for (const [reason, pick, paired] of SHAPES) {
       const chosen = pick(pool)
-      // A single Assignment is a one-entry run-assignments; the other workflows need a pair.
-      if (chosen.length >= (name === "run-assignments" ? 1 : 2)) {
+      // A single Assignment is a one-entry workflow; pairs come two by two.
+      if (chosen.length >= 1) {
         const assignmentIds = chosen.map((row) => row.id)
-        // The pairs of implement-review run as writer then review, so without the workflow the
-        // reviews wait for their writers.
-        const reviews =
-          name === "implement-review" ? assignmentIds.filter((_, at) => at % 2 === 1) : []
+        // Pairs run as writer then review, so without the workflow the reviews wait for their
+        // writers.
+        const reviews = paired ? assignmentIds.filter((_, at) => at % 2 === 1) : []
         const fallback = {
           assignmentIds: assignmentIds.filter((id) => !reviews.includes(id)),
           afterwards: reviews,
@@ -205,7 +200,6 @@ export const recommend = (
         )
         return {
           action: "workflow",
-          name,
           assignmentIds,
           fallback,
           continues,
