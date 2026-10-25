@@ -8,6 +8,10 @@ import { ROUTES } from "../../../runtime/src/domain/route.ts"
 import { ROOT_CORE_FILES } from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
 import packageJson from "../package.json" with { type: "json" }
 import {
+  CONDITIONAL_SECTIONS,
+  FRONTEND_DESIGN_SECTION,
+  INSPECTION_SECTION,
+  MERGE_READY_SECTION,
   REQUIREMENT_SECTIONS,
   ROLE_SECTIONS,
   ROOT_SECTIONS,
@@ -96,11 +100,11 @@ describe("the generated plugin is in step with its sources", () => {
     }
   })
 
-  test("frontend-design is the vendored skill, untouched", () => {
-    for (const name of ["SKILL.md", "LICENSE.txt"])
-      expect(read("packages/integrations/claude/dist/skills/frontend-design", name)).toBe(
-        read("packages/integrations/claude/vendor/frontend-design", name),
-      )
+  test("the frontend-design license ships untouched beside the embedded text, not as a skill", () => {
+    expect(read("packages/integrations/claude/dist/licenses/frontend-design/LICENSE.txt")).toBe(
+      read("packages/integrations/claude/vendor/frontend-design/LICENSE.txt"),
+    )
+    expect(generated.filter((file) => file.path.includes("/skills/frontend-design"))).toEqual([])
   })
 })
 
@@ -219,7 +223,7 @@ describe("agents", () => {
       .filter((file) => !file.path.includes("/scripts/"))
       .flatMap((file) => file.content.match(/holyagent:[A-Za-z0-9._-]+/g) ?? [])
       .map((reference) => reference.slice("holyagent:".length))
-    const known = new Set([...agents, "merge-ready", "interface-inspection", "user-busy"])
+    const known = new Set([...agents, "dev-server", "user-busy"])
     for (const name of [...references, ...ROUTES.map((route) => route.agent)]) {
       expect(name).toMatch(/^[a-z]+(?:-[a-z]+)*$/)
       expect(known.has(name)).toBe(true)
@@ -275,6 +279,7 @@ describe("agents", () => {
     const assembled = [
       ...ROOT_SECTIONS.map((name) => `root/${name}`),
       ...SPECIALIST_SECTIONS.map((name) => `specialist/${name}`),
+      ...CONDITIONAL_SECTIONS.map(({ file }) => `specialist/${file}`),
       ...Object.entries(ROLE_SECTIONS).flatMap(([role, names]) =>
         names.map((name) => `roles/${role}/${name}`),
       ),
@@ -282,11 +287,14 @@ describe("agents", () => {
     for (const [id, { section, phrase }] of Object.entries(REQUIREMENT_SECTIONS)) {
       expect({ id, assembled: assembled.includes(section) }).toEqual({ id, assembled: true })
       expect({ id, holds: read(CLAUDE, section).includes(phrase) }).toEqual({ id, holds: true })
+      const conditional = CONDITIONAL_SECTIONS.find(({ file }) => section === `specialist/${file}`)
       const reached = section.startsWith("root/")
         ? ["holyagent"]
         : section.startsWith("roles/")
           ? [section.split("/")[1] ?? ""]
-          : ROUTES.map((route) => route.agent)
+          : ROUTES.filter((route) => conditional?.applies(route) ?? true).map(
+              (route) => route.agent,
+            )
       for (const name of reached)
         expect({ id, name, reaches: agent(name)?.content.includes(phrase) }).toEqual({
           id,
@@ -305,7 +313,10 @@ describe("agents", () => {
       expect(new Set(names).size).toBe(names.length)
     }
     assembled("root", ROOT_SECTIONS)
-    assembled("specialist", [...SPECIALIST_SECTIONS, WRITING_BAR_SECTION])
+    assembled("specialist", [
+      ...SPECIALIST_SECTIONS,
+      ...CONDITIONAL_SECTIONS.map(({ file }) => file),
+    ])
     expect(Object.keys(ROLE_SECTIONS).toSorted()).toEqual(ROUTES.map((r) => r.agent).toSorted())
     for (const [role, names] of Object.entries(ROLE_SECTIONS)) {
       assembled(`roles/${role}`, names)
@@ -420,7 +431,7 @@ describe("agents", () => {
       .filter((file) => file.path.endsWith("SKILL.md"))
       .map((file) => file.path.split("/").at(-2) ?? "")
       .toSorted()
-    expect(names).toEqual(["frontend-design", "interface-inspection", "merge-ready", "user-busy"])
+    expect(names).toEqual(["dev-server", "user-busy"])
     expect(agent("reviewer-code")?.content).toContain(
       "Start every review, re-reviews included, with the built-in `/code-review`",
     )
@@ -429,21 +440,102 @@ describe("agents", () => {
       expect(text).not.toMatch(/`assignments` skill|grill-me|stacks-and-ci|continue-work/)
   })
 
-  test("preloaded skills are the ones that exist", () => {
-    const skills = new Set(
-      generated
-        .filter((file) => file.path.endsWith("SKILL.md"))
-        .map((file) => file.path.split("/").at(-2)),
-    )
-    for (const route of ROUTES) {
-      const listed = [
-        ...(agent(route.agent)?.content.matchAll(/^ {2}- holyagent:(.*)$/gm) ?? []),
-      ].map((match) => match[1])
-      for (const skill of listed) expect(skills.has(skill)).toBe(true)
-      expect(listed.includes("interface-inspection")).toBe(
-        route.capabilities.includes("VisualInspection"),
-      )
+  test("no specialist preloads a skill: what a role always needs is fixed text in it", () => {
+    for (const route of ROUTES)
+      expect(frontmatter(agent(route.agent)?.content ?? "")).not.toContain("skills:")
+  })
+
+  test("the mergeability bar and the inspection rules are fixed text in exactly the roles that need them, once", () => {
+    for (const { file, applies } of CONDITIONAL_SECTIONS) {
+      const section = read(`${CLAUDE}/specialist`, file).trim()
+      for (const route of ROUTES) {
+        const text = agent(route.agent)?.content ?? ""
+        expect({ file, agent: route.agent, copies: text.split(section).length - 1 }).toEqual({
+          file,
+          agent: route.agent,
+          copies: applies(route) ? 1 : 0,
+        })
+      }
     }
+    const merge = ROUTES.filter((route) =>
+      agent(route.agent)?.content.includes("A change is merge-ready when"),
+    ).map((route) => route.agent)
+    expect(merge.toSorted()).toEqual(
+      [
+        "worker-mechanical",
+        "worker-implementation",
+        "worker-integration",
+        "worker-debugging",
+        "worker-visual",
+        "reviewer-code",
+        "reviewer-testing",
+      ].toSorted(),
+    )
+    expect(MERGE_READY_SECTION).toBe("merge-ready.md")
+    const inspecting = ROUTES.filter((route) =>
+      agent(route.agent)?.content.includes(read(`${CLAUDE}/specialist`, INSPECTION_SECTION).trim()),
+    ).map((route) => route.agent)
+    expect(inspecting.toSorted()).toEqual(["reviewer-visual", "worker-visual"])
+  })
+
+  test("the visual roles embed the frontend-design guidance with its headings two levels down and its license named", () => {
+    const vendored = read("packages/integrations/claude/vendor/frontend-design", "SKILL.md")
+    const guidance = vendored
+      .slice(vendored.indexOf("# Frontend Design"))
+      .trim()
+      .split("\n")
+      .map((line) => (line.startsWith("#") ? `##${line}` : line))
+      .join("\n")
+    expect(guidance.length).toBeGreaterThan(5000)
+    expect(guidance).toStartWith("### Frontend Design")
+    for (const route of ROUTES) {
+      const text = agent(route.agent)?.content ?? ""
+      const visual = ["worker-visual", "reviewer-visual"].includes(route.agent)
+      expect({ agent: route.agent, embedded: text.includes(guidance) }).toEqual({
+        agent: route.agent,
+        embedded: visual,
+      })
+      if (visual) {
+        const framing = read(`${CLAUDE}/roles/${route.agent}`, FRONTEND_DESIGN_SECTION).trim()
+        expect(text).toContain(`${framing}\n\n${guidance}`)
+        expect(text).toContain("licenses/frontend-design/LICENSE.txt")
+      }
+    }
+  })
+
+  test("each agent description stands alone, without pointing at text below it", () => {
+    for (const route of ROUTES)
+      expect({
+        agent: route.agent,
+        points: /\b(below|above)\b/.test(
+          field(agent(route.agent)?.content ?? "", "description") ?? "",
+        ),
+      }).toEqual({ agent: route.agent, points: false })
+  })
+
+  test("the dev-server skill is generated, opens with the situation, and covers start, share and stop", () => {
+    const skill = generated.find((file) =>
+      file.path.endsWith("skills/dev-server/SKILL.md"),
+    )?.content
+    expect(skill).toBeDefined()
+    expect(field(skill ?? "", "name")).toBe("dev-server")
+    expect(field(skill ?? "", "description")).toStartWith("Use when ")
+    for (const part of [
+      "Worker.operations",
+      "process id",
+      "Worker.visual and Reviewer.visual",
+      "start none of your own",
+      "Stop it",
+    ])
+      expect(skill).toContain(part)
+    expect(read("packages/integrations/claude/dist/skills/dev-server/SKILL.md")).toBe(skill ?? "")
+  })
+
+  test("the root judges visual work from a section of its own, ahead of the guidelines", () => {
+    expect(ROOT_SECTIONS.indexOf("visual.md")).toBeGreaterThan(
+      ROOT_SECTIONS.indexOf("assignments.md"),
+    )
+    expect(agent("holyagent")?.content).toContain(read(`${CLAUDE}/root`, "visual.md").trim())
   })
 
   test("the writing bar is in the implementation writer and the artifact reviewer once, and nowhere else", () => {

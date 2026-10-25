@@ -15,8 +15,8 @@ packages/
       claude-5.5/               root/, specialist/, roles/<role>/ (one file per section), root-core.ts, skills/
       requirements/             cache.md, commit-text.md, mergeability.md: inputs to the instructions, not behavior
   integrations/claude/          turns the runtime into the Claude Code plugin
-    build.ts, src/              the generator, the wrapper source, the workflow sources
-    vendor/frontend-design/     Anthropic's skill, kept byte for byte
+    build.ts, src/              the generator and the wrapper source
+    vendor/frontend-design/     Anthropic's skill text and license, kept byte for byte; the visual roles embed it
     tests/
     dist/                       generated: the built plugin (.claude-plugin/, settings.json, agents/, skills/, hooks/, scripts/)
   cli/                          the public CLI: setup, doctor
@@ -68,8 +68,8 @@ Everything is configured in `bunfig.toml`. Bun's own `check`, `lint` and `fmt` a
 
 `mise run build` runs `packages/integrations/claude/build.ts`. It removes the generated paths (`GENERATED_PATHS` in `src/generate.ts`: the root `.claude-plugin/marketplace.json` and the built plugin in `packages/integrations/claude/dist/`) and writes them again from:
 
-- `packages/runtime/src/instructions/claude-5.5/`: the root agent (the body of `agents/holyagent.md` is the files of `root/` joined in the order of `ROOT_SECTIONS`), the eighteen specialist agents (the files of `roles/<agent>/` in the order of `ROLE_SECTIONS`, then the files of `specialist/` in the order of `SPECIALIST_SECTIONS` and, for some roles, `specialist/writing-bar.md`), the two skills of its own (`merge-ready` and `interface-inspection`; the vendored `frontend-design` comes from `packages/integrations/claude/vendor/`);
-- the route table in `packages/runtime/src/domain/route.ts` (model, effort and tools of each agent) and `packages/integrations/claude/src/agents.ts` (the skills each agent loads);
+- `packages/runtime/src/instructions/claude-5.5/`: the root agent (the body of `agents/holyagent.md` is the files of `root/` joined in the order of `ROOT_SECTIONS`), the eighteen specialist agents (the files of `roles/<agent>/` in the order of `ROLE_SECTIONS`, then the files of `specialist/` in the order of `SPECIALIST_SECTIONS` and, for the roles that need them, `CONDITIONAL_SECTIONS`: `specialist/writing-bar.md`, `merge-ready.md` and `interface-inspection.md`; the visual roles also embed the vendored `frontend-design` text from `packages/integrations/claude/vendor/`), and the two skills of its own, `dev-server` and `user-busy`; what an agent kind always needs is fixed text, not a skill;
+- the route table in `packages/runtime/src/domain/route.ts` (model, effort and tools of each agent) and `packages/integrations/claude/src/agents.ts` (how each agent is assembled);
 - `packages/integrations/claude/src/wrapper.sh` and `empty-bunfig.toml`;
 - `packages/runtime/src/cli/main.ts`, bundled for Bun into `scripts/holyagent.js`;
 - the hook table in `generate.ts`, and the version from `packages/integrations/claude/package.json`.

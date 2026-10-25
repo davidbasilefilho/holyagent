@@ -15,7 +15,7 @@ The term in its `LICENSE`, quoted:
 
 ## Vendored skill
 
-`frontend-design` is Anthropic's skill, shipped unmodified. Its terms are in its own `LICENSE.txt` (Apache License 2.0), kept next to it in `packages/integrations/claude/vendor/frontend-design/` and in the built plugin at `packages/integrations/claude/dist/skills/frontend-design/LICENSE.txt`. The build copies the skill byte for byte, and the formatter and linter skip it.
+`frontend-design` is Anthropic's skill. Its text is embedded in the `worker-visual` and `reviewer-visual` agents, not shipped as a skill: the build takes the vendored `SKILL.md` without its frontmatter and moves its headings down two levels. Its terms are in its own `LICENSE.txt` (Apache License 2.0), kept next to the vendored text in `packages/integrations/claude/vendor/frontend-design/` and, byte for byte, in the built plugin at `packages/integrations/claude/dist/licenses/frontend-design/LICENSE.txt`; both agents name that path. The vendored files are kept as Anthropic ships them, and the formatter and linter skip them.
 
 ## Other software
 

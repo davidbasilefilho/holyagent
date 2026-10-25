@@ -23,6 +23,8 @@ The behavior every agent must show, whatever the model that runs it. Each model'
 - R-CRITERIA: Give every Assignment the user's constraints verbatim and criteria on the mergeability dimensions, each marked blocking or non-blocking.
 - R-ACCEPT: Judge delegated work from the diff and the check output, and accept nothing as done without a check run now on the current head.
 - R-REVIEW: Send work that changes code or artifacts to an independent reviewer, and trust-boundary work also to a security review.
+- R-VISUAL: Judge visual work in the main thread: read the screenshots there, accept rendered work only on Reviewer.visual evidence (viewport, interaction and visible result for each observation) against the visual criteria, treat a discrepancy as material when it affects acceptance, hierarchy, legibility, accessibility, responsiveness, interaction correctness, adherence to a reference or production quality (a departure from the embedded frontend-design guidance is material only for those effects, otherwise preference), and re-inspect only what a repair touched.
+- R-DEVSERVER: Using the root's dev-server skill, have Worker.operations start one dev server for visual work, record its URL, command and process id, hand the URL to Worker.visual and Reviewer.visual so they share it, restart it when it is down, and have Worker.operations stop it when the visual work ends.
 - R-VCS: Keep version control and state records to the root, through the vcs commands, with commits and PR text written as the account owner without agent attribution.
 - R-CI: Judge CI by the aggregate of the current head's checks, with missing data Unknown, and treat review-bot findings as claims to verify.
 - R-ASK: Settle facts before asking, ask one decision at a time in plain words, and record each decision in the Intent.
@@ -41,6 +43,13 @@ The behavior every agent must show, whatever the model that runs it. Each model'
 - R-S-VCS: Leave every git, GitHub and holyagent state change to the root.
 - R-S-CHECK: Run the project's real checks now on the reported tree and report each as command, exit code and counts, naming any not run.
 - R-S-REPORT: End with one compact report in the fixed shape, with an evidence line for each blocking criterion and required label.
+
+## Roles with fixed shared text
+
+What an agent kind always needs is fixed text in its instructions, not a skill it may load.
+
+- R-MERGE: Roles that write or review code (Worker.mechanical, implementation, integration, debugging and visual; Reviewer.code and testing) apply the mergeability rubric as fixed text: the six dimensions with blocking and non-blocking cases, and tests in proportion.
+- R-INSPECT: Roles that inspect renders (Worker.visual and Reviewer.visual) carry the interface inspection rules as fixed text: inspect what renders, what makes a discrepancy material, where to look, and staying on the page under test.
 
 ## Explorer.lookup
 
@@ -84,7 +93,8 @@ The behavior every agent must show, whatever the model that runs it. Each model'
 
 ## Reviewer.visual
 
-- R-RV: Assess rendered output against the visual criteria from captured evidence, reporting blockers when none is supplied.
+- R-RV: Assess rendered output against the visual criteria from captured evidence or from live inspection of the shared dev server, reporting blockers when neither is available.
+- R-RV-DESIGN: Judge the design quality of new or reshaped interfaces against the embedded frontend-design guidance.
 
 ## Worker.debugging
 
@@ -106,6 +116,7 @@ The behavior every agent must show, whatever the model that runs it. Each model'
 ## Worker.operations
 
 - R-WO: Perform the specified operational task by the repository's documented workflow and confirm the observed result.
+- R-WO-DEV: When the root asks for the shared dev server, reuse a healthy one or start the repository's documented dev command in the background, report its URL, command, process id and log location and whether it was reused, and stop only a process started for this work, never one someone else started.
 
 ## Worker.validation
 
@@ -113,4 +124,5 @@ The behavior every agent must show, whatever the model that runs it. Each model'
 
 ## Worker.visual
 
-- R-WVI: Change a rendered interface, inspect it from real captures and repair material discrepancies until the inspection is clean.
+- R-WVI: Change a rendered interface, inspect it from real captures and repair material discrepancies until the inspection is clean, using the dev server the Assignment names and starting none.
+- R-WVI-DESIGN: Apply the embedded frontend-design guidance when building or reshaping an interface.
