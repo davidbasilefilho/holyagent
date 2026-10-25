@@ -7770,7 +7770,7 @@ function resolveOptions(options) {
 }
 var package_default = {
   name: "@holyagent/runtime",
-  version: "0.1.1-2",
+  version: "0.1.2",
   description: "The holyagent runtime: instructions and the shared command surface.",
   bin: {
     "holyagent-runtime": "./src/cli/main.ts"
