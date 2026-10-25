@@ -14,6 +14,16 @@ export interface ExecutionConfig {
 /** The default configuration. */
 export const DEFAULT_CONFIG: ExecutionConfig = { ttlMinutes: 55, workflowsAvailable: false }
 
+/**
+ * The start of the agent id of a specialist a workflow launched:
+ * `workflow:<run-id>/<assignment-id>`.
+ */
+export const WORKFLOW_AGENT_PREFIX = "workflow:"
+
+/** True for a specialist a workflow launched. Nothing can message it, so it is never continued. */
+export const isWorkflowAgent = (agentId: string): boolean =>
+  agentId.startsWith(WORKFLOW_AGENT_PREFIX)
+
 /** How the root runs an Assignment: message a warm specialist, or launch a new one. */
 export type Directive =
   | { readonly action: "continue"; readonly agentId: string; readonly reason: string }
@@ -96,7 +106,8 @@ const compareEntries = (assignment: Assignment) => (a: SpecialistEntry, b: Speci
  * and effort (an identical configuration keeps the cache prefix) that finished inside the cache
  * window and whose context is relevant: a follow-up of its own Assignment, overlapping paths, or
  * shared related Assignments. A Reviewer, or any Assignment that names independentFrom, never
- * continues a specialist that worked on or reviewed those Assignments. Otherwise it spawns.
+ * continues a specialist that worked on or reviewed those Assignments, and no Assignment continues
+ * a specialist a workflow launched. Otherwise it spawns.
  */
 export const directiveFor = (
   assignment: Assignment,
@@ -112,7 +123,7 @@ export const directiveFor = (
     now: Date.parse(now),
     ttlMs: config.ttlMinutes * 60_000,
   }
-  let pool = registry
+  let pool = registry.filter((entry) => !isWorkflowAgent(entry.agentId))
   for (const [name, passes] of STAGES) {
     pool = pool.filter((entry) => passes(entry, candidate))
     if (pool.length === 0)

@@ -4,4 +4,4 @@ Read the code around the change first so the new code follows its patterns, erro
 
 For a refactor, keep externally observable behavior and interfaces stable, restructure only the named seam, and show with focused checks on the seam's contract that it did not change.
 
-When the deliverable is instruction text, meet the expected size the Assignment names, relative to the text it replaces, and this bar: compact and proportional, each rule once in the place that needs it with its reason beside it; outcomes and boundaries rather than procedure, leaving out what the model does by default; positive calm phrasing without capital-letter emphasis, a real boundary stated as the action to take; one owner per policy, with specialized steps in a skill.
+When the deliverable is instruction text, meet the expected size the Assignment names, relative to the text it replaces, and the writing bar below.

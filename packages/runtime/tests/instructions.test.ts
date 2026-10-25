@@ -48,14 +48,7 @@ describe("instruction sources", () => {
 
   test("give each skill a folder named after it and only the frontmatter keys claude.ai accepts", () => {
     const skills = readdirSync(join(CLAUDE, "skills"))
-    expect(skills.toSorted()).toEqual([
-      "assignments",
-      "continue-work",
-      "grill-me",
-      "interface-inspection",
-      "merge-ready",
-      "stacks-and-ci",
-    ])
+    expect(skills.toSorted()).toEqual(["interface-inspection", "merge-ready", "user-busy"])
     for (const skill of skills) {
       const text = read(join(CLAUDE, "skills", skill, "SKILL.md"))
       const keys = frontmatterKeys(text)
@@ -65,6 +58,19 @@ describe("instruction sources", () => {
       expect(keys).toContain("description")
       expect(text).toContain(`name: ${skill}\n`)
     }
+  })
+
+  test("refer to no skill that has been folded into the root rules or the CLI help", () => {
+    for (const path of FILES)
+      expect({
+        path,
+        found: /\b(grill-me|continue-work|stacks-and-ci)\b|`assignments` skill/.exec(
+          read(path),
+        )?.[0],
+      }).toEqual({
+        path,
+        found: undefined,
+      })
   })
 
   test("hold no dates, times or other time-varying text, so prompts stay cache-stable", () => {

@@ -9,6 +9,7 @@ import { Effect } from "effect"
 
 import { StdinMissing } from "../src/cli/errors.ts"
 import { run } from "../src/cli/program.ts"
+import { dispatchedAssignment } from "../src/cli/report.ts"
 
 let project: string
 let home: string
@@ -202,6 +203,125 @@ describe("lifecycle", () => {
   })
 })
 
+describe("workflow runs", () => {
+  const dispatchWriter = async () =>
+    String(data(await cli(["assignment", "dispatch"], writer())).id)
+
+  test("records a workflow's agent as workflow:<run-id>/<assignment-id> and nothing else of that kind", async () => {
+    await createIntent()
+    const id = await dispatchWriter()
+    for (const bad of ["workflow:run-1", "workflow:run-1/assignment-other", "workflow:/" + id]) {
+      const refused = await cli(["assignment", "record", id, "--agent", bad])
+      expect(refused.code).toBe(2)
+      expect(refused.stderr).toContain(`workflow:<run-id>/${id}`)
+    }
+    expect(
+      data(await cli(["assignment", "record", id, "--agent", `workflow:run-1/${id}`])),
+    ).toMatchObject({ id, state: "Running", agent: `workflow:run-1/${id}` })
+  })
+
+  test("a workflow's agent is never continued, even for a follow-up of its Assignment", async () => {
+    await createIntent()
+    const id = await dispatchWriter()
+    data(await cli(["assignment", "record", id, "--agent", `workflow:run-1/${id}`]))
+    data(
+      await cli(["assignment", "close", id, "--outcome", "success", "--accept", "ok"], FULL_REPORT),
+    )
+    const next = data(
+      await cli(["assignment", "dispatch"], writer({ objective: "Fix it", followUpOf: id })),
+    )
+    expect(next).toMatchObject({ agent: "holyagent:worker-implementation" })
+    expect(next).not.toHaveProperty("continue")
+  })
+
+  test("closes from the JSON report a workflow returned, evidence included", async () => {
+    await createIntent()
+    const id = await dispatchWriter()
+    data(await cli(["assignment", "record", id, "--agent", `workflow:run-1/${id}`]))
+    const json = {
+      status: "done",
+      changed_paths: ["src/parser.ts"],
+      checks: [{ command: "bun test", exit: 0 }],
+      blockers: [],
+      notes: ["none"],
+      evidence: [
+        { key: "parses", support: "ran the parser" },
+        { key: "tests", support: "bun test passed" },
+      ],
+    }
+    expect(
+      data(
+        await cli(
+          ["assignment", "close", id, "--outcome", "success", "--accept", "ok", "--report-json"],
+          json,
+        ),
+      ),
+    ).toMatchObject({ state: "Succeeded", accepted: true })
+    const stored = data(await cli(["assignment", "show", id, "--full"]))
+    expect(stored.result).toBe(
+      [
+        "status: done",
+        "changed:",
+        "- src/parser.ts",
+        "checks:",
+        "- bun test -> exit 0",
+        "notes:",
+        "- none",
+        "evidence:",
+        "- parses: ran the parser",
+        "- tests: bun test passed",
+      ].join("\n"),
+    )
+  })
+
+  test("refuses --accept for a report whose status is not done, and closes nothing", async () => {
+    await createIntent()
+    const id = await dispatchWriter()
+    data(await cli(["assignment", "record", id, "--agent", `workflow:run-1/${id}`]))
+    const partial = {
+      status: "partial",
+      changed_paths: [],
+      checks: [],
+      blockers: ["no access"],
+      notes: [],
+      evidence: [
+        { key: "parses", support: "ran the parser" },
+        { key: "tests", support: "bun test passed" },
+      ],
+    }
+    const refused = await cli(
+      ["assignment", "close", id, "--outcome", "success", "--accept", "ok", "--report-json"],
+      partial,
+    )
+    expect(refused.code).toBe(2)
+    expect(refused.stderr).toContain("status done")
+    expect(data(await cli(["assignment", "show", id, "--full"]))).toMatchObject({
+      state: "Running",
+    })
+    // Without --accept the root still records the partial report.
+    expect(
+      data(
+        await cli(["assignment", "close", id, "--outcome", "success", "--report-json"], partial),
+      ),
+    ).toMatchObject({ state: "Succeeded", accepted: false })
+  })
+
+  test("refuses a JSON report that is not one, and closes nothing", async () => {
+    await createIntent()
+    const id = await dispatchWriter()
+    data(await cli(["assignment", "record", id, "--agent", `workflow:run-1/${id}`]))
+    const refused = await cli(
+      ["assignment", "close", id, "--outcome", "success", "--report-json"],
+      { status: "done" },
+    )
+    expect(refused.code).toBe(2)
+    expect(refused.stderr).toContain("error: InvalidDraft:")
+    expect(data(await cli(["assignment", "show", id, "--full"]))).toMatchObject({
+      state: "Running",
+    })
+  })
+})
+
 describe("report and prompt", () => {
   const dispatchWriter = async () =>
     String(data(await cli(["assignment", "dispatch"], writer())).id)
@@ -250,6 +370,22 @@ describe("report and prompt", () => {
     expect(
       data(await cli(["assignment", "accept", id, "--rationale", "reviewed the report"])),
     ).toMatchObject({ id, accepted: true, revision: 1 })
+  })
+
+  test("the prompt's first line names its Assignment, and nothing else is taken for a dispatch", async () => {
+    await createIntent()
+    const dispatched = data(await cli(["assignment", "dispatch"], writer()))
+    const prompt = String(dispatched.prompt)
+    expect(dispatchedAssignment(prompt)).toBe(String(dispatched.id))
+    expect(dispatchedAssignment(`${prompt}\nExtra`)).toBe(String(dispatched.id))
+    for (const other of [
+      "Fix the bug",
+      `Please run\n${prompt}`,
+      `Role: x. Assignment: ${String(dispatched.id)}.`,
+      prompt.replace("Assignment: assignment-", "Assignment: intent-"),
+      "",
+    ])
+      expect(dispatchedAssignment(other)).toBeUndefined()
   })
 
   test("dispatch prints the Assignment as a prompt to send, for a spawn and for a continue", async () => {
@@ -378,6 +514,74 @@ describe("command line", () => {
     }
   })
 
+  test("help is --help as a word, for the top level, a group and a command", async () => {
+    for (const [word, flag] of [
+      [["help"], ["--help"]],
+      [
+        ["help", "assignment"],
+        ["assignment", "--help"],
+      ],
+      [
+        ["help", "assignment", "close"],
+        ["assignment", "close", "--help"],
+      ],
+      [
+        ["help", "plan"],
+        ["plan", "--help"],
+      ],
+    ] as const) {
+      const words = await cli(word)
+      expect(words.code).toBe(0)
+      expect(words).toEqual(await cli(flag))
+    }
+    expect((await cli(["help", "nothing"])).code).toBe(2)
+  })
+
+  test("the help carries what a model needs to run Assignments without a manual", async () => {
+    const help = async (...words: Array<string>) => (await cli(["help", ...words])).stdout
+    const dispatch = await help("assignment", "dispatch")
+    for (const part of [
+      "roleTask",
+      "criteria",
+      "dimension: behavior|regressions|tests|scope|style|repo-standards",
+      "ownershipPaths",
+      "dependencies",
+      "independentFrom",
+      "followUpOf",
+      "checks-run",
+      '{"id": "<id>"}',
+      "prompt:",
+    ])
+      expect(dispatch).toContain(part)
+    const close = await help("assignment", "close")
+    for (const part of [
+      "success|failure|errored|interrupted|stopped",
+      "evidence:",
+      "<criterion text or evidence label>: <support>",
+      "InsufficientAcceptance",
+      "--report-json",
+    ])
+      expect(close).toContain(part)
+    expect(await help("assignment", "record")).toContain("a hook records")
+    expect(close).toContain("a workflow agent cannot be messaged")
+    const accept = await help("assignment", "accept")
+    expect(accept).toContain("--carry-forward")
+    expect(accept).toContain("validation Assignment")
+    expect(await help("intent", "update")).toContain("--material")
+    const plan = await help("plan")
+    for (const part of [
+      "holyagent:run-assignments",
+      "holyagent:review-diff",
+      "holyagent:implement-review",
+      "fallback",
+      "Workflow tool is disabled or unavailable",
+      "workflow:<run-id>/<id>",
+      "agentType holyagent:<agent>",
+    ])
+      expect(plan).toContain(part)
+    expect(await help()).toContain("hint:")
+  })
+
   test("a group name with --help lists the group's commands", async () => {
     const help = await cli(["intent", "--help"])
     expect(help.code).toBe(0)
@@ -410,19 +614,90 @@ describe("plan", () => {
     const ids = await readyPair()
     expect(data(await cli(["plan"]))).toMatchObject({
       action: "workflow",
-      workflow: "review-diff",
+      workflow: "holyagent:review-diff",
       assignments: ids,
+      fallback: { action: "subagent", assignments: ids, parallel: true },
+    })
+  })
+
+  test("the workflow comes first and its subagent fallback says when to use it", async () => {
+    await readyPair()
+    const plan = data(await cli(["plan"]))
+    expect(Object.keys(plan).indexOf("workflow")).toBeLessThan(
+      Object.keys(plan).indexOf("fallback"),
+    )
+    expect(plan.fallback).toMatchObject({
+      when: "only if the Workflow tool is disabled or unavailable",
+    })
+  })
+
+  test("a writer and the review that names it in independentFrom run as implement-review", async () => {
+    await createIntent()
+    const w = String(data(await cli(["assignment", "create"], writer())).id)
+    const r = String(
+      data(await cli(["assignment", "create"], reviewer("Reviewer.code", { independentFrom: [w] })))
+        .id,
+    )
+    expect(data(await cli(["plan"]))).toMatchObject({
+      action: "workflow",
+      workflow: "holyagent:implement-review",
+      assignments: [w, r],
+      fallback: { action: "subagent", assignments: [w], afterwards: [r] },
     })
   })
 
   test("without workflows the same set runs as parallel subagents", async () => {
     const ids = await readyPair()
     const disabled = data(await cli(["plan"], undefined, { CLAUDE_CODE_DISABLE_WORKFLOWS: "1" }))
-    expect(disabled).toMatchObject({ action: "subagent", assignments: ids, parallel: true })
+    expect(disabled).toMatchObject({
+      action: "subagent",
+      assignments: ids,
+      parallel: true,
+      reason: "the Workflow tool is disabled or unavailable",
+    })
+    expect(disabled).not.toHaveProperty("fallback")
 
     await mkdir(join(project, ".claude"))
     await Bun.write(join(project, ".claude", "settings.local.json"), '{"enableWorkflows": false}')
     expect(data(await cli(["plan"]))).toMatchObject({ action: "subagent", assignments: ids })
+  })
+
+  test("a single Ready Assignment is a one-entry workflow, and direct subagents only without the tool", async () => {
+    await createIntent()
+    const id = String(data(await cli(["assignment", "create"], writer())).id)
+    expect(data(await cli(["plan"]))).toMatchObject({
+      action: "workflow",
+      workflow: "holyagent:run-assignments",
+      assignments: [id],
+      fallback: { action: "subagent", assignments: [id] },
+    })
+    expect(
+      data(await cli(["plan"], undefined, { CLAUDE_CODE_DISABLE_WORKFLOWS: "1" })),
+    ).toMatchObject({
+      action: "subagent",
+      assignments: [id],
+    })
+  })
+
+  test("work that continues a warm specialist is listed beside the workflow", async () => {
+    await createIntent()
+    const first = await runToClose(writer(), "agent-1", true)
+    const follow = String(
+      data(await cli(["assignment", "create"], writer({ objective: "Fix it", followUpOf: first })))
+        .id,
+    )
+    const other = String(
+      data(await cli(["assignment", "create"], writer({ ownershipPaths: ["src/other.ts"] }))).id,
+    )
+    const plan = data(await cli(["plan"]))
+    expect(plan).toMatchObject({
+      action: "workflow",
+      workflow: "holyagent:run-assignments",
+      assignments: [other],
+      continues: [{ assignment: follow, agent: "agent-1" }],
+    })
+    expect(String(plan.reason)).toContain("SendMessage")
+    expect(plan.fallback).toMatchObject({ assignments: [other] })
   })
 
   test("a single Ready Assignment with a warm specialist is a continue", async () => {
@@ -585,6 +860,6 @@ describe("process", () => {
     const unknown = await $`bun ${main} bogus`.cwd(inner).quiet().nothrow()
     expect(unknown.exitCode).toBe(2)
     expect(unknown.stderr.toString()).toStartWith("error: Usage:")
-    expect((await $`bun ${main} --version`.quiet()).text()).toMatch(/^\d+\.\d+\.\d+\n$/)
+    expect((await $`bun ${main} --version`.quiet()).text()).toMatch(/^\d+\.\d+\.\d+(?:-\d+)?\n$/)
   })
 })

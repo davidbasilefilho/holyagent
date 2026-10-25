@@ -7,7 +7,7 @@ import {
   createAssignment,
   type Outcome,
 } from "../domain/assignment.ts"
-import type { Directive } from "../domain/directive.ts"
+import { type Directive, isWorkflowAgent, WORKFLOW_AGENT_PREFIX } from "../domain/directive.ts"
 import { AssignmentId, IntentId, newId } from "../domain/ids.ts"
 import { closeAssignment, dispatch, record } from "../domain/lifecycle.ts"
 import { Revision } from "../domain/primitives.ts"
@@ -16,14 +16,15 @@ import { RoleTask, routeFor } from "../domain/route.ts"
 import { readState, type Snapshot, updateState } from "../state/store.ts"
 import { booleanFlag, choiceFlag, requiredFlag, stringFlag } from "./args.ts"
 import { nowIso } from "./context.ts"
-import { Usage } from "./errors.ts"
+import { AgentMismatch, Usage } from "./errors.ts"
 import { resolveIntent } from "./intent.ts"
+import { JsonReport, renderJsonReport } from "./jsonreport.ts"
 import { acceptanceFrom, renderPrompt } from "./report.ts"
 import { type Command, WithTrailer } from "./types.ts"
 import { assignmentRow, assignmentView, byId, present } from "./views.ts"
 
-/** The plugin namespace the host knows the specialists under. */
-const AGENT_NAMESPACE = "holyagent"
+/** The plugin namespace the host knows the specialists and workflows under. */
+export const PLUGIN_NAMESPACE = "holyagent"
 
 /**
  * A new Assignment as the root writes it. The Intent and its revision default to the Intent in use
@@ -36,6 +37,12 @@ const AssignmentInput = Schema.Struct({
 })
 
 const DRAFT_SHAPE = `{roleTask: ${RoleTask.literals.join("|")}, objective, scope?: [text], constraints?: [text], criteria: [{text, blocking, dimension: behavior|regressions|tests|scope|style|repo-standards}], evidence?: [label], ownershipPaths?: [path] (required for writers), dependencies?: [assignmentId], independentFrom?: [assignmentId], followUpOf?: assignmentId, intentId?, intentRevision?}`
+
+const DRAFT_NOTES: ReadonlyArray<string> = [
+  "required: roleTask, objective and criteria; unknown fields are refused",
+  "evidence labels are answered by the specialist by name; keep them few and observable (checks-run, changed-paths, diff-file)",
+  "ownershipPaths: relative portable paths that must not overlap a Running writer's; dependencies must be accepted at the live revision; a review names the work it must be independent from in independentFrom; a repair or follow-up sets followUpOf",
+]
 
 const completeDraft = (snapshot: Snapshot, input: typeof AssignmentInput.Type) =>
   Effect.gen(function* () {
@@ -68,7 +75,7 @@ const directiveView = (directive: Directive) =>
   directive.action === "continue"
     ? { continue: directive.agentId, reason: directive.reason }
     : {
-        agent: `${AGENT_NAMESPACE}:${directive.agent}`,
+        agent: `${PLUGIN_NAMESPACE}:${directive.agent}`,
         model: directive.model,
         effort: directive.effort,
         reason: directive.reason,
@@ -88,10 +95,49 @@ const OUTCOMES: Readonly<Record<typeof OutcomeFlag.Type, Outcome>> = {
 
 const RECORD_USAGE = "assignment record <id> (--agent <agentId> | --failed)"
 const CLOSE_USAGE =
-  "assignment close <id> --outcome success|failure|errored|interrupted|stopped [--accept <rationale>]"
+  "assignment close <id> --outcome success|failure|errored|interrupted|stopped [--accept <rationale>] [--report-json]"
 const LIST_USAGE = "assignment list [--state <state>] [--all] [--full]"
 
+const withoutNamespace = (type: string | undefined): string | undefined =>
+  type?.startsWith(`${PLUGIN_NAMESPACE}:`) === true ? type.slice(PLUGIN_NAMESPACE.length + 1) : type
+
+/**
+ * Records the launch of a Running Assignment: binds the agent id, or with none returns the
+ * Assignment to Ready because the launch failed. The `record` command and the launch hook both come
+ * through here, so they cannot differ. With `launchedAs` (the hook's case) the agent type that was
+ * launched must be the one the Assignment's route names.
+ */
+export const recordLaunch = (
+  directory: string,
+  id: string,
+  agentId: string | undefined,
+  launchedAs?: { readonly type: string | undefined },
+) =>
+  updateState(directory, (snapshot) =>
+    Effect.gen(function* () {
+      const route = routeFor((yield* findAssignment(snapshot.project, id)).roleTask)
+      const { model, effort } = route
+      if (launchedAs !== undefined && withoutNamespace(launchedAs.type) !== route.agent)
+        return yield* new AgentMismatch({ expected: route.agent, launched: launchedAs.type })
+      return yield* record(
+        snapshot.project,
+        snapshot.specialists,
+        id,
+        agentId === undefined ? { launched: false } : { launched: true, agentId, model, effort },
+      )
+    }),
+  ).pipe(Effect.map(({ assignment }) => assignment))
+
 const idArgument = (positionals: ReadonlyArray<string>): string => positionals[0] ?? ""
+
+/** A workflow's agent is recorded as `workflow:<run-id>/<assignment-id>`, naming its own Assignment. */
+const workflowAgentProblem = (agentId: string, id: string): string | undefined => {
+  if (!isWorkflowAgent(agentId)) return undefined
+  const [run = "", assignment, ...rest] = agentId.slice(WORKFLOW_AGENT_PREFIX.length).split("/")
+  return /^\S+$/.test(run) && assignment === id && rest.length === 0
+    ? undefined
+    : `A workflow agent is recorded as workflow:<run-id>/${id}`
+}
 
 /** The `assignment` commands. */
 export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
@@ -100,6 +146,7 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
     usage: "assignment create",
     summary: "Plan an Assignment as Ready without starting it (for plan and workflows)",
     input: DRAFT_SHAPE,
+    notes: ["the draft rules are under assignment dispatch"],
     flags: {},
     positionals: 0,
     run: ({ directory, input }) =>
@@ -122,7 +169,8 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
       "Start an Assignment and say how to run it: spawn an agent or continue a warm one. A new draft is created and started in one step",
     input: `{id} for a Ready Assignment, or a new draft ${DRAFT_SHAPE}`,
     output:
-      "TOON fields (id, state, agent/model/effort or continue, reason), then a line `prompt:` alone, then the specialist prompt verbatim to the end; pass that text to the Agent tool or SendMessage as it is",
+      "TOON fields (id, state, agent/model/effort or continue, reason), then a line `prompt:` alone, then the specialist prompt verbatim to the end; pass that text as it is: as the prompt of a workflow entry first, to the Agent tool only when the Workflow tool is disabled or unavailable, and by SendMessage only for a warm continuation",
+    notes: [...DRAFT_NOTES, 'dispatching a Ready Assignment takes {"id": "<id>"}'],
     flags: {},
     positionals: 0,
     run: ({ directory, config, inputBy }) =>
@@ -150,7 +198,7 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
           "prompt",
           renderPrompt(
             started.assignment,
-            `${AGENT_NAMESPACE}:${routeFor(started.assignment.roleTask).agent}`,
+            `${PLUGIN_NAMESPACE}:${routeFor(started.assignment.roleTask).agent}`,
           ),
         )
       }),
@@ -158,7 +206,12 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
   {
     path: ["assignment", "record"],
     usage: RECORD_USAGE,
-    summary: "Record the launch of a dispatched Assignment, or roll it back when the launch failed",
+    summary:
+      "Record the launch of a dispatched Assignment (a workflow's agent as workflow:<run-id>/<id>), or roll it back when the launch failed",
+    notes: [
+      "the agent id is in the Agent result, or is the continued agent's; --failed returns the Assignment to Ready",
+      "a hook records an agent spawned from a dispatch prompt and says so in its note; record it yourself when the note says it did not, or for a continued agent",
+    ],
     flags: { agent: "string", failed: "boolean" },
     positionals: 1,
     run: ({ directory, args }) =>
@@ -170,21 +223,10 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
             message: "Give exactly one of --agent and --failed",
             hint: `Usage: holyagent ${RECORD_USAGE}`,
           })
-        const { assignment } = yield* updateState(directory, (snapshot) =>
-          Effect.gen(function* () {
-            const { model, effort } = routeFor(
-              (yield* findAssignment(snapshot.project, id)).roleTask,
-            )
-            return yield* record(
-              snapshot.project,
-              snapshot.specialists,
-              id,
-              agentId === undefined
-                ? { launched: false }
-                : { launched: true, agentId, model, effort },
-            )
-          }),
-        )
+        const problem = agentId === undefined ? undefined : workflowAgentProblem(agentId, id)
+        if (problem !== undefined)
+          return yield* new Usage({ message: problem, hint: `Usage: holyagent ${RECORD_USAGE}` })
+        const assignment = yield* recordLaunch(directory, id, agentId)
         return present({
           id,
           state: assignment.state,
@@ -198,10 +240,16 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
     summary:
       "Finish an Assignment with the specialist's report on stdin; --accept also accepts it from the report's evidence block",
     input:
-      "the specialist's report as raw text. Required for success; optional for the other outcomes, which store the outcome name when it is empty. With --accept it ends with `evidence:` and one `<criterion or evidence label>: <support>` line per blocking criterion and required label",
-    flags: { outcome: "string", accept: "string" },
+      "the specialist's report as raw text. Required for success; optional for the other outcomes, which store the outcome name when it is empty. With --accept it ends with `evidence:` and one `<criterion or evidence label>: <support>` line per blocking criterion and required label. With --report-json it is the JSON report a workflow returned ({status: done|partial|blocked, changed_paths, checks: [{command, exit}], blockers, notes, evidence: [{key, support}]}), which is stored as the text of such a report",
+    notes: [
+      "pass the report through a quoted heredoc so it stays intact",
+      "--accept applies to success only and reads the last `evidence:` block: one `<criterion text or evidence label>: <support>` line per blocking criterion and per required label, each starting with that text alone. Accept only support you judge true",
+      "an evidence gap (InsufficientAcceptance) records nothing: SendMessage the missing support to the same subagent, then close again; a workflow agent cannot be messaged, so draft a follow-up with followUpOf",
+      "outcomes: success; failure (the work failed); errored (the agent died or returned no report); interrupted (its agent is gone after a resume or compaction); stopped (you stopped it). A report from a workflow is closed with --report-json",
+    ],
+    flags: { outcome: "string", accept: "string", "report-json": "boolean" },
     positionals: 1,
-    run: ({ directory, args, text }) =>
+    run: ({ directory, args, text, input }) =>
       Effect.gen(function* () {
         const id = idArgument(args.positionals)
         const flag = yield* choiceFlag(
@@ -218,8 +266,24 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
             hint: `Usage: holyagent ${CLOSE_USAGE}`,
           })
         // Only success has to say what was done; a lost or stopped specialist often has no report.
-        const report =
-          outcome === "Succeeded" ? yield* text : yield* text.pipe(Effect.orElseSucceed(() => ""))
+        const read = input(JsonReport)
+        const json = !booleanFlag(args, "report-json")
+          ? undefined
+          : outcome === "Succeeded"
+            ? yield* read
+            : yield* read.pipe(Effect.orElseSucceed(() => undefined))
+        if (rationale !== undefined && json !== undefined && json.status !== "done")
+          return yield* new Usage({
+            message: `--accept needs a report with status done, but the report says ${json.status}`,
+            hint: "Close it without --accept, or send the work back with a follow-up.",
+          })
+        const report = booleanFlag(args, "report-json")
+          ? json === undefined
+            ? ""
+            : renderJsonReport(json)
+          : outcome === "Succeeded"
+            ? yield* text
+            : yield* text.pipe(Effect.orElseSucceed(() => ""))
         const result =
           outcome === "Succeeded" ? report : report.trim() === "" ? flag : `${flag}: ${report}`
         const now = yield* nowIso
@@ -251,6 +315,10 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
     usage: "assignment accept <id> --rationale <text> [--carry-forward]",
     summary:
       "Accept a Succeeded Assignment later from its stored report, or carry its acceptance forward to a newer revision",
+    notes: [
+      "--carry-forward accepts, at the live revision, work that finished at an earlier one and still holds; the rationale says why",
+      "when a later change touched the files it established, a bounded validation Assignment reassesses it first",
+    ],
     flags: { rationale: "string", "carry-forward": "boolean" },
     positionals: 1,
     run: ({ directory, args }) =>
