@@ -50,7 +50,7 @@ describe("instruction sources", () => {
 
   test("give each skill a folder named after it and only the frontmatter keys claude.ai accepts", () => {
     const skills = readdirSync(join(CLAUDE, "skills"))
-    expect(skills.toSorted()).toEqual(["interface-inspection", "merge-ready", "user-busy"])
+    expect(skills.toSorted()).toEqual(["dev-server", "user-busy"])
     for (const skill of skills) {
       const text = read(join(CLAUDE, "skills", skill, "SKILL.md"))
       const keys = frontmatterKeys(text)
@@ -66,9 +66,10 @@ describe("instruction sources", () => {
     for (const path of FILES)
       expect({
         path,
-        found: /\b(grill-me|continue-work|stacks-and-ci)\b|`assignments` skill/.exec(
-          read(path),
-        )?.[0],
+        found:
+          /\b(grill-me|continue-work|stacks-and-ci)\b|`assignments` skill|`(merge-ready|interface-inspection)` skill/.exec(
+            read(path),
+          )?.[0],
       }).toEqual({
         path,
         found: undefined,

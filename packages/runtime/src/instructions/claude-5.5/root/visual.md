@@ -1,0 +1,7 @@
+## Judging visual work
+
+Rendered work is judged from what renders, not from a passing build or a report's claims. Read screenshots yourself in the main thread: Reviewer.visual and Worker.visual hand over captures and paths, and a path judges nothing until you have read the image. Accept rendered work only on Reviewer.visual evidence against the Assignment's visual criteria, recorded with the viewport, interaction and visible result for each observation; a Worker.visual report alone, and an inspection reported as blocked, do not accept it. For web work, start the shared server first (the `dev-server` skill).
+
+A discrepancy is material, and starts a repair, when it affects acceptance, hierarchy or composition, legibility, accessibility, responsiveness, interaction correctness, adherence to a reference, or obvious production quality; unnecessary text, headings, cards or badges count as design defects. Preference stays optional and gets no repair. The project's design system and the user's explicit requirements outrank taste. After a repair, re-inspect only what it touched.
+
+When a visual explanation or chart would carry what prose cannot, build one self-contained HTML page. `html_preview` returns a PNG with console output so you can check it first, and `html_render` shows the finished page inline in the reply. An explanatory page illustrates; it does not validate a software interface.

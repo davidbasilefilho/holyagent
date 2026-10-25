@@ -4,6 +4,7 @@ import packageJson from "../package.json" with { type: "json" }
 import { agentFiles, PLUGIN_NAME } from "./agents.ts"
 import {
   DIST_DIRECTORY,
+  FRONTEND_DESIGN_DIRECTORY,
   type GeneratedFile,
   generatedNote,
   INSTRUCTIONS_DIRECTORY,
@@ -26,8 +27,6 @@ export const MARKETPLACE_PATH = ".claude-plugin/marketplace.json"
 export const GENERATED_PATHS: ReadonlyArray<string> = [MARKETPLACE_PATH, DIST_DIRECTORY]
 
 const SOURCES = `${PLUGIN_DIRECTORY}/src`
-/** The official frontend-design skill, kept byte for byte as Anthropic ships it. */
-const VENDORED_SKILLS = `${PLUGIN_DIRECTORY}/vendor`
 
 const DESCRIPTION =
   "A root agent that plans work as Intents and Assignments and eighteen specialists it dispatches, with a CLI that keeps their state."
@@ -133,20 +132,28 @@ const hooks = (): GeneratedFile => ({
 
 const skills = async (): Promise<ReadonlyArray<GeneratedFile>> => {
   const root = `${INSTRUCTIONS_DIRECTORY}/skills`
-  const own = (await listFiles(root)).map(async (path) => {
-    const source = `${root}/${path}`
-    const text = await readSource(source)
-    return {
-      path: inPlugin(`skills/${path}`),
-      content: path.endsWith("SKILL.md") ? noteInFrontmatter(text, source) : text,
-    }
-  })
-  const vendored = (await listFiles(VENDORED_SKILLS)).map(async (path) => ({
-    path: inPlugin(`skills/${path}`),
-    content: await readSource(`${VENDORED_SKILLS}/${path}`),
-  }))
-  return Promise.all([...own, ...vendored])
+  return Promise.all(
+    (await listFiles(root)).map(async (path) => {
+      const source = `${root}/${path}`
+      const text = await readSource(source)
+      return {
+        path: inPlugin(`skills/${path}`),
+        content: path.endsWith("SKILL.md") ? noteInFrontmatter(text, source) : text,
+      }
+    }),
+  )
 }
+
+/**
+ * The license of the `frontend-design` text that the visual roles embed, byte for byte, because the
+ * Apache License asks for it to travel with the text.
+ */
+const licenses = async (): Promise<ReadonlyArray<GeneratedFile>> => [
+  {
+    path: inPlugin("licenses/frontend-design/LICENSE.txt"),
+    content: await readSource(`${FRONTEND_DESIGN_DIRECTORY}/LICENSE.txt`),
+  },
+]
 
 const BUNDLE_MARKER = /^\/\/ \S+\.(?:[cm]?[jt]s|json|md)$\n/gm
 
@@ -196,5 +203,6 @@ export const generate = async (): Promise<ReadonlyArray<GeneratedFile>> =>
     hooks(),
     ...(await agentFiles()),
     ...(await skills()),
+    ...(await licenses()),
     ...(await scripts()),
   ].toSorted((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))

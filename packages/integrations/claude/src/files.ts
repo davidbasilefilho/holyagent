@@ -6,6 +6,13 @@ export const PLUGIN_DIRECTORY = "packages/integrations/claude"
 /** The built plugin that Claude Code loads, relative to the repository root. */
 export const DIST_DIRECTORY = `${PLUGIN_DIRECTORY}/dist`
 
+/**
+ * Anthropic's `frontend-design` skill, kept byte for byte as it ships (its `SKILL.md` and
+ * `LICENSE.txt`), relative to the repository root. The visual roles embed its text, and the plugin
+ * ships its license.
+ */
+export const FRONTEND_DESIGN_DIRECTORY = `${PLUGIN_DIRECTORY}/vendor/frontend-design`
+
 /** The instruction sources the plugin is built from, relative to the repository root. */
 export const INSTRUCTIONS_DIRECTORY = "packages/runtime/src/instructions/claude-5.5"
 

@@ -2,6 +2,7 @@ import { type Capability, type Route, ROUTES } from "../../../runtime/src/domain
 import { ROOT_CORE_FILES } from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
 import {
   DIST_DIRECTORY,
+  FRONTEND_DESIGN_DIRECTORY,
   type GeneratedFile,
   generatedNote,
   INSTRUCTIONS_DIRECTORY,
@@ -24,12 +25,12 @@ const WEB = ["web_search_exa", "web_fetch_exa", "agent_run"].map(
 )
 const WRITING = ["Write", "Edit", "Bash"]
 /**
- * The T3 Code tools of the root; the visual roles take theirs from the `interface-inspection`
- * skill.
+ * The T3 Code tools of the root; the visual roles take theirs from the interface inspection
+ * section.
  */
 const ROOT_T3_TOOLS = ["html_render", "html_preview", "watch_pull_request"]
 
-/** Roles that review code and take the mergeability bar and the `merge-ready` skill with them. */
+/** Roles that write or review code and take the mergeability bar with them. */
 const MERGE_READY: ReadonlySet<string> = new Set([
   "Worker.mechanical",
   "Worker.implementation",
@@ -39,6 +40,9 @@ const MERGE_READY: ReadonlySet<string> = new Set([
   "Reviewer.code",
   "Reviewer.testing",
 ])
+
+/** Roles that get the writing bar, for the instruction text they write or judge. */
+const WRITING_BAR: ReadonlySet<string> = new Set(["Worker.implementation", "Reviewer.artifact"])
 
 /**
  * The sections of the root prompt, as files of `root/` in prompt order. The core opens it; the
@@ -50,6 +54,7 @@ export const ROOT_SECTIONS: ReadonlyArray<string> = [
   "routing.md",
   "workflows.md",
   "assignments.md",
+  "visual.md",
   "instruction-guidelines.md",
   "version-control.md",
   "stack-plan.md",
@@ -74,6 +79,35 @@ export const SPECIALIST_SECTIONS: ReadonlyArray<string> = [
  */
 export const WRITING_BAR_SECTION = "writing-bar.md"
 
+/** The mergeability bar, a file of `specialist/` that the roles of {@link MERGE_READY} get. */
+export const MERGE_READY_SECTION = "merge-ready.md"
+
+/** The interface inspection rules, a file of `specialist/` for the roles that inspect renders. */
+export const INSPECTION_SECTION = "interface-inspection.md"
+
+/**
+ * The files of `specialist/` that only some roles need, in prompt order after the conduct, with the
+ * roles that get each. Their text is fixed in those agents, so none of it is loaded as a skill.
+ */
+export const CONDITIONAL_SECTIONS: ReadonlyArray<{
+  readonly file: string
+  readonly applies: (route: Route) => boolean
+}> = [
+  { file: WRITING_BAR_SECTION, applies: (route) => WRITING_BAR.has(route.roleTask) },
+  { file: MERGE_READY_SECTION, applies: (route) => MERGE_READY.has(route.roleTask) },
+  {
+    file: INSPECTION_SECTION,
+    applies: (route) => route.capabilities.includes("VisualInspection"),
+  },
+]
+
+/**
+ * The role section that opens the embedded `frontend-design` guidance: the file holds the framing
+ * and the generator appends the vendored text after it, so the guidance stays as Anthropic ships
+ * it.
+ */
+export const FRONTEND_DESIGN_SECTION = "frontend-design.md"
+
 /**
  * The sections of each role, as files of `roles/<agent>/` in prompt order. The first is the
  * purpose, whose first sentence describes the agent to the root.
@@ -89,14 +123,14 @@ export const ROLE_SECTIONS: Readonly<Record<string, ReadonlyArray<string>>> = {
   "reviewer-code": ["purpose.md", "builtin-review.md", "range.md"],
   "reviewer-security": ["purpose.md", "builtin-review.md", "trust-boundaries.md", "findings.md"],
   "reviewer-testing": ["purpose.md", "method.md"],
-  "reviewer-visual": ["purpose.md", "captures.md"],
+  "reviewer-visual": ["purpose.md", "captures.md", FRONTEND_DESIGN_SECTION],
   "worker-debugging": ["purpose.md", "phases.md", "escalation.md"],
   "worker-implementation": ["purpose.md", "method.md", "refactor.md", "instruction-text.md"],
   "worker-integration": ["purpose.md", "method.md"],
   "worker-mechanical": ["purpose.md", "method.md", "refactor.md"],
   "worker-operations": ["purpose.md", "method.md", "dev-server.md"],
   "worker-validation": ["purpose.md", "method.md", "baseline.md"],
-  "worker-visual": ["purpose.md", "method.md"],
+  "worker-visual": ["purpose.md", "method.md", FRONTEND_DESIGN_SECTION],
 }
 
 /**
@@ -137,6 +171,11 @@ export const REQUIREMENT_SECTIONS: Readonly<
     phrase: "judged from the diff and the check output",
   },
   "R-REVIEW": { section: "root/assignments.md", phrase: "gets an independent reviewer" },
+  "R-VISUAL": { section: "root/visual.md", phrase: "Read screenshots yourself in the main thread" },
+  "R-DEVSERVER": {
+    section: "root/skills.md",
+    phrase: "start the one server the visual specialists share",
+  },
   "R-VCS": {
     section: "root/version-control.md",
     phrase: "Version control and state records are yours alone",
@@ -167,6 +206,10 @@ export const REQUIREMENT_SECTIONS: Readonly<
     phrase: "run the ones that exercise your change now",
   },
   "R-S-REPORT": { section: "specialist/report.md", phrase: "End with one compact report" },
+  "R-MERGE": {
+    section: "specialist/merge-ready.md",
+    phrase: "A change is merge-ready when the repository's maintainer would merge it",
+  },
   "R-EL": { section: "roles/explorer-lookup/method.md", phrase: "Locate with Grep and Glob" },
   "R-EM": { section: "roles/explorer-map/method.md", phrase: "Cite a path" },
   "R-ET": { section: "roles/explorer-trace/method.md", phrase: "Begin at the trigger" },
@@ -193,6 +236,14 @@ export const REQUIREMENT_SECTIONS: Readonly<
     section: "roles/reviewer-visual/captures.md",
     phrase: "report the inspection as blocked",
   },
+  "R-RV-DESIGN": {
+    section: "roles/reviewer-visual/frontend-design.md",
+    phrase: "Judge the design quality",
+  },
+  "R-INSPECT": {
+    section: "specialist/interface-inspection.md",
+    phrase: "A material discrepancy affects acceptance",
+  },
   "R-WD": { section: "roles/worker-debugging/phases.md", phrase: "Reproduce" },
   "R-WI": { section: "roles/worker-implementation/method.md", phrase: "smallest complete change" },
   "R-WI-TEXT": {
@@ -207,6 +258,10 @@ export const REQUIREMENT_SECTIONS: Readonly<
     section: "roles/worker-visual/purpose.md",
     phrase: "repair material discrepancies",
   },
+  "R-WVI-DESIGN": {
+    section: "roles/worker-visual/frontend-design.md",
+    phrase: "Apply this guidance when you build or reshape an interface",
+  },
 }
 
 const readSections = async (
@@ -216,9 +271,6 @@ const readSections = async (
   (await Promise.all(names.map((name) => readSource(`${directory}/${name}`)))).map((text) =>
     text.trim(),
   )
-
-/** Roles that get the writing bar, for the instruction text they write or judge. */
-const WRITING_BAR: ReadonlySet<string> = new Set(["Worker.implementation", "Reviewer.artifact"])
 
 /**
  * Roles that start with a built-in review of Claude Code, `/code-review` and `/security-review`.
@@ -230,13 +282,13 @@ const BUILTIN_REVIEW: ReadonlySet<string> = new Set(["Reviewer.code", "Reviewer.
 const t3 = (names: ReadonlyArray<string>) => names.map((name) => `mcp__t3-code__${name}`)
 
 /**
- * The T3 Code inspection tools the `interface-inspection` skill names (`preview_*`, `device_*` and
- * `html_*`), in order of appearance, so the skill stays their one source.
+ * The T3 Code inspection tools the interface inspection section names (`preview_*`, `device_*` and
+ * `html_*`), in order of appearance, so that section stays their one source.
  */
-export const inspectionTools = (skill: string): ReadonlyArray<string> => [
+export const inspectionTools = (section: string): ReadonlyArray<string> => [
   ...new Set(
     Array.from(
-      skill.matchAll(/\b(?:mcp__t3-code__)?((?:preview|device|html)(?:_[a-z]+)+)\b/g),
+      section.matchAll(/\b(?:mcp__t3-code__)?((?:preview|device|html)(?:_[a-z]+)+)\b/g),
       ([, name = ""]) => name,
     ),
   ),
@@ -270,13 +322,6 @@ const toolsOf = (route: Route, inspection: ReadonlyArray<string>): ReadonlyArray
   return unique.includes("Bash") ? [...unique, "Monitor"] : unique
 }
 
-const skillsOf = (route: Route): ReadonlyArray<string> => [
-  ...(MERGE_READY.has(route.roleTask) ? [`${PLUGIN_NAME}:merge-ready`] : []),
-  ...(route.capabilities.includes("VisualInspection")
-    ? [`${PLUGIN_NAME}:interface-inspection`]
-    : []),
-]
-
 const firstSentence = (text: string): string => {
   const paragraph = text.trim().split("\n")[0] ?? ""
   return /^.*?\.(?=\s|$)/.exec(paragraph)?.[0] ?? paragraph
@@ -289,23 +334,37 @@ const describe = (route: Route, role: string): string =>
 const frontmatter = (source: string, lines: ReadonlyArray<string>): string =>
   ["---", `# ${generatedNote(source)}`, ...lines, "---"].join("\n")
 
-const specialist = async (
-  route: Route,
-  specialistText: ReadonlyArray<string>,
-  writingBar: string,
-  inspection: ReadonlyArray<string>,
-): Promise<GeneratedFile> => {
+/**
+ * The text of the vendored `frontend-design` skill without its frontmatter, which is all the visual
+ * roles embed.
+ */
+const frontendDesign = async (): Promise<string> => {
+  const [, , ...body] = (await readSource(`${FRONTEND_DESIGN_DIRECTORY}/SKILL.md`)).split(/^---$/m)
+  return body.join("---").trim()
+}
+
+/** What the specialists of the roles share, read once for all of them. */
+interface Shared {
+  readonly conduct: ReadonlyArray<string>
+  /** The text of each of {@link CONDITIONAL_SECTIONS}, by file. */
+  readonly conditional: Readonly<Record<string, string>>
+  readonly inspection: ReadonlyArray<string>
+  readonly design: string
+}
+
+const specialist = async (route: Route, shared: Shared): Promise<GeneratedFile> => {
   const source = `${INSTRUCTIONS_DIRECTORY}/roles/${route.agent}`
-  const [role = "", ...rest] = await readSections(source, ROLE_SECTIONS[route.agent] ?? [])
-  const skills = skillsOf(route)
+  const sections = ROLE_SECTIONS[route.agent] ?? []
+  const [role = "", ...rest] = (await readSections(source, sections)).map((text, at) =>
+    sections[at] === FRONTEND_DESIGN_SECTION ? `${text}\n\n${shared.design}` : text,
+  )
   const head = frontmatter(source, [
     `name: ${route.agent}`,
     `description: ${JSON.stringify(describe(route, role))}`,
     `model: ${route.model}`,
     `effort: ${route.effort}`,
     "background: true",
-    `tools: ${toolsOf(route, inspection).join(", ")}`,
-    ...(skills.length === 0 ? [] : ["skills:", ...skills.map((skill) => `  - ${skill}`)]),
+    `tools: ${toolsOf(route, shared.inspection).join(", ")}`,
     "experimental:",
     "  cacheTtl: 1h",
   ])
@@ -313,8 +372,10 @@ const specialist = async (
     `You are the ${PLUGIN_NAME} ${route.agent} specialist. Independence: ${route.independence}.`,
     role,
     ...rest,
-    ...specialistText,
-    ...(WRITING_BAR.has(route.roleTask) ? [writingBar] : []),
+    ...shared.conduct,
+    ...CONDITIONAL_SECTIONS.filter(({ applies }) => applies(route)).map(
+      ({ file }) => shared.conditional[file] ?? "",
+    ),
   ].join("\n\n")
   return {
     path: `${DIST_DIRECTORY}/agents/${route.agent}.md`,
@@ -359,16 +420,22 @@ const rootAgent = async (): Promise<GeneratedFile> => {
 
 /** The root agent and one agent for each route, with paths relative to the plugin folder. */
 export const agentFiles = async (): Promise<ReadonlyArray<GeneratedFile>> => {
-  const [specialistText, [writingBar = ""], skill] = await Promise.all([
-    readSections(`${INSTRUCTIONS_DIRECTORY}/specialist`, SPECIALIST_SECTIONS),
-    readSections(`${INSTRUCTIONS_DIRECTORY}/specialist`, [WRITING_BAR_SECTION]),
-    readSource(`${INSTRUCTIONS_DIRECTORY}/skills/interface-inspection/SKILL.md`),
+  const directory = `${INSTRUCTIONS_DIRECTORY}/specialist`
+  const files = CONDITIONAL_SECTIONS.map(({ file }) => file)
+  const [conduct, texts, design] = await Promise.all([
+    readSections(directory, SPECIALIST_SECTIONS),
+    readSections(directory, files),
+    frontendDesign(),
   ])
-  const inspection = inspectionTools(skill)
+  const conditional = Object.fromEntries(files.map((file, at) => [file, texts[at] ?? ""]))
+  const shared: Shared = {
+    conduct,
+    conditional,
+    inspection: inspectionTools(conditional[INSPECTION_SECTION] ?? ""),
+    design,
+  }
   return [
     await rootAgent(),
-    ...(await Promise.all(
-      ROUTES.map((route) => specialist(route, specialistText, writingBar, inspection)),
-    )),
+    ...(await Promise.all(ROUTES.map((route) => specialist(route, shared)))),
   ]
 }
