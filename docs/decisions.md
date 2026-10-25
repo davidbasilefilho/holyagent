@@ -38,7 +38,7 @@ Standing decisions and their reasons. Many come from an audit of one long sessio
 
 **Language follows the artifact.** PRs, commits, docs and instruction text are in English unless the target repository's convention says otherwise; the task list and the root's messages to you are in the language of your latest message.
 
-**Progress lives in the task list.** The root creates the list first, updates it at every dispatch, close and verdict, and writes to you only for a decision, a blocker and the final report.
+**Progress lives in the task list.** The root creates the list first, updates it at every dispatch, close and verdict, and writes to you only for a decision, a blocker and the final report, with one exception: a brief acknowledgment of each user message.
 
 ## Kept
 
@@ -46,7 +46,7 @@ Standing decisions and their reasons. Many come from an audit of one long sessio
 - **Models do not reason about cache, TTL or cost.** The predecessor's root text did not either, apart from the prompt lines removed above. (`root-conduct-11`)
 - **Narrow, matcher-scoped hooks.** The cheap ones were worth keeping; the broad one was not. (`mechanisms-11`)
 - **Warm continuation where it worked.** One agent carried five or six merge-conflict resolutions at about a 0.98 cache ratio. (`cache-reuse-10`)
-- **The root plans and judges; specialists do the work.** The root owns the user relationship, acceptance and version control, runs no gates itself and does not poll: completion notices are its only wake-ups. It speaks to the user only for a decision, a blocker only the user can clear and the final report; everything else lives in its task list.
+- **The root plans and judges; specialists do the work.** The root owns the user relationship, acceptance and version control, runs no gates itself and does not poll: completion notices are its only wake-ups. It speaks to the user only for a decision, a blocker only the user can clear and the final report, with one exception: a brief acknowledgment of each user message; everything else lives in its task list.
 - **Eighteen specialists with pinned model and effort**, writers confined to disjoint ownership paths, and independent review of every change to code or artifacts, with a security review for trust boundaries.
 - **Mergeability as the bar**, in six dimensions with blocking and non-blocking criteria, the repository's own conventions first.
 - **One PR per reviewable change**, every PR of one delivery stacked in work order by default (the target repository's conventions first, other work branched from the base), with a CI PR first when the work adds CI, disjoint paths for parallel writers, a PR opened or updated in the same step as every push, merge-forward with merge commits, no force-push without your approval.

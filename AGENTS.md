@@ -15,4 +15,4 @@ Rules for working in this repository, each with the reason it exists. The contri
 
 ## Blocked actions
 
-- When a denial or a blocking hook names a holyagent route, follow it: the `vcs-redirect` hook denies `git commit` and `git push` and names `holyagent vcs commit` and `holyagent vcs push`. When one names none, stop and report it, and do not route around it through another tool, because the block is a deliberate boundary and a workaround defeats it.
+- The root follows a route that a denial or blocking hook names: the `vcs-redirect` hook denies `git commit` and `git push` and names `holyagent vcs commit` and `holyagent vcs push`. When one names none, the root stops and reports it, and does not route around it through another tool, because the block is a deliberate boundary and a workaround defeats it. A specialist stops and reports instead, since version-control writes are the root's.

@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mvnxwkr9-w3v8",
+  "intentId": "intent-0mvnv553v-zwx8",
+  "intentRevision": 10,
+  "roleTask": "Worker.mechanical",
+  "slug": "fix-the-stale-marketplace-sentence-in",
+  "objective": "Fix the stale marketplace sentence in docs/usage.md on the PR1 branch.",
+  "state": "Succeeded",
+  "scope": [
+    "Worktree /home/davidbasile/dev/holyagent-pr1 (branch release/0.1.2/build/plugin-dist, head 20df8a7); paths relative to it.",
+    "docs/usage.md:29 (paragraph 'This repository') says the root .claude-plugin/marketplace.json points at packages/integrations/claude; change it to packages/integrations/claude/dist, which is the source at .claude-plugin/marketplace.json:14. Change nothing else.",
+    "Run `mise run verify` in that worktree."
+  ],
+  "constraints": [
+    "Do not commit, push, branch, check out, or touch .git or .holyagent. Work only in /home/davidbasile/dev/holyagent-pr1."
+  ],
+  "criteria": [
+    {
+      "text": "docs/usage.md names packages/integrations/claude/dist as the marketplace source and nothing else changes.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "`mise run verify` passes in the worktree.",
+      "blocking": true,
+      "dimension": "style"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "docs/usage.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "workflow:wf_23a789fe-588/assignment-0mvnxwkr9-w3v8",
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-25T14:45:31.798Z",
+    "finishedAt": "2026-10-25T14:48:25.655Z"
+  },
+  "result": "result: docs/usage.md line 29 now names `packages/integrations/claude/dist` as the marketplace source; no other line changed, and `mise run verify` passes in the PR1 worktree.\nchanged: docs/usage.md\nchecks:\n- `mise run verify` -> exit 0; fmt:check \"All 163 files are formatted\", check \"No type errors in 103 files\", lint \"No problems in 104 files\", test 547 pass / 1 skip / 0 fail (548 tests, 26 files). Log: /tmp/claude-1000/-home-davidbasile-dev-holyagent/e7f538f4-40ba-40c9-9aff-8bf7e8fc4874/scratchpad/verify-pr1.log\n- `grep \"integrations/claude[^/]\" docs/usage.md` -> no matches (no remaining stale path)\n- `git status --short` -> only ` M docs/usage.md`; `git diff --stat` -> 1 insertion, 1 deletion\nblockers: none\nquestions: none\nnotes: The diff is saved at /tmp/claude-1000/-home-davidbasile-dev-holyagent/e7f538f4-40ba-40c9-9aff-8bf7e8fc4874/scratchpad/usage-md.diff. Not committed; the root owns that.\nevidence:\n[blocking] docs/usage.md names packages/integrations/claude/dist as the marketplace source and nothing else changes (behavior): docs/usage.md:29 now reads \"whose `.claude-plugin/marketplace.json` points at `packages/integrations/claude/dist`\"; `git diff --stat` shows 1 line changed; diff file above\n[blocking] `mise run verify` passes in the worktree (style): exit 0 on /home/davidbasile/dev/holyagent-pr1, log at the verify-pr1.log path above\nchanged-paths: docs/usage.md (diff at the usage-md.diff path above)\nchecks-run: mise run verify -> exit 0; grep stale-path search -> no matches; git status/diff --stat -> only docs/usage.md modified",
+  "createdAt": "2026-10-25T14:45:31.798Z"
+}
