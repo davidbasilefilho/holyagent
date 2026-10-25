@@ -253,6 +253,10 @@ export const REQUIREMENT_SECTIONS: Readonly<
   "R-WIN": { section: "roles/worker-integration/method.md", phrase: "end to end" },
   "R-WM": { section: "roles/worker-mechanical/method.md", phrase: "Find every site" },
   "R-WO": { section: "roles/worker-operations/method.md", phrase: "documented workflow" },
+  "R-WO-DEV": {
+    section: "roles/worker-operations/dev-server.md",
+    phrase: "Report the URL, exact command, process id and log location",
+  },
   "R-WV": { section: "roles/worker-validation/method.md", phrase: "choose the real check" },
   "R-WVI": {
     section: "roles/worker-visual/purpose.md",
@@ -335,12 +339,16 @@ const frontmatter = (source: string, lines: ReadonlyArray<string>): string =>
   ["---", `# ${generatedNote(source)}`, ...lines, "---"].join("\n")
 
 /**
- * The text of the vendored `frontend-design` skill without its frontmatter, which is all the visual
- * roles embed.
+ * The text of the vendored `frontend-design` skill without its frontmatter, with its headings moved
+ * down two levels so that they sit under the role's own heading; that is all the visual roles
+ * embed, and the vendored file stays as Anthropic ships it.
  */
 const frontendDesign = async (): Promise<string> => {
   const [, , ...body] = (await readSource(`${FRONTEND_DESIGN_DIRECTORY}/SKILL.md`)).split(/^---$/m)
-  return body.join("---").trim()
+  return body
+    .join("---")
+    .trim()
+    .replace(/^(#{1,4}) /gm, "$1## ")
 }
 
 /** What the specialists of the roles share, read once for all of them. */

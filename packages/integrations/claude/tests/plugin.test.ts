@@ -223,7 +223,7 @@ describe("agents", () => {
       .filter((file) => !file.path.includes("/scripts/"))
       .flatMap((file) => file.content.match(/holyagent:[A-Za-z0-9._-]+/g) ?? [])
       .map((reference) => reference.slice("holyagent:".length))
-    const known = new Set([...agents, "merge-ready", "interface-inspection", "user-busy"])
+    const known = new Set([...agents, "dev-server", "user-busy"])
     for (const name of [...references, ...ROUTES.map((route) => route.agent)]) {
       expect(name).toMatch(/^[a-z]+(?:-[a-z]+)*$/)
       expect(known.has(name)).toBe(true)
@@ -478,10 +478,16 @@ describe("agents", () => {
     expect(inspecting.toSorted()).toEqual(["reviewer-visual", "worker-visual"])
   })
 
-  test("the visual roles embed the frontend-design guidance as Anthropic ships it, with its license named", () => {
+  test("the visual roles embed the frontend-design guidance with its headings two levels down and its license named", () => {
     const vendored = read("packages/integrations/claude/vendor/frontend-design", "SKILL.md")
-    const guidance = vendored.slice(vendored.indexOf("# Frontend Design")).trim()
+    const guidance = vendored
+      .slice(vendored.indexOf("# Frontend Design"))
+      .trim()
+      .split("\n")
+      .map((line) => (line.startsWith("#") ? `##${line}` : line))
+      .join("\n")
     expect(guidance.length).toBeGreaterThan(5000)
+    expect(guidance).toStartWith("### Frontend Design")
     for (const route of ROUTES) {
       const text = agent(route.agent)?.content ?? ""
       const visual = ["worker-visual", "reviewer-visual"].includes(route.agent)
@@ -495,6 +501,16 @@ describe("agents", () => {
         expect(text).toContain("licenses/frontend-design/LICENSE.txt")
       }
     }
+  })
+
+  test("each agent description stands alone, without pointing at text below it", () => {
+    for (const route of ROUTES)
+      expect({
+        agent: route.agent,
+        points: /\b(below|above)\b/.test(
+          field(agent(route.agent)?.content ?? "", "description") ?? "",
+        ),
+      }).toEqual({ agent: route.agent, points: false })
   })
 
   test("the dev-server skill is generated, opens with the situation, and covers start, share and stop", () => {

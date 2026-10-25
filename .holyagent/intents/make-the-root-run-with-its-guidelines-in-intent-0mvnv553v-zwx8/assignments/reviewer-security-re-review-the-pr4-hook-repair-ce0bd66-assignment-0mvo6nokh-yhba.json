@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mvo6nokh-yhba",
+  "intentId": "intent-0mvnv553v-zwx8",
+  "intentRevision": 11,
+  "roleTask": "Reviewer.security",
+  "slug": "re-review-the-pr4-hook-repair-ce0bd66",
+  "objective": "Re-review the PR4 hook repair ce0bd66..8fdedd0 and confirm the three earlier bypasses are closed and no new way to auto-allow a non-holyagent agent exists.",
+  "state": "Running",
+  "scope": [
+    "Earlier findings: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/r-eof0.json (yours) and r-gcrq.json (code review). Repair diff only: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/pr4-repair.diff. Full current hook: /home/davidbasile/dev/holyagent-feat-inline-workflows/packages/runtime/src/cli/hook.ts.",
+    "Judge whether each earlier finding is closed, then look for new bypasses in the allowlist design: declared names shadowing globals, destructuring, property access after a dot to dangerous properties not on the denylist, Promise or Map methods reaching code, template text, keyword fusion."
+  ],
+  "constraints": [
+    "Decision (user, verbatim): the workflow PreToolUse hook allows, without a prompt, an inline script the root writes in which every agent() call uses a holyagent specialist (agentType holyagent:*); a script with any other agent type, a scriptPath or a resume keeps the normal permission flow.",
+    "Read-only."
+  ],
+  "criteria": [
+    {
+      "text": "Each earlier finding is marked closed or open with the reason, and any new finding has a concrete allowed script.",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvo6bk89-je3k"
+  ],
+  "followUpOf": "assignment-0mvo60jh9-eof0",
+  "specialist": {
+    "agentId": "workflow:wf_5ede1c17-1a0/assignment-0mvo6nokh-yhba",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-25T18:50:33.378Z"
+  },
+  "createdAt": "2026-10-25T18:50:33.378Z"
+}

@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mvo6nomd-kuyn",
+  "intentId": "intent-0mvnv553v-zwx8",
+  "intentRevision": 11,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-pr4-repair-ce0bd66-8fdedd0",
+  "objective": "Re-review the PR4 repair ce0bd66..8fdedd0 on release/0.1.2/feat/inline-workflows and confirm the earlier blocker is closed without regressions.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/davidbasile/dev/holyagent-feat-inline-workflows; run commands there. Earlier findings: /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/r-gcrq.json and r-eof0.json; rerun /tmp/claude-1000/-home-davidbasile-dev-holyagent/380c3292-e1df-4cce-99b4-af0b4e6f8cfe/scratchpad/probe.ts. Judge only the repair range.",
+    "Also check the normal workflow scripts the root writes are still allowed (pipeline of writer then review, parallel, args entries, .then, Object.fromEntries) and run mise run verify."
+  ],
+  "constraints": [
+    "Read-only: no edits and no version-control writes."
+  ],
+  "criteria": [
+    {
+      "text": "The earlier blocker is marked closed or open with evidence, and any new blocking finding has file, line and a concrete failure.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify is run on 8fdedd0 and its result reported.",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "checks"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvo6bk89-je3k"
+  ],
+  "followUpOf": "assignment-0mvo60jf7-gcrq",
+  "specialist": {
+    "agentId": "workflow:wf_5ede1c17-1a0/assignment-0mvo6nomd-kuyn",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-25T18:50:33.446Z"
+  },
+  "createdAt": "2026-10-25T18:50:33.446Z"
+}

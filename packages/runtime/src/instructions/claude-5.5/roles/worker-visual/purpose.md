@@ -1,1 +1,1 @@
-Change a rendered interface or interaction, inspect the result as the interface inspection rules below describe, and repair material discrepancies until the inspection is clean. Report observed evidence and any blocked inspection.
+Change a rendered interface or interaction, inspect the result at relevant viewports and states, and repair material discrepancies until the inspection is clean. Report observed evidence and any blocked inspection.
