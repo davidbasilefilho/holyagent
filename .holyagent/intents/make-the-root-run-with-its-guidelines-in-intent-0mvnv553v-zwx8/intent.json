@@ -1,0 +1,28 @@
+{
+  "id": "intent-0mvnv553v-zwx8",
+  "slug": "make-the-root-run-with-its-guidelines-in",
+  "objective": "Make the root run with its guidelines in this repository, restructure the instructions per model into per-section files with an instruction-making set for the root, and replace prebuilt workflows with workflows the root writes on the spot.",
+  "requirements": [
+    "quero que arrume isso",
+    "se você não tinha antes as guidelines, era para você ter tido",
+    "se você tinha e ignorou, melhore as guidelines",
+    "siga o guia de instruções claude 5.5",
+    "deve ter um set de instructions para instruction making que vai para o root",
+    "cada seção de cada prompt de agente deve ficar separado em arquivos em instructions/**/root/*.md",
+    "o {modelo}/root/intruction-guidelines.md deve sempre seguir o guia de modelos do próprio {modelo}",
+    "workflows prebuilds não devem existir, o root deve criar na hora porque é literalmente o ponto de workflows",
+    "isso vai ser o 0.1.2",
+    "você vai criar como pr stack né? se não fosse, quero que reforce como padrão do holyagent",
+    "você está atualizando as tasks? você está falando demais comigo / quero que reforce",
+    "o padrão de prs, commits, docs, instruções, etc deve ser em ingles, com o padrão do repo como prioridade / mas tasks, texto que o root manda para o usuário, etc deve ser na lingua mais recente que o usuário utilizou / aplique aqui e no holyagent",
+    "quero que resolva esse problema primeiro, e dê merge nele como 0.1.1-2",
+    "Decision (user): sempre empilhar como PADRÃO, os padrões do repo em mãos devem vir primeiro para mergeability. The root stack plan changes from stack only on a real code dependency to every PR of one delivery stacks in work order by default, with the target repository own conventions taking precedence for mergeability.",
+    "Decision (user): the workflow PreToolUse hook allows, without a prompt, an inline script the root writes in which every agent() call uses a holyagent specialist (agentType holyagent:*); a script with any other agent type, a scriptPath or a resume keeps the normal permission flow.",
+    "Decision (user): specialists follow the same layout as the root: shared specialist sections in claude-5.5/specialist/*.md and each role in claude-5.5/roles/<role>/*.md, one section per file, assembled in a fixed order.",
+    "Finding: this session ran without the root guidelines: the user desktop app shows the holyagent marketplace added but no plugin installed in this project, and neither .claude/settings.json nor the WSL user settings enable it. Fix: this repository project settings enable its own plugin and it is installed for the WSL session.",
+    "Plan: the plugin activation fix ships first as hotfix 0.1.1-2, branched from main and merged with the user approval given above; the 0.1.2 stack (PR1 build into dist; PR3 instruction restructure, guidelines, stacking default, task-list/quiet and language rules; PR4 remove prebuilt workflows) then merges main forward."
+  ],
+  "revision": 5,
+  "state": "Open",
+  "createdAt": "2026-10-25T13:28:12.572Z"
+}

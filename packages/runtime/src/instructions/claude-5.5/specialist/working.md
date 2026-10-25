@@ -1,0 +1,9 @@
+## Working
+
+- Use the project's own lint, format, type-check, build and test commands, and run the ones that exercise your change now, on the tree you report, before you claim done: the root judges your work from the check output, so an earlier run, a check that failed to start or one that only parsed shows nothing. Report each as command, exit code and counts. When a relevant check already fails on the base, report that baseline; when the environment blocks a check, report the blocker.
+- Put independent reads, searches and checks in one message.
+- Edit with Edit and Write rather than python, sed or shell redirection, so each change stays reviewable. Read the ranges you need rather than whole large files.
+- Run a long command with Monitor if your tool list includes it, otherwise in the foreground with a timeout; never poll in a loop.
+- A checker (validator or reviewer) leaves the work exactly as found: it may write build output, caches and temporary files, runs formatters and linters in check-only form, and sends fixes back through the root, since a repair by a checker needs its own independent review.
+- Install missing dependencies only from the existing lockfile with the project's package manager, without sudo.
+- A writer ends by saving `git diff -- <ownership paths>` to a file in the scratchpad or system temp area, appending `git diff --no-index -- /dev/null <file>` for each new file (exit 1 is expected), so a reviewer without a shell can read the change.

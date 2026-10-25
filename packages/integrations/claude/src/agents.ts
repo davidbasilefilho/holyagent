@@ -1,4 +1,5 @@
 import { type Capability, type Route, ROUTES } from "../../../runtime/src/domain/route.ts"
+import { ROOT_CORE_FILES } from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
 import {
   DIST_DIRECTORY,
   type GeneratedFile,
@@ -38,6 +39,72 @@ const MERGE_READY: ReadonlySet<string> = new Set([
   "Reviewer.code",
   "Reviewer.testing",
 ])
+
+/**
+ * The sections of the root prompt, as files of `root/` in prompt order. The core opens it; the
+ * order is fixed here so that a file's name never decides where its text lands.
+ */
+export const ROOT_SECTIONS: ReadonlyArray<string> = [
+  ...ROOT_CORE_FILES,
+  "routing.md",
+  "workflows.md",
+  "assignments.md",
+  "instruction-guidelines.md",
+  "version-control.md",
+  "stack-plan.md",
+  "ci.md",
+  "pr-text.md",
+  "asking.md",
+  "skills.md",
+]
+
+/** The sections of the conduct every specialist shares, as files of `specialist/` in prompt order. */
+export const SPECIALIST_SECTIONS: ReadonlyArray<string> = [
+  "conduct.md",
+  "scope.md",
+  "state-changes.md",
+  "working.md",
+  "report.md",
+]
+
+/**
+ * The writing bar, a file of `specialist/` that only the roles of {@link WRITING_BAR} get, after
+ * the conduct.
+ */
+export const WRITING_BAR_SECTION = "writing-bar.md"
+
+/**
+ * The sections of each role, as files of `roles/<agent>/` in prompt order. The first is the
+ * purpose, whose first sentence describes the agent to the root.
+ */
+export const ROLE_SECTIONS: Readonly<Record<string, ReadonlyArray<string>>> = {
+  "explorer-lookup": ["purpose.md", "method.md"],
+  "explorer-map": ["purpose.md", "method.md"],
+  "explorer-trace": ["purpose.md", "method.md"],
+  "librarian-lookup": ["purpose.md", "method.md"],
+  "librarian-research": ["purpose.md", "method.md"],
+  "reviewer-artifact": ["purpose.md", "method.md", "instruction-text.md"],
+  "reviewer-audit": ["purpose.md", "method.md"],
+  "reviewer-code": ["purpose.md", "builtin-review.md", "range.md"],
+  "reviewer-security": ["purpose.md", "builtin-review.md", "trust-boundaries.md", "findings.md"],
+  "reviewer-testing": ["purpose.md", "method.md"],
+  "reviewer-visual": ["purpose.md", "captures.md"],
+  "worker-debugging": ["purpose.md", "phases.md", "escalation.md"],
+  "worker-implementation": ["purpose.md", "method.md", "refactor.md", "instruction-text.md"],
+  "worker-integration": ["purpose.md", "method.md"],
+  "worker-mechanical": ["purpose.md", "method.md", "refactor.md"],
+  "worker-operations": ["purpose.md", "method.md", "dev-server.md"],
+  "worker-validation": ["purpose.md", "method.md", "baseline.md"],
+  "worker-visual": ["purpose.md", "method.md"],
+}
+
+const readSections = async (
+  directory: string,
+  names: ReadonlyArray<string>,
+): Promise<ReadonlyArray<string>> =>
+  (await Promise.all(names.map((name) => readSource(`${directory}/${name}`)))).map((text) =>
+    text.trim(),
+  )
 
 /** Roles that get the writing bar, for the instruction text they write or judge. */
 const WRITING_BAR: ReadonlySet<string> = new Set(["Worker.implementation", "Reviewer.artifact"])
@@ -113,12 +180,12 @@ const frontmatter = (source: string, lines: ReadonlyArray<string>): string =>
 
 const specialist = async (
   route: Route,
-  specialistText: string,
+  specialistText: ReadonlyArray<string>,
   writingBar: string,
   inspection: ReadonlyArray<string>,
 ): Promise<GeneratedFile> => {
-  const source = `${INSTRUCTIONS_DIRECTORY}/roles/${route.agent}.md`
-  const role = await readSource(source)
+  const source = `${INSTRUCTIONS_DIRECTORY}/roles/${route.agent}`
+  const [role = "", ...rest] = await readSections(source, ROLE_SECTIONS[route.agent] ?? [])
   const skills = skillsOf(route)
   const head = frontmatter(source, [
     `name: ${route.agent}`,
@@ -133,9 +200,10 @@ const specialist = async (
   ])
   const body = [
     `You are the ${PLUGIN_NAME} ${route.agent} specialist. Independence: ${route.independence}.`,
-    role.trim(),
-    specialistText.trim(),
-    ...(WRITING_BAR.has(route.roleTask) ? [writingBar.trim()] : []),
+    role,
+    ...rest,
+    ...specialistText,
+    ...(WRITING_BAR.has(route.roleTask) ? [writingBar] : []),
   ].join("\n\n")
   return {
     path: `${DIST_DIRECTORY}/agents/${route.agent}.md`,
@@ -143,9 +211,12 @@ const specialist = async (
   }
 }
 
-/** The root agent: the main thread, which dispatches every specialist. Its body is root.md as it is. */
+/**
+ * The root agent: the main thread, which dispatches every specialist. Its body is the files of
+ * `root/` in order.
+ */
 const rootAgent = async (): Promise<GeneratedFile> => {
-  const source = `${INSTRUCTIONS_DIRECTORY}/root.md`
+  const source = `${INSTRUCTIONS_DIRECTORY}/root`
   const tools = [
     `Agent(${ROUTES.map((route) => `${PLUGIN_NAME}:${route.agent}`).join(", ")})`,
     "SendMessage",
@@ -171,15 +242,15 @@ const rootAgent = async (): Promise<GeneratedFile> => {
   ])
   return {
     path: `${DIST_DIRECTORY}/agents/${PLUGIN_NAME}.md`,
-    content: `${head}\n\n${await readSource(source)}`,
+    content: `${head}\n\n${(await readSections(source, ROOT_SECTIONS)).join("\n\n")}\n`,
   }
 }
 
 /** The root agent and one agent for each route, with paths relative to the plugin folder. */
 export const agentFiles = async (): Promise<ReadonlyArray<GeneratedFile>> => {
-  const [specialistText, writingBar, skill] = await Promise.all([
-    readSource(`${INSTRUCTIONS_DIRECTORY}/specialist.md`),
-    readSource(`${INSTRUCTIONS_DIRECTORY}/writing-bar.md`),
+  const [specialistText, [writingBar = ""], skill] = await Promise.all([
+    readSections(`${INSTRUCTIONS_DIRECTORY}/specialist`, SPECIALIST_SECTIONS),
+    readSections(`${INSTRUCTIONS_DIRECTORY}/specialist`, [WRITING_BAR_SECTION]),
     readSource(`${INSTRUCTIONS_DIRECTORY}/skills/interface-inspection/SKILL.md`),
   ])
   const inspection = inspectionTools(skill)

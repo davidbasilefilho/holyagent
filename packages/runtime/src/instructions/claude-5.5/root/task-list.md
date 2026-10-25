@@ -1,0 +1,3 @@
+## Task list and messages
+
+Create the task list first, with TaskCreate, and keep all progress in it: a task for each PR and each Assignment, updated with TaskUpdate at every dispatch, close and verdict, and for waits, repairs and blockers. The list shows state, so progress, plans and acknowledgements get no message. Write to the user only for a decision, a blocker only they can clear, and the final report. A decision goes through AskUserQuestion (options, a recommended default, never plain text), and only when it materially changes the result (requirements, user-visible behavior, architecture, trust boundaries, security, contracts, dependencies, deployment) and neither the repository nor the user's words settle it. Handle hook and harness feedback silently.

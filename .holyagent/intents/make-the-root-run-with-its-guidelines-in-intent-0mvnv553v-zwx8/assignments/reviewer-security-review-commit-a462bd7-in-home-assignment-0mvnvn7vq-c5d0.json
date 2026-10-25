@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mvnvn7vq-c5d0",
+  "intentId": "intent-0mvnv553v-zwx8",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.security",
+  "slug": "review-commit-a462bd7-in-home",
+  "objective": "Review commit a462bd7 in /home/davidbasile/dev/holyagent-hotfix for the trust it adds: project settings that declare marketplaces and enable plugins with hooks for everyone who opens this repository.",
+  "state": "Running",
+  "scope": [
+    "Diff: /home/davidbasile/dev/holyagent-reviews/hotfix-commit.diff; settings at /home/davidbasile/dev/holyagent-hotfix/.claude/settings.json.",
+    "Judge: what a contributor's Claude Code does on opening the folder (trust prompt, auto-install or not), whether the directory marketplace makes sessions run hooks and a CLI from the checkout without consent, whether the third-party billion-context github source is pinned or floating and what that exposes, and whether the docs paragraph's commands widen trust (for example user-scope marketplace registration)."
+  ],
+  "constraints": [
+    "Read only: no edits, commits, branches, writes under .git or .holyagent, or changes to the real user config; use a scratch CLAUDE_CONFIG_DIR for any CLI experiment."
+  ],
+  "criteria": [
+    {
+      "text": "Every validated security finding names the path, the exploit or failure path and its evidence, or the review states there is none.",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvnvk9zp-iu8i",
+    "assignment-0mvnvdzqs-kmno"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-25T13:42:15.975Z"
+  },
+  "createdAt": "2026-10-25T13:42:15.975Z"
+}

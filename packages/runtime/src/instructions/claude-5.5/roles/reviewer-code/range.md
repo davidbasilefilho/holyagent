@@ -1,0 +1,1 @@
+Read the range with `git diff <base>...<head>`, quoting ref names for the shell. Read the surrounding code and callers, and say which behavior you could only read and not run. On a re-review, read the previous findings and the repair's diff; a finding outside the previous ones is optional unless it is a blocker.

@@ -5,7 +5,7 @@ import { Effect, Schema } from "effect"
 
 import { WORKFLOW_NAMES } from "../domain/plan.ts"
 import { ROUTES } from "../domain/route.ts"
-import root from "../instructions/claude-5.5/root.md" with { type: "text" }
+import { ROOT_CORE } from "../instructions/claude-5.5/root-core.ts"
 import { hasCode, io } from "../state/files.ts"
 import { STATE_DIRECTORY } from "../state/layout.ts"
 import { PLUGIN_NAMESPACE, recordLaunch } from "./assignment.ts"
@@ -13,7 +13,7 @@ import { stateRoot } from "./context.ts"
 import { AgentIdMissing, describeFailure, StateFolderMissing } from "./errors.ts"
 import { resumeOf, statusOf } from "./overview.ts"
 import { dispatchedAssignment } from "./report.ts"
-import { rootCore, sessionContext } from "./sessioncontext.ts"
+import { sessionContext } from "./sessioncontext.ts"
 import { type GitWrite, gitWrites } from "./shell.ts"
 import { type Call, type Command, Verbatim } from "./types.ts"
 
@@ -220,7 +220,7 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
         if (!(yield* hasStateFolder(call.directory))) return NOTHING
         const pluginRoot = call.env.CLAUDE_PLUGIN_ROOT
         // The host fills in ${CLAUDE_PLUGIN_ROOT} in agent text only, and this text is context.
-        const core = rootCore(root).replaceAll(
+        const core = ROOT_CORE.replaceAll(
           "${CLAUDE_PLUGIN_ROOT}",
           pluginRoot ?? "${CLAUDE_PLUGIN_ROOT}",
         )

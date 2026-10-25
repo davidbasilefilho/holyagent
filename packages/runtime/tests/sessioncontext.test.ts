@@ -1,10 +1,7 @@
 import { describe, expect, test } from "bun:test"
-import { readFileSync } from "node:fs"
-import { join } from "node:path"
 
-import { CONTEXT_BUDGET, rootCore, sessionContext } from "../src/cli/sessioncontext.ts"
-
-const ROOT = readFileSync(join(import.meta.dir, "../src/instructions/claude-5.5/root.md"), "utf8")
+import { CONTEXT_BUDGET, sessionContext } from "../src/cli/sessioncontext.ts"
+import { ROOT_CORE, ROOT_CORE_FILES } from "../src/instructions/claude-5.5/root-core.ts"
 const LONG = "Make every part of the system reliable and observable. ".repeat(40)
 
 const bigStatus = (intents: number, assignments: number) => ({
@@ -29,17 +26,18 @@ const bigStatus = (intents: number, assignments: number) => ({
 })
 
 describe("the core of the root rules", () => {
-  test("is marked in root.md and about 4,000 characters at most", () => {
-    const core = rootCore(ROOT)
+  test("is made of its own files of root/ and about 4,000 characters at most", () => {
+    const core = ROOT_CORE
     expect(core.length).toBeGreaterThan(1000)
     expect(core.length).toBeLessThanOrEqual(4000)
     expect(core).toContain("You are the root.")
     expect(core).toContain("assignment dispatch")
     expect(core).not.toContain("core:start")
+    expect(ROOT_CORE_FILES.every((name) => /^[a-z-]+\.md$/.test(name))).toBe(true)
   })
 
   test("stands alone for a root that gets only the core", () => {
-    const core = rootCore(ROOT)
+    const core = ROOT_CORE
     for (const part of [
       "AskUserQuestion",
       "trust boundaries",
@@ -53,13 +51,23 @@ describe("the core of the root rules", () => {
     expect(core).not.toContain("(see Asking)")
   })
 
-  test("is nothing when the markers are gone", () => {
-    expect(rootCore("# HolyAgent root\n")).toBe("")
+  test("makes the task list the place for progress and keeps messages for decisions, blockers and the report", () => {
+    for (const part of [
+      "Create the task list first",
+      "at every dispatch, close and verdict",
+      "a decision, a blocker only they can clear, and the final report",
+    ])
+      expect(ROOT_CORE).toContain(part)
+  })
+
+  test("sets the language rule: English for repository artifacts, the user's latest language for the user", () => {
+    expect(ROOT_CORE).toContain("in English by default unless the target repository's convention")
+    expect(ROOT_CORE).toContain("in the language of the user's latest message")
   })
 })
 
 describe("the session context", () => {
-  const core = rootCore(ROOT)
+  const core = ROOT_CORE
 
   test("a small state shows in full under a line that it is data", () => {
     const text = sessionContext(

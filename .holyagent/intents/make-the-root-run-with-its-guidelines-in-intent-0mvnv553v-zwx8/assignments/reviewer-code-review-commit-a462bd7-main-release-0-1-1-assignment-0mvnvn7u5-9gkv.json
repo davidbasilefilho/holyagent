@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mvnvn7u5-9gkv",
+  "intentId": "intent-0mvnv553v-zwx8",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.code",
+  "slug": "review-commit-a462bd7-main-release-0-1-1",
+  "objective": "Review commit a462bd7 (main..release/0.1.1-2/fix/enable-plugin-in-repo in the worktree /home/davidbasile/dev/holyagent-hotfix), which enables the plugin in this repository's project settings and bumps to 0.1.1-2, for mergeability.",
+  "state": "Running",
+  "scope": [
+    "Review in /home/davidbasile/dev/holyagent-hotfix. Diff without the regenerated bundle: /home/davidbasile/dev/holyagent-reviews/hotfix-commit.diff.",
+    "Check: the settings keys and schema (directory marketplace path \".\" resolving to the repository root, billion-context source matching packages/cli/src/claude/project.ts, enabledPlugins id), that the docs/usage.md paragraph is accurate and names no command that writes an absolute path into project settings, that every version string is 0.1.1-2 and the bundle change is only the embedded version, and that the change works for a teammate who ran `holyagent setup claude` (same marketplace name `holyagent` but a github source).",
+    "Run `mise run verify` and `bun run claude plugin validate --strict .` in the worktree on the current head."
+  ],
+  "constraints": [
+    "Read only: no edits, commits, branches, or writes under .git or .holyagent, in either tree. Do not install or register plugins in the real user config; use a scratch CLAUDE_CONFIG_DIR for any CLI experiment."
+  ],
+  "criteria": [
+    {
+      "text": "Every blocking mergeability finding is reported with path, symbol and evidence, or the review states there is none.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The verdict rests on gates run now on the current head.",
+      "blocking": true,
+      "dimension": "style"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvnvk9zp-iu8i",
+    "assignment-0mvnvdzqs-kmno"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-25T13:42:15.917Z"
+  },
+  "createdAt": "2026-10-25T13:42:15.917Z"
+}

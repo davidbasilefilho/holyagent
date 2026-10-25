@@ -1,0 +1,46 @@
+{
+  "id": "assignment-0mvnv5jrf-spuq",
+  "intentId": "intent-0mvnv553v-zwx8",
+  "intentRevision": 1,
+  "roleTask": "Librarian.research",
+  "slug": "collect-anthropic-s-official-prompting",
+  "objective": "Collect Anthropic's official prompting guidance for the Claude 5.5 models into one cited reference file the instruction rewrite can follow.",
+  "state": "Succeeded",
+  "scope": [
+    "Find Anthropic's current prompt-engineering and model guides that apply to Claude 5.5 (Opus 5.5, Sonnet 5.5, Haiku 5.5): docs.claude.com / platform.claude.com prompting best practices, agentic and subagent prompting, system prompt and tool-description guidance, and any model-specific notes for the 5.5 family (how it reads emphasis, verbosity, literal instruction following, examples, XML structure, parallel tool use).",
+    "Check whether the repository already names or summarizes such a guide (search packages/runtime/src/instructions, docs/) and say how its current instructions differ from the guide, briefly.",
+    "Write the result to /home/davidbasile/dev/holyagent-reviews/claude-5.5-prompting-guide.md: each rule as a short imperative line with its source URL, grouped by topic, plus a list of what is Unknown or not model-specific."
+  ],
+  "constraints": [
+    "Read only in the repository; write only the one result file outside it.",
+    "Cite a URL for every rule; mark inference as inference."
+  ],
+  "criteria": [
+    {
+      "text": "Every rule in the file cites an official Anthropic URL, and model-specific guidance for the 5.5 family is separated from general guidance or named Unknown.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The file is under 250 lines and holds only guidance usable for writing agent instructions.",
+      "blocking": false,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "sources",
+    "result-file"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "a8b31e27385ec5dc0",
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-10-25T13:28:31.563Z",
+    "finishedAt": "2026-10-25T13:32:45.211Z"
+  },
+  "result": "result: cited Claude 5.5 prompting reference at /home/davidbasile/dev/holyagent-reviews/claude-5.5-prompting-guide.md (134 lines).\n",
+  "createdAt": "2026-10-25T13:28:31.563Z"
+}
