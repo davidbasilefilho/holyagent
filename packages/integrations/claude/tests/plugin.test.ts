@@ -103,6 +103,7 @@ describe("manifests", () => {
       name: "holyagent",
       version: packageJson.version,
       author: { name: "davidbasilefilho" },
+      dependencies: ["billion-context@billion-context"],
     })
     expect(manifest).not.toHaveProperty("license")
   })
@@ -111,6 +112,7 @@ describe("manifests", () => {
     expect(marketplace).toMatchObject({
       name: "holyagent",
       owner: { name: "davidbasilefilho" },
+      allowCrossMarketplaceDependenciesOn: ["billion-context"],
       plugins: [
         {
           name: "holyagent",

@@ -73,7 +73,7 @@ describe("holyagent binary", () => {
     const dry = await $`bun ${entry} setup claude --dir ${directory} --dry-run ${flags}`
       .env(env)
       .quiet()
-    expect(dry.stdout.toString()).toContain("dry run: would add 7")
+    expect(dry.stdout.toString()).toContain("dry run: would add 8")
     expect(existsSync(file)).toBe(false)
     const real =
       await $`bun ${entry} setup claude --dir ${directory} --subagent-cache-ttl 5m ${flags}`

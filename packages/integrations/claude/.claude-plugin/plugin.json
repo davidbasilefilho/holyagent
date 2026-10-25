@@ -4,5 +4,8 @@
   "description": "A root agent that plans work as Intents and Assignments and eighteen specialists it dispatches, with a CLI that keeps their state.",
   "author": {
     "name": "davidbasilefilho"
-  }
+  },
+  "dependencies": [
+    "billion-context@billion-context"
+  ]
 }

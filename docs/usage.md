@@ -8,12 +8,13 @@ Check [requirements.md](requirements.md) first. Pick one route.
 
 ```sh
 claude plugin marketplace add davidbasilefilho/holyagent
+claude plugin marketplace add ranxianglei/billion-context
 claude plugin install holyagent@holyagent
 ```
 
-Inside Claude Code the same two steps are `/plugin marketplace add davidbasilefilho/holyagent` and `/plugin install holyagent@holyagent`. This installs only the plugin. The plugin's own `settings.json` makes the main thread the root agent (`agent: holyagent`) while the plugin is enabled.
+Inside Claude Code the same steps are `/plugin marketplace add davidbasilefilho/holyagent`, `/plugin marketplace add ranxianglei/billion-context` and `/plugin install holyagent@holyagent`. The plugin declares Billion Context's Claude Code plugin (`billion-context@billion-context`) as a dependency, so the install pulls it in, and Claude Code resolves a dependency only from a marketplace that is already added. That plugin carries only the `/billion-context:bili-setup` command, which installs nothing by itself; run it, or `holyagent setup claude`, to set up Billion Context. This route installs only the plugins. The plugin's own `settings.json` makes the main thread the root agent (`agent: holyagent`) while the plugin is enabled.
 
-**`holyagent setup claude`.** The public CLI installs the plugin the same way, then Billion Context and ctx7, then configures the project you run it in (see [Set up a project](#set-up-a-project)). Use it when you also want the project settings and the two tools; it is the only route that writes them.
+**`holyagent setup claude`.** The public CLI adds both marketplaces and installs the plugin the same way, then Billion Context and ctx7, then configures the project you run it in (see [Set up a project](#set-up-a-project)). Use it when you also want the project settings and the two tools; it is the only route that writes them.
 
 ```sh
 holyagent setup claude [--dir <path>] [--subagent-cache-ttl 1h|5m] [--dry-run] [--skip-billion-context] [--skip-ctx7]
@@ -31,14 +32,15 @@ Restart Claude Code after installing so the plugin and Billion Context's native 
 
 `holyagent setup claude` does this as its last step. Run it once per project, from its root, or pass `--dir <path>`. A plugin can only set `agent` and `subagentStatusLine`, so the rest of the project settings are this command's job. It adds the missing keys to `.claude/settings.json` and never changes a value that is already set (`+` added, `=` already that value, `~` kept, with the recommendation shown).
 
-| Key                                     | Value                               | Why                                                                                                    |
-| --------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `attribution.commit`, `attribution.pr`  | `""`                                | No attribution trailer or PR line; see [commit-authorship.md](commit-authorship.md)                    |
-| `attribution.sessionUrl`                | `false`                             | No claude.ai session link in commits                                                                   |
-| `includeGitInstructions`                | `false`                             | Removes Claude Code's built-in commit and PR instructions and the git status snapshot from the context |
-| `subagentPromptCacheTtl`                | `1h` (or the flag)                  | Specialists stay warm for the reuse window; see [cache-and-workflows.md](cache-and-workflows.md)       |
-| `extraKnownMarketplaces.holyagent`      | GitHub `davidbasilefilho/holyagent` | Offers the marketplace to teammates                                                                    |
-| `enabledPlugins["holyagent@holyagent"]` | `true`                              | Turns the plugin on for the project                                                                    |
+| Key                                      | Value                                | Why                                                                                                    |
+| ---------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `attribution.commit`, `attribution.pr`   | `""`                                 | No attribution trailer or PR line; see [commit-authorship.md](commit-authorship.md)                    |
+| `attribution.sessionUrl`                 | `false`                              | No claude.ai session link in commits                                                                   |
+| `includeGitInstructions`                 | `false`                              | Removes Claude Code's built-in commit and PR instructions and the git status snapshot from the context |
+| `subagentPromptCacheTtl`                 | `1h` (or the flag)                   | Specialists stay warm for the reuse window; see [cache-and-workflows.md](cache-and-workflows.md)       |
+| `extraKnownMarketplaces.holyagent`       | GitHub `davidbasilefilho/holyagent`  | Offers the marketplace to teammates                                                                    |
+| `extraKnownMarketplaces.billion-context` | GitHub `ranxianglei/billion-context` | Offers the marketplace of the plugin's Billion Context dependency                                      |
+| `enabledPlugins["holyagent@holyagent"]`  | `true`                               | Turns the plugin on for the project                                                                    |
 
 `attribution` is written as an object (`commit`, `pr`, `sessionUrl`), the form earlier Claude Code versions also read; the shorter `attribution: false` needs 2.1.281 or later.
 
@@ -69,7 +71,7 @@ The root keeps everything in a task list for the whole request (TaskCreate, Task
 
 The plugin has no `bin/` folder (its executable is `scripts/holyagent`), because claude.ai and Cowork do not install a plugin that has one. Anthropic's [plugin platform support](https://claude.com/docs/plugins/platform-support) table says that in Chat (claude.ai) agents, hooks, local MCP servers and settings are ignored, commands load as skills, and a top-level `bin/` makes the surface refuse the whole plugin (Cowork refuses it too). The [skills documentation](https://code.claude.com/docs/en/skills.md) lists the frontmatter keys claude.ai skill uploads accept: `name`, `description`, `license`, `compatibility`, `metadata` and `allowed-tools`; HolyAgent's skills use `name` and `description`, plus `license` for the vendored one. So the plugin's skills load, but there is no root agent, no runtime CLI calls and no hooks. For the full workflow use Claude Code.
 
-Cloud sessions (claude.ai/code) are a different case: Claude Code does not load plugins you installed on your machine or ones your repository's `.claude/settings.json` enables there. Billion Context does not run in them either, and commits follow the cloud rules in [commit-authorship.md](commit-authorship.md).
+Cloud sessions (claude.ai/code) are a different case: plugins installed on your account are synced into them, but Billion Context does not run there. The host manages the model provider (`CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST`), so Claude Code ignores an `ANTHROPIC_BASE_URL` from any settings file and the proxy is never in the path; the plugin dependency installs but changes nothing there, and commits follow the cloud rules in [commit-authorship.md](commit-authorship.md).
 
 ## T3 Code
 

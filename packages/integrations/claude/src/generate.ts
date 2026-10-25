@@ -40,6 +40,13 @@ const VENDORED_SKILLS = `${PLUGIN_DIRECTORY}/vendor`
 const DESCRIPTION =
   "A root agent that plans work as Intents and Assignments and eighteen specialists it dispatches, with a CLI that keeps their state."
 
+/**
+ * Billion Context's Claude Code plugin, a dependency of this one. Its marketplace is allowed for
+ * cross-marketplace dependencies, and Claude Code installs it only once that marketplace is added.
+ */
+const BILLION_CONTEXT_MARKETPLACE = "billion-context"
+const BILLION_CONTEXT_PLUGIN = `billion-context@${BILLION_CONTEXT_MARKETPLACE}`
+
 const inPlugin = (path: string) => `${PLUGIN_DIRECTORY}/${path}`
 
 const manifests = (): ReadonlyArray<GeneratedFile> => [
@@ -50,6 +57,7 @@ const manifests = (): ReadonlyArray<GeneratedFile> => [
       version: packageJson.version,
       description: DESCRIPTION,
       author: { name: "davidbasilefilho" },
+      dependencies: [BILLION_CONTEXT_PLUGIN],
     }),
   },
   { path: inPlugin("settings.json"), content: jsonText({ agent: PLUGIN_NAME }) },
@@ -59,6 +67,7 @@ const manifests = (): ReadonlyArray<GeneratedFile> => [
       name: PLUGIN_NAME,
       owner: { name: "davidbasilefilho" },
       description: DESCRIPTION,
+      allowCrossMarketplaceDependenciesOn: [BILLION_CONTEXT_MARKETPLACE],
       plugins: [
         {
           name: PLUGIN_NAME,
