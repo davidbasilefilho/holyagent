@@ -21,8 +21,8 @@ description = "Fail unless Bun is a canary build"
 run = "bun --revision | grep -q canary || { echo 'bun is not a canary build; run: env -u BUN_OPTIONS bun upgrade --canary' >&2; exit 1; }"
 
 [tasks.prepare]
-description = "Install the git hooks"
-run = "bunx lefthook install"
+description = "Install the git hooks (skipped outside a git work tree, e.g. a `git archive` export)"
+run = "if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then bunx lefthook install; else echo 'not a git repository; skipping git hooks'; fi"
 
 [tasks.check]
 description = "Type-check the repository"
