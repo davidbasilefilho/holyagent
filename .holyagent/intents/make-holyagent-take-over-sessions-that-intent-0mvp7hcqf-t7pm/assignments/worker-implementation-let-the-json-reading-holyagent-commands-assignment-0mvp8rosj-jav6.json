@@ -1,0 +1,80 @@
+{
+  "id": "assignment-0mvp8rosj-jav6",
+  "intentId": "intent-0mvp7hcqf-t7pm",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "let-the-json-reading-holyagent-commands",
+  "objective": "Let the JSON-reading holyagent commands take their payload inline as `--input '<json>'`, as holycodex-agent 0.16.12 does, falling back to stdin, so the root never writes a draft file.",
+  "state": "Running",
+  "scope": [
+    "Repository: /home/user/holyagent, branch release/0.1.2-1/fix/legacy-state-takeover. User request: the root creates Intents and Assignments through the agent-facing holyagent CLI without hand-written JSON draft files, the way holycodex-agent 0.16.12 does.",
+    "Findings to build on (accepted trace): holyagent reads JSON payloads only from stdin through the input(schema)/inputBy(pick) helpers in packages/runtime/src/cli/context.ts:59-79, bound to host.stdin in callFor (packages/runtime/src/cli/program.ts:39-55, :52-53); parseArgs is packages/runtime/src/cli/args.ts:18-49; Call.input is documented in packages/runtime/src/cli/types.ts:74-77. holycodex-agent takes `--input <json>` inline in argv, decoded with Schema.fromJsonString and onExcessProperty: \"error\" (holycodex packages/agent/src/index.ts:431-443).",
+    "Change: add an `--input <json>` string flag to intent create, intent update, assignment create and assignment dispatch (packages/runtime/src/cli/intent.ts:66,123; packages/runtime/src/cli/assignment.ts:150,176). When the flag is given, decode it with the same strict schema as stdin (blank or invalid JSON fails the same way, with a hint); when absent, read stdin as today. Giving both a non-empty stdin and --input is refused as a usage error. assignment close and accept --report keep reading the report from stdin (out of scope).",
+    "Make it discoverable: the help top line in program.ts (\"JSON on stdin\"), each affected command's input string and notes, and docs/usage.md where it describes how payloads are passed say `--input '<json>'` or stdin. Search the plugin's instruction and skill sources under packages/runtime/src/instructions and packages/integrations/claude (sources, not dist) for text telling the root to pass drafts on stdin or write draft files; update the ones you own below, and list in your report the exact file and line of any such text in files you do not own.",
+    "Tests: cover --input for each of the four commands (success, strict excess-property refusal, invalid JSON, both stdin and --input refused) next to the existing CLI tests in packages/runtime/tests."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md and AGENTS.md: Effect and tagged errors (no try/catch, new Promise, async functions or Promise statics in runtime source), Effect Schema with onExcessProperty: \"error\", Bun APIs first, JSDoc on exports. Run gates through mise (`mise run verify`).",
+    "Do not touch packages/runtime/src/cli/commands.ts, cli/migrate.ts, state/legacy.ts, cli/hook.ts, cli/sessioncontext.ts, packages/runtime/src/instructions/claude-5.5/root-core.ts, root/identity.md, session-reminder.md, requirements.md or AGENTS.md (other writers own them); if docs/usage.md is being edited by the migrate writer, edit only the payload-passing passage. Do not edit generated files under packages/integrations/claude/dist.",
+    "Do not commit, branch, push or edit .git/ or .holyagent/; report changed paths.",
+    "Do not add unrequested features (no flag-per-field form, no JSON output mode); name them in the report instead.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report."
+  ],
+  "criteria": [
+    {
+      "text": "intent create, intent update, assignment create and assignment dispatch accept `--input '<json>'` decoded strictly, and still read stdin when the flag is absent",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Both stdin and --input given is refused as a usage error, and invalid or excess-property input fails with a hint",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Help, command input strings and docs/usage.md describe --input or stdin; instruction text elsewhere that tells the root to write draft files is listed with file and line",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Tests cover --input for the four commands, including the refusals, and fail without the change",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Existing tests still pass and `mise run verify` passes for the changed files",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "No change outside the CLI input path, its help, docs and tests",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "help-text"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli/context.ts",
+    "packages/runtime/src/cli/program.ts",
+    "packages/runtime/src/cli/args.ts",
+    "packages/runtime/src/cli/types.ts",
+    "packages/runtime/src/cli/intent.ts",
+    "packages/runtime/src/cli/assignment.ts",
+    "packages/runtime/tests/input.test.ts"
+  ],
+  "dependencies": [
+    "assignment-0mvp8mroj-g5hh"
+  ],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "a334c6334413d7e09",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-26T12:37:25.700Z"
+  },
+  "createdAt": "2026-10-26T12:37:25.700Z"
+}
