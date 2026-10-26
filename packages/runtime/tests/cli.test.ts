@@ -659,6 +659,26 @@ describe("close without a report, and report matching", () => {
     const both = report("Handles errors: network: retried 3 times", "handles errors: caught")
     expect(data(await cli(close, both))).toMatchObject({ accepted: true })
   })
+
+  test("a criterion text that holds a colon takes the line keyed by all of it", async () => {
+    await createIntent()
+    const text = "mise run verify: command, exit code and pass/fail counts on the current head"
+    const draft = writer({
+      criteria: [{ text, blocking: true, dimension: "regressions" }],
+      evidence: [],
+    })
+    const id = String(data(await cli(["assignment", "dispatch"], draft)).id)
+    data(await cli(["assignment", "record", id, "--agent", "agent-1"]))
+    const close = ["assignment", "close", id, "--outcome", "success", "--accept", "ok"]
+
+    // The key cut at its first colon is not the criterion, so it is no support for it.
+    const cut = await cli(close, report("mise run verify: `mise run verify` -> exit 0"))
+    expect(cut.code).toBe(3)
+    expect(cut.stderr).toContain(`criterion "${text}"`)
+
+    const whole = report(`${text}: \`mise run verify\` -> exit 0: 12 pass / 0 fail`)
+    expect(data(await cli(close, whole))).toMatchObject({ accepted: true })
+  })
 })
 
 describe("command line", () => {

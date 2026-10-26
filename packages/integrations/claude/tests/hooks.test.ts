@@ -1085,6 +1085,15 @@ describe("hook session-start", () => {
   const additional = (stdout: string) =>
     (JSON.parse(stdout) as { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput
       .additionalContext
+  /** The smallest state the migrate rule counts: one Intent folder, for either legacy tool. */
+  const writeLegacyState = async (root: string, legacy: string) => {
+    const file =
+      legacy === ".holyclaude"
+        ? join(root, legacy, "intents", "x", "intent.json")
+        : join(root, legacy, "x", "intent.toon")
+    await mkdir(dirname(file), { recursive: true })
+    await writeFile(file, "")
+  }
 
   test("prints nothing in a project without a .holyagent folder, whatever the agent", async () => {
     for (const agent of [undefined, "holyagent", "other"])
@@ -1154,6 +1163,9 @@ describe("hook session-start", () => {
       const legacyOnly = await mkdtemp(join(tmpdir(), "holyagent-hook-legacy-"))
       try {
         await mkdir(join(legacyOnly, legacy, "intents"), { recursive: true })
+        // A legacy folder with no state to convert is neither announced nor migrated.
+        expect((await hook("session-start", start(), legacyOnly)).stdout).toBe("")
+        await writeLegacyState(legacyOnly, legacy)
         for (const payload of [start(), start("general-purpose")]) {
           const result = await hook("session-start", payload, legacyOnly)
           expect({ code: result.code, stderr: result.stderr }).toEqual({ code: 0, stderr: "" })
@@ -1186,8 +1198,8 @@ describe("hook session-start", () => {
   test("names both legacy folders when both are present", async () => {
     const both = await mkdtemp(join(tmpdir(), "holyagent-hook-legacy-both-"))
     try {
-      await mkdir(join(both, ".holyclaude"))
-      await mkdir(join(both, ".holycodex"))
+      await writeLegacyState(both, ".holyclaude")
+      await writeLegacyState(both, ".holycodex")
       const text = additional((await hook("session-start", start("holyagent"), both)).stdout)
       expect(text).toContain("`.holyclaude/` and `.holycodex/`")
     } finally {

@@ -1,0 +1,103 @@
+{
+  "id": "assignment-0mvpcs9hf-pw08",
+  "intentId": "intent-0mvp7hcqf-t7pm",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "fix-the-cli-so-input-never-waits-on",
+  "objective": "Fix the CLI so --input never waits on stdin, so acceptance matches a criterion whose text contains a colon, and so the hook and migrate agree on what counts as legacy state.",
+  "state": "Succeeded",
+  "scope": [
+    "packages/runtime/src/cli/context.ts payloadOf: today it reads host.stdin even when --input is given; with stdin an open pipe that never closes (an agent's Bash tool) intent create, assignment create and assignment dispatch hang (reproduced: sleep 30 | holyagent intent create --input '{...}' under timeout 10 exits 124).",
+    "Acceptance matching in the runtime (assignment close --accept / assignment accept): an evidence line whose key is a criterion text that itself contains a colon, e.g. 'mise run verify: command, exit code and pass/fail counts on the current head: <support>', is rejected as InsufficientAcceptance because only the text before the first colon is compared. Match the longest prefix that equals a criterion text or label after the existing normalization.",
+    "Non-blocking, ride along: (a) a .holyclaude/ holding only local/ (legacy.ts:494) makes the SessionStart hook announce legacy state while migrate prints migrated: true with 0 records; make both treat a folder without convertible state the same way (no notice, NothingToMigrate), using one shared predicate. (b) migrate prints each already-existing record twice on a second run (id and target file, migrate.ts:63); report each conflict once. (c) the holyclaude converter keeps ownership paths on a read-only role (legacy.ts:464) while the holycodex one guards with isWriter (legacy.ts:642); guard the same way."
+  ],
+  "constraints": [
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report; do not add unrequested features, tests, files or refactors (name them in the report). Make no version-control writes and no edits under .git/ or .holyagent/; report your changed paths. Do not run mise run build (the root runs it once after both writers). mise is installed at /tmp/holyagent-validation/mise-bin/mise (add it to PATH) and pins the canary Bun for bun lint. Run the changed-scope tests, bun check, lint and format check before reporting; name any check you could not run.",
+    "Follow .claude/CLAUDE.md: Effect composition, tagged errors, Schema with onExcessProperty error, JSDoc on exports. Keep stdin as the fallback when --input is absent, and keep the error when JSON arrives on both only if it can be detected without blocking; otherwise drop that check and say so.",
+    "Do not change the specialist report path: assignment close keeps reading the report on stdin."
+  ],
+  "criteria": [
+    {
+      "text": "--input commands complete with stdin an open pipe that never closes, and stdin remains the payload source when --input is absent",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A test runs a JSON-reading command with --input and a stdin that never completes (Effect.never) and fails on the old code",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "close --accept accepts an evidence line keyed by a criterion text containing a colon, with a test that fails on the old code, and existing matching rules still pass",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The hook and migrate agree on a legacy folder with no convertible state, conflicts print once, and holyclaude drops ownership paths on read-only roles, each with a test",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Changed-scope tests, bun check, bun lint and bun fmt --check pass",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli",
+    "packages/runtime/src/state",
+    "packages/runtime/src/domain",
+    "packages/runtime/tests"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "workflow:wf_f4dc61f0-056/assignment-0mvpcs9hf-pw08",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-26T14:29:58.104Z",
+    "finishedAt": "2026-10-26T14:34:43.541Z"
+  },
+  "result": "result: --input no longer reads stdin, and the legacy-folder, conflict and read-only-role fixes are done. The colon-key matching bug does not exist in this source, so that part needed no code change.\nchanged:\n- /home/user/holyagent/packages/runtime/src/cli/context.ts\n- /home/user/holyagent/packages/runtime/src/cli/types.ts\n- /home/user/holyagent/packages/runtime/src/cli/hook.ts\n- /home/user/holyagent/packages/runtime/src/cli/migrate.ts\n- /home/user/holyagent/packages/runtime/src/state/legacy.ts\n- /home/user/holyagent/packages/runtime/tests/input.test.ts\n- /home/user/holyagent/packages/runtime/tests/cli.test.ts\n- /home/user/holyagent/packages/runtime/tests/migrate.test.ts\n\nDiff of these paths: /tmp/claude-0/-home-user-holyagent/955f248d-75f2-5c36-9dd0-d4e898af84ee/scratchpad/worker.diff. The `src/instructions/*` changes in the tree belong to the other writer.\n\nchecks:\n- `mise run check` -> exit 0, no type errors in 97 files.\n- `mise run lint` -> exit 0, no problems in 98 files.\n- `mise run fmt:check` -> exit 0, all 210 files formatted. It first failed on `legacy.ts` and `input.test.ts`, so I ran `bun fmt` on those two files only and re-checked.\n- `bun test` in `packages/runtime` -> exit 0, 302 pass, 0 fail across 17 files.\n- Before/after: I restored the old `context.ts`, `legacy.ts`, `migrate.ts` and `hook.ts` and ran the input, migrate and cli tests. 7 tests failed: the four `--input` never-completing-stdin tests, the read-only ownership assertion, the local-only folder test and the conflict-once test. I then put my versions back.\n- Not run: `mise run build`, as instructed.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- **Colon-key matching:** `ownerOf` in `/home/user/holyagent/packages/runtime/src/cli/report.ts` has tried every colon, longest head first, since 841ef47. The example criterion with a colon already matches, so I changed no code.\n  - **Likely cause:** the failed validation report keyed its line as `mise run verify:`, which is only the first part of the criterion text. A key that is a shorter prefix of a criterion is not an equal match, so I kept it rejected.\n  - **New test:** it covers a colon criterion with a colon in the support, and a key cut at the first colon. It passes on the old code too, because the bug is not in the source. That makes the criterion \"a test that fails on the old code\" unattainable for this item.\n- **Both-payloads check dropped:** a stdin that never closes cannot be told from an empty one without reading it. The \"Got JSON on both stdin and --input\" check and its test are gone, and the doc comments say so. Stdin is still the source when `--input` is absent. The close and accept report paths are unchanged.\n- **Shared predicate:** `legacyFoldersWithState` in `legacy.ts` serves both the hook and the gatherers, through `convertibleFolders`. A holyclaude folder counts only if it has files under `intents/<folder>/`. A holycodex folder counts only if it has a non-dot `<folder>/...` path. A `.holyclaude/` with only `local/` and `state.json` now gives no hook notice and `NothingToMigrate`.\n- **Path that is not a directory:** `listFiles` now treats ENOTDIR as no files, so a plain file named `.holyclaude` does not fail the session-start hook.\n- **Conflicts once:** a record whose id is already in `.holyagent/` now yields one conflict, not that plus \"file already exists\". Note files that already exist still each get their own line.\n- **Read-only ownership:** the holyclaude converter drops ownership paths on read-only roles. A non-portable owned path on such a role still appears in `scope` as \"Owned path (not portable)\".\n- **Plugin dist:** `packages/integrations/claude/dist/scripts/holyagent.js` is stale until the root runs `mise run build`.\n\nevidence:\n- --input commands complete with stdin an open pipe that never closes, and stdin remains the payload source when --input is absent: `context.ts` `payloadOf` no longer reads stdin when `--input` is given. The existing \"still reads stdin when the flag is absent\" and \"accepts a blank stdin beside the flag\" tests pass. The full runtime suite exited 0 with 302 pass.\n- A test runs a JSON-reading command with --input and a stdin that never completes (Effect.never) and fails on the old code: `input.test.ts` \"never waits on a stdin that does not complete\" runs for `intent create`, `intent update`, `assignment create` and `assignment dispatch`. All four failed on the old code, each timing out at about 5s, and pass now.\n- close --accept accepts an evidence line keyed by a criterion text containing a colon, with a test that fails on the old code, and existing matching rules still pass: the new test in `cli.test.ts` accepts the colon criterion and passes. It does not fail on the old code because the old code already matched correctly (see notes). The existing \"a key that prefixes another key does not take the longer key's line\" test still passes.\n- The hook and migrate agree on a legacy folder with no convertible state, conflicts print once, and holyclaude drops ownership paths on read-only roles, each with a test: three tests in `migrate.test.ts`. They are \"a legacy folder with only local state is nothing to migrate, and the hook says nothing\", \"lists a record that .holyagent already holds once, not once per file\", and the READY Reviewer.code case in \"maps Intents, Assignments...\", which now asserts `ownershipPaths: []`. All three failed on the old code and pass now.\n- Changed-scope tests, bun check, bun lint and bun fmt --check pass: check exit 0, lint exit 0, fmt:check exit 0, `bun test` in `packages/runtime` exit 0 with 302 pass.\n- checks-run: the check, lint, fmt:check and `bun test` results listed under checks above. `mise run build` was not run.\n- changed-paths: the eight paths under changed above.",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Diff limited to ownership paths; check, lint, fmt exit 0; runtime 302 pass; 7 new tests shown failing on the old code. Colon matching already worked (report.ts ownerOf); the earlier rejection came from a truncated key, so no code change there.",
+    "criteria": [
+      {
+        "criterion": "--input commands complete with stdin an open pipe that never closes, and stdin remains the payload source when --input is absent",
+        "support": "`context.ts` `payloadOf` no longer reads stdin when `--input` is given. The existing \"still reads stdin when the flag is absent\" and \"accepts a blank stdin beside the flag\" tests pass. The full runtime suite exited 0 with 302 pass."
+      },
+      {
+        "criterion": "A test runs a JSON-reading command with --input and a stdin that never completes (Effect.never) and fails on the old code",
+        "support": "`input.test.ts` \"never waits on a stdin that does not complete\" runs for `intent create`, `intent update`, `assignment create` and `assignment dispatch`. All four failed on the old code, each timing out at about 5s, and pass now."
+      },
+      {
+        "criterion": "close --accept accepts an evidence line keyed by a criterion text containing a colon, with a test that fails on the old code, and existing matching rules still pass",
+        "support": "the new test in `cli.test.ts` accepts the colon criterion and passes. It does not fail on the old code because the old code already matched correctly (see notes). The existing \"a key that prefixes another key does not take the longer key's line\" test still passes."
+      },
+      {
+        "criterion": "The hook and migrate agree on a legacy folder with no convertible state, conflicts print once, and holyclaude drops ownership paths on read-only roles, each with a test",
+        "support": "three tests in `migrate.test.ts`. They are \"a legacy folder with only local state is nothing to migrate, and the hook says nothing\", \"lists a record that .holyagent already holds once, not once per file\", and the READY Reviewer.code case in \"maps Intents, Assignments...\", which now asserts `ownershipPaths: []`. All three failed on the old code and pass now."
+      },
+      {
+        "criterion": "Changed-scope tests, bun check, bun lint and bun fmt --check pass",
+        "support": "check exit 0, lint exit 0, fmt:check exit 0, `bun test` in `packages/runtime` exit 0 with 302 pass."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "the check, lint, fmt:check and `bun test` results listed under checks above. `mise run build` was not run."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the eight paths under changed above."
+      }
+    ]
+  },
+  "createdAt": "2026-10-26T14:29:50.980Z"
+}

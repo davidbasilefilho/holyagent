@@ -394,7 +394,7 @@ describe("agents", () => {
       expect(own.includes("Monitor")).toBe(own.includes("Bash"))
       expect(own.includes("Write")).toBe(route.capabilities.includes("Write"))
       expect(own.includes("WebSearch") || own.includes("WebFetch")).toBe(false)
-      const web = own.filter((tool) => /^mcp__(claude_ai_Exa|plugin_exa_exa)__/.test(tool))
+      const web = own.filter((tool) => /^mcp__(claude_ai_Exa|plugin_exa_exa|Exa)__/.test(tool))
       expect(web).toEqual(
         route.capabilities.includes("Search")
           ? [
@@ -402,6 +402,8 @@ describe("agents", () => {
               "mcp__claude_ai_Exa__web_fetch_exa",
               "mcp__plugin_exa_exa__web_search_exa",
               "mcp__plugin_exa_exa__web_fetch_exa",
+              "mcp__Exa__web_search_exa",
+              "mcp__Exa__web_fetch_exa",
             ]
           : [],
       )

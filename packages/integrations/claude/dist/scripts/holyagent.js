@@ -10038,12 +10038,11 @@ var compact = (message) => message.replace(LITERAL_RUN, (run) => {
 var payloadOf = (host, inline) => gen2(function* () {
   if (inline === undefined)
     return { source: "stdin", text: yield* readReport(host) };
-  const hint = "Give the JSON once: `--input '<json>'`, or on stdin without --input.";
   if (inline.trim() === "")
-    return yield* new Usage({ message: "--input is empty", hint });
-  const piped = yield* host.stdin.pipe(orElseSucceed2(() => ""));
-  if (piped.trim() !== "")
-    return yield* new Usage({ message: "Got JSON on both stdin and --input", hint });
+    return yield* new Usage({
+      message: "--input is empty",
+      hint: "Give the JSON as `--input '<json>'`, or on stdin without --input."
+    });
   return { source: "--input", text: inline };
 });
 var readInputBy = (host, pick, inline) => gen2(function* () {
@@ -11311,7 +11310,7 @@ var parseText = (format, text) => try_2({
   catch: (cause) => `not valid ${format === "json" ? "JSON" : "TOON"}: ${String(cause)}`
 });
 var readLegacy = (pick, format, path) => readText(path).pipe(flatMap2((text) => parseText(format, text ?? "").pipe(flatMap2((raw) => decodeUnknownEffect2(pick(raw), strict2)(raw).pipe(mapError2((error) => collapse(error.message)))), map4((value) => ({ value })), catch_2((problem) => succeed6({ problem })))));
-var listFiles = (directory) => io(directory, () => Array.fromAsync(new Bun.Glob("**/*").scan({ cwd: directory, dot: true, onlyFiles: true }))).pipe(map4((paths) => paths.toSorted()), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6([])));
+var listFiles = (directory) => io(directory, () => Array.fromAsync(new Bun.Glob("**/*").scan({ cwd: directory, dot: true, onlyFiles: true }))).pipe(map4((paths) => paths.toSorted()), catchIf2((error) => hasCode(error.cause, "ENOENT") || hasCode(error.cause, "ENOTDIR"), () => succeed6([])));
 var byFolder = (paths) => {
   const folders = new Map;
   for (const path of paths) {
@@ -11323,6 +11322,8 @@ var byFolder = (paths) => {
   }
   return folders;
 };
+var convertibleFolders = (source, files) => byFolder(source === "holyclaude" ? files.filter((path) => path.startsWith("intents/")).map((path) => path.slice(8)) : files.filter((path) => !path.startsWith(".")));
+var legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join6(root, LEGACY_FOLDERS[source])).pipe(map4((files) => convertibleFolders(source, files).size > 0))).pipe(map4((sources) => sources.map((source) => LEGACY_FOLDERS[source])));
 var isoOf = (millis) => {
   const date = new Date(millis);
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
@@ -11419,7 +11420,7 @@ var holyclaudeAssignment = (legacy, roleTask, siblings) => {
     constraints: legacy.constraints ?? [],
     criteria: criteriaOf(legacy.acceptance_criteria ?? [], legacy.objective),
     evidence: legacy.required_evidence ?? [],
-    ownershipPaths: owned.filter(isPortable),
+    ownershipPaths: isWriter(roleTask) ? owned.filter(isPortable) : [],
     dependencies: dependencies.ids,
     independentFrom: independent.ids,
     ...result === undefined ? {} : { result },
@@ -11444,11 +11445,10 @@ var holyclaudeAssignment = (legacy, roleTask, siblings) => {
 var gatherHolyclaude = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holyclaude;
   const legacy = join6(root, folderName);
-  const files = yield* listFiles(legacy);
-  if (files.length === 0)
+  const intents = convertibleFolders("holyclaude", yield* listFiles(legacy));
+  if (intents.size === 0)
     return;
   const state = collector("holyclaude");
-  const intents = byFolder(files.filter((path) => path.startsWith("intents/")).map((path) => path.slice(8)));
   for (const [folder, inside] of intents) {
     const base = join6(legacy, "intents", folder);
     const shown = (relative) => `${folderName}/intents/${folder}/${relative}`;
@@ -11575,11 +11575,10 @@ var TRANSACTION_FILE = ".holycodex-transaction.toon";
 var gatherHolycodex = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holycodex;
   const legacy = join6(root, folderName);
-  const files = yield* listFiles(legacy);
-  if (files.length === 0)
+  const folders = convertibleFolders("holycodex", yield* listFiles(legacy));
+  if (folders.size === 0)
     return;
   const state = collector("holycodex");
-  const folders = byFolder(files.filter((path) => !path.startsWith(".")));
   for (const [folder, inside] of folders) {
     const base = join6(legacy, folder);
     const shown = (relative) => `${folderName}/${folder}/${relative}`;
@@ -18019,14 +18018,14 @@ var commentPrefix = gen2(function* () {
 });
 var INLINE_INPUTS = new Set(["script", "args"]);
 var HOOK_COMMANDS = [
-  hook("session-start", "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread), always ending with a short block of the root rules most often missed; for a project with a .holyclaude or .holycodex folder and no .holyagent, a notice naming the folder and `holyagent migrate`, with the same rules; nothing in a project with none of the three", (payload, call) => gen2(function* () {
+  hook("session-start", "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread), always ending with a short block of the root rules most often missed; for a project with no .holyagent and a .holyclaude or .holycodex folder that holds state to convert, a notice naming the folder and `holyagent migrate`, with the same rules; nothing in a project with none of the three", (payload, call) => gen2(function* () {
     const pluginRoot = call.env.CLAUDE_PLUGIN_ROOT;
     const core = ROOT_AGENTS.has(payload.agent_type) ? undefined : [ROOT_CORE, ROOT_TAKEOVER].join(`
 
 `).replaceAll("${CLAUDE_PLUGIN_ROOT}", pluginRoot ?? "${CLAUDE_PLUGIN_ROOT}");
     if (!(yield* hasStateFolder(call.directory))) {
       const root = dirname2(call.directory);
-      const found = yield* filter3(Object.values(LEGACY_FOLDERS), (name) => hasStateFolder(join7(root, name)));
+      const found = yield* legacyFoldersWithState(root);
       return found.length === 0 ? NOTHING : output({
         hookEventName: "SessionStart",
         additionalContext: legacyContext(found, core)
@@ -18152,13 +18151,15 @@ var conflictsOf = (root, directory, found) => gen2(function* () {
   const shown = (path) => relative4(root, path);
   for (const record of found.flatMap((gathered) => gathered.records)) {
     const first = seen.get(record.id);
+    seen.set(record.id, record.from);
     if (known.has(record.id))
       problems.push(`${record.kind} ${record.id} (${record.from}) already exists in .holyagent/`);
-    else if (first !== undefined)
-      problems.push(`${record.kind} ${record.id} is in both ${first} and ${record.from}`);
-    seen.set(record.id, record.from);
-    if (yield* exists(record.file.path))
-      problems.push(`${shown(record.file.path)} already exists`);
+    else {
+      if (first !== undefined)
+        problems.push(`${record.kind} ${record.id} is in both ${first} and ${record.from}`);
+      if (yield* exists(record.file.path))
+        problems.push(`${shown(record.file.path)} already exists`);
+    }
   }
   for (const note of found.flatMap((gathered) => gathered.notes))
     if (yield* exists(note.to))

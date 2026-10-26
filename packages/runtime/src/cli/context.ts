@@ -52,17 +52,18 @@ const compact = (message: string): string =>
   })
 
 /**
- * The JSON text a command was given: the inline `--input` value when present, else stdin. An inline
- * value must not be blank, and stdin must then be empty, so one command never has two payloads.
+ * The JSON text a command was given: the inline `--input` value when present, else stdin. With the
+ * flag, stdin is never read: a pipe that stays open (an agent's shell tool) would block the command
+ * forever, and an open pipe cannot be told from an empty one without reading it.
  */
 const payloadOf = (host: Host, inline: string | undefined) =>
   Effect.gen(function* () {
     if (inline === undefined) return { source: "stdin", text: yield* readReport(host) }
-    const hint = "Give the JSON once: `--input '<json>'`, or on stdin without --input."
-    if (inline.trim() === "") return yield* new Usage({ message: "--input is empty", hint })
-    const piped = yield* host.stdin.pipe(Effect.orElseSucceed(() => ""))
-    if (piped.trim() !== "")
-      return yield* new Usage({ message: "Got JSON on both stdin and --input", hint })
+    if (inline.trim() === "")
+      return yield* new Usage({
+        message: "--input is empty",
+        hint: "Give the JSON as `--input '<json>'`, or on stdin without --input.",
+      })
     return { source: "--input", text: inline }
   })
 

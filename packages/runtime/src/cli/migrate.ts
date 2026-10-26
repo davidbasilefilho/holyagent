@@ -72,13 +72,16 @@ const conflictsOf = (root: string, directory: string, found: ReadonlyArray<Gathe
     const shown = (path: string) => relative(root, path)
     for (const record of found.flatMap((gathered) => gathered.records)) {
       const first = seen.get(record.id)
+      seen.set(record.id, record.from)
+      // A record already in .holyagent/ is one conflict, however many of its files exist.
       if (known.has(record.id))
         problems.push(`${record.kind} ${record.id} (${record.from}) already exists in .holyagent/`)
-      else if (first !== undefined)
-        problems.push(`${record.kind} ${record.id} is in both ${first} and ${record.from}`)
-      seen.set(record.id, record.from)
-      if (yield* exists(record.file.path))
-        problems.push(`${shown(record.file.path)} already exists`)
+      else {
+        if (first !== undefined)
+          problems.push(`${record.kind} ${record.id} is in both ${first} and ${record.from}`)
+        if (yield* exists(record.file.path))
+          problems.push(`${shown(record.file.path)} already exists`)
+      }
     }
     for (const note of found.flatMap((gathered) => gathered.notes))
       if (yield* exists(note.to)) problems.push(`${shown(note.to)} already exists`)

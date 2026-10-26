@@ -17,11 +17,12 @@ const ROOT_DESCRIPTION =
 
 /**
  * The web tools of the Search roles, in place of Claude Code's WebSearch and WebFetch: Exa's search
- * and fetch, from the claude.ai connector named Exa and from the MCP server of Exa's plugin, a
- * dependency of this one. Either one works, so both prefixes are listed; a name that matches no
- * connected server is ignored. `agent_run` is left out because the connector can block it.
+ * and fetch, from the claude.ai connector named Exa (`mcp__claude_ai_Exa__` in the desktop app,
+ * `mcp__Exa__` in a claude.ai cloud session) and from the MCP server of Exa's plugin, a dependency
+ * of this one. Any one works, so every prefix is listed; a name that matches no connected server is
+ * ignored. `agent_run` is left out because the connector can block it.
  */
-const WEB = ["mcp__claude_ai_Exa__", "mcp__plugin_exa_exa__"].flatMap((prefix) =>
+const WEB = ["mcp__claude_ai_Exa__", "mcp__plugin_exa_exa__", "mcp__Exa__"].flatMap((prefix) =>
   ["web_search_exa", "web_fetch_exa"].map((name) => `${prefix}${name}`),
 )
 const WRITING = ["Write", "Edit", "Bash"]
@@ -219,6 +220,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
     section: "specialist/working.md",
     phrase: "run the ones that exercise your change now",
   },
+  "R-S-RULES": { section: "specialist/conduct.md", phrase: "without being reminded" },
   "R-S-REPORT": { section: "specialist/report.md", phrase: "End with one compact report" },
   "R-MERGE": {
     section: "specialist/merge-ready.md",
