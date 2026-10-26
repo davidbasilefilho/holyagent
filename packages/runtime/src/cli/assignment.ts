@@ -143,11 +143,11 @@ const workflowAgentProblem = (agentId: string, id: string): string | undefined =
 export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
   {
     path: ["assignment", "create"],
-    usage: "assignment create",
+    usage: "assignment create [--input <json>]",
     summary: "Plan an Assignment as Ready without starting it (for plan and workflows)",
     input: DRAFT_SHAPE,
     notes: ["the draft rules are under assignment dispatch"],
-    flags: {},
+    flags: { input: "string" },
     positionals: 0,
     run: ({ directory, input }) =>
       Effect.gen(function* () {
@@ -164,14 +164,14 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
   },
   {
     path: ["assignment", "dispatch"],
-    usage: "assignment dispatch",
+    usage: "assignment dispatch [--input <json>]",
     summary:
       "Start an Assignment and say how to run it: spawn an agent or continue a warm one. A new draft is created and started in one step",
     input: `{id} for a Ready Assignment, or a new draft ${DRAFT_SHAPE}`,
     output:
       "TOON fields (id, state, agent/model/effort or continue, reason), then a line `prompt:` alone, then the specialist prompt verbatim to the end; pass that text as it is: as the prompt of its agent() in your inline workflow script first, to the Agent tool only when the Workflow tool is disabled or unavailable, and by SendMessage only for a warm continuation",
     notes: [...DRAFT_NOTES, 'dispatching a Ready Assignment takes {"id": "<id>"}'],
-    flags: {},
+    flags: { input: "string" },
     positionals: 0,
     run: ({ directory, config, inputBy }) =>
       Effect.gen(function* () {

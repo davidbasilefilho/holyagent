@@ -6,7 +6,7 @@ import { Cause, Effect } from "effect"
 import packageJson from "../../package.json" with { type: "json" }
 import { STATE_DIRECTORY } from "../state/layout.ts"
 import { vcsLive } from "../vcs/live.ts"
-import { parseArgs } from "./args.ts"
+import { INPUT_FLAG, parseArgs, stringFlag } from "./args.ts"
 import { COMMANDS } from "./commands.ts"
 import { loadConfig } from "./config.ts"
 import { readInput, readInputBy, readReport, stateRoot } from "./context.ts"
@@ -23,23 +23,28 @@ export interface Result {
 const help = (command: Command): string =>
   [
     `${command.usage}  ${command.summary}`,
-    ...(command.input === undefined ? [] : [`stdin: ${command.input}`]),
+    ...(command.input === undefined
+      ? []
+      : [
+          `${INPUT_FLAG in command.flags ? "input (--input '<json>' or stdin)" : "stdin"}: ${command.input}`,
+        ]),
     ...(command.output === undefined ? [] : [`stdout: ${command.output}`]),
     ...(command.notes ?? []).map((note) => `note: ${note}`),
   ].join("\n")
 
 const topHelp = (): string =>
   [
-    "holyagent <command> [args]; JSON on stdin, TOON on stdout; errors go to stderr as `error:` and `hint:` lines",
+    "holyagent <command> [args]; JSON inline as `--input '<json>'` or on stdin, TOON on stdout; errors go to stderr as `error:` and `hint:` lines",
     "exit codes: 2 usage, 3 refused by the current state, 4 state or I/O failure; every error's `hint:` says what to do next",
     ...COMMANDS.map((command) => `${command.usage}  ${command.summary}`),
-    "help [command] or <command> --help shows a command's stdin shape, stdout and rules",
+    "help [command] or <command> --help shows a command's input shape, stdout and rules",
   ].join("\n")
 
 const callFor = (args: Call["args"], host: Host, emit: Call["emit"], stateless: boolean) =>
   Effect.gen(function* () {
     // A stateless command never reads the state, so a git failure must not stop it.
     const root = stateless ? host.cwd : yield* stateRoot(host.cwd)
+    const inline = stringFlag(args, INPUT_FLAG)
     return {
       args,
       cwd: host.cwd,
@@ -49,8 +54,8 @@ const callFor = (args: Call["args"], host: Host, emit: Call["emit"], stateless: 
       text: readReport(host),
       emit,
       vcs: host.vcs ?? vcsLive(root, host.env),
-      input: (schema) => readInput(host, schema),
-      inputBy: (pick) => readInputBy(host, pick),
+      input: (schema) => readInput(host, schema, inline),
+      inputBy: (pick) => readInputBy(host, pick, inline),
     } satisfies Call
   })
 

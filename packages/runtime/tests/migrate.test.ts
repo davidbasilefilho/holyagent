@@ -7,7 +7,8 @@ import { decode, encode } from "@toon-format/toon"
 import { $ } from "bun"
 import { Effect } from "effect"
 
-import { StdinMissing } from "../src/cli/errors.ts"
+import { describeFailure, StdinMissing } from "../src/cli/errors.ts"
+import { MigrationUnverified } from "../src/cli/migrate.ts"
 import { run } from "../src/cli/program.ts"
 import { loadProject } from "../src/state/store.ts"
 
@@ -43,10 +44,15 @@ const data = (result: Result): Record<string, unknown> => {
   return decode(result.stdout) as Record<string, unknown>
 }
 
-/** Fails the test unless the command failed, and returns its error text. */
+/**
+ * Fails the test unless the command was refused (exit 3, with the migrate hint); returns its error
+ * text.
+ */
 const refusal = (result: Result): string => {
   expect(result.stdout).toBe("")
-  expect(result.code).not.toBe(0)
+  expect(result.code).toBe(3)
+  expect(result.stderr).toContain("hint: ")
+  expect(result.stderr).not.toContain("holyagent --help")
   return result.stderr
 }
 
@@ -683,6 +689,7 @@ describe("refusals", () => {
     const error = refusal(await cli(["migrate"]))
 
     expect(error).toContain("MigrationRefused")
+    expect(error).toContain("hint: Run `holyagent migrate --dry-run`")
     expect(error).toContain("already exists")
     expect(await readJson(`${NEW_A}/intent.json`)).toEqual(before)
     expect(await Bun.file(join(project, NEW_A, "resume-notes.md")).text()).toBe(
@@ -771,6 +778,12 @@ describe("refusals", () => {
   test("fails when there is no legacy state", async () => {
     expect(refusal(await cli(["migrate"]))).toContain("NothingToMigrate")
     expect(await exists(".holyagent")).toBe(false)
+  })
+
+  test("hints at the way out of a failed reload", () => {
+    const failure = describeFailure(new MigrationUnverified({ detail: "boom" }))
+    expect(failure.hint).toContain("git status")
+    expect(failure.hint).toContain("holyagent migrate --dry-run")
   })
 })
 
