@@ -1,0 +1,83 @@
+{
+  "id": "assignment-0mvp7isqq-3wmx",
+  "intentId": "intent-0mvp7hcqf-t7pm",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "add-a-holyagent-migrate-command-that",
+  "objective": "Add a `holyagent migrate` command that converts legacy `.holyclaude/` and `.holycodex/` state into `.holyagent/` records the current CLI loads, with a dry run, refusal to overwrite, a stop on running work and a reload check.",
+  "state": "Ready",
+  "scope": [
+    "Repository: /home/user/holyagent, branch claude/friendly-carson-g8dudb. Runtime sources are in packages/runtime/src (domain/, state/, cli/); the command table is packages/runtime/src/cli/commands.ts; the existing writers are state/store.ts (persist/updateState), state/files.ts (encodeJson, commitFile, readJson), state/layout.ts (intentFolder, intentFile, assignmentFile), state/local.ts (ensureLocalDirectory), domain/slug.ts (slugOf), domain/paths.ts (pathProblem), domain/intent.ts and domain/assignment.ts (schemas). `@toon-format/toon` is already a runtime dependency.",
+    "HOLYCLAUDE LEGACY FORMAT (as observed): `.holyclaude/intents/<slug>-<intent-id>/intent.json`: {id, objective, requirements: string, revision}, with no state, slug or createdAt. `.holyclaude/intents/<…>/assignments/<slug>-<assignment-id>.json` (no role prefix): {id, intent_id, intent_revision, role: \"<Role.task>\", objective, scope: [text], constraints: [text], acceptance_criteria: [text], required_evidence: [label], mutability, metadata: {ownership_paths, symbols, domains, dependencies, related_assignments, independent_from}, clone_id?, state, result?, acceptance?: {intent_revision, rationale, criteria_evidence: {criterion: support}, required_evidence: [label]}}. States seen: Succeeded, Ready, Failed, Cancelled (Running possible). Intent folders may also hold free-form notes (resume-notes.md, root-followups.md, notes/…). `.holyclaude/.gitignore`: /local/, *.tmp, /state.json*, /state.observations.jsonl. Ids already match intent-… and assignment-…; the first id segment is the base-36 creation time in milliseconds. holyclaude's source is cloned at /tmp/claude-0/-home-user-holyagent/ac2d8da5-c3d9-5d08-bb8b-cad6d748431d/scratchpad/ref/holyclaude for reference (read only).",
+    "HOLYCLAUDE MAPPING (proven to load with the current CLI on 1104 records): Intent: keep id, objective and revision; slug = slugOf(objective); requirements = [requirements] when non-blank; state = Open; createdAt from the id time. Assignment: intentId, intentRevision and roleTask = role; slug = slugOf(objective); keep scope and constraints; criteria = each acceptance_criteria string as {text, blocking: true, dimension: behavior}, or the objective when there are none; evidence = required_evidence; ownershipPaths = the portable metadata.ownership_paths, with non-portable ones added to scope as text; dependencies and independentFrom from metadata (only valid assignment ids); related_assignments added to scope as text; result for every non-Ready state (placeholder when missing); acceptance only for Succeeded: {revision: intent_revision, rationale, criteria: [{criterion, support}] from criteria_evidence, evidence: [{label, support}] from required_evidence}; createdAt from the id time. File name: <route agent>-<slug>-<id>.json via the layout helpers. Notes are copied unchanged into the new Intent folder. The legacy .gitignore is dropped; local/ gets its own .gitignore from the CLI (ensureLocalDirectory).",
+    "HOLYCODEX FORMAT: `.holycodex/<slug>-<short-id>/intent.toon` (schema holycodex-intent-1, or legacy holycodex-intent-0 with fewer fields), `plan.toon` and `plan.old-NNN.toon`, `assignments/<id>.toon`, a `current` pointer file and a `.holycodex-transaction.toon` when a write was interrupted. All TOON. The exact schemas (IntentSchema, LegacyIntentSchema, AssignmentSchema with owner {role, task}, status pending|executing|completed|blocked|needs_root_input|failed|superseded, invocations with summary/blocker) are in /tmp/claude-0/-home-user-holyagent/ac2d8da5-c3d9-5d08-bb8b-cad6d748431d/scratchpad/ref/holycodex/packages/core/src/work-state.ts lines 26-290 (read only). Ids are intent-<10 hex>[-NN] and assignment-<10 hex>, which already satisfy holyagent's id patterns.",
+    "HOLYCODEX MAPPING (decide the details, record every lossy choice in the help): Intent: id kept; objective = title; requirements = goal plus each acceptance_criteria; revision kept; state complete or abandoned -> Closed with a closeReason naming the holycodex state, every other state -> Open; createdAt = created_at as ISO UTC. Assignment: roleTask = `${owner.role}.${owner.task}` when holyagent has that route, otherwise the record is reported as not convertible (with the reason) in the dry run and the real run refuses; status pending -> Ready, executing -> Running (stop, as for holyclaude), completed -> Succeeded (no acceptance: holycodex has none per Assignment), failed -> Failed, blocked and needs_root_input -> Failed with the blocker in the result, superseded -> Cancelled; result = the last invocation summary, else the blocker, else a placeholder; intentRevision = the Intent's revision; criteria = acceptance_criteria as blocking/behavior; scope keeps the text, ownershipPaths = the portable scope entries; constraints = constraints plus exclusions as text; dependencies = valid assignment ids; createdAt from created_at. plan*.toon files and other non-record files are copied unchanged as notes. A pending `.holycodex-transaction.toon` stops the run like a Running Assignment, saying how to settle it with holycodex.",
+    "Command shape: one command (`holyagent migrate [--dry-run]`) that finds `.holyclaude/` and/or `.holycodex/` at the state root and converts what is there. Register it in COMMANDS with help (summary, notes) that records every lossy choice. Dry run prints counts per source and kind and each record it cannot convert with the reason, writing nothing. The real run refuses before writing anything when any target file already exists, when a record cannot be converted, or when an Assignment is Running/executing (naming it and how to settle it: finish or cancel it with the legacy tool first). Records are decoded strictly with Effect Schema at the boundary and written through the holyagent schemas and encodeJson/commitFile; afterwards it reloads the project with loadProject and fails if anything does not decode. It also lists project files that mention the legacy folder name (for example lint/format ignore lists) so the root can point them at `.holyagent/`; it does not edit them. It leaves deleting the legacy folder and committing to the root, and says so in its output.",
+    "Tests in packages/runtime/tests/migrate.test.ts (follow the style of the existing tests and fixtures.ts): a fixture `.holyclaude/` tree with each state (Succeeded with an acceptance, Ready, Failed, Cancelled), non-portable ownership paths, notes, missing fields (no result, no acceptance_criteria, blank requirements), then a reload through the CLI (`status`, `intent list`, `assignment list --all` read every record); a fixture `.holycodex/` tree with each status and a plan file; the dry run (counts, unconvertible records, nothing written); refusal to overwrite; the Running stop for both sources and the holycodex transaction stop.",
+    "Docs: add the command to docs/usage.md where the CLI's commands are described, briefly."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md and AGENTS.md: Effect for effects and tagged errors (no try/catch, new Promise, async functions or Promise statics in runtime source; the linter enforces this), Effect Schema with onExcessProperty: \"error\" at every data boundary, Bun APIs first, JSDoc on every exported function, type and interface.",
+    "Edit only sources; do not edit generated files under packages/integrations/claude/dist (the root rebuilds them), and do not touch packages/runtime/src/cli/hook.ts, cli/sessioncontext.ts or the instruction files (another writer owns them).",
+    "Do not commit, branch, push or edit .git/ or .holyagent/; report changed paths.",
+    "Do not add unrequested features, files or refactors; name them in the report instead.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report."
+  ],
+  "criteria": [
+    {
+      "text": "`holyagent migrate` converts a .holyclaude tree with the given mapping and a .holycodex tree with the documented mapping, and the written project reloads through loadProject and the CLI's status, intent list and assignment list --all",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The dry run lists counts and every unconvertible record with its reason and writes nothing",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The run refuses to overwrite an existing record, stops on a Running or executing Assignment and on a pending holycodex transaction, saying how to settle it, before writing anything",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The help text records every lossy mapping choice for both sources",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Tests cover each state, an acceptance, non-portable paths, notes, missing fields, reload, dry run, overwrite refusal and the Running stop, and fail without the change",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "No change outside the command, its registration, its tests and docs/usage.md",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Runtime code follows the repository rules: Effect and tagged errors, strict Schema decoding, JSDoc on exports",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Existing tests still pass",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "help-text"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli/migrate.ts",
+    "packages/runtime/src/state/legacy.ts",
+    "packages/runtime/src/cli/commands.ts",
+    "packages/runtime/tests/migrate.test.ts",
+    "docs/usage.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-10-26T12:02:31.298Z"
+}
