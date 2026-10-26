@@ -1,0 +1,91 @@
+{
+  "id": "assignment-0mvp97zxk-k2ld",
+  "intentId": "intent-0mvp7hcqf-t7pm",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "tie-up-the-loose-ends-the-migrate-hook",
+  "objective": "Tie up the loose ends the migrate, hook and --input changes left: error codes and hints, the shared legacy-folder constant, instruction text that names --input, the lost US-English rule and the stale budget figure.",
+  "state": "Running",
+  "scope": [
+    "Repository: /home/user/holyagent, branch release/0.1.2-1/fix/legacy-state-takeover. mise and the canary Bun are installed; run gates with mise.",
+    "1. packages/runtime/src/cli/errors.ts: add the migrate command's tagged errors MigrationRefused and NothingToMigrate (defined in packages/runtime/src/cli/migrate.ts or state/legacy.ts) to REFUSED_ERRORS so they exit 3, and give MigrationRefused, NothingToMigrate and MigrationUnverified a hint in HINTS (for example: run `holyagent migrate --dry-run` to see what blocks it; settle a Running legacy Assignment with the legacy tool first). Also make the StdinMissing hint (errors.ts:92, 'Pipe the input in…') name `--input '<json>'` as the other way for commands that take it.",
+    "2. packages/runtime/src/cli/hook.ts:86 keeps a local `LEGACY_FOLDERS` array of [\".holyclaude\", \".holycodex\"]; replace it with the exported `LEGACY_FOLDERS` record from packages/runtime/src/state/legacy.ts:22 (type Readonly<Record<LegacySource, string>>; use its values), without changing behavior.",
+    "3. packages/runtime/src/instructions/claude-5.5/root/dispatch.md:3 says `assignment dispatch` takes the draft on stdin; say it takes the draft as `--input '<json>'` (or on stdin), so the root never writes a draft file. If workflows.md:1 (assignment create) or asking.md:9 (intent update --material) describe the input route, align them the same way; otherwise leave them.",
+    "4. To fit the 4,000-character root core, the sentence 'Model-facing text is in US English.' was removed from root/identity.md and now appears nowhere in the root text. Restore it once in the full root prompt outside the core, where language of artifacts is discussed (for example root/instruction-guidelines.md or root/user-messages.md, whichever already covers languages), without changing ROOT_CORE's size.",
+    "5. docs/pi/claude-parity.md:134 still says the session-start budget is 9,000 characters; CONTEXT_BUDGET is now 9,300 (packages/runtime/src/cli/sessioncontext.ts, docs/hooks.md). Update the figure.",
+    "Tests: add or adjust tests only where behavior changes (exit codes and hints of the migrate errors; the hint text if a test pins it). Any test pinning dispatch.md text should follow the new wording."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md and AGENTS.md: Effect and tagged errors, no try/catch/async/new Promise in runtime source, JSDoc on exports.",
+    "Do not edit packages/runtime/src/state/legacy.ts or cli/migrate.ts (their writer is fixing lint there), packages/integrations/claude/dist (the root rebuilds), .git/ or .holyagent/. No commits.",
+    "Do not add unrequested features or refactors; name them in the report instead.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done and checked, stop and report."
+  ],
+  "criteria": [
+    {
+      "text": "Migrate refusals exit 3 with specific hints, MigrationUnverified has a hint, and the StdinMissing hint names --input",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "hook.ts uses the LEGACY_FOLDERS constant from state/legacy.ts and the hook tests still pass",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "dispatch.md tells the root to pass the draft as --input or on stdin",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "'Model-facing text is in US English.' appears once in the root prompt outside the core, and ROOT_CORE stays under 4,000 characters",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "docs/pi/claude-parity.md gives the 9,300-character budget",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run lint, check and fmt:check pass for the changed files and bun test packages/runtime and packages/integrations/claude pass except the stale-dist check",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "No change outside the five items and their tests",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli/errors.ts",
+    "packages/runtime/src/cli/hook.ts",
+    "packages/runtime/src/instructions/claude-5.5/root/dispatch.md",
+    "packages/runtime/src/instructions/claude-5.5/root/workflows.md",
+    "packages/runtime/src/instructions/claude-5.5/root/asking.md",
+    "packages/runtime/src/instructions/claude-5.5/root/instruction-guidelines.md",
+    "packages/runtime/src/instructions/claude-5.5/root/user-messages.md",
+    "docs/pi/claude-parity.md",
+    "packages/runtime/tests/errors.test.ts",
+    "packages/runtime/tests/cli.test.ts",
+    "packages/runtime/tests/migrate.test.ts",
+    "packages/runtime/tests/agents.test.ts",
+    "packages/integrations/claude/tests/hooks.test.ts"
+  ],
+  "dependencies": [
+    "assignment-0mvp8mroj-g5hh"
+  ],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "a50b1e12cd1289581",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-26T12:50:06.632Z"
+  },
+  "createdAt": "2026-10-26T12:50:06.632Z"
+}
