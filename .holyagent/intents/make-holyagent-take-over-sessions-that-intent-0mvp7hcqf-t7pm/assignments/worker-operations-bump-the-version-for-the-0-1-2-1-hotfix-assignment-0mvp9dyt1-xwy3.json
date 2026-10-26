@@ -1,0 +1,81 @@
+{
+  "id": "assignment-0mvp9dyt1-xwy3",
+  "intentId": "intent-0mvp7hcqf-t7pm",
+  "intentRevision": 4,
+  "roleTask": "Worker.operations",
+  "slug": "bump-the-version-for-the-0-1-2-1-hotfix",
+  "objective": "Bump the version for the 0.1.2-1 hotfix with `mise run bump:hotfix` (which also rebuilds the generated plugin), then run the full `mise run verify` and report the outcome.",
+  "state": "Succeeded",
+  "scope": [
+    "Repository: /home/user/holyagent, branch release/0.1.2-1/fix/legacy-state-takeover. mise is at /root/.local/bin/mise (put it on PATH). The current version is 0.1.2; the branch name says the hotfix is 0.1.2-1.",
+    "Run `mise run bump:hotfix` once. It runs scripts/bump-version.ts hotfix (writes the version into package.json, packages/cli/package.json, packages/runtime/package.json, packages/integrations/claude/package.json and bun.lock) and then the build task (regenerates packages/integrations/claude/dist). Report the new version and the files it changed (`git status --short`).",
+    "Then run `mise run verify` and report each stage's outcome verbatim (fmt:check, check, lint, test with pass/fail counts). If the bumped version is not 0.1.2-1, stop after the bump and report it without running anything else."
+  ],
+  "constraints": [
+    "Change files only by running those two mise tasks; do not edit sources or tests, and do not fix failures (report them).",
+    "Do not commit, branch, push or edit .git/ or .holyagent/."
+  ],
+  "criteria": [
+    {
+      "text": "mise run bump:hotfix ran and the version is 0.1.2-1 in every manifest and the generated plugin",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify ran to completion and its per-stage outcome is reported",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "package.json",
+    "packages/cli/package.json",
+    "packages/runtime/package.json",
+    "packages/integrations/claude/package.json",
+    "bun.lock",
+    "packages/integrations/claude/dist",
+    ".claude-plugin"
+  ],
+  "dependencies": [
+    "assignment-0mvp8lutt-vd4h",
+    "assignment-0mvp97zxk-k2ld"
+  ],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "a205428cce12be7e8",
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-26T12:54:45.110Z",
+    "finishedAt": "2026-10-26T12:56:15.784Z"
+  },
+  "result": "result: Bumped to 0.1.2-1 with `mise run bump:hotfix` (exit 0), and the full `mise run verify` passed (exit 0) on the resulting tree.\n\nchanged: package.json, packages/cli/package.json, packages/runtime/package.json, packages/integrations/claude/package.json, bun.lock, .claude-plugin/marketplace.json, packages/integrations/claude/dist/.claude-plugin/plugin.json, packages/integrations/claude/dist/agents/holyagent.md, packages/integrations/claude/dist/scripts/holyagent.js\n\nchecks:\n- `mise run bump:hotfix` -> exit 0. Output: `0.1.2 -> 0.1.2-1`, then `[build] built 29 files into /home/user/holyagent` (the path is the repo root).\n- `mise run verify` -> exit 0. Full log: /tmp/claude-0/-home-user-holyagent/737d3a1b-dae6-5c0b-bd4a-0e2fde353bd5/scratchpad/verify.log\n  - toolchain: `bun --revision` is canary (`v1.4.4-canary.1`), passed.\n  - fmt:check: `All 210 files are formatted.`, exit 0.\n  - check (type-check): `No type errors in 97 files`, exit 0.\n  - lint: `No problems in 98 files`, exit 0.\n  - test: `760 pass`, `1 skip`, `0 fail`, 4635 expect() calls, `Ran 761 tests across 25 files`, exit 0.\n\nVersion check after the bump: `\"version\": \"0.1.2-1\"` in package.json, packages/cli/package.json, packages/runtime/package.json and packages/integrations/claude/package.json. bun.lock has 0.1.2-1 on its three workspace entries (lines 17, 28, 35). The generated plugin has it in dist/.claude-plugin/plugin.json and in dist/scripts/holyagent.js (line 9057), and .claude-plugin/marketplace.json (line 16) also has it.\n\nblockers: none\nquestions: none\nnotes: `git status` before the bump already showed many modified files from other workers, under .holyagent/, AGENTS.md, docs/, packages/runtime/src/cli/, packages/runtime/src/instructions/ and tests, plus untracked `input.test.ts` and an assignment JSON. None of them are in my ownership paths, and I did not touch them. The verify run therefore covered that uncommitted state as well as the bump. Nothing was committed, branched or pushed.\n\nevidence:\nmise run bump:hotfix ran and the version is 0.1.2-1 in every manifest and the generated plugin: `mise run bump:hotfix` exit 0 printed `0.1.2 -> 0.1.2-1`; grep of \"version\" shows 0.1.2-1 in the four package.json files, bun.lock, dist/.claude-plugin/plugin.json, dist/scripts/holyagent.js:9057 and .claude-plugin/marketplace.json:16.\nmise run verify ran to completion and its per-stage outcome is reported: `mise run verify` exit 0. fmt:check: 210 files formatted. check: 0 type errors in 97 files. lint: no problems in 98 files. test: 760 pass, 1 skip, 0 fail, 25 files. Log at /tmp/claude-0/-home-user-holyagent/737d3a1b-dae6-5c0b-bd4a-0e2fde353bd5/scratchpad/verify.log\nchecks-run: `mise run bump:hotfix` (exit 0) and `mise run verify` (exit 0), as above. No separate checks were run.\nchanged-paths: `git status --short` restricted to the ownership paths shows M package.json, packages/cli/package.json, packages/runtime/package.json, packages/integrations/claude/package.json, bun.lock, .claude-plugin/marketplace.json, and M packages/integrations/claude/dist/{.claude-plugin/plugin.json, agents/holyagent.md, scripts/holyagent.js}.\n",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Version is 0.1.2-1 in every manifest, lockfile and the generated plugin; full mise run verify exit 0 with 760 pass, 0 fail.",
+    "criteria": [
+      {
+        "criterion": "mise run bump:hotfix ran and the version is 0.1.2-1 in every manifest and the generated plugin",
+        "support": "`mise run bump:hotfix` exit 0 printed `0.1.2 -> 0.1.2-1`; grep of \"version\" shows 0.1.2-1 in the four package.json files, bun.lock, dist/.claude-plugin/plugin.json, dist/scripts/holyagent.js:9057 and .claude-plugin/marketplace.json:16."
+      },
+      {
+        "criterion": "mise run verify ran to completion and its per-stage outcome is reported",
+        "support": "`mise run verify` exit 0. fmt:check: 210 files formatted. check: 0 type errors in 97 files. lint: no problems in 98 files. test: 760 pass, 1 skip, 0 fail, 25 files. Log at /tmp/claude-0/-home-user-holyagent/737d3a1b-dae6-5c0b-bd4a-0e2fde353bd5/scratchpad/verify.log"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`mise run bump:hotfix` (exit 0) and `mise run verify` (exit 0), as above. No separate checks were run."
+      },
+      {
+        "label": "changed-paths",
+        "support": "`git status --short` restricted to the ownership paths shows M package.json, packages/cli/package.json, packages/runtime/package.json, packages/integrations/claude/package.json, bun.lock, .claude-plugin/marketplace.json, and M packages/integrations/claude/dist/{.claude-plugin/plugin.json, agents/holyagent.md, scripts/holyagent.js}."
+      }
+    ]
+  },
+  "createdAt": "2026-10-26T12:54:45.110Z"
+}

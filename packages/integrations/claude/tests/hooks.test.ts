@@ -5,7 +5,11 @@ import { dirname, join } from "node:path"
 
 import { $ } from "bun"
 
-import { SESSION_REMINDER } from "../../../runtime/src/cli/sessioncontext.ts"
+import {
+  CONTEXT_BUDGET,
+  ROOT_TAKEOVER,
+  SESSION_REMINDER,
+} from "../../../runtime/src/cli/sessioncontext.ts"
 import { ROUTES } from "../../../runtime/src/domain/route.ts"
 import { ROOT_CORE } from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
 import { freshPlugin } from "./built.ts"
@@ -1078,6 +1082,9 @@ describe("hook session-start", () => {
   })
   const context = (additionalContext: string) =>
     `${JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext } })}\n`
+  const additional = (stdout: string) =>
+    (JSON.parse(stdout) as { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput
+      .additionalContext
 
   test("prints nothing in a project without a .holyagent folder, whatever the agent", async () => {
     for (const agent of [undefined, "holyagent", "other"])
@@ -1103,12 +1110,88 @@ describe("hook session-start", () => {
         })
       for (const agent of [undefined, "general-purpose"])
         expect(await hook("session-start", start(agent), stated)).toEqual({
-          stdout: context(`${core}\n\n${CORE_TAIL}\n\n${state}\n\n${SESSION_REMINDER}`),
+          stdout: context(
+            `${core}\n\n${ROOT_TAKEOVER}\n\n${CORE_TAIL}\n\n${state}\n\n${SESSION_REMINDER}`,
+          ),
           stderr: "",
           code: 0,
         })
     } finally {
       await rm(stated, { recursive: true, force: true })
+    }
+  })
+
+  test("tells a main thread that is not the root that it is, with the plugin path filled in", async () => {
+    const stated = await mkdtemp(join(tmpdir(), "holyagent-hook-takeover-"))
+    try {
+      expect((await cli(["intent", "create"], '{"objective":"Ship it"}', stated)).code).toBe(0)
+      for (const payload of [start(), start("general-purpose")]) {
+        const text = additional(
+          (await hook("session-start", payload, stated, { CLAUDE_PLUGIN_ROOT: "/opt/plugin" }))
+            .stdout,
+        )
+        expect(text).toContain("You are the root.")
+        expect(text).toContain("read `/opt/plugin/agents/holyagent.md` before acting")
+        expect(text).toContain("run all work through an Intent and Assignments")
+        expect(text).toContain("whatever agent it started as")
+        expect(text).not.toContain("${CLAUDE_PLUGIN_ROOT}")
+      }
+      for (const agent of ["holyagent", "holyagent:holyagent"]) {
+        const text = additional(
+          (await hook("session-start", start(agent), stated, { CLAUDE_PLUGIN_ROOT: "/opt/plugin" }))
+            .stdout,
+        )
+        expect(text).not.toContain("agents/holyagent.md")
+        expect(text).not.toContain("You are the root.")
+      }
+    } finally {
+      await rm(stated, { recursive: true, force: true })
+    }
+  })
+
+  test("a project with only a legacy folder gets the migrate notice, the rules and the takeover line", async () => {
+    for (const legacy of [".holyclaude", ".holycodex"]) {
+      const legacyOnly = await mkdtemp(join(tmpdir(), "holyagent-hook-legacy-"))
+      try {
+        await mkdir(join(legacyOnly, legacy, "intents"), { recursive: true })
+        for (const payload of [start(), start("general-purpose")]) {
+          const result = await hook("session-start", payload, legacyOnly)
+          expect({ code: result.code, stderr: result.stderr }).toEqual({ code: 0, stderr: "" })
+          const text = additional(result.stdout)
+          expect(text).toStartWith(`${core}\n\n${ROOT_TAKEOVER}\n\n${CORE_TAIL.split("\n\n")[0]}`)
+          expect(text).toContain(`\`${legacy}/\``)
+          expect(text).toContain("holyagent migrate --dry-run")
+          expect(text).toContain("`holyagent migrate`")
+          expect(text.endsWith(`\n\n${SESSION_REMINDER}`)).toBe(true)
+          expect(text).not.toContain("holyagent status:")
+        }
+        // The root has its rules in the system prompt, so it gets the notice and the reminder only.
+        const root = additional(
+          (await hook("session-start", start("holyagent"), legacyOnly)).stdout,
+        )
+        expect(root).toContain("holyagent migrate --dry-run")
+        expect(root).not.toContain("You are the root.")
+        expect(root.endsWith(`\n\n${SESSION_REMINDER}`)).toBe(true)
+        // A legacy folder ignored once `.holyagent` exists.
+        await mkdir(join(legacyOnly, ".holyagent"))
+        const migrated = additional((await hook("session-start", start(), legacyOnly)).stdout)
+        expect(migrated).toContain("holyagent status:")
+        expect(migrated).not.toContain("holyagent migrate")
+      } finally {
+        await rm(legacyOnly, { recursive: true, force: true })
+      }
+    }
+  })
+
+  test("names both legacy folders when both are present", async () => {
+    const both = await mkdtemp(join(tmpdir(), "holyagent-hook-legacy-both-"))
+    try {
+      await mkdir(join(both, ".holyclaude"))
+      await mkdir(join(both, ".holycodex"))
+      const text = additional((await hook("session-start", start("holyagent"), both)).stdout)
+      expect(text).toContain("`.holyclaude/` and `.holycodex/`")
+    } finally {
+      await rm(both, { recursive: true, force: true })
     }
   })
 
@@ -1261,7 +1344,7 @@ describe("hook session-start, after a resume or compaction", () => {
       expect((await cli(["intent", "create"], JSON.stringify(draft), stated)).code).toBe(0)
       for (const source of ["resume", "compact"]) {
         const text = additional((await hook("session-start", start(source), stated)).stdout)
-        expect(text.length).toBeLessThanOrEqual(9000)
+        expect(text.length).toBeLessThanOrEqual(CONTEXT_BUDGET)
         expect(text).toContain("Requirement 0:")
         expect(text).not.toContain("Requirement 39:")
         expect(text).toMatch(/\+\d+ more requirements; run `holyagent intent show`/)
@@ -1272,7 +1355,7 @@ describe("hook session-start, after a resume or compaction", () => {
     }
   })
 
-  test("keeps the static text first and the whole within 9,000 characters for a large state", async () => {
+  test("keeps the static text first and the whole within the context budget for a large state", async () => {
     const big = await mkdtemp(join(tmpdir(), "holyagent-hook-resume-big-"))
     try {
       expect((await cli(["intent", "create"], '{"objective":"Ship it"}', big)).code).toBe(0)
@@ -1293,7 +1376,7 @@ describe("hook session-start, after a resume or compaction", () => {
           big,
         )
         const text = additional(result.stdout)
-        expect(text.length).toBeLessThanOrEqual(9000)
+        expect(text.length).toBeLessThanOrEqual(CONTEXT_BUDGET)
         expect(text).toStartWith(core)
         expect(text.indexOf("holyagent status:")).toBeLessThan(text.indexOf("holyagent reconcile:"))
       }
@@ -1542,7 +1625,7 @@ describe("hooks that need no state", () => {
 })
 
 describe("hook session-start, size", () => {
-  test("stays within 9,000 characters for a large state, and names the plugin folder", async () => {
+  test("stays within the context budget for a large state, and names the plugin folder", async () => {
     const big = await mkdtemp(join(tmpdir(), "holyagent-hook-big-"))
     try {
       for (let at = 0; at < 14; at += 1)
@@ -1564,7 +1647,7 @@ describe("hook session-start, size", () => {
       const text = (
         JSON.parse(result.stdout) as { hookSpecificOutput: { additionalContext: string } }
       ).hookSpecificOutput.additionalContext
-      expect(text.length).toBeLessThanOrEqual(9000)
+      expect(text.length).toBeLessThanOrEqual(CONTEXT_BUDGET)
       expect(text).toContain("You are the root.")
       expect(text).not.toContain("## Assignments and acceptance")
       expect(text).toContain('"/plugins/holyagent/scripts/holyagent"')

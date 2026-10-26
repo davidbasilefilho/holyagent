@@ -999,6 +999,7 @@ describe("failures", () => {
     const result = await cli(["intent", "create"])
     expect(result.code).toBe(2)
     expect(result.stderr).toContain("error: StdinMissing:")
+    expect(result.stderr).toContain("hint: Give the input as --input '<json>' or pipe it in")
   })
 })
 

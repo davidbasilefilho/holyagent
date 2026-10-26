@@ -60,10 +60,10 @@ const IntentEdit = Schema.Struct({
 export const INTENT_COMMANDS: ReadonlyArray<Command> = [
   {
     path: ["intent", "create"],
-    usage: "intent create",
+    usage: "intent create [--input <json>]",
     summary: "Create an Intent and put it in use",
     input: "{objective, requirements?: [text]}",
-    flags: {},
+    flags: { input: "string" },
     positionals: 0,
     run: ({ directory, input }) =>
       Effect.gen(function* () {
@@ -114,13 +114,13 @@ export const INTENT_COMMANDS: ReadonlyArray<Command> = [
   },
   {
     path: ["intent", "update"],
-    usage: "intent update [--material]",
+    usage: "intent update [--input <json>] [--material]",
     summary: "Edit the Intent in use; --material moves its revision and makes open work stale",
     input: "{objective?, requirements?: [text]}",
     notes: [
       "--material when requirements, user-visible behavior, architecture, security, contracts, dependencies or deployment change; omit it for clarifications. Open work planned on the old revision is then stale",
     ],
-    flags: { material: "boolean" },
+    flags: { input: "string", material: "boolean" },
     positionals: 0,
     run: ({ directory, args, input }) =>
       Effect.gen(function* () {

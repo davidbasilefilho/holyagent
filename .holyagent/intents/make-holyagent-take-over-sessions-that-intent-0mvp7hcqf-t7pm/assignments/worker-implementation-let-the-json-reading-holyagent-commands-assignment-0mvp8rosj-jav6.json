@@ -1,0 +1,126 @@
+{
+  "id": "assignment-0mvp8rosj-jav6",
+  "intentId": "intent-0mvp7hcqf-t7pm",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "let-the-json-reading-holyagent-commands",
+  "objective": "Let the JSON-reading holyagent commands take their payload inline as `--input '<json>'`, as holycodex-agent 0.16.12 does, falling back to stdin, so the root never writes a draft file.",
+  "state": "Succeeded",
+  "scope": [
+    "Repository: /home/user/holyagent, branch release/0.1.2-1/fix/legacy-state-takeover. User request: the root creates Intents and Assignments through the agent-facing holyagent CLI without hand-written JSON draft files, the way holycodex-agent 0.16.12 does.",
+    "Findings to build on (accepted trace): holyagent reads JSON payloads only from stdin through the input(schema)/inputBy(pick) helpers in packages/runtime/src/cli/context.ts:59-79, bound to host.stdin in callFor (packages/runtime/src/cli/program.ts:39-55, :52-53); parseArgs is packages/runtime/src/cli/args.ts:18-49; Call.input is documented in packages/runtime/src/cli/types.ts:74-77. holycodex-agent takes `--input <json>` inline in argv, decoded with Schema.fromJsonString and onExcessProperty: \"error\" (holycodex packages/agent/src/index.ts:431-443).",
+    "Change: add an `--input <json>` string flag to intent create, intent update, assignment create and assignment dispatch (packages/runtime/src/cli/intent.ts:66,123; packages/runtime/src/cli/assignment.ts:150,176). When the flag is given, decode it with the same strict schema as stdin (blank or invalid JSON fails the same way, with a hint); when absent, read stdin as today. Giving both a non-empty stdin and --input is refused as a usage error. assignment close and accept --report keep reading the report from stdin (out of scope).",
+    "Make it discoverable: the help top line in program.ts (\"JSON on stdin\"), each affected command's input string and notes, and docs/usage.md where it describes how payloads are passed say `--input '<json>'` or stdin. Search the plugin's instruction and skill sources under packages/runtime/src/instructions and packages/integrations/claude (sources, not dist) for text telling the root to pass drafts on stdin or write draft files; update the ones you own below, and list in your report the exact file and line of any such text in files you do not own.",
+    "Tests: cover --input for each of the four commands (success, strict excess-property refusal, invalid JSON, both stdin and --input refused) next to the existing CLI tests in packages/runtime/tests."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md and AGENTS.md: Effect and tagged errors (no try/catch, new Promise, async functions or Promise statics in runtime source), Effect Schema with onExcessProperty: \"error\", Bun APIs first, JSDoc on exports. Run gates through mise (`mise run verify`).",
+    "Do not touch packages/runtime/src/cli/commands.ts, cli/migrate.ts, state/legacy.ts, cli/hook.ts, cli/sessioncontext.ts, packages/runtime/src/instructions/claude-5.5/root-core.ts, root/identity.md, session-reminder.md, requirements.md or AGENTS.md (other writers own them); if docs/usage.md is being edited by the migrate writer, edit only the payload-passing passage. Do not edit generated files under packages/integrations/claude/dist.",
+    "Do not commit, branch, push or edit .git/ or .holyagent/; report changed paths.",
+    "Do not add unrequested features (no flag-per-field form, no JSON output mode); name them in the report instead.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report."
+  ],
+  "criteria": [
+    {
+      "text": "intent create, intent update, assignment create and assignment dispatch accept `--input '<json>'` decoded strictly, and still read stdin when the flag is absent",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Both stdin and --input given is refused as a usage error, and invalid or excess-property input fails with a hint",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Help, command input strings and docs/usage.md describe --input or stdin; instruction text elsewhere that tells the root to write draft files is listed with file and line",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Tests cover --input for the four commands, including the refusals, and fail without the change",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Existing tests still pass and `mise run verify` passes for the changed files",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "No change outside the CLI input path, its help, docs and tests",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "help-text"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli/context.ts",
+    "packages/runtime/src/cli/program.ts",
+    "packages/runtime/src/cli/args.ts",
+    "packages/runtime/src/cli/types.ts",
+    "packages/runtime/src/cli/intent.ts",
+    "packages/runtime/src/cli/assignment.ts",
+    "packages/runtime/tests/input.test.ts"
+  ],
+  "dependencies": [
+    "assignment-0mvp8mroj-g5hh"
+  ],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "a334c6334413d7e09",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-26T12:37:25.700Z",
+    "finishedAt": "2026-10-26T12:42:06.085Z"
+  },
+  "result": "result: `--input '<json>'` now works on intent create, intent update, assignment create and assignment dispatch, decoded with the same strict schema as stdin. Without the flag they read stdin as before. The lint gate could not run here.\n\nchanged:\n- /home/user/holyagent/packages/runtime/src/cli/args.ts (new `INPUT_FLAG = \"input\"`)\n- /home/user/holyagent/packages/runtime/src/cli/context.ts (`readInput` and `readInputBy` take an optional inline value; new private `payloadOf` picks `--input` or stdin)\n- /home/user/holyagent/packages/runtime/src/cli/program.ts (`callFor` passes the flag value; top help line; help label)\n- /home/user/holyagent/packages/runtime/src/cli/types.ts (`Call.input` docs and error type now include `Usage`)\n- /home/user/holyagent/packages/runtime/src/cli/intent.ts\n- /home/user/holyagent/packages/runtime/src/cli/assignment.ts (both declare `flags.input: \"string\"`; usage lines gain `[--input <json>]`)\n- /home/user/holyagent/packages/runtime/tests/input.test.ts (new)\n- /home/user/holyagent/docs/usage.md (two edits only: the new sentence on how payloads are passed, and the `assignment dispatch` step)\n- Diff file: /tmp/claude-0/-home-user-holyagent/737d3a1b-dae6-5c0b-bd4a-0e2fde353bd5/scratchpad/input.diff\n\nbehavior:\n- `--input` is parsed only on commands that declare the flag, so `assignment close` and `accept --report` still reject it as an unknown flag and read the report from stdin.\n- A blank `--input` fails as `Usage: --input is empty`, with a hint. Both a non-empty stdin and `--input` fail as `Usage: Got JSON on both stdin and --input`, exit 2, with a hint.\n- Invalid JSON or an excess property fails as `InvalidDraft: --input: ...`, exit 2, with the existing InvalidDraft hint. Stdin errors keep the `stdin:` prefix.\n- A terminal or blank stdin beside `--input` is treated as empty.\n- I did not edit errors.ts (not mine). A blank `--input` therefore uses `Usage` with its own hint instead of the stdin-specific `StdinMissing`, whose hint says \"Pipe the input in\".\n- Help: commands that take the flag print `input (--input '<json>' or stdin): <shape>`; the others still print `stdin:`. The top line now reads \"JSON inline as `--input '<json>'` or on stdin\". I added no separate notes lines, because the label already says it.\n\nchecks:\n- `bun test packages/runtime/tests/input.test.ts` -> 0, 34 pass, 0 fail\n- Same test file against a copy of HEAD (a `git archive` in the scratchpad) -> 5 pass, 29 fail. The 5 passes are the stdin-path regression tests, and the failures are the missing `--input` flag.\n- `bun check --no-script` -> 0, no type errors in 94 files\n- `bun fmt --no-script --check` -> 0, all 207 files formatted (I ran `bun fmt` once on my three source files first)\n- `bun test` (whole repo) -> 737 pass, 1 skip, 3 fail. The failures are all outside my paths:\n  - sessioncontext x3: the session-context tests, whose source is another writer's edited area.\n  - plugin.test.ts \"generated plugin in step with sources\": `packages/integrations/claude/dist` is stale. The dist bundle includes this CLI change and the other writers' instruction edits, so the root must run `mise run build`. I did not touch dist.\n- `mise run verify` and `bun lint` did not run. `mise` is not installed here, and Bun is 1.4.4 stable, not canary, so `bun lint` falls through to the missing mise. By hand: every new export has JSDoc and the runtime source has no try/catch, async or Promise statics. The root should run `mise run verify` where mise is available.\n\nblockers: none. `mise run lint` and the full `verify` need an environment with mise and canary Bun.\n\nquestions: none\n\nnotes:\n- Instruction text that tells the root to pass drafts on stdin, not mine to edit:\n  - /home/user/holyagent/packages/runtime/src/instructions/claude-5.5/root/dispatch.md:3 says \"`assignment dispatch` with the draft on stdin ...\" and should say `--input '<json>'` or stdin.\n  - /home/user/holyagent/packages/runtime/src/instructions/claude-5.5/root/workflows.md:1 says \"`assignment create` each Assignment\" without naming the input route. Optional.\n  - /home/user/holyagent/packages/runtime/src/instructions/claude-5.5/root/asking.md:9 says \"`intent update --material`\" without naming the input route. Optional.\n  - /home/user/holyagent/packages/runtime/src/cli/overview.ts:83 covers the report on stdin, which is correct and unchanged.\n  - /home/user/holyagent/packages/runtime/src/cli/errors.ts:92 is the `StdinMissing` hint: \"Pipe the input in, for example: echo '...' | holyagent <command>\". It could also name `--input '<json>'`. Also not mine.\n  - I found no text anywhere that tells the root to write draft files.\n- The real stdin (`cli/main.ts`) is read with `Bun.stdin.text()` when stdin is not a terminal. With `--input` given, an inherited pipe that is never closed would wait on that read. A closed or /dev/null stdin, as in Bash tool calls, returns empty at once. I kept this because the both-sources refusal needs the read.\n- Ideas I left out, as asked: a flag-per-field form, a JSON output mode, and `--input` for `assignment close` and `accept --report`.\n\nevidence:\nchecks-run: `bun test packages/runtime/tests/input.test.ts` -> 0, 34 pass. `bun check --no-script` -> 0. `bun fmt --no-script --check` -> 0. `bun test` -> 737 pass, 3 fail, all in other writers' areas or the stale dist. `mise run verify` and `bun lint` did not run (no mise, non-canary Bun).\nchanged-paths: the eight files listed under \"changed\" above.\nhelp-text: top line \"JSON inline as `--input '<json>'` or on stdin, TOON on stdout\" (program.ts, `topHelp`). Each of the four commands' help prints `input (--input '<json>' or stdin): <shape>` (program.ts, `help`); the usage lines carry `[--input <json>]`. Checked live with `bun run packages/runtime/src/cli/main.ts assignment dispatch --help`, and asserted in the `help` describe block of input.test.ts.\nintent create, intent update, assignment create and assignment dispatch accept `--input '<json>'` decoded strictly, and still read stdin when the flag is absent: input.test.ts, `describe.each` of the four commands. Tests \"takes the payload inline, decoded strictly\", \"--input=<json> form\" and \"still reads stdin when the flag is absent\", 34 pass.\nBoth stdin and --input given is refused as a usage error, and invalid or excess-property input fails with a hint: input.test.ts tests \"refuses JSON on both stdin and --input\", \"refuses an excess property with a hint\", \"refuses invalid JSON with a hint\" and \"refuses a blank value with a hint\". Each asserts exit code 2, the error line and `hint:`, for all four commands.\nHelp, command input strings and docs/usage.md describe --input or stdin; instruction text elsewhere that tells the root to write draft files is listed with file and line: help is covered under help-text. docs/usage.md has the new sentence in the \"How a session works\" paragraph and the dispatch step. The instruction text is listed under notes: dispatch.md:3 plus the optional workflows.md:1 and asking.md:9. No text anywhere tells the root to write draft files.\nTests cover --input for the four commands, including the refusals, and fail without the change: input.test.ts, 34 tests. Against a copy of HEAD: 29 fail, 5 pass (the stdin-path ones).\nExisting tests still pass and `mise run verify` passes for the changed files: full `bun test` has no new failures in files I touched. The 3 failures are sessioncontext (other writer) and the stale generated dist, which needs `mise run build`. check and fmt:check pass; `mise run verify` and lint could not run here.\nNo change outside the CLI input path, its help, docs and tests: the diff is limited to the eight listed files, and the usage.md edit is limited to the payload-passing passage and the dispatch step.\n",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Its evidence holds, and the open gate is now closed: the full mise run verify on the combined tree (assignment-0mvp9dyt1-xwy3) passed with lint, check, fmt:check and 760 tests, 0 fail.",
+    "criteria": [
+      {
+        "criterion": "intent create, intent update, assignment create and assignment dispatch accept `--input '<json>'` decoded strictly, and still read stdin when the flag is absent",
+        "support": "input.test.ts, `describe.each` of the four commands. Tests \"takes the payload inline, decoded strictly\", \"--input=<json> form\" and \"still reads stdin when the flag is absent\", 34 pass."
+      },
+      {
+        "criterion": "Both stdin and --input given is refused as a usage error, and invalid or excess-property input fails with a hint",
+        "support": "input.test.ts tests \"refuses JSON on both stdin and --input\", \"refuses an excess property with a hint\", \"refuses invalid JSON with a hint\" and \"refuses a blank value with a hint\". Each asserts exit code 2, the error line and `hint:`, for all four commands."
+      },
+      {
+        "criterion": "Help, command input strings and docs/usage.md describe --input or stdin; instruction text elsewhere that tells the root to write draft files is listed with file and line",
+        "support": "help is covered under help-text. docs/usage.md has the new sentence in the \"How a session works\" paragraph and the dispatch step. The instruction text is listed under notes: dispatch.md:3 plus the optional workflows.md:1 and asking.md:9. No text anywhere tells the root to write draft files."
+      },
+      {
+        "criterion": "Tests cover --input for the four commands, including the refusals, and fail without the change",
+        "support": "input.test.ts, 34 tests. Against a copy of HEAD: 29 fail, 5 pass (the stdin-path ones)."
+      },
+      {
+        "criterion": "Existing tests still pass and `mise run verify` passes for the changed files",
+        "support": "full `bun test` has no new failures in files I touched. The 3 failures are sessioncontext (other writer) and the stale generated dist, which needs `mise run build`. check and fmt:check pass; `mise run verify` and lint could not run here."
+      },
+      {
+        "criterion": "No change outside the CLI input path, its help, docs and tests",
+        "support": "the diff is limited to the eight listed files, and the usage.md edit is limited to the payload-passing passage and the dispatch step."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bun test packages/runtime/tests/input.test.ts` -> 0, 34 pass. `bun check --no-script` -> 0. `bun fmt --no-script --check` -> 0. `bun test` -> 737 pass, 3 fail, all in other writers' areas or the stale dist. `mise run verify` and `bun lint` did not run (no mise, non-canary Bun)."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the eight files listed under \"changed\" above."
+      },
+      {
+        "label": "help-text",
+        "support": "top line \"JSON inline as `--input '<json>'` or on stdin, TOON on stdout\" (program.ts, `topHelp`). Each of the four commands' help prints `input (--input '<json>' or stdin): <shape>` (program.ts, `help`); the usage lines carry `[--input <json>]`. Checked live with `bun run packages/runtime/src/cli/main.ts assignment dispatch --help`, and asserted in the `help` describe block of input.test.ts."
+      }
+    ]
+  },
+  "createdAt": "2026-10-26T12:37:25.700Z"
+}

@@ -2,7 +2,13 @@ import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
-import { CONTEXT_BUDGET, SESSION_REMINDER, sessionContext } from "../src/cli/sessioncontext.ts"
+import {
+  CONTEXT_BUDGET,
+  legacyContext,
+  ROOT_TAKEOVER,
+  SESSION_REMINDER,
+  sessionContext,
+} from "../src/cli/sessioncontext.ts"
 import { ROOT_CORE, ROOT_CORE_FILES } from "../src/instructions/claude-5.5/root-core.ts"
 const LONG = "Make every part of the system reliable and observable. ".repeat(40)
 
@@ -61,6 +67,12 @@ describe("the core of the root rules", () => {
     ])
       expect(core).toContain(part)
     expect(core).not.toContain("(see Asking)")
+  })
+
+  test("says the default, user-facing agent of every session is the root, whatever it started as", () => {
+    expect(ROOT_CORE).toContain("Every session's default, user-facing agent is the root")
+    expect(ROOT_CORE).toContain("whatever it started as")
+    expect(ROOT_CORE).toContain("without a reminder")
   })
 
   test("makes the task list the place for progress and keeps messages for decisions, blockers and the report", () => {
@@ -192,6 +204,20 @@ describe("the rules block that ends the session context", () => {
       expect(SESSION_REMINDER).toContain(part)
   })
 
+  test("states that the default session agent is the root and that all work goes through Intents and Assignments", () => {
+    for (const part of [
+      "default, user-facing agent of every session is the holyagent root",
+      "whatever agent the session started as",
+      "without being reminded",
+      "Run all work through an Intent and Assignments dispatched to the specialists",
+      "the main thread does not edit files",
+    ])
+      expect(SESSION_REMINDER).toContain(part)
+    expect(SESSION_REMINDER.indexOf("default, user-facing agent")).toBeLessThan(
+      SESSION_REMINDER.indexOf("Rules most often missed"),
+    )
+  })
+
   test("ends the context with or without the root core, a reconcile result or requirements", () => {
     const reconcile = { running: [{ id: "assignment-a", role: "Worker.implementation" }] }
     const intent = { id: "intent-a", revision: 1, requirements: ["Parse every file"] }
@@ -268,5 +294,32 @@ describe("the requirements of the Intent in use", () => {
     expect(text.length).toBeLessThanOrEqual(CONTEXT_BUDGET)
     expect(text).toContain("+1 more requirements; run `holyagent intent show`")
     expect(text).not.toContain("xxxxxxxxxx")
+  })
+})
+
+describe("the takeover line and the legacy context", () => {
+  test("the takeover line makes the main thread the root and names the agent prompt", () => {
+    for (const part of [
+      "default, user-facing agent of this session is the holyagent root",
+      "whatever agent it started as",
+      "${CLAUDE_PLUGIN_ROOT}/agents/holyagent.md",
+      "before acting",
+      "without being reminded",
+      "all work through an Intent and Assignments dispatched to the holyagent specialists",
+      "never implementing in the main thread",
+    ])
+      expect(ROOT_TAKEOVER).toContain(part)
+  })
+
+  test("names the legacy folders and holyagent migrate, between the core and the reminder", () => {
+    const text = legacyContext([".holyclaude", ".holycodex"], ROOT_CORE)
+    expect(text).toStartWith(ROOT_CORE)
+    expect(text).toContain("`.holyclaude/` and `.holycodex/`")
+    expect(text.indexOf("holyagent migrate --dry-run")).toBeLessThan(
+      text.indexOf("then `holyagent migrate`"),
+    )
+    expect(text.endsWith(`\n\n${SESSION_REMINDER}`)).toBe(true)
+    expect(text.length).toBeLessThanOrEqual(CONTEXT_BUDGET)
+    expect(legacyContext([".holycodex"])).not.toContain("You are the root.")
   })
 })

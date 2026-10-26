@@ -3,7 +3,7 @@ import { Clock, Effect, Schema } from "effect"
 
 import { InvalidDraft } from "../domain/errors.ts"
 import { StateIo } from "../state/errors.ts"
-import { StdinMissing } from "./errors.ts"
+import { StdinMissing, Usage } from "./errors.ts"
 import type { Host } from "./types.ts"
 
 /** The current time as ISO 8601 text, the form the records store. */
@@ -52,28 +52,48 @@ const compact = (message: string): string =>
   })
 
 /**
- * Reads stdin as JSON and decodes it with the schema `pick` chooses from the parsed value, failing
- * on a missing or excess property. Choosing by value lets a command accept two shapes and report
- * only the one that was meant.
+ * The JSON text a command was given: the inline `--input` value when present, else stdin. An inline
+ * value must not be blank, and stdin must then be empty, so one command never has two payloads.
+ */
+const payloadOf = (host: Host, inline: string | undefined) =>
+  Effect.gen(function* () {
+    if (inline === undefined) return { source: "stdin", text: yield* readReport(host) }
+    const hint = "Give the JSON once: `--input '<json>'`, or on stdin without --input."
+    if (inline.trim() === "") return yield* new Usage({ message: "--input is empty", hint })
+    const piped = yield* host.stdin.pipe(Effect.orElseSucceed(() => ""))
+    if (piped.trim() !== "")
+      return yield* new Usage({ message: "Got JSON on both stdin and --input", hint })
+    return { source: "--input", text: inline }
+  })
+
+/**
+ * Reads the payload as JSON (inline `--input` when given, else stdin) and decodes it with the
+ * schema `pick` chooses from the parsed value, failing on a missing or excess property. Choosing by
+ * value lets a command accept two shapes and report only the one that was meant.
  */
 export const readInputBy = <S extends Schema.Decoder<unknown>>(
   host: Host,
   pick: (raw: unknown) => S,
+  inline?: string,
 ) =>
   Effect.gen(function* () {
+    const { source, text } = yield* payloadOf(host, inline)
     const invalid = (error: { readonly message: string }) =>
-      new InvalidDraft({ message: compact(`stdin: ${error.message}`) })
-    const raw = yield* readReport(host).pipe(
-      Effect.flatMap((text) =>
-        Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))(text),
-      ),
-      Effect.mapError((error) => (error._tag === "StdinMissing" ? error : invalid(error))),
+      new InvalidDraft({ message: compact(`${source}: ${error.message}`) })
+    const raw = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))(text).pipe(
+      Effect.mapError(invalid),
     )
     return yield* Schema.decodeUnknownEffect(pick(raw), { onExcessProperty: "error" })(raw).pipe(
       Effect.mapError(invalid),
     )
   })
 
-/** Reads stdin as JSON and decodes it with the schema, failing on a missing or excess property. */
-export const readInput = <S extends Schema.Decoder<unknown>>(host: Host, schema: S) =>
-  readInputBy(host, () => schema)
+/**
+ * Reads the payload as JSON and decodes it with the schema, failing on a missing or excess
+ * property.
+ */
+export const readInput = <S extends Schema.Decoder<unknown>>(
+  host: Host,
+  schema: S,
+  inline?: string,
+) => readInputBy(host, () => schema, inline)

@@ -2,6 +2,9 @@ import { Effect, Schema } from "effect"
 
 import { Usage } from "./errors.ts"
 
+/** The flag that passes a command's JSON payload inline instead of on stdin. */
+export const INPUT_FLAG = "input"
+
 /** The kind of value a flag takes. */
 export type FlagKind = "string" | "boolean"
 

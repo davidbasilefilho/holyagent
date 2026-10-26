@@ -85,11 +85,14 @@ const REFUSED_ERRORS = new Set([
   "InsufficientAcceptance",
   "SpecialistMismatch",
   "SpecialistNotRecorded",
+  "MigrationRefused",
+  "NothingToMigrate",
   ...VCS_REFUSED_ERRORS,
 ])
 
 const HINTS: Readonly<Record<string, string>> = {
-  StdinMissing: "Pipe the input in, for example: echo '...' | holyagent <command>; see --help.",
+  StdinMissing:
+    "Give the input as --input '<json>' or pipe it in, for example: echo '...' | holyagent <command>; see --help.",
   NoActiveIntent:
     "Pick one with `holyagent intent use <id>`, or start one with `holyagent intent create`.",
   InvalidDraft:
@@ -113,6 +116,12 @@ const HINTS: Readonly<Record<string, string>> = {
   SpecialistMismatch: "Record the agent that was actually launched, or dispatch again.",
   SpecialistNotRecorded:
     "Run `holyagent assignment record <id> --agent <agentId>` first, or close with another outcome.",
+  MigrationRefused:
+    "Run `holyagent migrate --dry-run` to see everything that blocks it. Settle a Running legacy Assignment with the legacy tool first; the command never overwrites an existing .holyagent record.",
+  NothingToMigrate:
+    "Run it in a project that has a .holyclaude or .holycodex folder with state in it, or check that you are in the project root.",
+  MigrationUnverified:
+    "The records were written but do not load back: delete the files this run wrote (git status lists them), fix the cause the message names and run `holyagent migrate --dry-run` again.",
   StateLocked: "Another process holds the state lock; retry in a moment.",
   StateIo: "Check the permissions of the .holyagent folder in the project root.",
   CorruptRecord: "Fix or delete the file the message names, or restore it from version control.",

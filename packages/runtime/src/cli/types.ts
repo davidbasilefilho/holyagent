@@ -71,14 +71,18 @@ export interface Call {
   readonly emit: (text: string) => Effect.Effect<void>
   /** Git and GitHub for the `vcs` commands. */
   readonly vcs: Layer.Layer<Git | GitHub>
-  /** Reads stdin as JSON and decodes it strictly; unknown fields are refused. */
+  /**
+   * Reads the JSON payload, from the inline `--input` flag when the command has it and it was
+   * given, else from stdin, and decodes it strictly; unknown fields are refused. Both at once is a
+   * Usage.
+   */
   readonly input: <S extends Schema.Decoder<unknown>>(
     schema: S,
-  ) => Effect.Effect<S["Type"], StdinMissing | InvalidDraft, S["DecodingServices"]>
+  ) => Effect.Effect<S["Type"], StdinMissing | Usage | InvalidDraft, S["DecodingServices"]>
   /** Like `input`, with the schema chosen from the parsed JSON, for a command with two shapes. */
   readonly inputBy: <S extends Schema.Decoder<unknown>>(
     pick: (raw: unknown) => S,
-  ) => Effect.Effect<S["Type"], StdinMissing | InvalidDraft, S["DecodingServices"]>
+  ) => Effect.Effect<S["Type"], StdinMissing | Usage | InvalidDraft, S["DecodingServices"]>
 }
 
 /** One CLI command: its words, help and implementation. */
@@ -87,7 +91,10 @@ export interface Command {
   /** The usage line without the program name, such as `intent show [id]`. */
   readonly usage: string
   readonly summary: string
-  /** The shape of the JSON on stdin, when the command reads any. */
+  /**
+   * The shape of the JSON payload (stdin, or `--input` when the command takes the flag), when the
+   * command reads any.
+   */
   readonly input?: string
   /** What stdout holds when it is more than TOON, such as a trailer after the fields. */
   readonly output?: string
