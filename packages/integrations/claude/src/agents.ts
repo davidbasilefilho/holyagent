@@ -1,4 +1,4 @@
-import { type Capability, type Route, ROUTES } from "../../../runtime/src/domain/route.ts"
+import { type Route, ROUTES } from "../../../runtime/src/domain/route.ts"
 import { ROOT_CORE_FILES } from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
 import {
   DIST_DIRECTORY,
@@ -16,21 +16,82 @@ const ROOT_DESCRIPTION =
   "Use as the main-thread agent: it plans the work as an Intent with Assignments, dispatches the holyagent specialists through the CLI, judges their reports, accepts work on evidence and owns version control."
 
 /**
- * The web tools of the Search roles, in place of Claude Code's WebSearch and WebFetch: Exa's search
- * and fetch, from the claude.ai connector named Exa (`mcp__claude_ai_Exa__` in the desktop app,
- * `mcp__Exa__` in a claude.ai cloud session) and from the MCP server of Exa's plugin, a dependency
- * of this one. Any one works, so every prefix is listed; a name that matches no connected server is
- * ignored. `agent_run` is left out because the connector can block it.
+ * The built-in tools of Claude Code that an agent definition can grant or deny: the ones a
+ * background subagent keeps (per the sub-agents documentation) plus the dispatch, ask and task
+ * tools the root uses. Each agent's `disallowedTools` is this list minus what its role grants, so a
+ * grant and its denial cannot drift. MCP tools are not in it: an agent without a `tools` line
+ * inherits every MCP tool of the session, custom servers included.
  */
-const WEB = ["mcp__claude_ai_Exa__", "mcp__plugin_exa_exa__", "mcp__Exa__"].flatMap((prefix) =>
-  ["web_search_exa", "web_fetch_exa"].map((name) => `${prefix}${name}`),
-)
-const WRITING = ["Write", "Edit", "Bash"]
+export const BUILTIN_TOOLS: ReadonlyArray<string> = [
+  "Agent",
+  "Artifact",
+  "AskUserQuestion",
+  "Bash",
+  "Edit",
+  "EnterWorktree",
+  "ExitWorktree",
+  "Glob",
+  "Grep",
+  "LSP",
+  "Monitor",
+  "NotebookEdit",
+  "PowerShell",
+  "Read",
+  "SendMessage",
+  "Skill",
+  "TaskCreate",
+  "TaskGet",
+  "TaskList",
+  "TaskStop",
+  "TaskUpdate",
+  "TodoWrite",
+  "ToolSearch",
+  "WebFetch",
+  "WebSearch",
+  "Workflow",
+  "Write",
+]
+
 /**
- * The T3 Code tools of the root; the visual roles take theirs from the interface inspection
- * section.
+ * Claude Code's own web tools, denied to every agent: web work goes through Exa, whose tools every
+ * agent inherits as MCP tools.
  */
-const ROOT_T3_TOOLS = ["html_render", "html_preview", "watch_pull_request"]
+export const NATIVE_WEB_TOOLS: ReadonlyArray<string> = ["WebSearch", "WebFetch"]
+
+/**
+ * The built-in tool every agent keeps: with tool search on, Claude Code loads deferred MCP tools
+ * through it, so denying it would cut agents off from the MCP servers they inherit.
+ */
+const MCP_LOADER = "ToolSearch"
+
+const WRITING = ["Write", "Edit", "Bash"]
+
+/** The built-in tools of the root: dispatch, ask, tasks and reading; it writes no files. */
+const ROOT_BUILTINS = [
+  "Agent",
+  "SendMessage",
+  "AskUserQuestion",
+  "Skill",
+  "Monitor",
+  "Workflow",
+  "TaskCreate",
+  "TaskUpdate",
+  "TaskList",
+  "TaskGet",
+  "Read",
+  "Grep",
+  "Glob",
+  "Bash",
+]
+
+/**
+ * The `disallowedTools` value of an agent that is granted `granted`: every built-in tool left over,
+ * which always includes the native web tools.
+ */
+const denylist = (granted: ReadonlyArray<string>): string =>
+  BUILTIN_TOOLS.filter(
+    (tool) => NATIVE_WEB_TOOLS.includes(tool) || (tool !== MCP_LOADER && !granted.includes(tool)),
+  ).join(", ")
 
 /** Roles that write or review code and take the mergeability bar with them. */
 const MERGE_READY: ReadonlySet<string> = new Set([
@@ -299,43 +360,19 @@ const readSections = async (
  */
 const BUILTIN_REVIEW: ReadonlySet<string> = new Set(["Reviewer.code", "Reviewer.security"])
 
-const t3 = (names: ReadonlyArray<string>) => names.map((name) => `mcp__t3-code__${name}`)
-
 /**
- * The T3 Code inspection tools the interface inspection section names (`preview_*`, `device_*` and
- * `html_*`), in order of appearance, so that section stays their one source.
+ * The built-in tools of a specialist: reading for all, then what its capabilities call for. The
+ * Search capability grants none, since the Exa tools come as MCP tools. Reviewer.code keeps Bash
+ * without a Shell capability, since it reads diffs with git. The roles of {@link BUILTIN_REVIEW}
+ * get Skill, and a role with Bash gets Monitor for its long commands.
  */
-export const inspectionTools = (section: string): ReadonlyArray<string> => [
-  ...new Set(
-    Array.from(
-      section.matchAll(/\b(?:mcp__t3-code__)?((?:preview|device|html)(?:_[a-z]+)+)\b/g),
-      ([, name = ""]) => name,
-    ),
-  ),
-]
-
-const capabilityTools = (
-  capabilities: ReadonlyArray<Capability>,
-  inspection: ReadonlyArray<string>,
-): ReadonlyArray<string> => [
-  ...(capabilities.includes("Search") ? WEB : []),
-  ...(capabilities.includes("Write") ? WRITING : []),
-  ...(capabilities.includes("Shell") ? ["Bash"] : []),
-  ...(capabilities.includes("VisualInspection") ? t3(inspection) : []),
-]
-
-/**
- * The tools of a specialist: reading for all, then what its capabilities call for. Reviewer.code
- * keeps Bash without a Shell capability, since it reads diffs with git. The roles of
- * {@link BUILTIN_REVIEW} get Skill, and a role with Bash gets Monitor for its long commands.
- */
-const toolsOf = (route: Route, inspection: ReadonlyArray<string>): ReadonlyArray<string> => {
+const builtinsOf = (route: Route): ReadonlyArray<string> => {
   const granted = [
     "Read",
     "Grep",
     "Glob",
-    ...capabilityTools(route.capabilities, inspection),
-    ...(route.roleTask === "Reviewer.code" ? ["Bash"] : []),
+    ...(route.capabilities.includes("Write") ? WRITING : []),
+    ...(route.capabilities.includes("Shell") || route.roleTask === "Reviewer.code" ? ["Bash"] : []),
     ...(BUILTIN_REVIEW.has(route.roleTask) ? ["Skill"] : []),
   ]
   const unique = [...new Set(granted)]
@@ -372,7 +409,6 @@ interface Shared {
   readonly conduct: ReadonlyArray<string>
   /** The text of each of {@link CONDITIONAL_SECTIONS}, by file. */
   readonly conditional: Readonly<Record<string, string>>
-  readonly inspection: ReadonlyArray<string>
   readonly design: string
 }
 
@@ -388,7 +424,7 @@ const specialist = async (route: Route, shared: Shared): Promise<GeneratedFile> 
     `model: ${route.model}`,
     `effort: ${route.effort}`,
     "background: true",
-    `tools: ${toolsOf(route, shared.inspection).join(", ")}`,
+    `disallowedTools: ${denylist(builtinsOf(route))}`,
     "experimental:",
     "  cacheTtl: 1h",
   ])
@@ -413,28 +449,11 @@ const specialist = async (route: Route, shared: Shared): Promise<GeneratedFile> 
  */
 const rootAgent = async (): Promise<GeneratedFile> => {
   const source = `${INSTRUCTIONS_DIRECTORY}/root`
-  const tools = [
-    `Agent(${ROUTES.map((route) => `${PLUGIN_NAME}:${route.agent}`).join(", ")})`,
-    "SendMessage",
-    "AskUserQuestion",
-    "Skill",
-    "Monitor",
-    "Workflow",
-    "TaskCreate",
-    "TaskUpdate",
-    "TaskList",
-    "TaskGet",
-    "Read",
-    "Grep",
-    "Glob",
-    "Bash",
-    ...t3(ROOT_T3_TOOLS),
-  ]
   const head = frontmatter(source, [
     `name: ${PLUGIN_NAME}`,
     `description: ${JSON.stringify(ROOT_DESCRIPTION)}`,
     "model: opus",
-    `tools: ${tools.join(", ")}`,
+    `disallowedTools: ${denylist(ROOT_BUILTINS)}`,
   ])
   return {
     path: `${DIST_DIRECTORY}/agents/${PLUGIN_NAME}.md`,
@@ -455,7 +474,6 @@ export const agentFiles = async (): Promise<ReadonlyArray<GeneratedFile>> => {
   const shared: Shared = {
     conduct,
     conditional,
-    inspection: inspectionTools(conditional[INSPECTION_SECTION] ?? ""),
     design,
   }
   return [

@@ -5,7 +5,7 @@ description: "Use for worker-mechanical: Apply a specified mechanical source tra
 model: haiku
 effort: high
 background: true
-tools: Read, Grep, Glob, Write, Edit, Bash, Monitor
+disallowedTools: Agent, Artifact, AskUserQuestion, EnterWorktree, ExitWorktree, LSP, NotebookEdit, PowerShell, SendMessage, Skill, TaskCreate, TaskGet, TaskList, TaskStop, TaskUpdate, TodoWrite, WebFetch, WebSearch, Workflow
 experimental:
   cacheTtl: 1h
 ---

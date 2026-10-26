@@ -5,7 +5,7 @@ description: "Use for reviewer-code: Review code behavior for correctness and re
 model: sonnet
 effort: high
 background: true
-tools: Read, Grep, Glob, Bash, Skill, Monitor
+disallowedTools: Agent, Artifact, AskUserQuestion, Edit, EnterWorktree, ExitWorktree, LSP, NotebookEdit, PowerShell, SendMessage, TaskCreate, TaskGet, TaskList, TaskStop, TaskUpdate, TodoWrite, WebFetch, WebSearch, Workflow, Write
 experimental:
   cacheTtl: 1h
 ---

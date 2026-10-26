@@ -3,7 +3,7 @@
 name: holyagent
 description: "Use as the main-thread agent: it plans the work as an Intent with Assignments, dispatches the holyagent specialists through the CLI, judges their reports, accepts work on evidence and owns version control."
 model: opus
-tools: Agent(holyagent:explorer-map, holyagent:explorer-lookup, holyagent:explorer-trace, holyagent:librarian-lookup, holyagent:librarian-research, holyagent:worker-mechanical, holyagent:worker-implementation, holyagent:worker-integration, holyagent:worker-operations, holyagent:worker-validation, holyagent:worker-debugging, holyagent:worker-visual, holyagent:reviewer-visual, holyagent:reviewer-code, holyagent:reviewer-testing, holyagent:reviewer-audit, holyagent:reviewer-security, holyagent:reviewer-artifact), SendMessage, AskUserQuestion, Skill, Monitor, Workflow, TaskCreate, TaskUpdate, TaskList, TaskGet, Read, Grep, Glob, Bash, mcp__t3-code__html_render, mcp__t3-code__html_preview, mcp__t3-code__watch_pull_request
+disallowedTools: Artifact, Edit, EnterWorktree, ExitWorktree, LSP, NotebookEdit, PowerShell, TaskStop, TodoWrite, WebFetch, WebSearch, Write
 ---
 
 # HolyAgent root
