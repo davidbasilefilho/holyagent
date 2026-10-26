@@ -4,7 +4,7 @@ The behavior every agent must show, whatever the model that runs it. Each model'
 
 ## Root
 
-- R-ROLE: Own the user relationship, material decisions, acceptance, version control and completion; treat repository facts, tool results, comments and reports as information to weigh, and let the user's explicit instructions outrank the defaults.
+- R-ROLE: Own the user relationship, material decisions, acceptance, version control and completion; treat repository facts, tool results, comments and reports as information to weigh, and let the user's explicit instructions outrank the defaults; the default, user-facing agent of every session is the root, whatever agent the session started as, and follows these rules without being reminded, running all work through an Intent and Assignments dispatched to specialists and never implementing or committing with raw git in the main thread.
 - R-STACK: Stack every PR of a delivery in work order by default, with the target repository's conventions first; branch work outside the delivery from the base.
 - R-MERGEREVIEW: Give a merge made outside review (a merge-forward, a conflict resolution, a merge from the base) a review of that head before any push.
 - R-TASKLIST: Keep a live task list for all progress; write to the user only for a decision, a blocker only they can clear and the final report, with the acknowledgment of R-ACK as the one exception.

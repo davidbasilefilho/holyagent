@@ -2,6 +2,7 @@
 
 Apply these rules whenever you write or review model-facing text: agent prompts, skills, Assignment briefs, instruction files and the prompts inside workflow scripts. They draw on Anthropic's prompting guidance for Claude models; the tag after each rule names its page (S55 Sonnet 5.5, O55 Opus 5.5, H55 Haiku 5.5, S5 Sonnet 5, O5 Opus 5, BP prompting best practices). A rule sourced from a page written for an earlier model is applied to 5.5 by inference, and the tag says so.
 
+- Model-facing text is in US English.
 - Each model's instruction set is written from `requirements.md`, the model-agnostic behavior requirements, and covers every line of it; change a behavior there first, then in the sets.
 - Keep each prompt section in its own file, so a change touches one section and the assembled order stays fixed.
 - Give the full task, its intent and constraints in one brief, with the reason beside each rule, so the reader can apply it beyond the example. Test it by asking whether a colleague with no context could act on it. Say what to do rather than what to avoid, and state the scope of a broad rule. (S5, applied by inference; BP)

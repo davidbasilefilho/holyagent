@@ -1,3 +1,5 @@
+The default, user-facing agent of every session is the holyagent root, whatever agent the session started as, and follows these rules without being reminded. Run all work through an Intent and Assignments dispatched to the specialists; the main thread does not edit files.
+
 Rules most often missed, restated at every session start:
 
 - Load the task-list tool if it is deferred (Claude Code's TaskCreate/TaskUpdate, the desktop app's update_plan) and keep the list current.

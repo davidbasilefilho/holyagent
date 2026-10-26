@@ -7,6 +7,7 @@ import { ROOT_CORE } from "../instructions/claude-5.5/root-core.ts"
 import stateChanges from "../instructions/claude-5.5/specialist/state-changes.md" with { type: "text" }
 import { hasCode, io } from "../state/files.ts"
 import { STATE_DIRECTORY } from "../state/layout.ts"
+import { LEGACY_FOLDERS } from "../state/legacy.ts"
 import { readOpenState } from "../state/store.ts"
 import { MessageRefused } from "../vcs/errors.ts"
 import { gitMaybe } from "../vcs/git.ts"
@@ -18,7 +19,12 @@ import { AgentIdMissing, describeFailure, StateFolderMissing } from "./errors.ts
 import { resolveIntent } from "./intent.ts"
 import { resumeOf, statusOf } from "./overview.ts"
 import { dispatchedAssignment } from "./report.ts"
-import { type IntentRequirements, sessionContext } from "./sessioncontext.ts"
+import {
+  type IntentRequirements,
+  legacyContext,
+  ROOT_TAKEOVER,
+  sessionContext,
+} from "./sessioncontext.ts"
 import { type Call, type Command, Verbatim } from "./types.ts"
 import { workflowRefusal } from "./workflow-check.ts"
 
@@ -187,16 +193,29 @@ const INLINE_INPUTS: ReadonlySet<string> = new Set(["script", "args"])
 export const HOOK_COMMANDS: ReadonlyArray<Command> = [
   hook(
     "session-start",
-    "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules when the root agent is not the main thread), always ending with a short block of the root rules most often missed; nothing without a .holyagent folder",
+    "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread), always ending with a short block of the root rules most often missed; for a project with a .holyclaude or .holycodex folder and no .holyagent, a notice naming the folder and `holyagent migrate`, with the same rules; nothing in a project with none of the three",
     (payload, call) =>
       Effect.gen(function* () {
-        if (!(yield* hasStateFolder(call.directory))) return NOTHING
         const pluginRoot = call.env.CLAUDE_PLUGIN_ROOT
         // The host fills in ${CLAUDE_PLUGIN_ROOT} in agent text only, and this text is context.
-        const core = ROOT_CORE.replaceAll(
-          "${CLAUDE_PLUGIN_ROOT}",
-          pluginRoot ?? "${CLAUDE_PLUGIN_ROOT}",
-        )
+        // A main thread that is not the root gets the core and the line that makes it the root.
+        const core = ROOT_AGENTS.has(payload.agent_type)
+          ? undefined
+          : [ROOT_CORE, ROOT_TAKEOVER]
+              .join("\n\n")
+              .replaceAll("${CLAUDE_PLUGIN_ROOT}", pluginRoot ?? "${CLAUDE_PLUGIN_ROOT}")
+        if (!(yield* hasStateFolder(call.directory))) {
+          const root = dirname(call.directory)
+          const found = yield* Effect.filter(Object.values(LEGACY_FOLDERS), (name) =>
+            hasStateFolder(join(root, name)),
+          )
+          return found.length === 0
+            ? NOTHING
+            : output({
+                hookEventName: "SessionStart",
+                additionalContext: legacyContext(found, core),
+              })
+        }
         const { status, reconcile } = RESUMED.has(payload.source)
           ? yield* resumeOf(call.directory)
           : { status: yield* statusOf(call.directory), reconcile: undefined }
@@ -204,7 +223,7 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
           hookEventName: "SessionStart",
           additionalContext: sessionContext(
             status,
-            ROOT_AGENTS.has(payload.agent_type) ? undefined : core,
+            core,
             reconcile,
             RESUMED.has(payload.source) ? yield* requirementsOf(call.directory) : undefined,
           ),
