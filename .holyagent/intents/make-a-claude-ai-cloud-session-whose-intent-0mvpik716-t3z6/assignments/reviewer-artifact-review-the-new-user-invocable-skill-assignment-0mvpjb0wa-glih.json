@@ -1,0 +1,49 @@
+{
+  "id": "assignment-0mvpjb0wa-glih",
+  "intentId": "intent-0mvpik716-t3z6",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-the-new-user-invocable-skill",
+  "objective": "Review the new user-invocable skill holyagent:root and the doc lines that now list it, for correctness and completeness.",
+  "state": "Running",
+  "scope": [
+    "Diff at /tmp/claude-0/-home-user-holyagent/d7d6ecf5-4ff8-56fa-bc68-7035c761f626/scratchpad/diff-root-skill.patch: packages/runtime/src/instructions/claude-5.5/skills/root/SKILL.md (source), its generated copy in packages/integrations/claude/dist/skills/root/SKILL.md, and skill-list lines in docs/usage.md, docs/development.md, docs/decisions.md, docs/pi/claude-parity.md, plus the two test files.",
+    "Purpose: a main thread that is not the holyagent agent (e.g. a claude.ai cloud session where the plugin agent setting did not apply) runs /holyagent:root to take on the root rules. Claude Code substitutes ${CLAUDE_PLUGIN_ROOT} inline in skill Markdown bodies; the Bash tool has no CLAUDE_PLUGIN_ROOT and holyagent is not on PATH.",
+    "Repository rules: a skill description starts with the situation, then what the skill does (.claude/CLAUDE.md); model-facing text in US English, calm imperative voice; the root rules have one owner (the agent prompt), so the skill points to it rather than copying."
+  ],
+  "constraints": [
+    "Read-only. Keep working until the review is done; then stop and report findings with file:line and blocking/non-blocking."
+  ],
+  "criteria": [
+    {
+      "text": "The skill does its job: situation-first description, points to the agent prompt and the absolute CLI path via CLAUDE_PLUGIN_ROOT, adds no rule that contradicts or duplicates the agent prompt",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Docs that list the plugin's skills are accurate and consistent with the new skill; no unrelated change",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Text follows the repository's instruction-writing rules",
+      "blocking": true,
+      "dimension": "style"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvpiqvqz-9yox"
+  ],
+  "specialist": {
+    "agentId": "a64fdc3f7d216a358",
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-26T17:32:24.011Z"
+  },
+  "createdAt": "2026-10-26T17:32:24.011Z"
+}

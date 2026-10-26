@@ -1,0 +1,119 @@
+{
+  "id": "assignment-0mvpikisw-0o88",
+  "intentId": "intent-0mvpik716-t3z6",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "make-holyagent-hook-session-start-inject",
+  "objective": "Make `holyagent hook session-start` inject the core root rules, with the absolute CLI path, when the main thread is not the holyagent agent even in a project with no .holyagent, .holyclaude or .holycodex folder, and stay silent there only when the main thread is holyagent.",
+  "state": "Succeeded",
+  "scope": [
+    "packages/runtime/src/cli/hook.ts session-start: today a project with none of the three folders returns NOTHING whatever the agent (around line 208). In a claude.ai cloud session the cwd was a fresh non-git /home/user, agent_type was absent, the hook exited 0 with empty stdout, so the main thread never got the root rules.",
+    "The core already substitutes ${CLAUDE_PLUGIN_ROOT} (set in the hook's env) into ROOT_CORE + ROOT_TAKEOVER, which yields `holyagent <command>` stands for `\"<abs>/scripts/holyagent\" <command>`. The main thread's Bash has no CLAUDE_PLUGIN_ROOT and holyagent is not on PATH, so that substituted absolute path is what makes the CLI resolvable.",
+    "Update the command summary/help text of hook session-start, and the docs that describe its behavior (docs/hooks.md, and docs/usage.md / docs/components.md only where they state the old 'nothing in a project with none of the three' rule).",
+    "Tests in packages/integrations/claude/tests/hooks.test.ts (describe \"hook session-start\"): replace the test 'prints nothing in a project without a .holyagent folder, whatever the agent'."
+  ],
+  "constraints": [
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When the work is done and checked, stop and report; do not add unrequested features, tests, files or refactors (name them in the report).",
+    "No version-control writes and no edits under .git/ or .holyagent/; report changed paths.",
+    "Use Effect, no try/catch or async functions in runtime source; JSDoc on exported items; match surrounding style.",
+    "Smallest change: reuse ROOT_CORE, ROOT_TAKEOVER, the existing POINTER and SESSION_REMINDER from sessioncontext.ts (add one small exported builder there if needed) rather than new text. Keep the legacy-folder and state-folder paths behaving as today."
+  ],
+  "criteria": [
+    {
+      "text": "No state folder and no legacy folder, main thread not holyagent (agent_type absent or another agent): stdout is SessionStart additionalContext holding the core root rules, the takeover line, the pointer and the session reminder, with the absolute CLI path `<CLAUDE_PLUGIN_ROOT>/scripts/holyagent` substituted, exit 0",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No state folder and no legacy folder, main thread holyagent or holyagent:holyagent: prints nothing, exit 0",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Existing state-folder and legacy-folder outputs unchanged; existing hook tests still pass unweakened",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Test covers both cases above, including the substituted CLI path given CLAUDE_PLUGIN_ROOT, and fails without the change",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Help summary and docs describe the new rule; no other behavior added",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "mise run verify passes and mise run build regenerated the plugin dist",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli",
+    "packages/integrations/claude/tests/hooks.test.ts",
+    "packages/integrations/claude/dist",
+    "docs"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "a8df3fe95925bead2",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-26T17:11:47.504Z",
+    "finishedAt": "2026-10-26T17:16:20.841Z"
+  },
+  "result": "result: `hook session-start` now injects the core root rules, takeover line, pointer and session reminder when the main thread is not holyagent and the project has no state or legacy folder. The CLI path is the substituted `<CLAUDE_PLUGIN_ROOT>/scripts/holyagent`. It prints nothing there for `holyagent` or `holyagent:holyagent`. `bun test`, `bun check` and the format check pass, but lint did not run and `mise run verify` could not be used because mise is not installed.\n\nchanged:\n- /home/user/holyagent/packages/runtime/src/cli/hook.ts (branch for no state and no legacy; help summary updated)\n- /home/user/holyagent/packages/runtime/src/cli/sessioncontext.ts (new exported `bareContext(core)`, which joins core, POINTER and SESSION_REMINDER)\n- /home/user/holyagent/packages/integrations/claude/tests/hooks.test.ts\n- /home/user/holyagent/packages/integrations/claude/dist/scripts/holyagent.js (regenerated by the build)\n- /home/user/holyagent/docs/hooks.md (table row, intro paragraph and legacy bullet describe the new rule; `bun fmt` also re-aligned the first table, a whitespace-only change)\n- /home/user/holyagent/packages/runtime/tests/migrate.test.ts (outside my ownership paths; see questions)\n\nNot touched: docs/usage.md and docs/components.md (they do not state the old rule). docs/pi/claude-parity.md line 134 still says Pi stays silent without a `.holyagent` folder; I left it because it describes Pi and was not in scope.\n\nchecks:\n- `bun packages/integrations/claude/build.ts` -> exit 0, \"built 29 files\", dist regenerated. I ran it directly because `mise run build` is unavailable.\n- `bun install --frozen-lockfile --ignore-scripts` -> exit 0. Dependencies were missing, and the plain install fails on the `prepare` script because mise is absent.\n- `bun test` (full suite) -> 765 pass, 1 skip, 0 fail, 766 tests in 25 files, after the rebuild and fixes.\n- `bun test packages/integrations/claude/tests/hooks.test.ts -t session-start` -> 15 pass, 0 fail.\n- `bun check --no-script` -> \"No type errors in 97 files\".\n- `bun fmt --no-script --check` -> \"All 210 files are formatted\", after `bun fmt` fixed hooks.md and sessioncontext.ts.\n- `bun lint` -> not run. It delegates to mise, and the installed Bun is the stable 1.4.4, not canary.\n- The new test fails on the old code: the old code printed nothing for `agent_type` absent or `other`, so the exact-output assertion cannot hold. I did not run it against the old code, because stashing is a version-control write.\n\nblockers: `mise run verify` and `mise run build` could not run because mise is not installed, and the Bun is not canary, so lint is unchecked. The root should rerun `mise run verify` and `mise run build` where mise exists.\n\nquestions:\n- Two existing tests assumed the old rule, and I changed them (the second is outside my ownership paths):\n  - hooks.test.ts, legacy test: the \"legacy folder with no state to convert gives no notice\" assertion used a payload with no agent. That payload now gets the bare rules, so the assertion now uses `start(\"holyagent\")` for empty stdout, plus a check that the no-agent output has no \"holyagent migrate\".\n  - `packages/runtime/tests/migrate.test.ts`: the `sessionStart()` helper sent `{}` and expected \"\" for a legacy folder with only local state. It now sends `{\"agent_type\":\"holyagent\"}`, which keeps the same intent.\n- Confirm you accept the migrate.test.ts edit.\n\nnotes:\n- The new helper reuses ROOT_CORE, ROOT_TAKEOVER, POINTER and SESSION_REMINDER, so no new text was added. The legacy-folder and state-folder outputs are unchanged.\n- The diff file also covers docs/hooks.md, the dist bundle and migrate.test.ts.\n\nevidence:\n- No state folder and no legacy folder, main thread not holyagent (agent_type absent or another agent): stdout is SessionStart additionalContext holding the core root rules, the takeover line, the pointer and the session reminder, with the absolute CLI path `<CLAUDE_PLUGIN_ROOT>/scripts/holyagent` substituted, exit 0: hook.ts `found.length === 0` branch plus `bareContext` in sessioncontext.ts. Test \"gives another main thread the root rules with the CLI path in a project with no state and no legacy folder\" covers `agent_type` undefined and `other`, and passes.\n- No state folder and no legacy folder, main thread holyagent or holyagent:holyagent: prints nothing, exit 0: test \"prints nothing in a project with no state and no legacy folder when the root is the main thread\" passes.\n- Existing state-folder and legacy-folder outputs unchanged; existing hook tests still pass unweakened: the full suite passes (765 pass, 0 fail). Two assertions were adjusted as described under questions; the intent of both is kept.\n- Test covers both cases above, including the substituted CLI path given CLAUDE_PLUGIN_ROOT, and fails without the change: the new test sets `CLAUDE_PLUGIN_ROOT=/opt/plugin` and asserts the exact stdout, `holyagent <command>` standing for `\"/opt/plugin/scripts/holyagent\"`, the agents/holyagent.md path, and no leftover `${CLAUDE_PLUGIN_ROOT}`. I did not run it against the old code.\n- Help summary and docs describe the new rule; no other behavior added: the `session-start` summary in hook.ts and three passages in docs/hooks.md (hook table row, intro paragraph, legacy bullet) are updated; the only code addition is `bareContext`.\n- mise run verify passes and mise run build regenerated the plugin dist: `mise run verify` was not run (mise missing). The equivalent steps were run directly: build exit 0, tests 0 fail, `bun check` clean, `bun fmt --check` clean. Lint was not run.\n- checks-run: the check list above.\n- changed-paths: the changed list above.\n- diff-file: /tmp/claude-0/-home-user-holyagent/d7d6ecf5-4ff8-56fa-bc68-7035c761f626/scratchpad/diff.patch (199 lines; no new files were created).\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Diff read; independent review found no blockers; mise run verify exit 0 (765 pass, lint clean) and build left dist unchanged.",
+    "criteria": [
+      {
+        "criterion": "No state folder and no legacy folder, main thread not holyagent (agent_type absent or another agent): stdout is SessionStart additionalContext holding the core root rules, the takeover line, the pointer and the session reminder, with the absolute CLI path `<CLAUDE_PLUGIN_ROOT>/scripts/holyagent` substituted, exit 0",
+        "support": "hook.ts `found.length === 0` branch plus `bareContext` in sessioncontext.ts. Test \"gives another main thread the root rules with the CLI path in a project with no state and no legacy folder\" covers `agent_type` undefined and `other`, and passes."
+      },
+      {
+        "criterion": "No state folder and no legacy folder, main thread holyagent or holyagent:holyagent: prints nothing, exit 0",
+        "support": "test \"prints nothing in a project with no state and no legacy folder when the root is the main thread\" passes."
+      },
+      {
+        "criterion": "Existing state-folder and legacy-folder outputs unchanged; existing hook tests still pass unweakened",
+        "support": "the full suite passes (765 pass, 0 fail). Two assertions were adjusted as described under questions; the intent of both is kept."
+      },
+      {
+        "criterion": "Test covers both cases above, including the substituted CLI path given CLAUDE_PLUGIN_ROOT, and fails without the change",
+        "support": "the new test sets `CLAUDE_PLUGIN_ROOT=/opt/plugin` and asserts the exact stdout, `holyagent <command>` standing for `\"/opt/plugin/scripts/holyagent\"`, the agents/holyagent.md path, and no leftover `${CLAUDE_PLUGIN_ROOT}`. I did not run it against the old code."
+      },
+      {
+        "criterion": "Help summary and docs describe the new rule; no other behavior added",
+        "support": "the `session-start` summary in hook.ts and three passages in docs/hooks.md (hook table row, intro paragraph, legacy bullet) are updated; the only code addition is `bareContext`."
+      },
+      {
+        "criterion": "mise run verify passes and mise run build regenerated the plugin dist",
+        "support": "`mise run verify` was not run (mise missing). The equivalent steps were run directly: build exit 0, tests 0 fail, `bun check` clean, `bun fmt --check` clean. Lint was not run."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "the check list above."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the changed list above."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/d7d6ecf5-4ff8-56fa-bc68-7035c761f626/scratchpad/diff.patch (199 lines; no new files were created)."
+      }
+    ]
+  },
+  "createdAt": "2026-10-26T17:11:47.504Z"
+}

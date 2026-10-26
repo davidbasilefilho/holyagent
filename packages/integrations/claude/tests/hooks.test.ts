@@ -1095,9 +1095,30 @@ describe("hook session-start", () => {
     await writeFile(file, "")
   }
 
-  test("prints nothing in a project without a .holyagent folder, whatever the agent", async () => {
-    for (const agent of [undefined, "holyagent", "other"])
+  test("prints nothing in a project with no state and no legacy folder when the root is the main thread", async () => {
+    for (const agent of ["holyagent", "holyagent:holyagent"])
       expect(await hook("session-start", start(agent))).toEqual({ stdout: "", stderr: "", code: 0 })
+  })
+
+  test("gives another main thread the root rules with the CLI path in a project with no state and no legacy folder", async () => {
+    for (const agent of [undefined, "other"]) {
+      const result = await hook("session-start", start(agent), project, {
+        CLAUDE_PLUGIN_ROOT: "/opt/plugin",
+      })
+      expect({ code: result.code, stderr: result.stderr }).toEqual({ code: 0, stderr: "" })
+      const text = additional(result.stdout)
+      expect(result.stdout).toBe(
+        context(
+          `${core}\n\n${ROOT_TAKEOVER}\n\nThe full root rules are in the holyagent agent prompt.\n\n${SESSION_REMINDER}`.replaceAll(
+            "${CLAUDE_PLUGIN_ROOT}",
+            "/opt/plugin",
+          ),
+        ),
+      )
+      expect(text).toContain('`holyagent <command>` stands for `"/opt/plugin/scripts/holyagent"')
+      expect(text).toContain("read `/opt/plugin/agents/holyagent.md` before acting")
+      expect(text).not.toContain("${CLAUDE_PLUGIN_ROOT}")
+    }
   })
 
   test("adds the status, and the root rules only when the root is not the main thread", async () => {
@@ -1164,7 +1185,10 @@ describe("hook session-start", () => {
       try {
         await mkdir(join(legacyOnly, legacy, "intents"), { recursive: true })
         // A legacy folder with no state to convert is neither announced nor migrated.
-        expect((await hook("session-start", start(), legacyOnly)).stdout).toBe("")
+        expect((await hook("session-start", start("holyagent"), legacyOnly)).stdout).toBe("")
+        expect(additional((await hook("session-start", start(), legacyOnly)).stdout)).not.toContain(
+          "holyagent migrate",
+        )
         await writeLegacyState(legacyOnly, legacy)
         for (const payload of [start(), start("general-purpose")]) {
           const result = await hook("session-start", payload, legacyOnly)

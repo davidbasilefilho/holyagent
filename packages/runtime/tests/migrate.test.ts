@@ -41,7 +41,7 @@ const sessionStart = () =>
     run(["hook", "session-start"], {
       cwd: project,
       env: { HOME: home },
-      stdin: Effect.succeed("{}"),
+      stdin: Effect.succeed('{"agent_type":"holyagent"}'),
     }),
   ).then((result) => result.stdout)
 

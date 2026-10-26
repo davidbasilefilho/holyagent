@@ -82,6 +82,13 @@ export const legacyContext = (folders: ReadonlyArray<string>, core?: string): st
     SESSION_REMINDER,
   ].join("\n\n")
 
+/**
+ * The context of a session in a project with no state folder and no legacy state, whose main thread
+ * is not the holyagent agent: the core of the root rules and the {@link SESSION_REMINDER}. Without
+ * it the main thread would never read the rules, for there is no status to carry them.
+ */
+export const bareContext = (core: string): string => [core, POINTER, SESSION_REMINDER].join("\n\n")
+
 /** The Intent in use and its requirements, for the context of a resumed or compacted session. */
 export interface IntentRequirements {
   readonly id: string
