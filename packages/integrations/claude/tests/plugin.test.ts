@@ -8,10 +8,12 @@ import { ROUTES } from "../../../runtime/src/domain/route.ts"
 import { ROOT_CORE_FILES } from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
 import packageJson from "../package.json" with { type: "json" }
 import {
+  BUILTIN_TOOLS,
   CONDITIONAL_SECTIONS,
   FRONTEND_DESIGN_SECTION,
   INSPECTION_SECTION,
   MERGE_READY_SECTION,
+  NATIVE_WEB_TOOLS,
   REQUIREMENT_SECTIONS,
   ROLE_SECTIONS,
   ROOT_SECTIONS,
@@ -39,6 +41,14 @@ const agent = (name: string) => generated.find((file) => file.path.endsWith(`age
 const frontmatter = (text: string) => text.split("\n---\n")[0] ?? ""
 const field = (text: string, key: string) =>
   new RegExp(`^${key}: (.*)$`, "m").exec(frontmatter(text))?.[1]
+/** The tools an agent's `disallowedTools` line lists, found by the agent file's path. */
+const deniedTools = (path: string): ReadonlyArray<string> =>
+  (
+    field(generated.find((file) => file.path.endsWith(path))?.content ?? "", "disallowedTools") ??
+    ""
+  )
+    .split(", ")
+    .filter(Boolean)
 
 describe("the generated plugin is in step with its sources", () => {
   test("every committed generated file equals a fresh build, byte for byte", async () => {
@@ -238,9 +248,6 @@ describe("agents", () => {
       expect(name).toMatch(/^[a-z]+(?:-[a-z]+)*$/)
       expect(known.has(name)).toBe(true)
     }
-    const tools = field(agent("holyagent")?.content ?? "", "tools") ?? ""
-    const listed = /Agent\(([^)]*)\)/.exec(tools)?.[1]?.split(", ")
-    expect(listed).toEqual(ROUTES.map((route) => `holyagent:${route.agent}`))
     for (const file of generated.filter((f) => f.path.includes("/agents/")))
       expect(frontmatter(file.content)).not.toMatch(/Worker\.|Reviewer\.|Explorer\.|Librarian\./)
   })
@@ -386,65 +393,81 @@ describe("agents", () => {
     }
   })
 
-  test("tools follow the capabilities, and every role with Bash gets Monitor", () => {
-    const tools = (name: string) => (field(agent(name)?.content ?? "", "tools") ?? "").split(", ")
-    for (const route of ROUTES) {
-      const own = tools(route.agent)
-      expect(own.slice(0, 3)).toEqual(["Read", "Grep", "Glob"])
-      expect(own.includes("Monitor")).toBe(own.includes("Bash"))
-      expect(own.includes("Write")).toBe(route.capabilities.includes("Write"))
-      expect(own.includes("WebSearch") || own.includes("WebFetch")).toBe(false)
-      const web = own.filter((tool) => /^mcp__(claude_ai_Exa|plugin_exa_exa|Exa)__/.test(tool))
-      expect(web).toEqual(
-        route.capabilities.includes("Search")
-          ? [
-              "mcp__claude_ai_Exa__web_search_exa",
-              "mcp__claude_ai_Exa__web_fetch_exa",
-              "mcp__plugin_exa_exa__web_search_exa",
-              "mcp__plugin_exa_exa__web_fetch_exa",
-              "mcp__Exa__web_search_exa",
-              "mcp__Exa__web_fetch_exa",
-            ]
-          : [],
-      )
-      expect(own.some((tool) => tool.endsWith("agent_run"))).toBe(false)
-      expect(own.some((tool) => tool.startsWith("mcp__t3-code__"))).toBe(
-        route.capabilities.includes("VisualInspection"),
-      )
+  test("no agent has a tools line, and every one inherits MCP tools while denying the native web tools", () => {
+    for (const file of generated.filter((f) => f.path.includes("/agents/"))) {
+      const head = frontmatter(file.content)
+      expect(head).not.toMatch(/^tools:/m)
+      expect(head).not.toMatch(/Agent\(/)
+      const denied = deniedTools(file.path)
+      for (const web of NATIVE_WEB_TOOLS) expect(denied).toContain(web)
+      expect(denied.some((tool) => tool.startsWith("mcp__"))).toBe(false)
+      for (const tool of denied) expect(BUILTIN_TOOLS).toContain(tool)
     }
-    for (const kept of ["reviewer-code", "worker-implementation", "worker-visual"])
-      expect(tools(kept)).toContain("Bash")
-    for (const bare of [
-      "explorer-map",
-      "reviewer-audit",
-      "reviewer-security",
-      "reviewer-artifact",
-      "reviewer-visual",
-    ])
-      expect(tools(bare)).not.toContain("Bash")
-    expect(tools("reviewer-testing")).toEqual(["Read", "Grep", "Glob", "Bash", "Monitor"])
-    // The built-in reviews are prompt commands that only the Skill tool runs, and they need nothing
-    // more: /security-review reads through the host's own shell, so reviewer-security stays shell-free.
-    expect(tools("reviewer-security")).toEqual(["Read", "Grep", "Glob", "Skill"])
-    expect(tools("reviewer-code")).toEqual(["Read", "Grep", "Glob", "Bash", "Skill", "Monitor"])
-    for (const route of ROUTES)
-      expect({ agent: route.agent, skill: tools(route.agent).includes("Skill") }).toEqual({
-        agent: route.agent,
-        skill: ["reviewer-code", "reviewer-security"].includes(route.agent),
-      })
-    expect(tools("reviewer-visual")).toContain("mcp__t3-code__device_screenshot")
-    expect(tools("worker-visual")).toContain("mcp__t3-code__html_preview")
   })
 
-  test("the root's tools are the dispatch, ask and T3 Code set", () => {
-    const tools = (field(agent("holyagent")?.content ?? "", "tools") ?? "").replace(
-      /Agent\([^)]*\), /,
-      "",
+  test("each role keeps exactly its previous built-in tools, less the native web tools", () => {
+    const reading = ["Read", "Grep", "Glob"]
+    const writing = [...reading, "Write", "Edit", "Bash", "Monitor"]
+    const shell = [...reading, "Bash", "Monitor"]
+    const previous: Record<string, ReadonlyArray<string>> = {
+      holyagent: [
+        "Agent",
+        "SendMessage",
+        "AskUserQuestion",
+        "Skill",
+        "Monitor",
+        "Workflow",
+        "TaskCreate",
+        "TaskUpdate",
+        "TaskList",
+        "TaskGet",
+        ...reading,
+        "Bash",
+      ],
+      "explorer-map": reading,
+      "explorer-lookup": reading,
+      "explorer-trace": reading,
+      "librarian-lookup": reading,
+      "librarian-research": reading,
+      "reviewer-artifact": reading,
+      "reviewer-audit": reading,
+      "reviewer-visual": reading,
+      "reviewer-security": [...reading, "Skill"],
+      "reviewer-code": [...shell, "Skill"],
+      "reviewer-testing": shell,
+      "worker-operations": shell,
+      "worker-validation": shell,
+      "worker-mechanical": writing,
+      "worker-implementation": writing,
+      "worker-integration": writing,
+      "worker-debugging": writing,
+      "worker-visual": writing,
+    }
+    expect(Object.keys(previous).toSorted()).toEqual(
+      ["holyagent", ...ROUTES.map((route) => route.agent)].toSorted(),
     )
-    expect(tools).toBe(
-      "SendMessage, AskUserQuestion, Skill, Monitor, Workflow, TaskCreate, TaskUpdate, TaskList, TaskGet, Read, Grep, Glob, Bash, mcp__t3-code__html_render, mcp__t3-code__html_preview, mcp__t3-code__watch_pull_request",
-    )
+    for (const [name, builtins] of Object.entries(previous)) {
+      const effective = BUILTIN_TOOLS.filter(
+        (tool) => !deniedTools(`agents/${name}.md`).includes(tool),
+      )
+      // ToolSearch loads deferred MCP tools, so every agent keeps it besides its previous built-ins.
+      expect({ name, effective: effective.toSorted() }).toEqual({
+        name,
+        effective: [...builtins, "ToolSearch"].toSorted(),
+      })
+    }
+    // The documented built-ins a background subagent keeps, and the root's extras, are all covered.
+    for (const tool of ["Write", "Edit", "NotebookEdit", "Bash", "WebSearch", "WebFetch", "Agent"])
+      expect(BUILTIN_TOOLS).toContain(tool)
+  })
+
+  test("the root runs on opus, and the librarians are still told to search with the Exa tools", () => {
     expect(field(agent("holyagent")?.content ?? "", "model")).toBe("opus")
+    for (const name of ["librarian-lookup", "librarian-research"]) {
+      const text = agent(name)?.content ?? ""
+      expect(text).toContain("`web_search_exa`")
+      expect(text).toContain("`web_fetch_exa`")
+    }
   })
 
   test("the removed skills are gone from the plugin, and the roles start with the built-in reviews", () => {

@@ -5,7 +5,7 @@ description: "Use for reviewer-visual: Independently assess rendered output agai
 model: sonnet
 effort: high
 background: true
-tools: Read, Grep, Glob, mcp__t3-code__preview_navigate, mcp__t3-code__preview_snapshot, mcp__t3-code__preview_click, mcp__t3-code__preview_type, mcp__t3-code__preview_press, mcp__t3-code__preview_hover, mcp__t3-code__preview_resize, mcp__t3-code__preview_set_appearance, mcp__t3-code__preview_wait_for, mcp__t3-code__device_list, mcp__t3-code__device_open, mcp__t3-code__device_screenshot, mcp__t3-code__device_close, mcp__t3-code__html_preview, mcp__t3-code__preview_evaluate
+disallowedTools: Agent, Artifact, AskUserQuestion, Bash, Edit, EnterWorktree, ExitWorktree, LSP, Monitor, NotebookEdit, PowerShell, SendMessage, Skill, TaskCreate, TaskGet, TaskList, TaskStop, TaskUpdate, TodoWrite, WebFetch, WebSearch, Workflow, Write
 experimental:
   cacheTtl: 1h
 ---

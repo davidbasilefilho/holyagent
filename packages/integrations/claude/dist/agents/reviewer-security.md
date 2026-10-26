@@ -5,7 +5,7 @@ description: "Use for reviewer-security: Assess a change for security vulnerabil
 model: sonnet
 effort: high
 background: true
-tools: Read, Grep, Glob, Skill
+disallowedTools: Agent, Artifact, AskUserQuestion, Bash, Edit, EnterWorktree, ExitWorktree, LSP, Monitor, NotebookEdit, PowerShell, SendMessage, TaskCreate, TaskGet, TaskList, TaskStop, TaskUpdate, TodoWrite, WebFetch, WebSearch, Workflow, Write
 experimental:
   cacheTtl: 1h
 ---

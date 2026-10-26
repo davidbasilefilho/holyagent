@@ -30,7 +30,7 @@ The plugin's runtime only calls `bun` and does not check the build. Running the 
 | T3 Code                                       | Works through the Claude Agent SDK; see [usage.md](usage.md)                                                                                                                      |
 | Claude Code desktop app, Code tab             | Billion Context is bypassed because the app sets its own `ANTHROPIC_BASE_URL`, yet `DISABLE_AUTO_COMPACT` still applies, so nothing compacts (see [components.md](components.md)) |
 | Claude Code on the web (cloud sessions)       | Billion Context does not run; commits are unsigned (see [commit-authorship.md](commit-authorship.md)). Claude Code does not load locally installed plugins there                  |
-| claude.ai chat and Cowork                     | Skills only; agents, hooks and settings are ignored (see [usage.md](usage.md))                                                                                                    |
+| claude.ai (chat and Cowork, one Claude)       | Skills load in plain chat, which ignores agents, hooks and settings; not tested in a Cowork session (see [usage.md](usage.md))                                                    |
 | Pi                                            | Not in 0.1.0; see [pi/README.md](pi/README.md)                                                                                                                                    |
 
 The public `holyagent` CLI is a Bun program (`packages/cli/src/index.ts`, with a `bun` shebang). Run it from a checkout, after `bun install` there, with `bun packages/cli/src/index.ts <command>`, or put that file on your `PATH`.

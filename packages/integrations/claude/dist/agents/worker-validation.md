@@ -5,7 +5,7 @@ description: "Use for worker-validation: Check whether stated acceptance criteri
 model: haiku
 effort: high
 background: true
-tools: Read, Grep, Glob, Bash, Monitor
+disallowedTools: Agent, Artifact, AskUserQuestion, Edit, EnterWorktree, ExitWorktree, LSP, NotebookEdit, PowerShell, SendMessage, Skill, TaskCreate, TaskGet, TaskList, TaskStop, TaskUpdate, TodoWrite, WebFetch, WebSearch, Workflow, Write
 experimental:
   cacheTtl: 1h
 ---

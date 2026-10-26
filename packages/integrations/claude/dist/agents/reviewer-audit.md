@@ -5,7 +5,7 @@ description: "Use for reviewer-audit: Compare a change against its stated requir
 model: haiku
 effort: high
 background: true
-tools: Read, Grep, Glob
+disallowedTools: Agent, Artifact, AskUserQuestion, Bash, Edit, EnterWorktree, ExitWorktree, LSP, Monitor, NotebookEdit, PowerShell, SendMessage, Skill, TaskCreate, TaskGet, TaskList, TaskStop, TaskUpdate, TodoWrite, WebFetch, WebSearch, Workflow, Write
 experimental:
   cacheTtl: 1h
 ---
