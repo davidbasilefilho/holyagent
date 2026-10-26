@@ -11907,6 +11907,9 @@ var legacyContext = (folders, core) => [
 ].join(`
 
 `);
+var bareContext = (core) => [core, POINTER, SESSION_REMINDER].join(`
+
+`);
 var renderRequirements = (intent, shown) => [
   "holyagent requirements:",
   encode2({
@@ -18018,7 +18021,7 @@ var commentPrefix = gen2(function* () {
 });
 var INLINE_INPUTS = new Set(["script", "args"]);
 var HOOK_COMMANDS = [
-  hook("session-start", "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread), always ending with a short block of the root rules most often missed; for a project with no .holyagent and a .holyclaude or .holycodex folder that holds state to convert, a notice naming the folder and `holyagent migrate`, with the same rules; nothing in a project with none of the three", (payload, call) => gen2(function* () {
+  hook("session-start", "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread), always ending with a short block of the root rules most often missed; for a project with no .holyagent and a .holyclaude or .holycodex folder that holds state to convert, a notice naming the folder and `holyagent migrate`, with the same rules; for a project with none of the three, the core root rules with that line and the reminder when the holyagent agent is not the main thread, otherwise nothing", (payload, call) => gen2(function* () {
     const pluginRoot = call.env.CLAUDE_PLUGIN_ROOT;
     const core = ROOT_AGENTS.has(payload.agent_type) ? undefined : [ROOT_CORE, ROOT_TAKEOVER].join(`
 
@@ -18026,7 +18029,9 @@ var HOOK_COMMANDS = [
     if (!(yield* hasStateFolder(call.directory))) {
       const root = dirname2(call.directory);
       const found = yield* legacyFoldersWithState(root);
-      return found.length === 0 ? NOTHING : output({
+      if (found.length === 0)
+        return core === undefined ? NOTHING : output({ hookEventName: "SessionStart", additionalContext: bareContext(core) });
+      return output({
         hookEventName: "SessionStart",
         additionalContext: legacyContext(found, core)
       });

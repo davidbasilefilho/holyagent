@@ -20,6 +20,7 @@ import { resolveIntent } from "./intent.ts"
 import { resumeOf, statusOf } from "./overview.ts"
 import { dispatchedAssignment } from "./report.ts"
 import {
+  bareContext,
   type IntentRequirements,
   legacyContext,
   ROOT_TAKEOVER,
@@ -193,7 +194,7 @@ const INLINE_INPUTS: ReadonlySet<string> = new Set(["script", "args"])
 export const HOOK_COMMANDS: ReadonlyArray<Command> = [
   hook(
     "session-start",
-    "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread), always ending with a short block of the root rules most often missed; for a project with no .holyagent and a .holyclaude or .holycodex folder that holds state to convert, a notice naming the folder and `holyagent migrate`, with the same rules; nothing in a project with none of the three",
+    "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread), always ending with a short block of the root rules most often missed; for a project with no .holyagent and a .holyclaude or .holycodex folder that holds state to convert, a notice naming the folder and `holyagent migrate`, with the same rules; for a project with none of the three, the core root rules with that line and the reminder when the holyagent agent is not the main thread, otherwise nothing",
     (payload, call) =>
       Effect.gen(function* () {
         const pluginRoot = call.env.CLAUDE_PLUGIN_ROOT
@@ -207,12 +208,15 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
         if (!(yield* hasStateFolder(call.directory))) {
           const root = dirname(call.directory)
           const found = yield* legacyFoldersWithState(root)
-          return found.length === 0
-            ? NOTHING
-            : output({
-                hookEventName: "SessionStart",
-                additionalContext: legacyContext(found, core),
-              })
+          // Nothing to show or convert: only a main thread that lacks the root rules gets them.
+          if (found.length === 0)
+            return core === undefined
+              ? NOTHING
+              : output({ hookEventName: "SessionStart", additionalContext: bareContext(core) })
+          return output({
+            hookEventName: "SessionStart",
+            additionalContext: legacyContext(found, core),
+          })
         }
         const { status, reconcile } = RESUMED.has(payload.source)
           ? yield* resumeOf(call.directory)

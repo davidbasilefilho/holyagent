@@ -1,0 +1,66 @@
+{
+  "id": "assignment-0mvpjgpd9-jbyl",
+  "intentId": "intent-0mvpik716-t3z6",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-root-skill-review-findings",
+  "objective": "Repair the root skill review findings: cut the restated root rules from the skill, explain in the docs why the skill exists beside the session-start hook, fix the garbled skill sentences, and correct the stale comment about where the host substitutes CLAUDE_PLUGIN_ROOT.",
+  "state": "Succeeded",
+  "scope": [
+    "skills/root/SKILL.md: keep the situation-first description, the pointer to read ${CLAUDE_PLUGIN_ROOT}/agents/holyagent.md and follow it, and the CLI path mapping with its reason (no CLAUDE_PLUGIN_ROOT in the shell, holyagent not on PATH). Remove the restated lines (the 'default, user-facing agent ... whatever it started as' sentence and the 'run all work through an Intent ... never implement in the main thread' step), since the agent prompt owns them.",
+    "Why both exist (record in docs/hooks.md near the session-start text and in the docs/decisions.md skills paragraph, one sentence each): the hook only fires at session start and only when the plugin's hooks load; the skill lets the user turn a running main thread into the root on demand, e.g. mid-session or when the hook printed nothing.",
+    "docs/usage.md, docs/decisions.md, docs/pi/claude-parity.md: rewrite the sentence about the root skill so it reads correctly (it has a main thread that is not the holyagent agent read the agent prompt -> e.g. 'it has a main thread that is not the holyagent agent read the agent prompt and work as the root'). In claude-parity.md drop the claim that Pi covers what Claude lacks; say the Claude session-start hook covers session start and the skill adds an on-demand entry.",
+    "packages/runtime/src/cli/hook.ts:~201 and packages/runtime/src/cli/sessioncontext.ts:~19 say the host fills ${CLAUDE_PLUGIN_ROOT} in agent text only. Per code.claude.com/docs/en/plugins/manifest-reference.md#environment-variables it substitutes it in skill, command and agent Markdown bodies, but never in hook output or the Bash environment. Correct both comments to say it is not filled in hook output (the reason the hook substitutes it). Comments only, no behavior change."
+  ],
+  "constraints": [
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done and checked, stop and report; no unrequested changes.",
+    "No version-control writes and no edits under .git/ or .holyagent/; report changed paths.",
+    "mise is at /root/.local/bin/mise (add it to PATH): run mise run build and mise run verify."
+  ],
+  "criteria": [
+    {
+      "text": "SKILL.md holds only the description, the pointer and the CLI path mapping with its reason; dist copy regenerated",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "hooks.md and decisions.md say why the skill exists beside the hook; the three garbled sentences read correctly; claude-parity.md no longer contradicts its session-start row",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "The two comments state where the host substitutes CLAUDE_PLUGIN_ROOT correctly; no code behavior change",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "mise run verify exit 0 and mise run build leaves dist matching the sources",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions/claude-5.5/skills/root",
+    "packages/integrations/claude/dist",
+    "docs",
+    "packages/runtime/src/cli/hook.ts",
+    "packages/runtime/src/cli/sessioncontext.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvpiqvqz-9yox",
+  "specialist": {
+    "agentId": "a8df3fe95925bead2",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-26T17:36:49.005Z",
+    "finishedAt": "2026-10-26T17:39:29.479Z"
+  },
+  "result": "result: The root skill is removed, and the tree differs from HEAD only by the deletion of dist/skills/root/SKILL.md. `mise run build` and `mise run verify` both pass (verify exit 0).\n\nchanged: the only path changed versus HEAD is /home/user/holyagent/packages/integrations/claude/dist/skills/root/SKILL.md, deleted. The source folder packages/runtime/src/instructions/claude-5.5/skills/root/ is also gone, but it was never committed.\n\nI restored these six files from `git show HEAD:<path>`; each now matches HEAD:\n- docs/usage.md\n- docs/development.md\n- docs/decisions.md\n- docs/pi/claude-parity.md\n- packages/runtime/tests/instructions.test.ts\n- packages/integrations/claude/tests/plugin.test.ts\n\nI made no edits to hook.ts or sessioncontext.ts for this assignment. `git diff --stat -- packages/runtime/src/cli` printed nothing.\n\nchecks:\n- `mise run build` -> built 29 files, dist matches the sources (the root skill file is absent, as expected).\n- `mise run verify` -> exit 0:\n  - type-check: no errors in 97 files\n  - lint: no problems in 98 files\n  - format check: all 210 files formatted\n  - tests: 765 pass, 1 skip, 0 fail\n- `git status --short`, with the `.holyagent` state entries filtered out: ` D packages/integrations/claude/dist/skills/root/SKILL.md`\n\nblockers: none\n\nquestions: none\n\nnotes: the earlier `bun fmt` run had left a stray whitespace reformat in the docs/hooks.md table. That was part of the hook fix now committed at HEAD, so I did not touch it.\n\nevidence:\n- SKILL.md holds only the description, the pointer and the CLI path mapping with its reason; dist copy regenerated: dropped by the user's decision (the root skill is removed).\n- hooks.md and decisions.md say why the skill exists beside the hook; the three garbled sentences read correctly; claude-parity.md no longer contradicts its session-start row: dropped by the user's decision. The docs are back at HEAD, which has no skill text.\n- The two comments state where the host substitutes CLAUDE_PLUGIN_ROOT correctly; no code behavior change: dropped by the user's decision. hook.ts and sessioncontext.ts are unchanged, with no diff against HEAD.\n- mise run verify exit 0 and mise run build leaves dist matching the sources: `mise run verify` exited 0 (765 pass, 0 fail; check, lint and fmt clean). `mise run build` built 29 files, and the only difference from HEAD is the deleted root SKILL.md.\n- checks-run: `mise run build`, and `mise run verify` with exit 0 (type-check, lint, format check, test).\n- changed-paths: the deletion of packages/integrations/claude/dist/skills/root/SKILL.md versus HEAD, as listed under changed.\n- diff-file: /tmp/claude-0/-home-user-holyagent/d7d6ecf5-4ff8-56fa-bc68-7035c761f626/scratchpad/diff-root-repair.patch (not written; the full uncommitted change is the deletion of dist/skills/root/SKILL.md). `git diff HEAD -- packages/integrations/claude/dist/skills/root/SKILL.md` shows it.\n",
+  "createdAt": "2026-10-26T17:36:49.005Z"
+}
