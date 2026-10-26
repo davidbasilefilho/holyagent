@@ -5,13 +5,13 @@
   "requirements": [
     "hook session-start: when the main thread is not holyagent, inject the core root rules even with no .holyagent, .holyclaude or .holycodex folder; stay silent only when the main thread already is holyagent.",
     "Make the CLI resolvable: the injected context names the absolute script path, since CLAUDE_PLUGIN_ROOT is not set in the main thread's Bash.",
-    "Optionally add a user-invocable skill (holyagent:root) that loads the root rules when the main thread is not the root.",
+    "No root skill (user decision): the root rules are the main-thread agent's instructions only, through the plugin agent setting and the session-start hook; remove the holyagent:root skill and its doc and test changes.",
     "If the plugin agent setting is ignored for synced/available plugins, document the required install state or report it as a platform issue with evidence; do not work around it silently.",
     "Add a test for hook session-start: no state folder + main thread not holyagent gives rules and CLI path; main thread holyagent gives nothing extra.",
     "Do not modify the reference session. Do not add unrequested features.",
     "Done means mise run verify passes; rebuild the plugin with mise run build when plugin sources change."
   ],
-  "revision": 1,
+  "revision": 2,
   "state": "Open",
   "createdAt": "2026-10-26T17:11:32.251Z"
 }
