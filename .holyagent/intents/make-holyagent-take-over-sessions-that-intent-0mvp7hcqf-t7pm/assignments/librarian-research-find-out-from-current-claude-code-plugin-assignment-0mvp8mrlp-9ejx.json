@@ -1,0 +1,46 @@
+{
+  "id": "assignment-0mvp8mrlp-9ejx",
+  "intentId": "intent-0mvp7hcqf-t7pm",
+  "intentRevision": 4,
+  "roleTask": "Librarian.research",
+  "slug": "find-out-from-current-claude-code-plugin",
+  "objective": "Find out from current Claude Code plugin documentation whether a plugin can declare the marketplaces of its plugin dependencies so they install automatically, and list the options when it cannot.",
+  "state": "Failed",
+  "scope": [
+    "Plugin: packages/integrations/claude (sources) and its generated dist (packages/integrations/claude/dist/.claude-plugin/plugin.json); root marketplace .claude-plugin/marketplace.json. holyagent 0.1.2 declares billion-context (marketplace github ranxianglei/billion-context) and exa (marketplace claude-plugins-official) as required dependencies.",
+    "Observed (2026-10-26): a claude.ai cloud session that syncs the account's plugins received only holyagent; holyagent did not load because its dependencies were missing, so its agents never appeared. Adding the two marketplaces and installing both plugins made the synced copy load.",
+    "Questions: (1) Can plugin.json or marketplace.json declare where a dependency comes from (another marketplace, a git source) so Claude Code resolves and installs it automatically? Cite the exact field and doc page. (2) Do dependencies support optional/soft declarations, and what happens to the plugin when an optional one is missing? (3) How does the claude.ai cloud plugin sync handle dependencies, if documented? (4) Given the answers, list the realistic options for holyagent (for example declaring marketplaces, making dependencies optional, vendoring, documenting a setup script), each with its trade-off.",
+    "Sources: https://code.claude.com/docs/en/plugins, plugins-reference, plugin-marketplaces, claude-code-on-the-web and related current pages; the repository's own files for what holyagent declares today."
+  ],
+  "constraints": [
+    "Read-only: no edits, no installs.",
+    "Separate sourced facts (with URL and quoted field names) from inference."
+  ],
+  "criteria": [
+    {
+      "text": "Each of the four questions is answered with a cited current source or marked as undocumented",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The options for holyagent are listed with their trade-offs and a recommendation",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "a170ec4e9c54c4bcc",
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-10-26T12:33:36.062Z",
+    "finishedAt": "2026-10-26T12:35:23.627Z"
+  },
+  "result": "failure: result: BLOCKED. No web tool is available to me (web_search_exa and web_fetch_exa both return \"No such tool available\"), so I could not read any current Claude Code doc page. Questions 1-4 are not answered from cited sources, and I give no doc-based answers because I would have to guess.\nchanged: none\nchecks: none run (read-only research). I read two repository files only.\nblockers: The Exa web tools are not exposed in this session. Re-run with them enabled, or have the root fetch these pages: https://code.claude.com/docs/en/plugins-reference, /plugin-marketplaces, /plugins, /claude-code-on-the-web, and the page on discovering and installing plugins.\nquestions: none beyond the blocker.\nnotes:\nRepository facts, read directly (sourced):\n- /home/user/holyagent/packages/integrations/claude/dist/.claude-plugin/plugin.json (version 0.1.2) has `\"dependencies\": [\"billion-context@billion-context\", \"exa@claude-plugins-official\"]`. These are plain \"name@marketplace\" strings, with no source URL or git source.\n- /home/user/holyagent/.claude-plugin/marketplace.json has `\"allowCrossMarketplaceDependenciesOn\": [\"billion-context\", \"claude-plugins-official\"]`. The only plugin entry is `holyagent`, with `source: ./packages/integrations/claude/dist`.\n- The marketplace therefore already lists the allowed cross-marketplace names. Nothing in these files says where \"billion-context\" is fetched from (the observed github ranxianglei/billion-context). Whether the user has to add that marketplace by hand is not answered here.\n\nInference, not sourced and to be verified against the docs:\n- Likely questions to check on the plugins-reference and plugin-marketplaces pages: (a) whether `allowCrossMarketplaceDependenciesOn` only permits the dependency and does not auto-add the marketplace; (b) whether dependency entries accept an object form with a version constraint or marketplace source; (c) whether any optional or soft dependency field exists; (d) whether the claude.ai cloud sync on the web page mentions dependencies at all.\n- Candidate options for holyagent, with unverified trade-offs. (1) Declare or document the marketplace sources: lowest effort, but needs user action unless the docs show auto-resolution. (2) Make dependencies optional, if supported: the plugin would load, but exa and billion-context features would degrade, and the specialists need exa for web research. (3) Vendor billion-context and exa into the holyagent marketplace as its own plugins, so same-marketplace dependencies resolve: this is the most robust choice but adds a maintenance burden and may have licence limits. (4) Document a setup step or script: works everywhere but is manual. My provisional recommendation is option 3 or 2, whichever the docs support, but I can't confirm it.\nevidence:\nEach of the four questions is answered with a cited current source or marked as undocumented: NOT MET. No docs could be fetched, so none of the four questions is answered or marked undocumented. The repository declarations are in the notes above.\nThe options for holyagent are listed with their trade-offs and a recommendation: PARTIAL. The notes give provisional, unsourced options and a tentative recommendation, pending the docs.\nsources: Only /home/user/holyagent/packages/integrations/claude/dist/.claude-plugin/plugin.json and /home/user/holyagent/.claude-plugin/marketplace.json. No web sources were retrieved.\n",
+  "createdAt": "2026-10-26T12:33:36.062Z"
+}

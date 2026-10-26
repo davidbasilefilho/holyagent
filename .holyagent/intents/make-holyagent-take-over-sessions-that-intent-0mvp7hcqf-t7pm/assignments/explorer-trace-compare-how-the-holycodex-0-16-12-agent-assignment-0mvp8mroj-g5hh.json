@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mvp8mroj-g5hh",
+  "intentId": "intent-0mvp7hcqf-t7pm",
+  "intentRevision": 4,
+  "roleTask": "Explorer.trace",
+  "slug": "compare-how-the-holycodex-0-16-12-agent",
+  "objective": "Compare how the holycodex 0.16.12 agent-facing CLI (holycodex-agent) takes Intent and Assignment input with how the holyagent CLI does, and list what holyagent would need so the root never writes JSON draft files by hand.",
+  "state": "Running",
+  "scope": [
+    "holycodex is cloned read-only at /tmp/claude-0/-home-user-holyagent/737d3a1b-dae6-5c0b-bd4a-0e2fde353bd5/scratchpad/ref/holycodex; read tag v0.16.12 with `git -C <path> show v0.16.12:<file>` or `git grep ... v0.16.12` (no checkout, no edits). Find the holycodex-agent entry point, its command set, and how each command takes input (flags, stdin, TOON or JSON, interactive steps, defaults it fills in).",
+    "holyagent CLI: packages/runtime/src/cli (commands.ts and the command modules) in /home/user/holyagent; `holyagent help` lists commands; intent create and assignment dispatch/create read JSON on stdin today.",
+    "User request: \"porque você está criando os json file manualmente? deve-se fazer isso pela cli holyagent agent-facing. se não for esse caso, é para ser. veja como funciona a cli agent-facing do holycodex 0.16.12\"."
+  ],
+  "constraints": [
+    "Read-only: no edits, no installs, no checkouts."
+  ],
+  "criteria": [
+    {
+      "text": "The holycodex-agent input model is described per command with file and line references at v0.16.12",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The holyagent input model is described per command with file and line references",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The gaps are listed as concrete, minimal changes to the holyagent CLI, each with the files it would touch",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "file-references"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "a71e07d521a4a4bd7",
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-10-26T12:33:36.164Z"
+  },
+  "createdAt": "2026-10-26T12:33:36.164Z"
+}
