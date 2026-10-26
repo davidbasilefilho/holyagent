@@ -250,14 +250,17 @@ const readLegacy = <S extends Schema.Decoder<unknown>>(
     ),
   )
 
-/** The relative paths of every file below a folder, dotfiles included; a missing folder has none. */
+/**
+ * The relative paths of every file below a folder, dotfiles included; a missing folder, or a path
+ * that is not a folder, has none.
+ */
 const listFiles = (directory: string) =>
   io(directory, () =>
     Array.fromAsync(new Bun.Glob("**/*").scan({ cwd: directory, dot: true, onlyFiles: true })),
   ).pipe(
     Effect.map((paths) => paths.toSorted()),
     Effect.catchIf(
-      (error) => hasCode(error.cause, "ENOENT"),
+      (error) => hasCode(error.cause, "ENOENT") || hasCode(error.cause, "ENOTDIR"),
       () => Effect.succeed([] as ReadonlyArray<string>),
     ),
   )
@@ -273,6 +276,32 @@ const byFolder = (paths: ReadonlyArray<string>) => {
   }
   return folders
 }
+
+/**
+ * The files of a legacy folder that a converter reads, grouped by the folder each sits in:
+ * holyclaude keeps Intents below `intents/` (the paths are relative to it), holycodex keeps one
+ * folder per Intent beside dot files. The rest of the folder (`local/`, `state.json*`, dot files)
+ * is not state the conversion carries over, and a folder with nothing else has no state to
+ * migrate.
+ */
+const convertibleFolders = (source: LegacySource, files: ReadonlyArray<string>) =>
+  byFolder(
+    source === "holyclaude"
+      ? files.filter((path) => path.startsWith("intents/")).map((path) => path.slice(8))
+      : files.filter((path) => !path.startsWith(".")),
+  )
+
+/**
+ * The legacy folders of the project that hold state to convert, by their names (`.holyclaude`). It
+ * is the test `gatherLegacy` applies, so a folder the session hook announces is one `holyagent
+ * migrate` will convert, and one it leaves out is neither announced nor migrated.
+ */
+export const legacyFoldersWithState = (root: string) =>
+  Effect.filter(["holyclaude", "holycodex"] as const, (source) =>
+    listFiles(join(root, LEGACY_FOLDERS[source])).pipe(
+      Effect.map((files) => convertibleFolders(source, files).size > 0),
+    ),
+  ).pipe(Effect.map((sources) => sources.map((source) => LEGACY_FOLDERS[source])))
 
 /** A date as ISO text, or undefined when it is not a date this CLI can store. */
 const isoOf = (millis: number): string | undefined => {
@@ -461,7 +490,7 @@ const holyclaudeAssignment = (
     constraints: legacy.constraints ?? [],
     criteria: criteriaOf(legacy.acceptance_criteria ?? [], legacy.objective),
     evidence: legacy.required_evidence ?? [],
-    ownershipPaths: owned.filter(isPortable),
+    ownershipPaths: isWriter(roleTask) ? owned.filter(isPortable) : [],
     dependencies: dependencies.ids,
     independentFrom: independent.ids,
     ...(result === undefined ? {} : { result }),
@@ -490,12 +519,9 @@ const gatherHolyclaude = (root: string, directory: string) =>
   Effect.gen(function* () {
     const folderName = LEGACY_FOLDERS.holyclaude
     const legacy = join(root, folderName)
-    const files = yield* listFiles(legacy)
-    if (files.length === 0) return undefined
+    const intents = convertibleFolders("holyclaude", yield* listFiles(legacy))
+    if (intents.size === 0) return undefined
     const state = collector("holyclaude")
-    const intents = byFolder(
-      files.filter((path) => path.startsWith("intents/")).map((path) => path.slice(8)),
-    )
     for (const [folder, inside] of intents) {
       const base = join(legacy, "intents", folder)
       const shown = (relative: string) => `${folderName}/intents/${folder}/${relative}`
@@ -656,10 +682,9 @@ const gatherHolycodex = (root: string, directory: string) =>
   Effect.gen(function* () {
     const folderName = LEGACY_FOLDERS.holycodex
     const legacy = join(root, folderName)
-    const files = yield* listFiles(legacy)
-    if (files.length === 0) return undefined
+    const folders = convertibleFolders("holycodex", yield* listFiles(legacy))
+    if (folders.size === 0) return undefined
     const state = collector("holycodex")
-    const folders = byFolder(files.filter((path) => !path.startsWith(".")))
     for (const [folder, inside] of folders) {
       const base = join(legacy, folder)
       const shown = (relative: string) => `${folderName}/${folder}/${relative}`
@@ -749,8 +774,9 @@ const gatherHolycodex = (root: string, directory: string) =>
 /**
  * Reads the legacy folders of a project (`.holyclaude/` and `.holycodex/` at the state root) and
  * converts what they hold into the records and files `.holyagent/` would get, without writing
- * anything. A source whose folder is absent or empty is left out of the result. Records that cannot
- * be converted and work that must be settled first are listed on each source, not failed on.
+ * anything. A source whose folder is absent or holds no convertible state (see
+ * {@link legacyFoldersWithState}) is left out of the result. Records that cannot be converted and
+ * work that must be settled first are listed on each source, not failed on.
  */
 export const gatherLegacy = (root: string, directory: string) =>
   Effect.gen(function* () {

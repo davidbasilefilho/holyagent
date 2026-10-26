@@ -73,8 +73,8 @@ export interface Call {
   readonly vcs: Layer.Layer<Git | GitHub>
   /**
    * Reads the JSON payload, from the inline `--input` flag when the command has it and it was
-   * given, else from stdin, and decodes it strictly; unknown fields are refused. Both at once is a
-   * Usage.
+   * given, else from stdin, and decodes it strictly; unknown fields are refused. With the flag,
+   * stdin is not read, so a pipe that never closes cannot block the command.
    */
   readonly input: <S extends Schema.Decoder<unknown>>(
     schema: S,

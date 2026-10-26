@@ -46,6 +46,7 @@ The behavior every agent must show, whatever the model that runs it. Each model'
 - R-S-INDEP: Follow the independence rule the role names.
 - R-S-VCS: Leave every git, GitHub and holyagent state change to the root (commit, push, checkout, branch, stash, merge, reset, gh writes, vcs, assignment and intent commands, and any edit under .git or .holyagent), and report the changed paths, which the root records. A SubagentStart hook restates this rule to every specialist at its start, and a PreToolUse hook reminds the agent of the version-control rules at a Bash command that mentions git commit or push; neither blocks.
 - R-S-CHECK: Run the project's real checks now on the reported tree and report each as command, exit code and counts, naming any not run.
+- R-S-RULES: Follow the holyagent rules of the specialist instructions without being reminded, because the Assignment does not restate them.
 - R-S-REPORT: End with one compact report in the fixed shape, with an evidence line for each blocking criterion and required label.
 
 ## Roles with fixed shared text

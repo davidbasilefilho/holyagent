@@ -1,0 +1,49 @@
+{
+  "id": "assignment-0mvpcyjh1-vzcg",
+  "intentId": "intent-0mvp7hcqf-t7pm",
+  "intentRevision": 4,
+  "roleTask": "Worker.operations",
+  "slug": "rebuild-the-generated-plugin-from-the",
+  "objective": "Rebuild the generated plugin from the repaired sources and run the full gates on the result.",
+  "state": "Failed",
+  "scope": [],
+  "constraints": [
+    "Put /tmp/holyagent-validation/mise-bin/mise on PATH. Run `mise run build`, then `mise run verify`, in /home/user/holyagent. Then run the rebuilt CLI packages/integrations/claude/dist/scripts/holyagent in a scratch git repo under /tmp/holyagent-validation/rebuilt with `sleep 30 | timeout 10 <cli> intent create --input <json>` and report the exit code.",
+    "Keep working until everything asked is done; stop and report when done. Make no version-control writes and no edits under .git/ or .holyagent/; edit no source files. Report the changed paths git status shows under packages/integrations/claude/dist."
+  ],
+  "criteria": [
+    {
+      "text": "mise run build exits 0 and the changed dist paths are listed",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify exits 0 with test pass and fail counts",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The rebuilt CLI completes intent create --input with a never-closing stdin pipe, exit code shown",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/claude/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "workflow:wf_7d1717ba-fb0/assignment-0mvpcyjh1-vzcg",
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-26T14:34:43.862Z",
+    "finishedAt": "2026-10-26T14:38:09.224Z"
+  },
+  "result": "failure: result: build exits 0 and rebuilt 19 dist files, but `mise run verify` fails with 2 test failures (761 pass, 1 skip, 2 fail), so the verify criterion is not met. The rebuilt CLI exits 0 on `intent create --input` with a never-closing stdin pipe.\nchanged: packages/integrations/claude/dist/agents/explorer-lookup.md, explorer-map.md, explorer-trace.md, librarian-lookup.md, librarian-research.md, reviewer-artifact.md, reviewer-audit.md, reviewer-code.md, reviewer-security.md, reviewer-testing.md, reviewer-visual.md, worker-debugging.md, worker-implementation.md, worker-integration.md, worker-mechanical.md, worker-operations.md, worker-validation.md, worker-visual.md (all under packages/integrations/claude/dist/agents/), packages/integrations/claude/dist/scripts/holyagent.js (git diff --stat: 19 files changed, 41 insertions, 40 deletions). The scratch repo /tmp/holyagent-validation/rebuilt was created outside the project and is not in the changed list.\nchecks:\n- `PATH=/tmp/holyagent-validation/mise-bin:$PATH mise run build` (cwd /home/user/holyagent) -> exit 0; output \"built 29 files into /home/user/holyagent\".\n- `mise run verify` -> exit 1; full log at /tmp/holyagent-validation/verify-rebuild.log. `bun check` ✓ no type errors in 97 files (exit 0); `bun lint` ✓ no problems in 98 files (exit 0); `bun fmt --check` All 210 files are formatted (exit 0); `bun test` 761 pass, 1 skip, 2 fail, 4646 expect() calls, 764 tests across 25 files (failing step, task failed).\n- `bun test packages/integrations/claude/tests/hooks.test.ts` (rerun) -> exit 1; 338 pass, 2 fail. Same two failures, so they are stable.\n- Failing tests: \"hook session-start > a project with only a legacy folder gets the migrate notice, the rules and the takeover line\" and \"hook session-start > names both legacy folders when both are present\". Both fail with `SyntaxError: JSON Parse error: Unexpected EOF` because the hook prints nothing.\n- Baseline: /tmp/holyagent-validation/verify.log (earlier run) shows 760 pass, 0 fail. The two failures are new.\n- `cd /tmp/holyagent-validation/rebuilt && sleep 30 | timeout 10 /home/user/holyagent/packages/integrations/claude/dist/scripts/holyagent intent create --input '{\"objective\":\"Ship it\"}'` -> `${PIPESTATUS[1]}` = 0. Output: `id: intent-0mvpd0gn4-gald`, `revision: 1`, `state: Open`, `objective: Ship it`. The scratch repo was git-initialised; `intent create` wrote its state there, not in the project.\nblockers: `mise run verify` fails on the two session-start legacy tests. The repaired source (dist/scripts/holyagent.js, `legacyFoldersWithState`/`convertibleFolders`, from packages/runtime/src/cli/hook.ts and legacy.ts) now sends the legacy notice only when a legacy folder holds state to convert. The tests create empty `.holyclaude/intents` or `.holyclaude`/`.holycodex` folders and still expect the notice, so the tests and the source disagree. Resolving this needs a root decision: update the tests to create state, or change the source behaviour. I did not edit either.\nquestions: Should the two legacy tests be updated to create convertible state, or should the empty-folder notice behaviour be restored?\nnotes: The dist was built from the working tree as it stood, which has uncommitted modifications under packages/runtime/src and packages/integrations/claude/src, so the dist reflects in-progress sources. The `intent create` run wrote state into the scratch repo's `.holyagent/`, which is expected for that check.\nevidence:\nmise run build exits 0 and the changed dist paths are listed: `PATH=/tmp/holyagent-validation/mise-bin:$PATH mise run build` exit 0, \"built 29 files\"; `git status --short -- packages/integrations/claude/dist` lists 18 agents/*.md and scripts/holyagent.js, all M.\nmise run verify exits 0 with test pass and fail counts: NOT MET. `mise run verify` exit 1; bun test 761 pass, 2 fail, 1 skip (764 tests, 25 files); log /tmp/holyagent-validation/verify-rebuild.log. Hooks rerun: 338 pass, 2 fail, exit 1.\nThe rebuilt CLI completes intent create --input with a never-closing stdin pipe, exit code shown: `sleep 30 | timeout 10 .../dist/scripts/holyagent intent create --input '{\"objective\":\"Ship it\"}'` in /tmp/holyagent-validation/rebuilt, PIPESTATUS[1]=0, intent-0mvpd0gn4-gald created at revision 1.\nchecks-run: build exit 0; verify exit 1 (check 0, lint 0, fmt:check 0, test 761 pass / 2 fail); hooks.test.ts rerun exit 1 (338 pass / 2 fail); CLI pipe check exit 0.\nchanged-paths: git status --short -- packages/integrations/claude/dist, 19 files (18 agents/*.md plus scripts/holyagent.js), as listed in the changed field.",
+  "createdAt": "2026-10-26T14:34:43.862Z"
+}

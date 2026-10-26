@@ -7,7 +7,7 @@ import { ROOT_CORE } from "../instructions/claude-5.5/root-core.ts"
 import stateChanges from "../instructions/claude-5.5/specialist/state-changes.md" with { type: "text" }
 import { hasCode, io } from "../state/files.ts"
 import { STATE_DIRECTORY } from "../state/layout.ts"
-import { LEGACY_FOLDERS } from "../state/legacy.ts"
+import { legacyFoldersWithState } from "../state/legacy.ts"
 import { readOpenState } from "../state/store.ts"
 import { MessageRefused } from "../vcs/errors.ts"
 import { gitMaybe } from "../vcs/git.ts"
@@ -193,7 +193,7 @@ const INLINE_INPUTS: ReadonlySet<string> = new Set(["script", "args"])
 export const HOOK_COMMANDS: ReadonlyArray<Command> = [
   hook(
     "session-start",
-    "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread), always ending with a short block of the root rules most often missed; for a project with a .holyclaude or .holycodex folder and no .holyagent, a notice naming the folder and `holyagent migrate`, with the same rules; nothing in a project with none of the three",
+    "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread), always ending with a short block of the root rules most often missed; for a project with no .holyagent and a .holyclaude or .holycodex folder that holds state to convert, a notice naming the folder and `holyagent migrate`, with the same rules; nothing in a project with none of the three",
     (payload, call) =>
       Effect.gen(function* () {
         const pluginRoot = call.env.CLAUDE_PLUGIN_ROOT
@@ -206,9 +206,7 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
               .replaceAll("${CLAUDE_PLUGIN_ROOT}", pluginRoot ?? "${CLAUDE_PLUGIN_ROOT}")
         if (!(yield* hasStateFolder(call.directory))) {
           const root = dirname(call.directory)
-          const found = yield* Effect.filter(Object.values(LEGACY_FOLDERS), (name) =>
-            hasStateFolder(join(root, name)),
-          )
+          const found = yield* legacyFoldersWithState(root)
           return found.length === 0
             ? NOTHING
             : output({

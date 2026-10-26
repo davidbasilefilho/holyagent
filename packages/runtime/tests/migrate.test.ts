@@ -35,6 +35,16 @@ const cli = (argv: ReadonlyArray<string>) =>
     }),
   )
 
+/** What the SessionStart hook prints for the project. */
+const sessionStart = () =>
+  Effect.runPromise(
+    run(["hook", "session-start"], {
+      cwd: project,
+      env: { HOME: home },
+      stdin: Effect.succeed("{}"),
+    }),
+  ).then((result) => result.stdout)
+
 type Result = Awaited<ReturnType<typeof cli>>
 
 /** The TOON a successful command printed, decoded. */
@@ -167,7 +177,8 @@ const holyclaudeTree = async () => {
       mutability: "ReadOnly",
       required_evidence: [],
       metadata: {
-        ownership_paths: [],
+        // A read-only role that kept a path in holyclaude; holyagent gives it none.
+        ownership_paths: ["packages/runtime/src"],
         symbols: [],
         domains: [],
         dependencies: [],
@@ -319,6 +330,7 @@ describe("migrating .holyclaude", () => {
       state: "Ready",
       roleTask: "Reviewer.code",
       independentFrom: [SUCCEEDED],
+      ownershipPaths: [],
     })
     expect(ready).not.toHaveProperty("result")
     expect(ready).not.toHaveProperty("acceptance")
@@ -778,6 +790,32 @@ describe("refusals", () => {
   test("fails when there is no legacy state", async () => {
     expect(refusal(await cli(["migrate"]))).toContain("NothingToMigrate")
     expect(await exists(".holyagent")).toBe(false)
+  })
+
+  test("a legacy folder with only local state is nothing to migrate, and the hook says nothing", async () => {
+    await put(".holyclaude/local/lock", "{}")
+    await put(".holyclaude/state.json", "{}")
+    await put(".holycodex/.gitignore", "*.tmp\n")
+
+    expect(refusal(await cli(["migrate"]))).toContain("NothingToMigrate")
+    expect(await sessionStart()).toBe("")
+    expect(await exists(".holyagent")).toBe(false)
+
+    await holyclaudeTree()
+    expect(await sessionStart()).toContain(".holyclaude/")
+    expect(data(await cli(["migrate", "--dry-run"]))).toHaveProperty("holyclaude")
+  })
+
+  test("lists a record that .holyagent already holds once, not once per file", async () => {
+    await holyclaudeTree()
+    data(await cli(["migrate"]))
+
+    const { conflicts } = data(await cli(["migrate", "--dry-run"]))
+
+    expect(conflicts).toBeArray()
+    const named = (id: string) => (conflicts as Array<string>).filter((text) => text.includes(id))
+    expect(named(SUCCEEDED)).toHaveLength(1)
+    expect(named(`intent ${INTENT_A}`)).toHaveLength(1)
   })
 
   test("hints at the way out of a failed reload", () => {

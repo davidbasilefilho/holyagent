@@ -24,7 +24,7 @@ afterEach(() =>
 )
 
 /** Runs one command line in-process against the temp project, with `stdin` as its raw text. */
-const cli = (argv: ReadonlyArray<string>, stdin?: string) =>
+const cli = (argv: ReadonlyArray<string>, stdin?: string | Effect.Effect<string, StdinMissing>) =>
   Effect.runPromise(
     run(argv, {
       cwd: project,
@@ -32,7 +32,9 @@ const cli = (argv: ReadonlyArray<string>, stdin?: string) =>
       stdin:
         stdin === undefined
           ? Effect.fail(new StdinMissing({ reason: "no stdin in this test" }))
-          : Effect.succeed(stdin),
+          : typeof stdin === "string"
+            ? Effect.succeed(stdin)
+            : stdin,
     }),
   )
 
@@ -131,15 +133,13 @@ describe.each(COMMANDS)("$name --input", (command) => {
     expect(result.stderr).toContain("hint:")
   })
 
-  test("refuses JSON on both stdin and --input", async () => {
+  test("never waits on a stdin that does not complete", async () => {
     await start()
-    const result = await cli(
-      [...command.argv, "--input", json(command.payload)],
-      json(command.payload),
-    )
-    expect(result.code).toBe(2)
-    expect(result.stderr).toContain("error: Usage: Got JSON on both stdin and --input")
-    expect(result.stderr).toContain("hint:")
+    // An agent's shell tool leaves stdin an open pipe; the old code read it and hung here.
+    const result = await cli([...command.argv, "--input", json(command.payload)], Effect.never)
+    expect(result.stderr).toBe("")
+    expect(result.code).toBe(0)
+    expect(command.printed(decoded(result.stdout))).toBe(true)
   })
 
   test("still reads stdin when the flag is absent", async () => {
