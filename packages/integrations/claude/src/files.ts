@@ -7,6 +7,13 @@ export const PLUGIN_DIRECTORY = "packages/integrations/claude"
 export const DIST_DIRECTORY = `${PLUGIN_DIRECTORY}/dist`
 
 /**
+ * The bundled ripgrep and fd with their licenses, relative to the repository root. Unlike the rest
+ * of the built plugin, `build.ts` leaves it in place: `scripts/vendor.ts` fills it from the pinned
+ * release archives, so a build needs no network.
+ */
+export const VENDOR_DIRECTORY = `${DIST_DIRECTORY}/scripts/vendor`
+
+/**
  * Anthropic's `frontend-design` skill, kept byte for byte as it ships (its `SKILL.md` and
  * `LICENSE.txt`), relative to the repository root. The visual roles embed its text, and the plugin
  * ships its license.

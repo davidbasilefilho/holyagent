@@ -4,6 +4,7 @@ import { HOOK_COMMANDS } from "./hook.ts"
 import { INTENT_COMMANDS } from "./intent.ts"
 import { MIGRATE_COMMANDS } from "./migrate.ts"
 import { OVERVIEW_COMMANDS } from "./overview.ts"
+import { TOOL_COMMANDS } from "./tools.ts"
 import type { Command } from "./types.ts"
 
 /** Every command, in the order the help lists them. */
@@ -12,6 +13,7 @@ export const COMMANDS: ReadonlyArray<Command> = [
   ...ASSIGNMENT_COMMANDS,
   ...OVERVIEW_COMMANDS,
   ...MIGRATE_COMMANDS,
+  ...TOOL_COMMANDS,
   ...VCS_COMMANDS,
   ...HOOK_COMMANDS,
 ]

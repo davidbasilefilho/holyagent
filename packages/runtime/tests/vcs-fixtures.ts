@@ -109,8 +109,8 @@ export const vcs = async (
   argv: ReadonlyArray<string>,
   github: Layer.Layer<GitHub>,
   stdin?: unknown,
+  env: Record<string, string> = {},
 ) => {
-  const env = {}
   const written: Array<string> = []
   const result = await Effect.runPromise(
     run(argv, {

@@ -54,6 +54,11 @@ export interface Host {
   readonly emit?: (text: string) => Effect.Effect<void>
   /** Git and GitHub for the `vcs` commands; the real ones when absent. */
   readonly vcs?: Layer.Layer<Git | GitHub>
+  /**
+   * The folder of the bundled search tools for the `rg` and `fd` commands; the plugin's when
+   * absent.
+   */
+  readonly tools?: string
 }
 
 /** Everything a command may use while it runs. */
@@ -85,6 +90,8 @@ export interface Call {
   readonly emit: (text: string) => Effect.Effect<void>
   /** Git and GitHub for the `vcs` commands. */
   readonly vcs: Layer.Layer<Git | GitHub>
+  /** The folder of the bundled search tools, with one subfolder for each target. */
+  readonly tools: string
   /**
    * Reads the JSON payload, from the inline `--input` flag when the command has it and it was
    * given, else from stdin, and decodes it strictly; unknown fields are refused. With the flag,
@@ -124,6 +131,11 @@ export interface Command {
   readonly state?: Ensure | ((args: Parsed) => Ensure)
   /** True when the command reads its own arguments: they arrive unparsed in `args.positionals`. */
   readonly raw?: true
+  /**
+   * True when the command hands its arguments to another program, so `--help` and `-h` reach that
+   * program instead of showing the help of the command. Only for a `raw` command.
+   */
+  readonly passthrough?: true
   /** How many positional arguments the command takes. */
   readonly positionals: number
   /** True when the last positional may be left out. */
