@@ -1,0 +1,67 @@
+{
+  "id": "assignment-0mvr5i685-pbxg",
+  "intentId": "intent-0mvr4zvnq-k1q1",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-docs-and-installers-present-the",
+  "objective": "Make the docs and installers present the three plugin commands as the only install path, shrink the installers to prerequisites, and keep packages/cli untouched for the future pi port.",
+  "state": "Ready",
+  "scope": [
+    "Worktree C:/Users/david.basile/dev/holyagent-feat-plugin-only-install (branch feat/plugin-only-install). Another specialist adds `holyagent setup` and `holyagent doctor [--fix]` to the plugin runtime and the /holyagent:setup command in parallel; packages/runtime, packages/integrations/claude, .claude-plugin/marketplace.json and docs/hooks.md are theirs, do not edit them.",
+    "packages/cli stays: the user said to leave it, it will be needed for the future pi port. Do not edit or delete packages/cli, bun.lock, bunfig.toml or scripts/bump-version*. Docs may still describe packages/cli as a component kept for the pi port, but must not tell users to run it to install or set up Claude Code.",
+    "Install-path references to rewrite: README.md install section, docs/usage.md, docs/requirements.md (why setup claude exists, the packages/cli/src/index.ts path), docs/components.md (setup claude and doctor), docs/commit-authorship.md (section on settings setup claude writes), docs/cache-and-workflows.md (cache TTL written by setup), docs/README.md, install/wsl-install.sh, install/windows-install.ps1. Search the docs for setup claude, packages/cli and doctor to catch the rest (outside .holyagent/)."
+  ],
+  "constraints": [
+    "User requirements (binding): a user installs with `claude plugin marketplace add davidbasilefilho/holyagent`, `claude plugin marketplace add ranxianglei/billion-context`, `claude plugin install holyagent@holyagent` and nothing else: no clone, no `bun install`, no `holyagent setup claude`. Prerequisites left: Bun on PATH (the hooks run `bun`), Node LTS, git and an authenticated gh. The installers shrink to the prerequisites only: Bun, Node LTS, git, gh and, for development, mise; each ends by printing the three plugin commands. README How do I install it? shows the three commands, the prerequisites, and one line about running /holyagent:setup on first launch.",
+    "The new runtime commands, to describe in docs: `holyagent setup [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-billion-context] [--skip-ctx7]` installs bili (native mode, compress.rules) and ctx7 with its skill, and merges attribution, includeGitInstructions, subagentPromptCacheTtl, extraKnownMarketplaces, enabledPlugins and permissions.deny into the user settings (~/.claude/settings.json, or CLAUDE_CONFIG_DIR) without changing set values; `holyagent doctor [--fix]` checks bun, bili, ctx7 and those settings keys, and --fix runs the missing setup steps; /holyagent:setup runs setup from a session; a SessionStart check adds one line suggesting /holyagent:setup when setup is missing and is silent in claude.ai cloud sessions, where setup skips bili and ctx7. No plugin-registration step and no Bun canary check in setup or doctor; canary Bun stays a development requirement checked by mise.",
+    "AGENTS.md requires README.md to keep exactly these sections in order: # HolyAgent, ## How do I install it?, ## Why HolyAgent?, ## Development, ## Special thanks, ## License; detail goes in docs/ and is linked, not repeated.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report; do not add unrequested features, tests, files or refactors (name them in the report). Do not stop at a summary that announces a next step.",
+    "No version-control writes (no git add, rm, commit, checkout, stash), no edits under .git/ or .holyagent/; report changed paths."
+  ],
+  "criteria": [
+    {
+      "text": "packages/cli, bun.lock, bunfig.toml and scripts/bump-version* are unchanged, and no file in README.md, docs/ (except docs/hooks.md) or install/ tells users to run packages/cli or holyagent setup claude to install (show the search command and its result)",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "install/wsl-install.sh and install/windows-install.ps1 install only Bun, Node LTS, git, gh and (for development) mise, stay idempotent, and end by printing the three plugin commands; the shell script passes `bash -n` and the PowerShell script parses (show both checks)",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "README.md keeps the six required sections in order, and How do I install it? shows the three commands, the prerequisites and one line about /holyagent:setup on first launch",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "docs describe the plugin-only install and the new setup, doctor, /holyagent:setup and SessionStart check consistently with the constraints above",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "`mise run verify` passes except for failures inside the other specialist paths, which are named (command, exit code, counts)",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "README.md",
+    "docs/usage.md",
+    "docs/requirements.md",
+    "docs/components.md",
+    "docs/commit-authorship.md",
+    "docs/cache-and-workflows.md",
+    "docs/README.md",
+    "docs/development.md",
+    "install"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-10-27T20:41:35.237Z"
+}
