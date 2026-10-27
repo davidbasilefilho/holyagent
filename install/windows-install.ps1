@@ -52,22 +52,47 @@ function Note([string]$Text) { Write-Host "    $Text" }
 function Warn([string]$Text) { Write-Warning $Text }
 function Have([string]$Name) { return [bool](Get-Command $Name -ErrorAction SilentlyContinue) }
 
-# Runs a native command and fails the step when it exits non-zero, so no error is silent.
+# Runs a native command and fails the step when it exits non-zero, so no error is silent. The message
+# redacts the value after --api-key, because it is printed by the error handler and may reach logs.
 function Invoke-Native {
   param([Parameter(Mandatory)][string]$File, [Parameter(ValueFromRemainingArguments)][string[]]$Arguments)
+  $Arguments = @($Arguments)
+  $ErrorActionPreference = 'Continue'
   & $File @Arguments
-  if ($LASTEXITCODE -ne 0) { throw "$File $($Arguments -join ' ') exited $LASTEXITCODE" }
+  $code = $LASTEXITCODE
+  $shown = for ($i = 0; $i -lt $Arguments.Count; $i++) {
+    if ($Arguments[$i] -like '--api-key=*') { '--api-key=<redacted>' }
+    elseif ($i -gt 0 -and $Arguments[$i - 1] -eq '--api-key') { '<redacted>' }
+    else { $Arguments[$i] }
+  }
+  if ($code -ne 0) { throw "$File $(@($shown) -join ' ') exited $code" }
 }
 
-# The first line a command prints, or $null when it fails; used for versions.
+# Runs a native command whose failure is an answer, not an error, and returns its exit code and output
+# lines. Windows PowerShell 5.1 turns a native command's stderr into a terminating error when
+# $ErrorActionPreference is 'Stop', even when the stream is redirected; the local 'Continue' (a function
+# scope, restored on return) keeps the probe from ending the script. A missing program gives exit code 127.
+function Invoke-Probe([string]$File, [string[]]$Arguments = @()) {
+  $ErrorActionPreference = 'Continue'
+  $lines = @()
+  $code = 127
+  try {
+    $lines = @(& $File @Arguments 2>$null)
+    $code = $LASTEXITCODE
+  } catch { $code = 127 }
+  return [pscustomobject]@{ ExitCode = $code; Lines = $lines }
+}
+
+# The first line a command prints, or $null when it fails or prints nothing; used for versions.
 function Get-FirstLine {
   param([Parameter(Mandatory)][string]$File, [Parameter(ValueFromRemainingArguments)][string[]]$Arguments)
-  try {
-    $lines = & $File @Arguments 2>$null
-    if ($LASTEXITCODE -ne 0) { return $null }
-    return ($lines | Select-Object -First 1).ToString().Trim()
-  } catch { return $null }
+  $result = Invoke-Probe $File @($Arguments)
+  if ($result.ExitCode -ne 0 -or $result.Lines.Count -eq 0 -or $null -eq $result.Lines[0]) { return $null }
+  return $result.Lines[0].ToString().Trim()
 }
+
+# A string as a PowerShell single-quoted literal, for lines written into your profile.
+function ConvertTo-SingleQuoted([string]$Text) { return "'" + $Text.Replace("'", "''") + "'" }
 
 # Work from the profile folder so a repository mise.toml never changes what the global installs below
 # resolve.
@@ -84,8 +109,8 @@ $Mise = $null
 function Update-SessionPath {
   $paths = @()
   if ($script:Mise) {
-    $listed = & $script:Mise bin-paths 2>$null
-    if ($LASTEXITCODE -eq 0 -and $listed) { $paths += @($listed | Where-Object { $_ }) }
+    $listed = Invoke-Probe $script:Mise @('bin-paths')
+    if ($listed.ExitCode -eq 0) { $paths += @($listed.Lines | Where-Object { $_ }) }
   }
   $paths += (Join-Path $BunInstall 'bin')
   $env:Path = (($paths + @($env:Path)) -join [IO.Path]::PathSeparator)
@@ -183,18 +208,22 @@ try {
   }
   if (-not $Mise) { throw 'mise was not found after the install; open a new window and re-run' }
 
-  # Bun's global bin comes first so mise's activation, appended after it, still wins for node and bun.
+  # Bun's global bin is appended to your user PATH, behind the system folders. In PowerShell the profile
+  # line puts it first, and the mise line added after it puts mise's tools (node, bun) ahead again, so
+  # mise still wins for those two.
   Add-UserPath (Join-Path $BunInstall 'bin')
-  Add-ProfileLine '^\s*\$env:BUN_INSTALL\s*=' "`$env:BUN_INSTALL = '$BunInstall'; `$env:Path = `"`$env:BUN_INSTALL\bin;`$env:Path`""
-  Add-ProfileLine '^\s*.*mise.*\bactivate\b.*pwsh' "(& '$Mise' activate pwsh) | Out-String | Invoke-Expression"
+  $quotedBun = ConvertTo-SingleQuoted $BunInstall
+  $quotedMise = ConvertTo-SingleQuoted $Mise
+  Add-ProfileLine '^\s*\$env:BUN_INSTALL\s*=' "`$env:BUN_INSTALL = $quotedBun; `$env:Path = `"`$env:BUN_INSTALL\bin;`$env:Path`""
+  Add-ProfileLine '^\s*(?!#).*mise.*\bactivate\b.*pwsh' "(& $quotedMise activate pwsh) | Out-String | Invoke-Expression"
 
   # ---------------------------------------------------------------------------------------------
   Step 'Node.js LTS (Billion Context and ctx7 run on Node)'
 
-  & $Mise where node *> $null
-  if ($LASTEXITCODE -eq 0) { Note 'node already selected globally' } else { Invoke-Native $Mise use -g node@lts }
+  if ((Invoke-Probe $Mise @('where', 'node')).ExitCode -eq 0) { Note 'node already selected globally' } else { Invoke-Native $Mise use -g node@lts }
   Update-SessionPath
   $nodeVersion = Get-FirstLine node --version
+  if (-not $nodeVersion) { throw 'node did not report a version after mise selected it; open a new window and re-run' }
   Note "node $nodeVersion"
   # ctx7 requires Node >= 22.13; an older global node chosen earlier would fail later and obscurely.
   if ([version]($nodeVersion.TrimStart('v')) -lt [version]'22.13') {
@@ -208,8 +237,7 @@ try {
   # cannot install bun@canary, so it installs a stable Bun and `bun upgrade --canary` replaces the
   # binary in place. A later `mise upgrade bun` that installs a new stable brings stable back, so the
   # canary check below runs on every invocation, like the repo's `toolchain` task.
-  & $Mise where bun *> $null
-  if ($LASTEXITCODE -ne 0) { Invoke-Native $Mise use -g bun }
+  if ((Invoke-Probe $Mise @('where', 'bun')).ExitCode -ne 0) { Invoke-Native $Mise use -g bun }
   Update-SessionPath
   if (Test-Canary) {
     Note "bun is already canary: $(Get-FirstLine bun --revision)"
@@ -258,11 +286,11 @@ try {
 
   # compress.rules protects persistent reminders (rules text) from being folded. It is set only when
   # the key is absent, so a value the user chose and every other key stay untouched. The Node script
-  # goes through a file because PowerShell 5.1 mangles double quotes in native command arguments.
+  # goes to node on stdin, never through a file another process could replace, because PowerShell 5.1
+  # mangles double quotes in native command arguments.
   $xdg = if ($env:XDG_CONFIG_HOME) { $env:XDG_CONFIG_HOME } else { Join-Path $HOME '.config' }
   $env:BILI_CONFIG = if ($env:BILI_CONFIG_FILE) { $env:BILI_CONFIG_FILE } else { Join-Path $xdg 'billion-context\billion-context.json' }
-  $configScript = Join-Path ([IO.Path]::GetTempPath()) "holyagent-bili-config-$PID.js"
-  @'
+  $configScript = @'
 const fs = require("node:fs")
 const path = require("node:path")
 const file = process.env.BILI_CONFIG
@@ -293,8 +321,12 @@ const temporary = path.join(directory, "." + path.basename(file) + "." + process
 fs.writeFileSync(temporary, JSON.stringify(config, null, 2) + "\n", { mode: 0o600 })
 fs.renameSync(temporary, file)
 console.log("    set compress.rules=true in " + file)
-'@ | Set-Content -Path $configScript -Encoding ASCII
-  try { Invoke-Native node $configScript } finally { Remove-Item $configScript -ErrorAction SilentlyContinue }
+'@
+  $ErrorActionPreference = 'Continue'
+  $configScript | & node -
+  $configExit = $LASTEXITCODE
+  $ErrorActionPreference = 'Stop'
+  if ($configExit -ne 0) { throw "the Billion Context config step exited $configExit" }
 
   # ---------------------------------------------------------------------------------------------
   Step 'ctx7 (Context7 CLI via Bun) and its Claude Code skill'
