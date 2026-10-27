@@ -1,0 +1,50 @@
+{
+  "id": "assignment-0mvqzlmrs-vpw9",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "finish-the-windows-branch-after-merging",
+  "objective": "Finish the Windows branch after merging the instruction change: rebuild, keep the safe hand-run invocation, and close the leftovers the Windows writer reported.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-windows (head 6c8528b: the Windows commit plus a merge of the instructions branch). Writer report: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-assignment-0mvqz0jb5-96fd.txt.",
+    "(1) Run mise run build and fix any test the merge broke (the root core text budget in sessioncontext.test.ts is the likely one, since both branches edited core sections). (2) Restore the safety flags in the documented hand-run form in packages/runtime/src/instructions/claude-5.5/root/dispatch.md: bun --no-env-file --config=\"${CLAUDE_PLUGIN_ROOT}/scripts/empty-bunfig.toml\" \"${CLAUDE_PLUGIN_ROOT}/scripts/holyagent.js\" <command>, because without them a project .env or bunfig.toml can change a hand-run call. To make room, raise the root-core character cap in the test by the needed amount (state the new cap and the reason in a comment) rather than cutting other rules. (3) In packages/runtime/src/instructions/claude-5.5/specialist/working.md change the rg/fd invocation to the same bun form so it works on Windows. (4) Add the Windows installer (install/windows-install.ps1) next to the WSL one in README.md's install section, keeping the six sections. (5) Rebuild and run mise run verify."
+  ],
+  "constraints": [
+    "Follow /home/user/holyagent/.claude/CLAUDE.md.",
+    "Work only in that worktree; make no version-control writes and no edits under .git/ or .holyagent/.",
+    "Keep working until done; when done and checked, stop and report; no unrequested changes."
+  ],
+  "criteria": [
+    {
+      "text": "The documented invocation keeps --no-env-file and the empty bunfig, specialist rg/fd use the bun form, and README names the Windows installer",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build leaves no diff after the commit and mise run verify passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions/claude-5.5/root/dispatch.md",
+    "packages/runtime/src/instructions/claude-5.5/specialist/working.md",
+    "packages/runtime/tests",
+    "packages/integrations/claude",
+    "README.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvqz0jb5-96fd",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T17:56:18.952Z"
+  },
+  "createdAt": "2026-10-27T17:56:18.952Z"
+}
