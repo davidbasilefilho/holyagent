@@ -1,0 +1,64 @@
+{
+  "id": "assignment-0mvr8a9ob-1qbm",
+  "intentId": "intent-0mvr4zvnq-k1q1",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-security-and-consistency",
+  "objective": "Repair the security and consistency findings in holyagent setup and doctor so setup children ignore the current project's Bun and npm config and doctor agrees with setup about where tools are found.",
+  "state": "Ready",
+  "scope": [
+    "Worktree C:/Users/david.basile/dev/holyagent-feat-plugin-only-install (branch feat/plugin-only-install, commit 450465c added packages/runtime/src/setup).",
+    "Blocking security finding (Medium): packages/runtime/src/setup/shell.ts:97 runs `bun add -g billion-context`, `bun add -g ctx7`, `bili plugin install claude` and `ctx7 setup` with the process cwd (the user's project, cli/main.ts:36), so a project bunfig.toml, .npmrc or .env can redirect the install registry or preload code. Run every setup child from a neutral directory (the home directory), and start `bun add -g` with `--no-env-file` and `--config=<the plugin's empty-bunfig.toml>` so project config cannot change it; keep ignoring a project .npmrc (a neutral cwd covers it; set npm_config_userconfig only if needed).",
+    "Blocking stale text: packages/runtime/src/instructions/requirements/cache.md:7 says \"the public CLI sets `subagentPromptCacheTtl` to 1h\"; the public CLI is deleted and `holyagent setup` writes that key now. Update it and anything generated from it.",
+    "Non-blocking, fix alongside: doctor.ts:28 checkCommand uses shell.which without includeBunBin while setup and check.ts:21 search Bun's bin directory; make doctor agree (and name the PATH hint when found only in Bun's bin). json-file.ts:52: treat a 0-byte or whitespace-only settings.json as an empty object, as a missing file is."
+  ],
+  "constraints": [
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report; do not add unrequested features, tests, files or refactors (name them in the report).",
+    "No version-control writes, no edits under .git/ or .holyagent/; report changed paths. If `mise run build` removes the vendored tools, run `git restore packages/integrations/claude/dist/scripts/vendor`.",
+    "Follow .claude/CLAUDE.md and AGENTS.md (Effect, Effect Schema, Bun Shell, JSDoc, mise run build after plugin source changes)."
+  ],
+  "criteria": [
+    {
+      "text": "Every setup child process runs from a neutral working directory and `bun add -g` starts with --no-env-file and the empty bunfig, shown by a test on the command and cwd the shell receives",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "cache.md and the generated plugin no longer say the public CLI sets subagentPromptCacheTtl",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "doctor finds bili and ctx7 where setup and the SessionStart check find them, and an empty settings.json is treated as an empty object, each with a test",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Setup tests pass, check, lint and fmt:check exit 0, and the generated plugin matches its sources after mise run build",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Changes stay within packages/runtime/src/setup, packages/runtime/src/cli/setup.ts, packages/runtime/src/instructions/requirements/cache.md, their tests and the rebuilt plugin",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/setup",
+    "packages/runtime/src/cli/setup.ts",
+    "packages/runtime/src/instructions/requirements/cache.md",
+    "packages/runtime/tests",
+    "packages/integrations/claude/dist",
+    "packages/integrations/claude/tests"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvr5ftro-9wfh",
+  "createdAt": "2026-10-27T21:59:25.308Z"
+}
