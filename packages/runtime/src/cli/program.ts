@@ -14,6 +14,7 @@ import { COMMANDS } from "./commands.ts"
 import { loadConfig } from "./config.ts"
 import { readInput, readInputBy, readReport } from "./context.ts"
 import { describeFailure, Usage } from "./errors.ts"
+import { BUNDLED_TOOLS } from "./tools.ts"
 import { type Call, type Command, type Host, Streamed, Verbatim, WithTrailer } from "./types.ts"
 
 /** What one run prints and the exit code it ends with. */
@@ -68,6 +69,7 @@ const callFor = (args: Call["args"], host: Host, emit: Call["emit"], command: Co
       text: readReport(host),
       emit,
       vcs: host.vcs ?? vcsLive(root, host.env),
+      tools: host.tools ?? BUNDLED_TOOLS,
       input: (schema) => readInput(host, schema, inline),
       inputBy: (pick) => readInputBy(host, pick, inline),
     } satisfies Call
@@ -103,7 +105,7 @@ const execute = (given: ReadonlyArray<string>, host: Host) =>
       })
     }
     const rest = argv.slice(command.path.length)
-    if (rest.includes("--help") || rest.includes("-h"))
+    if (command.passthrough !== true && (rest.includes("--help") || rest.includes("-h")))
       return { stdout: `${help(command)}\n`, stderr: "", code: 0 }
     const args =
       command.raw === true

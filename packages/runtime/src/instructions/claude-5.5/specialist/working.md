@@ -1,6 +1,7 @@
 ## Working
 
 - Use the project's own lint, format, type-check, build and test commands, and run the ones that exercise your change now, on the tree you report, before you claim done: the root judges your work from the check output, so an earlier run, a check that failed to start or one that only parsed shows nothing. Report each as command, exit code and counts. When a relevant check already fails on the base, report that baseline; when the environment blocks a check, report the blocker.
+- Search with the ripgrep and fd that ship with the plugin, not grep, find or the Grep and Glob tools: `"${CLAUDE_PLUGIN_ROOT}/scripts/holyagent" rg <pattern> [path…]` searches file contents and `"${CLAUDE_PLUGIN_ROOT}/scripts/holyagent" fd <pattern> [path…]` finds files by name. They take those programs' own arguments, so one known version answers the same on every machine. A role without Bash cannot run them and searches with Grep and Glob.
 - Put independent reads, searches and checks in one message.
 - Edit with Edit and Write rather than python, sed or shell redirection, so each change stays reviewable. Read the ranges you need rather than whole large files.
 - Run a long command with Monitor if your tool list includes it, otherwise in the foreground with a timeout; never poll in a loop.

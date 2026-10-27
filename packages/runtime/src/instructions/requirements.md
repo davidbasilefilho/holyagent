@@ -16,6 +16,7 @@ The behavior every agent must show, whatever the model that runs it. Each model'
 - R-LANG: Write PRs, commits, docs and instruction text in English with the repository's own standard first; write user-facing text and the task list in the user's latest language.
 - R-OUTWARD: Get the user's approval for merging, publishing, deploying, credentials, security settings, messaging third parties and destructive steps, and never push to the base, default or a protected branch without it.
 - R-DELEGATE: Send edits, runs, checks, reviews, research and investigation to specialists, and read only what a decision needs.
+- R-SEARCH: Search file contents and names through the bundled ripgrep and fd (`holyagent rg`, `holyagent fd`) instead of grep, find or the Grep and Glob tools.
 - R-NORESOLVE: When holyagent:* agent types do not resolve, stop and report it instead of falling back to general-purpose agents.
 - R-ROUTE: Pick the cheapest specialist whose description fits and whose result can be judged.
 - R-DISPATCH: Dispatch every Assignment through the CLI and run it as an agent() of an inline workflow script, recording the agent that runs it.
@@ -46,6 +47,7 @@ The behavior every agent must show, whatever the model that runs it. Each model'
 - R-S-INDEP: Follow the independence rule the role names.
 - R-S-VCS: Leave every git, GitHub and holyagent state change to the root (commit, push, checkout, branch, stash, merge, reset, gh writes, vcs, assignment and intent commands, and any edit under .git or .holyagent), and report the changed paths, which the root records. A SubagentStart hook restates this rule to every specialist at its start, and a PreToolUse hook reminds the agent of the version-control rules at a Bash command that mentions git commit or push; neither blocks.
 - R-S-CHECK: Run the project's real checks now on the reported tree and report each as command, exit code and counts, naming any not run.
+- R-S-SEARCH: A role with a shell searches contents and file names through the bundled ripgrep and fd (`holyagent rg`, `holyagent fd`) instead of grep, find or the Grep and Glob tools; a role without a shell searches with Grep and Glob.
 - R-S-RULES: Follow the holyagent rules of the specialist instructions without being reminded, because the Assignment does not restate them.
 - R-S-REPORT: End with one compact report in the fixed shape, with an evidence line for each blocking criterion and required label.
 

@@ -53,8 +53,13 @@ run = "bun fmt --no-script --check"
 description = "Run the test suite"
 run = "bun test"
 
+[tasks.vendor]
+description = "Download, verify and extract the pinned ripgrep and fd into the plugin; does nothing when they are in place"
+run = "bun scripts/vendor.ts"
+
 [tasks.build]
 description = "Generate the Claude plugin from the instructions, the route table and the runtime"
+depends = ["vendor"]
 run = "bun packages/integrations/claude/build.ts"
 
 [tasks.verify]

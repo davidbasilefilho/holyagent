@@ -13,6 +13,8 @@ What HolyAgent installs or configures, and why. The WSL installer (`install/wsl-
 | ctx7 and skill   | WSL installer, `holyagent setup claude`                    | Current library documentation for the agents                                |
 | Exa plugin       | Plugin dependency                                          | Web search and page reading for the Search specialists                      |
 
+ripgrep and fd ship inside the plugin rather than being installed; see [ripgrep and fd](#ripgrep-and-fd).
+
 Pi is not installed: 0.1.0 has no Pi integration ([pi/README.md](pi/README.md)).
 
 ## mise, Node, Bun
@@ -62,6 +64,10 @@ The HolyAgent plugin depends on Exa's Claude Code plugin, `exa@claude-plugins-of
 **Why Exa.** [Exa 3.0](https://exa.ai/blog/exa-3) (2026-10-19) is, in Exa's words, its largest search-quality improvement. It ranks first on the independent [Artificial Analysis Search Index](https://artificialanalysis.ai/agents/search-api), per [Exa's post](https://exa.ai/blog/artificial-analysis-exa-3-best-search-api). Its Dynamic Highlights use 95% fewer tokens than full page text, which keeps the agents' context small, and Exa runs its own crawler and index. Exa's head-to-head benchmark table against Perplexity, Brave and Parallel is self-reported, so treat it as a vendor claim rather than an independent result.
 
 `holyagent setup claude` also adds `WebSearch` and `WebFetch` to the project's `permissions.deny`, so agents outside HolyAgent do not fall back to them either. A project that already has a `permissions.deny` list keeps it unchanged; add the two entries by hand there. A plugin cannot set permissions, so the marketplace route alone leaves the built-in web tools on for agents other than HolyAgent's.
+
+## ripgrep and fd
+
+The plugin bundles ripgrep 15.2.0 and fd 10.5.0 for macOS on Apple silicon, Linux on x64 and Windows on x64, and runs them through `holyagent rg` and `holyagent fd` (arguments, stdin, stdout and exit code are the program's own). Every agent with a Bash tool searches with them instead of grep, find or the built-in Grep and Glob, so a search answers the same on every machine and the agents need nothing installed. The agents without Bash (the explorers, the librarians, `reviewer-audit`, `reviewer-artifact`, `reviewer-security` and `reviewer-visual`) keep the built-in Grep and Glob. Claude Code documents its Grep tool as built on ripgrep; it documents no backend for Glob. On any other platform the commands fail with `UnsupportedPlatform`, and the agents use their own search. How the programs are pinned and built is in [development.md](development.md#the-generated-plugin).
 
 ## ctx7 and the Context7 skill
 

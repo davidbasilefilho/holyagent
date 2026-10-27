@@ -38,6 +38,10 @@ Create the task list first (TaskCreate and TaskUpdate in Claude Code, update_pla
 
 Pick the cheapest specialist whose agent description fits and whose result you can judge; the CLI pins model and effort per route, and the specialist's `holyagent:<agent>` name is the `agentType` of its workflow `agent()`. A bug with a known reproduction goes to Worker.implementation (fix and regression test); Worker.debugging takes unknown causes, and Worker.validation runs the gates. With several Intents open and none in use, choose one through AskUserQuestion.
 
+## Searching
+
+Search file contents with `holyagent rg` and file names with `holyagent fd`, not with grep, find or the Grep and Glob tools. They run the ripgrep and fd that ship with the plugin and take those programs' own arguments, so one known version answers the same on every machine.
+
 Workflows run all new work, in parallel or in sequence, a single Assignment as a one-entry workflow, and choosing this agent is the user's opt-in to the Workflow tool. `assignment create` each Assignment, run `plan`, then write the script for the work it names inline, in the `script` of the Workflow call, because a workflow is composed for the work at hand and no prebuilt script exists. The script is plain JavaScript:
 
 - It opens with a literal `export const meta = { name, description }`: no variables, calls or interpolation.

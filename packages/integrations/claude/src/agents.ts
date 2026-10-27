@@ -115,6 +115,7 @@ export const ROOT_SECTIONS: ReadonlyArray<string> = [
   ...ROOT_CORE_FILES,
   "user-messages.md",
   "routing.md",
+  "search.md",
   "workflows.md",
   "assignments.md",
   "visual.md",
@@ -227,6 +228,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
   "R-LANG": { section: "root/identity.md", phrase: "in the language of the user's latest message" },
   "R-OUTWARD": { section: "root/identity.md", phrase: "need the user's approval" },
   "R-DELEGATE": { section: "root/delegating.md", phrase: "go to specialists" },
+  "R-SEARCH": { section: "root/search.md", phrase: "Search file contents with `holyagent rg`" },
   "R-NORESOLVE": { section: "root/delegating.md", phrase: "stop and report it" },
   "R-ROUTE": { section: "root/routing.md", phrase: "cheapest specialist" },
   "R-DISPATCH": { section: "root/dispatch.md", phrase: "`assignment dispatch`" },
@@ -280,6 +282,10 @@ export const REQUIREMENT_SECTIONS: Readonly<
   "R-S-CHECK": {
     section: "specialist/working.md",
     phrase: "run the ones that exercise your change now",
+  },
+  "R-S-SEARCH": {
+    section: "specialist/working.md",
+    phrase: "Search with the ripgrep and fd that ship with the plugin",
   },
   "R-S-RULES": { section: "specialist/conduct.md", phrase: "without being reminded" },
   "R-S-REPORT": { section: "specialist/report.md", phrase: "End with one compact report" },

@@ -122,6 +122,10 @@ const HINTS: Readonly<Record<string, string>> = {
     "Run it in a project that has a .holyclaude or .holycodex folder with state in it, or check that you are in the project root.",
   MigrationUnverified:
     "The records were written but do not load back: delete the files this run wrote (git status lists them), fix the cause the message names and run `holyagent migrate --dry-run` again.",
+  UnsupportedPlatform:
+    "Search with the programs of your system instead, or run holyagent on darwin-arm64, linux-x64 or windows-x64.",
+  ToolMissing:
+    "The plugin was built without its vendored tools: run `mise run vendor`, then `mise run build`, and reinstall the plugin.",
   StateLocked: "Another process holds the state lock; retry in a moment.",
   StateIo:
     "Check what the message names: the permissions of the .holyagent folder of the state worktree (under the git directory, or in the project outside git), that git runs there, and that no branch already uses a name the state branch needs (holyagent/state needs no branch called holyagent; git config holyagent.stateBranch picks another name).",
