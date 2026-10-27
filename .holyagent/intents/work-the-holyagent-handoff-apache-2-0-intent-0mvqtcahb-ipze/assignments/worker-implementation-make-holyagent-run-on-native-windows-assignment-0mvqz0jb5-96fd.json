@@ -1,0 +1,79 @@
+{
+  "id": "assignment-0mvqz0jb5-96fd",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "make-holyagent-run-on-native-windows",
+  "objective": "Make holyagent run on native Windows without forcing a shell, following the handoff list, and keep macOS and Linux behavior unchanged.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-windows (branch ccr-046ad103-6qsvgx-windows, stacked on the README PR; it already carries the state branch, license, cloud identity, rg/fd and README work).",
+    "First, settle with sources (Exa tools; cite URLs) whether Claude Code on native Windows runs a hook's command (and command+args) through a shell, and how ${CLAUDE_PLUGIN_ROOT} is substituted there. Pick the hook form that runs on Windows, macOS and Linux; prefer command 'bun' with args ['--no-env-file','--config=<root>/scripts/empty-bunfig.toml','<root>/scripts/holyagent.js','hook','<name>'] if supported. That changes the BunMissing contract in docs/hooks.md; update it and say what replaces it.",
+    "Handoff items (verified only by reading; verify each): instructions in packages/runtime/src/instructions/claude-5.5/root/dispatch.md:1, docs/README.md and docs/commit-authorship.md use bash syntax: switch to bun \"<pluginRoot>/scripts/holyagent.js\" <cmd>, which works in bash, PowerShell and cmd (hook.ts already resolves pluginRoot); packages/cli/src/shell.ts:41-58: use path.delimiter, os.homedir(), a case-insensitive PATH key, no fixed /.bun; packages/cli/src/claude/user.ts:23: fall back to USERPROFILE or os.homedir(); packages/runtime/src/cli/config.ts:59: use CLAUDE_CONFIG_DIR, else the home directory, instead of silently skipping when HOME is missing; packages/runtime/src/vcs/commit.ts:31-63: relative() yields backslashes compared to git's slashes: add toPosix in packages/runtime/src/domain/paths.ts and use it; packages/runtime/src/state/store.ts:95-98: Bun.Glob patterns built with backslashes (glob escapes) find nothing: build them with forward slashes, and check the slicing in legacy.ts; packages/runtime/src/cli/context.ts:23-28: normalize git rev-parse --show-toplevel output; also check the new state worktree code (packages/runtime/src/state/tree.ts) and the rg/fd launcher for the same path issues; mise.toml uses grep -q, env -u and /dev/null: replace with small Bun scripts; lefthook.yml:6 calls the sh wrapper: make it cross-platform; add install/windows-install.ps1 mirroring install/wsl-install.sh and update docs/requirements.md and docs/components.md.",
+    "Leave alone (already portable): domain/paths.ts existing helpers, lock.ts, files.ts, vcs/git.ts, vcs/process.ts, .gitattributes, empty-bunfig.toml.",
+    "Tests: backslash paths, PATH key casing and delimiter, missing HOME, glob building, commit scope with Windows-style relative paths; there is no Windows machine, so state what remains untested on real Windows."
+  ],
+  "constraints": [
+    "Follow /home/user/holyagent/.claude/CLAUDE.md (Effect with tagged errors, no try/catch/new Promise/async in runtime source, Schema at boundaries, Bun APIs and Bun Shell, JSDoc on exports).",
+    "Work only in your worktree; make no version-control writes and no edits under .git/ or .holyagent/. Run bun install --frozen-lockfile if node_modules is missing; finish with mise run build and mise run verify and report them.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When done and checked, stop and report; no unrequested features or refactors.",
+    "Do not edit the instruction files another writer owns: requirements.md, root/asking.md, root/user-messages.md, root/delegating.md, root/task-list.md, session-cloud-identity.md, root/search.md, specialist/working.md, session-reminder.md. dispatch.md is yours."
+  ],
+  "criteria": [
+    {
+      "text": "Hooks and the documented CLI invocation run without a POSIX shell, with the Windows hook behavior sourced",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Each handoff path item is fixed or shown already correct, with tests that fail without the fix",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "macOS and Linux behavior is unchanged and mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "install/windows-install.ps1 exists and the docs describe native Windows",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Changes stay inside the ownership paths",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file",
+    "sources-read"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli",
+    "packages/runtime/src/vcs",
+    "packages/runtime/src/state",
+    "packages/runtime/src/domain",
+    "packages/runtime/tests",
+    "packages/runtime/src/instructions/claude-5.5/root/dispatch.md",
+    "packages/cli",
+    "packages/integrations/claude/src",
+    "packages/integrations/claude/build.ts",
+    "docs",
+    "install",
+    "mise.toml",
+    "lefthook.yml",
+    "scripts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T17:39:54.690Z"
+  },
+  "createdAt": "2026-10-27T17:39:54.690Z"
+}
