@@ -6,7 +6,7 @@ Commits and PR text read as the user wrote them: the author and committer are th
 
 `holyagent vcs` has two commands. Everything else a change needs is plain Git and `gh`: branches, pushes, merges, CI (`gh pr checks <n> --watch`).
 
-An earlier design also detected how to commit and then committed through GitHub's API as the credential owner, read the first commit back, and wrapped pushing, branching and CI watching in commands of their own. All of that is gone: it needed a GraphQL endpoint that is blocked in some hosted sessions, signed or unsigned commits depending on the session, and a cache to explain it. Commits are now plain `git commit` with the repository's own identity and hooks, which also keeps Intent state versioned in Git like any other file.
+An earlier design also detected how to commit and then committed through GitHub's API as the credential owner, read the first commit back, and wrapped pushing, branching and CI watching in commands of their own. All of that is gone: it needed a GraphQL endpoint that is blocked in some hosted sessions, signed or unsigned commits depending on the session, and a cache to explain it. Commits are now plain `git commit` with the repository's own identity and hooks, while Intent state is committed by the holyagent commands on its own state branch.
 
 ## What `vcs commit` does
 
@@ -15,7 +15,7 @@ holyagent vcs commit -m <headline> [-m <body>] -- <paths…>
 ```
 
 - Refuses an identity that looks like an agent's (`noreply@anthropic.com`, or a name starting with `Claude`) with `AgentIdentity`: set the user's own with `git config user.name <name>` and `git config user.email <email>` in the repository.
-- Stages exactly the named paths plus the changed Intent state of the worktree it runs in, so state rides the work commit and never gets a commit of its own. The state is the folder of the Intent in use; in a linked worktree, where no Intent is in use yet, it is the whole `.holyagent/intents` folder of that worktree. If something else is already staged the command refuses (`StagedOutsideScope`), and with nothing changed it refuses (`NothingToCommit`).
+- Stages exactly the named paths and refuses any path under `.holyagent/`: Intent state is committed on the state branch by the holyagent commands, never on a work branch. If something else is already staged the command refuses (`StagedOutsideScope`), and with nothing changed it refuses (`NothingToCommit`).
 - Cleans and checks the message (below), then runs `git commit`, so the repository's own hooks run, a `commit-msg` hook included.
 
 `holyagent vcs pr --base <b> --title <t> [--body-file <f>] [--update <n>]` opens a ready-for-review PR from the current branch, or updates one with `--update <n>`, through the REST API of `gh`; the body comes from a file inside the project that git does not ignore (at most 256 KiB, never under `.git`).

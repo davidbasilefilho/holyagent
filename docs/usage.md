@@ -56,7 +56,7 @@ Restart Claude Code after installing so the plugin and Billion Context's native 
 
 `attribution` is written as an object (`commit`, `pr`, `sessionUrl`), the form earlier Claude Code versions also read; the shorter `attribution: false` needs 2.1.281 or later.
 
-The project state lives in `.holyagent/` at the git top level, created by the first `intent create`. It is versioned with the project and travels in the same commits as the work (see [decisions.md](decisions.md)); everything under `.holyagent/local/` is per clone and ignored by git. `.holyagent/config.json` holds optional project settings (`vcs.allowWords`; an old `vcs.api` is still read and ignored).
+The project state is a `.holyagent/` folder created by the first `intent create`. It lives on its own branch, `holyagent/state`, in one worktree shared by every worktree of the clone, so work branches never carry it; the root pushes that branch with the work (see [decisions.md](decisions.md)). Everything under `.holyagent/local/` is per clone and ignored by git. `.holyagent/config.json` holds optional project settings (`vcs.allowWords`; an old `vcs.api` is still read and ignored).
 
 ## Migrate legacy state
 

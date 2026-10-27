@@ -8,7 +8,7 @@ The contributing rules are in `.claude/CLAUDE.md`; this page explains the layout
 packages/
   runtime/                      shared by every harness
     src/domain/                 Intents, Assignments, routes, readiness, plan, warm-reuse directive
-    src/state/                  records under .holyagent/, the lock, per-clone local state
+    src/state/                  records under .holyagent/, the state branch and its worktree, the lock, per-clone local state
     src/cli/                    the runtime CLI: intent, assignment, plan, status, reconcile, hook
     src/vcs/                    the vcs commands (commit, pr)
     src/instructions/
