@@ -2,6 +2,7 @@
   "name": "@holyagent/claude",
   "version": "0.1.2-3",
   "description": "The holyagent integration for Claude Code.",
+  "license": "Apache-2.0",
   "type": "module",
   "dependencies": {
     "@holyagent/runtime": "workspace:*"

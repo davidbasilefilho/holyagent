@@ -54,6 +54,7 @@ const manifests = (): ReadonlyArray<GeneratedFile> => [
       version: packageJson.version,
       description: DESCRIPTION,
       author: { name: "davidbasilefilho" },
+      license: "Apache-2.0",
       dependencies: DEPENDENCIES,
     }),
   },

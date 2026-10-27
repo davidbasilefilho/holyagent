@@ -2,6 +2,7 @@
   "name": "holyagent",
   "version": "0.1.2-3",
   "private": true,
+  "license": "Apache-2.0",
   "workspaces": [
     "packages/*",
     "packages/integrations/*"
