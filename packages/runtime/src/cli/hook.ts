@@ -12,6 +12,7 @@ import { readOpenState, updateState } from "../state/store.ts"
 import { resolveState } from "../state/tree.ts"
 import { MessageRefused } from "../vcs/errors.ts"
 import { gitMaybe } from "../vcs/git.ts"
+import { inCloudSession } from "../vcs/identity.ts"
 import { cleanMessage, forbiddenPhrases } from "../vcs/message.ts"
 import { readSettings } from "../vcs/settings.ts"
 import { recordLaunch } from "./assignment.ts"
@@ -21,6 +22,7 @@ import { resumeOf, statusOf } from "./overview.ts"
 import { dispatchedAssignment } from "./report.ts"
 import {
   bareContext,
+  CLOUD_IDENTITY,
   type IntentRequirements,
   legacyContext,
   ROOT_TAKEOVER,
@@ -194,7 +196,7 @@ const INLINE_INPUTS: ReadonlySet<string> = new Set(["script", "args"])
 export const HOOK_COMMANDS: ReadonlyArray<Command> = [
   hook(
     "session-start",
-    "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread), always ending with a short block of the root rules most often missed; for a project with no .holyagent and a .holyclaude or .holycodex folder that holds state to convert, a notice naming the folder and `holyagent migrate`, with the same rules; for a project with none of the three, the core root rules with that line and the reminder when the holyagent agent is not the main thread, otherwise nothing",
+    "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread, and in a claude.ai cloud session, `CLAUDE_CODE_REMOTE=true`, the steps that set the commit author to the user), always ending with a short block of the root rules most often missed; for a project with no .holyagent and a .holyclaude or .holycodex folder that holds state to convert, a notice naming the folder and `holyagent migrate`, with the same rules; for a project with none of the three, the core root rules with that line and the reminder when the holyagent agent is not the main thread, otherwise nothing",
     (payload, call) =>
       Effect.gen(function* () {
         const pluginRoot = call.env.CLAUDE_PLUGIN_ROOT
@@ -205,16 +207,21 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
           : [ROOT_CORE, ROOT_TAKEOVER]
               .join("\n\n")
               .replaceAll("${CLAUDE_PLUGIN_ROOT}", pluginRoot ?? "${CLAUDE_PLUGIN_ROOT}")
+        // How the commit author is set matters only where git's committer is the platform's.
+        const cloud = inCloudSession(call.env) ? CLOUD_IDENTITY : undefined
         if (!(yield* hasStateFolder(call.directory))) {
           const found = yield* legacyFoldersWithState(call.root)
           // Nothing to show or convert: only a main thread that lacks the root rules gets them.
           if (found.length === 0)
             return core === undefined
               ? NOTHING
-              : output({ hookEventName: "SessionStart", additionalContext: bareContext(core) })
+              : output({
+                  hookEventName: "SessionStart",
+                  additionalContext: bareContext(core, cloud),
+                })
           return output({
             hookEventName: "SessionStart",
-            additionalContext: legacyContext(found, core),
+            additionalContext: legacyContext(found, core, cloud),
           })
         }
         const { status, reconcile } = RESUMED.has(payload.source)
@@ -227,6 +234,7 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
             core,
             reconcile,
             RESUMED.has(payload.source) ? yield* requirementsOf(call.directory) : undefined,
+            cloud,
           ),
         })
       }),

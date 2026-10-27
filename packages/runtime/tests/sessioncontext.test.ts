@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
 import {
+  bareContext,
+  CLOUD_IDENTITY,
   CONTEXT_BUDGET,
   legacyContext,
   ROOT_TAKEOVER,
@@ -321,5 +323,32 @@ describe("the takeover line and the legacy context", () => {
     expect(text.endsWith(`\n\n${SESSION_REMINDER}`)).toBe(true)
     expect(text.length).toBeLessThanOrEqual(CONTEXT_BUDGET)
     expect(legacyContext([".holycodex"])).not.toContain("You are the root.")
+  })
+})
+
+describe("the cloud identity text", () => {
+  test("names the get_me and identity steps and the Claude committer, and sits between the core and the state", () => {
+    for (const part of [
+      "get_me",
+      "holyagent vcs identity --name",
+      "users.noreply.github.com",
+      "committer",
+    ])
+      expect(CLOUD_IDENTITY).toContain(part)
+    const text = sessionContext({ intents: [] }, ROOT_CORE, undefined, undefined, CLOUD_IDENTITY)
+    expect(text.indexOf(CLOUD_IDENTITY)).toBeGreaterThan(text.indexOf(ROOT_CORE))
+    expect(text.indexOf(CLOUD_IDENTITY)).toBeLessThan(text.indexOf("holyagent status:"))
+    expect(text.endsWith(`\n\n${SESSION_REMINDER}`)).toBe(true)
+    expect(sessionContext({ intents: [] }, ROOT_CORE)).not.toContain("get_me")
+  })
+
+  test("counts against the budget and is carried by the legacy and bare contexts", () => {
+    expect(
+      sessionContext(bigStatus(500, 500), ROOT_CORE, undefined, undefined, CLOUD_IDENTITY).length,
+    ).toBeLessThanOrEqual(CONTEXT_BUDGET)
+    expect(legacyContext([".holyclaude"], ROOT_CORE, CLOUD_IDENTITY)).toContain(CLOUD_IDENTITY)
+    expect(legacyContext([".holyclaude"], ROOT_CORE)).not.toContain(CLOUD_IDENTITY)
+    expect(bareContext(ROOT_CORE, CLOUD_IDENTITY)).toContain(CLOUD_IDENTITY)
+    expect(bareContext(ROOT_CORE)).not.toContain(CLOUD_IDENTITY)
   })
 })

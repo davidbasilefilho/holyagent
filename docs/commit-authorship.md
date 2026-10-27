@@ -1,10 +1,10 @@
 # Commit authorship
 
-Commits and PR text read as the user wrote them: the author and committer are the user's own configured Git identity, and nothing in the text names an agent. The history describes the change, not the process that made it, and the owner is accountable for it. An audit of the predecessor plugin found nearly all of about 397 commits and every observed PR body carrying `Co-Authored-By`, `Claude-Session` and "Generated with" lines, because the harness injects the trailer rule and nothing in the project overrode it. `holyagent vcs commit`, `holyagent vcs pr` and the `commit-msg` hook below are the fix; the root never writes `git commit -m` by hand.
+Commits and PR text read as the user wrote them: commits use the configured Git identity, the author is never an agent, and nothing in the text names an agent. The one exception is the committer of a claude.ai cloud session, which stays Claude so that branch commits are Verified (see [Cloud sessions](#cloud-sessions)). The history describes the change, not the process that made it, and the owner is accountable for it. An audit of the predecessor plugin found nearly all of about 397 commits and every observed PR body carrying `Co-Authored-By`, `Claude-Session` and "Generated with" lines, because the harness injects the trailer rule and nothing in the project overrode it. `holyagent vcs commit`, `holyagent vcs pr` and the `commit-msg` hook below are the fix; the root never writes `git commit -m` by hand.
 
 ## The `vcs` commands
 
-`holyagent vcs` has two commands. Everything else a change needs is plain Git and `gh`: branches, pushes, merges, CI (`gh pr checks <n> --watch`).
+`holyagent vcs` has three commands: `commit`, `pr` and `identity` (for cloud sessions). Everything else a change needs is plain Git and `gh`: branches, pushes, merges, CI (`gh pr checks <n> --watch`).
 
 An earlier design also detected how to commit and then committed through GitHub's API as the credential owner, read the first commit back, and wrapped pushing, branching and CI watching in commands of their own. All of that is gone: it needed a GraphQL endpoint that is blocked in some hosted sessions, signed or unsigned commits depending on the session, and a cache to explain it. Commits are now plain `git commit` with the repository's own identity and hooks, while Intent state is committed by the holyagent commands on its own state branch.
 
@@ -14,11 +14,22 @@ An earlier design also detected how to commit and then committed through GitHub'
 holyagent vcs commit -m <headline> [-m <body>] -- <paths…>
 ```
 
-- Refuses an identity that looks like an agent's (`noreply@anthropic.com`, or a name starting with `Claude`) with `AgentIdentity`: set the user's own with `git config user.name <name>` and `git config user.email <email>` in the repository.
+- Refuses an identity that looks like an agent's (`noreply@anthropic.com`, or a name starting with `Claude`) with `AgentIdentity`: set the user's own with `git config user.name <name>` and `git config user.email <email>` in the repository. In a claude.ai cloud session it checks the author instead (below).
 - Stages exactly the named paths and refuses any path under `.holyagent/`: Intent state is committed on the state branch by the holyagent commands, never on a work branch. If something else is already staged the command refuses (`StagedOutsideScope`), and with nothing changed it refuses (`NothingToCommit`).
 - Cleans and checks the message (below), then runs `git commit`, so the repository's own hooks run, a `commit-msg` hook included.
 
 `holyagent vcs pr --base <b> --title <t> [--body-file <f>] [--update <n>]` opens a ready-for-review PR from the current branch, or updates one with `--update <n>`, through the REST API of `gh`; the body comes from a file inside the project that git does not ignore (at most 256 KiB, never under `.git`).
+
+## Cloud sessions
+
+A claude.ai cloud session (`CLAUDE_CODE_REMOTE=true`) configures git with `user.name` Claude, `user.email` `noreply@anthropic.com` and an SSH signature that GitHub verifies for that committer. Probed in October 2026: a commit with the user as author and Claude as committer showed as Verified, while the user as both author and committer was `unknown_key`. So the committer stays Claude, and only the author is set to the user:
+
+1. The session-start hook adds the steps to the context, in a cloud session only. Locally nothing about them is in the context or the root rules.
+2. The root calls the GitHub connector's `get_me` (`mcp__github__get_me`) and runs `holyagent vcs identity --name <name> --email <id>+<login>@users.noreply.github.com`, with the name from `get_me` (the login when it has none) and the noreply address built from its id and login, since `get_me` returns no email.
+3. `vcs identity` writes `author.name` and `author.email` to the clone's local git config (`.git/config`, shared by its worktrees), which git uses for the author without touching the committer. No value goes into a file of the repository, so the user's name and address are never committed or tracked. It refuses an identity that looks like an agent's, an email that is not an address, and a name with angle brackets or control characters.
+4. `vcs commit` in a cloud session requires an author that git resolves (`GIT_AUTHOR_*`, else `author.*`, else `user.*`) and that does not look like an agent's, and leaves the committer alone. A missing or agent-looking author is refused with `CloudAuthor` (exit 3), whose hint names the `get_me` and `vcs identity` steps. Outside a cloud session the check on `user.name` and `user.email` above is unchanged.
+
+The no-attribution rule covers the author and the commit text; the Claude committer of a cloud session is its documented exception. The `commit-msg` hook, the message cleaning and the committer's signature are unaffected.
 
 ## Message cleaning and refusal
 
