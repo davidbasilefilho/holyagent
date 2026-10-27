@@ -1,0 +1,60 @@
+{
+  "id": "assignment-0mvr4zzku-siut",
+  "intentId": "intent-0mvr4zvnq-k1q1",
+  "intentRevision": 1,
+  "roleTask": "Explorer.trace",
+  "slug": "map-what-packages-cli-setup-claude-and",
+  "objective": "Map what packages/cli `setup claude` and `doctor` do, end to end, and how they would move into the Claude plugin runtime, so the root can plan the move and identify parts incompatible with Claude plugins or claude.ai.",
+  "state": "Ready",
+  "scope": [
+    "Repository worktree: C:/Users/david.basile/dev/holyagent-feat-plugin-only-install (read-only)",
+    "packages/cli/** (src and tests)",
+    "packages/runtime/** CLI command registration and how scripts/holyagent.js is built (packages/integrations/claude/build.ts, src)",
+    "packages/integrations/claude/src hooks and hooks.json generation; docs/hooks.md bounds",
+    "Billion Context plugin installed under C:/Users/david.basile/.claude/plugins/cache/billion-context (its bili-setup command/skill: how it is defined and how it runs a script)",
+    "README.md, docs/usage.md, docs/requirements.md, docs/components.md, mise.toml, install/*, scripts/*, package.json workspaces, tests referring to packages/cli"
+  ],
+  "constraints": [
+    "Read-only: no edits, no version-control writes, nothing under .git/ or .holyagent/.",
+    "Report facts with file:line paths; mark inference as inference."
+  ],
+  "criteria": [
+    {
+      "text": "Lists each step of `setup claude` and `doctor` (what it installs or writes, which commands it shells out to, which settings keys and values, the +/=/~/! report line format, --dry-run and --fix handling, idempotence, error isolation) with file:line",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Explains how a new subcommand is added to the plugin runtime (packages/runtime command table, help text, build into dist/scripts/holyagent.js) and which dependencies packages/cli uses that the runtime lacks",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Describes how Billion Context's /billion-context:bili-setup is defined (command vs skill file, frontmatter, how it invokes its script) and the plugin layout to mirror for /holyagent:setup",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "States the SessionStart hook bounds from docs/hooks.md (time, output size, side effects) and where the existing session-start hook lives",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Lists every reference to packages/cli or `holyagent setup claude` across the repo (docs, README, mise, tests, package.json, bun.lock, tsconfig, lefthook, scripts) with paths",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Lists each setup/doctor behavior that may not work from a Claude plugin or in a claude.ai cloud session (e.g. global npm installs, PATH assumptions, project-level files, interactive steps), with the reason",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-10-27T20:27:26.814Z"
+}
