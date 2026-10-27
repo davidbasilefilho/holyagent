@@ -9,7 +9,7 @@ packages/
   runtime/                      shared by every harness
     src/domain/                 Intents, Assignments, routes, readiness, plan, warm-reuse directive
     src/state/                  records under .holyagent/, the state branch and its worktree, the lock, per-clone local state
-    src/cli/                    the runtime CLI: intent, assignment, plan, status, reconcile, hook
+    src/cli/                    the runtime CLI: intent, assignment, plan, status, reconcile, hook, setup, doctor
     src/vcs/                    the vcs commands (commit, pr)
     src/instructions/
       claude-5.5/               root/, specialist/, roles/<role>/ (one file per section), root-core.ts, skills/
@@ -19,9 +19,8 @@ packages/
     vendor/frontend-design/     Anthropic's skill text and license, kept byte for byte; the visual roles embed it
     tests/
     dist/                       generated: the built plugin (.claude-plugin/, settings.json, agents/, skills/, hooks/, scripts/)
-  cli/                          the public CLI: setup, doctor
 .claude-plugin/marketplace.json generated; the marketplace entry for the plugin
-install/wsl-install.sh          development environment installer (WSL Ubuntu)
+install/wsl-install.sh          prerequisites installer (WSL Ubuntu): Bun, Node LTS, git, gh, mise
 install/windows-install.ps1     the same for native Windows (PowerShell)
 docs/                           these pages; docs/pi holds the Pi research
 mise.toml  bunfig.toml  lefthook.yml
@@ -54,7 +53,7 @@ Done means `mise run verify` passes; after changing plugin sources, run `mise ru
 Everything is configured in `bunfig.toml`. Bun's own `check`, `lint` and `fmt` are the tools (`eslint-plugin-jsdoc` runs inside `bun lint`); the repository adds none beside them.
 
 - **Type-aware lint with type-check and zero warnings** (`typeAware`, `typeCheck`, `maxWarnings = 0`). The `correctness` category is an error. `consistent-type-imports`, `no-floating-promises` and `no-misused-promises` catch errors the type-checker accepts, such as a dropped promise.
-- **Effect enforcement.** In `packages/runtime/src` and `packages/cli/src` the lint forbids `async` and `await`, `new Promise`, `try`/`catch` and `Promise` statics. Failures there are tagged Effect errors and effects are composed with Effect; `Effect.runPromise` is for integration boundaries only. One error model keeps failures typed and visible in signatures, and keeps the runtime's behavior testable without exceptions. The plugin generator (`packages/integrations/claude`) is outside the override and uses plain async code.
+- **Effect enforcement.** In `packages/runtime/src` the lint forbids `async` and `await`, `new Promise`, `try`/`catch` and `Promise` statics. Failures there are tagged Effect errors and effects are composed with Effect; `Effect.runPromise` is for integration boundaries only. One error model keeps failures typed and visible in signatures, and keeps the runtime's behavior testable without exceptions. The plugin generator (`packages/integrations/claude`) is outside the override and uses plain async code.
 - **JSDoc on the public API.** `jsdoc/require-jsdoc` covers exported functions, classes, methods, interfaces, type aliases, enums and exported variables, and the formatter keeps JSDoc tidy (`jsdoc = true`). Skills open their description with the situation, so a model can tell when to load them.
 - **Formatting.** No semicolons, 100 columns, `sortImports` and `sortPackageJson` so imports and `package.json` keys have one order and diffs carry no reordering noise. `bracketSameLine` keeps the closing `>` of a multi-line tag on its last attribute line. The maintainer requested these three options; the repository has no JSX yet, so `bracketSameLine` only fixes the style for later UI code.
 

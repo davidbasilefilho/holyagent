@@ -75,9 +75,9 @@ This repository wires it that way in `lefthook.yml`, through the built bundle in
 
 The rule that commits go through `holyagent vcs commit` is instruction text, not a guard: the root's and the specialists' texts state it, a `SubagentStart` hook restates it to every specialist at its start, and a `PreToolUse` hook on the Bash tool adds a one-line reminder to a command that mentions `git` and then `commit` or `push`. No hook denies or rewrites a command, so a raw `git commit` still runs; its message gets the `commit-msg` hook above where that is installed. [hooks.md](hooks.md) has the details and the reason is in [decisions.md](decisions.md).
 
-## Settings that `holyagent setup claude` writes
+## Settings that `holyagent setup` writes
 
-`attribution.commit` and `attribution.pr` as empty strings, `attribution.sessionUrl` as `false` and `includeGitInstructions` as `false` (see [usage.md](usage.md)). They stop Claude Code adding its trailer, its PR line and the session link, and remove its built-in commit and PR instructions from the context. They apply to commits made by Claude Code itself; `vcs commit` and the hook clean the text either way.
+`attribution.commit` and `attribution.pr` as empty strings, `attribution.sessionUrl` as `false` and `includeGitInstructions` as `false`, in your user settings (see [usage.md](usage.md#user-settings)). They stop Claude Code adding its trailer, its PR line and the session link, and remove its built-in commit and PR instructions from the context. They apply to commits made by Claude Code itself; `vcs commit` and the hook clean the text either way.
 
 ## What the plugin cannot remove
 

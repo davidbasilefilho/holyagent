@@ -20,7 +20,7 @@ correctness = "error"
 # async functions and try/catch are out. Adapters at the integration boundary get a path
 # override below once they exist.
 [[lint.overrides]]
-files = ["packages/runtime/src/**", "packages/cli/src/**"]
+files = ["packages/runtime/src/**"]
 
 [lint.overrides.rules]
 "oxc/no-async-await" = "error"

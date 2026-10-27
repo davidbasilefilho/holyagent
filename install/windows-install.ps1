@@ -1,22 +1,21 @@
-# Sets up the HolyAgent development environment on native Windows (no WSL, no Git Bash needed to run
-# the plugin). It mirrors install/wsl-install.sh step for step.
+# Installs the prerequisites of HolyAgent on native Windows (no WSL, no Git Bash needed to run the
+# plugin): git, Bun, Node LTS, gh and mise. HolyAgent itself installs as a Claude Code plugin; the
+# script ends by printing those commands. It mirrors install/wsl-install.sh step for step.
 #
 # Usage: powershell -ExecutionPolicy Bypass -File install\windows-install.ps1
 #        (takes no arguments; works in Windows PowerShell 5.1 and PowerShell 7)
 #
 # Every step checks its own result first, so a re-run changes nothing that is already right. The
-# script touches only your user profile (mise, Bun globals, Claude Code settings, your PowerShell
-# profile and your user PATH) and installs missing programs with winget. Run it as your own user, in
-# a normal (not elevated) window.
+# script touches only your user profile (mise and the tools it manages, your PowerShell profile and
+# your user PATH) and installs missing programs with winget. Run it as your own user, in a normal
+# (not elevated) window.
 #
 # What you are opting into:
-# - Billion Context routes all Claude Code traffic through a local proxy (127.0.0.1:18787), turns
-#   off Claude Code's auto-compact, and auto-updates itself from npm by default.
-# - `ctx7 setup` downloads a skill and a rule from Context7's servers into ~\.claude.
-# - Bun runs a canary build (`bun upgrade --canary`), because the toolchain needs `bun lint`,
-#   `bun fmt` and `bun check`.
 # - Your PowerShell profile gains two lines (a one-time copy is kept next to it as
-#   <profile>.pre-holyagent), and your user PATH gains Bun's global bin directory.
+#   <profile>.pre-holyagent), and your user PATH gains Bun's global bin directory, where
+#   `holyagent setup` puts Billion Context and ctx7.
+# - Bun and Node LTS are installed globally through mise. Bun stays a stable build; developing this
+#   repository needs a canary build, which `mise install` in the checkout upgrades to.
 #
 # Not covered, because it is not tested on a real Windows machine: see docs/requirements.md.
 Set-StrictMode -Version Latest
@@ -38,7 +37,7 @@ if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator))
   exit 1
 }
 
-$script:TotalSteps = 8
+$script:TotalSteps = 6
 $script:StepNumber = 0
 $script:CurrentStep = 'startup'
 
@@ -52,20 +51,14 @@ function Note([string]$Text) { Write-Host "    $Text" }
 function Warn([string]$Text) { Write-Warning $Text }
 function Have([string]$Name) { return [bool](Get-Command $Name -ErrorAction SilentlyContinue) }
 
-# Runs a native command and fails the step when it exits non-zero, so no error is silent. The message
-# redacts the value after --api-key, because it is printed by the error handler and may reach logs.
+# Runs a native command and fails the step when it exits non-zero, so no error is silent.
 function Invoke-Native {
   param([Parameter(Mandatory)][string]$File, [Parameter(ValueFromRemainingArguments)][string[]]$Arguments)
   $Arguments = @($Arguments)
   $ErrorActionPreference = 'Continue'
   & $File @Arguments
   $code = $LASTEXITCODE
-  $shown = for ($i = 0; $i -lt $Arguments.Count; $i++) {
-    if ($Arguments[$i] -like '--api-key=*') { '--api-key=<redacted>' }
-    elseif ($i -gt 0 -and $Arguments[$i - 1] -eq '--api-key') { '<redacted>' }
-    else { $Arguments[$i] }
-  }
-  if ($code -ne 0) { throw "$File $(@($shown) -join ' ') exited $code" }
+  if ($code -ne 0) { throw "$File $($Arguments -join ' ') exited $code" }
 }
 
 # Runs a native command whose failure is an answer, not an error, and returns its exit code and output
@@ -104,12 +97,10 @@ Set-Location $HOME
 
 $BunInstall = if ($env:BUN_INSTALL) { $env:BUN_INSTALL } else { Join-Path $HOME '.bun' }
 $env:BUN_INSTALL = $BunInstall
-$ClaudeDir = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $HOME '.claude' }
-$ClaudeJson = Join-Path $(if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { $HOME }) '.claude.json'
 $Mise = $null
 
-# Puts the tools mise has selected globally (node, bun) and Bun's global bin directory (claude, bili,
-# ctx7) ahead of the rest of PATH for the remaining steps.
+# Puts the tools mise has selected globally (node, bun) and Bun's global bin directory ahead of the
+# rest of PATH for the remaining steps.
 function Update-SessionPath {
   $paths = @()
   if ($script:Mise) {
@@ -165,17 +156,6 @@ function Add-UserPath([string]$Folder) {
   Note "added to your user PATH: $Folder"
 }
 
-# Installs a Bun global package unless its command is already on PATH, then prints the version.
-function Install-BunGlobal([string]$CommandName, [string]$Package) {
-  if (Have $CommandName) {
-    Note "$CommandName already installed"
-  } else {
-    Invoke-Native bun add -g $Package
-    Update-SessionPath
-  }
-  Note "$CommandName $(Get-FirstLine $CommandName --version)"
-}
-
 # Installs a program with winget unless the command is already available.
 function Install-WithWinget([string]$CommandName, [string]$Id) {
   if (Have $CommandName) { Note "$CommandName already installed: $(Get-FirstLine $CommandName --version)"; return }
@@ -187,15 +167,13 @@ function Install-WithWinget([string]$CommandName, [string]$Id) {
   $env:Path = ([Environment]::GetEnvironmentVariable('Path', 'Machine'), [Environment]::GetEnvironmentVariable('Path', 'User'), $env:Path) -join ';'
 }
 
-function Test-Canary { $revision = Get-FirstLine bun --revision; return ($revision -and $revision -match 'canary') }
-
 try {
   # ---------------------------------------------------------------------------------------------
   Step 'Prerequisites (platform, winget, git)'
 
   Note "Windows $([Environment]::OSVersion.Version), PowerShell $($PSVersionTable.PSVersion)"
   if (-not (Have winget)) {
-    Warn 'winget was not found; programs this script needs (git, mise) must then be installed by hand'
+    Warn 'winget was not found; programs this script needs (git, mise, gh) must then be installed by hand'
   }
   Install-WithWinget git 'Git.Git'
 
@@ -235,125 +213,18 @@ try {
   }
 
   # ---------------------------------------------------------------------------------------------
-  Step 'Bun (canary)'
+  Step "Bun (the plugin's hooks run it)"
 
-  # The toolchain needs `bun lint`, `bun fmt` and `bun check`, which exist only in canary builds. mise
-  # cannot install bun@canary, so it installs a stable Bun and `bun upgrade --canary` replaces the
-  # binary in place. A later `mise upgrade bun` that installs a new stable brings stable back, so the
-  # canary check below runs on every invocation, like the repo's `toolchain` task.
-  if ((Invoke-Probe $Mise @('where', 'bun')).ExitCode -ne 0) { Invoke-Native $Mise use -g bun }
+  # A stable Bun is enough to run the plugin. Developing this repository needs a canary build for
+  # `bun check`, `bun lint` and `bun fmt`; `mise install` in the checkout upgrades it.
+  if ((Invoke-Probe $Mise @('where', 'bun')).ExitCode -eq 0) { Note 'bun already selected globally' } else { Invoke-Native $Mise use -g bun }
   Update-SessionPath
-  if (Test-Canary) {
-    Note "bun is already canary: $(Get-FirstLine bun --revision)"
-  } else {
-    # A `--smol` in BUN_OPTIONS makes `bun upgrade` fail ("does not take package names").
-    $savedOptions = $env:BUN_OPTIONS
-    Remove-Item Env:BUN_OPTIONS -ErrorAction SilentlyContinue
-    try { Invoke-Native bun upgrade --canary } finally { if ($savedOptions) { $env:BUN_OPTIONS = $savedOptions } }
-  }
-  if (-not (Test-Canary)) { throw 'bun is not a canary build after upgrade' }
   Note "bun $(Get-FirstLine bun --revision)"
 
   # ---------------------------------------------------------------------------------------------
-  Step 'Claude Code (via Bun)'
+  Step 'GitHub CLI (gh)'
 
-  # Anthropic's setup page (https://code.claude.com/docs/en/setup) documents the native installer,
-  # WinGet, Homebrew and `npm install -g @anthropic-ai/claude-code`; it does not mention Bun.
-  # Installing the same npm package with Bun works but is not an officially documented method, and
-  # its auto-update behavior is undocumented. `claude doctor` reports the install type.
-  Install-BunGlobal claude '@anthropic-ai/claude-code'
-
-  # ---------------------------------------------------------------------------------------------
-  Step 'Billion Context (via Bun) with Claude Code native mode'
-
-  # Billion Context (https://github.com/ranxianglei/billion-context) documents npm only; Bun works
-  # and the bins run on Node.
-  Install-BunGlobal bili billion-context
-
-  # Native mode merges a proxy base URL, a SessionStart hook and an MCP server into the Claude Code
-  # settings and sets DISABLE_AUTO_COMPACT=1: bili owns compression, so Claude Code's auto-compact
-  # stays off (manual /compact still works). Every re-run of the command writes another settings
-  # backup, so it runs only when one of its artifacts is missing.
-  function Test-BiliNativeReady {
-    $settings = Join-Path $ClaudeDir 'settings.json'
-    return (Test-Path $settings) -and
-      (Select-String -Path $settings -Pattern 'claude-native-bootstrap' -SimpleMatch -Quiet) -and
-      (Test-Path (Join-Path $ClaudeDir 'commands\acp-cache.md')) -and
-      (Test-Path $ClaudeJson) -and
-      (Select-String -Path $ClaudeJson -Pattern '"bili"' -SimpleMatch -Quiet)
-  }
-  if (Test-BiliNativeReady) {
-    Note 'Claude Code native mode already configured'
-  } else {
-    Invoke-Native bili plugin install claude
-  }
-
-  # compress.rules protects persistent reminders (rules text) from being folded. It is set only when
-  # the key is absent, so a value the user chose and every other key stay untouched. The Node script
-  # goes to node on stdin, never through a file another process could replace, because PowerShell 5.1
-  # mangles double quotes in native command arguments.
-  $xdg = if ($env:XDG_CONFIG_HOME) { $env:XDG_CONFIG_HOME } else { Join-Path $HOME '.config' }
-  $env:BILI_CONFIG = if ($env:BILI_CONFIG_FILE) { $env:BILI_CONFIG_FILE } else { Join-Path $xdg 'billion-context\billion-context.json' }
-  $configScript = @'
-const fs = require("node:fs")
-const path = require("node:path")
-const file = process.env.BILI_CONFIG
-const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value)
-const refuse = (message) => {
-  console.error("    error: " + message)
-  process.exit(1)
-}
-let config = {}
-if (fs.existsSync(file)) {
-  try {
-    config = JSON.parse(fs.readFileSync(file, "utf8"))
-  } catch (error) {
-    refuse(file + " is not valid JSON (" + error.message + "); fix or remove it, then re-run")
-  }
-  if (!isObject(config)) refuse(file + " must contain a JSON object; fix it, then re-run")
-}
-const compress = config.compress ?? {}
-if (!isObject(compress)) refuse("compress in " + file + " is not an object; fix it, then re-run")
-if (compress.rules !== undefined) {
-  console.log("    compress.rules already set (" + compress.rules + ") in " + file)
-  process.exit(0)
-}
-config.compress = { ...compress, rules: true }
-const directory = path.dirname(file)
-fs.mkdirSync(directory, { recursive: true })
-const temporary = path.join(directory, "." + path.basename(file) + "." + process.pid + ".tmp")
-fs.writeFileSync(temporary, JSON.stringify(config, null, 2) + "\n", { mode: 0o600 })
-fs.renameSync(temporary, file)
-console.log("    set compress.rules=true in " + file)
-'@
-  $ErrorActionPreference = 'Continue'
-  $configScript | & node -
-  $configExit = $LASTEXITCODE
-  $ErrorActionPreference = 'Stop'
-  if ($configExit -ne 0) { throw "the Billion Context config step exited $configExit" }
-
-  # ---------------------------------------------------------------------------------------------
-  Step 'ctx7 (Context7 CLI via Bun) and its Claude Code skill'
-
-  # ctx7 needs Node >= 22.13, checked in the Node step.
-  Install-BunGlobal ctx7 ctx7
-
-  # `ctx7 setup --cli --claude` downloads the find-docs skill and a rule file for Claude Code. The
-  # hosted setup needs a login or an API key; without either, --yes starts a browser device flow
-  # that blocks a script, so the step is skipped with a hint instead. ctx7 reads CONTEXT7_API_KEY
-  # during setup only for --base-url deployments, so the key goes on the command line, visible in
-  # the process list for the seconds the command runs.
-  $ctx7Ready = (Test-Path (Join-Path $ClaudeDir 'skills\find-docs\SKILL.md')) -and (Test-Path (Join-Path $ClaudeDir 'rules\context7.md'))
-  if ($ctx7Ready) {
-    Note 'Context7 skill and rule already installed'
-  } elseif ($env:CONTEXT7_API_KEY) {
-    Invoke-Native ctx7 setup --cli --claude --yes --api-key $env:CONTEXT7_API_KEY
-  } elseif (Test-Path (Join-Path $HOME '.config\context7\credentials.json')) {
-    Invoke-Native ctx7 setup --cli --claude --yes
-  } else {
-    Warn 'Context7 skill not installed: no login or API key found.'
-    Warn "run 'ctx7 login', or set CONTEXT7_API_KEY (for example: `$env:CONTEXT7_API_KEY = Read-Host 'key'), then re-run this script"
-  }
+  Install-WithWinget gh 'GitHub.cli'
 
   # ---------------------------------------------------------------------------------------------
   Step 'Verification'
@@ -366,16 +237,27 @@ console.log("    set compress.rules=true in " + file)
   Test-Tool 'mise' $Mise @('--version')
   Test-Tool 'node' 'node' @('--version')
   Test-Tool 'bun' 'bun' @('--revision')
-  Test-Tool 'claude' 'claude' @('--version')
-  Test-Tool 'bili' 'bili' @('--version')
-  Test-Tool 'ctx7' 'ctx7' @('--version')
-  if ((Have bun) -and -not (Test-Canary)) {
-    [Console]::Error.WriteLine('    bun is not a canary build')
-    $failed += 'bun-canary'
-  }
+  Test-Tool 'git' 'git' @('--version')
+  Test-Tool 'gh' 'gh' @('--version')
   if ($failed.Count -gt 0) { throw "verification failed for: $($failed -join ' ')" }
 
-  Write-Host 'Done. Open a new PowerShell window so PATH picks up mise and Bun.'
+  if ((Invoke-Probe 'gh' @('auth', 'status')).ExitCode -ne 0) {
+    Warn 'gh is not authenticated; run: gh auth login (or set GH_TOKEN)'
+  }
+  if (-not (Have claude)) {
+    Warn 'Claude Code is not installed; see https://code.claude.com/docs/en/setup'
+  }
+
+  Write-Host ''
+  Write-Host 'Done. Open a new PowerShell window so PATH picks up mise and Bun, then install HolyAgent with'
+  Write-Host 'these three commands:'
+  Write-Host ''
+  Write-Host '  claude plugin marketplace add davidbasilefilho/holyagent'
+  Write-Host '  claude plugin marketplace add ranxianglei/billion-context'
+  Write-Host '  claude plugin install holyagent@holyagent'
+  Write-Host ''
+  Write-Host 'On the first launch, run /holyagent:setup to install Billion Context and ctx7 and to configure'
+  Write-Host 'Claude Code.'
 } catch {
   [Console]::Error.WriteLine("error: step failed: $($script:CurrentStep) ($($_.Exception.Message)). Fix the cause and re-run; finished steps are skipped.")
   exit 1

@@ -8,7 +8,7 @@ HolyAgent ships today as a Claude Code plugin. The shared runtime underneath is 
 
 ## How do I install it?
 
-You need Claude Code 2.1.295 or later (the highest minimum the plugin documents, see [Claude Code version](docs/requirements.md#claude-code-version)), [Bun](https://bun.sh), Node.js LTS (20 or later, 22.13 or later for ctx7), `git` and an authenticated `gh`. The full list is in [docs/requirements.md](docs/requirements.md). From a shell:
+You need Claude Code 2.1.295 or later (the highest minimum the plugin documents, see [Claude Code version](docs/requirements.md#claude-code-version)), [Bun](https://bun.sh) on your `PATH` (the plugin's hooks run it), Node.js LTS (22.13 or later), `git` and an authenticated `gh`. On a clean WSL Ubuntu or native Windows machine, `install/wsl-install.sh` and `install/windows-install.ps1` install everything except Claude Code ([docs/usage.md](docs/usage.md#install)). The full list is in [docs/requirements.md](docs/requirements.md). Then, from a shell:
 
 ```sh
 claude plugin marketplace add davidbasilefilho/holyagent
@@ -16,15 +16,7 @@ claude plugin marketplace add ranxianglei/billion-context
 claude plugin install holyagent@holyagent
 ```
 
-The plugin requires `billion-context` and `exa`, so add the Billion Context marketplace first, as above, and restart Claude Code afterwards. The same steps as slash commands are in [docs/usage.md](docs/usage.md#install).
-
-This route installs only the plugins. To also set up Billion Context, ctx7 and the project settings in one go, run the public CLI from a checkout, after `bun install` there. `setup claude` adds the marketplaces, installs the plugin and configures the directory it runs in (or the one passed with `--dir <path>`):
-
-```sh
-bun packages/cli/src/index.ts setup claude
-```
-
-Add `--dry-run` to see what it would change, and run `bun packages/cli/src/index.ts doctor` to check the result. On a clean WSL Ubuntu, `bash install/wsl-install.sh` prepares the whole environment first; run it as your own user, not through sudo, and pass it no arguments. On native Windows, run `powershell -ExecutionPolicy Bypass -File install\windows-install.ps1` in a normal (not elevated) window instead. The details and options are in [docs/usage.md](docs/usage.md), and the status of the other environments (T3 Code, the desktop app, claude.ai) is in [docs/requirements.md](docs/requirements.md#supported-environments).
+The plugin requires `billion-context` and `exa`, so add the Billion Context marketplace first, as above, and restart Claude Code afterwards. On the first launch, run `/holyagent:setup` once to install Billion Context and ctx7 and to configure Claude Code. The same steps as slash commands, the details and `holyagent doctor` are in [docs/usage.md](docs/usage.md#install), and the status of the other environments (T3 Code, the desktop app, claude.ai) is in [docs/requirements.md](docs/requirements.md#supported-environments).
 
 ## Why HolyAgent?
 

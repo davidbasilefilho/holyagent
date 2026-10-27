@@ -1,19 +1,18 @@
 #!/usr/bin/env bash
-# Sets up the HolyAgent development environment on a clean WSL Ubuntu install.
+# Installs the prerequisites of HolyAgent on a clean WSL Ubuntu install: git, Bun, Node LTS, gh and
+# mise. HolyAgent itself installs as a Claude Code plugin; the script ends by printing those commands.
 #
 # Usage: bash install/wsl-install.sh
 #
 # Every step checks its own result first, so a re-run changes nothing that is already right. The
-# script touches only $HOME (mise, Bun globals, Claude Code settings, ~/.bashrc) and runs sudo
-# only to install missing apt packages. Run it as your own user, not through sudo.
+# script touches only $HOME (mise and the tools it manages, ~/.bashrc) and runs sudo only to install
+# missing apt packages. Run it as your own user, not through sudo.
 #
 # What you are opting into:
-# - Billion Context routes all Claude Code traffic through a local proxy (127.0.0.1:18787), turns
-#   off Claude Code's auto-compact, and auto-updates itself from npm by default.
-# - `ctx7 setup` downloads a skill and a rule from Context7's servers into ~/.claude.
-# - Bun runs a canary build (`bun upgrade --canary`), because the toolchain needs `bun lint`,
-#   `bun fmt` and `bun check`.
-# - ~/.bashrc gains two lines (a one-time copy is kept as ~/.bashrc.pre-holyagent).
+# - ~/.bashrc gains two lines (a one-time copy is kept as ~/.bashrc.pre-holyagent): Bun's global bin
+#   directory on PATH, where `holyagent setup` puts Billion Context and ctx7, and mise's activation.
+# - Bun, Node LTS and gh are installed globally through mise. Bun stays a stable build; developing
+#   this repository needs a canary build, which `mise install` in the checkout upgrades to.
 set -Eeuo pipefail
 
 if [[ $# -gt 0 ]]; then
@@ -26,7 +25,7 @@ if [[ $EUID -eq 0 && -n "${SUDO_USER:-}" ]]; then
   exit 1
 fi
 
-TOTAL_STEPS=8
+TOTAL_STEPS=6
 CURRENT_STEP="startup"
 STEP_NUMBER=0
 MISE_INSTALLER=""
@@ -54,11 +53,9 @@ cd "$HOME"
 MISE="${MISE_INSTALL_PATH:-$HOME/.local/bin/mise}"
 export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
 BASHRC="$HOME/.bashrc"
-CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-CLAUDE_JSON="${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json"
 
-# Puts the tools mise has selected globally (node, bun) and Bun's global bin directory (claude,
-# bili, ctx7) ahead of the rest of PATH for the remaining steps.
+# Puts the tools mise has selected globally (node, bun, gh) and Bun's global bin directory ahead of
+# the rest of PATH for the remaining steps.
 refresh_path() {
   local dir mise_paths=""
   while IFS= read -r dir; do
@@ -85,20 +82,18 @@ ensure_bashrc_line() {
   note "added to ${BASHRC}: ${line}"
 }
 
-# Installs a Bun global package unless its command is already on PATH, then prints the version.
-install_bun_global() {
-  local command_name=$1 package=$2
-  if have "$command_name"; then
-    note "${command_name} already installed"
+# Selects a tool globally through mise unless mise already has a version of it.
+ensure_mise_tool() {
+  local tool=$1 spec=$2
+  if "$MISE" where "$tool" >/dev/null 2>&1; then
+    note "${tool} already selected globally"
   else
-    bun add -g "$package"
-    refresh_path
+    "$MISE" use -g "$spec"
   fi
-  note "${command_name} $("$command_name" --version 2>&1 | head -n 1)"
 }
 
 # ---------------------------------------------------------------------------------------------
-step "Prerequisites (platform, apt packages)"
+step "Prerequisites (platform, apt packages, git)"
 
 if grep -qiE 'microsoft|wsl' /proc/version 2>/dev/null || [[ -n "${WSL_DISTRO_NAME:-}" ]]; then
   note "WSL detected (${WSL_DISTRO_NAME:-unnamed distro})"
@@ -116,7 +111,7 @@ fi
 
 if have apt-get && have dpkg-query; then
   missing=()
-  for pkg in curl git ca-certificates unzip build-essential; do
+  for pkg in curl git ca-certificates unzip; do
     if ! dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q 'install ok installed'; then
       missing+=("$pkg")
     fi
@@ -139,7 +134,7 @@ if have apt-get && have dpkg-query; then
   fi
 else
   warn "apt-get not found; checking for the commands only"
-  for cmd in curl git unzip make gcc; do
+  for cmd in curl git unzip; do
     have "$cmd" || { echo "error: '${cmd}' is required and apt-get is unavailable to install it" >&2; exit 1; }
   done
 fi
@@ -170,11 +165,7 @@ ensure_bashrc_line '^[[:space:]]*eval .*mise.* activate bash' "$mise_line"
 # ---------------------------------------------------------------------------------------------
 step "Node.js LTS (Billion Context and ctx7 run on Node)"
 
-if "$MISE" where node >/dev/null 2>&1; then
-  note "node already selected globally"
-else
-  "$MISE" use -g node@lts
-fi
+ensure_mise_tool node node@lts
 refresh_path
 note "node $(node --version)"
 # ctx7 requires Node >= 22.13; an older global node chosen earlier would fail later and obscurely.
@@ -184,117 +175,20 @@ if ! node -e 'const [major, minor] = process.versions.node.split(".").map(Number
 fi
 
 # ---------------------------------------------------------------------------------------------
-step "Bun (canary)"
+step "Bun (the plugin's hooks run it)"
 
-# The toolchain needs `bun lint`, `bun fmt` and `bun check`, which exist only in canary builds.
-# mise cannot install bun@canary, so it installs a stable Bun and `bun upgrade --canary` replaces
-# the binary in place. A later `mise upgrade bun` that installs a new stable brings stable back,
-# so the canary check below runs on every invocation, like the repo's `toolchain` task.
-if ! "$MISE" where bun >/dev/null 2>&1; then
-  "$MISE" use -g bun
-fi
+# A stable Bun is enough to run the plugin. Developing this repository needs a canary build for
+# `bun check`, `bun lint` and `bun fmt`; `mise install` in the checkout upgrades it.
+ensure_mise_tool bun bun
 refresh_path
-if bun --revision | grep -q canary; then
-  note "bun is already canary: $(bun --revision)"
-else
-  # A `--smol` in BUN_OPTIONS makes `bun upgrade` fail ("does not take package names").
-  env -u BUN_OPTIONS bun upgrade --canary
-fi
-bun --revision | grep -q canary || { echo "error: bun is not a canary build after upgrade" >&2; exit 1; }
 note "bun $(bun --revision)"
 
 # ---------------------------------------------------------------------------------------------
-step "Claude Code (via Bun)"
+step "GitHub CLI (gh)"
 
-# Anthropic's setup page (https://code.claude.com/docs/en/setup) documents the native installer,
-# Homebrew, WinGet, apt/dnf/apk and `npm install -g @anthropic-ai/claude-code`; it does not mention
-# Bun. Installing the same npm package with Bun works but is not an officially documented method,
-# and its auto-update behavior is undocumented. `claude doctor` reports the install type.
-install_bun_global claude @anthropic-ai/claude-code
-
-# ---------------------------------------------------------------------------------------------
-step "Billion Context (via Bun) with Claude Code native mode"
-
-# Billion Context (https://github.com/ranxianglei/billion-context) documents npm only; Bun works
-# and the bins run on Node through their shebang.
-install_bun_global bili billion-context
-
-# Native mode merges a proxy base URL, a SessionStart hook and an MCP server into the Claude Code
-# settings and sets DISABLE_AUTO_COMPACT=1: bili owns compression, so Claude Code's auto-compact
-# stays off (manual /compact still works). Every re-run of the command writes another settings
-# backup, so it runs only when one of its artifacts is missing.
-bili_native_ready() {
-  grep -q 'claude-native-bootstrap' "$CLAUDE_DIR/settings.json" 2>/dev/null &&
-    [[ -f "$CLAUDE_DIR/commands/acp-cache.md" ]] &&
-    grep -q '"bili"' "$CLAUDE_JSON" 2>/dev/null
-}
-if bili_native_ready; then
-  note "Claude Code native mode already configured"
-else
-  bili plugin install claude
-fi
-
-# compress.rules protects persistent reminders (rules text) from being folded. It is set only when
-# the key is absent, so a value the user chose and every other key stay untouched.
-bili_config="${BILI_CONFIG_FILE:-${XDG_CONFIG_HOME:-$HOME/.config}/billion-context/billion-context.json}"
-BILI_CONFIG="$bili_config" node -e '
-  const fs = require("node:fs")
-  const path = require("node:path")
-  const file = process.env.BILI_CONFIG
-  const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value)
-  const refuse = (message) => {
-    console.error("    error: " + message)
-    process.exit(1)
-  }
-  let config = {}
-  if (fs.existsSync(file)) {
-    try {
-      config = JSON.parse(fs.readFileSync(file, "utf8"))
-    } catch (error) {
-      refuse(file + " is not valid JSON (" + error.message + "); fix or remove it, then re-run")
-    }
-    if (!isObject(config)) refuse(file + " must contain a JSON object; fix it, then re-run")
-  }
-  const compress = config.compress ?? {}
-  if (!isObject(compress)) refuse("compress in " + file + " is not an object; fix it, then re-run")
-  if (compress.rules !== undefined) {
-    console.log("    compress.rules already set (" + compress.rules + ") in " + file)
-    process.exit(0)
-  }
-  config.compress = { ...compress, rules: true }
-  const directory = path.dirname(file)
-  fs.mkdirSync(directory, { recursive: true })
-  const temporary = path.join(directory, "." + path.basename(file) + "." + process.pid + ".tmp")
-  fs.writeFileSync(temporary, JSON.stringify(config, null, 2) + "\n", { mode: 0o600 })
-  fs.renameSync(temporary, file)
-  console.log("    set compress.rules=true in " + file)
-'
-
-# ---------------------------------------------------------------------------------------------
-step "ctx7 (Context7 CLI via Bun) and its Claude Code skill"
-
-# ctx7 needs Node >= 22.13, checked in the Node step.
-install_bun_global ctx7 ctx7
-
-# `ctx7 setup --cli --claude` downloads the find-docs skill and a rule file for Claude Code. The
-# hosted setup needs a login or an API key; without either, --yes starts a browser device flow
-# that blocks a script, so the step is skipped with a hint instead. ctx7 0.8.2 reads
-# CONTEXT7_API_KEY during setup only for --base-url deployments (tested: with the variable set and
-# no login, hosted setup waited for the device flow), so the key has to go on the command line,
-# visible in the process list for the seconds the command runs.
-ctx7_ready() {
-  [[ -f "$CLAUDE_DIR/skills/find-docs/SKILL.md" && -f "$CLAUDE_DIR/rules/context7.md" ]]
-}
-if ctx7_ready; then
-  note "Context7 skill and rule already installed"
-elif [[ -n "${CONTEXT7_API_KEY:-}" ]]; then
-  ctx7 setup --cli --claude --yes --api-key "$CONTEXT7_API_KEY"
-elif [[ -f "$HOME/.config/context7/credentials.json" ]]; then
-  ctx7 setup --cli --claude --yes
-else
-  warn "Context7 skill not installed: no login or API key found."
-  warn "run 'ctx7 login', or export CONTEXT7_API_KEY (for example: read -rs CONTEXT7_API_KEY; export CONTEXT7_API_KEY), then re-run this script"
-fi
+ensure_mise_tool gh gh
+refresh_path
+note "gh $(gh --version | head -n 1)"
 
 # ---------------------------------------------------------------------------------------------
 step "Verification"
@@ -314,18 +208,30 @@ verify() {
 verify mise "$MISE" --version
 verify node node --version
 verify bun bun --revision
-verify claude claude --version
-verify bili bili --version
-verify ctx7 ctx7 --version
-
-if have bun && ! bun --revision | grep -q canary; then
-  echo "    bun is not a canary build" >&2
-  failed+=("bun-canary")
-fi
+verify git git --version
+verify gh gh --version
 
 if [[ ${#failed[@]} -gt 0 ]]; then
   echo "error: verification failed for: ${failed[*]}" >&2
   exit 1
 fi
 
-echo "Done. Open a new shell (or run: source ~/.bashrc) so PATH picks up mise and Bun."
+if ! gh auth status >/dev/null 2>&1; then
+  warn "gh is not authenticated; run: gh auth login (or export GH_TOKEN)"
+fi
+if ! have claude; then
+  warn "Claude Code is not installed; see https://code.claude.com/docs/en/setup"
+fi
+
+cat <<'EOF'
+
+Done. Open a new shell (or run: source ~/.bashrc) so PATH picks up mise and Bun, then install
+HolyAgent with these three commands:
+
+  claude plugin marketplace add davidbasilefilho/holyagent
+  claude plugin marketplace add ranxianglei/billion-context
+  claude plugin install holyagent@holyagent
+
+On the first launch, run /holyagent:setup to install Billion Context and ctx7 and to configure
+Claude Code.
+EOF
