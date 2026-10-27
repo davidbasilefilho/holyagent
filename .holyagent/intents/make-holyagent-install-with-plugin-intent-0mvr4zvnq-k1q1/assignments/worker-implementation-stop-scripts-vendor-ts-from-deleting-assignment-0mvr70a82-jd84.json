@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "stop-scripts-vendor-ts-from-deleting",
   "objective": "Stop scripts/vendor.ts from deleting every vendored ripgrep and fd file on Windows, so `mise run build` and the pre-commit hook work there.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-fix-state-off-main (branch fix/state-off-main).",
     "Known cause and reproduction: in scripts/vendor.ts the cleanup loop `for await (const file of new Bun.Glob(\"**/*\").scan({ cwd: directory, onlyFiles: true })) if (!expected.has(file)) await rm(join(directory, file))` compares Glob results with expectedFiles(), which use forward slashes. On Windows Bun.Glob yields backslash paths, so no file matches and every vendored file is removed; vendorProblems then reports each file missing. Reproduce with `bun scripts/vendor.ts` on Windows after `git restore packages/integrations/claude/dist/scripts/vendor`: it deletes the files and exits 1. Check other path comparisons in scripts/vendor.ts for the same separator issue."
@@ -48,5 +48,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T21:23:40.725Z"
+  },
   "createdAt": "2026-10-27T21:23:39.842Z"
 }
