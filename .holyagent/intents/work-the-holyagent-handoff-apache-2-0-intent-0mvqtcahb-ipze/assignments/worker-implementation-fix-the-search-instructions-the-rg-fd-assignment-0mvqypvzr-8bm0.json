@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mvqypvzr-8bm0",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "fix-the-search-instructions-the-rg-fd",
+  "objective": "Fix the search instructions the rg/fd review flagged, so agents always have a working search and get correct results.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-rgfd (head 79b4f61). Review: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-assignment-0mvqyg5c6-348e.txt, notes 1, 3 and 4.",
+    "(1) In packages/runtime/src/instructions/claude-5.5/root/search.md and specialist/working.md (and the matching requirements.md line), say that when holyagent rg or fd fails with UnsupportedPlatform the agent uses the system rg, fd, grep or find. (4) Tell agents to always pass the search path explicitly (for example '.'), because rg with an open stdin and no path searches stdin. (3) Move search.md after workflows.md in the root section order (packages/integrations/claude/src/agents.ts section list) so the workflow rules do not fall under the Searching heading. Rebuild with mise run build and run mise run verify."
+  ],
+  "constraints": [
+    "Follow /home/user/holyagent/.claude/CLAUDE.md.",
+    "Work only in that worktree; make no version-control writes and no edits under .git/ or .holyagent/.",
+    "Keep the text calm and short; no unrequested changes. When done and checked, stop and report."
+  ],
+  "criteria": [
+    {
+      "text": "Both instruction files carry the fallback and the explicit path rule, and search.md follows workflows.md in the generated root prompt",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify passes in the worktree",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/integrations/claude"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvqxh7l8-hxl9",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T17:31:37.912Z"
+  },
+  "createdAt": "2026-10-27T17:31:37.912Z"
+}
