@@ -16,9 +16,10 @@
     "Failure 7: after continue, plan returned action: workflow for both Assignments and the root ended the turn without starting it; no work ran until the user complained twice. Rule: workflows run all new work; choosing this agent is the opt-in to the Workflow tool.",
     "Failure 8: the root launched with parallel([...]) instead of pipeline(). Rule: run Assignments through pipeline(), which has no barrier; parallel() only where a stage needs every earlier result.",
     "Failure 9: the root saved assignment dispatch output to files, printed it into context and retyped it by hand into the script as .join(newline) string arrays. Rule: pass that text as it is. Trigger: no direct route from the dispatch output to the inline script, so the root improvised one; give it a direct route.",
-    "User decision: no PreToolUse guard hook restricting the root Bash to holyagent, git and gh (the user disagrees: easy to bypass). The root already lacks Write and Edit. Name the loophole in the rule text itself (e.g. transcribing user-provided text to a file is still writing a file; delegate it)."
+    "User decision: no PreToolUse guard hook restricting the root Bash to holyagent, git and gh (the user disagrees: easy to bypass). The root already lacks Write and Edit. Name the loophole in the rule text itself (e.g. transcribing user-provided text to a file is still writing a file; delegate it).",
+    "User direction: no hooks. Levers are behavior only: (1) rule text that names the tempting exceptions (transcribing pasted content, handoff notes, scratch files and just prep all count as writing and get delegated); (2) make delegating cheaper than doing it yourself, e.g. a one-step CLI route from content or dispatch output to a running specialist, so the correct path is the path of least resistance. Removing Write and Edit does not help since Bash writes remain. The user asks for a better fix if one exists."
   ],
-  "revision": 2,
+  "revision": 3,
   "state": "Open",
   "createdAt": "2026-10-27T20:34:04.901Z"
 }
