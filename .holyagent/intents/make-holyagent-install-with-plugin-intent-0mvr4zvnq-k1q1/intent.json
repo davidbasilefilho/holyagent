@@ -14,7 +14,9 @@
     "Anything not compatible with claude.ai or Claude plugins is adapted or dropped depending on the situation; ask the user when that is the case.",
     "Decision (user): drop the plugin-registration step from setup and doctor (no claude plugin marketplace add/install/list); the README plugin commands do that job.",
     "Decision (user): drop the Bun canary check and upgrade from the plugin doctor; doctor checks bun is on PATH, and doctor --fix runs the missing setup steps (bili, ctx7, user settings) instead of upgrading Bun.",
-    "Decision (user): in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) the SessionStart check says nothing and holyagent setup skips bili and ctx7 with a `-` line explaining why, while still merging the user-settings keys."
+    "Decision (user): in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) the SessionStart check says nothing and holyagent setup skips bili and ctx7 with a `-` line explaining why, while still merging the user-settings keys.",
+    "Decision (user): the one commit deleting .holyagent/ from main is a plain git commit (vcs commit refuses .holyagent paths); every other commit uses holyagent vcs commit.",
+    "Default: stack is PR1 fix/state-off-main (state removal, .gitignore, path-length and no-state test) on main, then PR2 feat/plugin-only-install on PR1."
   ],
   "revision": 2,
   "state": "Open",
