@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mvqyg5c6-348e",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-bundled-ripgrep-and-fd-change",
+  "objective": "Review the bundled ripgrep and fd change (a5575f1..79b4f61 on ccr-046ad103-6qsvgx-rgfd) for correctness and regressions.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-rgfd (node_modules installed, mise available). Diff without dist and .holyagent: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/rgfd-full.diff. The binaries live in packages/integrations/claude/dist/scripts/vendor (24 MB).",
+    "Intent: rg 15.2.0 and fd 10.5.0 bundled for darwin-arm64, linux-x64, windows-x64, pinned by SHA-256 and checked at build time; holyagent rg/fd run the current platform's binary; agents with Bash must use them (Grep and Glob disallowed there), agents without Bash keep Grep and Glob."
+  ],
+  "constraints": [
+    "Read-only: write no repository files; make no version-control writes."
+  ],
+  "criteria": [
+    {
+      "text": "Findings are ranked blocking or non-blocking with file:line and a failure scenario, covering platform selection, exit codes and stdio, Windows paths, the build-time check and the agent tool lists",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Tests are judged for whether they fail without the change",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvqxh7l8-hxl9",
+    "assignment-0mvqych36-xjqu"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T17:24:03.462Z"
+  },
+  "createdAt": "2026-10-27T17:24:03.462Z"
+}
