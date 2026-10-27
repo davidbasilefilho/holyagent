@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mvr0ofkj-nlqj",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Worker.mechanical",
+  "slug": "fix-the-two-small-installer-defects-the",
+  "objective": "Fix the two small installer defects the Windows re-reviews found: the profile-line regex matching indented comments and curly single quotes in profile paths.",
+  "state": "Running",
+  "scope": [
+    "File /home/user/holyagent-windows/install/windows-install.ps1 (head f106ac2).",
+    "(1) Line ~218: anchor the mise activation regex so indented commented lines do not match, using ^\\s*[^#\\s] before the rest of the pattern, and check the BUN_INSTALL regex the same way. Prove it with a bun one-liner over: \"(& mise activate pwsh)\" (match), \"  # (& mise activate pwsh)\" (no match), \"\\t#mise activate pwsh\" (no match), \"# (& mise activate pwsh)\" (no match).",
+    "(2) ConvertTo-SingleQuoted (~line 95): also double the curly single quotes U+2018, U+2019, U+201A and U+201B, which PowerShell treats as quote characters."
+  ],
+  "constraints": [
+    "Work only in that worktree; edit only install/windows-install.ps1; make no version-control writes and no edits under .git/ or .holyagent/.",
+    "When done, run mise run fmt:check and report; stop."
+  ],
+  "criteria": [
+    {
+      "text": "The regex probe gives the four expected results and ConvertTo-SingleQuoted doubles all five single-quote characters",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Only install/windows-install.ps1 changed and mise run fmt:check passes",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "install"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-27T18:26:29.203Z"
+  },
+  "createdAt": "2026-10-27T18:26:29.203Z"
+}
