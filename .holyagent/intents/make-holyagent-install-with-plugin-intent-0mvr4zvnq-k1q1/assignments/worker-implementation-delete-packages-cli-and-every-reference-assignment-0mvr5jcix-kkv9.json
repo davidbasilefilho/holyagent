@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "delete-packages-cli-and-every-reference",
   "objective": "Delete packages/cli and every reference to it, shrink the installers to prerequisites, rewrite the install docs so HolyAgent installs with the three plugin commands only, and record in docs/decisions.md that the future pi extension installs with plain `pi install`.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-feat-plugin-only-install (branch feat/plugin-only-install). Another specialist adds `holyagent setup` and `holyagent doctor [--fix]` to the plugin runtime and the /holyagent:setup command in parallel; packages/runtime, packages/integrations/claude, .claude-plugin/marketplace.json and docs/hooks.md are theirs, do not edit them.",
     "Known references: bun.lock (workspace packages/cli, @holyagent/cli), bunfig.toml lint glob packages/cli/src/**, scripts/bump-version.ts manifest list and scripts/bump-version.test.ts fixtures, README.md install section, docs/usage.md, docs/requirements.md, docs/components.md, docs/commit-authorship.md (section on settings setup claude writes), docs/cache-and-workflows.md, docs/README.md (Public CLI row), docs/development.md (lint override), install/wsl-install.sh, install/windows-install.ps1. Search the tree for packages/cli, setup claude and @holyagent/cli to catch the rest (outside .holyagent/)."
@@ -80,5 +80,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T21:25:31.393Z"
+  },
   "createdAt": "2026-10-27T20:42:30.057Z"
 }
