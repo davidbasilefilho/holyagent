@@ -1,0 +1,19 @@
+{
+  "id": "intent-0mvr58iqt-40ix",
+  "slug": "change-the-holyagent-root-instructions",
+  "objective": "Change the holyagent root instructions and hooks so a root never repeats the six rule breaks in the user's failure report: writing files itself, working before the Intent exists, keeping no task list silently, narrating progress, sending an empty reply, and leaving ready work unlaunched.",
+  "requirements": [
+    "User request: 'a report from a holyagent root that failed to follow the holyagent way. fix it so it never happens again!'",
+    "Failure 1: the root wrote files itself (basilismo-notes/HANDOFF.md via Bash heredocs) instead of delegating; trigger was a long pasted spec treated as prep work. Rule: edits, runs, checks go to specialists; the root's Bash is for the holyagent CLI, Git and gh.",
+    "Failure 2: the root did work before intent create and assignment create; the user's constraint ('faça para main diretamente sem prs') only reached an Intent after a correction. Rule: Intent and Assignments come first, user constraints verbatim right away.",
+    "Failure 3: TaskCreate, TaskUpdate and update_plan were missing from the session; the root kept no task list and did not tell the user. Rule: create the task list first and keep all progress in it.",
+    "Failure 4: the root narrated progress ('Preparando a especificação para os especialistas.', 'Now the content (section 10), in pieces.'). Rule: write only for decisions, blockers, acknowledgments and the final report.",
+    "Failure 5: the root answered a user message ('você não está seguindo o holyagent way') with a blank reply. Rule: acknowledge every user message.",
+    "Failure 6: after 'continue' the root created two Assignments, ran plan and ended the turn without starting the workflow, and did not return to the build task after a report was requested. Rule: start all ready independent work together and end the turn; open user objectives stay binding until done.",
+    "Observed in this session too: the holyagent CLI on Windows (Git Bash) exits 0 silently when a command reads stdin (assignment close, intent create/update with stdin), because main.ts runs Effect.runFork and Bun.stdin.text() leaves no handle keeping the event loop alive; the root silently lost a close and an intent create.",
+    "Follow .claude/CLAUDE.md and AGENTS.md: instruction changes go to requirements.md first, then every model's instruction set; per-section files; Effect, JSDoc, mise run build and mise run verify passing; Conventional Commits; worktree branch and PR."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-10-27T20:34:04.901Z"
+}
