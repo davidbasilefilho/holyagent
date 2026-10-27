@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mvqzz5pk-vnqv",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.security",
+  "slug": "assess-the-native-windows-change-f0ef15d",
+  "objective": "Assess the native Windows change (f0ef15d..daca0f9) for security problems in hooks, process spawning, path handling, config lookup and the installer.",
+  "state": "Running",
+  "scope": [
+    "Diff: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/windows.diff; sources in /home/user/holyagent-windows. Focus: hooks.json command and args (injection, env file and bunfig control), CLAUDE_CONFIG_DIR and HOME fallbacks, PATH handling in packages/cli/src/shell.ts (binary hijack through PATH order), scripts/toolchain.ts and scripts/prepare.ts, and install/windows-install.ps1 (downloads, execution policy, elevation)."
+  ],
+  "constraints": [
+    "Read-only: write no files."
+  ],
+  "criteria": [
+    {
+      "text": "Each finding traces source to sink with file:line and a severity, or absence is stated per surface",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources-read"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvqz0jb5-96fd",
+    "assignment-0mvqzlmrs-vpw9",
+    "assignment-0mvqztvnc-54e8"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T18:06:50.024Z"
+  },
+  "createdAt": "2026-10-27T18:06:50.024Z"
+}
