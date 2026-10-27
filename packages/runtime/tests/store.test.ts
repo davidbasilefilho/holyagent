@@ -10,6 +10,7 @@ import { DEFAULT_CONFIG } from "../src/domain/directive.ts"
 import { closeIntent, createIntent } from "../src/domain/intent.ts"
 import { dispatch, record } from "../src/domain/lifecycle.ts"
 import { stateDirectory } from "../src/state/layout.ts"
+import { WorkTree } from "../src/state/local.ts"
 import { loadOpenProject, readState, updateState } from "../src/state/store.ts"
 import { NOW } from "./fixtures.ts"
 
@@ -36,6 +37,10 @@ const draft: AssignmentDraft = {
   independentFrom: [],
 }
 
+/** Runs against the temporary project as its work tree, which keeps the Intent in use. */
+const inWorkTree = <A, E>(effect: Effect.Effect<A, E>) =>
+  effect.pipe(Effect.provideService(WorkTree, root))
+
 const seed = () =>
   updateState(directory, () =>
     Effect.gen(function* () {
@@ -57,7 +62,7 @@ const seed = () =>
         activeIntent: "intent-aaa",
       }
     }),
-  )
+  ).pipe(Effect.provideService(WorkTree, root))
 
 const assignmentPathOf =
   "intents/parse-everything-intent-aaa/assignments/worker-implementation-build-the-parser-assignment-bbb.json"
@@ -87,10 +92,15 @@ describe("state store", () => {
 
   test("records round-trip and live at readable, versioned paths", async () => {
     await Effect.runPromise(seed())
-    const state = await Effect.runPromise(readState(directory))
+    const state = await Effect.runPromise(inWorkTree(readState(directory)))
     expect(state.project.intents).toHaveLength(1)
     expect(state.project.assignments[0]).toMatchObject({ id: "assignment-bbb", state: "Ready" })
     expect(state.activeIntent).toBe("intent-aaa")
+    // Another work tree of the clone has made no choice of its own.
+    const other = await Effect.runPromise(
+      readState(directory).pipe(Effect.provideService(WorkTree, `${root}-other`)),
+    )
+    expect(other.activeIntent).toBeUndefined()
     expect(await files(directory)).toContain("intents/parse-everything-intent-aaa/intent.json")
     expect(await files(directory)).toContain(
       "intents/parse-everything-intent-aaa/assignments/worker-implementation-build-the-parser-assignment-bbb.json",
@@ -117,7 +127,10 @@ describe("state store", () => {
   test("the local folder ignores itself on first use and holds the unversioned files", async () => {
     await Effect.runPromise(seed())
     expect(await Bun.file(join(directory, "local/.gitignore")).text()).toBe("*\n")
-    expect(await files(join(directory, "local"))).toEqual([".gitignore", "active-intent.json"])
+    const local = await files(join(directory, "local"))
+    expect(local).toHaveLength(3)
+    expect(local.slice(0, 2)).toEqual([".gitignore", "active-intent"])
+    expect(local[2]).toMatch(/^active-intent\/[0-9a-f]{16}\.json$/)
   })
 
   test("dispatch and record persist the Running Assignment and the specialist registry", async () => {

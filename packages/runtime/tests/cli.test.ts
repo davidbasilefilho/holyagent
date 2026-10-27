@@ -949,7 +949,7 @@ describe("Intent in use", () => {
     expect(data(await cli(["intent", "show"]))).toMatchObject({ id: second })
 
     // A fresh clone has the Intents but no pointer to one of them.
-    await rm(join(project, ".holyagent", "local", "active-intent.json"))
+    await rm(join(project, ".holyagent", "local", "active-intent"), { recursive: true })
     const refused = await cli(["assignment", "list"])
     expect(refused.code).toBe(2)
     expect(refused.stderr).toContain("error: NoActiveIntent:")

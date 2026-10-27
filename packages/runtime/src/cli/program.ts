@@ -5,6 +5,7 @@ import { Cause, Effect } from "effect"
 
 import packageJson from "../../package.json" with { type: "json" }
 import { STATE_DIRECTORY } from "../state/layout.ts"
+import { WorkTree } from "../state/local.ts"
 import { updateState } from "../state/store.ts"
 import { resolveState } from "../state/tree.ts"
 import { vcsLive } from "../vcs/live.ts"
@@ -120,7 +121,9 @@ const execute = (given: ReadonlyArray<string>, host: Host) =>
       })
     const emitted: Array<string> = []
     const emit = host.emit ?? ((text: string) => Effect.sync(() => void emitted.push(text)))
-    const output = yield* command.run(yield* callFor(args, host, emit, command))
+    const call = yield* callFor(args, host, emit, command)
+    // The Intent in use is kept per work tree: every read and write of the run resolves it from here.
+    const output = yield* command.run(call).pipe(Effect.provideService(WorkTree, call.root))
     if (output instanceof Verbatim) return output
     if (output instanceof Streamed)
       return { stdout: emitted.join(""), stderr: "", code: output.code }

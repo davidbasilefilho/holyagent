@@ -1,8 +1,9 @@
-import { Effect, Schema } from "effect"
+import { Context, Effect, Schema } from "effect"
 
 import { IntentId } from "../domain/ids.ts"
 import { Text } from "../domain/primitives.ts"
 import { type Registry, SpecialistEntry } from "../domain/specialists.ts"
+import { StateIo } from "./errors.ts"
 import { commitFile, encodeJson, type File, io, readJson } from "./files.ts"
 import { localFile } from "./layout.ts"
 
@@ -11,6 +12,24 @@ import { localFile } from "./layout.ts"
 
 const ActiveIntentFile = Schema.Struct({ intentId: IntentId })
 const SpecialistsFile = Schema.Struct({ specialists: Schema.Array(SpecialistEntry) })
+
+/**
+ * The top-level folder of the work tree a command runs in. The Intent in use is kept per work tree,
+ * so sessions in different work trees of one clone never switch each other's Intent, while all
+ * other state stays shared. It is a reference so the reads and writes of one command all see the
+ * same work tree without every caller passing it; the CLI sets it for the run of a command, and
+ * without it no Intent is in use.
+ */
+export const WorkTree = Context.Reference<string | undefined>("holyagent/state/WorkTree", {
+  defaultValue: () => undefined,
+})
+
+/** The file that holds the Intent in use of a work tree, named by a hash of the work tree's path. */
+const activeIntentFile = (directory: string, workTree: string): string =>
+  localFile(
+    directory,
+    `active-intent/${new Bun.CryptoHasher("sha1").update(workTree).digest("hex").slice(0, 16)}.json`,
+  )
 
 /** What this clone knows of its version control, for the CLI to fill in. */
 export const Vcs = Schema.Struct({
@@ -28,7 +47,10 @@ export type Vcs = typeof Vcs.Type
 
 /** The per-clone state. */
 export interface Local {
-  /** The Intent this clone works on; it may have closed or gone since. */
+  /**
+   * The Intent the calling work tree works on, absent when it made no choice; it may have closed or
+   * gone since.
+   */
   readonly activeIntent?: string
   readonly specialists: Registry
   readonly vcs: Vcs
@@ -45,10 +67,17 @@ export const ensureLocalDirectory = (directory: string) => {
   )
 }
 
-/** Reads the per-clone state; a file that was never written reads as empty. */
+/**
+ * Reads the per-clone state, with the Intent in use of the current {@link WorkTree}; a file that was
+ * never written reads as empty.
+ */
 export const readLocal = (directory: string) =>
   Effect.gen(function* () {
-    const active = yield* readJson(ActiveIntentFile, localFile(directory, "active-intent.json"))
+    const workTree = yield* WorkTree
+    const active =
+      workTree === undefined
+        ? undefined
+        : yield* readJson(ActiveIntentFile, activeIntentFile(directory, workTree))
     const specialists = yield* readJson(SpecialistsFile, localFile(directory, "specialists.json"))
     const vcs = yield* readJson(Vcs, localFile(directory, "vcs.json"))
     return {
@@ -58,7 +87,10 @@ export const readLocal = (directory: string) =>
     } satisfies Local
   })
 
-/** What to change in the per-clone state; an absent field stays as it is. */
+/**
+ * What to change in the per-clone state; an absent field stays as it is. The Intent in use is set
+ * for the current {@link WorkTree}.
+ */
 export interface LocalChange {
   readonly activeIntent?: string
   readonly specialists?: Registry
@@ -69,11 +101,18 @@ export interface LocalChange {
 export const encodeLocal = (directory: string, change: LocalChange) =>
   Effect.gen(function* () {
     const files: Array<File> = []
-    if (change.activeIntent !== undefined)
+    if (change.activeIntent !== undefined) {
+      const workTree = yield* WorkTree
+      if (workTree === undefined)
+        return yield* new StateIo({
+          path: directory,
+          cause: "No work tree to keep the Intent in use for",
+        })
       files.push({
-        path: localFile(directory, "active-intent.json"),
+        path: activeIntentFile(directory, workTree),
         content: yield* encodeJson(ActiveIntentFile, { intentId: change.activeIntent }),
       })
+    }
     if (change.specialists !== undefined)
       files.push({
         path: localFile(directory, "specialists.json"),

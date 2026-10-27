@@ -21,23 +21,32 @@ import { byId, intentRow, intentView, oneLine, present } from "./views.ts"
 const openIntents = (snapshot: Snapshot) =>
   byId(snapshot.project.intents.filter((intent) => intent.state === "Open"))
 
-/** The id of the Intent in use, when it exists and is still open. */
-export const intentInUse = (snapshot: Snapshot): string | undefined =>
-  openIntents(snapshot).find((intent) => intent.id === snapshot.activeIntent)?.id
-
 /**
- * The Intent a command works on: the one in use, else the only open one. With none open, or several
- * open and none in use, the command fails listing the open ones, so it never guesses.
+ * The open Intent a command works on: the one this work tree put in use, else the only open one;
+ * undefined when neither holds.
  */
-export const resolveIntent = (snapshot: Snapshot): Effect.Effect<Intent, NoActiveIntent> => {
+const chosenIntent = (snapshot: Snapshot): Intent | undefined => {
   const open = openIntents(snapshot)
-  const chosen =
+  return (
     open.find((intent) => intent.id === snapshot.activeIntent) ??
     (open.length === 1 ? open[0] : undefined)
+  )
+}
+
+/** The id of the Intent in use, as {@link resolveIntent} would pick it. */
+export const intentInUse = (snapshot: Snapshot): string | undefined => chosenIntent(snapshot)?.id
+
+/**
+ * The Intent a command works on: the one in use in this work tree, else the only open one. With
+ * none open, or several open and none in use, the command fails listing the open ones, so it never
+ * guesses.
+ */
+export const resolveIntent = (snapshot: Snapshot): Effect.Effect<Intent, NoActiveIntent> => {
+  const chosen = chosenIntent(snapshot)
   return chosen === undefined
     ? Effect.fail(
         new NoActiveIntent({
-          open: open.map(({ id, objective }) => ({
+          open: openIntents(snapshot).map(({ id, objective }) => ({
             id,
             objective: oneLine(objective),
           })),
@@ -197,7 +206,7 @@ export const INTENT_COMMANDS: ReadonlyArray<Command> = [
   {
     path: ["intent", "use"],
     usage: "intent use <id>",
-    summary: "Put an open Intent in use in this clone",
+    summary: "Put an open Intent in use in this work tree",
     flags: {},
     positionals: 1,
     run: ({ update, args }) =>

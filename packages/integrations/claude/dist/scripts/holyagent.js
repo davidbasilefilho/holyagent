@@ -4125,6 +4125,7 @@ var orElseSucceed2 = orElseSucceed;
 var filter3 = filter2;
 var filterOrFail2 = filterOrFail;
 var provide3 = provide2;
+var provideService2 = provideService;
 var acquireUseRelease2 = acquireUseRelease;
 var ensuring2 = ensuring;
 var runFork2 = runFork;
@@ -9181,7 +9182,31 @@ var branchFile = (intentFolderPath, record) => join(intentFolderPath, "branches"
 var pullFile = (intentFolderPath, record) => join(intentFolderPath, "pulls", `${record.id}.json`);
 var localFile = (directory, name) => join(directory, "local", name);
 
-import { join as join3, relative } from "path";
+var identifier2 = (kind) => String4.check(isPattern2(new RegExp(`^${kind}-[a-z0-9]+(?:-[a-z0-9]+)*$`)));
+var IntentId = identifier2("intent");
+var AssignmentId = identifier2("assignment");
+var BranchId = identifier2("branch");
+var PullId = identifier2("pull");
+var AgentId = String4.check(isPattern2(/\S/));
+var newId = (kind) => gen2(function* () {
+  const time = (yield* currentTimeMillis2).toString(36).padStart(9, "0");
+  const digits = yield* forEach2([0, 1, 2, 3], () => nextIntBetween(0, 35));
+  return `${kind}-${time}-${digits.map((digit) => digit.toString(36)).join("")}`;
+});
+
+var Text = String4.check(isPattern2(/\S/));
+var Revision = Int.check(isGreaterThanOrEqualTo2(1));
+var INSTANT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?Z$/;
+var isInstant = (text) => {
+  const match = INSTANT.exec(text);
+  if (match === null || Number.isNaN(Date.parse(text)))
+    return false;
+  const [year, month, day, hour, minute, second] = match.slice(1).map(Number);
+  const date = new Date(text);
+  return date.getUTCFullYear() === year && date.getUTCMonth() + 1 === month && date.getUTCDate() === day && date.getUTCHours() === hour && date.getUTCMinutes() === minute && date.getUTCSeconds() === second;
+};
+var Timestamp = String4.check(makeFilter2((text) => isInstant(text) || "a real UTC instant such as 2026-01-02T03:04:05Z"));
+var TextList = ArraySchema(Text);
 
 class UnknownRecord extends TaggedError2("UnknownRecord") {
   get message() {
@@ -9264,18 +9289,6 @@ class SpecialistNotRecorded extends TaggedError2("SpecialistNotRecorded") {
   }
 }
 
-var identifier2 = (kind) => String4.check(isPattern2(new RegExp(`^${kind}-[a-z0-9]+(?:-[a-z0-9]+)*$`)));
-var IntentId = identifier2("intent");
-var AssignmentId = identifier2("assignment");
-var BranchId = identifier2("branch");
-var PullId = identifier2("pull");
-var AgentId = String4.check(isPattern2(/\S/));
-var newId = (kind) => gen2(function* () {
-  const time = (yield* currentTimeMillis2).toString(36).padStart(9, "0");
-  const digits = yield* forEach2([0, 1, 2, 3], () => nextIntBetween(0, 35));
-  return `${kind}-${time}-${digits.map((digit) => digit.toString(36)).join("")}`;
-});
-
 var decodeInput = (schema, input) => decodeUnknownEffect2(schema, { onExcessProperty: "error" })(input).pipe(mapError2((error) => new InvalidDraft({ message: error.message })));
 
 var UNSAFE_CHARACTERS = /[\\:*?"<>|\p{Cc}]/u;
@@ -9301,20 +9314,6 @@ var pathsOverlap = (a, b) => {
   return left === right || left.startsWith(`${right}/`) || right.startsWith(`${left}/`);
 };
 var firstOverlap = (a, b) => a.find((left) => b.some((right) => pathsOverlap(left, right)));
-
-var Text = String4.check(isPattern2(/\S/));
-var Revision = Int.check(isGreaterThanOrEqualTo2(1));
-var INSTANT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?Z$/;
-var isInstant = (text) => {
-  const match = INSTANT.exec(text);
-  if (match === null || Number.isNaN(Date.parse(text)))
-    return false;
-  const [year, month, day, hour, minute, second] = match.slice(1).map(Number);
-  const date = new Date(text);
-  return date.getUTCFullYear() === year && date.getUTCMonth() + 1 === month && date.getUTCDate() === day && date.getUTCHours() === hour && date.getUTCMinutes() === minute && date.getUTCSeconds() === second;
-};
-var Timestamp = String4.check(makeFilter2((text) => isInstant(text) || "a real UTC instant such as 2026-01-02T03:04:05Z"));
-var TextList = ArraySchema(Text);
 
 var findIntent = (project, id) => {
   const found = project.intents.find((intent) => intent.id === id);
@@ -9531,6 +9530,65 @@ var bindSpecialist = (registry, assignment, launch) => gen2(function* () {
   }));
 });
 
+var ActiveIntentFile = Struct({ intentId: IntentId });
+var SpecialistsFile = Struct({ specialists: ArraySchema(SpecialistEntry) });
+var WorkTree = Reference("holyagent/state/WorkTree", {
+  defaultValue: () => {
+    return;
+  }
+});
+var activeIntentFile = (directory, workTree) => localFile(directory, `active-intent/${new Bun.CryptoHasher("sha1").update(workTree).digest("hex").slice(0, 16)}.json`);
+var Vcs = Struct({
+  branch: optionalKey2(Text),
+  base: optionalKey2(Text),
+  pullRequest: optionalKey2(Text),
+  detection: optionalKey2(Unknown2)
+});
+var ensureLocalDirectory = (directory) => {
+  const ignore = localFile(directory, ".gitignore");
+  return io(ignore, () => Bun.file(ignore).exists()).pipe(flatMap2((exists) => exists ? void_3 : commitFile(ignore, `*
+`)));
+};
+var readLocal = (directory) => gen2(function* () {
+  const workTree = yield* WorkTree;
+  const active = workTree === undefined ? undefined : yield* readJson(ActiveIntentFile, activeIntentFile(directory, workTree));
+  const specialists = yield* readJson(SpecialistsFile, localFile(directory, "specialists.json"));
+  const vcs = yield* readJson(Vcs, localFile(directory, "vcs.json"));
+  return {
+    ...active === undefined ? {} : { activeIntent: active.intentId },
+    specialists: specialists?.specialists ?? [],
+    vcs: vcs ?? {}
+  };
+});
+var encodeLocal = (directory, change) => gen2(function* () {
+  const files = [];
+  if (change.activeIntent !== undefined) {
+    const workTree = yield* WorkTree;
+    if (workTree === undefined)
+      return yield* new StateIo({
+        path: directory,
+        cause: "No work tree to keep the Intent in use for"
+      });
+    files.push({
+      path: activeIntentFile(directory, workTree),
+      content: yield* encodeJson(ActiveIntentFile, { intentId: change.activeIntent })
+    });
+  }
+  if (change.specialists !== undefined)
+    files.push({
+      path: localFile(directory, "specialists.json"),
+      content: yield* encodeJson(SpecialistsFile, { specialists: change.specialists })
+    });
+  if (change.vcs !== undefined)
+    files.push({
+      path: localFile(directory, "vcs.json"),
+      content: yield* encodeJson(Vcs, change.vcs)
+    });
+  return files;
+});
+
+import { join as join3, relative } from "path";
+
 var IntentState = Literals(["Open", "Closed"]);
 var Intent = Struct({
   id: IntentId,
@@ -9649,49 +9707,6 @@ var pullsOf = (links, intentId) => {
   }
   return [...latest.values()].toSorted((a, b) => a.number - b.number);
 };
-
-var ActiveIntentFile = Struct({ intentId: IntentId });
-var SpecialistsFile = Struct({ specialists: ArraySchema(SpecialistEntry) });
-var Vcs = Struct({
-  branch: optionalKey2(Text),
-  base: optionalKey2(Text),
-  pullRequest: optionalKey2(Text),
-  detection: optionalKey2(Unknown2)
-});
-var ensureLocalDirectory = (directory) => {
-  const ignore = localFile(directory, ".gitignore");
-  return io(ignore, () => Bun.file(ignore).exists()).pipe(flatMap2((exists) => exists ? void_3 : commitFile(ignore, `*
-`)));
-};
-var readLocal = (directory) => gen2(function* () {
-  const active = yield* readJson(ActiveIntentFile, localFile(directory, "active-intent.json"));
-  const specialists = yield* readJson(SpecialistsFile, localFile(directory, "specialists.json"));
-  const vcs = yield* readJson(Vcs, localFile(directory, "vcs.json"));
-  return {
-    ...active === undefined ? {} : { activeIntent: active.intentId },
-    specialists: specialists?.specialists ?? [],
-    vcs: vcs ?? {}
-  };
-});
-var encodeLocal = (directory, change) => gen2(function* () {
-  const files = [];
-  if (change.activeIntent !== undefined)
-    files.push({
-      path: localFile(directory, "active-intent.json"),
-      content: yield* encodeJson(ActiveIntentFile, { intentId: change.activeIntent })
-    });
-  if (change.specialists !== undefined)
-    files.push({
-      path: localFile(directory, "specialists.json"),
-      content: yield* encodeJson(SpecialistsFile, { specialists: change.specialists })
-    });
-  if (change.vcs !== undefined)
-    files.push({
-      path: localFile(directory, "vcs.json"),
-      content: yield* encodeJson(Vcs, change.vcs)
-    });
-  return files;
-});
 
 import { mkdir, open, rm as rm2 } from "fs/promises";
 import { dirname } from "path";
@@ -9889,11 +9904,7 @@ var ensureWorktree = (top, common, env, branch, path, options) => withFileLock(j
   yield* io(ready, () => Bun.write(ready, ""));
   return { kind: "ready", path, created: true };
 }), "long");
-var LOCAL_FILES = new Set([
-  "local/active-intent.json",
-  "local/specialists.json",
-  "local/vcs.json"
-]);
+var LOCAL_FILES = new Set(["local/specialists.json", "local/vcs.json"]);
 var sameBytes = (a, b) => all2([io(a, () => Bun.file(a).bytes()), io(b, () => Bun.file(b).bytes())]).pipe(map4(([left, right]) => Buffer.from(left).equals(Buffer.from(right))));
 var fileExists = (path) => io(path, () => Bun.file(path).exists());
 var kindAt = (path) => io(path, () => lstat(path)).pipe(map4((info) => info.isSymbolicLink() ? "link" : info.isFile() ? "file" : info.isDirectory() ? "directory" : "other"), catchIf2((error) => hasCode(error.cause, "ENOENT") || hasCode(error.cause, "ENOTDIR"), () => succeed6(undefined)));
@@ -10623,12 +10634,15 @@ var readInputBy = (host, pick, inline) => gen2(function* () {
 var readInput = (host, schema, inline) => readInputBy(host, () => schema, inline);
 
 var openIntents = (snapshot) => byId(snapshot.project.intents.filter((intent) => intent.state === "Open"));
-var intentInUse = (snapshot) => openIntents(snapshot).find((intent) => intent.id === snapshot.activeIntent)?.id;
-var resolveIntent = (snapshot) => {
+var chosenIntent = (snapshot) => {
   const open = openIntents(snapshot);
-  const chosen = open.find((intent) => intent.id === snapshot.activeIntent) ?? (open.length === 1 ? open[0] : undefined);
+  return open.find((intent) => intent.id === snapshot.activeIntent) ?? (open.length === 1 ? open[0] : undefined);
+};
+var intentInUse = (snapshot) => chosenIntent(snapshot)?.id;
+var resolveIntent = (snapshot) => {
+  const chosen = chosenIntent(snapshot);
   return chosen === undefined ? fail5(new NoActiveIntent({
-    open: open.map(({ id, objective }) => ({
+    open: openIntents(snapshot).map(({ id, objective }) => ({
       id,
       objective: oneLine(objective)
     }))
@@ -10747,7 +10761,7 @@ var INTENT_COMMANDS = [
   {
     path: ["intent", "use"],
     usage: "intent use <id>",
-    summary: "Put an open Intent in use in this clone",
+    summary: "Put an open Intent in use in this work tree",
     flags: {},
     positionals: 1,
     run: ({ update, args }) => gen2(function* () {
@@ -18877,7 +18891,8 @@ var execute = (given, host) => gen2(function* () {
     });
   const emitted = [];
   const emit = host.emit ?? ((text) => sync2(() => void emitted.push(text)));
-  const output = yield* command.run(yield* callFor(args, host, emit, command));
+  const call = yield* callFor(args, host, emit, command);
+  const output = yield* command.run(call).pipe(provideService2(WorkTree, call.root));
   if (output instanceof Verbatim)
     return output;
   if (output instanceof Streamed)

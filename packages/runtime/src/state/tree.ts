@@ -351,11 +351,7 @@ interface Entry {
 }
 
 /** The per-clone files that move with the state: what the CLI keeps in `local/`. */
-const LOCAL_FILES: ReadonlySet<string> = new Set([
-  "local/active-intent.json",
-  "local/specialists.json",
-  "local/vcs.json",
-])
+const LOCAL_FILES: ReadonlySet<string> = new Set(["local/specialists.json", "local/vcs.json"])
 
 const sameBytes = (a: string, b: string) =>
   Effect.all([io(a, () => Bun.file(a).bytes()), io(b, () => Bun.file(b).bytes())]).pipe(

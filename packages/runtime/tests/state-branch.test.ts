@@ -106,6 +106,39 @@ describe("the state branch", () => {
     expect(project.assignments).toHaveLength(1)
   })
 
+  test("each worktree of a clone keeps its own Intent in use, and one with no choice resolves the only open Intent", async () => {
+    const dir = await initRepo(OWNER)
+    await seed(dir, { "a.txt": "a\n" })
+    const first = await createIntent(dir, "Ship the parser")
+    const tree = join(await scratch("holyagent-worktree-"), "tree")
+    await sh(dir, ["git", "worktree", "add", "-q", "-b", "feature", tree])
+    const idle = join(await scratch("holyagent-worktree-"), "idle")
+    await sh(dir, ["git", "worktree", "add", "-q", "-b", "idle", idle])
+    const inUse = async (where: string) => String(toon(await holy(where, ["intent", "show"])).id)
+
+    // With one Intent open, a worktree that chose nothing resolves it.
+    expect(await inUse(tree)).toBe(first)
+
+    const second = await createIntent(tree, "Ship the printer")
+    expect(await inUse(tree)).toBe(second)
+    // Creating it in the linked worktree did not switch the main checkout.
+    expect(await inUse(dir)).toBe(first)
+
+    await holy(dir, ["intent", "use", second])
+    await holy(dir, ["intent", "use", first])
+    expect(await inUse(dir)).toBe(first)
+    expect(await inUse(tree)).toBe(second)
+
+    // Two are open and the third worktree chose none, so it is told to pick.
+    const refused = await holy(idle, ["intent", "show"])
+    expect(refused.code).toBe(2)
+    expect(refused.stderr).toContain("NoActiveIntent")
+    const listed = toon(await holy(idle, ["intent", "list"])) as {
+      intents: Array<{ id: string; inUse: boolean }>
+    }
+    expect(listed.intents.every((row) => !row.inUse)).toBe(true)
+  })
+
   test("a new state branch starts at the base branch head, and the state branch name is configurable in git config", async () => {
     const dir = await initRepo(OWNER)
     const head = await seed(dir, { "a.txt": "a\n" })
