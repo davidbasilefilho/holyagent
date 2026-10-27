@@ -3,6 +3,7 @@ import { Effect } from "effect"
 import type { Assignment } from "./assignment.ts"
 import { IntentClosed, StaleRevision, UnknownRecord } from "./errors.ts"
 import type { Intent } from "./intent.ts"
+import type { BranchRecord, PullRecord } from "./links.ts"
 import type { Registry } from "./specialists.ts"
 
 /** Every Intent and Assignment of the project, as the store loads them. */
@@ -18,6 +19,8 @@ export interface Project {
 export interface Change {
   readonly intents?: ReadonlyArray<Intent>
   readonly assignments?: ReadonlyArray<Assignment>
+  readonly branches?: ReadonlyArray<BranchRecord>
+  readonly pulls?: ReadonlyArray<PullRecord>
   readonly registry?: Registry
 }
 

@@ -1,17 +1,23 @@
-import { dirname } from "node:path"
+import { join } from "node:path"
 
 import { Effect } from "effect"
 
 import { Usage } from "../cli/errors.ts"
 import { type Call, type Command } from "../cli/types.ts"
 import { present } from "../cli/views.ts"
+import { STATE_DIRECTORY } from "../state/layout.ts"
 import { type FlagShape, readArguments, requiredValue, valueOf } from "./arguments.ts"
 import { commit } from "./commit.ts"
 import { prepareMessage } from "./message.ts"
 import { pullRequest } from "./pr.ts"
+import { recordBranch } from "./record.ts"
 import { readSettings } from "./settings.ts"
 
-const rootOf = (call: Call) => dirname(call.directory)
+/**
+ * The folder that holds the config file: `.holyagent` of the work tree. The config file is the
+ * project's settings, not state, so it is never read from the state worktree.
+ */
+const settingsFolders = (call: Call) => [join(call.root, STATE_DIRECTORY)]
 
 /** Reads the raw arguments of a command against its flags, refusing more positionals than it takes. */
 const arguments_ = (
@@ -45,8 +51,9 @@ export const VCS_COMMANDS: ReadonlyArray<Command> = [
     path: ["vcs", "commit"],
     usage: COMMIT_USAGE,
     summary:
-      "Commit exactly the named paths (plus the changed Intent state of this worktree) with the configured git identity, after the message check",
+      "Commit exactly the named paths with the configured git identity, after the message check, and record the branch and commit on the Intent in use",
     notes: [
+      "Intent state is never part of the commit: it is committed on the state branch as it changes, and a path under .holyagent/ is refused",
       "the message is cleaned of agent attribution and refused when it talks about the user or the agent; an identity that looks like an agent's is refused",
       "the repository's own hooks run, a commit-msg hook that runs `holyagent hook commit-msg` included",
     ],
@@ -68,27 +75,22 @@ export const VCS_COMMANDS: ReadonlyArray<Command> = [
               messages.length === 0 ? "Missing -m <headline>" : "Name the paths to commit after --",
             hint: `Usage: holyagent ${COMMIT_USAGE}`,
           })
-        const root = rootOf(call)
-        const settings = yield* readSettings(root)
+        const settings = yield* readSettings(settingsFolders(call))
         const message = yield* prepareMessage(messages, settings.allowWords ?? [])
-        const done = yield* commit({
-          directory: call.directory,
-          root,
-          message,
-          paths: args.positionals,
-        })
+        const done = yield* commit({ message, paths: args.positionals })
         return present({
           branch: done.branch,
           commit: short(done.commit),
           files: done.files,
-          state: done.state?.length === 1 ? done.state[0] : done.state,
+          ...(yield* recordBranch(call, done)),
         })
       }).pipe(Effect.provide(call.vcs)),
   },
   {
     path: ["vcs", "pr"],
     usage: PR_USAGE,
-    summary: "Create a pull request from the current branch, or update one, through the REST API",
+    summary:
+      "Create a pull request from the current branch, or update one, through the REST API, and record it on the Intent in use",
     notes: ["the title and body get the same message check as a commit"],
     flags: {},
     raw: true,
@@ -117,11 +119,10 @@ export const VCS_COMMANDS: ReadonlyArray<Command> = [
           yield* requiredValue(args, "base", PR_USAGE)
           yield* requiredValue(args, "title", PR_USAGE)
         }
-        const root = rootOf(call)
-        const settings = yield* readSettings(root)
+        const settings = yield* readSettings(settingsFolders(call))
         return yield* pullRequest({
-          directory: call.directory,
-          root,
+          state: call,
+          root: call.root,
           base: valueOf(args, "base"),
           title: valueOf(args, "title"),
           bodyFile: valueOf(args, "body-file"),

@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { chmod, readFile, writeFile } from "node:fs/promises"
+import { chmod, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
-import { cleanup, fakeGitHub, initRepo, put, scratch, seed, sh, toon, vcs } from "./vcs-fixtures.ts"
+import { cleanup, fakeGitHub, initRepo, put, seed, sh, toon, vcs } from "./vcs-fixtures.ts"
 
 afterEach(cleanup)
 
@@ -49,64 +49,35 @@ describe("vcs commit", () => {
     expect((await sh(dir, ["git", "rev-parse", "HEAD"])).trim()).toBe(before)
   })
 
-  test("a changed Intent state folder rides along with the work commit", async () => {
+  test("Intent state never rides along: it is committed on the state branch, and the work commit holds only the named paths", async () => {
     const dir = await initRepo(OWNER)
     await seed(dir, { "a.txt": "a\n" })
-    const created = await vcs(dir, ["intent", "create"], github().layer, {
-      objective: "Ship the parser",
-    })
-    expect(created.code).toBe(0)
+    expect(
+      (await vcs(dir, ["intent", "create"], github().layer, { objective: "Ship the parser" })).code,
+    ).toBe(0)
     await put(dir, { "a.txt": "a2\n" })
 
     const first = toon(
       await vcs(dir, ["vcs", "commit", "-m", "Change a", "--", "a.txt"], github().layer),
     )
-    const files = await filesOf(dir)
-    expect(files).toHaveLength(2)
-    expect(files).toContain("a.txt")
-    expect(files.find((file) => file !== "a.txt")).toMatch(
-      /^\.holyagent\/intents\/ship-the-parser-[^/]+\/intent\.json$/,
-    )
-    expect(String(first["state"])).toMatch(/^\.holyagent\/intents\/ship-the-parser-/)
 
-    await put(dir, { "a.txt": "a3\n" })
-    const second = toon(
-      await vcs(dir, ["vcs", "commit", "-m", "Change a again", "--", "a.txt"], github().layer),
-    )
     expect(await filesOf(dir)).toEqual(["a.txt"])
-    expect(second).not.toHaveProperty("state")
+    expect(first).not.toHaveProperty("state")
+    expect(await sh(dir, ["git", "status", "--porcelain"])).toBe("")
+    expect(await sh(dir, ["git", "ls-files", ".holyagent"])).toBe("")
   })
 
-  test("in a linked worktree the Intent state of that worktree rides along, with no Intent in use there", async () => {
+  test("a path under .holyagent is refused, so a work branch never carries Intent state", async () => {
     const dir = await initRepo(OWNER)
     await seed(dir, { "a.txt": "a\n" })
-    for (const objective of ["Ship the parser", "Ship the printer"])
-      expect((await vcs(dir, ["intent", "create"], github().layer, { objective })).code).toBe(0)
-    await sh(dir, ["git", "add", "-A"])
-    await sh(dir, ["git", "commit", "-q", "-m", "state"])
+    await put(dir, { ".holyagent/intents/note.md": "note\n" })
 
-    // A new worktree has none of the per-clone state: two Intents are open and neither is in use.
-    const tree = join(await scratch("holyagent-worktree-"), "tree")
-    await sh(dir, ["git", "worktree", "add", "-q", "-b", "feature", tree])
-    const intents = (await sh(tree, ["git", "ls-files", ".holyagent/intents"]))
-      .trim()
-      .split("\n")
-      .filter((path) => path.endsWith("/intent.json"))
-    expect(intents).toHaveLength(2)
-    const target = join(tree, intents[0] ?? "")
-    const record = JSON.parse(await readFile(target, "utf8")) as Record<string, unknown>
-    await writeFile(
-      target,
-      `${JSON.stringify({ ...record, objective: "Ship the parser v2" }, null, 2)}\n`,
-    )
-    await put(tree, { "a.txt": "a2\n" })
-
-    const done = toon(
-      await vcs(tree, ["vcs", "commit", "-m", "Change a", "--", "a.txt"], github().layer),
-    )
-
-    expect(await filesOf(tree)).toEqual([intents[0] ?? "", "a.txt"].sort())
-    expect(String(done["state"])).toBe(".holyagent/intents")
+    for (const path of [".holyagent", ".holyagent/intents/note.md", ".holyagent/"]) {
+      const result = await vcs(dir, ["vcs", "commit", "-m", "Add note", "--", path], github().layer)
+      expect([path, result.code]).toEqual([path, 2])
+      expect(result.stderr).toContain("state branch")
+    }
+    expect(await sh(dir, ["git", "log", "--format=%s"])).toBe("seed\n")
   })
 
   test("changes staged outside the named paths refuse the commit and are left alone", async () => {

@@ -1,0 +1,93 @@
+{
+  "id": "assignment-0mvqu8qy3-tn26",
+  "intentId": "intent-0mvqpjnv6-vuzt",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "update-the-instruction-text-and-docs-so",
+  "objective": "Update the instruction text and docs so they describe the dedicated state branch that commit 2e519b7 introduced, and remove the manual state-repair rules it makes obsolete.",
+  "state": "Succeeded",
+  "scope": [
+    "Background: commit 2e519b7 on this branch keeps .holyagent/ state on a state-only branch (default holyagent/state) in a shared worktree under the git common dir; every command reads and writes there and commits each transition; vcs commit refuses .holyagent paths; Intents record branches and PRs; state in work trees is migrated once. Read its diff for exact behavior. The root pushes the state branch with plain git alongside work pushes. User requirement, verbatim: 'it must always be easy to stack onto other branches and merge seamslessly'.",
+    "Stale lines reported by the writer (verify each): AGENTS.md:12; docs/commit-authorship.md:18; docs/decisions.md:9 and :59 (record the reversal as a new decision, keeping history); docs/usage.md:59; docs/development.md:11; docs/hooks.md:23,:31,:39,:69; packages/runtime/src/instructions/requirements/commit-text.md:7; packages/runtime/src/instructions/claude-5.5/root/version-control.md:13; packages/runtime/src/instructions/requirements.md:32. Also check root/stack-plan.md (conflicted state record rule) and the specialist state-changes text.",
+    "Follow the 'Writing instructions' rules in packages/integrations/claude/dist/agents/holyagent.md for model-facing text: calm imperative US English, reason beside each rule; requirements.md first, then the claude-5.5 sets. Keep the replaced text's size or smaller."
+  ],
+  "constraints": [
+    "Do not run the plugin build; the root runs one build after all writers. Make no version-control writes (no git commit, add, checkout, switch, worktree, stash, push) and no edits under .git/ or .holyagent/.",
+    "Do not edit README.md (another Assignment owns it) or .claude/CLAUDE.md.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When done and checked, stop and report; do not add unrequested features, files or refactors (name them in the report)."
+  ],
+  "criteria": [
+    {
+      "text": "Every stale line listed is updated or removed so no text tells a model or human that state rides work commits or needs manual repair between worktrees",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Instruction text tells the root to push holyagent/state alongside work pushes and that work branches never carry .holyagent/",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Changes stay in the ownership paths and are no larger than the text they replace, apart from the new decision entry",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "bun fmt check passes on the changed files",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "docs",
+    "AGENTS.md",
+    "packages/runtime/src/instructions"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "workflow:wf_48caed43-cd9/assignment-0mvqu8qy3-tn26",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T15:26:19.756Z",
+    "finishedAt": "2026-10-27T15:38:55.616Z"
+  },
+  "result": "result: Every listed stale line is rewritten for the `holyagent/state` branch, and the manual state-repair rules are gone. `mise run fmt:check` passes on all 215 files.\n\nchanged:\n- `/home/user/holyagent/AGENTS.md`\n- `/home/user/holyagent/docs/commit-authorship.md`\n- `/home/user/holyagent/docs/decisions.md`\n- `/home/user/holyagent/docs/development.md`\n- `/home/user/holyagent/docs/hooks.md`\n- `/home/user/holyagent/docs/usage.md`\n- `/home/user/holyagent/packages/runtime/src/instructions/requirements.md`\n- `/home/user/holyagent/packages/runtime/src/instructions/requirements/commit-text.md`\n- `/home/user/holyagent/packages/runtime/src/instructions/claude-5.5/root/version-control.md`\n- `/home/user/holyagent/packages/runtime/src/instructions/claude-5.5/root/stack-plan.md`\n\nchecks:\n- `mise run fmt:check` -> exit 0, \"All 215 files are formatted\"; I ran it last, after the final edit.\n- I did not run the plugin build, as instructed.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- **Size:** the diff is +22/−18 lines. The new decision entry is the only real growth, about 900 characters. `version-control.md` shrank (2679 to 2622 bytes). I did not recheck the overall character count after my last two small trims, because my measurement command printed the same totals before and after them.\n- **Left alone as still accurate:**\n  - `specialist/state-changes.md` and `R-S-VCS`: specialists still must not touch `.holyagent/`.\n  - `session-reminder.md`.\n  - The `docs/hooks.md` sentences saying the stateless hooks (`subagent-start`, `vcs-reminder`) never call git. They still hold: `program.ts` skips state resolution for them.\n- **Unverified claim:** the new decision says `vcs.stateBranch` in `.holyagent/config.json` can name another branch. I confirmed that key exists in `settings.ts` and `tree.ts`, but the `docs/usage.md` line about `.holyagent/config.json` does not list it.\n- **README.md:** I did not touch it, per the Assignment.\n- **Generated plugin:** `dist` is stale until the root runs the build, since the instruction `.md` files feed it.\n- **VCS writes for the root:** none needed.\n\nevidence:\nEvery stale line listed is updated or removed so no text tells a model or human that state rides work commits or needs manual repair between worktrees: AGENTS.md:12, docs/commit-authorship.md:10 and :18, docs/decisions.md:9 and :63, docs/usage.md:59, docs/development.md:11, docs/hooks.md:23, :31, :39 and :69, commit-text.md:7, root/version-control.md (state-repair bullet replaced by a State bullet), requirements.md R-GIT and R-VCS (the `.holyagent` repair wording is gone). The \"conflicted state record keeps the side the later CLI write produced\" sentence is removed from root/stack-plan.md. The old decision entries stay as history, marked as replaced.\nInstruction text tells the root to push holyagent/state alongside work pushes and that work branches never carry .holyagent/: version-control.md Push bullet (\"push `holyagent/state` in the same step\") and State bullet (\"Work branches never carry `.holyagent/`\"); requirements.md R-GIT and R-VCS; `vcs commit` refusing `.holyagent/` paths is in commit-text.md and docs/commit-authorship.md.\nChanges stay in the ownership paths and are no larger than the text they replace, apart from the new decision entry: all 10 changed files are under docs, AGENTS.md or packages/runtime/src/instructions (`git diff --name-only`); the new section is \"Changed since the audit\" in docs/decisions.md.\nbun fmt check passes on the changed files: `mise run fmt:check` -> exit 0, 215 files formatted.\nchanged-paths: the 10 files listed under `changed:`; diff saved at /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/docs.diff (no new files).\nchecks-run: `mise run fmt:check` (exit 0). Not run: plugin build (root runs it), `mise run verify` (no code changed).",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "All listed stale lines rewritten, the state-repair rules removed, fmt:check exit 0; content judged again with the repair diff.",
+    "criteria": [
+      {
+        "criterion": "Every stale line listed is updated or removed so no text tells a model or human that state rides work commits or needs manual repair between worktrees",
+        "support": "AGENTS.md:12, docs/commit-authorship.md:10 and :18, docs/decisions.md:9 and :63, docs/usage.md:59, docs/development.md:11, docs/hooks.md:23, :31, :39 and :69, commit-text.md:7, root/version-control.md (state-repair bullet replaced by a State bullet), requirements.md R-GIT and R-VCS (the `.holyagent` repair wording is gone). The \"conflicted state record keeps the side the later CLI write produced\" sentence is removed from root/stack-plan.md. The old decision entries stay as history, marked as replaced."
+      },
+      {
+        "criterion": "Instruction text tells the root to push holyagent/state alongside work pushes and that work branches never carry .holyagent/",
+        "support": "version-control.md Push bullet (\"push `holyagent/state` in the same step\") and State bullet (\"Work branches never carry `.holyagent/`\"); requirements.md R-GIT and R-VCS; `vcs commit` refusing `.holyagent/` paths is in commit-text.md and docs/commit-authorship.md."
+      },
+      {
+        "criterion": "Changes stay in the ownership paths and are no larger than the text they replace, apart from the new decision entry",
+        "support": "all 10 changed files are under docs, AGENTS.md or packages/runtime/src/instructions (`git diff --name-only`); the new section is \"Changed since the audit\" in docs/decisions.md."
+      },
+      {
+        "criterion": "bun fmt check passes on the changed files",
+        "support": "`mise run fmt:check` -> exit 0, 215 files formatted."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "the 10 files listed under `changed:`; diff saved at /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/docs.diff (no new files)."
+      },
+      {
+        "label": "checks-run",
+        "support": "`mise run fmt:check` (exit 0). Not run: plugin build (root runs it), `mise run verify` (no code changed)."
+      }
+    ]
+  },
+  "createdAt": "2026-10-27T15:26:19.756Z"
+}

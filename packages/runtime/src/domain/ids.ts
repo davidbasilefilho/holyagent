@@ -9,11 +9,17 @@ export const IntentId = identifier("intent")
 /** The id of an Assignment. It names a file; the same character rules as an Intent id. */
 export const AssignmentId = identifier("assignment")
 
+/** The id of a branch record: one commit an Intent made on a branch. It names a file. */
+export const BranchId = identifier("branch")
+
+/** The id of a pull request record: one `vcs pr` call for an Intent. It names a file. */
+export const PullId = identifier("pull")
+
 /** The id of a launched specialist, as the host reports it. Opaque, but never blank. */
 export const AgentId = Schema.String.check(Schema.isPattern(/\S/))
 
 /** A kind of record that has a generated id. */
-export type IdKind = "intent" | "assignment"
+export type IdKind = "intent" | "assignment" | "branch" | "pull"
 
 /**
  * A new id: the kind, the creation time as 9 base36 digits and 4 random base36 digits, as in

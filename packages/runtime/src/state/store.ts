@@ -4,12 +4,14 @@ import { Effect, Schedule } from "effect"
 
 import { Assignment } from "../domain/assignment.ts"
 import { Intent } from "../domain/intent.ts"
+import { BranchRecord, type Links, PullRecord } from "../domain/links.ts"
 import type { Change, Project } from "../domain/project.ts"
 import { CorruptRecord, StateIo } from "./errors.ts"
 import { commitFile, encodeJson, type File, hasCode, io, readJson } from "./files.ts"
-import { assignmentFile, intentFile, intentFolder } from "./layout.ts"
+import { assignmentFile, branchFile, intentFile, intentFolder, pullFile } from "./layout.ts"
 import { encodeLocal, type Local, type LocalChange, readLocal } from "./local.ts"
 import { withStateLock } from "./lock.ts"
+import { commitState, type Environment } from "./tree.ts"
 
 /** The relative paths below the state folder that match, in a stable order. */
 const scan = (directory: string, pattern: string) =>
@@ -64,6 +66,35 @@ const loadAssignments = (
     return assignments
   })
 
+const loadLinks = (directory: string, intents: ReadonlyArray<Intent>) =>
+  Effect.gen(function* () {
+    const branches: Array<BranchRecord> = []
+    const pulls: Array<PullRecord> = []
+    for (const intent of intents) {
+      const folder = intentFolder(directory, intent)
+      const prefix = relative(directory, folder)
+      for (const file of yield* scan(directory, join(prefix, "branches/*.json"))) {
+        const path = join(directory, file)
+        const record = yield* readJson(BranchRecord, path)
+        if (record === undefined) continue
+        yield* requireLocation(path, branchFile(folder, record))
+        if (record.intentId !== intent.id)
+          return yield* new CorruptRecord({ path, reason: `the record belongs to ${intent.id}` })
+        branches.push(record)
+      }
+      for (const file of yield* scan(directory, join(prefix, "pulls/*.json"))) {
+        const path = join(directory, file)
+        const record = yield* readJson(PullRecord, path)
+        if (record === undefined) continue
+        yield* requireLocation(path, pullFile(folder, record))
+        if (record.intentId !== intent.id)
+          return yield* new CorruptRecord({ path, reason: `the record belongs to ${intent.id}` })
+        pulls.push(record)
+      }
+    }
+    return { branches, pulls } satisfies Links
+  })
+
 /**
  * Reads and validates every Intent and Assignment under the state folder. Each file must decode
  * strictly and sit at the path its own fields name (`intents/<slug>-<id>/intent.json`,
@@ -101,15 +132,22 @@ export const loadOpenProject = (directory: string) =>
     return { intents, assignments } satisfies Project
   })
 
-/** Everything the CLI reads: the versioned project and this clone's local state. */
+/**
+ * Everything the CLI reads: the versioned project, the branch and pull request records of its
+ * Intents and this clone's local state.
+ */
 export interface Snapshot extends Local {
   readonly project: Project
+  readonly links: Links
 }
 
 const readSnapshot = (directory: string, load: typeof loadProject = loadProject) =>
-  Effect.all({ project: load(directory), local: readLocal(directory) }).pipe(
-    Effect.map(({ project, local }): Snapshot => ({ ...local, project })),
-  )
+  Effect.gen(function* () {
+    const project = yield* load(directory)
+    const links = yield* loadLinks(directory, project.intents)
+    const local = yield* readLocal(directory)
+    return { ...local, project, links } satisfies Snapshot
+  })
 
 const retryCorrupt = {
   schedule: Schedule.spaced("25 millis"),
@@ -160,6 +198,30 @@ const persist = (directory: string, project: Project, change: StateChange) =>
         content: yield* encodeJson(Assignment, assignment),
       })
     }
+    for (const record of change.branches ?? []) {
+      const intent = intents.find((candidate) => candidate.id === record.intentId)
+      if (intent === undefined)
+        return yield* new StateIo({
+          path: directory,
+          cause: `Branch record ${record.id} names unknown Intent ${record.intentId}`,
+        })
+      files.push({
+        path: branchFile(intentFolder(directory, intent), record),
+        content: yield* encodeJson(BranchRecord, record),
+      })
+    }
+    for (const record of change.pulls ?? []) {
+      const intent = intents.find((candidate) => candidate.id === record.intentId)
+      if (intent === undefined)
+        return yield* new StateIo({
+          path: directory,
+          cause: `Pull request record ${record.id} names unknown Intent ${record.intentId}`,
+        })
+      files.push({
+        path: pullFile(intentFolder(directory, intent), record),
+        content: yield* encodeJson(PullRecord, record),
+      })
+    }
     files.push(
       ...(yield* encodeLocal(directory, {
         ...(change.activeIntent === undefined ? {} : { activeIntent: change.activeIntent }),
@@ -170,15 +232,34 @@ const persist = (directory: string, project: Project, change: StateChange) =>
     for (const file of files) yield* commitFile(file.path, file.content)
   })
 
+const MAX_LISTED = 4
+
+/** The subject of the state commit for a change: the records it wrote, by kind and id. */
+const describe = (change: StateChange): string => {
+  const records = [
+    ...(change.intents ?? []).map((intent) => `intent ${intent.id}`),
+    ...(change.assignments ?? []).map((row) => `assignment ${row.id} ${row.state}`),
+    ...(change.branches ?? []).map((row) => `branch ${row.branch} of ${row.intentId}`),
+    ...(change.pulls ?? []).map((row) => `pull request ${row.number} of ${row.intentId}`),
+  ]
+  const shown = records.slice(0, MAX_LISTED).join(", ")
+  const more = records.length - MAX_LISTED
+  return `chore(state): record ${records.length === 0 ? "state" : shown}${more > 0 ? ` and ${more} more` : ""}`
+}
+
 /**
- * Applies a transition under the state lock: lock, read, run the transition on what was read, and
- * write only the records and local files it changed. A transition that fails, or a record that
- * cannot be encoded, writes nothing. The files are then written one by one, so a crash between two
- * leaves the earlier ones written; every file on its own is whole.
+ * Applies a transition under the state lock: lock, read, run the transition on what was read, write
+ * only the records and local files it changed, and commit the changed records on the state branch
+ * (see {@link commitState}; nothing is committed outside the state worktree or when only local files
+ * changed). A transition that fails, or a record that cannot be encoded, writes nothing. The files
+ * are then written one by one, so a crash between two leaves the earlier ones written; every file
+ * on its own is whole. `env` is the environment git runs with for the commit; git's own (the
+ * process environment) is always the base.
  */
 export const updateState = <A extends StateChange, E>(
   directory: string,
   transition: (snapshot: Snapshot) => Effect.Effect<A, E>,
+  env: Environment = {},
 ) =>
   withStateLock(
     directory,
@@ -186,6 +267,13 @@ export const updateState = <A extends StateChange, E>(
       const snapshot = yield* readSnapshot(directory)
       const result = yield* transition(snapshot)
       yield* persist(directory, snapshot.project, result)
+      if (
+        result.intents !== undefined ||
+        result.assignments !== undefined ||
+        result.branches !== undefined ||
+        result.pulls !== undefined
+      )
+        yield* commitState(directory, env, describe(result))
       return result
     }),
   )

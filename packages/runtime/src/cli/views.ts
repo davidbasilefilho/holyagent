@@ -1,5 +1,6 @@
 import type { Assignment } from "../domain/assignment.ts"
 import type { Intent } from "../domain/intent.ts"
+import { branchesOf, type Links, pullsOf } from "../domain/links.ts"
 
 /** Drops absent values and empty lists, so a record prints only what it holds. */
 export const present = (record: Readonly<Record<string, unknown>>): Record<string, unknown> =>
@@ -12,8 +13,11 @@ export const present = (record: Readonly<Record<string, unknown>>): Record<strin
 /** Text on one line: runs of whitespace become a single space. */
 export const oneLine = (text: string): string => text.replace(/\s+/g, " ").trim()
 
-/** An Intent as the model reads it. */
-export const intentView = (intent: Intent) =>
+/**
+ * An Intent as the model reads it. With its links, the branches it committed on and the pull
+ * requests it created or updated.
+ */
+export const intentView = (intent: Intent, links?: Links) =>
   present({
     id: intent.id,
     revision: intent.revision,
@@ -21,6 +25,13 @@ export const intentView = (intent: Intent) =>
     objective: intent.objective,
     requirements: intent.requirements,
     closeReason: intent.closeReason,
+    branches: links === undefined ? undefined : branchesOf(links, intent.id),
+    pulls:
+      links === undefined
+        ? undefined
+        : pullsOf(links, intent.id).map(({ number, url, branch, base }) =>
+            present({ number, url, branch, base }),
+          ),
   })
 
 /** An Assignment in full, with its acceptance. */

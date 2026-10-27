@@ -5,14 +5,14 @@ import { join, relative, sep } from "node:path"
 import { Effect, Schema } from "effect"
 
 import { Usage } from "../cli/errors.ts"
+import type { Call } from "../cli/types.ts"
 import { pathProblem } from "../domain/paths.ts"
-import { commitFile, hasCode, io } from "../state/files.ts"
-import { encodeLocal, readLocal, type Vcs } from "../state/local.ts"
-import { withStateLock } from "../state/lock.ts"
+import { hasCode, io } from "../state/files.ts"
 import { GitFailed, RemoteMismatch } from "./errors.ts"
 import { currentBranch, Git, originUrl, repoSlug } from "./git.ts"
 import { apiPath, decodeAnswer, GitHub } from "./github.ts"
 import { checkedText } from "./message.ts"
+import { recordPull } from "./record.ts"
 
 const Created = Schema.Struct({ number: Schema.Int, html_url: Schema.String })
 
@@ -86,7 +86,7 @@ const readBodyFile = (root: string, file: string) => {
 
 /** What `vcs pr` was asked to do. */
 export interface PullRequestRequest {
-  readonly directory: string
+  readonly state: Pick<Call, "directory" | "update">
   readonly root: string
   readonly base: string | undefined
   readonly title: string | undefined
@@ -100,22 +100,16 @@ export interface PullRequested {
   readonly number: number
   readonly url: string
   readonly created: boolean
+  /** The Intent that recorded the pull request, when one was in use. */
+  readonly intent?: string
+  /** Why the pull request could not be recorded on the Intent; it exists on GitHub regardless. */
+  readonly unrecorded?: string
 }
-
-/** Rewrites the `vcs` part of the per-clone state under the state lock. */
-const saveVcs = (directory: string, change: (current: Vcs) => Vcs) =>
-  withStateLock(
-    directory,
-    Effect.gen(function* () {
-      const local = yield* readLocal(directory)
-      for (const file of yield* encodeLocal(directory, { vcs: change(local.vcs) }))
-        yield* commitFile(file.path, file.content)
-    }),
-  )
 
 /**
  * Creates a pull request from the current branch, or updates the one named by `update`, through the
- * REST API. Title and body are cleaned and checked like a commit message.
+ * REST API. Title and body are cleaned and checked like a commit message. The pull request, its
+ * branch and base are then recorded on the Intent in use, as a record of their own in the state.
  */
 export const pullRequest = (request: PullRequestRequest) =>
   Effect.gen(function* () {
@@ -158,15 +152,17 @@ export const pullRequest = (request: PullRequestRequest) =>
           }),
     )
     const pull = yield* decodeAnswer(Created, "pull request", answer)
-    yield* saveVcs(request.directory, (current) => ({
-      ...current,
+    const recorded = yield* recordPull(request.state, {
+      number: pull.number,
+      url: pull.html_url,
       branch,
-      pullRequest: String(pull.number),
-      ...(request.base === undefined ? {} : { base: request.base }),
-    }))
+      base: request.base,
+      created: request.update === undefined,
+    })
     return {
       number: pull.number,
       url: pull.html_url,
       created: request.update === undefined,
+      ...recorded,
     } satisfies PullRequested
   })

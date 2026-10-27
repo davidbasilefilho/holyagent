@@ -2,6 +2,8 @@ import type { Effect, Layer, Schema } from "effect"
 
 import type { ExecutionConfig } from "../domain/directive.ts"
 import type { InvalidDraft } from "../domain/errors.ts"
+import type { Snapshot, StateChange, updateState } from "../state/store.ts"
+import type { Ensure } from "../state/tree.ts"
 import type { Git } from "../vcs/git.ts"
 import type { GitHub } from "../vcs/github.ts"
 import type { FlagSpec, Parsed } from "./args.ts"
@@ -61,8 +63,20 @@ export interface Call {
   readonly cwd: string
   /** The environment of the process. */
   readonly env: Host["env"]
-  /** The `.holyagent` folder of the state root. */
+  /** The top-level folder of the work tree the command runs in. */
+  readonly root: string
+  /**
+   * The `.holyagent` folder that holds the state: the one in the state worktree, the same from
+   * every work tree of the clone.
+   */
   readonly directory: string
+  /**
+   * Applies a transition to the state and commits the changed records on the state branch (see
+   * `updateState`), with the environment of the process.
+   */
+  readonly update: <A extends StateChange, E>(
+    transition: (snapshot: Snapshot) => Effect.Effect<A, E>,
+  ) => ReturnType<typeof updateState<A, E>>
   /** The warm-reuse settings from the environment and the settings files. */
   readonly config: Effect.Effect<ExecutionConfig, Usage>
   /** Reads stdin as raw text; blank input is StdinMissing. */
@@ -103,6 +117,11 @@ export interface Command {
   readonly flags: FlagSpec
   /** True when the command needs neither the state root nor git, so no git runs before it. */
   readonly stateless?: true
+  /**
+   * How far the command goes to find the state (see {@link Ensure}); `ifPresent` when absent. A
+   * function chooses from the parsed arguments, for a command that only sometimes writes.
+   */
+  readonly state?: Ensure | ((args: Parsed) => Ensure)
   /** True when the command reads its own arguments: they arrive unparsed in `args.positionals`. */
   readonly raw?: true
   /** How many positional arguments the command takes. */

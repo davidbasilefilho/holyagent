@@ -1,0 +1,70 @@
+{
+  "id": "assignment-0mvqv1zxa-h23p",
+  "intentId": "intent-0mvqpjnv6-vuzt",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "keep-the-intent-in-use-per-work-tree-so",
+  "objective": "Keep the Intent in use per work tree, so sessions in different worktrees of one clone never switch each other's Intent, while all other state stays shared on the state branch.",
+  "state": "Succeeded",
+  "scope": [
+    "User decision: the Intent in use is kept per work tree; all other state stays shared. Today local/active-intent.json lives in the shared state worktree (see packages/runtime/src/state/local.ts, lock.ts:90 and tree.ts from commits 2e519b7 and c0b1b51 on this branch).",
+    "Store the active Intent per work tree, keyed by that work tree (for example in the work tree's own git dir, git rev-parse --git-dir, or a per-worktree key under the shared local/ folder); intent use, intent create and every reader resolve it from the calling work tree. A work tree with no choice of its own falls back to today's rule (resolve when exactly one Intent is open).",
+    "Also fix docs/decisions.md line 49, which still says the state branch can be set via vcs.stateBranch; it is now read from git config holyagent.stateBranch only."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md (Effect with tagged errors, no try/catch/new Promise/async in runtime source, Schema at boundaries, Bun Shell, JSDoc).",
+    "Make no version-control writes in this repository and no edits under .git/ or this repository's .holyagent/; tests use temporary repositories.",
+    "Do not run the plugin build; leave LICENSE, the package.json files and packages/integrations alone (another change is uncommitted there).",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done and checked, stop and report; do not add unrequested features or refactors."
+  ],
+  "criteria": [
+    {
+      "text": "Two worktrees of one clone can each have a different Intent in use, proven by a test that fails without the change",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A work tree with no choice of its own keeps today's resolution, and existing tests pass",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "docs/decisions.md no longer names vcs.stateBranch as the way to set the branch",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "bun test packages/runtime, bun check, lint and fmt check pass",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Changes stay inside the ownership paths",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/state",
+    "packages/runtime/src/cli",
+    "packages/runtime/src/domain",
+    "packages/runtime/tests",
+    "docs/decisions.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvqupf7d-dm5i",
+  "specialist": {
+    "agentId": "workflow:wf_71e54adc-7cc/assignment-0mvqv1zxa-h23p",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T15:49:04.415Z",
+    "finishedAt": "2026-10-27T15:56:54.075Z"
+  },
+  "result": "result: Each work tree of one clone now keeps its own Intent in use, and all other state stays shared. `bun test packages/runtime` and the type-check, lint and format-check gates pass. `mise run verify` as a whole fails on two tests in `packages/integrations/claude`, which I did not touch.\n\n**How it works**\n- The Intent in use is stored under the shared `local/active-intent/` folder, one file per work tree. The file name is a hash of the work tree's root path.\n- A new `WorkTree` context reference in `packages/runtime/src/state/local.ts` carries the root for the run. `execute` in `packages/runtime/src/cli/program.ts` sets it, so every reader and `updateState` resolve from the calling work tree. I used this rather than a new parameter because `packages/runtime/src/vcs/record.ts` calls `readOpenState(call.directory)` and `vcs/` is outside my ownership paths. A parameter would have needed a two-line edit there (`record.ts` and the `Pick` type in `pr.ts`).\n- With no `WorkTree` set, no Intent is in use. Writing an Intent in use without one fails with `StateIo`.\n- A work tree with no choice of its own falls back to today's rule: it resolves the Intent when exactly one is open.\n- `intentInUse` now follows that same rule, so `intent list` and `status` show the only open Intent as in use from a work tree that chose nothing. An existing test required this.\n- The old shared `local/active-intent.json` is ignored. I removed it from the migration list in `packages/runtime/src/state/tree.ts`, and the `intent use` summary now says \"in this work tree\".\n- `docs/decisions.md` line 49 now names only git config `holyagent.stateBranch`, and it states the per-work-tree exception.\n\n**Tests**\n- Existing tests adjusted for the new storage: `store.test.ts` provides the work tree and expects the new file layout, and `cli.test.ts` removes the `active-intent` folder.\n- New test in `state-branch.test.ts`: three worktrees of one clone. Creating or choosing an Intent in one does not switch another, and a worktree with no choice among two open Intents gets `NoActiveIntent`.\n- With the per-work-tree key temporarily replaced by a shared one, the new test fails, so it proves the change. I restored the file afterwards.\n\nchanged:\n- `/home/user/holyagent/packages/runtime/src/state/local.ts`\n- `/home/user/holyagent/packages/runtime/src/state/tree.ts`\n- `/home/user/holyagent/packages/runtime/src/cli/program.ts`\n- `/home/user/holyagent/packages/runtime/src/cli/intent.ts`\n- `/home/user/holyagent/packages/runtime/tests/store.test.ts`\n- `/home/user/holyagent/packages/runtime/tests/cli.test.ts`\n- `/home/user/holyagent/packages/runtime/tests/state-branch.test.ts`\n- `/home/user/holyagent/docs/decisions.md`\n\nThe diff for reviewers is at `/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/diff.patch`. It covers tracked files only, and none of my files are new.\n\nchecks:\n- `bun test packages/runtime` -> exit 0, 329 pass, 0 fail.\n- `mise run check` -> exit 0, no type errors in 102 files.\n- `mise run lint` -> exit 0, no problems in 103 files.\n- `mise run fmt` -> I ran the formatter, which only touched my changed files. The format check in `mise run verify` then passed with all 215 files formatted.\n- `mise run verify` -> fails only on two tests in `packages/integrations/claude/tests/plugin.test.ts`: the plugin manifest version and the \"generated plugin equals a fresh build\" check. They come from the other uncommitted change in `packages/integrations` and the package.json files, and I did not run the plugin build.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- `docs/usage.md` line 59 says everything under `.holyagent/local/` is per clone. That is now slightly off, since the Intent in use is per work tree. I did not edit it because `docs/usage.md` is outside my ownership.\n- Stale per-work-tree files remain in `local/active-intent/` after a worktree is removed. They are tiny and ignored by git.\n\nevidence:\nTwo worktrees of one clone can each have a different Intent in use, proven by a test that fails without the change: `packages/runtime/tests/state-branch.test.ts` \"each worktree of a clone keeps its own Intent in use...\"; it passes now and fails with a shared key (`bun test packages/runtime/tests/state-branch.test.ts` -> 1 fail).\nA work tree with no choice of its own keeps today's resolution, and existing tests pass: the same new test covers the fallback, and `bun test packages/runtime` -> exit 0, 329 pass, 0 fail.\ndocs/decisions.md no longer names vcs.stateBranch as the way to set the branch: `docs/decisions.md` line 49 names only `holyagent.stateBranch`.\nbun test packages/runtime, bun check, lint and fmt check pass: `bun test packages/runtime` -> exit 0, 329 pass; `mise run check`, `mise run lint` and the format check in `mise run verify` -> exit 0.\nChanges stay inside the ownership paths: `git status` shows my edits only under `packages/runtime/src/{state,cli}`, `packages/runtime/tests` and `docs/decisions.md`. The other modified files were already uncommitted before I started.\nchanged-paths: the eight paths listed under `changed` above.\nchecks-run: the four commands listed under `checks` above. `mise run verify` failed only on the two out-of-scope tests described there.",
+  "createdAt": "2026-10-27T15:49:04.415Z"
+}

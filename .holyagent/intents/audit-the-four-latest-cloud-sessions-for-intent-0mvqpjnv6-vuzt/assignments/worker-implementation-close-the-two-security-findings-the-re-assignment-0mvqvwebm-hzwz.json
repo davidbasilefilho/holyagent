@@ -1,0 +1,61 @@
+{
+  "id": "assignment-0mvqvwebm-hzwz",
+  "intentId": "intent-0mvqpjnv6-vuzt",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "close-the-two-security-findings-the-re",
+  "objective": "Close the two security findings the re-review left open: a symlinked .holyagent folder itself, in the state worktree or in a work tree, must never be followed by migration.",
+  "state": "Succeeded",
+  "scope": [
+    "Read the security re-review /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-assignment-0mvqvcy15-lklm.txt (findings 1 and 2 'still open': requirePlainTarget never lstats the .holyagent root, tree.ts:401-403; isPlainFile and copyInto compare against canonical(root), which resolves through a root symlink). Fix: lstat the .holyagent folder of the state worktree and of each source work tree and refuse anything but a real directory, and compare containment against realpath(worktree)/.holyagent and realpath(top)/.holyagent. Add regression tests with .holyagent itself a symlink in the state branch and in the work tree; each must fail without the fix.",
+    "While here (non-blocking, small): read the legacy shared local/active-intent.json as a fallback when the work tree has no choice of its own, so clones upgrading from main with several open Intents keep their Intent in use (code re-review finding 1, local.ts:68-92); add a test.",
+    "Ownership: packages/runtime/src/state, packages/runtime/tests."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md (Effect with tagged errors, no try/catch/new Promise/async in runtime source, Bun APIs, JSDoc).",
+    "Make no version-control writes in this repository and no edits under .git/ or this repository's .holyagent/; tests use temporary repositories. Do not run the plugin build.",
+    "Keep working until everything asked is done; when done and checked, stop and report; no unrequested refactors."
+  ],
+  "criteria": [
+    {
+      "text": "A symlinked .holyagent folder in the state worktree or in a work tree is refused before any read or write, proven by tests that fail without the fix",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The legacy active-intent fallback works and is tested",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "bun test packages/runtime, bun check, lint and fmt check pass",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Changes stay inside the ownership paths",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/state",
+    "packages/runtime/tests"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvqupf7d-dm5i",
+  "specialist": {
+    "agentId": "workflow:wf_a1854ee9-939/assignment-0mvqvwebm-hzwz",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T16:12:42.754Z",
+    "finishedAt": "2026-10-27T16:16:31.159Z"
+  },
+  "result": "result: A symlinked `.holyagent` in the state worktree or in a work tree is now refused before any read or write. The legacy shared `local/active-intent.json` is read as a fallback.\nchanged: `/home/user/holyagent/packages/runtime/src/state/tree.ts`, `/home/user/holyagent/packages/runtime/src/state/local.ts`, `/home/user/holyagent/packages/runtime/tests/state-branch.test.ts`\nchecks:\n- `bun test packages/runtime` -> exit 0, 332 pass, 0 fail\n- `bun check --no-script` -> exit 0, no type errors in 102 files\n- `bun lint --no-script` -> exit 0, no problems in 103 files\n- `bun fmt --no-script --check` -> exit 0, all 215 files formatted\n- Pre-fix run: with `tree.ts` and `local.ts` swapped for the HEAD versions, `bun test packages/runtime/tests/state-branch.test.ts` -> 3 fail, 27 pass. The three new tests are the ones that failed.\n- I did not run `mise run verify` as such, only its four gates one by one through bun. I did not run the plugin build.\n\nblockers: none\nquestions: none\nnotes:\n- I first ran an oxfmt invocation with default settings, which reformatted the other state files. I restored `errors.ts`, `files.ts`, `layout.ts`, `legacy.ts`, `lock.ts` and `store.ts` byte for byte from HEAD (`git show HEAD:... > file`, no git write), and `git status` shows only the three intended files changed.\n- Two behaviors to confirm:\n  - A state worktree whose `.holyagent` is not a real folder fails with `StateIo` and exit 4. That check runs before the lock and before `requirePlainTarget`, which now also checks the root.\n  - A work tree whose `.holyagent` is a link or another non-folder is skipped silently with exit 0, and no migration marker is written. This matches how links beneath `.holyagent` were already left out.\n- Only migration is guarded. Other commands such as `loadProject` still read through a `.holyagent` link in the state worktree. The re-review's Low note about links in the state worktree after migration still applies.\n- The legacy fallback also applies when no `WorkTree` is set, since `readLocal` now returns the per-work-tree choice, else the shared one.\n\nevidence:\nA symlinked .holyagent folder in the state worktree or in a work tree is refused before any read or write, proven by tests that fail without the fix: `/home/user/holyagent/packages/runtime/tests/state-branch.test.ts` has two new tests, \"migration refuses a state worktree whose .holyagent folder is a symlink\" (exit 4, nothing written to the link target) and \"migration leaves a work tree whose .holyagent folder is a symlink out of the state\" (no secret in the state worktree or its git log). Both fail on the HEAD `tree.ts` and pass with the fix. The fix is in `/home/user/holyagent/packages/runtime/src/state/tree.ts`: `requireStateFolder`, `realStateFolder`, the `isPlainFile`/`copyInto`/`requirePlainTarget` changes, and the pre-lock check in `migrateWorkTree`.\nThe legacy active-intent fallback works and is tested (non-blocking): `readLocal` in `/home/user/holyagent/packages/runtime/src/state/local.ts` falls back to `local/active-intent.json`. The test \"a worktree with no choice of its own uses the one shared choice an older version kept\" fails on HEAD `local.ts` and passes with the fix.\nbun test packages/runtime, bun check, lint and fmt check pass: the four commands above all exit 0.\nChanges stay inside the ownership paths: `git status --short` lists only `packages/runtime/src/state/local.ts`, `packages/runtime/src/state/tree.ts` and `packages/runtime/tests/state-branch.test.ts`, apart from untracked `.holyagent/intents/*` records I did not create.\nchanged-paths: the three files above.\nchecks-run: the commands listed under `checks`. The diff is saved at `/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/impl-diff.patch`.",
+  "createdAt": "2026-10-27T16:12:42.754Z"
+}

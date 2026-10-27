@@ -9,7 +9,7 @@ Rules for working in this repository, each with the reason it exists. The contri
 ## Branches and worktrees
 
 - Keep the main checkout on `main` and do other branches in git worktrees, for example `../holyagent-<branch-slug>`. Sessions here load the holyagent plugin from this checkout through the directory marketplace in `.claude/settings.json`, so checking out a branch that moves or deletes the plugin folder breaks the running session: every Bash call blocks and workflows fail.
-- Treat `.holyagent/` as versioned state. A branch that tracks older copies blocks a checkout while newer untracked copies exist, so when working in a worktree, copy the newer state into it before running `holyagent vcs commit` there.
+- `.holyagent/` state lives on its own branch, `holyagent/state`, in one worktree shared by every worktree of the clone, so work branches never carry it and nothing is copied between worktrees. Push `holyagent/state` with plain Git alongside the work branches.
 
 ## Commits and pull requests
 

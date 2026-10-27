@@ -13,14 +13,14 @@ import { closeAssignment, dispatch, record } from "../domain/lifecycle.ts"
 import { Revision } from "../domain/primitives.ts"
 import { findAssignment, findIntent, type Project } from "../domain/project.ts"
 import { RoleTask, routeFor } from "../domain/route.ts"
-import { readState, type Snapshot, updateState } from "../state/store.ts"
+import { readState, type Snapshot } from "../state/store.ts"
 import { booleanFlag, choiceFlag, requiredFlag, stringFlag } from "./args.ts"
 import { nowIso } from "./context.ts"
 import { AgentMismatch, Usage } from "./errors.ts"
 import { resolveIntent } from "./intent.ts"
 import { JsonReport, renderJsonReport } from "./jsonreport.ts"
 import { acceptanceFrom, renderPrompt } from "./report.ts"
-import { type Command, WithTrailer } from "./types.ts"
+import { type Call, type Command, WithTrailer } from "./types.ts"
 import { assignmentRow, assignmentView, byId, present } from "./views.ts"
 
 /** The plugin namespace the host knows the specialists under. */
@@ -108,12 +108,12 @@ const withoutNamespace = (type: string | undefined): string | undefined =>
  * launched must be the one the Assignment's route names.
  */
 export const recordLaunch = (
-  directory: string,
+  update: Call["update"],
   id: string,
   agentId: string | undefined,
   launchedAs?: { readonly type: string | undefined },
 ) =>
-  updateState(directory, (snapshot) =>
+  update((snapshot) =>
     Effect.gen(function* () {
       const route = routeFor((yield* findAssignment(snapshot.project, id)).roleTask)
       const { model, effort } = route
@@ -149,12 +149,12 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
     notes: ["the draft rules are under assignment dispatch"],
     flags: { input: "string" },
     positionals: 0,
-    run: ({ directory, input }) =>
+    run: ({ update, input }) =>
       Effect.gen(function* () {
         const draft = yield* input(AssignmentInput)
         const id = yield* newId("assignment")
         const now = yield* nowIso
-        const { assignment } = yield* updateState(directory, (snapshot) =>
+        const { assignment } = yield* update((snapshot) =>
           completeDraft(snapshot, draft).pipe(
             Effect.flatMap((complete) => createAssignment(snapshot.project, complete, { id, now })),
           ),
@@ -173,7 +173,7 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
     notes: [...DRAFT_NOTES, 'dispatching a Ready Assignment takes {"id": "<id>"}'],
     flags: { input: "string" },
     positionals: 0,
-    run: ({ directory, config, inputBy }) =>
+    run: ({ update, config, inputBy }) =>
       Effect.gen(function* () {
         const request = yield* inputBy((raw) =>
           typeof raw === "object" && raw !== null && "id" in raw ? ExistingRef : AssignmentInput,
@@ -181,7 +181,7 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
         const settings = yield* config
         const newAssignmentId = yield* newId("assignment")
         const now = yield* nowIso
-        const started = yield* updateState(directory, (snapshot) =>
+        const started = yield* update((snapshot) =>
           Effect.gen(function* () {
             const id = "id" in request ? request.id : newAssignmentId
             const project =
@@ -214,7 +214,7 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
     ],
     flags: { agent: "string", failed: "boolean" },
     positionals: 1,
-    run: ({ directory, args }) =>
+    run: ({ update, args }) =>
       Effect.gen(function* () {
         const id = idArgument(args.positionals)
         const agentId = stringFlag(args, "agent")
@@ -226,7 +226,7 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
         const problem = agentId === undefined ? undefined : workflowAgentProblem(agentId, id)
         if (problem !== undefined)
           return yield* new Usage({ message: problem, hint: `Usage: holyagent ${RECORD_USAGE}` })
-        const assignment = yield* recordLaunch(directory, id, agentId)
+        const assignment = yield* recordLaunch(update, id, agentId)
         return present({
           id,
           state: assignment.state,
@@ -249,7 +249,7 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
     ],
     flags: { outcome: "string", accept: "string", "report-json": "boolean" },
     positionals: 1,
-    run: ({ directory, args, text, input }) =>
+    run: ({ update, args, text, input }) =>
       Effect.gen(function* () {
         const id = idArgument(args.positionals)
         const flag = yield* choiceFlag(
@@ -287,7 +287,7 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
         const result =
           outcome === "Succeeded" ? report : report.trim() === "" ? flag : `${flag}: ${report}`
         const now = yield* nowIso
-        const { assignment } = yield* updateState(directory, (snapshot) =>
+        const { assignment } = yield* update((snapshot) =>
           Effect.gen(function* () {
             const accept =
               rationale === undefined
@@ -322,7 +322,7 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
     ],
     flags: { rationale: "string", "carry-forward": "boolean", report: "boolean" },
     positionals: 1,
-    run: ({ directory, args, text }) =>
+    run: ({ update, args, text }) =>
       Effect.gen(function* () {
         const id = idArgument(args.positionals)
         const rationale = yield* requiredFlag(
@@ -332,7 +332,7 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
         )
         const corrected = booleanFlag(args, "report") ? yield* text : undefined
         const now = yield* nowIso
-        const { assignment } = yield* updateState(directory, (snapshot) =>
+        const { assignment } = yield* update((snapshot) =>
           Effect.gen(function* () {
             const found = yield* findAssignment(snapshot.project, id)
             const acceptance = yield* acceptanceFrom(

@@ -1,4 +1,5 @@
-import { open, rm } from "node:fs/promises"
+import { mkdir, open, rm } from "node:fs/promises"
+import { dirname } from "node:path"
 
 import { Clock, Effect, Schedule, Schema } from "effect"
 
@@ -65,16 +66,21 @@ const claim = (file: string) =>
     return owner.token
   })
 
-const acquire = (file: string) =>
+/** How long a contender waits for a lock: a holder usually keeps it for milliseconds. */
+type Patience = "short" | "long"
+
+const WAITS = {
+  short: { schedule: Schedule.exponential("10 millis", 1.5), times: 10 },
+  // For a holder that works for as long as a checkout of a large repository takes, about a minute.
+  long: { schedule: Schedule.spaced("50 millis"), times: 1200 },
+} as const
+
+const acquire = (file: string, patience: Patience = "short") =>
   claim(file).pipe(
     Effect.catchTag("StateLocked", (locked) =>
       breakIfStale(file).pipe(Effect.andThen(Effect.fail(locked))),
     ),
-    Effect.retry({
-      schedule: Schedule.exponential("10 millis", 1.5),
-      times: 10,
-      while: (error) => error._tag === "StateLocked",
-    }),
+    Effect.retry({ ...WAITS[patience], while: (error) => error._tag === "StateLocked" }),
   )
 
 /** Removes the lock file, but only while it still carries the token. Never fails. */
@@ -87,16 +93,32 @@ const release = (file: string, token: string) =>
   )
 
 /**
- * Runs `use` while holding the state lock, so two processes never interleave their reads and
- * writes. The lock is a file in `local/` created exclusively; one left by a dead process is broken,
- * and the lock is released whatever the outcome. A contender retries for about a second (a holder
- * keeps the lock for milliseconds), then fails with StateLocked.
+ * Runs `use` while holding the lock file, so two processes never interleave. The lock is a file
+ * created exclusively; one left by a dead process is broken, and the lock is released whatever the
+ * outcome. A contender retries for about a second (a holder keeps the lock for milliseconds), or
+ * about a minute with `patience: "long"` for a holder that does slow work, then fails with
+ * StateLocked. The folder of the file is made when it is missing.
  */
-export const withStateLock = <A, E, R>(directory: string, use: Effect.Effect<A, E, R>) => {
-  const file = localFile(directory, "lock")
-  return Effect.acquireUseRelease(
-    ensureLocalDirectory(directory).pipe(Effect.andThen(acquire(file))),
+export const withFileLock = <A, E, R>(
+  file: string,
+  use: Effect.Effect<A, E, R>,
+  patience: Patience = "short",
+) =>
+  Effect.acquireUseRelease(
+    io(file, () => mkdir(dirname(file), { recursive: true })).pipe(
+      Effect.andThen(acquire(file, patience)),
+    ),
     () => use,
     (token) => release(file, token),
   )
-}
+
+/**
+ * Runs `use` while holding the state lock (`local/lock` of the state folder), so two processes
+ * never interleave their reads and writes.
+ */
+export const withStateLock = <A, E, R>(directory: string, use: Effect.Effect<A, E, R>) =>
+  Effect.acquireUseRelease(
+    ensureLocalDirectory(directory).pipe(Effect.andThen(acquire(localFile(directory, "lock")))),
+    () => use,
+    (token) => release(localFile(directory, "lock"), token),
+  )

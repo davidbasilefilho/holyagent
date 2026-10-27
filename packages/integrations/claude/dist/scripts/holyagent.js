@@ -4125,6 +4125,7 @@ var orElseSucceed2 = orElseSucceed;
 var filter3 = filter2;
 var filterOrFail2 = filterOrFail;
 var provide3 = provide2;
+var provideService2 = provideService;
 var acquireUseRelease2 = acquireUseRelease;
 var ensuring2 = ensuring;
 var runFork2 = runFork;
@@ -7313,7 +7314,7 @@ var HINTS = {
   NothingToMigrate: "Run it in a project that has a .holyclaude or .holycodex folder with state in it, or check that you are in the project root.",
   MigrationUnverified: "The records were written but do not load back: delete the files this run wrote (git status lists them), fix the cause the message names and run `holyagent migrate --dry-run` again.",
   StateLocked: "Another process holds the state lock; retry in a moment.",
-  StateIo: "Check the permissions of the .holyagent folder in the project root.",
+  StateIo: "Check what the message names: the permissions of the .holyagent folder of the state worktree (under the git directory, or in the project outside git), that git runs there, and that no branch already uses a name the state branch needs (holyagent/state needs no branch called holyagent; git config holyagent.stateBranch picks another name).",
   CorruptRecord: "Fix or delete the file the message names, or restore it from version control.",
   ...VCS_HINTS
 };
@@ -7328,7 +7329,7 @@ var describeFailure = (error) => {
   };
 };
 
-import { join as join10 } from "path";
+import { join as join11 } from "path";
 
 var NULL_LITERAL = "null";
 var DELIMITERS = {
@@ -9177,255 +9178,35 @@ var STATE_DIRECTORY = ".holyagent";
 var intentFolder = (directory, intent) => join(directory, "intents", recordName(intent.slug, intent.id));
 var intentFile = (directory, intent) => join(intentFolder(directory, intent), "intent.json");
 var assignmentFile = (intentFolderPath, assignment) => join(intentFolderPath, "assignments", `${routeFor(assignment.roleTask).agent}-${recordName(assignment.slug, assignment.id)}.json`);
+var branchFile = (intentFolderPath, record) => join(intentFolderPath, "branches", `${record.id}.json`);
+var pullFile = (intentFolderPath, record) => join(intentFolderPath, "pulls", `${record.id}.json`);
 var localFile = (directory, name) => join(directory, "local", name);
-
-var {$ } = globalThis.Bun;
-var spawn = (program, args, options) => promise2(() => {
-  const command = options.stdin === undefined ? $`${program} ${args}` : $`${program} ${args} < ${new Response(options.stdin)}`;
-  const env = Object.fromEntries(Object.entries(options.env).filter((entry) => entry[1] !== undefined));
-  return command.cwd(options.cwd).env(env).quiet().nothrow();
-}).pipe(map4((output) => ({
-  code: output.exitCode,
-  stdout: output.stdout,
-  stderr: output.stderr.toString()
-})));
-
-class Git extends Service()("holyagent/vcs/Git") {
-}
-var gitLive = (cwd, env) => succeed5(Git, {
-  run: (args, extra = {}) => spawn("git", args, { cwd, env: { ...process.env, ...env, ...extra } }).pipe(map4(({ code, stdout, stderr }) => ({
-    code,
-    stdout: new TextDecoder().decode(stdout),
-    stderr
-  }))),
-  blob: (oid) => spawn("git", ["cat-file", "blob", oid], { cwd, env: { ...process.env, ...env } }).pipe(filterOrFail2(({ code }) => code === 0, ({ code, stderr }) => new GitFailed({ args: ["cat-file", "blob", oid], code, output: stderr })), map4(({ stdout }) => stdout))
-});
-var tail = (result) => `${result.stderr}
-${result.stdout}`.trim().split(`
-`).slice(-20).join(`
-`);
-var git = (args, env) => Git.use((service) => service.run(args, env)).pipe(filterOrFail2(({ code }) => code === 0, (result) => new GitFailed({ args, code: result.code, output: tail(result) })), map4(({ stdout }) => stdout.trim()));
-var gitMaybe = (args) => Git.use((service) => service.run(args)).pipe(map4(({ code, stdout }) => code === 0 ? stdout.trim() : undefined));
-var gitPaths = (args, paths) => git(["--literal-pathspecs", ...args, "--", ...paths]);
-var validBranch = (name) => gen2(function* () {
-  const plain = !name.startsWith("-") && !name.startsWith("+");
-  if (plain && (yield* gitMaybe(["check-ref-format", "--branch", name])) === name)
-    return name;
-  return yield* new Usage({
-    message: `"${name}" is not a plain branch name`,
-    hint: "Name branches without a leading dash or plus, such as feature/parser."
-  });
-});
-var currentBranch = gen2(function* () {
-  const branch = yield* gitMaybe(["symbolic-ref", "--short", "-q", "HEAD"]);
-  if (branch === undefined || branch === "")
-    return yield* new DetachedHead;
-  return yield* validBranch(branch);
-});
-var stripUserinfo = (url) => url.replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/@]*@/i, "$1");
-var originUrl = gitMaybe(["remote", "get-url", "origin"]).pipe(map4((url) => stripUserinfo(url ?? "")));
-var repoSlug = (url) => {
-  const match = /([^/:]+)\/([^/]+?)(?:\.git)?\/*$/.exec(url.trim());
-  if (match === null)
-    return;
-  const [, owner = "", repo = ""] = match;
-  const dots = new Set([".", ".."]);
-  return dots.has(owner) || dots.has(repo) || !/^[\w.-]+\/[\w.-]+$/.test(`${owner}/${repo}`) ? undefined : `${owner}/${repo}`;
-};
-
-class GitHub extends Service()("holyagent/vcs/GitHub") {
-}
-var apiPath = (path) => path.split("/").map(encodeURIComponent).join("/");
-var ErrorBody = fromJsonString2(Struct({ message: String4 }));
-var Json2 = fromJsonString2(Unknown2);
-var gh = (cwd, env, what, args, stdin) => spawn("gh", args, {
-  cwd,
-  env: { ...process.env, ...env, GH_PROMPT_DISABLED: "1", NO_COLOR: "1" },
-  stdin
-}).pipe(flatMap2(({ code, stdout, stderr }) => {
-  const text = new TextDecoder().decode(stdout);
-  if (code === 0)
-    return succeed6(text);
-  const status = /HTTP (\d{3})/.exec(stderr)?.[1];
-  return decodeUnknownEffect2(ErrorBody)(text).pipe(map4((body) => body.message), orElseSucceed2(() => stderr.trim() || text.trim() || `gh exited ${code}`), flatMap2((reason) => fail5(new GitHubFailed({
-    what,
-    status: status === undefined ? undefined : Number(status),
-    reason
-  }))));
-}));
-var parse = (what, text) => text.trim() === "" ? succeed6(null) : decodeUnknownEffect2(Json2)(text).pipe(mapError2(() => new GitHubFailed({ what, status: undefined, reason: "the answer is not JSON" })));
-var githubLive = (cwd, env) => succeed5(GitHub, {
-  rest: ({ method, path, body }) => {
-    const what = `${method} ${path.split("?")[0]}`;
-    return gh(cwd, env, what, ["api", "-X", method, path, ...body === undefined ? [] : ["--input", "-"]], body === undefined ? undefined : JSON.stringify(body)).pipe(flatMap2((text) => parse(what, text)));
-  }
-});
-var decodeAnswer = (schema, what, answer) => decodeUnknownEffect2(schema)(answer).pipe(mapError2((error) => new GitHubFailed({
-  what,
-  status: undefined,
-  reason: `unexpected answer: ${error.message}`
-})));
-
-var vcsLive = (root, env) => merge2(gitLive(root, env), githubLive(root, env));
-
-var INPUT_FLAG = "input";
-var parseArgs = (args, spec, usage) => gen2(function* () {
-  const hint = `Usage: holyagent ${usage}`;
-  const positionals = [];
-  const flags = {};
-  for (let index = 0;index < args.length; index += 1) {
-    const arg = args[index] ?? "";
-    if (!arg.startsWith("--")) {
-      positionals.push(arg);
-      continue;
-    }
-    const equals = arg.indexOf("=");
-    const name = equals === -1 ? arg.slice(2) : arg.slice(2, equals);
-    const kind = Object.hasOwn(spec, name) ? spec[name] : undefined;
-    if (kind === undefined)
-      return yield* new Usage({ message: `Unknown flag --${name}`, hint });
-    if (kind === "boolean") {
-      if (equals !== -1)
-        return yield* new Usage({ message: `Flag --${name} takes no value`, hint });
-      flags[name] = true;
-      continue;
-    }
-    const next = args[index + 1];
-    const value = equals === -1 ? next?.startsWith("--") ? undefined : next : arg.slice(equals + 1);
-    if (equals === -1 && value !== undefined)
-      index += 1;
-    if (value === undefined)
-      return yield* new Usage({ message: `Flag --${name} needs a value`, hint });
-    flags[name] = value;
-  }
-  return { positionals, flags };
-});
-var stringFlag = (parsed, name) => {
-  const value = parsed.flags[name];
-  return typeof value === "string" ? value : undefined;
-};
-var booleanFlag = (parsed, name) => parsed.flags[name] === true;
-var requiredFlag = (parsed, name, usage) => {
-  const value = stringFlag(parsed, name);
-  return value === undefined ? fail5(new Usage({ message: `Missing --${name}`, hint: `Usage: holyagent ${usage}` })) : succeed6(value);
-};
-var choiceFlag = (schema, name, value, usage) => decodeUnknownEffect2(schema)(value).pipe(mapError2(() => new Usage({
-  message: `Invalid value for --${name}: ${String(value)}`,
-  hint: `Usage: holyagent ${usage}`
-})));
-
-import { dirname } from "path";
-
-var present = (record) => Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined && !(Array.isArray(value) && value.length === 0)));
-var oneLine = (text) => text.replace(/\s+/g, " ").trim();
-var intentView = (intent) => present({
-  id: intent.id,
-  revision: intent.revision,
-  state: intent.state,
-  objective: intent.objective,
-  requirements: intent.requirements,
-  closeReason: intent.closeReason
-});
-var assignmentView = (assignment) => present({
-  id: assignment.id,
-  intent: assignment.intentId,
-  revision: assignment.intentRevision,
-  role: assignment.roleTask,
-  state: assignment.state,
-  objective: assignment.objective,
-  scope: assignment.scope,
-  constraints: assignment.constraints,
-  criteria: assignment.criteria,
-  evidence: assignment.evidence,
-  paths: assignment.ownershipPaths,
-  dependsOn: assignment.dependencies,
-  independentFrom: assignment.independentFrom,
-  followUpOf: assignment.followUpOf,
-  agent: assignment.specialist?.agentId,
-  startedAt: assignment.specialist?.startedAt,
-  finishedAt: assignment.specialist?.finishedAt,
-  result: assignment.result,
-  acceptance: assignment.acceptance === undefined ? undefined : present({
-    revision: assignment.acceptance.revision,
-    carriedFrom: assignment.acceptance.carriedFrom,
-    rationale: assignment.acceptance.rationale,
-    criteria: assignment.acceptance.criteria,
-    evidence: assignment.acceptance.evidence
-  })
-});
-var assignmentRow = (assignment) => ({
-  id: assignment.id,
-  role: assignment.roleTask,
-  state: assignment.state,
-  rev: assignment.intentRevision,
-  accepted: assignment.acceptance !== undefined,
-  agent: assignment.specialist?.agentId ?? null,
-  objective: oneLine(assignment.objective)
-});
-var intentRow = (intent, inUse) => ({
-  id: intent.id,
-  state: intent.state,
-  revision: intent.revision,
-  inUse,
-  objective: oneLine(intent.objective)
-});
-var byId = (rows) => rows.toSorted((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
-
-var readArguments = (args, spec, usage) => gen2(function* () {
-  const hint = `Usage: holyagent ${usage}`;
-  const positionals = [];
-  const values = {};
-  const switches = new Set;
-  const lookup = (flag) => Object.entries(spec).find(([name, shape]) => flag.startsWith("--") ? flag.slice(2) === name : flag === `-${shape.short}`);
-  for (let index = 0;index < args.length; index += 1) {
-    const arg = args[index] ?? "";
-    if (arg === "--") {
-      positionals.push(...args.slice(index + 1));
-      break;
-    }
-    if (!arg.startsWith("-") || arg === "-") {
-      positionals.push(arg);
-      continue;
-    }
-    const equals = arg.startsWith("--") ? arg.indexOf("=") : -1;
-    const flag = equals === -1 ? arg : arg.slice(0, equals);
-    const found = lookup(flag);
-    if (found === undefined)
-      return yield* new Usage({ message: `Unknown flag ${flag}`, hint });
-    const [name, shape] = found;
-    if (shape.kind === "switch") {
-      switches.add(name);
-      continue;
-    }
-    const value = equals === -1 ? args[++index] : arg.slice(equals + 1);
-    if (value === undefined)
-      return yield* new Usage({ message: `Flag ${flag} needs a value`, hint });
-    if (shape.kind === "one" && values[name] !== undefined)
-      return yield* new Usage({ message: `Flag ${flag} was given twice`, hint });
-    (values[name] ??= []).push(value);
-  }
-  return { positionals, values, switches };
-});
-var valueOf = (args, name) => args.values[name]?.[0];
-var requiredValue = (args, name, usage) => {
-  const value = valueOf(args, name);
-  return value === undefined ? fail5(new Usage({
-    message: `Missing --${name}`,
-    hint: `Usage: holyagent ${usage}`
-  })) : succeed6(value);
-};
-
-import { join as join3, relative as relative2 } from "path";
 
 var identifier2 = (kind) => String4.check(isPattern2(new RegExp(`^${kind}-[a-z0-9]+(?:-[a-z0-9]+)*$`)));
 var IntentId = identifier2("intent");
 var AssignmentId = identifier2("assignment");
+var BranchId = identifier2("branch");
+var PullId = identifier2("pull");
 var AgentId = String4.check(isPattern2(/\S/));
 var newId = (kind) => gen2(function* () {
   const time = (yield* currentTimeMillis2).toString(36).padStart(9, "0");
   const digits = yield* forEach2([0, 1, 2, 3], () => nextIntBetween(0, 35));
   return `${kind}-${time}-${digits.map((digit) => digit.toString(36)).join("")}`;
 });
+
+var Text = String4.check(isPattern2(/\S/));
+var Revision = Int.check(isGreaterThanOrEqualTo2(1));
+var INSTANT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?Z$/;
+var isInstant = (text) => {
+  const match = INSTANT.exec(text);
+  if (match === null || Number.isNaN(Date.parse(text)))
+    return false;
+  const [year, month, day, hour, minute, second] = match.slice(1).map(Number);
+  const date = new Date(text);
+  return date.getUTCFullYear() === year && date.getUTCMonth() + 1 === month && date.getUTCDate() === day && date.getUTCHours() === hour && date.getUTCMinutes() === minute && date.getUTCSeconds() === second;
+};
+var Timestamp = String4.check(makeFilter2((text) => isInstant(text) || "a real UTC instant such as 2026-01-02T03:04:05Z"));
+var TextList = ArraySchema(Text);
 
 class UnknownRecord extends TaggedError2("UnknownRecord") {
   get message() {
@@ -9533,20 +9314,6 @@ var pathsOverlap = (a, b) => {
   return left === right || left.startsWith(`${right}/`) || right.startsWith(`${left}/`);
 };
 var firstOverlap = (a, b) => a.find((left) => b.some((right) => pathsOverlap(left, right)));
-
-var Text = String4.check(isPattern2(/\S/));
-var Revision = Int.check(isGreaterThanOrEqualTo2(1));
-var INSTANT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?Z$/;
-var isInstant = (text) => {
-  const match = INSTANT.exec(text);
-  if (match === null || Number.isNaN(Date.parse(text)))
-    return false;
-  const [year, month, day, hour, minute, second] = match.slice(1).map(Number);
-  const date = new Date(text);
-  return date.getUTCFullYear() === year && date.getUTCMonth() + 1 === month && date.getUTCDate() === day && date.getUTCHours() === hour && date.getUTCMinutes() === minute && date.getUTCSeconds() === second;
-};
-var Timestamp = String4.check(makeFilter2((text) => isInstant(text) || "a real UTC instant such as 2026-01-02T03:04:05Z"));
-var TextList = ArraySchema(Text);
 
 var findIntent = (project, id) => {
   const found = project.intents.find((intent) => intent.id === id);
@@ -9763,6 +9530,67 @@ var bindSpecialist = (registry, assignment, launch) => gen2(function* () {
   }));
 });
 
+var ActiveIntentFile = Struct({ intentId: IntentId });
+var SpecialistsFile = Struct({ specialists: ArraySchema(SpecialistEntry) });
+var WorkTree = Reference("holyagent/state/WorkTree", {
+  defaultValue: () => {
+    return;
+  }
+});
+var activeIntentFile = (directory, workTree) => localFile(directory, `active-intent/${new Bun.CryptoHasher("sha1").update(workTree).digest("hex").slice(0, 16)}.json`);
+var LEGACY_ACTIVE_INTENT = "active-intent.json";
+var Vcs = Struct({
+  branch: optionalKey2(Text),
+  base: optionalKey2(Text),
+  pullRequest: optionalKey2(Text),
+  detection: optionalKey2(Unknown2)
+});
+var ensureLocalDirectory = (directory) => {
+  const ignore = localFile(directory, ".gitignore");
+  return io(ignore, () => Bun.file(ignore).exists()).pipe(flatMap2((exists) => exists ? void_3 : commitFile(ignore, `*
+`)));
+};
+var readLocal = (directory) => gen2(function* () {
+  const workTree = yield* WorkTree;
+  const own = workTree === undefined ? undefined : yield* readJson(ActiveIntentFile, activeIntentFile(directory, workTree));
+  const active = own ?? (yield* readJson(ActiveIntentFile, localFile(directory, LEGACY_ACTIVE_INTENT)));
+  const specialists = yield* readJson(SpecialistsFile, localFile(directory, "specialists.json"));
+  const vcs = yield* readJson(Vcs, localFile(directory, "vcs.json"));
+  return {
+    ...active === undefined ? {} : { activeIntent: active.intentId },
+    specialists: specialists?.specialists ?? [],
+    vcs: vcs ?? {}
+  };
+});
+var encodeLocal = (directory, change) => gen2(function* () {
+  const files = [];
+  if (change.activeIntent !== undefined) {
+    const workTree = yield* WorkTree;
+    if (workTree === undefined)
+      return yield* new StateIo({
+        path: directory,
+        cause: "No work tree to keep the Intent in use for"
+      });
+    files.push({
+      path: activeIntentFile(directory, workTree),
+      content: yield* encodeJson(ActiveIntentFile, { intentId: change.activeIntent })
+    });
+  }
+  if (change.specialists !== undefined)
+    files.push({
+      path: localFile(directory, "specialists.json"),
+      content: yield* encodeJson(SpecialistsFile, { specialists: change.specialists })
+    });
+  if (change.vcs !== undefined)
+    files.push({
+      path: localFile(directory, "vcs.json"),
+      content: yield* encodeJson(Vcs, change.vcs)
+    });
+  return files;
+});
+
+import { join as join3, relative } from "path";
+
 var IntentState = Literals(["Open", "Closed"]);
 var Intent = Struct({
   id: IntentId,
@@ -9843,52 +9671,47 @@ var reopenIntent = (project, intentId) => gen2(function* () {
   return { intent, intents: [intent] };
 });
 
-import { join as join2, relative } from "path";
-
-var ActiveIntentFile = Struct({ intentId: IntentId });
-var SpecialistsFile = Struct({ specialists: ArraySchema(SpecialistEntry) });
-var Vcs = Struct({
-  branch: optionalKey2(Text),
+var BranchRecord = Struct({
+  id: BranchId,
+  intentId: IntentId,
+  branch: Text,
+  commit: Text,
+  committedAt: Timestamp
+});
+var PullRecord = Struct({
+  id: PullId,
+  intentId: IntentId,
+  number: Int.check(isGreaterThanOrEqualTo2(1)),
+  url: Text,
+  branch: Text,
   base: optionalKey2(Text),
-  pullRequest: optionalKey2(Text),
-  detection: optionalKey2(Unknown2)
+  created: Boolean3,
+  recordedAt: Timestamp
 });
-var ensureLocalDirectory = (directory) => {
-  const ignore = localFile(directory, ".gitignore");
-  return io(ignore, () => Bun.file(ignore).exists()).pipe(flatMap2((exists) => exists ? void_3 : commitFile(ignore, `*
-`)));
+var linkBranch = (project, input) => gen2(function* () {
+  const record = yield* decodeInput(BranchRecord, input);
+  yield* findIntent(project, record.intentId);
+  return { branches: [record], record };
+});
+var linkPull = (project, input) => gen2(function* () {
+  const record = yield* decodeInput(PullRecord, input);
+  yield* findIntent(project, record.intentId);
+  return { pulls: [record], record };
+});
+var branchesOf = (links, intentId) => [
+  ...new Set(links.branches.filter((record) => record.intentId === intentId).toSorted((a, b) => a.id < b.id ? -1 : 1).map((record) => record.branch))
+];
+var pullsOf = (links, intentId) => {
+  const latest = new Map;
+  for (const record of links.pulls.filter((candidate) => candidate.intentId === intentId).toSorted((a, b) => a.id < b.id ? -1 : 1)) {
+    const base = record.base ?? latest.get(record.number)?.base;
+    latest.set(record.number, base === undefined ? record : { ...record, base });
+  }
+  return [...latest.values()].toSorted((a, b) => a.number - b.number);
 };
-var readLocal = (directory) => gen2(function* () {
-  const active = yield* readJson(ActiveIntentFile, localFile(directory, "active-intent.json"));
-  const specialists = yield* readJson(SpecialistsFile, localFile(directory, "specialists.json"));
-  const vcs = yield* readJson(Vcs, localFile(directory, "vcs.json"));
-  return {
-    ...active === undefined ? {} : { activeIntent: active.intentId },
-    specialists: specialists?.specialists ?? [],
-    vcs: vcs ?? {}
-  };
-});
-var encodeLocal = (directory, change) => gen2(function* () {
-  const files = [];
-  if (change.activeIntent !== undefined)
-    files.push({
-      path: localFile(directory, "active-intent.json"),
-      content: yield* encodeJson(ActiveIntentFile, { intentId: change.activeIntent })
-    });
-  if (change.specialists !== undefined)
-    files.push({
-      path: localFile(directory, "specialists.json"),
-      content: yield* encodeJson(SpecialistsFile, { specialists: change.specialists })
-    });
-  if (change.vcs !== undefined)
-    files.push({
-      path: localFile(directory, "vcs.json"),
-      content: yield* encodeJson(Vcs, change.vcs)
-    });
-  return files;
-});
 
-import { open, rm as rm2 } from "fs/promises";
+import { mkdir, open, rm as rm2 } from "fs/promises";
+import { dirname } from "path";
 var LockOwner = Struct({
   pid: Int,
   token: String4,
@@ -9919,23 +9742,385 @@ var claim = (file) => gen2(function* () {
   yield* io(file, () => handle.writeFile(content)).pipe(tapError2(() => io(file, () => rm2(file, { force: true })).pipe(ignore2)), ensuring2(io(file, () => handle.close()).pipe(ignore2)));
   return owner.token;
 });
-var acquire = (file) => claim(file).pipe(catchTag2("StateLocked", (locked) => breakIfStale(file).pipe(andThen2(fail5(locked)))), retry2({
-  schedule: exponential("10 millis", 1.5),
-  times: 10,
-  while: (error) => error._tag === "StateLocked"
-}));
-var release = (file, token) => readOwner(file).pipe(flatMap2((owner) => owner?.token === token ? io(file, () => rm2(file, { force: true })) : void_3), ignore2);
-var withStateLock = (directory, use) => {
-  const file = localFile(directory, "lock");
-  return acquireUseRelease2(ensureLocalDirectory(directory).pipe(andThen2(acquire(file))), () => use, (token) => release(file, token));
+var WAITS = {
+  short: { schedule: exponential("10 millis", 1.5), times: 10 },
+  long: { schedule: spaced("50 millis"), times: 1200 }
 };
+var acquire = (file, patience = "short") => claim(file).pipe(catchTag2("StateLocked", (locked) => breakIfStale(file).pipe(andThen2(fail5(locked)))), retry2({ ...WAITS[patience], while: (error) => error._tag === "StateLocked" }));
+var release = (file, token) => readOwner(file).pipe(flatMap2((owner) => owner?.token === token ? io(file, () => rm2(file, { force: true })) : void_3), ignore2);
+var withFileLock = (file, use, patience = "short") => acquireUseRelease2(io(file, () => mkdir(dirname(file), { recursive: true })).pipe(andThen2(acquire(file, patience))), () => use, (token) => release(file, token));
+var withStateLock = (directory, use) => acquireUseRelease2(ensureLocalDirectory(directory).pipe(andThen2(acquire(localFile(directory, "lock")))), () => use, (token) => release(localFile(directory, "lock"), token));
+
+import { lstat, mkdir as mkdir2, readdir, realpath, rename as rename2, rm as rm3, rmdir, stat } from "fs/promises";
+import { basename, dirname as dirname2, join as join2, sep } from "path";
+var {$ } = globalThis.Bun;
+
+var looksLikeAgent = (identity) => identity.email.toLowerCase() === "noreply@anthropic.com" || /^claude\b/i.test(identity.name.trim());
+
+var DEFAULT_STATE_BRANCH = "holyagent/state";
+var BRANCH_KEY = "holyagent.stateBranch";
+var CONFIG_FILE = "config.json";
+var REPOSITORY_VARIABLES = new Set([
+  "GIT_DIR",
+  "GIT_WORK_TREE",
+  "GIT_INDEX_FILE",
+  "GIT_PREFIX",
+  "GIT_COMMON_DIR",
+  "GIT_OBJECT_DIRECTORY",
+  "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+  "GIT_NAMESPACE",
+  "GIT_QUARANTINE_PATH"
+]);
+var gitEnvironment = (env) => Object.fromEntries(Object.entries({ ...process.env, ...env }).filter((entry) => entry[1] !== undefined && !REPOSITORY_VARIABLES.has(entry[0])));
+var git = (cwd, env, args) => tryPromise2({
+  try: () => $`git ${args}`.cwd(cwd).env(gitEnvironment(env)).quiet().nothrow(),
+  catch: (cause) => new StateIo({ path: cwd, cause })
+}).pipe(map4((output) => ({
+  code: output.exitCode,
+  stdout: output.stdout.toString(),
+  stderr: output.stderr.toString()
+})));
+var failed = (cwd, args, ran) => new StateIo({
+  path: cwd,
+  cause: `git ${args.join(" ")} exited ${ran.code}: ${`${ran.stderr}
+${ran.stdout}`.trim().split(`
+`).slice(-10).join(`
+`)}`
+});
+var gitText = (cwd, env, args) => git(cwd, env, args).pipe(flatMap2((ran) => ran.code === 0 ? succeed6(ran.stdout.trim()) : fail5(failed(cwd, args, ran))));
+var gitSucceeds = (cwd, env, args) => git(cwd, env, args).pipe(map4((ran) => ran.code === 0));
+var BOOKKEEPING = ["-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false"];
+var NOT_A_REPOSITORY = /not a git repository|command not found/i;
+var isDirectory = (path) => io(path, () => stat(path)).pipe(map4((info) => info.isDirectory()), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
+var stateBranch = (top, env) => gen2(function* () {
+  const configured = yield* git(top, env, ["config", "--get", BRANCH_KEY]);
+  const fromGit = configured.code === 0 ? configured.stdout.trim() : "";
+  const branch = fromGit !== "" ? fromGit : DEFAULT_STATE_BRANCH;
+  const valid = !branch.startsWith("-") && (yield* gitSucceeds(top, env, ["check-ref-format", `refs/heads/${branch}`]));
+  if (!valid)
+    return yield* new StateIo({
+      path: top,
+      cause: `"${branch}" is not a branch name; set ${BRANCH_KEY} in git config to one`
+    });
+  return branch;
+});
+var listWorktrees = (cwd, env) => gitText(cwd, env, ["worktree", "list", "--porcelain"]).pipe(map4((text) => text.split(`
+
+`).map((block) => block.split(`
+`)).map((lines) => {
+  const field = (name) => lines.find((line) => line.startsWith(`${name} `))?.slice(name.length + 1);
+  return {
+    path: field("worktree") ?? "",
+    branch: field("branch"),
+    prunable: lines.some((line) => line === "prunable" || line.startsWith("prunable "))
+  };
+}).filter((entry) => entry.path !== "")));
+var checkedOut = (listed, branch) => gen2(function* () {
+  for (const entry of listed)
+    if (entry.branch === `refs/heads/${branch}` && !entry.prunable && (yield* isDirectory(entry.path)))
+      return entry.path;
+  return;
+});
+var refExists = (cwd, env, ref) => gitSucceeds(cwd, env, ["show-ref", "--verify", "--quiet", ref]);
+var NEUTRAL_IDENTITY = {
+  GIT_AUTHOR_NAME: "holyagent",
+  GIT_AUTHOR_EMAIL: "holyagent@localhost",
+  GIT_COMMITTER_NAME: "holyagent",
+  GIT_COMMITTER_EMAIL: "holyagent@localhost"
+};
+var committing = (cwd, env) => git(cwd, env, ["var", "GIT_COMMITTER_IDENT"]).pipe(map4((ran) => {
+  const ident = /^(.*) <(.*)> \d+ [+-]\d{4}$/.exec(ran.stdout.trim());
+  return ran.code === 0 && ident !== null && !looksLikeAgent({ name: ident[1] ?? "", email: ident[2] ?? "" }) ? env : { ...env, ...NEUTRAL_IDENTITY };
+}));
+var baseStart = (top, env) => gen2(function* () {
+  const head = yield* git(top, env, ["symbolic-ref", "-q", "refs/remotes/origin/HEAD"]);
+  const named = head.code === 0 ? head.stdout.trim().replace("refs/remotes/origin/", "") : "";
+  const initial = yield* git(top, env, ["config", "--get", "init.defaultBranch"]);
+  const configured = initial.code === 0 ? initial.stdout.trim() : "";
+  for (const name of [named, configured, "main", "master"]) {
+    if (name === "")
+      continue;
+    if (yield* refExists(top, env, `refs/heads/${name}`))
+      return `refs/heads/${name}`;
+    if (yield* refExists(top, env, `refs/remotes/origin/${name}`))
+      return `refs/remotes/origin/${name}`;
+  }
+  return;
+});
+var keepsState = (top, env, branch, listed) => gen2(function* () {
+  if ((yield* refExists(top, env, `refs/heads/${branch}`)) || (yield* refExists(top, env, `refs/remotes/origin/${branch}`)))
+    return true;
+  for (const entry of [
+    top,
+    ...listed.filter((tree) => !tree.prunable).map((tree) => tree.path)
+  ]) {
+    const folder = join2(entry, STATE_DIRECTORY);
+    if (!(yield* isDirectory(folder)))
+      continue;
+    const names = yield* io(folder, () => readdir(folder));
+    if (names.some((name) => name !== CONFIG_FILE))
+      return true;
+  }
+  return false;
+});
+var worktreeFolder = (branch) => `${branch.replace(/[^\w.-]+/g, "-").slice(0, 40)}-${new Bun.CryptoHasher("sha1").update(branch).digest("hex").slice(0, 10)}`;
+var canonical = (path) => io(path, () => realpath(path)).pipe(orElseSucceed2(() => path));
+var samePath = (a, b) => all2([canonical(a), canonical(b)]).pipe(map4(([left, right]) => left === right));
+var requireFree = (listed, path, branch) => gen2(function* () {
+  for (const entry of listed) {
+    if (entry.prunable || !(yield* isDirectory(entry.path)))
+      continue;
+    if (!(yield* samePath(entry.path, path)))
+      continue;
+    const on = entry.branch === undefined ? "a detached head" : entry.branch.replace("refs/heads/", "");
+    return yield* new StateIo({
+      path,
+      cause: `this work tree is registered with git but is on ${on}, not on ${branch}; switch it back with \`git -C ${path} switch ${branch}\` or remove it with \`git worktree remove\``
+    });
+  }
+});
+var readyMarker = (path) => `${path}.ready`;
+var ensureWorktree = (top, common, env, branch, path, options) => withFileLock(join2(common, "holyagent", "worktree.lock"), gen2(function* () {
+  const ready = readyMarker(path);
+  const again = yield* checkedOut(yield* listWorktrees(top, env), branch);
+  if (again !== undefined) {
+    if (!options.peek && (yield* samePath(again, path)) && !(yield* fileExists(ready)))
+      yield* io(ready, () => Bun.write(ready, ""));
+    return { kind: "ready", path: again, created: false };
+  }
+  if (!options.make)
+    return { kind: "absent" };
+  yield* git(top, env, ["worktree", "prune"]);
+  yield* requireFree(yield* listWorktrees(top, env), path, branch);
+  const add = [...BOOKKEEPING, "worktree", "add", "-q"];
+  const local = yield* refExists(top, env, `refs/heads/${branch}`);
+  const remote = yield* refExists(top, env, `refs/remotes/origin/${branch}`);
+  const start = local || remote ? undefined : yield* baseStart(top, env);
+  const target = local ? [path, branch] : remote ? ["--track", "-b", branch, path, `origin/${branch}`] : start === undefined ? undefined : ["--no-track", "-b", branch, path, start];
+  if (target === undefined)
+    return { kind: "deferred" };
+  yield* io(ready, () => rm3(ready, { force: true }));
+  yield* io(path, () => rm3(path, { recursive: true, force: true }));
+  yield* io(path, () => mkdir2(dirname2(path), { recursive: true }));
+  yield* gitText(top, env, [...add, ...target]);
+  yield* io(ready, () => Bun.write(ready, ""));
+  return { kind: "ready", path, created: true };
+}), "long");
+var LOCAL_FILES = new Set(["local/specialists.json", "local/vcs.json"]);
+var sameBytes = (a, b) => all2([io(a, () => Bun.file(a).bytes()), io(b, () => Bun.file(b).bytes())]).pipe(map4(([left, right]) => Buffer.from(left).equals(Buffer.from(right))));
+var fileExists = (path) => io(path, () => Bun.file(path).exists());
+var kindAt = (path) => io(path, () => lstat(path)).pipe(map4((info) => info.isSymbolicLink() ? "link" : info.isFile() ? "file" : info.isDirectory() ? "directory" : "other"), catchIf2((error) => hasCode(error.cause, "ENOENT") || hasCode(error.cause, "ENOTDIR"), () => succeed6(undefined)));
+var realStateFolder = (root) => canonical(dirname2(root)).pipe(map4((parent) => join2(parent, basename(root))));
+var requireStateFolder = (root) => kindAt(root).pipe(flatMap2((kind) => kind === undefined || kind === "directory" ? void_3 : fail5(new StateIo({
+  path: root,
+  cause: `a ${kind} stands where the state folder is to be; the state worktree must hold a real folder, so remove it`
+}))));
+var isPlainFile = (root, relative) => gen2(function* () {
+  const path = join2(root, relative);
+  if ((yield* kindAt(root)) !== "directory" || (yield* kindAt(path)) !== "file")
+    return false;
+  const [real, base] = yield* all2([canonical(path), realStateFolder(root)]);
+  return real === join2(base, relative);
+});
+var requirePlainTarget = (root, relative) => gen2(function* () {
+  yield* requireStateFolder(root);
+  const parts = relative.split("/");
+  let current = root;
+  for (const [index, part] of parts.entries()) {
+    current = join2(current, part);
+    const kind = yield* kindAt(current);
+    if (kind === undefined)
+      return;
+    if (kind !== (index === parts.length - 1 ? "file" : "directory"))
+      return yield* new StateIo({
+        path: current,
+        cause: `a ${kind} stands where state is to be written; the state worktree must hold only plain files and folders, so remove it`
+      });
+  }
+});
+var copyInto = (root, relative, from) => gen2(function* () {
+  yield* requirePlainTarget(root, relative);
+  const to = join2(root, relative);
+  yield* io(to, () => mkdir2(dirname2(to), { recursive: true }));
+  const [folder, base] = yield* all2([canonical(dirname2(to)), realStateFolder(root)]);
+  if (folder !== base && !folder.startsWith(`${base}${sep}`))
+    return yield* new StateIo({ path: to, cause: `${folder} is outside the state worktree` });
+  const temporary = `${to}.${process.pid}.${crypto.randomUUID()}.tmp`;
+  yield* io(to, () => Bun.write(temporary, Bun.file(from))).pipe(andThen2(io(to, () => rename2(temporary, to))), tapError2(() => io(temporary, () => rm3(temporary, { force: true })).pipe(ignore2)));
+});
+var workTreeEntries = (top, env) => gen2(function* () {
+  const folder = join2(top, STATE_DIRECTORY);
+  if (!(yield* isDirectory(folder)))
+    return [];
+  const files = yield* io(folder, () => Array.fromAsync(new Bun.Glob("**/*").scan({ cwd: folder, dot: true, onlyFiles: true })));
+  const status = new Map;
+  const listing = yield* git(top, env, [
+    "status",
+    "--porcelain=v1",
+    "-z",
+    "--untracked-files=all",
+    "--",
+    STATE_DIRECTORY
+  ]);
+  const parts = listing.stdout.split("\x00");
+  for (let index = 0;index < parts.length; index++) {
+    const part = parts[index] ?? "";
+    if (part.length < 4)
+      continue;
+    const code = part.slice(0, 2);
+    status.set(part.slice(3 + STATE_DIRECTORY.length + 1), code);
+    if (code.includes("R") || code.includes("C"))
+      index++;
+  }
+  return files.filter((path) => path !== CONFIG_FILE).filter((path) => !path.startsWith("local/") || LOCAL_FILES.has(path)).toSorted().map((path) => ({ path, status: status.get(path) }));
+});
+var pruneEmpty = (folder, from) => gen2(function* () {
+  let current = from;
+  while (current.startsWith(`${folder}/`)) {
+    const names = yield* io(current, () => readdir(current)).pipe(orElseSucceed2(() => ["still here"]));
+    if (names.length > 0)
+      return;
+    yield* io(current, () => rmdir(current)).pipe(ignore2);
+    current = dirname2(current);
+  }
+});
+var migrationMarker = (common, top) => io(top, () => realpath(top)).pipe(map4((real) => join2(common, "holyagent", "migrated", new Bun.CryptoHasher("sha1").update(real).digest("hex").slice(0, 16))));
+var migrateWorkTree = (top, common, worktree, env, commit) => {
+  const source = join2(top, STATE_DIRECTORY);
+  const target = join2(worktree, STATE_DIRECTORY);
+  return migrationMarker(common, top).pipe(flatMap2((marker) => fileExists(marker).pipe(flatMap2((done) => done ? void_3 : requireStateFolder(target).pipe(andThen2(kindAt(source)), flatMap2((kind) => kind !== undefined && kind !== "directory" ? void_3 : withStateLock(target, gen2(function* () {
+    if (yield* fileExists(marker))
+      return;
+    const entries = yield* workTreeEntries(top, env);
+    const moved = [];
+    for (const entry of entries) {
+      if (!(yield* isPlainFile(source, entry.path)))
+        continue;
+      const to = join2(target, entry.path);
+      yield* requirePlainTarget(target, entry.path);
+      const dirty = entry.status !== undefined && !entry.status.includes("D");
+      const there = (yield* kindAt(to)) !== undefined;
+      const wanted = !there || dirty && !(yield* sameBytes(join2(source, entry.path), to));
+      if (wanted)
+        yield* copyInto(target, entry.path, join2(source, entry.path));
+      if (dirty && !entry.path.startsWith("local/"))
+        moved.push(entry);
+    }
+    yield* commit("chore(state): migrate the state found in a work tree");
+    for (const entry of moved) {
+      const from = join2(source, entry.path);
+      if (!(yield* sameBytes(from, join2(target, entry.path))))
+        continue;
+      const status = entry.status ?? "";
+      if (status === "??")
+        yield* io(from, () => rm3(from, { force: true }));
+      else if (status.startsWith("A"))
+        yield* gitText(top, env, [
+          "rm",
+          "-f",
+          "-q",
+          "--",
+          `${STATE_DIRECTORY}/${entry.path}`
+        ]);
+      else
+        yield* gitText(top, env, [
+          "--literal-pathspecs",
+          "restore",
+          "--source=HEAD",
+          "--staged",
+          "--worktree",
+          "--",
+          `${STATE_DIRECTORY}/${entry.path}`
+        ]);
+      yield* pruneEmpty(source, dirname2(from));
+    }
+    yield* io(source, () => rmdir(source)).pipe(ignore2);
+    yield* io(marker, () => Bun.write(marker, ""));
+  }))))))));
+};
+var commitState = (directory, env, message) => gen2(function* () {
+  const worktree = dirname2(directory);
+  if (!(yield* isDirectory(worktree)))
+    return false;
+  const top = yield* git(worktree, env, ["rev-parse", "--show-toplevel"]);
+  if (top.code !== 0)
+    return false;
+  const own = yield* all2([
+    io(worktree, () => realpath(worktree)),
+    io(worktree, () => realpath(top.stdout.trim()))
+  ]).pipe(map4(([a, b]) => a === b));
+  if (!own)
+    return false;
+  const current = yield* git(worktree, env, ["symbolic-ref", "--short", "-q", "HEAD"]);
+  if (current.code !== 0 || current.stdout.trim() !== (yield* stateBranch(worktree, env)))
+    return false;
+  yield* gitText(worktree, env, ["add", "-A", "--", STATE_DIRECTORY]);
+  if (yield* gitSucceeds(worktree, env, ["diff", "--cached", "--quiet", "--", STATE_DIRECTORY]))
+    return false;
+  yield* gitText(worktree, yield* committing(worktree, env), [
+    ...BOOKKEEPING,
+    "commit",
+    "-q",
+    "--no-verify",
+    "-m",
+    message,
+    "--",
+    STATE_DIRECTORY
+  ]);
+  return true;
+});
+var resolveState = (cwd, env, ensure) => gen2(function* () {
+  const located = yield* git(cwd, env, [
+    "rev-parse",
+    "--path-format=absolute",
+    "--show-toplevel",
+    "--git-common-dir"
+  ]);
+  if (located.code !== 0) {
+    const complaint = located.stderr.trim();
+    if (NOT_A_REPOSITORY.test(complaint))
+      return { root: cwd, directory: join2(cwd, STATE_DIRECTORY) };
+    return yield* new StateIo({ path: cwd, cause: `git: ${complaint}` });
+  }
+  const [top = cwd, common = join2(cwd, ".git")] = located.stdout.trim().split(`
+`);
+  const branch = yield* stateBranch(top, env);
+  const listed = yield* listWorktrees(top, env);
+  const found = yield* checkedOut(listed, branch);
+  const standard = join2(common, "holyagent", worktreeFolder(branch));
+  const settled = found !== undefined && (!(yield* samePath(found, standard)) || (yield* fileExists(readyMarker(standard))));
+  const make = ensure === "create" || ensure === "ifPresent" && (yield* keepsState(top, env, branch, listed));
+  const ensured = found !== undefined && settled ? { kind: "ready", path: found, created: false } : found === undefined && !make ? { kind: "absent" } : yield* ensureWorktree(top, common, env, branch, standard, {
+    make,
+    peek: ensure === "peek"
+  });
+  if (ensured.kind === "deferred")
+    return { root: top, directory: join2(top, STATE_DIRECTORY) };
+  if (ensured.kind === "absent") {
+    yield* requireFree(listed, standard, branch);
+    return { root: top, directory: join2(standard, STATE_DIRECTORY) };
+  }
+  const worktree = ensured.path;
+  const directory = join2(worktree, STATE_DIRECTORY);
+  if (ensure !== "peek") {
+    const own = join2(common, "holyagent");
+    const sources = ensured.created ? [
+      top,
+      ...listed.filter((entry) => !entry.prunable && !entry.path.startsWith(`${own}/`)).map((entry) => entry.path)
+    ] : [top];
+    for (const source of new Set(sources))
+      if (source !== worktree && (yield* isDirectory(source)))
+        yield* migrateWorkTree(source, common, worktree, env, (message) => commitState(directory, env, message));
+  }
+  return { root: top, directory };
+});
 
 var scan = (directory, pattern) => io(directory, () => Array.fromAsync(new Bun.Glob(pattern).scan({ cwd: directory }))).pipe(map4((paths) => paths.toSorted()), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6([])));
 var requireLocation = (path, expected) => path === expected ? void_3 : fail5(new CorruptRecord({ path, reason: `the record belongs in ${expected}` }));
 var loadIntents = (directory) => gen2(function* () {
   const intents = [];
   for (const file of yield* scan(directory, "intents/*/intent.json")) {
-    const path = join2(directory, file);
+    const path = join3(directory, file);
     const intent = yield* readJson(Intent, path);
     if (intent === undefined)
       continue;
@@ -9947,7 +10132,7 @@ var loadIntents = (directory) => gen2(function* () {
 var loadAssignments = (directory, relatives, intents) => gen2(function* () {
   const assignments = [];
   for (const file of relatives) {
-    const path = join2(directory, file);
+    const path = join3(directory, file);
     const assignment = yield* readJson(Assignment, path);
     if (assignment === undefined)
       continue;
@@ -9962,6 +10147,35 @@ var loadAssignments = (directory, relatives, intents) => gen2(function* () {
   }
   return assignments;
 });
+var loadLinks = (directory, intents) => gen2(function* () {
+  const branches = [];
+  const pulls = [];
+  for (const intent of intents) {
+    const folder = intentFolder(directory, intent);
+    const prefix = relative(directory, folder);
+    for (const file of yield* scan(directory, join3(prefix, "branches/*.json"))) {
+      const path = join3(directory, file);
+      const record = yield* readJson(BranchRecord, path);
+      if (record === undefined)
+        continue;
+      yield* requireLocation(path, branchFile(folder, record));
+      if (record.intentId !== intent.id)
+        return yield* new CorruptRecord({ path, reason: `the record belongs to ${intent.id}` });
+      branches.push(record);
+    }
+    for (const file of yield* scan(directory, join3(prefix, "pulls/*.json"))) {
+      const path = join3(directory, file);
+      const record = yield* readJson(PullRecord, path);
+      if (record === undefined)
+        continue;
+      yield* requireLocation(path, pullFile(folder, record));
+      if (record.intentId !== intent.id)
+        return yield* new CorruptRecord({ path, reason: `the record belongs to ${intent.id}` });
+      pulls.push(record);
+    }
+  }
+  return { branches, pulls };
+});
 var loadProject = (directory) => gen2(function* () {
   const intents = yield* loadIntents(directory);
   const assignments = yield* loadAssignments(directory, yield* scan(directory, "intents/*/assignments/*.json"), intents);
@@ -9969,11 +10183,16 @@ var loadProject = (directory) => gen2(function* () {
 });
 var loadOpenProject = (directory) => gen2(function* () {
   const intents = (yield* loadIntents(directory)).filter((intent) => intent.state === "Open");
-  const relatives = yield* forEach2(intents, (intent) => scan(directory, join2(relative(directory, intentFolder(directory, intent)), "assignments/*.json")));
+  const relatives = yield* forEach2(intents, (intent) => scan(directory, join3(relative(directory, intentFolder(directory, intent)), "assignments/*.json")));
   const assignments = yield* loadAssignments(directory, relatives.flat(), intents);
   return { intents, assignments };
 });
-var readSnapshot = (directory, load = loadProject) => all2({ project: load(directory), local: readLocal(directory) }).pipe(map4(({ project, local }) => ({ ...local, project })));
+var readSnapshot = (directory, load = loadProject) => gen2(function* () {
+  const project = yield* load(directory);
+  const links = yield* loadLinks(directory, project.intents);
+  const local = yield* readLocal(directory);
+  return { ...local, project, links };
+});
 var retryCorrupt = {
   schedule: spaced("25 millis"),
   times: 3,
@@ -10001,6 +10220,30 @@ var persist = (directory, project, change) => gen2(function* () {
       content: yield* encodeJson(Assignment, assignment)
     });
   }
+  for (const record of change.branches ?? []) {
+    const intent = intents.find((candidate) => candidate.id === record.intentId);
+    if (intent === undefined)
+      return yield* new StateIo({
+        path: directory,
+        cause: `Branch record ${record.id} names unknown Intent ${record.intentId}`
+      });
+    files.push({
+      path: branchFile(intentFolder(directory, intent), record),
+      content: yield* encodeJson(BranchRecord, record)
+    });
+  }
+  for (const record of change.pulls ?? []) {
+    const intent = intents.find((candidate) => candidate.id === record.intentId);
+    if (intent === undefined)
+      return yield* new StateIo({
+        path: directory,
+        cause: `Pull request record ${record.id} names unknown Intent ${record.intentId}`
+      });
+    files.push({
+      path: pullFile(intentFolder(directory, intent), record),
+      content: yield* encodeJson(PullRecord, record)
+    });
+  }
   files.push(...yield* encodeLocal(directory, {
     ...change.activeIntent === undefined ? {} : { activeIntent: change.activeIntent },
     ...change.registry === undefined ? {} : { specialists: change.registry },
@@ -10009,189 +10252,266 @@ var persist = (directory, project, change) => gen2(function* () {
   for (const file of files)
     yield* commitFile(file.path, file.content);
 });
-var updateState = (directory, transition) => withStateLock(directory, gen2(function* () {
+var MAX_LISTED = 4;
+var describe = (change) => {
+  const records = [
+    ...(change.intents ?? []).map((intent) => `intent ${intent.id}`),
+    ...(change.assignments ?? []).map((row) => `assignment ${row.id} ${row.state}`),
+    ...(change.branches ?? []).map((row) => `branch ${row.branch} of ${row.intentId}`),
+    ...(change.pulls ?? []).map((row) => `pull request ${row.number} of ${row.intentId}`)
+  ];
+  const shown = records.slice(0, MAX_LISTED).join(", ");
+  const more = records.length - MAX_LISTED;
+  return `chore(state): record ${records.length === 0 ? "state" : shown}${more > 0 ? ` and ${more} more` : ""}`;
+};
+var updateState = (directory, transition, env = {}) => withStateLock(directory, gen2(function* () {
   const snapshot = yield* readSnapshot(directory);
   const result = yield* transition(snapshot);
   yield* persist(directory, snapshot.project, result);
+  if (result.intents !== undefined || result.assignments !== undefined || result.branches !== undefined || result.pulls !== undefined)
+    yield* commitState(directory, env, describe(result));
   return result;
 }));
 
 var {$: $2 } = globalThis.Bun;
-var nowIso = currentTimeMillis2.pipe(map4((millis) => new Date(millis).toISOString()));
-var NOT_A_REPOSITORY = /not a git repository|command not found/i;
-var stateRoot = (cwd) => tryPromise2({
-  try: () => $2`git rev-parse --show-toplevel`.cwd(cwd).quiet().nothrow(),
-  catch: (cause) => new StateIo({ path: cwd, cause })
-}).pipe(flatMap2((output) => {
-  const top = output.text().trim();
-  if (output.exitCode === 0 && top !== "")
-    return succeed6(top);
-  const complaint = output.stderr.toString().trim();
-  return NOT_A_REPOSITORY.test(complaint) ? succeed6(cwd) : fail5(new StateIo({ path: cwd, cause: `git: ${complaint}` }));
-}));
-var readReport = (host) => host.stdin.pipe(filterOrFail2((text) => text.trim() !== "", () => new StdinMissing({ reason: "stdin was empty" })));
-var LITERAL_RUN = /(?:"[^"]*" \| ){4,}"[^"]*"/g;
-var compact = (message) => message.replace(LITERAL_RUN, (run) => {
-  const choices = run.split(" | ");
-  return `${choices.slice(0, 3).join(" | ")} | \u2026 (${choices.length} choices)`;
-});
-var payloadOf = (host, inline) => gen2(function* () {
-  if (inline === undefined)
-    return { source: "stdin", text: yield* readReport(host) };
-  if (inline.trim() === "")
-    return yield* new Usage({
-      message: "--input is empty",
-      hint: "Give the JSON as `--input '<json>'`, or on stdin without --input."
-    });
-  return { source: "--input", text: inline };
-});
-var readInputBy = (host, pick, inline) => gen2(function* () {
-  const { source, text } = yield* payloadOf(host, inline);
-  const invalid = (error) => new InvalidDraft({ message: compact(`${source}: ${error.message}`) });
-  const raw = yield* decodeUnknownEffect2(fromJsonString2(Unknown2))(text).pipe(mapError2(invalid));
-  return yield* decodeUnknownEffect2(pick(raw), { onExcessProperty: "error" })(raw).pipe(mapError2(invalid));
-});
-var readInput = (host, schema, inline) => readInputBy(host, () => schema, inline);
+var spawn = (program, args, options) => promise2(() => {
+  const command = options.stdin === undefined ? $2`${program} ${args}` : $2`${program} ${args} < ${new Response(options.stdin)}`;
+  const env = Object.fromEntries(Object.entries(options.env).filter((entry) => entry[1] !== undefined));
+  return command.cwd(options.cwd).env(env).quiet().nothrow();
+}).pipe(map4((output) => ({
+  code: output.exitCode,
+  stdout: output.stdout,
+  stderr: output.stderr.toString()
+})));
 
-var openIntents = (snapshot) => byId(snapshot.project.intents.filter((intent) => intent.state === "Open"));
-var intentInUse = (snapshot) => openIntents(snapshot).find((intent) => intent.id === snapshot.activeIntent)?.id;
-var resolveIntent = (snapshot) => {
-  const open = openIntents(snapshot);
-  const chosen = open.find((intent) => intent.id === snapshot.activeIntent) ?? (open.length === 1 ? open[0] : undefined);
-  return chosen === undefined ? fail5(new NoActiveIntent({
-    open: open.map(({ id, objective }) => ({
-      id,
-      objective: oneLine(objective)
-    }))
-  })) : succeed6(chosen);
+class Git extends Service()("holyagent/vcs/Git") {
+}
+var gitLive = (cwd, env) => succeed5(Git, {
+  run: (args, extra = {}) => spawn("git", args, { cwd, env: { ...process.env, ...env, ...extra } }).pipe(map4(({ code, stdout, stderr }) => ({
+    code,
+    stdout: new TextDecoder().decode(stdout),
+    stderr
+  }))),
+  blob: (oid) => spawn("git", ["cat-file", "blob", oid], { cwd, env: { ...process.env, ...env } }).pipe(filterOrFail2(({ code }) => code === 0, ({ code, stderr }) => new GitFailed({ args: ["cat-file", "blob", oid], code, output: stderr })), map4(({ stdout }) => stdout))
+});
+var tail = (result) => `${result.stderr}
+${result.stdout}`.trim().split(`
+`).slice(-20).join(`
+`);
+var git2 = (args, env) => Git.use((service) => service.run(args, env)).pipe(filterOrFail2(({ code }) => code === 0, (result) => new GitFailed({ args, code: result.code, output: tail(result) })), map4(({ stdout }) => stdout.trim()));
+var gitMaybe = (args) => Git.use((service) => service.run(args)).pipe(map4(({ code, stdout }) => code === 0 ? stdout.trim() : undefined));
+var gitPaths = (args, paths) => git2(["--literal-pathspecs", ...args, "--", ...paths]);
+var validBranch = (name) => gen2(function* () {
+  const plain = !name.startsWith("-") && !name.startsWith("+");
+  if (plain && (yield* gitMaybe(["check-ref-format", "--branch", name])) === name)
+    return name;
+  return yield* new Usage({
+    message: `"${name}" is not a plain branch name`,
+    hint: "Name branches without a leading dash or plus, such as feature/parser."
+  });
+});
+var currentBranch = gen2(function* () {
+  const branch = yield* gitMaybe(["symbolic-ref", "--short", "-q", "HEAD"]);
+  if (branch === undefined || branch === "")
+    return yield* new DetachedHead;
+  return yield* validBranch(branch);
+});
+var stripUserinfo = (url) => url.replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/@]*@/i, "$1");
+var originUrl = gitMaybe(["remote", "get-url", "origin"]).pipe(map4((url) => stripUserinfo(url ?? "")));
+var repoSlug = (url) => {
+  const match = /([^/:]+)\/([^/]+?)(?:\.git)?\/*$/.exec(url.trim());
+  if (match === null)
+    return;
+  const [, owner = "", repo = ""] = match;
+  const dots = new Set([".", ".."]);
+  return dots.has(owner) || dots.has(repo) || !/^[\w.-]+\/[\w.-]+$/.test(`${owner}/${repo}`) ? undefined : `${owner}/${repo}`;
 };
-var IntentInput = Struct({
-  objective: IntentDraft.fields.objective,
-  requirements: IntentDraft.fields.requirements
-});
-var IntentEdit = Struct({
-  objective: IntentUpdate.fields.objective,
-  requirements: IntentUpdate.fields.requirements
-});
-var INTENT_COMMANDS = [
-  {
-    path: ["intent", "create"],
-    usage: "intent create [--input <json>]",
-    summary: "Create an Intent and put it in use",
-    input: "{objective, requirements?: [text]}",
-    flags: { input: "string" },
-    positionals: 0,
-    run: ({ directory, input }) => gen2(function* () {
-      const draft = yield* input(IntentInput);
-      const id = yield* newId("intent");
-      const now = yield* nowIso;
-      const { intent } = yield* updateState(directory, ({ project }) => createIntent(project, { ...draft, id, now }).pipe(map4((change) => ({ ...change, activeIntent: id }))));
-      return intentView(intent);
-    })
-  },
-  {
-    path: ["intent", "show"],
-    usage: "intent show [id]",
-    summary: "Show an Intent: the one named, else the one in use",
-    flags: {},
-    positionals: 1,
-    optional: true,
-    run: ({ directory, args }) => gen2(function* () {
-      const snapshot = yield* readState(directory);
-      const [id] = args.positionals;
-      return intentView(id === undefined ? yield* resolveIntent(snapshot) : yield* findIntent(snapshot.project, id));
-    })
-  },
-  {
-    path: ["intent", "list"],
-    usage: "intent list",
-    summary: "List every Intent",
-    flags: {},
-    positionals: 0,
-    run: ({ directory }) => readState(directory).pipe(map4((snapshot) => {
-      const inUse = intentInUse(snapshot);
-      return {
-        intents: byId(snapshot.project.intents).map((i) => intentRow(i, i.id === inUse))
-      };
-    }))
-  },
-  {
-    path: ["intent", "update"],
-    usage: "intent update [--input <json>] [--material]",
-    summary: "Edit the Intent in use; --material moves its revision and makes open work stale",
-    input: "{objective?, requirements?: [text]}",
-    notes: [
-      "--material when requirements, user-visible behavior, architecture, security, contracts, dependencies or deployment change; omit it for clarifications. Open work planned on the old revision is then stale"
-    ],
-    flags: { input: "string", material: "boolean" },
-    positionals: 0,
-    run: ({ directory, args, input }) => gen2(function* () {
-      const edit = yield* input(IntentEdit);
-      const { intent } = yield* updateState(directory, (snapshot) => resolveIntent(snapshot).pipe(flatMap2((current) => updateIntent(snapshot.project, current.id, {
-        ...edit,
-        material: booleanFlag(args, "material")
-      }))));
-      return intentView(intent);
-    })
-  },
-  {
-    path: ["intent", "close"],
-    usage: "intent close --reason <text> [--drop <reason>]",
-    summary: "Close the Intent in use; --drop cancels its Ready and Running Assignments",
-    notes: ["pull before closing: another clone may hold work this one cannot see"],
-    flags: { reason: "string", drop: "string" },
-    positionals: 0,
-    run: ({ directory, args }) => gen2(function* () {
-      const reason = yield* requiredFlag(args, "reason", "intent close --reason <text>");
-      const drop = stringFlag(args, "drop");
-      const now = yield* nowIso;
-      const closed = yield* updateState(directory, (snapshot) => resolveIntent(snapshot).pipe(flatMap2((current) => closeIntent(snapshot.project, snapshot.specialists, current.id, { reason, ...drop === undefined ? {} : { drop } }, now))));
-      return present({
-        ...intentView(closed.intent),
-        dropped: closed.assignments.map((assignment) => assignment.id)
-      });
-    })
-  },
-  {
-    path: ["intent", "reopen"],
-    usage: "intent reopen [id]",
-    summary: "Reopen a closed Intent at the next revision and put it in use",
-    flags: {},
-    positionals: 1,
-    optional: true,
-    run: ({ directory, args }) => gen2(function* () {
-      const { intent } = yield* updateState(directory, (snapshot) => gen2(function* () {
-        const id = args.positionals[0] ?? snapshot.activeIntent;
-        if (id === undefined)
-          return yield* new Usage({
-            message: "No id given and no Intent is in use",
-            hint: "Usage: holyagent intent reopen <id>"
-          });
-        const change = yield* reopenIntent(snapshot.project, id);
-        return { ...change, activeIntent: id };
-      }));
-      return intentView(intent);
-    })
-  },
-  {
-    path: ["intent", "use"],
-    usage: "intent use <id>",
-    summary: "Put an open Intent in use in this clone",
-    flags: {},
-    positionals: 1,
-    run: ({ directory, args }) => gen2(function* () {
-      const { intent } = yield* updateState(directory, ({ project }) => gen2(function* () {
-        const found = yield* findIntent(project, args.positionals[0] ?? "");
-        yield* requireOpen(found);
-        return { intent: found, activeIntent: found.id };
-      }));
-      return intentView(intent);
-    })
+
+class GitHub extends Service()("holyagent/vcs/GitHub") {
+}
+var apiPath = (path) => path.split("/").map(encodeURIComponent).join("/");
+var ErrorBody = fromJsonString2(Struct({ message: String4 }));
+var Json2 = fromJsonString2(Unknown2);
+var gh = (cwd, env, what, args, stdin) => spawn("gh", args, {
+  cwd,
+  env: { ...process.env, ...env, GH_PROMPT_DISABLED: "1", NO_COLOR: "1" },
+  stdin
+}).pipe(flatMap2(({ code, stdout, stderr }) => {
+  const text = new TextDecoder().decode(stdout);
+  if (code === 0)
+    return succeed6(text);
+  const status = /HTTP (\d{3})/.exec(stderr)?.[1];
+  return decodeUnknownEffect2(ErrorBody)(text).pipe(map4((body) => body.message), orElseSucceed2(() => stderr.trim() || text.trim() || `gh exited ${code}`), flatMap2((reason) => fail5(new GitHubFailed({
+    what,
+    status: status === undefined ? undefined : Number(status),
+    reason
+  }))));
+}));
+var parse = (what, text) => text.trim() === "" ? succeed6(null) : decodeUnknownEffect2(Json2)(text).pipe(mapError2(() => new GitHubFailed({ what, status: undefined, reason: "the answer is not JSON" })));
+var githubLive = (cwd, env) => succeed5(GitHub, {
+  rest: ({ method, path, body }) => {
+    const what = `${method} ${path.split("?")[0]}`;
+    return gh(cwd, env, what, ["api", "-X", method, path, ...body === undefined ? [] : ["--input", "-"]], body === undefined ? undefined : JSON.stringify(body)).pipe(flatMap2((text) => parse(what, text)));
   }
-];
+});
+var decodeAnswer = (schema, what, answer) => decodeUnknownEffect2(schema)(answer).pipe(mapError2((error) => new GitHubFailed({
+  what,
+  status: undefined,
+  reason: `unexpected answer: ${error.message}`
+})));
+
+var vcsLive = (root, env) => merge2(gitLive(root, env), githubLive(root, env));
+
+var INPUT_FLAG = "input";
+var parseArgs = (args, spec, usage) => gen2(function* () {
+  const hint = `Usage: holyagent ${usage}`;
+  const positionals = [];
+  const flags = {};
+  for (let index = 0;index < args.length; index += 1) {
+    const arg = args[index] ?? "";
+    if (!arg.startsWith("--")) {
+      positionals.push(arg);
+      continue;
+    }
+    const equals = arg.indexOf("=");
+    const name = equals === -1 ? arg.slice(2) : arg.slice(2, equals);
+    const kind = Object.hasOwn(spec, name) ? spec[name] : undefined;
+    if (kind === undefined)
+      return yield* new Usage({ message: `Unknown flag --${name}`, hint });
+    if (kind === "boolean") {
+      if (equals !== -1)
+        return yield* new Usage({ message: `Flag --${name} takes no value`, hint });
+      flags[name] = true;
+      continue;
+    }
+    const next = args[index + 1];
+    const value = equals === -1 ? next?.startsWith("--") ? undefined : next : arg.slice(equals + 1);
+    if (equals === -1 && value !== undefined)
+      index += 1;
+    if (value === undefined)
+      return yield* new Usage({ message: `Flag --${name} needs a value`, hint });
+    flags[name] = value;
+  }
+  return { positionals, flags };
+});
+var stringFlag = (parsed, name) => {
+  const value = parsed.flags[name];
+  return typeof value === "string" ? value : undefined;
+};
+var booleanFlag = (parsed, name) => parsed.flags[name] === true;
+var requiredFlag = (parsed, name, usage) => {
+  const value = stringFlag(parsed, name);
+  return value === undefined ? fail5(new Usage({ message: `Missing --${name}`, hint: `Usage: holyagent ${usage}` })) : succeed6(value);
+};
+var choiceFlag = (schema, name, value, usage) => decodeUnknownEffect2(schema)(value).pipe(mapError2(() => new Usage({
+  message: `Invalid value for --${name}: ${String(value)}`,
+  hint: `Usage: holyagent ${usage}`
+})));
+
+import { join as join6 } from "path";
+
+var present = (record) => Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined && !(Array.isArray(value) && value.length === 0)));
+var oneLine = (text) => text.replace(/\s+/g, " ").trim();
+var intentView = (intent, links) => present({
+  id: intent.id,
+  revision: intent.revision,
+  state: intent.state,
+  objective: intent.objective,
+  requirements: intent.requirements,
+  closeReason: intent.closeReason,
+  branches: links === undefined ? undefined : branchesOf(links, intent.id),
+  pulls: links === undefined ? undefined : pullsOf(links, intent.id).map(({ number, url, branch, base }) => present({ number, url, branch, base }))
+});
+var assignmentView = (assignment) => present({
+  id: assignment.id,
+  intent: assignment.intentId,
+  revision: assignment.intentRevision,
+  role: assignment.roleTask,
+  state: assignment.state,
+  objective: assignment.objective,
+  scope: assignment.scope,
+  constraints: assignment.constraints,
+  criteria: assignment.criteria,
+  evidence: assignment.evidence,
+  paths: assignment.ownershipPaths,
+  dependsOn: assignment.dependencies,
+  independentFrom: assignment.independentFrom,
+  followUpOf: assignment.followUpOf,
+  agent: assignment.specialist?.agentId,
+  startedAt: assignment.specialist?.startedAt,
+  finishedAt: assignment.specialist?.finishedAt,
+  result: assignment.result,
+  acceptance: assignment.acceptance === undefined ? undefined : present({
+    revision: assignment.acceptance.revision,
+    carriedFrom: assignment.acceptance.carriedFrom,
+    rationale: assignment.acceptance.rationale,
+    criteria: assignment.acceptance.criteria,
+    evidence: assignment.acceptance.evidence
+  })
+});
+var assignmentRow = (assignment) => ({
+  id: assignment.id,
+  role: assignment.roleTask,
+  state: assignment.state,
+  rev: assignment.intentRevision,
+  accepted: assignment.acceptance !== undefined,
+  agent: assignment.specialist?.agentId ?? null,
+  objective: oneLine(assignment.objective)
+});
+var intentRow = (intent, inUse) => ({
+  id: intent.id,
+  state: intent.state,
+  revision: intent.revision,
+  inUse,
+  objective: oneLine(intent.objective)
+});
+var byId = (rows) => rows.toSorted((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
+var readArguments = (args, spec, usage) => gen2(function* () {
+  const hint = `Usage: holyagent ${usage}`;
+  const positionals = [];
+  const values = {};
+  const switches = new Set;
+  const lookup = (flag) => Object.entries(spec).find(([name, shape]) => flag.startsWith("--") ? flag.slice(2) === name : flag === `-${shape.short}`);
+  for (let index = 0;index < args.length; index += 1) {
+    const arg = args[index] ?? "";
+    if (arg === "--") {
+      positionals.push(...args.slice(index + 1));
+      break;
+    }
+    if (!arg.startsWith("-") || arg === "-") {
+      positionals.push(arg);
+      continue;
+    }
+    const equals = arg.startsWith("--") ? arg.indexOf("=") : -1;
+    const flag = equals === -1 ? arg : arg.slice(0, equals);
+    const found = lookup(flag);
+    if (found === undefined)
+      return yield* new Usage({ message: `Unknown flag ${flag}`, hint });
+    const [name, shape] = found;
+    if (shape.kind === "switch") {
+      switches.add(name);
+      continue;
+    }
+    const value = equals === -1 ? args[++index] : arg.slice(equals + 1);
+    if (value === undefined)
+      return yield* new Usage({ message: `Flag ${flag} needs a value`, hint });
+    if (shape.kind === "one" && values[name] !== undefined)
+      return yield* new Usage({ message: `Flag ${flag} was given twice`, hint });
+    (values[name] ??= []).push(value);
+  }
+  return { positionals, values, switches };
+});
+var valueOf = (args, name) => args.values[name]?.[0];
+var requiredValue = (args, name, usage) => {
+  const value = valueOf(args, name);
+  return value === undefined ? fail5(new Usage({
+    message: `Missing --${name}`,
+    hint: `Usage: holyagent ${usage}`
+  })) : succeed6(value);
+};
 
 var inScope = (scope, path) => scope.some((entry) => path === entry || path.startsWith(`${entry}/`));
-var looksLikeAgent = (identity) => identity.email.toLowerCase() === "noreply@anthropic.com" || /^claude\b/i.test(identity.name.trim());
 var requireOwnIdentity = gen2(function* () {
   const identity = {
     name: (yield* gitMaybe(["config", "user.name"])) ?? "",
@@ -10200,22 +10520,24 @@ var requireOwnIdentity = gen2(function* () {
   if (looksLikeAgent(identity))
     return yield* new AgentIdentity({ identity: `${identity.name} <${identity.email}>` });
 });
-var changedIntentState = (directory, root) => readOpenState(directory).pipe(flatMap2(resolveIntent), map4((intent) => relative2(root, intentFolder(directory, intent))), catchTag2("NoActiveIntent", () => succeed6(relative2(root, join3(directory, "intents")))), flatMap2((folder) => gitPaths(["status", "--porcelain", "--untracked-files=all"], [folder]).pipe(map4((status) => status === "" ? [] : [folder]))));
-var stagedPaths = git(["diff", "--cached", "--name-only", "--no-renames", "-z"]).pipe(map4((names) => names.split("\x00").filter((path) => path !== "")));
+var stagedPaths = git2(["diff", "--cached", "--name-only", "--no-renames", "-z"]).pipe(map4((names) => names.split("\x00").filter((path) => path !== "")));
 var validatedPaths = (paths) => forEach2(paths, (path) => {
   const clean = path.replace(/\/+$/, "");
   const problem = pathProblem(clean);
-  return problem === undefined ? succeed6(clean) : fail5(new Usage({
-    message: `Invalid path "${path}": ${problem}`,
-    hint: "Name files or folders relative to the project root."
-  }));
+  if (problem !== undefined)
+    return fail5(new Usage({
+      message: `Invalid path "${path}": ${problem}`,
+      hint: "Name files or folders relative to the project root."
+    }));
+  return clean === STATE_DIRECTORY || clean.startsWith(`${STATE_DIRECTORY}/`) ? fail5(new Usage({
+    message: `"${path}" is Intent state, which is committed on the state branch by the holyagent commands`,
+    hint: "Commit only work files with `vcs commit`; Intent state never goes on a work branch."
+  })) : succeed6(clean);
 });
 var commit = (request) => gen2(function* () {
-  const { directory, root, message } = request;
+  const { message } = request;
   yield* requireOwnIdentity;
-  const declared = yield* validatedPaths(request.paths);
-  const state = yield* changedIntentState(directory, root);
-  const scope = [...declared, ...state];
+  const scope = yield* validatedPaths(request.paths);
   const alreadyStaged = yield* stagedPaths;
   const outside = alreadyStaged.filter((path) => !inScope(scope, path));
   if (outside.length > 0)
@@ -10225,19 +10547,14 @@ var commit = (request) => gen2(function* () {
   if (files === 0)
     return yield* new NothingToCommit({ paths: scope });
   const branch = yield* currentBranch;
-  yield* git([
+  yield* git2([
     "commit",
     "-m",
     message.headline,
     ...message.body === undefined ? [] : ["-m", message.body]
   ]);
-  const sha = yield* git(["rev-parse", "HEAD"]);
-  return {
-    branch,
-    commit: sha,
-    files,
-    ...state.length === 0 ? {} : { state }
-  };
+  const sha = yield* git2(["rev-parse", "HEAD"]);
+  return { branch, commit: sha, files };
 });
 
 var SESSION_TRAILER = /^\s*claude-session\s*:/i;
@@ -10296,8 +10613,205 @@ var prepareMessage = (parts, allowed) => checkedText(parts.join(`
 }));
 
 import { constants } from "fs";
-import { open as open2, realpath } from "fs/promises";
-import { join as join4, relative as relative3, sep } from "path";
+import { open as open2, realpath as realpath2 } from "fs/promises";
+import { join as join4, relative as relative2, sep as sep2 } from "path";
+
+var nowIso = currentTimeMillis2.pipe(map4((millis) => new Date(millis).toISOString()));
+var readReport = (host) => host.stdin.pipe(filterOrFail2((text) => text.trim() !== "", () => new StdinMissing({ reason: "stdin was empty" })));
+var LITERAL_RUN = /(?:"[^"]*" \| ){4,}"[^"]*"/g;
+var compact = (message) => message.replace(LITERAL_RUN, (run) => {
+  const choices = run.split(" | ");
+  return `${choices.slice(0, 3).join(" | ")} | \u2026 (${choices.length} choices)`;
+});
+var payloadOf = (host, inline) => gen2(function* () {
+  if (inline === undefined)
+    return { source: "stdin", text: yield* readReport(host) };
+  if (inline.trim() === "")
+    return yield* new Usage({
+      message: "--input is empty",
+      hint: "Give the JSON as `--input '<json>'`, or on stdin without --input."
+    });
+  return { source: "--input", text: inline };
+});
+var readInputBy = (host, pick, inline) => gen2(function* () {
+  const { source, text } = yield* payloadOf(host, inline);
+  const invalid = (error) => new InvalidDraft({ message: compact(`${source}: ${error.message}`) });
+  const raw = yield* decodeUnknownEffect2(fromJsonString2(Unknown2))(text).pipe(mapError2(invalid));
+  return yield* decodeUnknownEffect2(pick(raw), { onExcessProperty: "error" })(raw).pipe(mapError2(invalid));
+});
+var readInput = (host, schema, inline) => readInputBy(host, () => schema, inline);
+
+var openIntents = (snapshot) => byId(snapshot.project.intents.filter((intent) => intent.state === "Open"));
+var chosenIntent = (snapshot) => {
+  const open = openIntents(snapshot);
+  return open.find((intent) => intent.id === snapshot.activeIntent) ?? (open.length === 1 ? open[0] : undefined);
+};
+var intentInUse = (snapshot) => chosenIntent(snapshot)?.id;
+var resolveIntent = (snapshot) => {
+  const chosen = chosenIntent(snapshot);
+  return chosen === undefined ? fail5(new NoActiveIntent({
+    open: openIntents(snapshot).map(({ id, objective }) => ({
+      id,
+      objective: oneLine(objective)
+    }))
+  })) : succeed6(chosen);
+};
+var IntentInput = Struct({
+  objective: IntentDraft.fields.objective,
+  requirements: IntentDraft.fields.requirements
+});
+var IntentEdit = Struct({
+  objective: IntentUpdate.fields.objective,
+  requirements: IntentUpdate.fields.requirements
+});
+var INTENT_COMMANDS = [
+  {
+    path: ["intent", "create"],
+    usage: "intent create [--input <json>]",
+    summary: "Create an Intent and put it in use",
+    input: "{objective, requirements?: [text]}",
+    flags: { input: "string" },
+    positionals: 0,
+    state: "create",
+    run: ({ update, input }) => gen2(function* () {
+      const draft = yield* input(IntentInput);
+      const id = yield* newId("intent");
+      const now = yield* nowIso;
+      const { intent } = yield* update(({ project }) => createIntent(project, { ...draft, id, now }).pipe(map4((change) => ({ ...change, activeIntent: id }))));
+      return intentView(intent);
+    })
+  },
+  {
+    path: ["intent", "show"],
+    usage: "intent show [id]",
+    summary: "Show an Intent: the one named, else the one in use",
+    flags: {},
+    positionals: 1,
+    optional: true,
+    run: ({ directory, args }) => gen2(function* () {
+      const snapshot = yield* readState(directory);
+      const [id] = args.positionals;
+      const intent = id === undefined ? yield* resolveIntent(snapshot) : yield* findIntent(snapshot.project, id);
+      return intentView(intent, snapshot.links);
+    })
+  },
+  {
+    path: ["intent", "list"],
+    usage: "intent list",
+    summary: "List every Intent",
+    flags: {},
+    positionals: 0,
+    run: ({ directory }) => readState(directory).pipe(map4((snapshot) => {
+      const inUse = intentInUse(snapshot);
+      return {
+        intents: byId(snapshot.project.intents).map((i) => intentRow(i, i.id === inUse))
+      };
+    }))
+  },
+  {
+    path: ["intent", "update"],
+    usage: "intent update [--input <json>] [--material]",
+    summary: "Edit the Intent in use; --material moves its revision and makes open work stale",
+    input: "{objective?, requirements?: [text]}",
+    notes: [
+      "--material when requirements, user-visible behavior, architecture, security, contracts, dependencies or deployment change; omit it for clarifications. Open work planned on the old revision is then stale"
+    ],
+    flags: { input: "string", material: "boolean" },
+    positionals: 0,
+    run: ({ update, args, input }) => gen2(function* () {
+      const edit = yield* input(IntentEdit);
+      const { intent } = yield* update((snapshot) => resolveIntent(snapshot).pipe(flatMap2((current) => updateIntent(snapshot.project, current.id, {
+        ...edit,
+        material: booleanFlag(args, "material")
+      }))));
+      return intentView(intent);
+    })
+  },
+  {
+    path: ["intent", "close"],
+    usage: "intent close --reason <text> [--drop <reason>]",
+    summary: "Close the Intent in use; --drop cancels its Ready and Running Assignments",
+    notes: ["pull before closing: another clone may hold work this one cannot see"],
+    flags: { reason: "string", drop: "string" },
+    positionals: 0,
+    run: ({ update, args }) => gen2(function* () {
+      const reason = yield* requiredFlag(args, "reason", "intent close --reason <text>");
+      const drop = stringFlag(args, "drop");
+      const now = yield* nowIso;
+      const closed = yield* update((snapshot) => resolveIntent(snapshot).pipe(flatMap2((current) => closeIntent(snapshot.project, snapshot.specialists, current.id, { reason, ...drop === undefined ? {} : { drop } }, now))));
+      return present({
+        ...intentView(closed.intent),
+        dropped: closed.assignments.map((assignment) => assignment.id)
+      });
+    })
+  },
+  {
+    path: ["intent", "reopen"],
+    usage: "intent reopen [id]",
+    summary: "Reopen a closed Intent at the next revision and put it in use",
+    flags: {},
+    positionals: 1,
+    optional: true,
+    run: ({ update, args }) => gen2(function* () {
+      const { intent } = yield* update((snapshot) => gen2(function* () {
+        const id = args.positionals[0] ?? snapshot.activeIntent;
+        if (id === undefined)
+          return yield* new Usage({
+            message: "No id given and no Intent is in use",
+            hint: "Usage: holyagent intent reopen <id>"
+          });
+        const change = yield* reopenIntent(snapshot.project, id);
+        return { ...change, activeIntent: id };
+      }));
+      return intentView(intent);
+    })
+  },
+  {
+    path: ["intent", "use"],
+    usage: "intent use <id>",
+    summary: "Put an open Intent in use in this work tree",
+    flags: {},
+    positionals: 1,
+    run: ({ update, args }) => gen2(function* () {
+      const { intent } = yield* update(({ project }) => gen2(function* () {
+        const found = yield* findIntent(project, args.positionals[0] ?? "");
+        yield* requireOpen(found);
+        return { intent: found, activeIntent: found.id };
+      }));
+      return intentView(intent);
+    })
+  }
+];
+
+var onIntentInUse = (call, record) => readOpenState(call.directory).pipe(flatMap2(resolveIntent), map4(({ id }) => id), catchTag2("NoActiveIntent", () => succeed6(undefined)), flatMap2((id) => id === undefined ? succeed6({}) : record(id).pipe(map4((intent) => ({ intent })))), catch_2((error) => succeed6({ unrecorded: describeFailure(error).message })));
+var recordBranch = (call, commit) => onIntentInUse(call, (intentId) => gen2(function* () {
+  const id = yield* newId("branch");
+  const committedAt = yield* nowIso;
+  yield* call.update((snapshot) => linkBranch(snapshot.project, {
+    id,
+    intentId,
+    branch: commit.branch,
+    commit: commit.commit,
+    committedAt
+  }));
+  return intentId;
+}));
+var recordPull = (call, pull) => onIntentInUse(call, (intentId) => gen2(function* () {
+  const id = yield* newId("pull");
+  const recordedAt = yield* nowIso;
+  yield* call.update((snapshot) => linkPull(snapshot.project, {
+    id,
+    intentId,
+    number: pull.number,
+    url: pull.url,
+    branch: pull.branch,
+    ...pull.base === undefined ? {} : { base: pull.base },
+    created: pull.created,
+    recordedAt
+  }));
+  return intentId;
+}));
+
 var Created = Struct({ number: Int, html_url: String4 });
 var MAX_BODY_BYTES = 256 * 1024;
 var hasGitSegment = (path) => path.split(/[\\/]/).some((segment) => segment.toLowerCase() === ".git");
@@ -10313,12 +10827,12 @@ var readBodyFile = (root, file) => {
     if (hasGitSegment(file))
       return yield* refuse("is inside .git");
     const path = join4(root, file);
-    const resolve = io(path, () => realpath(path));
+    const resolve = io(path, () => realpath2(path));
     const real = yield* resolve.pipe(catchIf2((error) => hasCode(error.cause, "ENOENT"), () => fail5(refuse("does not exist"))));
-    const base = yield* io(root, () => realpath(root));
-    if (real !== base && !real.startsWith(`${base}${sep}`))
+    const base = yield* io(root, () => realpath2(root));
+    if (real !== base && !real.startsWith(`${base}${sep2}`))
       return yield* refuse("resolves to a path outside the project");
-    const inside = relative3(base, real);
+    const inside = relative2(base, real);
     if (hasGitSegment(inside))
       return yield* refuse("is inside .git");
     const ignored = yield* Git.use((service) => service.run(["check-ignore", "-q", "--no-index", "--", inside]));
@@ -10347,11 +10861,6 @@ var readBodyFile = (root, file) => {
     return text;
   });
 };
-var saveVcs = (directory, change) => withStateLock(directory, gen2(function* () {
-  const local = yield* readLocal(directory);
-  for (const file of yield* encodeLocal(directory, { vcs: change(local.vcs) }))
-    yield* commitFile(file.path, file.content);
-}));
 var pullRequest = (request) => gen2(function* () {
   const repo = repoSlug(yield* originUrl);
   if (repo === undefined)
@@ -10381,32 +10890,43 @@ var pullRequest = (request) => gen2(function* () {
     body: fields
   }));
   const pull = yield* decodeAnswer(Created, "pull request", answer);
-  yield* saveVcs(request.directory, (current) => ({
-    ...current,
+  const recorded = yield* recordPull(request.state, {
+    number: pull.number,
+    url: pull.html_url,
     branch,
-    pullRequest: String(pull.number),
-    ...request.base === undefined ? {} : { base: request.base }
-  }));
+    base: request.base,
+    created: request.update === undefined
+  });
   return {
     number: pull.number,
     url: pull.html_url,
-    created: request.update === undefined
+    created: request.update === undefined,
+    ...recorded
   };
 });
 
 import { join as join5 } from "path";
 var VcsSettings = Struct({
   api: optionalKey2(Boolean3),
-  allowWords: optionalKey2(ArraySchema(String4))
+  allowWords: optionalKey2(ArraySchema(String4)),
+  stateBranch: optionalKey2(String4)
 });
 var File2 = fromJsonString2(Record(String4, Unknown2));
-var readSettings = (root) => {
-  const path = join5(root, STATE_DIRECTORY, "config.json");
-  const corrupt = (reason) => new CorruptRecord({ path, reason });
-  return readText(path).pipe(flatMap2((text) => text === undefined ? succeed6({}) : decodeUnknownEffect2(File2)(text).pipe(mapError2((error) => corrupt(error.message)), flatMap2((file) => decodeUnknownEffect2(VcsSettings, { onExcessProperty: "error" })(file["vcs"] ?? {}).pipe(mapError2((error) => corrupt(`vcs: ${error.message}`)))))));
-};
+var readSettings = (directories) => gen2(function* () {
+  for (const directory of directories) {
+    const path = join5(directory, "config.json");
+    const text = yield* readText(path);
+    if (text === undefined)
+      continue;
+    const corrupt = (reason) => new CorruptRecord({ path, reason });
+    const file = yield* decodeUnknownEffect2(File2)(text).pipe(mapError2((error) => corrupt(error.message)));
+    return yield* decodeUnknownEffect2(VcsSettings, { onExcessProperty: "error" })(file["vcs"] ?? {}).pipe(mapError2((error) => corrupt(`vcs: ${error.message}`)));
+  }
+  const defaults = {};
+  return defaults;
+});
 
-var rootOf = (call) => dirname(call.directory);
+var settingsFolders = (call) => [join6(call.root, STATE_DIRECTORY)];
 var arguments_ = (call, usage, spec, positionals) => readArguments(call.args.positionals, spec, usage).pipe(filterOrFail2((args) => positionals === "any" || args.positionals.length === positionals, (args) => new Usage({
   message: `Expected ${positionals} argument(s), got ${args.positionals.length}`,
   hint: `Usage: holyagent ${usage}`
@@ -10418,8 +10938,9 @@ var VCS_COMMANDS = [
   {
     path: ["vcs", "commit"],
     usage: COMMIT_USAGE,
-    summary: "Commit exactly the named paths (plus the changed Intent state of this worktree) with the configured git identity, after the message check",
+    summary: "Commit exactly the named paths with the configured git identity, after the message check, and record the branch and commit on the Intent in use",
     notes: [
+      "Intent state is never part of the commit: it is committed on the state branch as it changes, and a path under .holyagent/ is refused",
       "the message is cleaned of agent attribution and refused when it talks about the user or the agent; an identity that looks like an agent's is refused",
       "the repository's own hooks run, a commit-msg hook that runs `holyagent hook commit-msg` included"
     ],
@@ -10434,27 +10955,21 @@ var VCS_COMMANDS = [
           message: messages.length === 0 ? "Missing -m <headline>" : "Name the paths to commit after --",
           hint: `Usage: holyagent ${COMMIT_USAGE}`
         });
-      const root = rootOf(call);
-      const settings = yield* readSettings(root);
+      const settings = yield* readSettings(settingsFolders(call));
       const message = yield* prepareMessage(messages, settings.allowWords ?? []);
-      const done = yield* commit({
-        directory: call.directory,
-        root,
-        message,
-        paths: args.positionals
-      });
+      const done = yield* commit({ message, paths: args.positionals });
       return present({
         branch: done.branch,
         commit: short(done.commit),
         files: done.files,
-        state: done.state?.length === 1 ? done.state[0] : done.state
+        ...yield* recordBranch(call, done)
       });
     }).pipe(provide3(call.vcs))
   },
   {
     path: ["vcs", "pr"],
     usage: PR_USAGE,
-    summary: "Create a pull request from the current branch, or update one, through the REST API",
+    summary: "Create a pull request from the current branch, or update one, through the REST API, and record it on the Intent in use",
     notes: ["the title and body get the same message check as a commit"],
     flags: {},
     raw: true,
@@ -10477,11 +10992,10 @@ var VCS_COMMANDS = [
         yield* requiredValue(args, "base", PR_USAGE);
         yield* requiredValue(args, "title", PR_USAGE);
       }
-      const root = rootOf(call);
-      const settings = yield* readSettings(root);
+      const settings = yield* readSettings(settingsFolders(call));
       return yield* pullRequest({
-        directory: call.directory,
-        root,
+        state: call,
+        root: call.root,
         base: valueOf(args, "base"),
         title: valueOf(args, "title"),
         bodyFile: valueOf(args, "body-file"),
@@ -10959,7 +11473,7 @@ var RECORD_USAGE = "assignment record <id> (--agent <agentId> | --failed)";
 var CLOSE_USAGE = "assignment close <id> --outcome success|failure|errored|interrupted|stopped [--accept <rationale>] [--report-json]";
 var LIST_USAGE = "assignment list [--state <state>] [--all] [--full]";
 var withoutNamespace = (type) => type?.startsWith(`${PLUGIN_NAMESPACE}:`) === true ? type.slice(PLUGIN_NAMESPACE.length + 1) : type;
-var recordLaunch = (directory, id, agentId, launchedAs) => updateState(directory, (snapshot) => gen2(function* () {
+var recordLaunch = (update, id, agentId, launchedAs) => update((snapshot) => gen2(function* () {
   const route = routeFor((yield* findAssignment(snapshot.project, id)).roleTask);
   const { model, effort } = route;
   if (launchedAs !== undefined && withoutNamespace(launchedAs.type) !== route.agent)
@@ -10982,11 +11496,11 @@ var ASSIGNMENT_COMMANDS = [
     notes: ["the draft rules are under assignment dispatch"],
     flags: { input: "string" },
     positionals: 0,
-    run: ({ directory, input }) => gen2(function* () {
+    run: ({ update, input }) => gen2(function* () {
       const draft = yield* input(AssignmentInput);
       const id = yield* newId("assignment");
       const now = yield* nowIso;
-      const { assignment } = yield* updateState(directory, (snapshot) => completeDraft(snapshot, draft).pipe(flatMap2((complete) => createAssignment(snapshot.project, complete, { id, now }))));
+      const { assignment } = yield* update((snapshot) => completeDraft(snapshot, draft).pipe(flatMap2((complete) => createAssignment(snapshot.project, complete, { id, now }))));
       return { id, state: assignment.state };
     })
   },
@@ -10999,12 +11513,12 @@ var ASSIGNMENT_COMMANDS = [
     notes: [...DRAFT_NOTES, 'dispatching a Ready Assignment takes {"id": "<id>"}'],
     flags: { input: "string" },
     positionals: 0,
-    run: ({ directory, config, inputBy }) => gen2(function* () {
+    run: ({ update, config, inputBy }) => gen2(function* () {
       const request = yield* inputBy((raw) => typeof raw === "object" && raw !== null && ("id" in raw) ? ExistingRef : AssignmentInput);
       const settings = yield* config;
       const newAssignmentId = yield* newId("assignment");
       const now = yield* nowIso;
-      const started = yield* updateState(directory, (snapshot) => gen2(function* () {
+      const started = yield* update((snapshot) => gen2(function* () {
         const id = "id" in request ? request.id : newAssignmentId;
         const project = "id" in request ? snapshot.project : yield* withPlanned(snapshot, request, id, now);
         return yield* dispatch(project, snapshot.specialists, id, now, settings);
@@ -11026,7 +11540,7 @@ var ASSIGNMENT_COMMANDS = [
     ],
     flags: { agent: "string", failed: "boolean" },
     positionals: 1,
-    run: ({ directory, args }) => gen2(function* () {
+    run: ({ update, args }) => gen2(function* () {
       const id = idArgument(args.positionals);
       const agentId = stringFlag(args, "agent");
       if (agentId !== undefined === booleanFlag(args, "failed"))
@@ -11037,7 +11551,7 @@ var ASSIGNMENT_COMMANDS = [
       const problem = agentId === undefined ? undefined : workflowAgentProblem(agentId, id);
       if (problem !== undefined)
         return yield* new Usage({ message: problem, hint: `Usage: holyagent ${RECORD_USAGE}` });
-      const assignment = yield* recordLaunch(directory, id, agentId);
+      const assignment = yield* recordLaunch(update, id, agentId);
       return present({
         id,
         state: assignment.state,
@@ -11058,7 +11572,7 @@ var ASSIGNMENT_COMMANDS = [
     ],
     flags: { outcome: "string", accept: "string", "report-json": "boolean" },
     positionals: 1,
-    run: ({ directory, args, text, input }) => gen2(function* () {
+    run: ({ update, args, text, input }) => gen2(function* () {
       const id = idArgument(args.positionals);
       const flag = yield* choiceFlag(OutcomeFlag, "outcome", yield* requiredFlag(args, "outcome", CLOSE_USAGE), CLOSE_USAGE);
       const outcome = OUTCOMES[flag];
@@ -11080,7 +11594,7 @@ var ASSIGNMENT_COMMANDS = [
       const report = booleanFlag(args, "report-json") ? json === undefined ? "" : renderJsonReport(json) : outcome === "Succeeded" ? yield* text : yield* text.pipe(orElseSucceed2(() => ""));
       const result = outcome === "Succeeded" ? report : report.trim() === "" ? flag : `${flag}: ${report}`;
       const now = yield* nowIso;
-      const { assignment } = yield* updateState(directory, (snapshot) => gen2(function* () {
+      const { assignment } = yield* update((snapshot) => gen2(function* () {
         const accept = rationale === undefined ? undefined : yield* acceptanceFrom(yield* findAssignment(snapshot.project, id), result, rationale, false);
         return yield* closeAssignment(snapshot.project, snapshot.specialists, id, { outcome, result, ...accept === undefined ? {} : { accept } }, now);
       }));
@@ -11098,12 +11612,12 @@ var ASSIGNMENT_COMMANDS = [
     ],
     flags: { rationale: "string", "carry-forward": "boolean", report: "boolean" },
     positionals: 1,
-    run: ({ directory, args, text }) => gen2(function* () {
+    run: ({ update, args, text }) => gen2(function* () {
       const id = idArgument(args.positionals);
       const rationale = yield* requiredFlag(args, "rationale", "assignment accept <id> --rationale <text>");
       const corrected = booleanFlag(args, "report") ? yield* text : undefined;
       const now = yield* nowIso;
-      const { assignment } = yield* updateState(directory, (snapshot) => gen2(function* () {
+      const { assignment } = yield* update((snapshot) => gen2(function* () {
         const found = yield* findAssignment(snapshot.project, id);
         const acceptance = yield* acceptanceFrom(found, corrected ?? found.result ?? "", rationale, booleanFlag(args, "carry-forward"));
         return corrected === undefined ? yield* accept(snapshot.project, id, acceptance) : yield* closeAssignment(snapshot.project, snapshot.specialists, id, { outcome: "Succeeded", result: corrected, accept: acceptance }, now);
@@ -11144,8 +11658,8 @@ var ASSIGNMENT_COMMANDS = [
   }
 ];
 
-import { stat } from "fs/promises";
-import { dirname as dirname2, join as join7 } from "path";
+import { stat as stat2 } from "fs/promises";
+import { join as join8 } from "path";
 
 var delegating_default = `## Delegating
 
@@ -11167,7 +11681,7 @@ var ROOT_CORE = [identity_default, delegating_default, dispatch_default, task_li
 
 var state_changes_default = "## Leave state changes to the root\n\nLeave to the root every command that changes git, GitHub or holyagent state (`git commit`, `branch`, `push`, `checkout`, `stash`, `merge`, `reset`, `gh` writes, and `holyagent vcs`, `assignment` and `intent` commands), and anything under `.git/` or `.holyagent/`. The root owns the branch, PR and state records and records your changed paths from the report, and other workers share the tree, so a stray write corrupts their work; nothing blocks one, so it rests on you. When you need such a change, say so in the report. Read-only commands are open: `git status`, `diff`, `log`, `show`, `blame`, `fetch`, and `holyagent status`, `plan`, `assignment show` and `assignment list`. To undo your own edit, edit the file back.\n";
 
-import { join as join6 } from "path";
+import { join as join7 } from "path";
 var LEGACY_FOLDERS = {
   holyclaude: ".holyclaude",
   holycodex: ".holycodex"
@@ -11323,7 +11837,7 @@ var byFolder = (paths) => {
   return folders;
 };
 var convertibleFolders = (source, files) => byFolder(source === "holyclaude" ? files.filter((path) => path.startsWith("intents/")).map((path) => path.slice(8)) : files.filter((path) => !path.startsWith(".")));
-var legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join6(root, LEGACY_FOLDERS[source])).pipe(map4((files) => convertibleFolders(source, files).size > 0))).pipe(map4((sources) => sources.map((source) => LEGACY_FOLDERS[source])));
+var legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join7(root, LEGACY_FOLDERS[source])).pipe(map4((files) => convertibleFolders(source, files).size > 0))).pipe(map4((sources) => sources.map((source) => LEGACY_FOLDERS[source])));
 var isoOf = (millis) => {
   const date = new Date(millis);
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
@@ -11444,13 +11958,13 @@ var holyclaudeAssignment = (legacy, roleTask, siblings) => {
 };
 var gatherHolyclaude = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holyclaude;
-  const legacy = join6(root, folderName);
+  const legacy = join7(root, folderName);
   const intents = convertibleFolders("holyclaude", yield* listFiles(legacy));
   if (intents.size === 0)
     return;
   const state = collector("holyclaude");
   for (const [folder, inside] of intents) {
-    const base = join6(legacy, "intents", folder);
+    const base = join7(legacy, "intents", folder);
     const shown = (relative) => `${folderName}/intents/${folder}/${relative}`;
     if (!inside.includes("intent.json")) {
       unconvertible(state, shown("").slice(0, -1), "the folder has no intent.json");
@@ -11458,7 +11972,7 @@ var gatherHolyclaude = (root, directory) => gen2(function* () {
     }
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.json$/.test(path));
     const notes = inside.filter((path) => path !== "intent.json" && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join6(base, "intent.json"));
+    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join7(base, "intent.json"));
     const intent = yield* intentRecord(directory, shown("intent.json"), "problem" in read ? read : holyclaudeIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.json"), intent.problem);
@@ -11469,10 +11983,10 @@ var gatherHolyclaude = (root, directory) => gen2(function* () {
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join6(base, path), to: join6(target, path) });
+      state.notes.push({ from: join7(base, path), to: join7(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join6(base, path));
+      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join7(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (assignment.value.intent_id !== intent.value.intent.id)
@@ -11574,13 +12088,13 @@ var holycodexAssignment = (legacy, roleTask, intent, siblings) => {
 var TRANSACTION_FILE = ".holycodex-transaction.toon";
 var gatherHolycodex = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holycodex;
-  const legacy = join6(root, folderName);
+  const legacy = join7(root, folderName);
   const folders = convertibleFolders("holycodex", yield* listFiles(legacy));
   if (folders.size === 0)
     return;
   const state = collector("holycodex");
   for (const [folder, inside] of folders) {
-    const base = join6(legacy, folder);
+    const base = join7(legacy, folder);
     const shown = (relative) => `${folderName}/${folder}/${relative}`;
     if (!inside.includes("intent.toon")) {
       unconvertible(state, `${folderName}/${folder}`, "the folder has no intent.toon");
@@ -11594,7 +12108,7 @@ var gatherHolycodex = (root, directory) => gen2(function* () {
       });
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.toon$/.test(path));
     const notes = inside.filter((path) => path !== "intent.toon" && path !== TRANSACTION_FILE && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join6(base, "intent.toon"));
+    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join7(base, "intent.toon"));
     const intent = yield* intentRecord(directory, shown("intent.toon"), "problem" in read ? read : holycodexIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.toon"), intent.problem);
@@ -11605,10 +12119,10 @@ var gatherHolycodex = (root, directory) => gen2(function* () {
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join6(base, path), to: join6(target, path) });
+      state.notes.push({ from: join7(base, path), to: join7(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join6(base, path));
+      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join7(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (mapId("intent", assignment.value.intent_id) !== intent.value.intent.id)
@@ -17990,7 +18504,7 @@ var hook = (name, summary, run, stateless) => ({
 `, 1))))
 });
 var ROOT_AGENTS = new Set(["holyagent", "holyagent:holyagent"]);
-var hasStateFolder = (directory) => io(directory, () => stat(directory)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
+var hasStateFolder = (directory) => io(directory, () => stat2(directory)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
 var RESUMED = new Set(["resume", "compact"]);
 var requirementsOf = (directory) => readOpenState(directory).pipe(flatMap2(resolveIntent), map4(({ id, revision, requirements }) => ({ id, revision, requirements })), catchTag2("NoActiveIntent", () => succeed6(undefined)));
 var SAFE_ID = /^[\w.:-]{1,80}$/;
@@ -18027,8 +18541,7 @@ var HOOK_COMMANDS = [
 
 `).replaceAll("${CLAUDE_PLUGIN_ROOT}", pluginRoot ?? "${CLAUDE_PLUGIN_ROOT}");
     if (!(yield* hasStateFolder(call.directory))) {
-      const root = dirname2(call.directory);
-      const found = yield* legacyFoldersWithState(root);
+      const found = yield* legacyFoldersWithState(call.root);
       if (found.length === 0)
         return core === undefined ? NOTHING : output({ hookEventName: "SessionStart", additionalContext: bareContext(core) });
       return output({
@@ -18051,11 +18564,11 @@ var HOOK_COMMANDS = [
     return gen2(function* () {
       if (agentId === undefined)
         return yield* new AgentIdMissing;
-      const directory = join7(yield* stateRoot(call.cwd), STATE_DIRECTORY);
+      const { directory } = yield* resolveState(call.cwd, call.env, "ifPresent");
       if (!(yield* hasStateFolder(directory)))
         return yield* new StateFolderMissing;
       const type = payload.tool_input?.subagent_type;
-      yield* recordLaunch(directory, id, agentId, {
+      yield* recordLaunch((transition) => updateState(directory, transition, call.env), id, agentId, {
         type: typeof type === "string" ? type : undefined
       });
       return postToolUse(`holyagent: recorded agent ${agentId} for ${id}.`);
@@ -18080,6 +18593,7 @@ var HOOK_COMMANDS = [
     ],
     flags: {},
     positionals: 1,
+    state: "peek",
     run: (call) => gen2(function* () {
       const file = call.args.positionals[0] ?? "";
       const text = yield* io(file, () => Bun.file(file).text());
@@ -18097,7 +18611,7 @@ var HOOK_COMMANDS = [
       const message = cleaned.split(`
 `).filter((line) => !line.startsWith(comment)).join(`
 `);
-      const phrases = forbiddenPhrases(message, (yield* readSettings(dirname2(call.directory))).allowWords);
+      const phrases = forbiddenPhrases(message, (yield* readSettings([join8(call.root, STATE_DIRECTORY)])).allowWords);
       if (phrases.length > 0)
         return yield* new MessageRefused({ phrases });
       if (cleaned !== above.trim() || cleanedBelow !== below.trim())
@@ -18118,7 +18632,7 @@ ${cleanedBelow}
   }, true)
 ];
 
-import { dirname as dirname3, join as join8, relative as relative4 } from "path";
+import { join as join9, relative as relative3 } from "path";
 var {$: $3 } = globalThis.Bun;
 class NothingToMigrate extends TaggedError2("NothingToMigrate") {
   get message() {
@@ -18153,7 +18667,7 @@ var conflictsOf = (root, directory, found) => gen2(function* () {
   ]);
   const seen = new Map;
   const problems = [];
-  const shown = (path) => relative4(root, path);
+  const shown = (path) => relative3(root, path);
   for (const record of found.flatMap((gathered) => gathered.records)) {
     const first = seen.get(record.id);
     seen.set(record.id, record.from);
@@ -18206,14 +18720,14 @@ var mentionsOf = (root, folders) => gen2(function* () {
   const names = yield* io(root, () => Array.fromAsync(new Bun.Glob("*").scan({ cwd: root, dot: true, onlyFiles: true })));
   const hits = [];
   for (const name of names.toSorted()) {
-    const text = yield* readText(join8(root, name));
+    const text = yield* readText(join9(root, name));
     if (text !== undefined && folders.some((folder) => text.includes(folder)))
       hits.push(name);
   }
   return hits;
 });
 var NOTES = [
-  "reads .holyclaude/ and .holycodex/ at the state root, whichever exist, and writes .holyagent/ records the CLI loads. It deletes nothing and commits nothing: removing the legacy folders and committing .holyagent/ is left to the root. It lists the project files that name a legacy folder (lint and format ignore lists, for example) without editing them, so the root can point them at .holyagent/",
+  "reads .holyclaude/ and .holycodex/ at the state root, whichever exist, and writes .holyagent/ records the CLI loads. It deletes nothing: the records are committed on the state branch (the legacy folders are read at the work tree root, the records written in the state worktree), and removing the legacy folders is left to the root. It lists the project files that name a legacy folder (lint and format ignore lists, for example) without editing them, so the root can point them at .holyagent/",
   "--dry-run prints the counts per source (intents, assignments, notes), every record it cannot convert with the reason, and everything a real run would refuse; it writes nothing. A real run first checks the same things and writes nothing unless all are clear: every record converts, no target file or id exists in .holyagent/ (nothing is overwritten), no Assignment is Running (holyclaude) or executing (holycodex) and no holycodex transaction is pending. A Running or executing Assignment is named with how to settle it: finish or cancel it with the legacy tool, then migrate again. It then reloads .holyagent/ and fails if any record does not decode",
   "records are decoded strictly: a field the legacy schema does not list makes the record unconvertible, and every record is written through the holyagent schemas, so one that breaks a holyagent rule is reported with that rule. Files ending in .tmp are skipped",
   "holyclaude, Intent: the id and revision are kept; the slug comes from the objective; requirements become one entry (none when blank); the state is Open, or Closed with its close_reason (closed_at is dropped); createdAt is the time in the id (the epoch for an early counter id such as intent-0001, which carries none). Notes in the Intent folder (resume-notes.md, notes/) are copied unchanged",
@@ -18231,8 +18745,8 @@ var MIGRATE_COMMANDS = [
     notes: NOTES,
     flags: { "dry-run": "boolean" },
     positionals: 0,
-    run: ({ args, directory }) => gen2(function* () {
-      const root = dirname3(directory);
+    state: (args) => booleanFlag(args, "dry-run") ? "ifPresent" : "create",
+    run: ({ args, directory, root, env }) => gen2(function* () {
       const dryRun = booleanFlag(args, "dry-run");
       const found = yield* gatherLegacy(root, directory);
       if (found.length === 0)
@@ -18264,7 +18778,9 @@ var MIGRATE_COMMANDS = [
         const again = yield* conflictsOf(root, directory, found);
         if (again.length > 0)
           return yield* new MigrationRefused({ problems: again });
-        return yield* writeAll(found);
+        const records = yield* writeAll(found);
+        yield* commitState(directory, env, "chore(state): convert the legacy state");
+        return records;
       }));
       const loaded = yield* reload(directory, written);
       return present({
@@ -18272,7 +18788,7 @@ var MIGRATE_COMMANDS = [
         ...counts,
         reloaded: loaded,
         mentions,
-        next: `Nothing was deleted or committed. Check the result with \`holyagent intent list\`, point the files under mentions at .holyagent/, then delete ${folders.join(" and ")} and commit .holyagent/ (the root does both)`
+        next: `Nothing was deleted; in a git repository the records are committed on the state branch. Check the result with \`holyagent intent list\`, point the files under mentions at .holyagent/, then delete ${folders.join(" and ")} (the root does it)`
       });
     })
   }
@@ -18287,7 +18803,7 @@ var COMMANDS = [
   ...HOOK_COMMANDS
 ];
 
-import { join as join9 } from "path";
+import { join as join10 } from "path";
 var TTL_VARIABLE = "HOLYAGENT_REUSE_TTL_MINUTES";
 var Minutes = NumberFromString.check(isFinite2(), isGreaterThanOrEqualTo2(0));
 var reuseTtl = (env) => {
@@ -18306,9 +18822,9 @@ var workflowsAvailable = (env, root) => {
   if (env.CLAUDE_CODE_DISABLE_WORKFLOWS === "1")
     return succeed6(false);
   const files = [
-    ...env.HOME === undefined ? [] : [join9(env.HOME, ".claude", "settings.json")],
-    join9(root, ".claude", "settings.json"),
-    join9(root, ".claude", "settings.local.json")
+    ...env.HOME === undefined ? [] : [join10(env.HOME, ".claude", "settings.json")],
+    join10(root, ".claude", "settings.json"),
+    join10(root, ".claude", "settings.local.json")
   ];
   return forEach2(files, disablesWorkflows).pipe(map4((disabled) => !disabled.includes(true)));
 };
@@ -18330,14 +18846,16 @@ var topHelp = () => [
   "help [command] or <command> --help shows a command's input shape, stdout and rules"
 ].join(`
 `);
-var callFor = (args, host, emit, stateless) => gen2(function* () {
-  const root = stateless ? host.cwd : yield* stateRoot(host.cwd);
+var callFor = (args, host, emit, command) => gen2(function* () {
+  const { root, directory } = command.stateless === true ? { root: host.cwd, directory: join11(host.cwd, STATE_DIRECTORY) } : yield* resolveState(host.cwd, host.env, typeof command.state === "function" ? command.state(args) : command.state ?? "ifPresent");
   const inline = stringFlag(args, INPUT_FLAG);
   return {
     args,
     cwd: host.cwd,
     env: host.env,
-    directory: join10(root, STATE_DIRECTORY),
+    root,
+    directory,
+    update: (transition) => updateState(directory, transition, host.env),
     config: loadConfig(host.env, root),
     text: readReport(host),
     emit,
@@ -18381,7 +18899,8 @@ var execute = (given, host) => gen2(function* () {
     });
   const emitted = [];
   const emit = host.emit ?? ((text) => sync2(() => void emitted.push(text)));
-  const output = yield* command.run(yield* callFor(args, host, emit, command.stateless === true));
+  const call = yield* callFor(args, host, emit, command);
+  const output = yield* command.run(call).pipe(provideService2(WorkTree, call.root));
   if (output instanceof Verbatim)
     return output;
   if (output instanceof Streamed)
@@ -18393,13 +18912,13 @@ ${output.text}
 `;
   return { stdout, stderr: "", code: 0 };
 });
-var failed = (error) => {
+var failed2 = (error) => {
   const { tag, message, hint, code } = describeFailure(error);
   return { stdout: "", stderr: `error: ${tag}: ${message}
 hint: ${hint}
 `, code };
 };
-var run2 = (argv, host) => execute(argv, host).pipe(catch_2((error) => succeed6(failed(error))), catchCause2((cause) => succeed6(failed({ _tag: "Defect", message: pretty(cause) }))));
+var run2 = (argv, host) => execute(argv, host).pipe(catch_2((error) => succeed6(failed2(error))), catchCause2((cause) => succeed6(failed2({ _tag: "Defect", message: pretty(cause) }))));
 
 var stdin = suspend2(() => process.stdin.isTTY ? fail5(new StdinMissing({ reason: "stdin is a terminal" })) : tryPromise2({
   try: () => Bun.stdin.text(),

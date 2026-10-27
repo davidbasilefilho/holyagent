@@ -1,4 +1,4 @@
-import { dirname, join, relative } from "node:path"
+import { join, relative } from "node:path"
 
 import { $ } from "bun"
 import { Data, Effect } from "effect"
@@ -9,6 +9,7 @@ import { STATE_DIRECTORY } from "../state/layout.ts"
 import { type Gathered, gatherLegacy, LEGACY_FOLDERS } from "../state/legacy.ts"
 import { withStateLock } from "../state/lock.ts"
 import { loadProject } from "../state/store.ts"
+import { commitState } from "../state/tree.ts"
 import { booleanFlag } from "./args.ts"
 import type { Command } from "./types.ts"
 import { present } from "./views.ts"
@@ -155,7 +156,7 @@ const mentionsOf = (root: string, folders: ReadonlyArray<string>) =>
   })
 
 const NOTES: ReadonlyArray<string> = [
-  "reads .holyclaude/ and .holycodex/ at the state root, whichever exist, and writes .holyagent/ records the CLI loads. It deletes nothing and commits nothing: removing the legacy folders and committing .holyagent/ is left to the root. It lists the project files that name a legacy folder (lint and format ignore lists, for example) without editing them, so the root can point them at .holyagent/",
+  "reads .holyclaude/ and .holycodex/ at the state root, whichever exist, and writes .holyagent/ records the CLI loads. It deletes nothing: the records are committed on the state branch (the legacy folders are read at the work tree root, the records written in the state worktree), and removing the legacy folders is left to the root. It lists the project files that name a legacy folder (lint and format ignore lists, for example) without editing them, so the root can point them at .holyagent/",
   "--dry-run prints the counts per source (intents, assignments, notes), every record it cannot convert with the reason, and everything a real run would refuse; it writes nothing. A real run first checks the same things and writes nothing unless all are clear: every record converts, no target file or id exists in .holyagent/ (nothing is overwritten), no Assignment is Running (holyclaude) or executing (holycodex) and no holycodex transaction is pending. A Running or executing Assignment is named with how to settle it: finish or cancel it with the legacy tool, then migrate again. It then reloads .holyagent/ and fails if any record does not decode",
   "records are decoded strictly: a field the legacy schema does not list makes the record unconvertible, and every record is written through the holyagent schemas, so one that breaks a holyagent rule is reported with that rule. Files ending in .tmp are skipped",
   "holyclaude, Intent: the id and revision are kept; the slug comes from the objective; requirements become one entry (none when blank); the state is Open, or Closed with its close_reason (closed_at is dropped); createdAt is the time in the id (the epoch for an early counter id such as intent-0001, which carries none). Notes in the Intent folder (resume-notes.md, notes/) are copied unchanged",
@@ -176,9 +177,9 @@ export const MIGRATE_COMMANDS: ReadonlyArray<Command> = [
     notes: NOTES,
     flags: { "dry-run": "boolean" },
     positionals: 0,
-    run: ({ args, directory }) =>
+    state: (args) => (booleanFlag(args, "dry-run") ? "ifPresent" : "create"),
+    run: ({ args, directory, root, env }) =>
       Effect.gen(function* () {
-        const root = dirname(directory)
         const dryRun = booleanFlag(args, "dry-run")
         const found = yield* gatherLegacy(root, directory)
         if (found.length === 0) return yield* new NothingToMigrate({ root })
@@ -214,7 +215,9 @@ export const MIGRATE_COMMANDS: ReadonlyArray<Command> = [
           Effect.gen(function* () {
             const again = yield* conflictsOf(root, directory, found)
             if (again.length > 0) return yield* new MigrationRefused({ problems: again })
-            return yield* writeAll(found)
+            const records = yield* writeAll(found)
+            yield* commitState(directory, env, "chore(state): convert the legacy state")
+            return records
           }),
         )
         const loaded = yield* reload(directory, written)
@@ -223,7 +226,7 @@ export const MIGRATE_COMMANDS: ReadonlyArray<Command> = [
           ...counts,
           reloaded: loaded,
           mentions,
-          next: `Nothing was deleted or committed. Check the result with \`holyagent intent list\`, point the files under mentions at .holyagent/, then delete ${folders.join(" and ")} and commit .holyagent/ (the root does both)`,
+          next: `Nothing was deleted; in a git repository the records are committed on the state branch. Check the result with \`holyagent intent list\`, point the files under mentions at .holyagent/, then delete ${folders.join(" and ")} (the root does it)`,
         })
       }),
   },

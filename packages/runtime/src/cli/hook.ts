@@ -1,5 +1,5 @@
 import { stat } from "node:fs/promises"
-import { dirname, join } from "node:path"
+import { join } from "node:path"
 
 import { Effect, Schema } from "effect"
 
@@ -8,13 +8,13 @@ import stateChanges from "../instructions/claude-5.5/specialist/state-changes.md
 import { hasCode, io } from "../state/files.ts"
 import { STATE_DIRECTORY } from "../state/layout.ts"
 import { legacyFoldersWithState } from "../state/legacy.ts"
-import { readOpenState } from "../state/store.ts"
+import { readOpenState, updateState } from "../state/store.ts"
+import { resolveState } from "../state/tree.ts"
 import { MessageRefused } from "../vcs/errors.ts"
 import { gitMaybe } from "../vcs/git.ts"
 import { cleanMessage, forbiddenPhrases } from "../vcs/message.ts"
 import { readSettings } from "../vcs/settings.ts"
 import { recordLaunch } from "./assignment.ts"
-import { stateRoot } from "./context.ts"
 import { AgentIdMissing, describeFailure, StateFolderMissing } from "./errors.ts"
 import { resolveIntent } from "./intent.ts"
 import { resumeOf, statusOf } from "./overview.ts"
@@ -206,8 +206,7 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
               .join("\n\n")
               .replaceAll("${CLAUDE_PLUGIN_ROOT}", pluginRoot ?? "${CLAUDE_PLUGIN_ROOT}")
         if (!(yield* hasStateFolder(call.directory))) {
-          const root = dirname(call.directory)
-          const found = yield* legacyFoldersWithState(root)
+          const found = yield* legacyFoldersWithState(call.root)
           // Nothing to show or convert: only a main thread that lacks the root rules gets them.
           if (found.length === 0)
             return core === undefined
@@ -243,13 +242,18 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
       // Recording is bookkeeping and authorizes nothing, so any failure only hands the step back.
       return Effect.gen(function* () {
         if (agentId === undefined) return yield* new AgentIdMissing()
-        const directory = join(yield* stateRoot(call.cwd), STATE_DIRECTORY)
+        const { directory } = yield* resolveState(call.cwd, call.env, "ifPresent")
         // The state folder is not made here: a project without one has no Assignment to record.
         if (!(yield* hasStateFolder(directory))) return yield* new StateFolderMissing()
         const type = payload.tool_input?.subagent_type
-        yield* recordLaunch(directory, id, agentId, {
-          type: typeof type === "string" ? type : undefined,
-        })
+        yield* recordLaunch(
+          (transition) => updateState(directory, transition, call.env),
+          id,
+          agentId,
+          {
+            type: typeof type === "string" ? type : undefined,
+          },
+        )
         return postToolUse(`holyagent: recorded agent ${agentId} for ${id}.`)
       }).pipe(
         Effect.catch((error) => {
@@ -300,6 +304,7 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
     ],
     flags: {},
     positionals: 1,
+    state: "peek",
     run: (call) =>
       Effect.gen(function* () {
         const file = call.args.positionals[0] ?? ""
@@ -321,7 +326,7 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
           .join("\n")
         const phrases = forbiddenPhrases(
           message,
-          (yield* readSettings(dirname(call.directory))).allowWords,
+          (yield* readSettings([join(call.root, STATE_DIRECTORY)])).allowWords,
         )
         if (phrases.length > 0) return yield* new MessageRefused({ phrases })
         if (cleaned !== above.trim() || cleanedBelow !== below.trim())
