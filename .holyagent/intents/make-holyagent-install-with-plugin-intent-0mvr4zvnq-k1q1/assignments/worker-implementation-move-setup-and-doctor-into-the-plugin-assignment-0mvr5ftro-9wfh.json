@@ -1,0 +1,80 @@
+{
+  "id": "assignment-0mvr5ftro-9wfh",
+  "intentId": "intent-0mvr4zvnq-k1q1",
+  "intentRevision": 2,
+  "roleTask": "Worker.implementation",
+  "slug": "move-setup-and-doctor-into-the-plugin",
+  "objective": "Move setup and doctor into the plugin runtime as `holyagent setup` and `holyagent doctor [--fix]`, add the /holyagent:setup slash command and a SessionStart setup check, so HolyAgent installs with plugin commands only.",
+  "state": "Ready",
+  "scope": [
+    "Worktree C:/Users/david.basile/dev/holyagent-feat-plugin-only-install (branch feat/plugin-only-install). Source to port: packages/cli/src (cmd/setup-claude.ts, cmd/doctor.ts, claude/user.ts, claude/project.ts, json-file.ts, shell.ts, report.ts) and packages/cli/tests. Another specialist deletes packages/cli and rewrites the docs in parallel: read packages/cli, do not edit or delete it.",
+    "Runtime commands: packages/runtime/src/cli/commands.ts (command arrays), types.ts (Command, stateless), program.ts (Verbatim and Streamed results), args.ts (flags). Hooks: packages/runtime/src/cli/hook.ts session-start, sessioncontext.ts. Plugin generation: packages/integrations/claude/src/generate.ts (dist is wiped and regenerated, so the command file needs a generator); build with `mise run build`.",
+    "Command to mirror: the Billion Context plugin command C:/Users/david.basile/.claude/plugins/cache/billion-context/billion-context/0.1.208/commands/bili-setup.md (a model-run prompt with description and allowed-tools frontmatter)."
+  ],
+  "constraints": [
+    "User requirements (binding): install Billion Context (`bili`, native mode, compress.rules) and ctx7 with its skill; merge the recommended keys into the USER settings (`~/.claude/settings.json`, which is `%USERPROFILE%/.claude/settings.json` on Windows). The keys are attribution, includeGitInstructions, subagentPromptCacheTtl, extraKnownMarketplaces, enabledPlugins and permissions.deny. Never change a value that is already set, and keep the existing `+`/`=`/`~`/`!` report lines; `doctor` checks the user settings, not the current directory. Steps must stay idempotent, a failed step must not stop the others, and `--dry-run` must keep working.",
+    "User decisions: drop the plugin-registration step (no claude plugin marketplace add, install or list in setup or doctor); drop the Bun canary check and upgrade (doctor checks bun is on PATH; `doctor --fix` runs the missing setup steps instead); in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) the SessionStart check says nothing and `holyagent setup` skips bili and ctx7 with a `-` line explaining why, while still merging the user-settings keys.",
+    "Flags: setup keeps --dry-run, --subagent-cache-ttl 1h|5m (default 1h), --skip-billion-context, --skip-ctx7; --dir is removed because settings are user-wide. doctor has --fix only. Resolve the user settings directory from CLAUDE_CONFIG_DIR when set, else the home .claude directory; confirm CLAUDE_CONFIG_DIR in the current Claude Code docs (ctx7 or the docs site). Tests point it at a temp dir.",
+    "/holyagent:setup works like /billion-context:bili-setup: a plugin command whose allowed-tools pre-authorize exactly the setup invocation; it runs `holyagent setup`, shows its report verbatim, and tells the user to restart Claude Code when native mode changed. Check the current Claude Code plugin docs for how a command reaches the plugin scripts (whether the CLAUDE_PLUGIN_ROOT variable expands in command bodies or allowed-tools, or bang-prefixed bash injection) and use the documented way; cite the source in the report.",
+    "SessionStart check: cheap and bounded (no process spawns or network; Bun.which PATH lookups and file reads only), never installs anything or writes any file, detects missing setup (bili, ctx7, the user-settings keys) and adds one line of context so the root offers /holyagent:setup; silent when everything is in place; within docs/hooks.md bounds (10 s timeout, 9,300-character additionalContext cap). Document it in docs/hooks.md.",
+    "Follow .claude/CLAUDE.md and AGENTS.md: Effect with tagged errors, no try/catch, async or new Promise in runtime source (bunfig lint), Effect Schema at data boundaries with onExcessProperty error, Bun Shell for processes, JSDoc on every export. Run `mise run build` after source changes.",
+    "No version-control writes (no git add, rm, commit, checkout, stash), no edits under .git/ or .holyagent/; report changed paths.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report; do not add unrequested features, tests, files or refactors (name them in the report). Do not stop at a summary that announces a next step."
+  ],
+  "criteria": [
+    {
+      "text": "`holyagent setup` installs bili (bun add -g billion-context) when missing, configures native mode when its artifacts are missing, sets compress.rules=true only when absent, installs ctx7 and its skill (same credential rules as packages/cli), and merges the six user-settings keys without changing any set value, printing the +/=/-/~/! lines; --dry-run writes nothing; a failed step prints `!` and later steps still run; exit 1 when any `!` line",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "`holyagent doctor` checks bun, bili and ctx7 on PATH and the user settings keys (not ./.claude/settings.json), with no plugin-list or canary check; `doctor --fix` runs the missing setup steps; exit 1 on any failing line",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "In a cloud session setup skips bili and ctx7 with a `-` line and still merges settings; the SessionStart check is silent there",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The generated plugin contains the /holyagent:setup command, emitted by generate.ts, and `claude plugin validate --strict` passes on dist",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "SessionStart adds exactly one line naming /holyagent:setup when bili, ctx7 or a settings key is missing, nothing when all are present, spawns no process and writes no file",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Tests cover each criterion above, including the error paths (failed install step continues, non-object settings file kept, dry run writes nothing, idempotent second run all `=`), ported from packages/cli/tests where they apply",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "`mise run build` and `mise run verify` pass (commands, exit codes, test counts); packages/cli is not edited",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Changes stay within the ownership paths",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime",
+    "packages/integrations/claude",
+    ".claude-plugin/marketplace.json",
+    "docs/hooks.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-10-27T20:39:45.781Z"
+}
