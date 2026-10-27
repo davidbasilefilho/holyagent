@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mvr7zc50-bdhp",
+  "intentId": "intent-0mvr4zvnq-k1q1",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.security",
+  "slug": "assess-commit-450465c-for-security",
+  "objective": "Assess commit 450465c for security issues in how it installs global tools, writes ~/.claude/settings.json and runs in the SessionStart hook.",
+  "state": "Ready",
+  "scope": [
+    "Worktree C:/Users/david.basile/dev/holyagent-feat-plugin-only-install, branch feat/plugin-only-install, stacked on fix/state-off-main (PR #35, head 935d4b3).",
+    "Intent: HolyAgent installs with `claude plugin marketplace add davidbasilefilho/holyagent`, `claude plugin marketplace add ranxianglei/billion-context`, `claude plugin install holyagent@holyagent` and nothing else; prerequisites Bun on PATH, Node LTS, git, authenticated gh. Setup moves into the plugin runtime as `holyagent setup` and `holyagent doctor [--fix]`: install Billion Context (bili, native mode, compress.rules) and ctx7 with its skill; merge attribution, includeGitInstructions, subagentPromptCacheTtl, extraKnownMarketplaces, enabledPlugins and permissions.deny into the USER settings (~/.claude/settings.json) never changing a value already set, keeping the + = ~ ! report lines; doctor checks user settings, not the current directory; steps idempotent, a failed step does not stop the others, --dry-run works. /holyagent:setup slash command runs setup and shows its report like /billion-context:bili-setup. SessionStart check: cheap, bounded, never installs or writes, only detects missing bili, ctx7 or settings keys and adds one line suggesting /holyagent:setup; silent when all is in place; within docs/hooks.md bounds. User decisions: plugin-registration step dropped; Bun canary check dropped (doctor checks bun on PATH); cloud sessions (CLAUDE_CODE_REMOTE=true): SessionStart silent, setup skips bili/ctx7 with a '-' line but still merges settings. packages/cli is deleted; the future pi extension installs with plain `pi install` (recorded in docs/decisions.md). README keeps its six sections in order (AGENTS.md).",
+    "Known Windows baseline: about 107 tests in packages/* fail on untouched main on this machine (symlink EPERM, backslash paths, POSIX modes, bundled hook tests); compare against that rather than treating them as new.",
+    "Read the diff file C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/node_modules/.review/setup.diff and the sources it touches under C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/packages/runtime/src/setup and packages/runtime/src/cli."
+  ],
+  "constraints": [
+    "Read-only: no edits, no version-control writes, nothing under .git/ or .holyagent/.",
+    "When the review is done, stop and report findings marked blocking or non-blocking with file:line; launch no other reviewers."
+  ],
+  "criteria": [
+    {
+      "text": "Process spawning (bun add -g, bili, ctx7) passes no untrusted input to a shell and handles a missing or failing tool",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Writing user settings cannot corrupt or drop existing keys (parse failure, partial write, unexpected types) and never weakens an existing permission",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The SessionStart check performs no writes, network calls or installs and leaks no secret (for example a CONTEXT7_API_KEY) into context or reports",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvr5ftro-9wfh"
+  ],
+  "createdAt": "2026-10-27T21:50:55.284Z"
+}
