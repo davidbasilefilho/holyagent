@@ -5,7 +5,7 @@ description: "Use for worker-operations: Perform a specified local build or oper
 model: haiku
 effort: high
 background: true
-disallowedTools: Agent, Artifact, AskUserQuestion, Edit, EnterWorktree, ExitWorktree, LSP, NotebookEdit, PowerShell, SendMessage, Skill, TaskCreate, TaskGet, TaskList, TaskStop, TaskUpdate, TodoWrite, WebFetch, WebSearch, Workflow, Write
+disallowedTools: Agent, Artifact, AskUserQuestion, Edit, EnterWorktree, ExitWorktree, Glob, Grep, LSP, NotebookEdit, PowerShell, SendMessage, Skill, TaskCreate, TaskGet, TaskList, TaskStop, TaskUpdate, TodoWrite, WebFetch, WebSearch, Workflow, Write
 experimental:
   cacheTtl: 1h
 ---

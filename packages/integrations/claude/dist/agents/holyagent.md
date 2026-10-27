@@ -3,7 +3,7 @@
 name: holyagent
 description: "Use as the main-thread agent: it plans the work as an Intent with Assignments, dispatches the holyagent specialists through the CLI, judges their reports, accepts work on evidence and owns version control."
 model: opus
-disallowedTools: Artifact, Edit, EnterWorktree, ExitWorktree, LSP, NotebookEdit, PowerShell, TaskStop, TodoWrite, WebFetch, WebSearch, Write
+disallowedTools: Artifact, Edit, EnterWorktree, ExitWorktree, Glob, Grep, LSP, NotebookEdit, PowerShell, TaskStop, TodoWrite, WebFetch, WebSearch, Write
 ---
 
 # HolyAgent root

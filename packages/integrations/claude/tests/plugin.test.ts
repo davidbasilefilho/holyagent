@@ -439,10 +439,11 @@ describe("agents", () => {
     }
   })
 
-  test("each role keeps exactly its previous built-in tools, less the native web tools", () => {
+  test("each role keeps exactly its built-in tools, with Grep and Glob only where there is no Bash", () => {
     const reading = ["Read", "Grep", "Glob"]
-    const writing = [...reading, "Write", "Edit", "Bash", "Monitor"]
-    const shell = [...reading, "Bash", "Monitor"]
+    // A role with Bash searches with the bundled ripgrep and fd, so it has no Grep or Glob.
+    const writing = ["Read", "Write", "Edit", "Bash", "Monitor"]
+    const shell = ["Read", "Bash", "Monitor"]
     const previous: Record<string, ReadonlyArray<string>> = {
       holyagent: [
         "Agent",
@@ -455,7 +456,7 @@ describe("agents", () => {
         "TaskUpdate",
         "TaskList",
         "TaskGet",
-        ...reading,
+        "Read",
         "Bash",
       ],
       "explorer-map": reading,

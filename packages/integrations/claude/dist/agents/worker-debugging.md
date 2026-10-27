@@ -5,7 +5,7 @@ description: "Use for worker-debugging: Diagnose and repair a concrete failure o
 model: sonnet
 effort: high
 background: true
-disallowedTools: Agent, Artifact, AskUserQuestion, EnterWorktree, ExitWorktree, LSP, NotebookEdit, PowerShell, SendMessage, Skill, TaskCreate, TaskGet, TaskList, TaskStop, TaskUpdate, TodoWrite, WebFetch, WebSearch, Workflow
+disallowedTools: Agent, Artifact, AskUserQuestion, EnterWorktree, ExitWorktree, Glob, Grep, LSP, NotebookEdit, PowerShell, SendMessage, Skill, TaskCreate, TaskGet, TaskList, TaskStop, TaskUpdate, TodoWrite, WebFetch, WebSearch, Workflow
 experimental:
   cacheTtl: 1h
 ---

@@ -66,7 +66,10 @@ const MCP_LOADER = "ToolSearch"
 
 const WRITING = ["Write", "Edit", "Bash"]
 
-/** The built-in tools of the root: dispatch, ask, tasks and reading; it writes no files. */
+/**
+ * The built-in tools of the root: dispatch, ask, tasks and reading; it writes no files. It has no
+ * Grep or Glob, since a role with a shell searches with the bundled ripgrep and fd.
+ */
 const ROOT_BUILTINS = [
   "Agent",
   "SendMessage",
@@ -79,8 +82,6 @@ const ROOT_BUILTINS = [
   "TaskList",
   "TaskGet",
   "Read",
-  "Grep",
-  "Glob",
   "Bash",
 ]
 
@@ -370,19 +371,19 @@ const BUILTIN_REVIEW: ReadonlySet<string> = new Set(["Reviewer.code", "Reviewer.
  * The built-in tools of a specialist: reading for all, then what its capabilities call for. The
  * Search capability grants none, since the Exa tools come as MCP tools. Reviewer.code keeps Bash
  * without a Shell capability, since it reads diffs with git. The roles of {@link BUILTIN_REVIEW}
- * get Skill, and a role with Bash gets Monitor for its long commands.
+ * get Skill, and a role with Bash gets Monitor for its long commands. A role with Bash searches
+ * with the bundled ripgrep and fd and so gets neither Grep nor Glob; a role without it keeps both.
  */
 const builtinsOf = (route: Route): ReadonlyArray<string> => {
+  const shell = route.capabilities.includes("Shell") || route.roleTask === "Reviewer.code"
   const granted = [
     "Read",
-    "Grep",
-    "Glob",
     ...(route.capabilities.includes("Write") ? WRITING : []),
-    ...(route.capabilities.includes("Shell") || route.roleTask === "Reviewer.code" ? ["Bash"] : []),
+    ...(shell ? ["Bash"] : []),
     ...(BUILTIN_REVIEW.has(route.roleTask) ? ["Skill"] : []),
   ]
   const unique = [...new Set(granted)]
-  return unique.includes("Bash") ? [...unique, "Monitor"] : unique
+  return unique.includes("Bash") ? [...unique, "Monitor"] : [...unique, "Grep", "Glob"]
 }
 
 const firstSentence = (text: string): string => {
