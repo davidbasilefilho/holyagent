@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "move-setup-and-doctor-into-the-plugin",
   "objective": "Move setup and doctor into the plugin runtime as `holyagent setup` and `holyagent doctor [--fix]`, add the /holyagent:setup slash command and a SessionStart setup check, so HolyAgent installs with plugin commands only.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-feat-plugin-only-install (branch feat/plugin-only-install). Source to port: packages/cli/src (cmd/setup-claude.ts, cmd/doctor.ts, claude/user.ts, claude/project.ts, json-file.ts, shell.ts, report.ts) and packages/cli/tests. Another specialist deletes packages/cli and rewrites the docs in parallel: read packages/cli, do not edit or delete it.",
     "Runtime commands: packages/runtime/src/cli/commands.ts (command arrays), types.ts (Command, stateless), program.ts (Verbatim and Streamed results), args.ts (flags). Hooks: packages/runtime/src/cli/hook.ts session-start, sessioncontext.ts. Plugin generation: packages/integrations/claude/src/generate.ts (dist is wiped and regenerated, so the command file needs a generator); build with `mise run build`.",
@@ -76,5 +76,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T20:39:56.156Z"
+  },
   "createdAt": "2026-10-27T20:39:45.781Z"
 }
