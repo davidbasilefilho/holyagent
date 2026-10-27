@@ -11,9 +11,14 @@
     "Failure 5: the root answered a user message ('você não está seguindo o holyagent way') with a blank reply. Rule: acknowledge every user message.",
     "Failure 6: after 'continue' the root created two Assignments, ran plan and ended the turn without starting the workflow, and did not return to the build task after a report was requested. Rule: start all ready independent work together and end the turn; open user objectives stay binding until done.",
     "Observed in this session too: the holyagent CLI on Windows (Git Bash) exits 0 silently when a command reads stdin (assignment close, intent create/update with stdin), because main.ts runs Effect.runFork and Bun.stdin.text() leaves no handle keeping the event loop alive; the root silently lost a close and an intent create.",
-    "Follow .claude/CLAUDE.md and AGENTS.md: instruction changes go to requirements.md first, then every model's instruction set; per-section files; Effect, JSDoc, mise run build and mise run verify passing; Conventional Commits; worktree branch and PR."
+    "Follow .claude/CLAUDE.md and AGENTS.md: instruction changes go to requirements.md first, then every model's instruction set; per-section files; Effect, JSDoc, mise run build and mise run verify passing; Conventional Commits; worktree branch and PR.",
+    "User addendum titled Addendum: workflow failures.",
+    "Failure 7: after continue, plan returned action: workflow for both Assignments and the root ended the turn without starting it; no work ran until the user complained twice. Rule: workflows run all new work; choosing this agent is the opt-in to the Workflow tool.",
+    "Failure 8: the root launched with parallel([...]) instead of pipeline(). Rule: run Assignments through pipeline(), which has no barrier; parallel() only where a stage needs every earlier result.",
+    "Failure 9: the root saved assignment dispatch output to files, printed it into context and retyped it by hand into the script as .join(newline) string arrays. Rule: pass that text as it is. Trigger: no direct route from the dispatch output to the inline script, so the root improvised one; give it a direct route.",
+    "User decision: no PreToolUse guard hook restricting the root Bash to holyagent, git and gh (the user disagrees: easy to bypass). The root already lacks Write and Edit. Name the loophole in the rule text itself (e.g. transcribing user-provided text to a file is still writing a file; delegate it)."
   ],
-  "revision": 1,
+  "revision": 2,
   "state": "Open",
   "createdAt": "2026-10-27T20:34:04.901Z"
 }
