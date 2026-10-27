@@ -1,0 +1,69 @@
+{
+  "id": "assignment-0mvqz0j46-rf4y",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-holyagent-instructions-stop-the",
+  "objective": "Make the holyagent instructions stop the root from asking what the project's mergeability standard or holyagent's own rules already answer, and from replying to hook and harness noise, and apply the small wording fixes the reviews left.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-instructions (branch ccr-046ad103-6qsvgx-instructions, stacked on the README PR).",
+    "User, verbatim: 'não pergunte me (ou qualquer usuário) mais coisas que podem ser respondidas pelo padrão do projeto (mergeability) ou o padrão do holyagent ... tem perguntas que não precisam ser feitas se você já consegue a resposta' and 'não no AGENTS.md, isso é padrão do holyagent'. Example the user flagged: asking permission to push and open stacked PRs, which the stack plan already settles. Rule: before asking, check the target project's conventions, the mergeability dimensions and holyagent's rules (stack plan, version control, CI, asking); when they settle the question, act and record the default instead of asking.",
+    "User, verbatim: 'qualquer coisa que o usuário não precisa saber não precisa ser mencionada'. Name the noise the root never writes about: the claude.ai Stop hook ~/.claude/stop-hook-git-check.sh (asks to commit and push on uncommitted, untracked or unverified local commits; keep the checkout clean instead and never reply to it), harness nudges to narrate (one neutral line only when the harness demands visible output after an empty reply, never naming the hook or what it said), tool reminders and deferred-tool lists, holyagent's own hook reminders and session-start status, worker or container restart notices unless something was lost, background-task notification envelopes and workflow diagnostics, GitHub event boilerplate (report only the result), MCP authentication notices the work does not need, and internal ids, revisions, scratchpad paths and CLI errors already resolved. What reaches the user: decisions, blockers only they can clear, verified results, outward actions (pushes, PRs, branches left on GitHub), denials, and anything lost or broken.",
+    "Where: packages/runtime/src/instructions/requirements.md first, then packages/runtime/src/instructions/claude-5.5/root/asking.md and packages/runtime/src/instructions/claude-5.5/root/user-messages.md; replace the weak 'Handle hook and harness feedback silently' line in the core text if it lives in a file you own, else report its location. Not AGENTS.md.",
+    "Ride-along wording fixes from reviews: in packages/runtime/src/instructions/claude-5.5/session-cloud-identity.md tell the model to single-quote the profile name (escaping single quotes) in the vcs identity command, since a name with shell metacharacters breaks double quotes; in packages/runtime/src/instructions/claude-5.5/root/search.md and packages/runtime/src/instructions/claude-5.5/specialist/working.md state the rg stdin reason precisely ('with no path and stdin a pipe or file, rg reads stdin instead of the tree, so pass the path, for example .') and open the fallback with 'Only when either fails with UnsupportedPlatform'.",
+    "Follow the 'Writing instructions' rules in packages/integrations/claude/dist/agents/holyagent.md: calm imperative US English, the reason beside each rule, no larger than needed. Mind the session-start budget tests (root core under 4000 characters, CONTEXT_BUDGET)."
+  ],
+  "constraints": [
+    "Follow /home/user/holyagent/.claude/CLAUDE.md (Effect with tagged errors, no try/catch/new Promise/async in runtime source, Schema at boundaries, Bun APIs and Bun Shell, JSDoc on exports).",
+    "Work only in your worktree; make no version-control writes and no edits under .git/ or .holyagent/. Run bun install --frozen-lockfile if node_modules is missing; finish with mise run build and mise run verify and report them.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When done and checked, stop and report; no unrequested features or refactors."
+  ],
+  "criteria": [
+    {
+      "text": "The instruction text tells the root to settle questions from the project conventions, mergeability and holyagent rules before asking, with the stacked-PR example",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The instruction text names the hook and harness noise to stay silent on, including the claude.ai stop hook and the one-neutral-line case, and what does reach the user",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The three ride-along wording fixes are applied",
+      "blocking": false,
+      "dimension": "style"
+    },
+    {
+      "text": "AGENTS.md is unchanged and mise run verify passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions/requirements.md",
+    "packages/runtime/src/instructions/claude-5.5/root/asking.md",
+    "packages/runtime/src/instructions/claude-5.5/root/user-messages.md",
+    "packages/runtime/src/instructions/claude-5.5/root/delegating.md",
+    "packages/runtime/src/instructions/claude-5.5/root/task-list.md",
+    "packages/runtime/src/instructions/claude-5.5/session-cloud-identity.md",
+    "packages/runtime/src/instructions/claude-5.5/root/search.md",
+    "packages/runtime/src/instructions/claude-5.5/specialist/working.md",
+    "packages/runtime/src/instructions/claude-5.5/session-reminder.md",
+    "packages/integrations/claude/dist/agents",
+    "packages/integrations/claude/tests"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T17:39:54.439Z"
+  },
+  "createdAt": "2026-10-27T17:39:54.439Z"
+}
