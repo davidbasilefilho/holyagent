@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mvqzz5xu-lnt9",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Worker.validation",
+  "slug": "validate-the-instructions-head-f0ef15d",
+  "objective": "Validate the instructions head f0ef15d and the Windows head daca0f9 with the repository gates.",
+  "state": "Running",
+  "scope": [
+    "In /home/user/holyagent-instructions (HEAD f0ef15d) and /home/user/holyagent-windows (HEAD daca0f9): mise run verify, then mise run build and confirm no tracked diff in each."
+  ],
+  "constraints": [
+    "Read-only: make no version-control writes and change no files except what mise run build rewrites identically. Save logs under /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad."
+  ],
+  "criteria": [
+    {
+      "text": "mise run verify exit code and per-gate counts are reported for both heads",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "mise run build leaves no tracked diff in either worktree",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-27T18:06:50.323Z"
+  },
+  "createdAt": "2026-10-27T18:06:50.323Z"
+}
