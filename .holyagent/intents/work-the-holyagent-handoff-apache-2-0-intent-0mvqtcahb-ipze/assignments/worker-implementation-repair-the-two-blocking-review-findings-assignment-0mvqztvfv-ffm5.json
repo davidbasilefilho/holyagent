@@ -1,0 +1,60 @@
+{
+  "id": "assignment-0mvqztvfv-ffm5",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-two-blocking-review-findings",
+  "objective": "Repair the two blocking review findings in the instruction change and fold in its small notes.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-instructions (head 671bdca). Review: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-assignment-0mvqzlmko-it5f.txt.",
+    "Blocker 1: give push authority one owner. In root/identity.md say reviewed branches are pushed and their stacked PRs opened or updated as the stack plan sets, once reviews accept, and that a user instruction to the contrary outranks this; change root/stack-plan.md:8, root/version-control.md:11 and requirements.md R-GIT to 'as the stack plan sets'; keep user approval for pushes to the base, default or protected branch, force-push, merges, publishing and deploys, and state in R-OUTWARD that opening a PR for a reviewed stacked branch is not publishing.",
+    "Blocker 2: add 'after an empty reply' to the neutral-line rule in root/task-list.md and requirements.md R-NUDGE.",
+    "Notes to fold in: state the noise list once (user-messages.md owns it; task-list.md keeps a one-line pointer) and trim R-NUDGE to point at it; say 'keep the checkout clean by committing work with holyagent vcs commit, so state stays on the state branch'; keep the ~/.claude/stop-hook-git-check.sh path (it is real, confirmed in this cloud session); restore 'not git loops' in root/delegating.md if it fits the core budget, else leave it out and say so; clarify asking.md:3 ('including when the user asks what needs their decision; then list only those').",
+    "Mind the root-core budget test (4000 on this branch)."
+  ],
+  "constraints": [
+    "Follow /home/user/holyagent/.claude/CLAUDE.md and the 'Writing instructions' rules in packages/integrations/claude/dist/agents/holyagent.md.",
+    "Work only in your worktree; make no version-control writes and no edits under .git/ or .holyagent/. Finish with mise run build and mise run verify.",
+    "Keep working until done; when done and checked, stop and report; no unrequested changes."
+  ],
+  "criteria": [
+    {
+      "text": "Push authority is stated one way across identity.md, stack-plan.md, version-control.md and requirements.md, with approvals kept for protected pushes, force-push and merges",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The neutral-line rule carries 'after an empty reply' everywhere it appears",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions/requirements.md",
+    "packages/runtime/src/instructions/claude-5.5/root",
+    "packages/runtime/src/instructions/claude-5.5/session-reminder.md",
+    "packages/integrations/claude/dist/agents",
+    "packages/integrations/claude/dist/scripts",
+    "packages/integrations/claude/tests",
+    "packages/runtime/tests"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvqz0j46-rf4y",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T18:02:43.435Z"
+  },
+  "createdAt": "2026-10-27T18:02:43.435Z"
+}
