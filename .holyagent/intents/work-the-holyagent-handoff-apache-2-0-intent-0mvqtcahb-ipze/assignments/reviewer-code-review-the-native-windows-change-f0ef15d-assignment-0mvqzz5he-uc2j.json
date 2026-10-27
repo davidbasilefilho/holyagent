@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mvqzz5he-uc2j",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-native-windows-change-f0ef15d",
+  "objective": "Review the native Windows change (f0ef15d..daca0f9 on ccr-046ad103-6qsvgx-windows) for correctness and regressions on Windows, macOS and Linux.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-windows (node_modules installed, mise available). Diff without dist and .holyagent: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/windows.diff. Writer reports: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-assignment-0mvqz0jb5-96fd.txt and /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-assignment-0mvqzlmrs-vpw9.txt.",
+    "Intent: hooks run bun in exec form (no POSIX shell); documented invocation bun --no-env-file --config=<empty-bunfig> <holyagent.js> <cmd>; path normalization (toPosix, globs, git output), PATH delimiter and key casing, HOME/USERPROFILE/CLAUDE_CONFIG_DIR fallbacks; mise and lefthook through Bun scripts; PowerShell installer. Nothing was run on Windows."
+  ],
+  "constraints": [
+    "Read-only: write no repository files; make no version-control writes."
+  ],
+  "criteria": [
+    {
+      "text": "Findings are ranked blocking or non-blocking with file:line and a failure scenario, covering hooks.json, the BunMissing replacement, each path fix, the mise/lefthook scripts and the installer",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Tests are judged for whether they fail without the change",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvqz0jb5-96fd",
+    "assignment-0mvqzlmrs-vpw9",
+    "assignment-0mvqztvnc-54e8"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T18:06:49.730Z"
+  },
+  "createdAt": "2026-10-27T18:06:49.730Z"
+}
