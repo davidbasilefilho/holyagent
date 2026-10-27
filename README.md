@@ -24,7 +24,7 @@ This route installs only the plugins. To also set up Billion Context, ctx7 and t
 bun packages/cli/src/index.ts setup claude
 ```
 
-Add `--dry-run` to see what it would change, and run `bun packages/cli/src/index.ts doctor` to check the result. On a clean WSL Ubuntu, `bash install/wsl-install.sh` prepares the whole environment first; run it as your own user, not through sudo, and pass it no arguments. The details and options are in [docs/usage.md](docs/usage.md), and the status of the other environments (T3 Code, the desktop app, claude.ai) is in [docs/requirements.md](docs/requirements.md#supported-environments).
+Add `--dry-run` to see what it would change, and run `bun packages/cli/src/index.ts doctor` to check the result. On a clean WSL Ubuntu, `bash install/wsl-install.sh` prepares the whole environment first; run it as your own user, not through sudo, and pass it no arguments. On native Windows, run `powershell -ExecutionPolicy Bypass -File install\windows-install.ps1` in a normal (not elevated) window instead. The details and options are in [docs/usage.md](docs/usage.md), and the status of the other environments (T3 Code, the desktop app, claude.ai) is in [docs/requirements.md](docs/requirements.md#supported-environments).
 
 ## Why HolyAgent?
 
