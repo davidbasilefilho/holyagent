@@ -21,3 +21,7 @@ Rules for working in this repository, each with the reason it exists. The contri
 ## Version-control rules
 
 - The root commits only with `holyagent vcs commit`, uses plain Git and `gh` for branches, pushes, merges and CI, and never force-pushes or pushes to a protected branch without the user's approval. After a denial it stops that line of work and reports a blocker, and does not reach the same result through another tool, because a workaround defeats the boundary the user set. A specialist makes no version-control writes and no edits under `.git/` or `.holyagent/`, and reports its changed paths for the root to record. Nothing blocks these writes: the rules are instruction text, restated by hooks that only add context (`docs/hooks.md`).
+
+## The README
+
+- Keep `README.md` to exactly these sections, in this order: `# HolyAgent` (what it is, as a pitch), `## How do I install it?` (quick install), `## Why HolyAgent?` (the reasons to use it), `## Development` (contributing and the gates), `## Special thanks` (inspirations and projects) and `## License` (points to `LICENSE`). The maintainer set this structure so a reader finds the same things in the same place; detail belongs in `docs/`, which the README links to rather than repeats, so the two cannot drift.
