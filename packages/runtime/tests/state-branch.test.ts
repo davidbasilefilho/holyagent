@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdir, readFile, stat, symlink, writeFile } from "node:fs/promises"
+import { mkdir, readdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import { Effect } from "effect"
@@ -137,6 +137,21 @@ describe("the state branch", () => {
       intents: Array<{ id: string; inUse: boolean }>
     }
     expect(listed.intents.every((row) => !row.inUse)).toBe(true)
+  })
+
+  test("a worktree with no choice of its own uses the one shared choice an older version kept", async () => {
+    const dir = await initRepo(OWNER)
+    await seed(dir, { "a.txt": "a\n" })
+    const first = await createIntent(dir, "Ship the parser")
+    await createIntent(dir, "Ship the printer")
+    const idle = join(await scratch("holyagent-worktree-"), "idle")
+    await sh(dir, ["git", "worktree", "add", "-q", "-b", "idle", idle])
+    const legacy = join(await stateTree(dir), ".holyagent", "local", "active-intent.json")
+    await writeFile(legacy, JSON.stringify({ intentId: first }))
+
+    const shown = toon(await holy(idle, ["intent", "show"]))
+
+    expect(String(shown.id)).toBe(first)
   })
 
   test("a new state branch starts at the base branch head, and the state branch name is configurable in git config", async () => {
@@ -674,6 +689,34 @@ describe("a state worktree that is not what it should be", () => {
     expect(await Bun.file(join(state, ".holyagent", "leak.md")).exists()).toBe(false)
     expect(await sh(state, ["git", "log", "--all", "-p"])).not.toContain("secret")
     expect(await readFile(join(state, ".holyagent", "real.md"), "utf8")).toBe("real\n")
+  })
+
+  test("migration refuses a state worktree whose .holyagent folder is a symlink", async () => {
+    const { tree, state } = await withLinked()
+    const outside = await scratch("holyagent-outside-")
+    await rm(join(state, ".holyagent"), { recursive: true })
+    await symlink(outside, join(state, ".holyagent"))
+    await put(tree, { ".holyagent/real.md": "attacker\n" })
+
+    const result = await holy(tree, ["intent", "list"])
+
+    expect(result.code).toBe(4)
+    expect(result.stderr).toContain(join(state, ".holyagent"))
+    expect(await readdir(outside)).toEqual([])
+  })
+
+  test("migration leaves a work tree whose .holyagent folder is a symlink out of the state", async () => {
+    const { tree, state } = await withLinked()
+    const outside = await scratch("holyagent-outside-")
+    await writeFile(join(outside, "secret.md"), "secret\n")
+    await symlink(outside, join(tree, ".holyagent"))
+
+    const result = await holy(tree, ["intent", "list"])
+
+    expect(result.code).toBe(0)
+    expect(await Bun.file(join(state, ".holyagent", "secret.md")).exists()).toBe(false)
+    expect(await sh(state, ["git", "log", "--all", "-p"])).not.toContain("secret")
+    expect(await readFile(join(outside, "secret.md"), "utf8")).toBe("secret\n")
   })
 
   test("a state worktree switched to another branch is reported and its folder is kept", async () => {

@@ -1,5 +1,5 @@
 import { lstat, mkdir, readdir, realpath, rename, rm, rmdir, stat } from "node:fs/promises"
-import { dirname, join, sep } from "node:path"
+import { basename, dirname, join, sep } from "node:path"
 
 import { $ } from "bun"
 import { Effect } from "effect"
@@ -379,24 +379,51 @@ const kindAt = (path: string) =>
   )
 
 /**
- * True when `relative` under `root` is a regular file reached through no link: a link, a device, a
- * socket or a link in the path is not state, and following it would read or write elsewhere.
+ * The `.holyagent` folder at `root` reached through the real path of its work tree only. The folder
+ * itself is left unresolved, so a link standing for it never counts as being inside itself.
+ */
+const realStateFolder = (root: string) =>
+  canonical(dirname(root)).pipe(Effect.map((parent) => join(parent, basename(root))))
+
+/**
+ * Fails when the `.holyagent` folder at `root` is there as anything but a real folder: a link in
+ * its place would send every read and write somewhere else. An absent folder passes.
+ */
+const requireStateFolder = (root: string) =>
+  kindAt(root).pipe(
+    Effect.flatMap((kind) =>
+      kind === undefined || kind === "directory"
+        ? Effect.void
+        : Effect.fail(
+            new StateIo({
+              path: root,
+              cause: `a ${kind} stands where the state folder is to be; the state worktree must hold a real folder, so remove it`,
+            }),
+          ),
+    ),
+  )
+
+/**
+ * True when `relative` under the state folder `root` is a regular file reached through no link: a
+ * link, a device, a socket or a link in the path is not state, and following it would read or write
+ * elsewhere. The state folder itself must be a real folder inside the real path of its work tree.
  */
 const isPlainFile = (root: string, relative: string) =>
   Effect.gen(function* () {
     const path = join(root, relative)
-    if ((yield* kindAt(path)) !== "file") return false
-    const [real, base] = yield* Effect.all([canonical(path), canonical(root)])
+    if ((yield* kindAt(root)) !== "directory" || (yield* kindAt(path)) !== "file") return false
+    const [real, base] = yield* Effect.all([canonical(path), realStateFolder(root)])
     return real === join(base, relative)
   })
 
 /**
- * Fails when something in the path from `root` down to `relative` (the last part included) is
- * already there as anything but a folder, or a file for the last part: a link in the state worktree
- * would send a write outside it.
+ * Fails when `root`, the state folder, or something in the path from it down to `relative` (the
+ * last part included) is already there as anything but a folder, or a file for the last part: a
+ * link in the state worktree would send a write outside it.
  */
 const requirePlainTarget = (root: string, relative: string) =>
   Effect.gen(function* () {
+    yield* requireStateFolder(root)
     const parts = relative.split("/")
     let current = root
     for (const [index, part] of parts.entries()) {
@@ -421,7 +448,7 @@ const copyInto = (root: string, relative: string, from: string) =>
     yield* requirePlainTarget(root, relative)
     const to = join(root, relative)
     yield* io(to, () => mkdir(dirname(to), { recursive: true }))
-    const [folder, base] = yield* Effect.all([canonical(dirname(to)), canonical(root)])
+    const [folder, base] = yield* Effect.all([canonical(dirname(to)), realStateFolder(root)])
     if (folder !== base && !folder.startsWith(`${base}${sep}`))
       return yield* new StateIo({ path: to, cause: `${folder} is outside the state worktree` })
     const temporary = `${to}.${process.pid}.${crypto.randomUUID()}.tmp`
@@ -516,55 +543,66 @@ const migrateWorkTree = (
         Effect.flatMap((done) =>
           done
             ? Effect.void
-            : withStateLock(
-                target,
-                Effect.gen(function* () {
-                  if (yield* fileExists(marker)) return
-                  const entries = yield* workTreeEntries(top, env)
-                  const moved: Array<Entry> = []
-                  for (const entry of entries) {
-                    // A link, device or socket in the work tree is not state.
-                    if (!(yield* isPlainFile(source, entry.path))) continue
-                    const to = join(target, entry.path)
-                    yield* requirePlainTarget(target, entry.path)
-                    const dirty = entry.status !== undefined && !entry.status.includes("D")
-                    const there = (yield* kindAt(to)) !== undefined
-                    const wanted =
-                      !there || (dirty && !(yield* sameBytes(join(source, entry.path), to)))
-                    if (wanted) yield* copyInto(target, entry.path, join(source, entry.path))
-                    if (dirty && !entry.path.startsWith("local/")) moved.push(entry)
-                  }
-                  yield* commit("chore(state): migrate the state found in a work tree")
-                  // Only what the state worktree now holds byte for byte leaves the work tree.
-                  for (const entry of moved) {
-                    const from = join(source, entry.path)
-                    if (!(yield* sameBytes(from, join(target, entry.path)))) continue
-                    const status = entry.status ?? ""
-                    if (status === "??") yield* io(from, () => rm(from, { force: true }))
-                    else if (status.startsWith("A"))
-                      yield* gitText(top, env, [
-                        "rm",
-                        "-f",
-                        "-q",
-                        "--",
-                        `${STATE_DIRECTORY}/${entry.path}`,
-                      ])
-                    else
-                      yield* gitText(top, env, [
-                        "--literal-pathspecs",
-                        "restore",
-                        "--source=HEAD",
-                        "--staged",
-                        "--worktree",
-                        "--",
-                        `${STATE_DIRECTORY}/${entry.path}`,
-                      ])
-                    yield* pruneEmpty(source, dirname(from))
-                  }
-                  // The folder goes too when only its emptied husk is left; one with `local/` stays.
-                  yield* io(source, () => rmdir(source)).pipe(Effect.ignore)
-                  yield* io(marker, () => Bun.write(marker, ""))
-                }),
+            : // Checked before the lock, which writes under the target: a link or other non-folder
+              // in place of either state folder is never read or written through. A work tree
+              // whose folder is one has no state to move.
+              requireStateFolder(target).pipe(
+                Effect.andThen(kindAt(source)),
+                Effect.flatMap((kind) =>
+                  kind !== undefined && kind !== "directory"
+                    ? Effect.void
+                    : withStateLock(
+                        target,
+                        Effect.gen(function* () {
+                          if (yield* fileExists(marker)) return
+                          const entries = yield* workTreeEntries(top, env)
+                          const moved: Array<Entry> = []
+                          for (const entry of entries) {
+                            // A link, device or socket in the work tree is not state.
+                            if (!(yield* isPlainFile(source, entry.path))) continue
+                            const to = join(target, entry.path)
+                            yield* requirePlainTarget(target, entry.path)
+                            const dirty = entry.status !== undefined && !entry.status.includes("D")
+                            const there = (yield* kindAt(to)) !== undefined
+                            const wanted =
+                              !there || (dirty && !(yield* sameBytes(join(source, entry.path), to)))
+                            if (wanted)
+                              yield* copyInto(target, entry.path, join(source, entry.path))
+                            if (dirty && !entry.path.startsWith("local/")) moved.push(entry)
+                          }
+                          yield* commit("chore(state): migrate the state found in a work tree")
+                          // Only what the state worktree now holds byte for byte leaves the work tree.
+                          for (const entry of moved) {
+                            const from = join(source, entry.path)
+                            if (!(yield* sameBytes(from, join(target, entry.path)))) continue
+                            const status = entry.status ?? ""
+                            if (status === "??") yield* io(from, () => rm(from, { force: true }))
+                            else if (status.startsWith("A"))
+                              yield* gitText(top, env, [
+                                "rm",
+                                "-f",
+                                "-q",
+                                "--",
+                                `${STATE_DIRECTORY}/${entry.path}`,
+                              ])
+                            else
+                              yield* gitText(top, env, [
+                                "--literal-pathspecs",
+                                "restore",
+                                "--source=HEAD",
+                                "--staged",
+                                "--worktree",
+                                "--",
+                                `${STATE_DIRECTORY}/${entry.path}`,
+                              ])
+                            yield* pruneEmpty(source, dirname(from))
+                          }
+                          // The folder goes too when only its emptied husk is left; one with `local/` stays.
+                          yield* io(source, () => rmdir(source)).pipe(Effect.ignore)
+                          yield* io(marker, () => Bun.write(marker, ""))
+                        }),
+                      ),
+                ),
               ),
         ),
       ),

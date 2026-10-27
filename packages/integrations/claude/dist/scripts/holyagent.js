@@ -9539,6 +9539,7 @@ var WorkTree = Reference("holyagent/state/WorkTree", {
   }
 });
 var activeIntentFile = (directory, workTree) => localFile(directory, `active-intent/${new Bun.CryptoHasher("sha1").update(workTree).digest("hex").slice(0, 16)}.json`);
+var LEGACY_ACTIVE_INTENT = "active-intent.json";
 var Vcs = Struct({
   branch: optionalKey2(Text),
   base: optionalKey2(Text),
@@ -9552,7 +9553,8 @@ var ensureLocalDirectory = (directory) => {
 };
 var readLocal = (directory) => gen2(function* () {
   const workTree = yield* WorkTree;
-  const active = workTree === undefined ? undefined : yield* readJson(ActiveIntentFile, activeIntentFile(directory, workTree));
+  const own = workTree === undefined ? undefined : yield* readJson(ActiveIntentFile, activeIntentFile(directory, workTree));
+  const active = own ?? (yield* readJson(ActiveIntentFile, localFile(directory, LEGACY_ACTIVE_INTENT)));
   const specialists = yield* readJson(SpecialistsFile, localFile(directory, "specialists.json"));
   const vcs = yield* readJson(Vcs, localFile(directory, "vcs.json"));
   return {
@@ -9751,7 +9753,7 @@ var withFileLock = (file, use, patience = "short") => acquireUseRelease2(io(file
 var withStateLock = (directory, use) => acquireUseRelease2(ensureLocalDirectory(directory).pipe(andThen2(acquire(localFile(directory, "lock")))), () => use, (token) => release(localFile(directory, "lock"), token));
 
 import { lstat, mkdir as mkdir2, readdir, realpath, rename as rename2, rm as rm3, rmdir, stat } from "fs/promises";
-import { dirname as dirname2, join as join2, sep } from "path";
+import { basename, dirname as dirname2, join as join2, sep } from "path";
 var {$ } = globalThis.Bun;
 
 var looksLikeAgent = (identity) => identity.email.toLowerCase() === "noreply@anthropic.com" || /^claude\b/i.test(identity.name.trim());
@@ -9909,14 +9911,20 @@ var LOCAL_FILES = new Set(["local/specialists.json", "local/vcs.json"]);
 var sameBytes = (a, b) => all2([io(a, () => Bun.file(a).bytes()), io(b, () => Bun.file(b).bytes())]).pipe(map4(([left, right]) => Buffer.from(left).equals(Buffer.from(right))));
 var fileExists = (path) => io(path, () => Bun.file(path).exists());
 var kindAt = (path) => io(path, () => lstat(path)).pipe(map4((info) => info.isSymbolicLink() ? "link" : info.isFile() ? "file" : info.isDirectory() ? "directory" : "other"), catchIf2((error) => hasCode(error.cause, "ENOENT") || hasCode(error.cause, "ENOTDIR"), () => succeed6(undefined)));
+var realStateFolder = (root) => canonical(dirname2(root)).pipe(map4((parent) => join2(parent, basename(root))));
+var requireStateFolder = (root) => kindAt(root).pipe(flatMap2((kind) => kind === undefined || kind === "directory" ? void_3 : fail5(new StateIo({
+  path: root,
+  cause: `a ${kind} stands where the state folder is to be; the state worktree must hold a real folder, so remove it`
+}))));
 var isPlainFile = (root, relative) => gen2(function* () {
   const path = join2(root, relative);
-  if ((yield* kindAt(path)) !== "file")
+  if ((yield* kindAt(root)) !== "directory" || (yield* kindAt(path)) !== "file")
     return false;
-  const [real, base] = yield* all2([canonical(path), canonical(root)]);
+  const [real, base] = yield* all2([canonical(path), realStateFolder(root)]);
   return real === join2(base, relative);
 });
 var requirePlainTarget = (root, relative) => gen2(function* () {
+  yield* requireStateFolder(root);
   const parts = relative.split("/");
   let current = root;
   for (const [index, part] of parts.entries()) {
@@ -9935,7 +9943,7 @@ var copyInto = (root, relative, from) => gen2(function* () {
   yield* requirePlainTarget(root, relative);
   const to = join2(root, relative);
   yield* io(to, () => mkdir2(dirname2(to), { recursive: true }));
-  const [folder, base] = yield* all2([canonical(dirname2(to)), canonical(root)]);
+  const [folder, base] = yield* all2([canonical(dirname2(to)), realStateFolder(root)]);
   if (folder !== base && !folder.startsWith(`${base}${sep}`))
     return yield* new StateIo({ path: to, cause: `${folder} is outside the state worktree` });
   const temporary = `${to}.${process.pid}.${crypto.randomUUID()}.tmp`;
@@ -9981,7 +9989,7 @@ var migrationMarker = (common, top) => io(top, () => realpath(top)).pipe(map4((r
 var migrateWorkTree = (top, common, worktree, env, commit) => {
   const source = join2(top, STATE_DIRECTORY);
   const target = join2(worktree, STATE_DIRECTORY);
-  return migrationMarker(common, top).pipe(flatMap2((marker) => fileExists(marker).pipe(flatMap2((done) => done ? void_3 : withStateLock(target, gen2(function* () {
+  return migrationMarker(common, top).pipe(flatMap2((marker) => fileExists(marker).pipe(flatMap2((done) => done ? void_3 : requireStateFolder(target).pipe(andThen2(kindAt(source)), flatMap2((kind) => kind !== undefined && kind !== "directory" ? void_3 : withStateLock(target, gen2(function* () {
     if (yield* fileExists(marker))
       return;
     const entries = yield* workTreeEntries(top, env);
@@ -10029,7 +10037,7 @@ var migrateWorkTree = (top, common, worktree, env, commit) => {
     }
     yield* io(source, () => rmdir(source)).pipe(ignore2);
     yield* io(marker, () => Bun.write(marker, ""));
-  }))))));
+  }))))))));
 };
 var commitState = (directory, env, message) => gen2(function* () {
   const worktree = dirname2(directory);

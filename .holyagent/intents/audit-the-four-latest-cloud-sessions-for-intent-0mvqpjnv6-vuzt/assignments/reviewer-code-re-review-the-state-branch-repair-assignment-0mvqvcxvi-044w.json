@@ -1,0 +1,68 @@
+{
+  "id": "assignment-0mvqvcxvi-044w",
+  "intentId": "intent-0mvqpjnv6-vuzt",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-state-branch-repair",
+  "objective": "Re-review the state-branch repair (2e519b7..16e135b) and confirm the earlier code blockers are closed without new regressions.",
+  "state": "Succeeded",
+  "scope": [
+    "Re-review: the repair commits are 2e519b7..16e135b on branch ccr-046ad103-6qsvgx in /home/user/holyagent (c0b1b51 fixes the earlier findings, 6f9318c updates docs, 16e135b keeps the Intent in use per work tree). The diff without .holyagent/ and dist is /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/rereview.diff.",
+    "Judge only whether the earlier findings are closed and whether the repair introduced new problems; do not reopen the reviewed parts of 2e519b7 beyond that.",
+    "Earlier findings: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-assignment-0mvqu8qob-0hpo.txt (blockers 1 concurrency, 2 config.json precedence, 3 base start). The tree is clean at 16e135b; you may run git and bun tests read-only."
+  ],
+  "constraints": [
+    "Read-only: write no repository files. Make no version-control writes and no edits under .git/ or .holyagent/."
+  ],
+  "criteria": [
+    {
+      "text": "Each earlier blocker is marked closed or open with evidence from a reproduction or test run",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "New findings from the repair are ranked blocking or non-blocking with file:line and a failure scenario",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvqupf7d-dm5i",
+    "assignment-0mvqv1zxa-h23p"
+  ],
+  "followUpOf": "assignment-0mvqu8qob-0hpo",
+  "specialist": {
+    "agentId": "workflow:wf_9ed21dca-8f1/assignment-0mvqvcxvi-044w",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T15:57:34.976Z",
+    "finishedAt": "2026-10-27T16:12:42.050Z"
+  },
+  "result": "result: Blockers 1, 2 and 3 are closed. The repair adds no blocking regression. The most notable new findings are non-blocking: a lost Intent-in-use pointer on upgrade from main, and `StateLocked` under heavy concurrency on very large repositories.\n\nI ran `/code-review 2e519b7...16e135b` through the Skill tool. It returned 9 findings, all judged below. The skill text loaded was the built-in's. The tree was clean at 16e135b throughout. The other workers' new `.holyagent/` Assignment files showed up untracked, and that is all.\n\n**Earlier blockers**\n- **Blocker 1, concurrency: closed at the reported scale, with a residual limit.**\n  - The reported repro (6 parallel `intent create` on 3000 files) gave 6 of 6 exit 0 in three runs on 16e135b. On 2e519b7 it gave 1 of 6 exit 0 (5 exit 4, the same result as the earlier review).\n  - The new test \"six commands that start at once...\" passes on 16e135b and fails on 2e519b7.\n  - Residual limit: at 20000 files, 6 parallel first starts gave 1 `StateLocked` (exit 4) in 2 of 3 runs, 10 parallel gave 3 of 10, and 10 parallel after warm-up gave 2 of 10. 4 parallel passed 4 of 4.\n  - The base commit 9c14b46 passed 10 of 10 at 3000 files. The failure is on the state lock (`local/lock`, about 1 s patience), not the worktree lock.\n  - It is loud and retry-safe, and it comes from the commit-under-lock design of 2e519b7. I rank it non-blocking, but it is a root decision.\n- **Blocker 2, `config.json` precedence: closed.**\n  - An untracked `config.json` with `stateBranch: team/state` stays in the work tree. Two intent creates make no `team/state` branch and one state worktree (2 entries in `worktree list`). `vcs commit -m \"document Claude Code usage\"` passes.\n  - With a tracked `config.json`, the first commit is refused with `MessageRefused`. After adding `allowWords` in the work tree, the same commit succeeds at once.\n  - The three new config tests fail on 2e519b7 and pass on 16e135b.\n- **Blocker 3, base start: closed.**\n  - Empty repo: the first commit is made after the state was created, then `git merge holyagent/state` succeeds (no unrelated-histories error).\n  - Default branch `develop` with the current branch `feature`: the merge-base of `develop` and `holyagent/state` equals `develop`, and no feature commit is in `develop..holyagent/state`.\n  - The three new base tests fail on 2e519b7 and pass on 16e135b.\n\n**New findings from the repair**\nAll of these are non-blocking.\n1. `packages/runtime/src/state/local.ts:68-92`, `tree.ts:354`. The old `local/active-intent.json` is no longer read or migrated.\n   - I reproduced it: two open Intents created with the base CLI (9c14b46), then `intent show` with the new CLI. It fails with `NoActiveIntent` (\"2 Intents are open and none is in use\"). 2e519b7 kept the pointer.\n   - The effect is limited to clones upgrading from main that have several open Intents. The error is loud and its hint says to run `intent use`.\n   - A fallback read of the legacy file would remove it.\n2. `tree.ts:314`. A worktree registered without its `.ready` marker (for example, a creator killed mid-checkout) gets the marker written on trust, then is used.\n   - A partial checkout could then be committed as deletions by `commitState`'s `add -A`. Unreproduced, read-only analysis. It already existed in 2e519b7.\n3. `tree.ts:301`. A `peek` on an unsettled worktree takes `worktree.lock` and can wait up to about 60 s. Read-only analysis.\n4. `tree.ts:544`. A staged rename (`R `) of a state file makes `git restore --source=HEAD` fail on the new path, and `StateIo` blocks every command in that work tree. Unreproduced, read-only analysis. It is in 2e519b7 code and was not touched by the repair.\n5. `tree.ts:910`. The `startsWith(`${own}/`)` filter compares the git common dir with `worktree list` paths. On macOS, where `/tmp` is a symlink, it may fail to exclude state worktrees from migration sources. I could not run this.\n6. `vcs/settings.ts:19`. `vcs.stateBranch` in `config.json` is now silently ignored. This is not an upgrade regression, because that field never existed on main.\n\n**/code-review findings, judged**\n\n| Finding | Verdict |\n|---|---|\n| `tree.ts:354` | Optional: confirmed and reproduced, new finding 1 |\n| `vcs/commands.ts:20` | Optional: base also read `config.json` only from the work tree, so this is not a regression |\n| `tree.ts:544` | Optional: new finding 4 |\n| `tree.ts:314` | Optional: new finding 2 |\n| `tree.ts:301` | Optional: new finding 3 |\n| `vcs/settings.ts:19` | Optional: new finding 6 |\n| `tree.ts:217` | Rejected: rooting at the base is what makes merges clean (see the blocker 3 repro). Only the header comment overclaims |\n| `tree.ts:623` | Optional: latency from many git spawns, not a correctness defect |\n| `cli/hook.ts:329` | Optional: the inline settings folder duplicates `settingsFolders` |\n\n**Standards and tests**\n- The new tests fail on 2e519b7 and pass on 16e135b. They assert behavior: CLI exit codes, merge results, files on disk.\n- I found no weakened tests. The deleted \"no commit\" test was replaced by one for the new deferral semantics.\n- The new source has no try/catch, async or Promise statics, and exports have JSDoc.\n- `mise run verify` exits 0, and the checks below were run on this tree.\n\nchanged: none (read-only). Scratch repos and an extracted 2e519b7 copy are under /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/rr.\n\nchecks:\n- `mise run verify` -> exit 0. Type-check 102 files, lint 103 files, fmt 215 files clean, tests 792 pass, 1 skip, 0 fail.\n- `bun test state-branch.test.ts store.test.ts cli.test.ts` on 16e135b -> 94 pass, 0 fail.\n- The new `state-branch.test.ts` run against 2e519b7 source -> 16 pass, 11 fail (every new repair test fails there).\n- `conc.sh` stress script (in the scratchpad `rr` folder; the table shows the pass counts): CLI processes started in parallel on a seeded repo.\n\n| Scenario | Result |\n|---|---|\n| 6x3000, 16e135b | 18 of 18 exit 0 (three runs) |\n| 6x3000, 2e519b7 | 1 of 6 exit 0 |\n| 10x3000, 9c14b46 | 10 of 10 exit 0 |\n| 10x3000, 16e135b | 10 of 10 exit 0 |\n| 10x20000, 16e135b | 7 and 8 of 10 exit 0 (two runs) |\n| 6x20000, 16e135b | 5 of 6, 5 of 6, 6 of 6 (three runs) |\n| 4x20000, 16e135b | 4 of 4 exit 0 |\n\n- Blocker 2 and 3 CLI repros: results in the closed-blocker sections above.\n- Upgrade repro (base CLI state read by the new CLI) -> `NoActiveIntent`. The 2e519b7 CLI kept the pointer.\n\nblockers: none\n\nquestions:\n- Should the state lock use the long patience, or the transition's commit move out of it, so that 6 or more parallel writers in repositories of about 20000 files no longer fail with `StateLocked`? This is a design choice for the root.\n- Should the legacy `local/active-intent.json` be read once as a fallback for the Intent in use?\n\nnotes: new findings 1 to 6 above, all optional. I could not run the macOS path case, and findings 2, 3, 4 and 5 rest on reading the code.\n\nevidence:\nEach earlier blocker is marked closed or open with evidence from a reproduction or test run: blockers 1, 2 and 3 are closed. The CLI repros are in the stress script (`conc.sh`) and the sections above. 11 new tests fail on 2e519b7 and pass on 16e135b. `bun test` of the three files on 16e135b gives 94 pass, 0 fail.\nNew findings from the repair are ranked blocking or non-blocking with file:line and a failure scenario: none blocking. The six non-blocking findings are listed above with `tree.ts` and `local.ts` line references. The most notable are the lost Intent-in-use pointer on upgrade (reproduced) and the `StateLocked` limit at 20000 files (reproduced).\nchecks-run: `mise run verify` exit 0 (792 pass, 0 fail); `bun test` of the three state files 94 pass; the stress and repro scripts above. All were run on the clean tree at 16e135b.",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Review or validation ran on HEAD 16e135b with reproduced or traced evidence.",
+    "criteria": [
+      {
+        "criterion": "Each earlier blocker is marked closed or open with evidence from a reproduction or test run",
+        "support": "blockers 1, 2 and 3 are closed. The CLI repros are in the stress script (`conc.sh`) and the sections above. 11 new tests fail on 2e519b7 and pass on 16e135b. `bun test` of the three files on 16e135b gives 94 pass, 0 fail."
+      },
+      {
+        "criterion": "New findings from the repair are ranked blocking or non-blocking with file:line and a failure scenario",
+        "support": "none blocking. The six non-blocking findings are listed above with `tree.ts` and `local.ts` line references. The most notable are the lost Intent-in-use pointer on upgrade (reproduced) and the `StateLocked` limit at 20000 files (reproduced)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`mise run verify` exit 0 (792 pass, 0 fail); `bun test` of the three state files 94 pass; the stress and repro scripts above. All were run on the clean tree at 16e135b."
+      }
+    ]
+  },
+  "createdAt": "2026-10-27T15:57:34.976Z"
+}
