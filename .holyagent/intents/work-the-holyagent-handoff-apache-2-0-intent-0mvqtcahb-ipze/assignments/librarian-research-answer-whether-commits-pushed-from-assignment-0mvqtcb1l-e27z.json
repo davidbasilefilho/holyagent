@@ -1,0 +1,66 @@
+{
+  "id": "assignment-0mvqtcb1l-e27z",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 1,
+  "roleTask": "Librarian.research",
+  "slug": "answer-whether-commits-pushed-from",
+  "objective": "Answer whether commits pushed from claude.ai cloud sessions can show as Verified on GitHub (via the Claude GitHub connector, the GitHub MCP, commit signing or the API), and what it would take.",
+  "state": "Succeeded",
+  "scope": [
+    "Handoff fact (read only): merge and squash commits made on github.com show Verified; commits pushed from sessions show Unverified.",
+    "Check GitHub docs on commit signature verification (web-flow signing for API-created commits, SSH/GPG signing), the GitHub MCP tools available in this session (mcp__github__push_files, create_or_update_file), and claude.ai cloud docs (read_documentation if available)."
+  ],
+  "constraints": [
+    "Read-only: write no files in the repository; scratch notes only under /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad.",
+    "Look up facts that may have changed (versions, release assets, sizes, product behavior) instead of answering from memory, and cite each source URL or file:line.",
+    "Keep working until the question is answered; when done, stop and report. Separate sourced facts from inference."
+  ],
+  "criteria": [
+    {
+      "text": "Each viable route to Verified commits is named with its mechanism, its cost and its fit with holyagent's vcs commit, with sources",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Sourced facts are separated from inference, with a source for each fact",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "sources-read"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "workflow:wf_45d2f497-d70/assignment-0mvqtcb1l-e27z",
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-10-27T15:01:06.154Z",
+    "finishedAt": "2026-10-27T15:27:29.850Z"
+  },
+  "result": "result: Yes, there are viable routes. Two are sourced and one is empirical. No source I read says a plain `git push` from a cloud session can be Verified without a signing key. The user-token case is contested, so test it before relying on it.\n\n**Sourced facts**\n- F1: GitHub marks a commit Verified only when it carries a GPG, SSH or S/MIME signature GitHub can verify. Unsigned commits show no status. Source: https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification\n- F2: GitHub signs web-interface commits itself with the web-flow key (https://github.com/web-flow.gpg). That explains why your merge and squash commits are Verified. Same source as F1.\n- F3: Bot or GitHub App commits are signed by GitHub only if the request is authenticated as the App or bot and carries no custom author, committer or signature, as in the Commits API. Same source as F1.\n- F4: The REST \"Create a commit\" endpoint takes an optional `signature` field. It must be an ASCII-armored detached PGP signature that you create yourself. The response's `verification` object reports `verified` and `reason`. Source: https://docs.github.com/en/rest/git/commits#create-a-commit\n- F5: An open issue, anthropics/claude-code #90255, reports that cloud/remote sessions push unsigned commits (`verification.reason: \"unsigned\"`). It says repos that require signed commits get blocked. It asks for server-side signing through the GitHub App identity or API. It is labelled stale and I found no maintainer response. The earlier #7711 was auto-closed as not planned. Sources: https://github.com/anthropics/claude-code/issues/90255 and https://github.com/anthropics/claude-code/issues/7711\n- F6: The Claude Code GitHub Action documents two signing options. `use_commit_signing: true` creates commits through the GitHub API as the App, so they show Verified, but it cannot rebase, cherry-pick or do other complex git operations. `ssh_signing_key` signs with an SSH key you register as a Signing Key. Source: https://github.com/anthropics/claude-code-action/blob/9a3c761f/docs/security.md\n- F7: In the GitHub MCP server, `push_files` uses the Git Data API (CreateTree, CreateCommit, UpdateRef). `create_or_update_file` uses the Contents API. Source: https://github.com/github/github-mcp-server/issues/2578 (the DeepWiki summary at https://deepwiki.com/github/github-mcp-server/3.1-repository-toolset agrees).\n- F8: The runtime builds commits with local git, using `git config user.name` and `user.email`, and refuses an agent identity. Source: `/home/user/holyagent/packages/runtime/src/vcs/commit.ts:27-31,81-92`. It adds only the named paths and runs the repository's hooks (`commit.ts:68`).\n- F9: `read_documentation` (github.access) only describes connecting GitHub through https://claude.ai/connect-github. It says nothing about signing. I found no claude.ai doc on commit signing.\n\n**Third-party claims, not first-party**\n- C1: github-tools.com says `createCommitOnBranch` and Contents API commits are signed only with a GitHub App installation token or the Actions `GITHUB_TOKEN`. It says user OAuth tokens and PATs are not signed, and a custom author or committer forces an unsigned REST path. Source: https://github-tools.com/guide/commit-attribution\n- C2: A Terraform provider issue reports Contents API commits signed by the \"App/user\" when no author or committer is given. Adding author and committer made them unsigned. Source: https://github.com/integrations/terraform-provider-github/issues/1152\n- C3: anthropics/claude-plugins-community commit c41c691 reports that `createCommitOnBranch` commits are signed by web-flow and show Verified. Source: https://github.com/anthropics/claude-plugins-community/commit/c41c6911de0afffd2bc5cd8b21fb1e06444ee13b\n- C4: A blog (https://docs.jacobpevans.com/infrastructure/cicd/git-signing) says a cloud routine that \"had only an OAuth token in the sandbox\" could never produce signed commits.\n- C1 and C2 conflict on whether user tokens get web-flow signing. The official docs (F3) only promise it for bots.\n\n**Routes**\n\n1. **Local SSH or GPG signing in the session**\n   - Mechanism: register an SSH public key as a Signing Key on the GitHub account, set `gpg.format=ssh`, `user.signingkey` and `commit.gpgsign=true`, and make the committer email a verified one on that account (F1, F4).\n   - Cost: the private key must be in the ephemeral cloud VM, probably as an environment secret. The issue author calls that a security cost (F5). Setup is per environment.\n   - Fit: best. `holyagent vcs commit` calls plain `git commit`, so it signs with no code change (F8). You could add a preflight check or docs. Inference: nothing in the runtime disables signing, but I did not test it.\n\n2. **Create commits server-side through the API as a GitHub App**\n   - Mechanism: use the Git Data API or `createCommitOnBranch` with an App installation token and no custom author or committer (F3, C3). It is the same approach as `use_commit_signing` in the Action (F6).\n   - Cost: you must create and install your own GitHub App and mint its token, which the cloud session may not have. The commits are authored by the App bot, not you. It cannot rebase or cherry-pick (F6).\n   - Fit: poor. It bypasses local git and `vcs commit`. Commit-scoping, the commit-msg hook and the identity check would all need reimplementing. That is a new vcs backend and a change in holyagent's architecture and trust boundaries, so it is the root's decision.\n\n3. **The session's GitHub MCP tools (`push_files`, `create_or_update_file`)**\n   - Mechanism: server-side API commits (F7). Whether they come out Verified depends on the token type. That is unknown here, and C1 and C2 conflict.\n   - Cost: a one-commit test. `push_files` cannot set file mode (F7). Neither tool does rebase or merge, and neither runs local hooks.\n   - Fit: poor. It bypasses `vcs commit` and its hooks, as in route 2.\n   - Inference: the session's MCP most likely uses the connector's user OAuth token, so C1 suggests these commits would stay unverified. Unconfirmed.\n\n4. **Squash-merge the PR on github.com**\n   - Mechanism: this is your observed handoff fact. The merge commit on `main` is signed by web-flow (F2).\n   - Cost: nothing, but the branch commits themselves stay Unverified. Rebase-and-merge does not sign (F1). Branch rules that require signed commits would block the PR beforehand (F5).\n   - Fit: fully compatible with `vcs commit` and `gh`. This is the zero-change route.\n\n**Not viable**\n- Vigilant mode only changes how unsigned commits are displayed (F1).\n- Re-signing locally and force-pushing works (F5) but needs a machine with a real key and a force-push, which AGENTS.md forbids without user approval.\n\n**Inference and recommendation**\n- If the goal is Verified commits on `main` only, route 4 already does it.\n- If branch commits must be Verified, route 1 is the only one that keeps `vcs commit` unchanged. The decisions for the root and user are whether to place a signing key in the cloud environment and which GitHub account owns it.\n- Routes 2 and 3 should wait for a test. The root, not a specialist, would have to create a throwaway branch and call `mcp__github__create_or_update_file` or `push_files`. Then read `commit.verification.reason` with `mcp__github__get_commit`. A `reason` of `valid` would settle the C1/C2 conflict.\n\nquestions: Which GitHub account should own the signing key? Does the root accept putting a private key in the cloud environment secrets?\nnotes: I wrote no files and ran no checks.\n\nevidence:\nEach viable route to Verified commits is named with its mechanism, its cost and its fit with holyagent's vcs commit, with sources: The four routes above, each with its mechanism, cost, fit and sources F1-F9. Fit for the local-git routes rests on `/home/user/holyagent/packages/runtime/src/vcs/commit.ts:27-31,81-92`.\nSourced facts are separated from inference, with a source for each fact: The \"Sourced facts\" and \"Third-party claims\" sections carry URLs or file:line. The user-token signing question is flagged as conflicting and untested, and the recommendations are labelled as inference.\nsources-read: The GitHub docs pages on signature verification and the REST Create a commit endpoint, claude-code issues #90255 and #7711, the claude-code-action security doc, github-mcp-server issue #2578 and the DeepWiki summary, the github-tools.com page, terraform-provider-github issue #1152, claude-plugins-community commit c41c691, the jacobpevans blog, the `read_documentation` github.access page, and `commit.ts`. The GraphQL mutation reference page returned only an index, so it was not read.",
+  "acceptance": {
+    "revision": 2,
+    "carriedFrom": 1,
+    "rationale": "Research answered with cited sources; the rev 2 change only recorded decisions on items 1, 2 and 4, not on item 3.",
+    "criteria": [
+      {
+        "criterion": "Each viable route to Verified commits is named with its mechanism, its cost and its fit with holyagent's vcs commit, with sources",
+        "support": "The four routes above, each with its mechanism, cost, fit and sources F1-F9. Fit for the local-git routes rests on `/home/user/holyagent/packages/runtime/src/vcs/commit.ts:27-31,81-92`."
+      },
+      {
+        "criterion": "Sourced facts are separated from inference, with a source for each fact",
+        "support": "The \"Sourced facts\" and \"Third-party claims\" sections carry URLs or file:line. The user-token signing question is flagged as conflicting and untested, and the recommendations are labelled as inference."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "sources-read",
+        "support": "The GitHub docs pages on signature verification and the REST Create a commit endpoint, claude-code issues #90255 and #7711, the claude-code-action security doc, github-mcp-server issue #2578 and the DeepWiki summary, the github-tools.com page, terraform-provider-github issue #1152, claude-plugins-community commit c41c691, the jacobpevans blog, the `read_documentation` github.access page, and `commit.ts`. The GraphQL mutation reference page returned only an index, so it was not read."
+      }
+    ]
+  },
+  "createdAt": "2026-10-27T15:01:06.154Z"
+}

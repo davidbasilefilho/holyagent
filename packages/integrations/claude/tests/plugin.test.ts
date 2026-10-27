@@ -129,9 +129,9 @@ describe("manifests", () => {
       name: "holyagent",
       version: packageJson.version,
       author: { name: "davidbasilefilho" },
+      license: "Apache-2.0",
       dependencies: ["billion-context@billion-context", "exa@claude-plugins-official"],
     })
-    expect(manifest).not.toHaveProperty("license")
   })
 
   test("the marketplace points at the built plugin with the same version", () => {
