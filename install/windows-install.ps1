@@ -91,8 +91,12 @@ function Get-FirstLine {
   return $result.Lines[0].ToString().Trim()
 }
 
-# A string as a PowerShell single-quoted literal, for lines written into your profile.
-function ConvertTo-SingleQuoted([string]$Text) { return "'" + $Text.Replace("'", "''") + "'" }
+# A string as a PowerShell single-quoted literal, for lines written into your profile. PowerShell also reads
+# U+2018 to U+201B as single quotes, so each of those is doubled along with the straight quote.
+function ConvertTo-SingleQuoted([string]$Text) {
+  $curly = '[' + [char]0x2018 + [char]0x2019 + [char]0x201A + [char]0x201B + ']'
+  return "'" + [regex]::Replace($Text.Replace("'", "''"), $curly, '$0$0') + "'"
+}
 
 # Work from the profile folder so a repository mise.toml never changes what the global installs below
 # resolve.
@@ -215,7 +219,7 @@ try {
   $quotedBun = ConvertTo-SingleQuoted $BunInstall
   $quotedMise = ConvertTo-SingleQuoted $Mise
   Add-ProfileLine '^\s*\$env:BUN_INSTALL\s*=' "`$env:BUN_INSTALL = $quotedBun; `$env:Path = `"`$env:BUN_INSTALL\bin;`$env:Path`""
-  Add-ProfileLine '^\s*(?!#).*mise.*\bactivate\b.*pwsh' "(& $quotedMise activate pwsh) | Out-String | Invoke-Expression"
+  Add-ProfileLine '^\s*[^#\s].*mise.*\bactivate\b.*pwsh' "(& $quotedMise activate pwsh) | Out-String | Invoke-Expression"
 
   # ---------------------------------------------------------------------------------------------
   Step 'Node.js LTS (Billion Context and ctx7 run on Node)'
