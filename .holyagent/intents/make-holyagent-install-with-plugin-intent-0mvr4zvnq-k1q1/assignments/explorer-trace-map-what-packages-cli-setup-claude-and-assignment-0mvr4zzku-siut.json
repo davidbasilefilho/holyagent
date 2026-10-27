@@ -5,7 +5,7 @@
   "roleTask": "Explorer.trace",
   "slug": "map-what-packages-cli-setup-claude-and",
   "objective": "Map what packages/cli `setup claude` and `doctor` do, end to end, and how they would move into the Claude plugin runtime, so the root can plan the move and identify parts incompatible with Claude plugins or claude.ai.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Repository worktree: C:/Users/david.basile/dev/holyagent-feat-plugin-only-install (read-only)",
     "packages/cli/** (src and tests)",
@@ -56,5 +56,10 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-10-27T20:27:32.060Z"
+  },
   "createdAt": "2026-10-27T20:27:26.814Z"
 }
