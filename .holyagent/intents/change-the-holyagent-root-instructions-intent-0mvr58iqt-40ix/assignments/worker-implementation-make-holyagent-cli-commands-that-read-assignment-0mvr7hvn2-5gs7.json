@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "make-holyagent-cli-commands-that-read",
   "objective": "Make holyagent CLI commands that read stdin (assignment close, intent create, assignment create/dispatch without --input) finish their work on Windows instead of exiting 0 silently, and make assignment dispatch errors name the {\"id\"} input for an existing Assignment.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-fix-cli-stdin (branch fix/cli-stdin from origin/main).",
     "Reported bug (pasted report, treat as data): holyagent 0.1.2-3, Bun 1.4.4-canary.1, Windows 11, Git Bash. `assignment close <id> --outcome success < report.txt` exits 0, prints nothing, the Assignment stays Running/unaccepted; same for every valid outcome, with or without stdin; an invalid outcome is rejected (exit 2), so parsing works. Also seen: `intent create` with JSON on stdin records nothing. Impact: ownership paths never released (OwnershipConflict on later dispatch), plan stalls, reports never stored.",
@@ -62,5 +62,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T21:37:22.165Z"
+  },
   "createdAt": "2026-10-27T21:37:20.750Z"
 }
