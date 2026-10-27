@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mvr0ihri-v7we",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.code",
+  "slug": "confirm-the-windows-repair-closes-the",
+  "objective": "Confirm the Windows repair closes the two code-review blockers without new regressions.",
+  "state": "Running",
+  "scope": [
+    "Repair diff (daca0f9..8e9399b on ccr-046ad103-6qsvgx-windows, without dist): /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/windows-fix2.diff; files in /home/user/holyagent-windows. Judge only whether the earlier findings close and whether the repair adds a problem.",
+    "Earlier findings: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-assignment-0mvqzz5he-uc2j.txt (blocker 1 specialist rg/fd without flags; blocker 2 PowerShell 5.1 probes terminating). No PowerShell is installed here."
+  ],
+  "constraints": [
+    "Read-only: write no repository files; make no version-control writes."
+  ],
+  "criteria": [
+    {
+      "text": "Each earlier blocker is marked closed or open with file:line and evidence, and new findings are ranked",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvr0ck29-hdsz"
+  ],
+  "followUpOf": "assignment-0mvqzz5he-uc2j",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T18:21:52.111Z"
+  },
+  "createdAt": "2026-10-27T18:21:52.111Z"
+}
