@@ -1,0 +1,66 @@
+{
+  "id": "assignment-0mvr0ck29-hdsz",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-windows-review-findings-safe",
+  "objective": "Repair the Windows review findings: safe rg/fd invocation for specialists, PowerShell 5.1 probes, the installer secret leak and temp-file execution, and the doc claims.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-windows (head daca0f9). Reviews: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-assignment-0mvqzz5he-uc2j.txt (code) and /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-assignment-0mvqzz5pk-vnqv.txt (security).",
+    "Blockers: (1) packages/runtime/src/instructions/claude-5.5/specialist/working.md: use bun --no-env-file --config=\"${CLAUDE_PLUGIN_ROOT}/scripts/empty-bunfig.toml\" \"${CLAUDE_PLUGIN_ROOT}/scripts/holyagent.js\" rg|fd ..., and add a test that every holyagent.js invocation in the instruction sources carries both flags; (2) install/windows-install.ps1 :127, :194, :215: native-command probes must not terminate under Windows PowerShell 5.1 with ErrorActionPreference Stop (run them with a local Continue preference or a helper), and guard the null node --version case.",
+    "Security fixes: windows-install.ps1:59 must not print arguments after --api-key (redact them); the Billion Context config script must not run from a predictable temp file (pipe it to node on stdin, or create it with a random name and CreateNew); escape single quotes in the profile lines (:188-189); make the profile-line regex ignore commented lines; match the PATH order comment to the code.",
+    "Docs: docs/hooks.md must not claim hooks 'fail visibly' if the host drops args (bun with no args prints help and exits 0) and must not show the hand-run form without flags at line 23.",
+    "Also carry two small instruction nits from the instructions review (they are on this branch through the merge): in packages/runtime/src/instructions/claude-5.5/root/asking.md change 'then list only those' to 'then ask only those through AskUserQuestion'; in root/user-messages.md say 'commit the Assignment paths you own with holyagent vcs commit' instead of 'committing work'.",
+    "Rebuild with mise run build and run mise run verify."
+  ],
+  "constraints": [
+    "Follow /home/user/holyagent/.claude/CLAUDE.md.",
+    "Work only in that worktree; make no version-control writes and no edits under .git/ or .holyagent/.",
+    "Keep working until done; when done and checked, stop and report; no unrequested changes. Name what still cannot be checked without Windows."
+  ],
+  "criteria": [
+    {
+      "text": "Specialist rg/fd text carries both safety flags and a test fails if any instruction invocation lacks them",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The installer probes cannot terminate on Windows PowerShell 5.1, the API key is never printed, and no predictable temp script is executed",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "docs/hooks.md claims are accurate and the two instruction nits are applied",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions/claude-5.5/specialist/working.md",
+    "packages/runtime/src/instructions/claude-5.5/root/asking.md",
+    "packages/runtime/src/instructions/claude-5.5/root/user-messages.md",
+    "packages/runtime/tests",
+    "packages/integrations/claude",
+    "install",
+    "docs"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvqz0jb5-96fd",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T18:17:15.153Z"
+  },
+  "createdAt": "2026-10-27T18:17:15.153Z"
+}
