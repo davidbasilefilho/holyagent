@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "make-the-installers-install-bun-node-lts",
   "objective": "Make the installers install Bun, Node LTS, git and gh without mise, and install mise only when development is asked for, then fix the two stale CLI mentions in the docs.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-feat-plugin-only-install (branch feat/plugin-only-install, commit bb36687 rewrote install/ and docs).",
     "Blocking: install/wsl-install.sh:143 and install/windows-install.ps1 (mise step) install mise on every run and use it to install Node, Bun and gh (wsl-install.sh:166-187). The requirement is: installers shrink to the prerequisites only: Bun, Node LTS, git, gh and, for development, mise. Install Bun, Node LTS, git and gh with each platform's usual installer (for example Bun's official install script, the distribution or NodeSource/winget packages, the GitHub CLI apt repository or winget), and install mise only behind an explicit development option (a flag such as --dev / -Dev); keep the scripts idempotent and keep printing the three plugin commands and the /holyagent:setup line at the end. Update README.md, docs/usage.md or docs/development.md only where they describe the installer options.",
@@ -60,5 +60,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mvr5jcix-kkv9",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T21:59:26.788Z"
+  },
   "createdAt": "2026-10-27T21:59:26.218Z"
 }
