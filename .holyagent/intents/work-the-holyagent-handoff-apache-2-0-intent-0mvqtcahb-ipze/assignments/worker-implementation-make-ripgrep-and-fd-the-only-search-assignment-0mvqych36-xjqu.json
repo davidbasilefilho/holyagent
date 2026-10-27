@@ -1,0 +1,46 @@
+{
+  "id": "assignment-0mvqych36-xjqu",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "make-ripgrep-and-fd-the-only-search",
+  "objective": "Make ripgrep and fd the only search tools for holyagent agents that have a shell, by removing the built-in Grep and Glob from those roles.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-rgfd (branch ccr-046ad103-6qsvgx-rgfd, head d5e0b52). User decision: agents must use the bundled rg and fd. In packages/integrations/claude/src/agents.ts, add Grep and Glob to the disallowed tools of the root and of every specialist role that has Bash, so those agents cannot fall back to them; roles without Bash keep Grep and Glob. Update packages/integrations/claude/tests/plugin.test.ts (the per-role built-in tools test) and the instruction text in root/search.md and specialist/working.md only if it now says Grep/Glob are allowed for shell roles. Rebuild with mise run build and run mise run verify."
+  ],
+  "constraints": [
+    "Follow /home/user/holyagent/.claude/CLAUDE.md.",
+    "Work only in your worktree; make no version-control writes (no commit, add, checkout, switch, merge, stash, push) and no edits under .git/ or .holyagent/.",
+    "Keep working until everything asked is done; when done and checked, stop and report; no unrequested features or refactors."
+  ],
+  "criteria": [
+    {
+      "text": "Every generated agent file with Bash disallows Grep and Glob, and those without Bash keep them, with a test that fails without the change",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify passes in the worktree",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/claude",
+    "packages/runtime/src/instructions"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvqxh7l8-hxl9",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T17:21:12.066Z"
+  },
+  "createdAt": "2026-10-27T17:21:12.066Z"
+}
