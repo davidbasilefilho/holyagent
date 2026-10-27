@@ -31,6 +31,9 @@ const activeIntentFile = (directory: string, workTree: string): string =>
     `active-intent/${new Bun.CryptoHasher("sha1").update(workTree).digest("hex").slice(0, 16)}.json`,
   )
 
+/** The file the Intent in use was kept in before it was kept per work tree: one for the clone. */
+const LEGACY_ACTIVE_INTENT = "active-intent.json"
+
 /** What this clone knows of its version control, for the CLI to fill in. */
 export const Vcs = Schema.Struct({
   branch: Schema.optionalKey(Text),
@@ -68,16 +71,19 @@ export const ensureLocalDirectory = (directory: string) => {
 }
 
 /**
- * Reads the per-clone state, with the Intent in use of the current {@link WorkTree}; a file that was
- * never written reads as empty.
+ * Reads the per-clone state, with the Intent in use of the current {@link WorkTree}, else the one
+ * shared choice an older version kept; a file that was never written reads as empty.
  */
 export const readLocal = (directory: string) =>
   Effect.gen(function* () {
     const workTree = yield* WorkTree
-    const active =
+    const own =
       workTree === undefined
         ? undefined
         : yield* readJson(ActiveIntentFile, activeIntentFile(directory, workTree))
+    // A clone that came from a version with one shared choice keeps it until a work tree makes its own.
+    const active =
+      own ?? (yield* readJson(ActiveIntentFile, localFile(directory, LEGACY_ACTIVE_INTENT)))
     const specialists = yield* readJson(SpecialistsFile, localFile(directory, "specialists.json"))
     const vcs = yield* readJson(Vcs, localFile(directory, "vcs.json"))
     return {
