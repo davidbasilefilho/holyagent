@@ -5,7 +5,7 @@
   "roleTask": "Explorer.map",
   "slug": "map-where-the-holyagent-root-s-rules-and",
   "objective": "Map where the holyagent root's rules and enforcement points live, so the root can plan instruction and hook changes that stop six observed rule breaks.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-fix-root-rule-adherence (read-only)",
     "requirements.md and the per-model instruction sets and their section files (find them; likely under an instructions directory), the root agent text and how packages/integrations/claude builds dist/agents/holyagent.md",
@@ -51,5 +51,10 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-10-27T20:39:56.970Z"
+  },
   "createdAt": "2026-10-27T20:39:46.925Z"
 }
