@@ -1,0 +1,36 @@
+{
+  "id": "assignment-0mvqytgwe-hm5s",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-the-search-instruction-fix",
+  "objective": "Review the search instruction fix (79b4f61..461af9d on ccr-046ad103-6qsvgx-rgfd) for correctness, calm wording and consistency between requirements.md, the root and specialist text.",
+  "state": "Running",
+  "scope": [
+    "Diff: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/search-fix.diff; files in /home/user/holyagent-rgfd. Rules for model-facing text: the 'Writing instructions' section of packages/integrations/claude/dist/agents/holyagent.md. Intent: agents with a shell search with holyagent rg/fd, always pass a path, and fall back to the system rg, fd, grep or find on UnsupportedPlatform; agents without a shell use Grep/Glob."
+  ],
+  "constraints": [
+    "Read-only: write no files."
+  ],
+  "criteria": [
+    {
+      "text": "Findings are ranked blocking or non-blocking with the file, line and fix, or their absence is stated",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources-read"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvqypvzr-8bm0"
+  ],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-27T17:34:24.974Z"
+  },
+  "createdAt": "2026-10-27T17:34:24.974Z"
+}
