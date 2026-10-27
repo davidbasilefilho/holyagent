@@ -326,7 +326,7 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
           .join("\n")
         const phrases = forbiddenPhrases(
           message,
-          (yield* readSettings([call.directory, join(call.root, STATE_DIRECTORY)])).allowWords,
+          (yield* readSettings([join(call.root, STATE_DIRECTORY)])).allowWords,
         )
         if (phrases.length > 0) return yield* new MessageRefused({ phrases })
         if (cleaned !== above.trim() || cleanedBelow !== below.trim())

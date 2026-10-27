@@ -124,7 +124,7 @@ const HINTS: Readonly<Record<string, string>> = {
     "The records were written but do not load back: delete the files this run wrote (git status lists them), fix the cause the message names and run `holyagent migrate --dry-run` again.",
   StateLocked: "Another process holds the state lock; retry in a moment.",
   StateIo:
-    "Check what the message names: the permissions of the .holyagent folder of the state worktree (under the git directory, or in the project outside git) and that git runs there.",
+    "Check what the message names: the permissions of the .holyagent folder of the state worktree (under the git directory, or in the project outside git), that git runs there, and that no branch already uses a name the state branch needs (holyagent/state needs no branch called holyagent; git config holyagent.stateBranch picks another name).",
   CorruptRecord: "Fix or delete the file the message names, or restore it from version control.",
   ...VCS_HINTS,
 }

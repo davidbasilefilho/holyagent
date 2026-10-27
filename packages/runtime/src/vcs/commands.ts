@@ -13,8 +13,11 @@ import { pullRequest } from "./pr.ts"
 import { recordBranch } from "./record.ts"
 import { readSettings } from "./settings.ts"
 
-/** The state folders that may hold the config file: the state worktree's, then the work tree's. */
-const settingsFolders = (call: Call) => [call.directory, join(call.root, STATE_DIRECTORY)]
+/**
+ * The folder that holds the config file: `.holyagent` of the work tree. The config file is the
+ * project's settings, not state, so it is never read from the state worktree.
+ */
+const settingsFolders = (call: Call) => [join(call.root, STATE_DIRECTORY)]
 
 /** Reads the raw arguments of a command against its flags, refusing more positionals than it takes. */
 const arguments_ = (

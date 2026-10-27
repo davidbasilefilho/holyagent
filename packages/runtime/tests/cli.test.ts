@@ -1027,7 +1027,10 @@ describe("process", () => {
   const main = join(import.meta.dir, "..", "src", "cli", "main.ts")
 
   test("the state lives in the shared state worktree, and the entry point sets the exit code", async () => {
-    await $`git init -q`.cwd(project).quiet()
+    await $`git init -q -b main`.cwd(project).quiet()
+    await $`git -c user.name=Octo -c user.email=octo@example.com commit -q --allow-empty -m seed`
+      .cwd(project)
+      .quiet()
     const inner = join(project, "packages", "app")
     await mkdir(inner, { recursive: true })
 
@@ -1040,8 +1043,15 @@ describe("process", () => {
     // Not in the work tree, nor in the folder the command ran in: in the worktree of the state branch.
     expect(await Bun.file(join(project, ".holyagent")).exists()).toBe(false)
     expect(await Bun.file(join(inner, ".holyagent")).exists()).toBe(false)
-    const worktree = join(project, ".git", "holyagent", "holyagent-state")
-    expect((await stat(join(worktree, ".holyagent", "intents"))).isDirectory()).toBe(true)
+    const listed = (await $`git worktree list --porcelain`.cwd(project).quiet().text()).split(
+      "\n\n",
+    )
+    const worktree = listed
+      .find((block) => block.includes("\nbranch refs/heads/holyagent/state"))
+      ?.split("\n")[0]
+      ?.replace("worktree ", "")
+    expect(worktree).toStartWith(join(project, ".git", "holyagent"))
+    expect((await stat(join(worktree ?? "", ".holyagent", "intents"))).isDirectory()).toBe(true)
 
     const unknown = await $`bun ${main} bogus`.cwd(inner).quiet().nothrow()
     expect(unknown.exitCode).toBe(2)

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { readFile, stat, writeFile } from "node:fs/promises"
+import { mkdir, readFile, stat, symlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import { Effect } from "effect"
@@ -42,11 +42,14 @@ const planAssignment = async (dir: string, objective: string, path: string) =>
     ).id,
   )
 
-const commonDir = async (dir: string) =>
-  (await sh(dir, ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"])).trim()
-
-/** Where the state branch is checked out, from any worktree of the clone. */
-const stateTree = async (dir: string) => join(await commonDir(dir), "holyagent", "holyagent-state")
+/** Where a branch (the state branch by default) is checked out, from any worktree of the clone. */
+const stateTree = async (dir: string, branch = STATE) => {
+  const blocks = (await sh(dir, ["git", "worktree", "list", "--porcelain"])).split("\n\n")
+  const block = blocks.find((text) => text.includes(`\nbranch refs/heads/${branch}`))
+  const path = block?.split("\n")[0]?.replace("worktree ", "")
+  if (path === undefined) throw new Error(`no worktree has ${branch} checked out`)
+  return path
+}
 
 const lines = (text: string) => text.split("\n").filter((line) => line !== "")
 
@@ -103,7 +106,7 @@ describe("the state branch", () => {
     expect(project.assignments).toHaveLength(1)
   })
 
-  test("a new state branch starts at the base branch head, and the state branch name is configurable", async () => {
+  test("a new state branch starts at the base branch head, and the state branch name is configurable in git config", async () => {
     const dir = await initRepo(OWNER)
     const head = await seed(dir, { "a.txt": "a\n" })
     await sh(dir, ["git", "switch", "-q", "-c", "work"])
@@ -116,23 +119,6 @@ describe("the state branch", () => {
     await createIntent(other, "Ship the parser")
     expect(lines(await sh(other, ["git", "branch", "--list", "ops/state"]))).toHaveLength(1)
     expect(await sh(other, ["git", "branch", "--list", STATE])).toBe("")
-
-    const third = await initRepo(OWNER)
-    await seed(third, {
-      "a.txt": "a\n",
-      ".holyagent/config.json": '{"vcs":{"stateBranch":"meta"}}\n',
-    })
-    await createIntent(third, "Ship the parser")
-    expect(lines(await sh(third, ["git", "branch", "--list", "meta"]))).toHaveLength(1)
-  })
-
-  test("a repository with no commit gets its state branch too", async () => {
-    const dir = await initRepo(OWNER)
-    await createIntent(dir, "Ship the parser")
-    const files = await touched(dir, STATE)
-    expect(files).toHaveLength(1)
-    expect(files[0]).toHaveLength(1)
-    expect(files[0]?.[0]).toStartWith(".holyagent/intents/")
   })
 
   test("each transition is a commit that touches only .holyagent, and local changes make none", async () => {
@@ -442,5 +428,235 @@ describe("moving the state found in a work tree", () => {
       objective: "Ship the parser",
     })
     expect((await stat(join(await stateTree(dir), record))).isFile()).toBe(true)
+  })
+})
+
+describe("starting the state in a large tree", () => {
+  test("six commands that start at once all succeed while the state worktree is still being checked out", async () => {
+    const dir = await initRepo(OWNER)
+    const files: Record<string, string> = {}
+    for (let index = 0; index < 3000; index++) files[`src/dir${index % 30}/f${index}.txt`] = "x\n"
+    await seed(dir, files)
+
+    const results = await Promise.all(
+      Array.from({ length: 6 }, (_, index) =>
+        holy(dir, ["intent", "create"], { objective: `Objective ${index}` }),
+      ),
+    )
+
+    expect(results.map((result) => result.stderr)).toEqual(Array.from({ length: 6 }, () => ""))
+    expect(results.map((result) => result.code)).toEqual(Array.from({ length: 6 }, () => 0))
+    expect(lines(await sh(dir, ["git", "worktree", "list"]))).toHaveLength(2)
+    const project = await Effect.runPromise(loadProject(join(await stateTree(dir), ".holyagent")))
+    expect(project.intents).toHaveLength(6)
+  }, 120_000)
+})
+
+describe("the config file of the project", () => {
+  test("an untracked config.json stays in the work tree and is never moved into the state", async () => {
+    const dir = await initRepo(OWNER)
+    await seed(dir, { "a.txt": "a\n" })
+    const config = '{"vcs":{"allowWords":["Claude Code"],"stateBranch":"team/state"}}\n'
+    await put(dir, { ".holyagent/config.json": config })
+
+    await createIntent(dir, "First")
+    await createIntent(dir, "Second")
+
+    expect(await readFile(join(dir, ".holyagent", "config.json"), "utf8")).toBe(config)
+    expect(await sh(dir, ["git", "branch", "--list", "team/*"])).toBe("")
+    expect(lines(await sh(dir, ["git", "worktree", "list"]))).toHaveLength(2)
+    expect(await sh(dir, ["git", "ls-tree", "-r", "--name-only", STATE])).not.toContain(
+      "config.json",
+    )
+    // The settings are the work tree's: the word the file allows passes the message check.
+    await put(dir, { "a.txt": "a2\n" })
+    const done = await holy(dir, [
+      "vcs",
+      "commit",
+      "-m",
+      "document Claude Code usage",
+      "--",
+      "a.txt",
+    ])
+    expect(done.code).toBe(0)
+  })
+
+  test("an edit of a tracked config.json in the work tree takes effect at once", async () => {
+    const dir = await initRepo(OWNER)
+    await seed(dir, { "a.txt": "a\n", ".holyagent/config.json": '{"vcs":{}}\n' })
+    await createIntent(dir, "Ship the parser")
+    await put(dir, { "a.txt": "a2\n" })
+    const refused = await holy(dir, [
+      "vcs",
+      "commit",
+      "-m",
+      "document Claude Code usage",
+      "--",
+      "a.txt",
+    ])
+    expect(refused.code).toBe(3)
+
+    await put(dir, { ".holyagent/config.json": '{"vcs":{"allowWords":["Claude Code"]}}\n' })
+    const done = await holy(dir, [
+      "vcs",
+      "commit",
+      "-m",
+      "document Claude Code usage",
+      "--",
+      "a.txt",
+    ])
+
+    expect(done.code).toBe(0)
+  })
+
+  test("a state branch named by the repository's own files is ignored", async () => {
+    const dir = await initRepo(OWNER)
+    await seed(dir, {
+      "a.txt": "a\n",
+      ".holyagent/config.json": '{"vcs":{"stateBranch":"main"}}\n',
+    })
+    const before = (await sh(dir, ["git", "rev-parse", "main"])).trim()
+
+    await createIntent(dir, "Ship the parser")
+
+    expect((await sh(dir, ["git", "rev-parse", "main"])).trim()).toBe(before)
+    expect(lines(await sh(dir, ["git", "branch", "--list", STATE]))).toHaveLength(1)
+    expect(await sh(dir, ["git", "status", "--porcelain"])).toBe("")
+  })
+
+  test("two branch names that look alike get their own state worktrees", async () => {
+    const dir = await initRepo(OWNER)
+    await seed(dir, { "a.txt": "a\n" })
+    await sh(dir, ["git", "config", "holyagent.stateBranch", "holyagent-state"])
+    const first = await createIntent(dir, "First")
+    const tree = await stateTree(dir, "holyagent-state")
+
+    await sh(dir, ["git", "config", "holyagent.stateBranch", STATE])
+    const second = await createIntent(dir, "Second")
+
+    expect(await stateTree(dir, STATE)).not.toBe(tree)
+    expect(lines(await sh(dir, ["git", "worktree", "list"]))).toHaveLength(3)
+    const kept = await Effect.runPromise(loadProject(join(tree, ".holyagent")))
+    expect(kept.intents.map((intent) => intent.id)).toEqual([first])
+    const other = await Effect.runPromise(loadProject(join(await stateTree(dir), ".holyagent")))
+    expect(other.intents.map((intent) => intent.id)).toEqual([second])
+  })
+})
+
+describe("the base of a new state branch", () => {
+  test("a repository with no commit keeps its state in the work tree until the base has one, then merges cleanly", async () => {
+    const dir = await initRepo(OWNER)
+    const first = await createIntent(dir, "Ship the parser")
+    expect(await sh(dir, ["git", "branch", "--list", STATE])).toBe("")
+
+    await put(dir, { "a.txt": "a\n" })
+    await sh(dir, ["git", "add", "a.txt"])
+    await sh(dir, ["git", "commit", "-q", "-m", "first"])
+    const listed = toon(await holy(dir, ["intent", "list"])) as { intents: Array<{ id: string }> }
+
+    expect(listed.intents.map((row) => row.id)).toEqual([first])
+    await sh(dir, ["git", "merge", "--no-edit", STATE]) // an unrelated history would fail here
+    expect(await sh(dir, ["git", "merge-base", "main", STATE])).toBe(
+      await sh(dir, ["git", "rev-parse", "main"]),
+    )
+    const tree = await stateTree(dir)
+    await sh(tree, ["git", "merge", "--no-edit", "main"])
+    expect(await sh(tree, ["git", "status", "--porcelain"])).toBe("")
+  })
+
+  test("a repository without main starts the state at its default branch, never at the current commit", async () => {
+    const dir = await initRepo(OWNER)
+    await sh(dir, ["git", "branch", "-m", "main", "develop"])
+    await sh(dir, ["git", "config", "init.defaultBranch", "develop"])
+    const base = await seed(dir, { "a.txt": "a\n" })
+    await sh(dir, ["git", "switch", "-q", "-c", "feature"])
+    await put(dir, { "a.txt": "a2\n" })
+    await sh(dir, ["git", "commit", "-q", "-am", "feature work"])
+
+    await createIntent(dir, "Ship the parser")
+
+    expect((await sh(dir, ["git", "merge-base", "develop", STATE])).trim()).toBe(base)
+    expect(await sh(dir, ["git", "log", "--format=%s", `develop..${STATE}`])).not.toContain(
+      "feature work",
+    )
+    await sh(dir, ["git", "switch", "-q", "develop"])
+    await sh(dir, ["git", "merge", "--no-edit", STATE])
+    expect(await readFile(join(dir, "a.txt"), "utf8")).toBe("a\n")
+  })
+
+  test("a repository whose base cannot be told makes no state branch and keeps the state in the work tree", async () => {
+    const dir = await initRepo(OWNER)
+    await sh(dir, ["git", "branch", "-m", "main", "trunk"])
+    await seed(dir, { "a.txt": "a\n" })
+    await sh(dir, ["git", "switch", "-q", "-c", "feature"])
+
+    await createIntent(dir, "Ship the parser")
+
+    expect(await sh(dir, ["git", "branch", "--list", STATE])).toBe("")
+    expect(lines(await sh(dir, ["git", "worktree", "list"]))).toHaveLength(1)
+  })
+})
+
+describe("a state worktree that is not what it should be", () => {
+  /** A clone with a state worktree, and a linked worktree on `feature` to run commands from. */
+  const withLinked = async () => {
+    const dir = await initRepo(OWNER)
+    await seed(dir, { "a.txt": "a\n" })
+    await createIntent(dir, "Ship the parser")
+    const tree = join(await scratch("holyagent-worktree-"), "tree")
+    await sh(dir, ["git", "worktree", "add", "-q", "-b", "feature", tree])
+    return { dir, tree, state: await stateTree(dir) }
+  }
+
+  test("migration does not write through a symlink in the state worktree", async () => {
+    const { tree, state } = await withLinked()
+    const outside = await scratch("holyagent-outside-")
+    const victim = join(outside, "victim.txt")
+    await symlink(victim, join(state, ".holyagent", "note.txt"))
+    await mkdir(join(outside, "shared"))
+    await symlink(join(outside, "shared"), join(state, ".holyagent", "linked"))
+    await put(tree, {
+      ".holyagent/note.txt": "attacker\n",
+      ".holyagent/linked/p.txt": "attacker\n",
+    })
+
+    const result = await holy(tree, ["intent", "list"])
+
+    expect(result.code).toBe(4)
+    expect(await Bun.file(victim).exists()).toBe(false)
+    expect(await Bun.file(join(outside, "shared", "p.txt")).exists()).toBe(false)
+  })
+
+  test("migration leaves a symlink in a work tree out of the state", async () => {
+    const { tree, state } = await withLinked()
+    const outside = await scratch("holyagent-outside-")
+    await writeFile(join(outside, "secret.txt"), "secret\n")
+    await mkdir(join(tree, ".holyagent"), { recursive: true })
+    await symlink(join(outside, "secret.txt"), join(tree, ".holyagent", "leak.md"))
+    await put(tree, { ".holyagent/real.md": "real\n" })
+
+    const result = await holy(tree, ["intent", "list"])
+
+    expect(result.code).toBe(0)
+    expect(await Bun.file(join(state, ".holyagent", "leak.md")).exists()).toBe(false)
+    expect(await sh(state, ["git", "log", "--all", "-p"])).not.toContain("secret")
+    expect(await readFile(join(state, ".holyagent", "real.md"), "utf8")).toBe("real\n")
+  })
+
+  test("a state worktree switched to another branch is reported and its folder is kept", async () => {
+    const { dir, state } = await withLinked()
+    await put(state, { ".holyagent/local/keep.txt": "per-clone\n" })
+    await sh(state, ["git", "switch", "-q", "--detach"])
+
+    const result = await holy(dir, ["intent", "list"])
+
+    expect(result.code).toBe(4)
+    expect(result.stderr).toContain(state)
+    expect(await readFile(join(state, ".holyagent", "local", "keep.txt"), "utf8")).toBe(
+      "per-clone\n",
+    )
+    expect(await sh(state, ["git", "rev-parse", "HEAD"])).toBe(
+      await sh(dir, ["git", "rev-parse", STATE]),
+    )
   })
 })

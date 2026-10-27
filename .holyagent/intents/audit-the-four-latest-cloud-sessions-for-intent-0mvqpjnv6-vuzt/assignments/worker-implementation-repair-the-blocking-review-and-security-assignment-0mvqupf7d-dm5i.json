@@ -1,0 +1,64 @@
+{
+  "id": "assignment-0mvqupf7d-dm5i",
+  "intentId": "intent-0mvqpjnv6-vuzt",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-blocking-review-and-security",
+  "objective": "Repair the blocking review and security findings in the state-branch change (commit 2e519b7) so the state branch is safe, concurrency-proof and always merges cleanly.",
+  "state": "Succeeded",
+  "scope": [
+    "Read both review reports in full: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-assignment-0mvqu8qob-0hpo.txt (code review, blockers 1-3) and /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-assignment-0mvqu8qt1-28fe.txt (security findings 1-4). Fix every blocker and every High/Medium security finding.",
+    "Code blockers: (1) tree.ts:525 concurrent first commands race the worktree checkout: take the worktree lock around detection and use until the checkout is complete; (2) config.json precedence: .holyagent/config.json is project configuration, not state; it is not migrated to the state branch and settings are read from the work tree; (3) baseStart must root a new state branch at the repository's base branch head (origin default, then init.defaultBranch/main/master), never at an empty root or the current feature HEAD; with no commits at all, defer creating the state branch until the base has a commit.",
+    "Security: (1) migration must not write through symlinks: refuse symlinks in source and target, write via temp file plus rename, verify containment with realpath; (2) skip work-tree entries that are not regular files; (3)+(4) the state branch name comes from git config only (holyagent.stateBranch), never from repository content; the worktree folder must be collision-free (for example a hash of the branch name) and rm -rf is refused for a path still registered in git worktree list; never resolve the state directory to a work tree that is not on the state branch.",
+    "Non-blocking notes to fix while here only if small: StateIo hint for a taken branch name; rm -rf on a detached or switched state worktree.",
+    "Add regression tests that fail without each fix (concurrency on a large tree, untracked config.json, no-main and empty repos merge cleanly, symlink in source and in state worktree, repo-controlled branch name ignored).",
+    "Ownership: packages/runtime/src/state, packages/runtime/src/vcs, packages/runtime/src/cli, packages/runtime/src/domain, packages/runtime/tests. Other writers' uncommitted edits exist in docs, instructions, package.json files and packages/integrations; leave them alone."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md (Effect with tagged errors, no try/catch/new Promise/async in runtime source, Schema at boundaries, Bun Shell, JSDoc).",
+    "Make no version-control writes in this repository and no edits under .git/ or this repository's .holyagent/; tests use temporary repositories.",
+    "Do not run the plugin build; the root runs one build after all writers.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done and checked, stop and report; do not add unrequested features or refactors (name them in the report)."
+  ],
+  "criteria": [
+    {
+      "text": "Each code blocker and each High or Medium security finding is fixed, with a regression test that fails without the fix",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The full runtime test suite, bun check, lint and fmt check pass for packages/runtime",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Changes stay inside the ownership paths",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/state",
+    "packages/runtime/src/vcs",
+    "packages/runtime/src/cli",
+    "packages/runtime/src/domain",
+    "packages/runtime/tests"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvqq9asr-azv3",
+  "specialist": {
+    "agentId": "workflow:wf_0dc71aa6-3d6/assignment-0mvqupf7d-dm5i",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T15:39:17.690Z",
+    "finishedAt": "2026-10-27T15:47:57.960Z"
+  },
+  "result": "result: All three code blockers and all four security findings are fixed. The full runtime suite passes (328 tests), along with type-check, lint and format check.\n\nchanged:\n- /home/user/holyagent/packages/runtime/src/state/tree.ts\n- /home/user/holyagent/packages/runtime/src/state/lock.ts\n- /home/user/holyagent/packages/runtime/src/vcs/commands.ts\n- /home/user/holyagent/packages/runtime/src/vcs/settings.ts\n- /home/user/holyagent/packages/runtime/src/cli/hook.ts\n- /home/user/holyagent/packages/runtime/src/cli/errors.ts\n- /home/user/holyagent/packages/runtime/tests/state-branch.test.ts\n- /home/user/holyagent/packages/runtime/tests/cli.test.ts\n\nchecks:\n- `bun test packages/runtime` -> exit 0, 328 pass, 0 fail\n- `bun check --no-script` -> exit 0, no type errors in 102 files\n- `bun lint --no-script` -> exit 0, no problems in 103 files\n- `bun fmt --check --no-script` -> exit 0, all 215 files formatted\n- Before the fixes, 9 of the 10 new tests failed on the unmodified source. The exception is the work-tree symlink test, which passed (see notes).\n- The 3000-file concurrency test passed 3 reruns on the fixed tree.\n- I did not run the plugin build or `mise run verify`.\n\nblockers: none\n\nquestions:\n- When no base branch can be identified (no origin default, no `init.defaultBranch`, no `main` or `master`, as with a repo whose only base is `trunk`), I create no state branch. The state then stays in the work tree's `.holyagent`. Should there be an explicit way to name the base, such as a `holyagent.baseBranch` git config key? I did not add one.\n\nnotes:\n- **Symlinks in the work tree:** Bun's `Glob` with `onlyFiles` does not list symlinks (checked on Bun 1.4.4), so that finding is not reachable here and its regression test passes without the fix. I kept the `lstat` and `realpath` guard as defense. Migration now skips any entry that is not a plain file reached through no link.\n- **Symlinks in the state worktree:** the test fails on the base and passes now. Migration fails with `StateIo` (exit 4) when a link is in the way, rather than skipping, because the state worktree itself is then tampered with.\n- **`vcs.stateBranch` in `config.json`:** the schema key stays accepted but ignored, like `api`, so older config files still read.\n- **Docs:** `/home/user/holyagent/docs/decisions.md` line 49 still says the state branch can be set via `vcs.stateBranch`. It is outside my paths, so the root or the docs worker should correct it.\n- **Locking:** the worktree lock now waits up to about a minute (`patience: \"long\"`). A finished state worktree gets a `<worktree>.ready` marker beside it, so later commands pass without the lock. An unfinished one makes them wait.\n- **State worktree folder:** it is now `<slug>-<sha1 of the branch>`, so `holyagent-state` and `holyagent/state` no longer collide.\n- **`rm -rf`:** a worktree registered at that path is never deleted. A worktree on another branch or detached is reported with the exit-4 `StateIo`, naming the `git -C <path> switch <branch>` fix, even in `peek` mode, so `peek` callers such as the commit-msg hook now fail on it.\n- **Commits and migration sources:** `commitState` now commits only when the worktree is on the state branch. Other state worktrees are no longer used as migration sources.\n- **`config.json`:** it is read only from the work tree's `.holyagent`, never migrated, and ignored when deciding whether a project keeps state.\n- **Existing tests:** I removed the old \"no commit gets its state branch\" test because it contradicts the new deferral rule. I also changed the `cli.test.ts` process test to seed a commit and find the state worktree through `git worktree list`.\n- **Not fixed (out of scope):** per-work-tree active Intent, `commitState` running after `persist`, and the duplicated record and link code.\n\nevidence:\nEach code blocker and each High or Medium security finding is fixed, with a regression test that fails without the fix:\n- Large-tree concurrency: test \"six commands that start at once all succeed while the state worktree is still being checked out\".\n- Untracked and tracked `config.json`: tests in \"the config file of the project\".\n- Empty and no-main repos: tests in \"the base of a new state branch\".\n- Symlink in the state worktree and a switched state worktree: tests in \"a state worktree that is not what it should be\".\n- Repo-controlled branch name ignored and folder collision: tests in \"the config file of the project\".\n- Work-tree symlink test: passes on the base too, because Bun does not list symlinks (see notes).\n- Before/after run: 9 of the 10 new tests failed on the base.\n\nThe full runtime test suite, bun check, lint and fmt check pass for packages/runtime: `bun test packages/runtime` exit 0, 328 pass, 0 fail; `bun check --no-script` exit 0; `bun lint --no-script` exit 0, 103 files; `bun fmt --check --no-script` exit 0, 215 files.\n\nChanges stay inside the ownership paths: the changed files are all under `packages/runtime/src/state`, `src/vcs`, `src/cli` and `tests`. I ran `bun fmt`, which reformatted only my own files.\n\nchanged-paths: the eight files under `changed:`.\n\nchecks-run: the five commands under `checks:`.\n\ndiff-file: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/repair-state-branch.diff (tracked-file diff of the ownership paths; no new files were created).",
+  "createdAt": "2026-10-27T15:39:17.690Z"
+}
