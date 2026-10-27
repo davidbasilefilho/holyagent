@@ -47,7 +47,7 @@ A new harness gets its own folder under `packages/integrations/`. It reuses the 
 | `build`     | Generates the Claude plugin (runs `vendor` first)        |
 | `verify`    | `check`, `lint`, `fmt:check` and `test`, all read-only   |
 
-Done means `mise run verify` passes; after changing plugin sources, run `mise run build`.
+Done means `mise run verify` passes; after changing plugin sources, run `mise run build`. `scripts/repo-paths.test.ts` (part of `test`) fails on a tracked path over 120 characters, which overruns Windows MAX_PATH in the marketplace clone, or under `.holyagent/`, which lives on the `holyagent/state` branch.
 
 ## Lint and format rules
 
