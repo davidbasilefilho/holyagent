@@ -5,6 +5,7 @@ import { Effect, Schema } from "effect"
 
 import { ROOT_CORE } from "../instructions/claude-5.5/root-core.ts"
 import stateChanges from "../instructions/claude-5.5/specialist/state-changes.md" with { type: "text" }
+import { setupNotice } from "../setup/check.ts"
 import { hasCode, io } from "../state/files.ts"
 import { STATE_DIRECTORY } from "../state/layout.ts"
 import { legacyFoldersWithState } from "../state/legacy.ts"
@@ -196,7 +197,7 @@ const INLINE_INPUTS: ReadonlySet<string> = new Set(["script", "args"])
 export const HOOK_COMMANDS: ReadonlyArray<Command> = [
   hook(
     "session-start",
-    "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread, and in a claude.ai cloud session, `CLAUDE_CODE_REMOTE=true`, the steps that set the commit author to the user), always ending with a short block of the root rules most often missed; for a project with no .holyagent and a .holyclaude or .holycodex folder that holds state to convert, a notice naming the folder and `holyagent migrate`, with the same rules; for a project with none of the three, the core root rules with that line and the reminder when the holyagent agent is not the main thread, otherwise nothing",
+    "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread, and in a claude.ai cloud session, `CLAUDE_CODE_REMOTE=true`, the steps that set the commit author to the user), always ending with a short block of the root rules most often missed; one line that offers /holyagent:setup when bili, ctx7 or a recommended user-settings key is missing (nothing in a cloud session, nothing installed or written); for a project with no .holyagent and a .holyclaude or .holycodex folder that holds state to convert, a notice naming the folder and `holyagent migrate`, with the same rules; for a project with none of the three, the core root rules with that line and the reminder when the holyagent agent is not the main thread, otherwise nothing",
     (payload, call) =>
       Effect.gen(function* () {
         const pluginRoot = call.env.CLAUDE_PLUGIN_ROOT
@@ -209,19 +210,25 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
               .replaceAll("${CLAUDE_PLUGIN_ROOT}", pluginRoot ?? "${CLAUDE_PLUGIN_ROOT}")
         // How the commit author is set matters only where git's committer is the platform's.
         const cloud = inCloudSession(call.env) ? CLOUD_IDENTITY : undefined
+        // Reads files and looks commands up; it installs and writes nothing (`holyagent setup` does).
+        const notice = yield* setupNotice(call.env)
         if (!(yield* hasStateFolder(call.directory))) {
           const found = yield* legacyFoldersWithState(call.root)
-          // Nothing to show or convert: only a main thread that lacks the root rules gets them.
-          if (found.length === 0)
-            return core === undefined
-              ? NOTHING
-              : output({
-                  hookEventName: "SessionStart",
-                  additionalContext: bareContext(core, cloud),
-                })
+          // Nothing to show or convert: a main thread that lacks the root rules gets them, and an
+          // incomplete setup is the only other thing worth saying.
+          if (found.length === 0) {
+            if (core === undefined)
+              return notice === undefined
+                ? NOTHING
+                : output({ hookEventName: "SessionStart", additionalContext: notice })
+            return output({
+              hookEventName: "SessionStart",
+              additionalContext: bareContext(core, cloud, notice),
+            })
+          }
           return output({
             hookEventName: "SessionStart",
-            additionalContext: legacyContext(found, core, cloud),
+            additionalContext: legacyContext(found, core, cloud, notice),
           })
         }
         const { status, reconcile } = RESUMED.has(payload.source)
@@ -235,6 +242,7 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
             reconcile,
             RESUMED.has(payload.source) ? yield* requirementsOf(call.directory) : undefined,
             cloud,
+            notice,
           ),
         })
       }),

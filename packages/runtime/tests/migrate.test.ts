@@ -35,12 +35,15 @@ const cli = (argv: ReadonlyArray<string>) =>
     }),
   )
 
-/** What the SessionStart hook prints for the project. */
+/**
+ * What the SessionStart hook prints for the project. It runs as in a cloud session, where the setup
+ * check says nothing, so that only the migration text is under test.
+ */
 const sessionStart = () =>
   Effect.runPromise(
     run(["hook", "session-start"], {
       cwd: project,
-      env: { HOME: home },
+      env: { HOME: home, CLAUDE_CODE_REMOTE: "true" },
       stdin: Effect.succeed('{"agent_type":"holyagent"}'),
     }),
   ).then((result) => result.stdout)
