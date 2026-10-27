@@ -1,0 +1,37 @@
+{
+  "id": "assignment-0mvqyg5j0-ftmm",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.security",
+  "slug": "assess-the-bundled-ripgrep-and-fd-change",
+  "objective": "Assess the bundled ripgrep and fd change (a5575f1..79b4f61) for supply-chain and execution risks.",
+  "state": "Running",
+  "scope": [
+    "Diff: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/rgfd-full.diff; sources in /home/user/holyagent-rgfd (scripts/vendor.ts, packages/integrations/claude/src/vendor.ts, packages/runtime/src/cli/tools.ts). Focus on download URLs and pinning, checksum verification (fd publishes no checksum file; its hashes are trust-on-first-use), archive extraction (path traversal, symlinks), the binary path resolution and spawn arguments, and what the build does when hashes mismatch."
+  ],
+  "constraints": [
+    "Read-only: write no files."
+  ],
+  "criteria": [
+    {
+      "text": "Each finding traces source to sink with file:line and a severity, or absence is stated per surface",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources-read"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvqxh7l8-hxl9",
+    "assignment-0mvqych36-xjqu"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T17:24:03.708Z"
+  },
+  "createdAt": "2026-10-27T17:24:03.708Z"
+}
