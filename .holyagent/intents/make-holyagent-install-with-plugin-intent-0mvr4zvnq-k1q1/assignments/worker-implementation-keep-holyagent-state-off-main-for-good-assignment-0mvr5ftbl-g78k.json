@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "keep-holyagent-state-off-main-for-good",
   "objective": "Keep .holyagent/ state off main for good and guard the Windows install: gitignore .holyagent/ and add a test, run by `mise run verify`, that fails when any tracked path is longer than 120 characters or is under .holyagent/.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-fix-state-off-main (branch fix/state-off-main). Its last commit already deletes the tracked .holyagent/ files.",
     "Why: `claude plugin marketplace add davidbasilefilho/holyagent` clones the repository on Windows into %USERPROFILE%/.claude/plugins/marketplaces/davidbasilefilho-holyagent..clone/, and state paths of up to 187 characters passed MAX_PATH. Intent state belongs on the holyagent/state branch (AGENTS.md)."
@@ -50,5 +50,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T20:39:55.604Z"
+  },
   "createdAt": "2026-10-27T20:39:45.201Z"
 }
