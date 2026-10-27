@@ -1,0 +1,55 @@
+{
+  "id": "assignment-0mvr5funh-q1k1",
+  "intentId": "intent-0mvr58iqt-40ix",
+  "intentRevision": 3,
+  "roleTask": "Explorer.map",
+  "slug": "map-where-the-holyagent-root-s-rules-and",
+  "objective": "Map where the holyagent root's rules and enforcement points live, so the root can plan instruction and hook changes that stop six observed rule breaks.",
+  "state": "Ready",
+  "scope": [
+    "Worktree C:/Users/david.basile/dev/holyagent-fix-root-rule-adherence (read-only)",
+    "requirements.md and the per-model instruction sets and their section files (find them; likely under an instructions directory), the root agent text and how packages/integrations/claude builds dist/agents/holyagent.md",
+    "packages/runtime/src/cli/hook.ts, sessioncontext.ts (ROOT_CORE, ROOT_TAKEOVER, the 'rules most often missed' block), hooks.json generation in packages/integrations/claude/src/generate.ts, docs/hooks.md",
+    "packages/runtime/src/cli/main.ts stdin handling",
+    "Tests that assert instruction text, section sizes or hook output",
+    "packages/runtime/src/cli commands for assignment dispatch, plan and the hook workflow allow rules (what a script may reference, such as the args global)"
+  ],
+  "constraints": [
+    "Read-only: no edits, no version-control writes, nothing under .git/ or .holyagent/.",
+    "Facts with file:line; mark inference as inference."
+  ],
+  "criteria": [
+    {
+      "text": "For each of the six failures (root writes files via Bash, work before the Intent, no task list when task tools are missing, progress narration, empty reply, ready Assignments left unlaunched) names the exact current rule text locations (requirements.md line, each model's section file, root core / reminder block) and any gap or ambiguity in that text",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Lists the hook events holyagent registers today and what each may do per docs/hooks.md (context only vs decisions, timeouts, output caps), and which Claude Code hook events could detect each failure (e.g. Stop, UserPromptSubmit, PreToolUse on Bash/Write) with the inputs they receive",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Lists tests and size caps that constrain changes to the instruction text and the session-start output (file paths and limits)",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Confirms or refutes, with code citations, that main.ts loses stdin on Windows because Effect.runFork leaves no handle while Bun.stdin.text() is pending, and names where a fix belongs",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "For failures 7 to 9 (plan says workflow but the root ends the turn; parallel() used where pipeline() fits; dispatch prompts retyped into the script by hand) names the rule text locations, and describes how dispatch output reaches a Workflow script today (dispatch stdout, the Workflow args global, the hook workflow allow rules in packages/runtime) and what direct route the CLI could offer so prompts pass verbatim without the root retyping them, and so delegating content to a writer is cheaper than writing it with Bash",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-10-27T20:39:46.925Z"
+}
