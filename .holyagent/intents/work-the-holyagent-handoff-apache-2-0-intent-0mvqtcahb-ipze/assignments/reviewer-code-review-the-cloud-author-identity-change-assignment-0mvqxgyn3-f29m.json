@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mvqxgyn3-f29m",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-cloud-author-identity-change",
+  "objective": "Review the cloud author identity change (4702068..a5575f1 on ccr-046ad103-6qsvgx-identity) for correctness and regressions.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-identity (node_modules installed; mise available). Diff without dist and .holyagent: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/identity.diff.",
+    "Intent: in claude.ai (CLAUDE_CODE_REMOTE=true) commits use the account owner as author (author.name/author.email in local git config, set by the new vcs identity command from the GitHub connector) and keep the cloud committer Claude <noreply@anthropic.com>, so the Anthropic signature verifies; outside claude.ai behavior is unchanged; identity guidance appears in session context only in the cloud; nothing identity-related is written to repository files."
+  ],
+  "constraints": [
+    "Read-only: write no repository files; make no version-control writes and no edits under .git/ or .holyagent/."
+  ],
+  "criteria": [
+    {
+      "text": "Findings are ranked blocking or non-blocking with file:line and a failure scenario, covering the cloud and non-cloud paths, GIT_AUTHOR_* precedence and the identity command's validation",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Tests are judged for whether they fail without the change",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvqw75ho-95eb"
+  ],
+  "specialist": {
+    "agentId": "workflow:wf_96692dce-8d3/assignment-0mvqxgyn3-f29m",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T16:56:41.823Z"
+  },
+  "createdAt": "2026-10-27T16:56:41.823Z"
+}

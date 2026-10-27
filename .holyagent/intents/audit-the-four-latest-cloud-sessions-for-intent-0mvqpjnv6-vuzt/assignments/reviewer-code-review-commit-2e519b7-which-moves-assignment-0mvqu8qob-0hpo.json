@@ -1,0 +1,56 @@
+{
+  "id": "assignment-0mvqu8qob-0hpo",
+  "intentId": "intent-0mvqpjnv6-vuzt",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.code",
+  "slug": "review-commit-2e519b7-which-moves",
+  "objective": "Review commit 2e519b7, which moves holyagent Intent state onto a dedicated state branch, for correctness and regressions against the merge-ready bar.",
+  "state": "Succeeded",
+  "scope": [
+    "The change is commit 2e519b7 on branch ccr-046ad103-6qsvgx in /home/user/holyagent; review git diff 9c14b46..2e519b7 excluding .holyagent/ and the generated packages/integrations/claude/dist/scripts/holyagent.js.",
+    "Design (user decision): Intent state lives on one state-only branch (default holyagent/state) in a persistent linked worktree shared by every worktree of the clone; every CLI command reads and writes there and commits each transition locally; vcs commit stops staging .holyagent/ and refuses paths under it; Intents record committed branches and PRs as per-record files; working-tree state is migrated once. User requirement, verbatim: 'it must always be easy to stack onto other branches and merge seamslessly'.",
+    "You may run git and bun (tests, check) read-only; mise run verify passed on this tree."
+  ],
+  "constraints": [
+    "Read-only: write no repository files. Make no version-control writes (no git commit, add, checkout, switch, worktree, stash, push) and no edits under .git/ or .holyagent/."
+  ],
+  "criteria": [
+    {
+      "text": "Findings are ranked blocking or non-blocking, each with file:line and a concrete failure scenario",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Error paths are judged: missing origin, no commits, concurrent first commands, detached HEAD, a branch name already taken, non-git directories, migration of tracked and untracked state",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The seamless-merge requirement is checked against real merge behaviour in both directions and across two state lines",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Conformance with .claude/CLAUDE.md (Effect, tagged errors, Schema at boundaries, Bun Shell, JSDoc) is checked",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvqq9asr-azv3"
+  ],
+  "specialist": {
+    "agentId": "workflow:wf_48caed43-cd9/assignment-0mvqu8qob-0hpo",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T15:26:19.403Z",
+    "finishedAt": "2026-10-27T15:39:16.946Z"
+  },
+  "result": "result: blocked — 4 blockers found in 2e519b7, all reproduced with the real CLI. Seamless merge itself works for a repo with a main base. It fails in the empty-repo and no-main cases below.\n\nchanged: none (read-only). Scratch repos under /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/e1 to e6.\n\nchecks:\n- `/code-review 9c14b46...2e519b7` (built-in, via Skill) -> ran; 10 findings, each judged below.\n- `bun test packages/runtime/tests/state-branch.test.ts` -> exit 0, 16 pass, 0 fail.\n- `mise run verify` -> check passes (102 files), lint passes (103 files). fmt:check fails on 4 package.json files and the full suite shows 779 pass, 2 fail. Both come from other workers' uncommitted edits (license field, plugin manifest, generated plugin file), not from the commit.\n- The shared tree is moving: 16 tracked files are modified outside this commit.\n\nblockers:\n1. tree.ts:525 — concurrent first commands fail on a larger repo.\n   - `resolveState` uses any registered worktree on the state branch without the worktree lock.\n   - Other callers therefore run `git add` while `git worktree add` is still checking out.\n   - With 3000 files and 6 parallel `intent create`, 5 exit 4 with `Unable to create ... index.lock`. A 200-file repo passed, as does the existing small-repo test.\n   - The failures are loud and retry-safe, but concurrent first commands is a named criterion.\n2. tree.ts:127 and vcs/commands.ts:17 (also cli/hook.ts:329) — config.json precedence is broken.\n   - (a) An untracked config.json with `vcs.stateBranch` is migrated away by the first command, so the second command makes a second state branch and worktree (`team/state` plus `holyagent/state`).\n   - (b) `readSettings` takes the state worktree's copy first. With a tracked config.json on main, a work-tree edit of `vcs.allowWords` is ignored: `vcs commit -m \"document Claude Code usage\"` still fails with MessageRefused. That is the remedy the error hint names.\n3. tree.ts:218 — `baseStart` falls back to an empty root commit, or to the current HEAD.\n   - In an empty repo (no commits), the first main commit and `holyagent/state` are unrelated, and `git merge holyagent/state` fails with \"refusing to merge unrelated histories\".\n   - With default branch `develop` and no origin, the first command on `feature` roots the state branch at feature's HEAD, and merging it into develop drags feature's commit in.\n   - This breaks the seamless-merge requirement. The existing no-commit test only checks the state commits, not mergeability.\n\nquestions:\n- Active Intent, specialist registry and `local/` are now shared by all worktrees of a clone (lock.ts:90). `intent use` in one worktree changes the Intent for the others. Should active-intent be keyed per work tree? This follows from the shared-worktree decision, so it is yours to decide.\n\nnotes (non-blocking):\n- store.ts:276 — `commitState` runs after `persist`, so a git failure errors a transition that was already written. A retry duplicates it. Confirmed by reading only.\n- tree.ts:274 — `rm -rf` on a detached or switched state worktree deletes the folder and then `worktree add` fails (\"missing but already registered\"). Reproduced; only uncommitted state is lost.\n- tree.ts:397 — the 1 s lock timeout around the full checkout and migration is plausible for very large repos. I did not reproduce StateLocked.\n- Reproduced: a state branch rooted at main merges cleanly in both directions, and two clones that create the state branch independently merge cleanly.\n- Branch name taken (a branch `holyagent` exists): a clear git error, but the StateIo hint blames permissions.\n- Missing origin is handled; detached HEAD is handled.\n- Migration: tracked-modified files are restored and untracked files are moved and committed. The one-time marker works.\n- Rejected from /code-review: \"a new state branch starts from main so carries the tree\". That is what makes merges clean; an orphan root would need `--allow-unrelated-histories`. Only the \"carries nothing else\" comment overclaims.\n- store.ts:270 — around 12 git processes per transition. Optional.\n- record.ts and links.ts — duplicated record, link and scan code. Optional.\n- Leftover `vcs` local-file plumbing (local.ts, LOCAL_FILES, StateChange.vcs) has no writer left.\n- The commit adds 9 `.holyagent/**` files to the work branch, which its own rule forbids. They are out of scope and listed as a note only.\n- CLAUDE.md conformance: the new source has no try/catch, async or Promise statics. Git runs through Bun `$`, records decode through Effect Schema (`BranchRecord`, `PullRecord`), exports have JSDoc, and lint passes. State failures reuse `StateIo` with string causes, which is acceptable.\n- Tests: none covers an untracked or stale config.json, a detached state worktree, a no-commit or no-main merge, or a large-repo concurrent start.\n\nevidence:\nFindings are ranked blocking or non-blocking, each with file:line and a concrete failure scenario: see the ReportFindings list (11 entries) and the blockers and notes above.\nError paths are judged: missing origin and detached HEAD fine; no commits, concurrent first commands, config/migration and base fallback are blockers 1 to 3; branch-name-taken in notes; non-git directory falls back to `./.holyagent` (reproduced); migration of tracked and untracked state checked in e4/mig3.\nThe seamless-merge requirement is checked against real merge behaviour in both directions and across two state lines: reproduced in e6 (state into feat, feat into main, main into state, two clones each creating the branch), plus 16 passing state-branch tests; it fails in the e1/nocommit and e3/trunk repos (blocker 3).\nConformance with .claude/CLAUDE.md (Effect, tagged errors, Schema at boundaries, Bun Shell, JSDoc) is checked: grep of new source files for try/catch/async/Promise returned none; `mise run verify` lint and check pass.\nchecks-run: see checks above; tests ran on a moving tree, and fmt:check and 2 plugin tests fail because of other workers' uncommitted edits.",
+  "createdAt": "2026-10-27T15:26:19.403Z"
+}

@@ -1,0 +1,17 @@
+{
+  "id": "intent-0mvqpjnv6-vuzt",
+  "slug": "audit-the-four-latest-cloud-sessions-for",
+  "objective": "Audit the four latest cloud sessions for inefficiencies and root-rule breaks, and design where Intent state lives in PR stacks so stacking and continuing work is easy.",
+  "requirements": [
+    "Audit the four latest cloud sessions across every project (excluding this one): session_01PbzbdhKs6KnbtmC3te3dhy, session_018ns3tcbg1JHsuJsQsvFFYR, session_01KoXoG7nw5qdDw88CPkQ2tk, session_01EQ8Y6XgacSktZS9oFWeKYa.",
+    "Check what inefficiencies there are.",
+    "Some threads are currently running: read them only; never message, interrupt or archive them.",
+    "Intents in PR stacks should always be in a specific branch that is easy to stack with other branches and easy to continue work on; past sessions always messed this up.",
+    "Decision (user, AskUserQuestion): Intent state lives on one dedicated state-only branch (e.g. holyagent/state) in a persistent linked worktree; every holyagent command reads and writes there from any branch or worktree; Intents record their stack branches and PRs; work branches and PRs stop carrying .holyagent/. This reverses docs/decisions.md:9,59 (state rides work commits).",
+    "it must always be easy to stack onto other branches and merge seamslessly",
+    "Decision (user): the Intent in use is kept per work tree, so sessions in different worktrees do not switch each other's Intent; all other state stays shared."
+  ],
+  "revision": 4,
+  "state": "Open",
+  "createdAt": "2026-10-27T13:14:50.898Z"
+}

@@ -1,0 +1,57 @@
+{
+  "id": "assignment-0mvqw75te-qv26",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "rewrite-the-readme-with-the-structure",
+  "objective": "Rewrite the README with the structure the user set and require that structure in AGENTS.md.",
+  "state": "Succeeded",
+  "scope": [
+    "Worktree: /home/user/holyagent-readme on branch ccr-046ad103-6qsvgx-readme.",
+    "User decision, verbatim structure: '# HolyAgent': what it is, in a pitch tone; '## How ...?': quick install; '## Why ...?': the reasons to use it; '## Development': contributing etc.; '## Special thanks': inspirations and projects; '## License': points to LICENSE. Fill the '...' in the How and Why headings naturally (for example 'How do I install it?', 'Why HolyAgent?').",
+    "English. Special thanks lists the inspirations already named in the repository (search docs/ and git log for credited projects) plus t3dotgg/tstack (https://github.com/t3dotgg/tstack). Install steps come from docs/ and install/ as they are today; do not invent commands. Link docs/ for details.",
+    "Add a short rule to AGENTS.md that the README keeps exactly these sections in this order, with the reason."
+  ],
+  "constraints": [
+    "Work only in your worktree; make no version-control writes (no commit, add, checkout, switch, merge, stash, push) and no edits under .git/ or .holyagent/.",
+    "Run `bun install --frozen-lockfile` in your worktree first if node_modules is missing (mise is installed; run gates through mise). When done, run `mise run build` and `mise run verify` in your worktree and report the results.",
+    "Write only README.md and AGENTS.md.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When done and checked, stop and report; do not add unrequested features or refactors (name them in the report)."
+  ],
+  "criteria": [
+    {
+      "text": "README.md has exactly the six sections in order with accurate install steps taken from the repository",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "AGENTS.md requires the structure",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run fmt:check passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "README.md",
+    "AGENTS.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "workflow:wf_3d59728b-a9a/assignment-0mvqw75te-qv26",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T16:21:04.947Z",
+    "finishedAt": "2026-10-27T16:56:00.709Z"
+  },
+  "result": "result: README.md is written with the six sections in the order set. AGENTS.md now has a rule requiring that structure. `mise run build` and `mise run verify` both exit 0.\nchanged: /home/user/holyagent-readme/README.md (new), /home/user/holyagent-readme/AGENTS.md (new \"The README\" section at the end)\nchecks:\n- `bun install --frozen-lockfile` -> exit 0, 128 packages installed.\n- `mise run build` -> exit 0, built 29 files. `git status` shows only AGENTS.md and README.md changed, so the build left the generated plugin unchanged.\n- `mise run verify` -> exit 0, with the 795 tests passing and none failing.\n  - type-check: no type errors in 102 files.\n  - lint: no problems in 103 files.\n  - format check: all 216 files formatted.\n  - tests: 795 pass, 1 skip, 0 fail.\n- `mise run fmt:check` -> exit 0, all 216 files formatted.\nblockers: none\nquestions: none\nnotes:\n- The inspirations in Special thanks are those found in `docs/attributions.md` and `docs/decisions.md`: HolyClaude (the predecessor plugin, linked to `docs/decisions.md`), Billion Context with acp-kernel, and Anthropic's frontend-design skill. The software the project is built with is also named (Context7, Effect, Bun, mise, lefthook, TOON, acorn). t3dotgg/tstack is added as asked.\n- The README links to `.claude/CLAUDE.md` and `AGENTS.md` from Development.\n- The install steps come from `docs/usage.md` and `docs/requirements.md`. The setup command is written as `bun packages/cli/src/index.ts setup claude`, run from a checkout, because `docs/requirements.md` says the public CLI is not on PATH. I did not add a global install route.\n- The diff is saved at /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/readme.diff.\nevidence:\nREADME.md has exactly the six sections in order with accurate install steps taken from the repository: `grep -n \"^#\" README.md` lists `# HolyAgent`, `## How do I install it?`, `## Why HolyAgent?`, `## Development`, `## Special thanks` and `## License`, at lines 1, 9, 29, 37, 49 and 59. The marketplace commands and the setup command are copied from `docs/usage.md`.\nAGENTS.md requires the structure: the new \"The README\" section at the end of /home/user/holyagent-readme/AGENTS.md lists the six sections in order and gives the reason.\nmise run fmt:check passes: exit 0, all 216 files formatted.\nchanged-paths: README.md, AGENTS.md\nchecks-run: `bun install --frozen-lockfile` exit 0; `mise run build` exit 0; `mise run verify` exit 0 (795 pass, 1 skip, 0 fail); `mise run fmt:check` exit 0",
+  "createdAt": "2026-10-27T16:21:04.947Z"
+}

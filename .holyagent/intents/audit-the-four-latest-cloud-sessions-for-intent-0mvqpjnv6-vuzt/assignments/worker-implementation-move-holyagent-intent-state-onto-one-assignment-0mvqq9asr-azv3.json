@@ -1,0 +1,83 @@
+{
+  "id": "assignment-0mvqq9asr-azv3",
+  "intentId": "intent-0mvqpjnv6-vuzt",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "move-holyagent-intent-state-onto-one",
+  "objective": "Move holyagent Intent state onto one dedicated state-only branch in a persistent shared worktree that every CLI command uses, records each Intent's branches and PRs, and always merges into or stacks with other branches without conflicts.",
+  "state": "Succeeded",
+  "scope": [
+    "Code background, from a source trace (verify each before relying on it): stateRoot in packages/runtime/src/cli/context.ts:21-34 and program.ts:46-52 resolve <worktree toplevel>/.holyagent, so each linked worktree has its own state; state/store.ts persist writes intents/<slug>-<id>/intent.json and assignments/*.json; local/active-intent.json and local/vcs.json are per clone and gitignored; vcs/commit.ts:54-122 stages the Intent-in-use folder into whatever branch HEAD is on; vcs/pr.ts records branch/base/PR only in local/vcs.json; the Intent schema has no branch or PR field.",
+    "Design to implement (user decision): (1) one branch, default name holyagent/state (configurable in .holyagent/config.json or git config), checked out in a persistent linked worktree shared by all worktrees of the clone (for example under the git common dir), created on first use from origin/holyagent/state when it exists, otherwise from the base branch head; (2) every holyagent command reads and writes state there whatever the cwd worktree or checked-out branch; (3) each state transition is committed locally on the state branch with the repository identity, so work trees never hold uncommitted state; no command pushes (the root pushes with plain git); (4) holyagent vcs commit stops staging .holyagent/; (5) the Intent records the branches it committed on and the PRs vcs pr opened or updated, in versioned state; (6) uncommitted or newer working-tree .holyagent records found in a work tree are migrated into the state worktree once.",
+    "Seamless-merge requirement (user, verbatim: 'it must always be easy to stack onto other branches and merge seamslessly'): the state branch changes only .holyagent/ and work branches never modify .holyagent/, so merging the state branch into any work or stack branch, and any work branch into it, never conflicts; every record is its own file with a unique id and no shared mutable index; append-only logs, if any, use a .gitattributes merge=union entry.",
+    "Ownership: packages/runtime/src/cli, packages/runtime/src/state, packages/runtime/src/vcs, packages/runtime/src/domain, packages/runtime/tests, packages/cli, .gitattributes. Instruction text, docs, AGENTS.md and the generated plugin are a later Assignment; list any of their lines your change makes wrong in the report."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md: Effect with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime/CLI source), Effect Schema with onExcessProperty error at data boundaries, Bun APIs and Bun Shell $ for git, JSDoc on every exported item.",
+    "Make no version-control writes in this repository (no git commit, add, checkout, switch, worktree, push, stash) and no edits under .git/ or this repository's .holyagent/; tests create their own temporary git repositories.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report; do not add unrequested features, files or refactors (name them in the report)."
+  ],
+  "criteria": [
+    {
+      "text": "Every CLI command resolves state to the shared state-branch worktree from the main checkout and from any linked worktree on any branch, creating it from origin/holyagent/state or the base when missing",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Each state transition leaves a commit on the state branch touching only .holyagent/ and leaves no uncommitted .holyagent/ changes in any work tree",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "holyagent vcs commit no longer stages .holyagent/ and the Intent records committed branches and PRs from vcs pr",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Tests prove merging the state branch into a work branch and a work branch into it has no conflicts, and that two state lines adding different records merge cleanly",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Existing working-tree state is migrated into the state worktree once, and existing tests still pass",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Changes stay inside the ownership paths and the design above",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "mise run verify passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file",
+    "stale-instruction-lines"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli",
+    "packages/runtime/src/state",
+    "packages/runtime/src/vcs",
+    "packages/runtime/src/domain",
+    "packages/runtime/tests",
+    "packages/cli",
+    ".gitattributes"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "workflow:wf_628bc533-ac0/assignment-0mvqq9asr-azv3",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T13:34:47.020Z",
+    "finishedAt": "2026-10-27T14:00:16.688Z"
+  },
+  "result": "result: Intent state now lives on one state branch (default `holyagent/state`) in one shared worktree under the git directory, and every CLI command uses it. `mise run verify` was not run (no `mise` here), and its test gate has 1 expected failure: the generated-plugin test, because `dist` is outside my ownership.\n\nchanged:\n- /home/user/holyagent/packages/runtime/src/state/tree.ts (new)\n- /home/user/holyagent/packages/runtime/src/domain/links.ts (new)\n- /home/user/holyagent/packages/runtime/src/vcs/record.ts (new)\n- /home/user/holyagent/packages/runtime/src/vcs/identity.ts (new)\n- /home/user/holyagent/packages/runtime/tests/state-branch.test.ts (new)\n- /home/user/holyagent/packages/runtime/src/cli/assignment.ts\n- /home/user/holyagent/packages/runtime/src/cli/context.ts\n- /home/user/holyagent/packages/runtime/src/cli/errors.ts\n- /home/user/holyagent/packages/runtime/src/cli/hook.ts\n- /home/user/holyagent/packages/runtime/src/cli/intent.ts\n- /home/user/holyagent/packages/runtime/src/cli/migrate.ts\n- /home/user/holyagent/packages/runtime/src/cli/program.ts\n- /home/user/holyagent/packages/runtime/src/cli/types.ts\n- /home/user/holyagent/packages/runtime/src/cli/views.ts\n- /home/user/holyagent/packages/runtime/src/domain/ids.ts\n- /home/user/holyagent/packages/runtime/src/domain/project.ts\n- /home/user/holyagent/packages/runtime/src/state/layout.ts\n- /home/user/holyagent/packages/runtime/src/state/lock.ts\n- /home/user/holyagent/packages/runtime/src/state/store.ts\n- /home/user/holyagent/packages/runtime/src/vcs/commands.ts\n- /home/user/holyagent/packages/runtime/src/vcs/commit.ts\n- /home/user/holyagent/packages/runtime/src/vcs/pr.ts\n- /home/user/holyagent/packages/runtime/src/vcs/settings.ts\n- /home/user/holyagent/packages/runtime/tests/cli.test.ts (the process test now asserts the new state location)\n- /home/user/holyagent/packages/runtime/tests/vcs-commit.test.ts (two tests that asserted state riding the work commit are replaced)\n- `packages/cli` and `.gitattributes` are unchanged. No log files were added, so no `merge=union` entry is needed.\n\nchecks:\n- `bun check --no-script` -> exit 0, no type errors in 102 files.\n- Lint -> exit 0, no problems in 103 files.\n- `bun fmt --no-script --check` -> exit 0, 215 files formatted.\n- `bun test` -> 780 pass, 1 fail. The failure is `plugin.test.ts` \"every committed generated file equals a fresh build\" (needs the rebuild). On a copy of the tree in scratch, after `bun packages/integrations/claude/build.ts`, `bun test packages/integrations` gave 381 pass, 0 fail.\n- `state-branch.test.ts` -> 16 pass.\n- `mise` is not installed here, and the installed Bun (1.4.4) has no `bun lint`. I ran lint and fmt with the canary Bun (1.4.4-canary) downloaded into scratch, using the same `bunfig.toml`. I ran `bun install --frozen-lockfile` once; it installed the dependencies, then its `mise run prepare` hook failed because `mise` is missing.\n\nblockers: The root must run `mise run build` for the generated plugin before `mise run verify` can pass. The runtime change alters the bundled CLI.\n\nquestions: none\n\nnotes:\n- **Active Intent:** it was already described as per clone, and now it really is one file shared by all worktrees. Two sessions in different worktrees working on different Intents will share it. Say if you want it per work tree.\n- **Identity:** state commits use the repository's git identity. If none is configured, or it looks like an agent's, they use a neutral `holyagent <holyagent@localhost>`, so state commits never carry agent attribution and never fail for lack of an identity. State commits skip hooks and signing.\n- **Merge safety:** `vcs commit` now refuses a path under `.holyagent` (exit 2), so a work branch can never carry state.\n- **Record files:**\n  - Branch and pull request records are separate files in the Intent's folder, `branches/<id>.json` and `pulls/<id>.json`.\n  - Each has a generated id and is never edited, so two lines of state never touch the same file.\n  - `intent show` lists the branches and the latest record per PR number; an update without `--base` keeps the earlier base.\n  - Recording is best effort: a failure shows as `unrecorded` in the output, and with no Intent in use nothing is written.\n  - `local/vcs.json` is no longer written, but still read.\n- **Creating the worktree:**\n  - Only `intent create` and a real `migrate` create it unconditionally.\n  - Every other command, including the hooks, creates it only if the project already has a state branch, its `origin` copy, or a `.holyagent` folder in any work tree.\n  - The `commit-msg` hook never creates or migrates anything.\n  - In a non-git folder the state stays in `<cwd>/.holyagent` and nothing is committed, as before.\n- **Migration:** it runs once per work tree, tracked by a marker under the git directory. A file the state worktree lacks is copied. An uncommitted edit wins over the state branch's copy. After the state commit, the copied untracked files are deleted from the work tree and edited tracked files are restored to HEAD. A newly created state worktree also takes in every other work tree of the clone.\n- **Existing branches:** old tracked `.holyagent/` on `main` and in-flight branches stays. The state branch starts from the base head, so it merges cleanly, but those old copies remain as history.\n- **Ideas, not done:**\n  - A sparse checkout would avoid a second full checkout of the repository for the state worktree.\n  - `LocalChange.vcs` and `Snapshot.vcs` are now unused.\n\nevidence:\n- Every CLI command resolves state to the shared state-branch worktree from the main checkout and from any linked worktree on any branch, creating it from origin/holyagent/state or the base when missing: `state-branch.test.ts` has the main checkout plus linked worktree on another branch, a base-head start with a configurable branch name, a repository with no commit, concurrent first commands, and a second clone created from `origin/holyagent/state`. Resolution is in `state/tree.ts` (`resolveState`). The 16 tests pass.\n- Each state transition leaves a commit on the state branch touching only .holyagent/ and leaves no uncommitted .holyagent/ changes in any work tree: `state-branch.test.ts` \"each transition is a commit that touches only .holyagent, and local changes make none\" checks `git log --name-only` and `git status --porcelain` in both work trees. `commitState` is called from `updateState` and from `migrate`.\n- holyagent vcs commit no longer stages .holyagent/ and the Intent records committed branches and PRs from vcs pr: `vcs-commit.test.ts` \"Intent state never rides along\" and \"a path under .holyagent is refused\"; `state-branch.test.ts` \"vcs commit records its branch and commit, and vcs pr the pull request, in versioned state\".\n- Tests prove merging the state branch into a work branch and a work branch into it has no conflict, and that two state lines adding different records merge cleanly: `state-branch.test.ts` describe \"merging the state\" has a stacked work branch merged both ways with real `git merge`, and two clones adding different Assignments and commit records, merged with `git merge origin/holyagent/state`.\n- Existing working-tree state is migrated into the state worktree once, and existing tests still pass: `state-branch.test.ts` describe \"moving the state found in a work tree\" has three tests (a one-time move, a tracked uncommitted edit winning, and every work tree taken in at creation). `bun test` shows 780 of 781 pass; the 1 failure is the generated-plugin test, which passes after a rebuild in a scratch copy.\n- Changes stay inside the ownership paths and the design above: `git status --short` lists only files under the ownership paths. This repository's `.holyagent/` was not edited.\n- `mise run verify` passes: not run, because `mise` is not installed. I ran `bun check`, lint (canary Bun), `bun fmt --check` and `bun test` instead, with the results under checks. The only failure is the plugin-rebuild test.\n- changed-paths: the list under `changed:`.\n- checks-run: the list under `checks:`.\n- diff-file: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/state-branch.diff\n- stale-instruction-lines:\n  - /home/user/holyagent/AGENTS.md:12 (treat `.holyagent/` as versioned state, copy newer state into a worktree before `vcs commit`)\n  - /home/user/holyagent/docs/commit-authorship.md:18 (`vcs commit` stages the changed Intent state)\n  - /home/user/holyagent/docs/decisions.md:9 (\"State rides the work commits\") and :59 (\"State in the repository\", moving it outside the tree)\n  - /home/user/holyagent/docs/usage.md:59 (state at the git top level, travels in the work commits)\n  - /home/user/holyagent/docs/development.md:11 (`src/state/` description)\n  - /home/user/holyagent/docs/hooks.md:23, :31, :39, :69 (state root, \"never calls git\", and `agent-launch` finding the state root)\n  - /home/user/holyagent/packages/runtime/src/instructions/requirements/commit-text.md:7 (Intent state travels in the same commit)\n  - /home/user/holyagent/packages/runtime/src/instructions/claude-5.5/root/version-control.md:13 (state repair between worktrees)\n  - /home/user/holyagent/packages/runtime/src/instructions/requirements.md:32 (R-GIT: repair of `.holyagent` state with plain Git)\n  - The generated `dist` copies of these.",
+  "createdAt": "2026-10-27T13:34:47.020Z"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "intent-0mvqtcahb-ipze",
+  "slug": "work-the-holyagent-handoff-apache-2-0",
+  "objective": "Work the holyagent handoff: Apache 2.0 license, native Windows support, four research questions, and a README structure required by AGENTS.md.",
+  "requirements": [
+    "Confirme comigo antes de implementar cada item.",
+    "Items marked verified in the handoff were only read in code, not executed.",
+    "1. Apache 2.0 license (see decision 1).",
+    "2. Native Windows support per the handoff list (see decision 2).",
+    "3. Research questions (answered at rev 1).",
+    "4. README structure required by AGENTS.md (see decision 4).",
+    "Decision 1 (user): implement the license, and the generated plugin.json also declares license Apache-2.0; plugin.test.ts changes to require the field instead of forbidding it.",
+    "Decision 2 (user): implement native Windows as a PR stacked on the state-branch change, after it is committed and reviewed; a specialist first confirms whether Claude Code on Windows runs hook command+args through a shell before the BunMissing contract changes.",
+    "Decision 4 (user): rewrite the README in English with # HolyAgent, ## How ...?, ## Why ...?, ## Development, ## Special thanks (repository inspirations plus t3dotgg/tstack), ## License; require the structure in AGENTS.md.",
+    "Decision identity (user): in claude.ai sessions only (CLAUDE_CODE_REMOTE=true), commits use the user as author and keep the cloud committer Claude <noreply@anthropic.com>, so the Anthropic signature makes branch commits Verified (probe b36cacc: verified valid; committer = user gave unknown_key). The author name and email come from the GitHub connector at session start and are never saved in the repository. Outside claude.ai the machine identity is used unchanged. The no-agent-attribution rule then covers the author and the commit text, not the cloud committer.",
+    "Decision search (user): drop fff; bundle ripgrep and fd in the plugin for darwin-arm64, linux-x64 and windows-x64, and agents must use them for content and file search.",
+    "Probe (root, 2026-10-27): get_me gives login, id 39467981 and name, no email; GitHub MCP commits carry author David Basile Filho <davidbasilefilho@gmail.com> but are unsigned; the cloud proxy blocks GraphQL and REST git/contents writes; /root/.gitconfig signs with gpg.format ssh via /tmp/code-sign.",
+    "User (verbatim): 'não pergunte me (ou qualquer usuário) mais coisas que podem ser respondidas pelo padrão do projeto (mergeability) ou o padrão do holyagent. reforce isso no projeto, porque tem perguntas que não precisam ser feitas se você já consegue a resposta'. User (verbatim): 'não no AGENTS.md, isso é padrão do holyagent'. Implement only in the holyagent instruction source (requirements.md, then the claude-5.5 root asking section), not in AGENTS.md, as a stacked change after rg/fd.",
+    "Decision (user): stacked work gets one pushed branch and PR per item, each based on the previous one, as the stack plan already says; no confirmation needed.",
+    "User (verbatim): 'tem um hook do claude.ai que fica te acordando toda hora, pode reconhecê-lo e colocar diretrizes no holyagent para que um agente não mencione coisas que esse hook diz, qualquer coisa que o usuário não precisa saber não precisa ser mencionada'. The hook is ~/.claude/stop-hook-git-check.sh (Stop hook; asks to commit and push on uncommitted, untracked or unverified local commits). Add to the holyagent instruction source, in the same stacked change as the no-unneeded-questions rule: the root never replies in text to that hook or to other harness noise (narration nudges, tool reminders, holyagent hook reminders, restart notices, background-task envelopes and diagnostics, GitHub event boilerplate, MCP auth notices the work does not need, internal ids, paths and resolved CLI errors); it reports only decisions, blockers, verified results, outward actions, denials and losses."
+  ],
+  "revision": 4,
+  "state": "Open",
+  "createdAt": "2026-10-27T15:01:05.424Z"
+}

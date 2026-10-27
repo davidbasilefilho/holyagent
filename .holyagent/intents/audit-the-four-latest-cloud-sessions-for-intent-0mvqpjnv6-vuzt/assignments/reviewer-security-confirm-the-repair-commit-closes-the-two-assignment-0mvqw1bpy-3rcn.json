@@ -1,0 +1,66 @@
+{
+  "id": "assignment-0mvqw1bpy-3rcn",
+  "intentId": "intent-0mvqpjnv6-vuzt",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.security",
+  "slug": "confirm-the-repair-commit-closes-the-two",
+  "objective": "Confirm the repair commit closes the two open security findings (a symlinked .holyagent folder followed by migration) without new vulnerabilities.",
+  "state": "Succeeded",
+  "scope": [
+    "The repair is the latest commit on ccr-046ad103-6qsvgx in /home/user/holyagent (HEAD, parent 16e135b); its diff without dist and .holyagent is at /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/impl-diff.patch (the writer's diff of the same three files: packages/runtime/src/state/tree.ts, local.ts, tests/state-branch.test.ts).",
+    "Previous findings: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-assignment-0mvqvcy15-lklm.txt, findings 1 and 2 'still open'. Judge only whether those close and whether this repair adds a new problem."
+  ],
+  "constraints": [
+    "Read-only: write no files."
+  ],
+  "criteria": [
+    {
+      "text": "Findings 1 and 2 are each marked closed or open with source-to-sink evidence and file:line",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "New problems from this repair are traced and rated, or their absence is stated",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources-read"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvqvwebm-hzwz"
+  ],
+  "followUpOf": "assignment-0mvqvcy15-lklm",
+  "specialist": {
+    "agentId": "workflow:wf_80ddcab2-a64/assignment-0mvqw1bpy-3rcn",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T16:16:32.662Z",
+    "finishedAt": "2026-10-27T16:18:42.674Z"
+  },
+  "result": "result: Findings 1 and 2 are both closed. The repair adds no new vulnerability. Two Low notes remain, one new and one carried over.\n\n**Built-in `/security-review`:** I ran it through the Skill tool and it failed in preprocessing. `git diff --name-only origin/HEAD...` gave `fatal: ambiguous argument 'origin/HEAD...'`, because this clone has no `origin/HEAD`, so it produced no findings. The review below is manual, from `impl-diff.patch` and the current files. `/home/user/holyagent/.git/HEAD` shows branch `ccr-046ad103-6qsvgx`; I had no shell, so I did not confirm the commit hash, and I ran no tests.\n\n**Finding 1 (High, write through a symlinked state worktree `.holyagent`): closed**\n- Source: a remote `holyagent/state` branch that tracks `.holyagent` as a symlink, so the state worktree gets one.\n- Path before: `resolveState` (`tree.ts:661`) → `migrateWorkTree` (`:531`) → `copyInto`. The target root was never `lstat`ed, and the containment check resolved through the link on both sides.\n- Now `migrateWorkTree` calls `requireStateFolder(target)` (`tree.ts:549`, defined `:392-404`) before the lock and before anything is written. `kindAt` is an `lstat`, so a link or any non-directory fails with `StateIo` (exit 4). Only a real folder or nothing passes.\n- `requirePlainTarget` (`:426`) repeats the check, and `copyInto` calls it first (`:448`), so no write path skips it.\n- `realStateFolder` (`:385-386`) resolves only the parent of `.holyagent`. `copyInto`'s containment check (`:451-453`) therefore compares against the real work-tree path and no longer passes through the link.\n- Sink reachability: the lock (`lock.ts:121`), `mkdir`, `Bun.write` and `rename` all come after the guard. The new test \"migration refuses a state worktree whose .holyagent folder is a symlink\" asserts exit 4 and an untouched outside directory (`state-branch.test.ts` around `:694`).\n\n**Finding 2 (Medium, read and commit through a symlinked work-tree `.holyagent`): closed**\n- Source: a default branch that tracks `.holyagent` as a symlink to `~/.ssh` or `$HOME`.\n- Path before: `workTreeEntries` listed the link target's files, `isPlainFile` compared against `canonical(root)` and always passed, and `copyInto` plus `commitState` put the files on the state branch.\n- Now `migrateWorkTree` runs `kindAt(source)` (`:550-552`) and returns `Effect.void` for any kind other than a directory, before the lock and before `workTreeEntries`. No marker is written, so a later real folder still migrates.\n- `isPlainFile` (`:411-417`) is a second layer. It requires `kindAt(root) === \"directory\"` and compares against `realStateFolder(root)`, so a link at `.holyagent` or below it no longer passes.\n- The test \"migration leaves a work tree whose .holyagent folder is a symlink out of the state\" asserts that no secret reaches the state worktree or `git log -p` (`state-branch.test.ts` around `:707`).\n\n**New problems from this repair:** none that are exploitable. Traced:\n- **Per-work-tree Intent fallback (`local.ts:77-94`):**\n  - The legacy file is the fixed name `local/active-intent.json`, with no user input in the path.\n  - It is read through the strict `IntentId` schema. `local/` is gitignored and filtered out of migration (`tree.ts:354` and `:491`), so a repository cannot plant it. It only supplies a pointer to an Intent id.\n  - It is read-only, and writes still use the per-work-tree file. No finding.\n- **`requireStateFolder` before the lock:** a hostile branch can make every holyagent command in that work tree fail with exit 4 until the user removes the link. This is the Low \"link-blocked migration\" already noted, now with a clearer message and the same fix. **Low, availability only.**\n- **Carried over, Low:**\n  - `withStateLock(target)` (`lock.ts:119-123`) creates `local/.gitignore` and `local/lock` under the state folder, and `ensureLocalDirectory` and the lock follow a tracked `.holyagent/local` symlink.\n  - The only content written is `*\\n` and a lock token.\n  - The repair's comment says the guard comes before \"the lock, which writes under the target\", but it checks only the root, not `local`. A one-component `lstat` of `local` would close it.\n  - It is not introduced by this repair, and ordinary `commitFile` writes share the same link-following behavior.\n- **Not rated:** the gap between the checks and the `rename`, which needs a concurrent local writer.\n\n**Checked and sound:**\n- Every call to `copyInto`, `requirePlainTarget` and `isPlainFile` is inside `tree.ts` and goes through the new guards.\n- `realStateFolder` falls back to the unresolved path if `realpath` fails, which is the same behavior as before.\n- Per-entry link checks, device and socket skipping, and the temp-and-rename write are unchanged.\n- The `rmdir(source)` after migration only removes an empty real folder, and the `rm` and `git restore` removals only run for entries that passed `isPlainFile`.\n\nchanged: none\nchecks: `/security-review` -> not completed (preprocessing failed, no `origin/HEAD`); no tests or other commands run (read-only, no shell)\nblockers: none\nquestions: none\nnotes: Optional Low hardening: `lstat` `.holyagent/local` in `requireStateFolder` or in `withStateLock`'s caller. Optional test: a state worktree where `.holyagent/local` is a symlink.\n\nevidence:\nFindings 1 and 2 are each marked closed or open with source-to-sink evidence and file:line: Finding 1 is closed. Source: `.holyagent` as a symlink in the state worktree. Path: `resolveState` `tree.ts:661` → `migrateWorkTree` `:549`, where `requireStateFolder(target)` (`:392-404`) fails on a link before `withStateLock` (`:554`, `lock.ts:121`) and `copyInto`'s `mkdir`/`rename` (`:450-456`). `requirePlainTarget` `:426` and the `realStateFolder` containment check `:451` back it up, and the test is at `state-branch.test.ts` around `:694`. Finding 2 is closed. Source: `.holyagent` as a symlink in the work tree. Path: `kindAt(source)` `tree.ts:550-552` skips migration before `workTreeEntries` `:558` and `copyInto` `:570`. `isPlainFile` `:411-417` requires a directory root and compares against `realStateFolder`. The test is at `state-branch.test.ts` around `:707`.\nNew problems from this repair are traced and rated, or their absence is stated: none exploitable. Traced the per-work-tree Intent legacy fallback (`local.ts:77-94`, no finding), the guard ordering and the link-blocked migration (Low, availability only), and the `local/` lock write (`lock.ts:119-123`, Low, carried over and not introduced here).\nsources-read: `/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/impl-diff.patch` (all), `/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-assignment-0mvqvcy15-lklm.txt` (all), `/home/user/holyagent/packages/runtime/src/state/tree.ts` (lines 225-725), `/home/user/holyagent/packages/runtime/src/state/local.ts` (all), `/home/user/holyagent/packages/runtime/src/state/lock.ts` (lines 100-125), `/home/user/holyagent/.git/HEAD`, and a grep over `/home/user/holyagent/packages/runtime/src` for `withStateLock`, `copyInto`, `requirePlainTarget`, `requireStateFolder`, `isPlainFile` and `realStateFolder`.",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Security findings closed with source-to-sink evidence; verify exit 0 on 4aa9b2f.",
+    "criteria": [
+      {
+        "criterion": "Findings 1 and 2 are each marked closed or open with source-to-sink evidence and file:line",
+        "support": "Finding 1 is closed. Source: `.holyagent` as a symlink in the state worktree. Path: `resolveState` `tree.ts:661` → `migrateWorkTree` `:549`, where `requireStateFolder(target)` (`:392-404`) fails on a link before `withStateLock` (`:554`, `lock.ts:121`) and `copyInto`'s `mkdir`/`rename` (`:450-456`). `requirePlainTarget` `:426` and the `realStateFolder` containment check `:451` back it up, and the test is at `state-branch.test.ts` around `:694`. Finding 2 is closed. Source: `.holyagent` as a symlink in the work tree. Path: `kindAt(source)` `tree.ts:550-552` skips migration before `workTreeEntries` `:558` and `copyInto` `:570`. `isPlainFile` `:411-417` requires a directory root and compares against `realStateFolder`. The test is at `state-branch.test.ts` around `:707`."
+      },
+      {
+        "criterion": "New problems from this repair are traced and rated, or their absence is stated",
+        "support": "none exploitable. Traced the per-work-tree Intent legacy fallback (`local.ts:77-94`, no finding), the guard ordering and the link-blocked migration (Low, availability only), and the `local/` lock write (`lock.ts:119-123`, Low, carried over and not introduced here)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "sources-read",
+        "support": "`/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/impl-diff.patch` (all), `/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-assignment-0mvqvcy15-lklm.txt` (all), `/home/user/holyagent/packages/runtime/src/state/tree.ts` (lines 225-725), `/home/user/holyagent/packages/runtime/src/state/local.ts` (all), `/home/user/holyagent/packages/runtime/src/state/lock.ts` (lines 100-125), `/home/user/holyagent/.git/HEAD`, and a grep over `/home/user/holyagent/packages/runtime/src` for `withStateLock`, `copyInto`, `requirePlainTarget`, `requireStateFolder`, `isPlainFile` and `realStateFolder`."
+      }
+    ]
+  },
+  "createdAt": "2026-10-27T16:16:32.662Z"
+}

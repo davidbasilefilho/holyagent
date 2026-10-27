@@ -1,0 +1,13 @@
+{
+  "id": "intent-0mvqpg496-r50c",
+  "slug": "answer-which-concepts-skills-and",
+  "objective": "Answer which concepts, skills and practices from t3dotgg/tstack holyagent could borrow, and in what form.",
+  "requirements": [
+    "Answer only; no code or instruction changes in this Intent.",
+    "Ground each recommendation in specific tstack files and specific holyagent files it would land in."
+  ],
+  "revision": 1,
+  "state": "Closed",
+  "closeReason": "Question answered; no code changes.",
+  "createdAt": "2026-10-27T13:12:05.514Z"
+}

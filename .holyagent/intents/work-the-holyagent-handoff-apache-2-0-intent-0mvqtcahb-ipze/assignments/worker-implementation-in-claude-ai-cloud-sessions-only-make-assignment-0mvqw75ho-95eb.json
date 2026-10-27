@@ -1,0 +1,73 @@
+{
+  "id": "assignment-0mvqw75ho-95eb",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "in-claude-ai-cloud-sessions-only-make",
+  "objective": "In claude.ai cloud sessions only, make holyagent commits use the user as author (taken from the GitHub connector, never stored in repository files) while keeping the cloud's Claude committer, so branch commits are Verified; outside claude.ai keep the machine identity unchanged.",
+  "state": "Succeeded",
+  "scope": [
+    "Worktree: /home/user/holyagent-identity on branch ccr-046ad103-6qsvgx-identity.",
+    "Facts (probed 2026-10-27 in this cloud session): CLAUDE_CODE_REMOTE=true and CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE=cloud_default are set; /root/.gitconfig has user.name Claude, user.email noreply@anthropic.com, commit.gpgsign true, gpg.format ssh via /tmp/code-sign. A commit with author David Basile Filho <davidbasilefilho@gmail.com> and committer Claude <noreply@anthropic.com> showed verification valid on GitHub; author and committer both the user gave unknown_key. mcp__github__get_me returns login davidbasilefilho, id 39467981, name David Basile Filho, no email.",
+    "Design: (1) git's author.name and author.email config keys set the author without touching the committer; in the cloud the root sets them in the clone's local config (.git/config, not a repository file) from get_me: name = details.name, email = <id>+<login>@users.noreply.github.com. Offer a CLI command, e.g. `holyagent vcs identity --name <n> --email <e>`, that writes exactly those two local keys, so the root does not hand-edit git config. (2) vcs commit: when CLAUDE_CODE_REMOTE=true, require an author (author.* or GIT_AUTHOR_*) that does not look like an agent, and allow the Claude committer; otherwise keep today's check of user.name/user.email. Its error hint in the cloud names the get_me + identity command steps. (3) Move the identity guidance out of the static root text (packages/runtime/src/instructions/claude-5.5/root/version-control.md Identity bullet, requirements.md R-VCS identity clause, requirements/commit-text.md:5) into the session-start hook context, emitted only when CLAUDE_CODE_REMOTE=true (packages/runtime/src/cli/hook.ts, sessioncontext.ts; respect CONTEXT_BUDGET). Locally the static text says: commits use the configured git identity. (4) The no-agent-attribution rule covers the author and the commit text; the cloud committer is the documented exception.",
+    "Tests: cloud and non-cloud vcs commit identity cases, the identity command, the session-start context with and without CLAUDE_CODE_REMOTE. Update docs/commit-authorship.md and docs/usage.md accordingly."
+  ],
+  "constraints": [
+    "Follow /home/user/holyagent/.claude/CLAUDE.md (Effect with tagged errors, no try/catch/new Promise/async in runtime source, Schema at boundaries, Bun APIs and Bun Shell, JSDoc on exports) and AGENTS.md.",
+    "Work only in your worktree; make no version-control writes (no commit, add, checkout, switch, merge, stash, push) and no edits under .git/ or .holyagent/.",
+    "Run `bun install --frozen-lockfile` in your worktree first if node_modules is missing (mise is installed; run gates through mise). When done, run `mise run build` and `mise run verify` in your worktree and report the results.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When done and checked, stop and report; do not add unrequested features or refactors (name them in the report)."
+  ],
+  "criteria": [
+    {
+      "text": "In a cloud session a commit gets the user as author and keeps the Claude committer, and vcs commit refuses an agent-looking author",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Outside claude.ai identity behavior is unchanged and no identity guidance appears in the session context",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "No identity value is written to any tracked or repository file",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Tests cover each case and fail without the change",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "mise run verify passes in the worktree",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli",
+    "packages/runtime/src/vcs",
+    "packages/runtime/src/instructions",
+    "packages/runtime/tests",
+    "docs",
+    "packages/integrations/claude/dist",
+    "packages/integrations/claude/tests"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "workflow:wf_3d59728b-a9a/assignment-0mvqw75ho-95eb",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T16:21:04.525Z",
+    "finishedAt": "2026-10-27T16:56:00.534Z"
+  },
+  "result": "result: A cloud commit now gets the user as author and keeps the Claude committer, and `vcs identity` sets that author. Outside claude.ai nothing changes. `mise run build` and `mise run verify` both exit 0.\n\nchanged:\n- `/home/user/holyagent-identity/packages/runtime/src/vcs/identity.ts`, `author.ts` (new), `errors.ts`, `commit.ts`, `commands.ts`\n- `/home/user/holyagent-identity/packages/runtime/src/cli/hook.ts`, `sessioncontext.ts`\n- `/home/user/holyagent-identity/packages/runtime/src/instructions/claude-5.5/session-cloud-identity.md` (new), `root/version-control.md`, `requirements.md`, `requirements/commit-text.md`\n- `/home/user/holyagent-identity/packages/runtime/tests/vcs-commit.test.ts`, `vcs-fixtures.ts`, `vcs-pr.test.ts`, `sessioncontext.test.ts`\n- `/home/user/holyagent-identity/packages/integrations/claude/tests/hooks.test.ts`, `plugin.test.ts`\n- `/home/user/holyagent-identity/packages/integrations/claude/dist/agents/holyagent.md`, `dist/scripts/holyagent.js` (both regenerated by `mise run build`)\n- `/home/user/holyagent-identity/docs/commit-authorship.md`, `decisions.md`, `hooks.md`, `requirements.md`, `usage.md`\n\nchecks:\n- `mise run build` -> exit 0, 29 files built.\n- `mise run verify` -> exit 0: type-check clean (103 files), lint clean (104 files), format check clean (217 files), 808 pass, 1 skip, 0 fail.\n- Mutation check: with the cloud detection forced to false, 4 of the new cloud commit tests fail; I restored it afterwards.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- **Design choice:** in the cloud, `vcs commit` takes the author from `git var GIT_AUTHOR_IDENT`. That is git's own resolution (`GIT_AUTHOR_*`, then `author.*`, then `user.*`), so a missing author and an agent-looking one both fail with the new `CloudAuthor` error (exit 3). Its hint names the `get_me` and `vcs identity` steps. Locally the old `AgentIdentity` check and hint are untouched.\n- **`vcs identity --name <n> --email <e>`:** it writes only `author.name` and `author.email` with `git config --local`. It refuses agent-looking values, a malformed email, and names with `<`, `>` or control characters. It is available outside the cloud too, because gating it seemed unnecessary.\n- **Root text:** the static root text and R-VCS now say commits use the configured git identity. The cloud steps appear only in `session-cloud-identity.md`, which the session-start hook injects when `CLAUDE_CODE_REMOTE=true`. It sits after the core, before the state, and counts toward `CONTEXT_BUDGET`.\n- **Gap:** a cloud session whose main thread is the root and which has no `.holyagent` and no legacy state gets no session-start context at all, so no identity steps. The `CloudAuthor` hint covers that case at commit time. I did not change this.\n- **Not tested:** the signature check on GitHub. I only confirmed locally that the committer stays Claude and the author is the user.\n- **For the root:** `/home/user/holyagent-identity/AGENTS.md` still says \"`holyagent vcs` has two commands\". It is outside my ownership paths, so I left it.\n\nevidence:\nIn a cloud session a commit gets the user as author and keeps the Claude committer, and vcs commit refuses an agent-looking author: `packages/runtime/tests/vcs-commit.test.ts` (\"vcs commit in a claude.ai cloud session\") asserts author `Octo Cat <id+login@users.noreply.github.com>` and committer `Claude <noreply@anthropic.com>`. It also covers `GIT_AUTHOR_*`, a missing author, and an agent-looking author set via `author.*` or env; each is refused with `CloudAuthor`, exit 3, and nothing is committed. `mise run verify` exit 0.\nOutside claude.ai identity behavior is unchanged and no identity guidance appears in the session context: the vcs-commit test \"outside a claude.ai cloud session\" shows `CLAUDE_CODE_REMOTE` unset, `false` or `1` still gives `AgentIdentity` and the same user-as-both result as before. `hooks.test.ts` (\"hook session-start, in a claude.ai cloud session\") checks no `vcs identity`, `get_me` or `CLOUD_IDENTITY` without the variable. `plugin.test.ts` checks the built `holyagent.md` holds no cloud guidance.\nNo identity value is written to any tracked or repository file: the \"vcs identity\" test diffs `git config --local --list` to exactly the two author keys, with `git status --porcelain` and `git ls-files` unchanged. The values come only from the command's arguments, and nothing in the source or docs holds a real name, email or login.\nTests cover each case and fail without the change: new tests in `vcs-commit.test.ts` (identity command, cloud, non-cloud), `sessioncontext.test.ts` (text order, budget, legacy and bare contexts) and `hooks.test.ts` (with and without `CLAUDE_CODE_REMOTE`, legacy and no-state, large state). The mutation check above made 4 cloud tests fail.\nmise run verify passes in the worktree: `mise run verify` -> exit 0, 808 pass, 0 fail, check, lint and fmt clean.\nchanged-paths: listed under `changed:` above.\nchecks-run: `mise run build` exit 0; `mise run verify` exit 0 (check, lint, fmt:check, test); `bun test packages/runtime/tests/vcs-commit.test.ts` before and after the mutation check.\ndiff-file: `/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/identity.diff`. It excludes the generated `dist/scripts/holyagent.js` bundle and includes the two new files.",
+  "createdAt": "2026-10-27T16:21:04.525Z"
+}

@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mvqxgyi3-m4p7",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Worker.validation",
+  "slug": "run-mise-run-verify-on-the-license",
+  "objective": "Run mise run verify on the license branch head 4702068 (the license commit plus a merge forward of the state-branch work) and confirm the generated plugin matches a fresh build.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-license on ccr-046ad103-6qsvgx-license. Run bun install --frozen-lockfile if node_modules is missing, then mise run verify, then mise run build and confirm git diff is empty. Also confirm dist/.claude-plugin/plugin.json has license Apache-2.0."
+  ],
+  "constraints": [
+    "Read-only: write no repository files; make no version-control writes and no edits under .git/ or .holyagent/. Save long logs under /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad."
+  ],
+  "criteria": [
+    {
+      "text": "mise run verify exit code and per-gate counts are reported for 4702068",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "mise run build leaves no tracked diff and plugin.json declares Apache-2.0",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "workflow:wf_96692dce-8d3/assignment-0mvqxgyi3-m4p7",
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-27T16:56:41.643Z"
+  },
+  "createdAt": "2026-10-27T16:56:41.643Z"
+}

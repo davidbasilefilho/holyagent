@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mvqw1k5q-s92j",
+  "intentId": "intent-0mvqpjnv6-vuzt",
+  "intentRevision": 4,
+  "roleTask": "Worker.validation",
+  "slug": "run-mise-run-verify-on-the-clean-head",
+  "objective": "Run mise run verify on the clean head 4aa9b2f of ccr-046ad103-6qsvgx and report the exact per-gate results.",
+  "state": "Succeeded",
+  "scope": [
+    "In /home/user/holyagent, confirm HEAD is 4aa9b2f and git status is clean apart from untracked .holyagent/ files, run mise run verify, then confirm mise run build leaves no tracked diff."
+  ],
+  "constraints": [
+    "Read-only: make no version-control writes and change no files except what mise run build rewrites identically. Save long logs under /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad."
+  ],
+  "criteria": [
+    {
+      "text": "mise run verify exit code and per-gate counts are reported for HEAD 4aa9b2f",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "mise run build leaves no tracked diff",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvqvwebm-hzwz"
+  ],
+  "specialist": {
+    "agentId": "workflow:wf_80ddcab2-a64/assignment-0mvqw1k5q-s92j",
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-27T16:16:43.599Z",
+    "finishedAt": "2026-10-27T16:19:05.140Z"
+  },
+  "result": "result: mise run verify passes on HEAD 4aa9b2f (exit 0, all four gates green), and mise run build leaves no tracked diff (exit 0, `git diff` empty, untracked set unchanged).\nchanged: none (the build rewrote 29 generated files byte-identically; the only untracked changes are the pre-existing .holyagent/ files)\nchecks:\n- Pre-run state: `git rev-parse --short HEAD` -> 4aa9b2f; `git status --short` -> only three untracked `.holyagent/` paths\n- `mise run verify` -> exit 0, log at /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/verify.log\n  - toolchain: canary check passed (bun 1.4.4-canary.1)\n  - check (`bun check --no-script`): exit 0, \"No type errors in 102 files\"\n  - lint (`bun lint --no-script`): exit 0, \"No problems in 103 files\"\n  - fmt:check (`bun fmt --no-script --check`): exit 0, \"All 215 files are formatted\"\n  - test (`bun test`): exit 0, 795 pass, 1 skip, 0 fail, 5307 expect() calls, 796 tests across 26 files\n- `mise run build` -> exit 0, \"built 29 files\"; log at /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/build.log\n  - `git diff --stat` after build -> empty (exit 0)\n  - `git status --short` before and after build -> identical\n- No baseline run was needed, since everything passed on HEAD and no check failed.\nblockers: none\nquestions: none\nnotes: The file counts differ by gate (102 type-checked, 103 linted, 215 formatted); I reported them as the gates printed them. The \"1 skip\" in the test run is reported by bun as-is and was not investigated.\nevidence:\nrepo-standards: `mise run verify` on HEAD 4aa9b2f -> exit 0; check 102 files no type errors; lint 103 files no problems; fmt:check 215 files formatted; test 795 pass / 1 skip / 0 fail over 796 tests in 26 files (log: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/verify.log)\nregressions: `mise run build` -> exit 0; `git diff --stat` empty and `git status --short` unchanged before vs after (status snapshot: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/status-before-build.txt)\nchecks-run: mise run verify (exit 0), mise run build (exit 0), git rev-parse HEAD, git status, git diff --stat",
+  "createdAt": "2026-10-27T16:16:43.599Z"
+}

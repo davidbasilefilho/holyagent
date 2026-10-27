@@ -1,0 +1,37 @@
+{
+  "id": "assignment-0mvqxgyst-2pl9",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.security",
+  "slug": "assess-the-cloud-author-identity-change",
+  "objective": "Assess the cloud author identity change (4702068..a5575f1) for security problems: identity spoofing, attribution bypass, config injection and environment-based detection.",
+  "state": "Running",
+  "scope": [
+    "Diff without dist and .holyagent: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/identity.diff; sources in /home/user/holyagent-identity. Focus on the vcs identity command writing git config (argument and value handling), the CLAUDE_CODE_REMOTE switch (who controls it, what it relaxes), the agent-identity check, and the session context text."
+  ],
+  "constraints": [
+    "Read-only: write no files."
+  ],
+  "criteria": [
+    {
+      "text": "Each finding traces source to sink with file:line and a severity, or absence is stated per surface",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources-read"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvqw75ho-95eb"
+  ],
+  "specialist": {
+    "agentId": "workflow:wf_96692dce-8d3/assignment-0mvqxgyst-2pl9",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T16:56:42.030Z"
+  },
+  "createdAt": "2026-10-27T16:56:42.030Z"
+}
