@@ -1,3 +1,5 @@
+import { homedir } from "node:os"
+
 import { Config, Effect, FileSystem, Option, Path, Schema } from "effect"
 
 import { applyDefaults, readJsonObject, writeJsonObject } from "../json-file.ts"
@@ -17,10 +19,24 @@ const failed = (what: string, result: ShellResult) => {
   return `! ${what}: failed (exit ${result.exitCode})${detail === "" ? "" : `: ${detail}`}`
 }
 
+/**
+ * The current user's home directory: `HOME`, else `USERPROFILE` (what Windows sets), else the
+ * operating system's answer. An empty variable counts as unset.
+ */
+export const homeDirectory = Effect.gen(function* () {
+  const home = yield* Config.option(Config.String("HOME"))
+  const profile = yield* Config.option(Config.String("USERPROFILE"))
+  return (
+    [home, profile]
+      .map(Option.getOrUndefined)
+      .find((value) => value !== undefined && value !== "") ?? homedir()
+  )
+})
+
 /** Where the current user's Claude Code, Billion Context and Context7 files live. */
 const userFiles = Effect.gen(function* () {
   const path = yield* Path.Path
-  const home = yield* Config.String("HOME")
+  const home = yield* homeDirectory
   const claudeConfigDir = yield* Config.option(Config.String("CLAUDE_CONFIG_DIR"))
   const xdgConfigHome = yield* Config.option(Config.String("XDG_CONFIG_HOME"))
   const biliConfigFile = yield* Config.option(Config.String("BILI_CONFIG_FILE"))

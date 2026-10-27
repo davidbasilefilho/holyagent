@@ -3,7 +3,9 @@
 commit-msg:
   jobs:
     - name: attribution
-      run: packages/integrations/claude/dist/scripts/holyagent hook commit-msg {1}
+      run: >-
+        bun --no-env-file --config=packages/integrations/claude/dist/scripts/empty-bunfig.toml
+        packages/integrations/claude/dist/scripts/holyagent.js hook commit-msg {1}
 
 # Hooks run the same mise tasks as CI; arguments after `--` go to the underlying Bun command.
 # `--staged` limits lint and fmt to the staged files, and Bun leaves a partly staged file unwritten

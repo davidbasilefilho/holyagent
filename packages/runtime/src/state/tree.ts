@@ -4,6 +4,7 @@ import { basename, dirname, join, sep } from "node:path"
 import { $ } from "bun"
 import { Effect } from "effect"
 
+import { fromGitPath, toPosix } from "../domain/paths.ts"
 import { looksLikeAgent } from "../vcs/identity.ts"
 import { StateIo } from "./errors.ts"
 import { hasCode, io } from "./files.ts"
@@ -158,7 +159,7 @@ const listWorktrees = (cwd: string, env: Environment) =>
           const field = (name: string) =>
             lines.find((line) => line.startsWith(`${name} `))?.slice(name.length + 1)
           return {
-            path: field("worktree") ?? "",
+            path: fromGitPath(field("worktree") ?? ""),
             branch: field("branch"),
             prunable: lines.some((line) => line === "prunable" || line.startsWith("prunable ")),
           }
@@ -467,7 +468,7 @@ const workTreeEntries = (top: string, env: Environment) =>
     if (!(yield* isDirectory(folder))) return [] as ReadonlyArray<Entry>
     const files = yield* io(folder, () =>
       Array.fromAsync(new Bun.Glob("**/*").scan({ cwd: folder, dot: true, onlyFiles: true })),
-    )
+    ).pipe(Effect.map((paths) => paths.map((path) => toPosix(path))))
     const status = new Map<string, string>()
     const listing = yield* git(top, env, [
       "status",
@@ -497,7 +498,7 @@ const workTreeEntries = (top: string, env: Environment) =>
 const pruneEmpty = (folder: string, from: string) =>
   Effect.gen(function* () {
     let current = from
-    while (current.startsWith(`${folder}/`)) {
+    while (current.startsWith(`${folder}${sep}`)) {
       const names = yield* io(current, () => readdir(current)).pipe(
         Effect.orElseSucceed(() => ["still here"]),
       )
@@ -624,7 +625,7 @@ export const commitState = (directory: string, env: Environment, message: string
     if (top.code !== 0) return false
     const own = yield* Effect.all([
       io(worktree, () => realpath(worktree)),
-      io(worktree, () => realpath(top.stdout.trim())),
+      io(worktree, () => realpath(fromGitPath(top.stdout.trim()))),
     ]).pipe(Effect.map(([a, b]) => a === b))
     if (!own) return false
     // Only a worktree on the state branch takes the commit, wherever it is: the one under the git
@@ -672,7 +673,12 @@ export const resolveState = (cwd: string, env: Environment, ensure: Ensure) =>
         return { root: cwd, directory: join(cwd, STATE_DIRECTORY) } satisfies StateTree
       return yield* new StateIo({ path: cwd, cause: `git: ${complaint}` })
     }
-    const [top = cwd, common = join(cwd, ".git")] = located.stdout.trim().split("\n")
+    // Git prints `/`-separated paths even on Windows (`C:/repo`); the rest of this file compares
+    // them with `join()` and `realpath()` results, so they are converted once, here.
+    const [top = cwd, common = join(cwd, ".git")] = located.stdout
+      .trim()
+      .split("\n")
+      .map((path) => fromGitPath(path))
     const branch = yield* stateBranch(top, env)
     const listed = yield* listWorktrees(top, env)
     const found = yield* checkedOut(listed, branch)
@@ -711,7 +717,7 @@ export const resolveState = (cwd: string, env: Environment, ensure: Ensure) =>
         ? [
             top,
             ...listed
-              .filter((entry) => !entry.prunable && !entry.path.startsWith(`${own}/`))
+              .filter((entry) => !entry.prunable && !entry.path.startsWith(`${own}${sep}`))
               .map((entry) => entry.path),
           ]
         : [top]

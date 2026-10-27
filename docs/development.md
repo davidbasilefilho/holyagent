@@ -21,7 +21,8 @@ packages/
     dist/                       generated: the built plugin (.claude-plugin/, settings.json, agents/, skills/, hooks/, scripts/)
   cli/                          the public CLI: setup, doctor
 .claude-plugin/marketplace.json generated; the marketplace entry for the plugin
-install/wsl-install.sh          development environment installer
+install/wsl-install.sh          development environment installer (WSL Ubuntu)
+install/windows-install.ps1     the same for native Windows (PowerShell)
 docs/                           these pages; docs/pi holds the Pi research
 mise.toml  bunfig.toml  lefthook.yml
 ```

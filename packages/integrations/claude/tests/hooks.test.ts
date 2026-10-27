@@ -1116,7 +1116,9 @@ describe("hook session-start", () => {
           ),
         ),
       )
-      expect(text).toContain('`holyagent <command>` stands for `"/opt/plugin/scripts/holyagent"')
+      expect(text).toContain(
+        '`holyagent <command>` is `bun "/opt/plugin/scripts/holyagent.js" <command>`',
+      )
       expect(text).toContain("read `/opt/plugin/agents/holyagent.md` before acting")
       expect(text).not.toContain("${CLAUDE_PLUGIN_ROOT}")
     }
@@ -1687,7 +1689,7 @@ describe("hook session-start, size", () => {
       expect(text.length).toBeLessThanOrEqual(CONTEXT_BUDGET)
       expect(text).toContain("You are the root.")
       expect(text).not.toContain("## Assignments and acceptance")
-      expect(text).toContain('"/plugins/holyagent/scripts/holyagent"')
+      expect(text).toContain('"/plugins/holyagent/scripts/holyagent.js"')
       expect(text).not.toContain("${CLAUDE_PLUGIN_ROOT}")
       expect(text).toMatch(/\+4 more intents/)
       expect(text).toContain(
@@ -1871,6 +1873,97 @@ describe("the built wrapper", () => {
       }
     } finally {
       await rm(empty, { recursive: true, force: true })
+    }
+  })
+})
+
+describe("the hooks as the host runs them", () => {
+  interface Entry {
+    readonly command: string
+    readonly args: ReadonlyArray<string>
+  }
+
+  /** Every hook of the built hooks.json, in exec form. */
+  const entries = async (): Promise<ReadonlyArray<Entry & { name: string }>> => {
+    const file = JSON.parse(
+      await readFile(join(await freshPlugin, "hooks", "hooks.json"), "utf8"),
+    ) as {
+      hooks: Record<string, Array<{ hooks: Array<Entry> }>>
+    }
+    return Object.values(file.hooks)
+      .flatMap((groups) => groups.flatMap((group) => group.hooks))
+      .map((entry) => ({ ...entry, name: entry.args.at(-1) ?? "" }))
+  }
+
+  /**
+   * What the host does for an exec-form hook: substitute `${CLAUDE_PLUGIN_ROOT}` into the command
+   * and each argument as plain text, find the command on PATH and spawn it with that argument
+   * vector. No shell stands between, so a root with spaces needs no quoting.
+   */
+  const spawnLikeHost = async (entry: Entry, root: string, payload: unknown) => {
+    const fill = (text: string) => text.replaceAll("${CLAUDE_PLUGIN_ROOT}", root)
+    const path = `${dirname(process.execPath)}:/usr/bin:/bin`
+    const program = Bun.which(fill(entry.command), { PATH: path })
+    if (program === null) throw new Error(`${entry.command} is not on PATH`)
+    const child = Bun.spawn([program, ...entry.args.map(fill)], {
+      cwd: project,
+      env: { PATH: path, HOME: home },
+      stdin: new Response(JSON.stringify(payload)),
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+    const [stdout, stderr, code] = await Promise.all([
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+      child.exited,
+    ])
+    return { stdout, stderr, code }
+  }
+
+  test("each hook is bun with arguments and runs from a plugin root with spaces, without a shell", async () => {
+    const root = await mkdtemp(join(tmpdir(), "holyagent plugin root "))
+    try {
+      for (const name of ["holyagent.js", "empty-bunfig.toml"])
+        await Bun.write(
+          join(root, "scripts", name),
+          Bun.file(join(await freshPlugin, "scripts", name)),
+        )
+      const listed = await entries()
+      expect(listed.length).toBeGreaterThan(0)
+      for (const entry of listed) {
+        expect(entry.command).toBe("bun")
+        const result = await spawnLikeHost(entry, root, { tool_name: "Bash", tool_input: {} })
+        expect({ name: entry.name, code: result.code, stderr: result.stderr }).toEqual({
+          name: entry.name,
+          code: 0,
+          stderr: "",
+        })
+      }
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  test("the project's .env and bunfig.toml cannot change the CLI when the hook starts bun", async () => {
+    const hostile = await mkdtemp(join(tmpdir(), "holyagent-hook-hostile-exec-"))
+    try {
+      await writeFile(join(hostile, "bunfig.toml"), 'preload = ["./evil.ts"]\n')
+      await writeFile(join(hostile, "evil.ts"), 'console.log("PRELOADED")\n')
+      const entry = (await entries()).find((candidate) => candidate.name === "workflow")
+      if (entry === undefined) throw new Error("no workflow hook")
+      const fill = (text: string) =>
+        text.replaceAll("${CLAUDE_PLUGIN_ROOT}", String(join(bundle, "../..")))
+      const child = Bun.spawn([process.execPath, ...entry.args.map(fill)], {
+        cwd: hostile,
+        env: { PATH: dirname(process.execPath), HOME: home },
+        stdin: new Response('{"tool_name":"Bash"}'),
+        stdout: "pipe",
+        stderr: "pipe",
+      })
+      expect(await new Response(child.stdout).text()).toBe("")
+      expect(await child.exited).toBe(0)
+    } finally {
+      await rm(hostile, { recursive: true, force: true })
     }
   })
 })

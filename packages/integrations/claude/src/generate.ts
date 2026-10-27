@@ -78,11 +78,26 @@ const manifests = (): ReadonlyArray<GeneratedFile> => [
   },
 ]
 
-const WRAPPER = "${CLAUDE_PLUGIN_ROOT}/scripts/holyagent"
+const SCRIPTS = "${CLAUDE_PLUGIN_ROOT}/scripts"
+
+/**
+ * One hook in exec form: Claude Code resolves `bun` on PATH and spawns it with these arguments, no
+ * shell on any platform (https://code.claude.com/docs/en/hooks, "Exec form and shell form"), so the
+ * hooks run on Windows without a POSIX shell. `bun.exe` is a real executable, which exec form needs
+ * there, and the host substitutes `${CLAUDE_PLUGIN_ROOT}` into each argument as plain text, so a
+ * path with spaces stays one argument. The flags are those of the `sh` wrapper: no `.env` and an
+ * empty config file, so the project's `.env` and `bunfig.toml` cannot change the CLI.
+ */
 const hookCommand = (name: string, extra: Readonly<Record<string, unknown>> = {}) => ({
   type: "command",
-  command: WRAPPER,
-  args: ["hook", name],
+  command: "bun",
+  args: [
+    "--no-env-file",
+    `--config=${SCRIPTS}/empty-bunfig.toml`,
+    `${SCRIPTS}/holyagent.js`,
+    "hook",
+    name,
+  ],
   timeout: 10,
   ...extra,
 })

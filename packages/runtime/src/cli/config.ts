@@ -1,3 +1,4 @@
+import { homedir } from "node:os"
 import { join } from "node:path"
 
 import { Effect, Schema } from "effect"
@@ -48,15 +49,28 @@ const disablesWorkflows = (path: string) =>
     Effect.orElseSucceed(() => false),
   )
 
+const firstNonEmpty = (...values: ReadonlyArray<string | undefined>) =>
+  values.find((value) => value !== undefined && value !== "")
+
 /**
- * Whether the host offers workflows: yes unless `CLAUDE_CODE_DISABLE_WORKFLOWS=1` or one of
- * `~/.claude/settings.json`, `<root>/.claude/settings.json` and
+ * The folder of the user's Claude Code settings: `CLAUDE_CONFIG_DIR` when set, else `.claude` in
+ * the home directory (`HOME`, else `USERPROFILE` as on Windows, else the operating system's).
+ */
+export const claudeConfigDirectory = (env: Host["env"], home: () => string = homedir): string => {
+  const configured = env.CLAUDE_CONFIG_DIR
+  if (configured !== undefined && configured !== "") return configured
+  return join(firstNonEmpty(env.HOME, env.USERPROFILE) ?? home(), ".claude")
+}
+
+/**
+ * Whether the host offers workflows: yes unless `CLAUDE_CODE_DISABLE_WORKFLOWS=1` or one of the
+ * user's `settings.json` (see {@link claudeConfigDirectory}), `<root>/.claude/settings.json` and
  * `<root>/.claude/settings.local.json` sets `disableWorkflows` true or `enableWorkflows` false.
  */
 export const workflowsAvailable = (env: Host["env"], root: string) => {
   if (env.CLAUDE_CODE_DISABLE_WORKFLOWS === "1") return Effect.succeed(false)
   const files = [
-    ...(env.HOME === undefined ? [] : [join(env.HOME, ".claude", "settings.json")]),
+    join(claudeConfigDirectory(env), "settings.json"),
     join(root, ".claude", "settings.json"),
     join(root, ".claude", "settings.local.json"),
   ]

@@ -6,7 +6,7 @@ import { Effect, Schema } from "effect"
 import { Assignment, type AssignmentState, type Criterion } from "../domain/assignment.ts"
 import { AssignmentId, IntentId } from "../domain/ids.ts"
 import { Intent } from "../domain/intent.ts"
-import { pathProblem } from "../domain/paths.ts"
+import { pathProblem, toPosix } from "../domain/paths.ts"
 import { isWriter, RoleTask } from "../domain/route.ts"
 import { slugOf } from "../domain/slug.ts"
 import { encodeJson, type File, hasCode, io, readText } from "./files.ts"
@@ -258,7 +258,7 @@ const listFiles = (directory: string) =>
   io(directory, () =>
     Array.fromAsync(new Bun.Glob("**/*").scan({ cwd: directory, dot: true, onlyFiles: true })),
   ).pipe(
-    Effect.map((paths) => paths.toSorted()),
+    Effect.map((paths) => paths.map((path) => toPosix(path)).toSorted()),
     Effect.catchIf(
       (error) => hasCode(error.cause, "ENOENT") || hasCode(error.cause, "ENOTDIR"),
       () => Effect.succeed([] as ReadonlyArray<string>),

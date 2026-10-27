@@ -1,3 +1,5 @@
+import { sep } from "node:path"
+
 import { Schema } from "effect"
 
 const UNSAFE_CHARACTERS = /[\\:*?"<>|\p{Cc}]/u
@@ -35,3 +37,20 @@ export const firstOverlap = (
   a: ReadonlyArray<string>,
   b: ReadonlyArray<string>,
 ): string | undefined => a.find((left) => b.some((right) => pathsOverlap(left, right)))
+
+/**
+ * A path with the platform's separator written as `/`, the form git, globs and the portable paths
+ * of the records use. On Windows (`\`) a `relative()` or `join()` result becomes `a/b`; on POSIX
+ * the separator already is `/` and the path comes back unchanged. The separator is a parameter so a
+ * test can stand in for Windows.
+ */
+export const toPosix = (path: string, separator: string = sep): string =>
+  separator === "/" ? path : path.replaceAll(separator, "/")
+
+/**
+ * A path git printed (`C:/repo/.git`, always `/`-separated) in the platform's own form, so it
+ * compares with what `join()` and `realpath()` return. On POSIX it comes back unchanged. The
+ * separator is a parameter so a test can stand in for Windows.
+ */
+export const fromGitPath = (path: string, separator: string = sep): string =>
+  separator === "/" ? path : path.replaceAll("/", separator)
