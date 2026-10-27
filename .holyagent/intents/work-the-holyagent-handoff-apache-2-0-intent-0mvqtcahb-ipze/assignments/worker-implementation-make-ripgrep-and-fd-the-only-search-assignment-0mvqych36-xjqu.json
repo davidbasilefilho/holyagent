@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "make-ripgrep-and-fd-the-only-search",
   "objective": "Make ripgrep and fd the only search tools for holyagent agents that have a shell, by removing the built-in Grep and Glob from those roles.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-rgfd (branch ccr-046ad103-6qsvgx-rgfd, head d5e0b52). User decision: agents must use the bundled rg and fd. In packages/integrations/claude/src/agents.ts, add Grep and Glob to the disallowed tools of the root and of every specialist role that has Bash, so those agents cannot fall back to them; roles without Bash keep Grep and Glob. Update packages/integrations/claude/tests/plugin.test.ts (the per-role built-in tools test) and the instruction text in root/search.md and specialist/working.md only if it now says Grep/Glob are allowed for shell roles. Rebuild with mise run build and run mise run verify."
   ],
@@ -41,7 +41,9 @@
     "agentId": "workflow:wf_94a09cae-ded/assignment-0mvqych36-xjqu",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-10-27T17:21:12.066Z"
+    "startedAt": "2026-10-27T17:21:12.066Z",
+    "finishedAt": "2026-10-27T17:23:35.083Z"
   },
+  "result": "result: The root and every role with Bash now disallow Grep and Glob. Roles without Bash keep both. `mise run verify` passes.\n\nchanged:\n- /home/user/holyagent-rgfd/packages/integrations/claude/src/agents.ts\n- /home/user/holyagent-rgfd/packages/integrations/claude/tests/plugin.test.ts\n- Rebuilt files in /home/user/holyagent-rgfd/packages/integrations/claude/dist/agents/: holyagent, reviewer-code, reviewer-testing, worker-debugging, worker-implementation, worker-integration, worker-mechanical, worker-operations, worker-validation, worker-visual (all `.md`).\n- No change was needed to `root/search.md` or `specialist/working.md`: both already say shell roles use `holyagent rg`/`fd` instead of Grep/Glob, and non-shell roles use Grep/Glob.\n\nchecks:\n- `mise run build` -> exit 0, built 29 files.\n- `mise run verify` -> exit 0. Type-check: 0 errors in 108 files. Lint: no problems in 109 files. Format: 223 files formatted. Tests: 825 pass, 1 skip, 0 fail.\n\nblockers: none\nquestions: none\nnotes: none\n\nevidence:\n- Every generated agent file with Bash disallows Grep and Glob, and those without Bash keep them, with a test that fails without the change: In `agents.ts`, `builtinsOf` grants Grep and Glob only when the role has no Bash, and `ROOT_BUILTINS` no longer lists them. The test \"each role keeps exactly its built-in tools, with Grep and Glob only where there is no Bash\" in `plugin.test.ts` compares the exact set of tools each agent keeps against the expected list. Before the change, shell roles kept Grep and Glob, so it would have failed. In the rebuilt files, holyagent and worker-implementation disallow Glob and Grep, and explorer-lookup (no Bash) does not.\n- mise run verify passes in the worktree: `mise run verify` -> exit 0, 825 pass, 0 fail.\n- changed-paths: the changed files listed above. The diff of `packages/integrations/claude` is saved at /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/rgfd.diff.\n- checks-run: `mise run build` -> exit 0; `mise run verify` -> exit 0 (check, lint, fmt:check, test as above).",
   "createdAt": "2026-10-27T17:21:12.066Z"
 }
