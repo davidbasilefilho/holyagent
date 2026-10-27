@@ -1,0 +1,46 @@
+{
+  "id": "assignment-0mvqztvnc-54e8",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "correct-the-docs-that-still-describe-the",
+  "objective": "Correct the docs that still describe the hand-run invocation without its safety flags on the Windows branch.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-windows (head a97b5db). docs/hooks.md line 23 says the hand-run form has no --no-env-file/--config flags because of the 4,000 cap: now false (the form keeps them and the cap is 4,100). docs/requirements.md line 41 and docs/README.md line 17 show the form without flags: show bun --no-env-file --config=\"<pluginRoot>/scripts/empty-bunfig.toml\" \"<pluginRoot>/scripts/holyagent.js\" <command>."
+  ],
+  "constraints": [
+    "Follow /home/user/holyagent/.claude/CLAUDE.md and the 'Writing instructions' rules in packages/integrations/claude/dist/agents/holyagent.md.",
+    "Work only in your worktree; make no version-control writes and no edits under .git/ or .holyagent/. Finish with mise run build and mise run verify.",
+    "Keep working until done; when done and checked, stop and report; no unrequested changes.",
+    "Write only under docs/."
+  ],
+  "criteria": [
+    {
+      "text": "Every doc line showing the hand-run form includes the flags and no doc claims they were dropped",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run fmt:check passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "docs"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvqzlmrs-vpw9",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T18:02:43.704Z"
+  },
+  "createdAt": "2026-10-27T18:02:43.704Z"
+}
