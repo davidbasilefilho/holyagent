@@ -7,7 +7,7 @@
     "1. Everything packages/cli does in `setup claude` and `doctor` moves into the plugin runtime (scripts/holyagent.js) as `holyagent setup` and `holyagent doctor [--fix]`: install Billion Context (bili, native mode, compress.rules) and ctx7 with its skill; merge recommended keys (attribution, includeGitInstructions, subagentPromptCacheTtl, extraKnownMarketplaces, enabledPlugins, permissions.deny) into USER settings (~/.claude/settings.json, %USERPROFILE%/.claude/settings.json on Windows); never change a value already set; keep the existing +/=/~/! report lines; doctor checks user settings, not ./.claude/settings.json. Steps idempotent, a failed step does not stop the others, --dry-run keeps working.",
     "2. Add a /holyagent:setup slash command that runs `holyagent setup` and shows its report, working like Billion Context's /billion-context:bili-setup.",
     "3. Add a SessionStart check: cheap and bounded, never installs or writes files; only detects missing setup (bili, ctx7, user-settings keys) and adds one line of context so the root offers /holyagent:setup; silent when everything is in place; within the bounds in docs/hooks.md.",
-    "4. (Revised by the user) Keep packages/cli: user said: no!!! leave packages/cli, it will be needed for the future pi port. Do not delete or edit packages/cli, its tests, its workspace entry or its bump-version manifest entry. Remove it only as the install path: README, docs/usage.md, docs/requirements.md, docs/components.md and other docs stop telling users to run it to install; installers (install/wsl-install.sh, install/windows-install.ps1) shrink to the prerequisites only: Bun, Node LTS, git, gh and, for development, mise; each ends by printing the three plugin commands.",
+    "4. (Final, user changed mind twice) Delete packages/cli and everything referring to it: README, docs/usage.md, docs/requirements.md, docs/components.md, mise tasks and tests. User said: actually, delete it. I changed my mind. the pi extension will be installed with plain pi install, document this decision. Record that decision in docs/decisions.md. Installers (install/wsl-install.sh, install/windows-install.ps1) shrink to the prerequisites only: Bun, Node LTS, git, gh and, for development, mise; each ends by printing the three plugin commands.",
     "5. Fix Windows install: move all .holyagent/ state off main onto holyagent/state; main never carries it again (gitignore on main, plus a check in `mise run verify`). Add a test that fails when any tracked path on main is longer than 120 characters.",
     "6. README 'How do I install it?' shows the three commands, the prerequisites, and one line about running /holyagent:setup on first launch; keep README's required sections and order.",
     "Follow .claude/CLAUDE.md and AGENTS.md: Effect and Effect Schema, Bun Shell, JSDoc, `mise run build` and `mise run verify` passing, Conventional Commits. Work in a worktree branch and open a PR.",
@@ -18,7 +18,7 @@
     "Decision (user): the one commit deleting .holyagent/ from main is a plain git commit (vcs commit refuses .holyagent paths); every other commit uses holyagent vcs commit.",
     "Default: stack is PR1 fix/state-off-main (state removal, .gitignore, path-length and no-state test) on main, then PR2 feat/plugin-only-install on PR1."
   ],
-  "revision": 3,
+  "revision": 4,
   "state": "Open",
   "createdAt": "2026-10-27T20:27:21.735Z"
 }
