@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-the-fix-state-off-main-commits",
   "objective": "Review the fix/state-off-main commits 023a6fa and 935d4b3 (range 7929f2d..935d4b3, excluding the pure deletion of .holyagent/ in be17c6d) for correctness and regressions before they are pushed as the first PR of the stack.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-fix-state-off-main, branch fix/state-off-main. Review with `git diff 7929f2d..935d4b3 -- . ':!.holyagent'`.",
     "023a6fa: .gitignore ignores /.holyagent/; scripts/repo-paths.test.ts fails when a tracked path is longer than 120 characters or sits under .holyagent/ (requirement: main never carries .holyagent state again, checked in `mise run verify`; a test fails when any tracked path on main is longer than 120 characters); docs/development.md one sentence.",
@@ -52,7 +52,41 @@
     "agentId": "workflow:wf_8f58871d-531/assignment-0mvr74vsd-mxa9",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-10-27T21:27:15.291Z"
+    "startedAt": "2026-10-27T21:27:15.291Z",
+    "finishedAt": "2026-10-27T21:29:58.304Z"
+  },
+  "result": "result: Merge-ready. No blockers; four optional notes.\nchanged: none (read-only review)\nchecks:\n- `bun test scripts` -> exit 0, 50 pass, 0 fail, 114 expect() calls (4 files; the two new files are 8 tests, all passing).\n- `bun check --no-script` -> exit 0, no type errors in 115 files.\n- `bun lint --no-script` -> exit 0, no problems in 116 files.\n- `bun fmt --no-script --check` -> exit 0, all 231 files formatted.\n- `git ls-files | awk 'length($0)>120'` -> 0 paths on the branch head.\n- `git ls-files .holyagent` -> 0 paths on the branch head.\n- `git status --short` was clean.\n- `/code-review medium 7929f2d...935d4b3` ran from the built-in skill; its five claims are classified below.\nblockers: none\nquestions: none\nnotes (all non-blocking):\n- `scripts/repo-paths.test.ts:2,58-60` and `scripts/vendor.test.ts:2,28`: the tests use `node:fs/promises` `mkdir` and `writeFile` where `Bun.write` would do (it creates parent directories). This is a minor deviation from the \"prefer Bun APIs\" rule. `mkdtemp` and `rm` have no Bun equivalent, so those stay. Optional.\n- `scripts/vendor.ts:47`: `removeUnpinned` removes files only and leaves empty directories behind. The old code did the same, so this is not a regression. Optional.\n- `scripts/repo-paths.test.ts:99`: the \"this repository\" check skips outside a work-tree root. That is the required behavior. I read `isWorkTreeRoot` (`git rev-parse --show-prefix`, which exits 128 outside a repo) and the `skipIf` use, but did not run the test outside a work tree.\n- `scripts/repo-paths.test.ts:64`: the fixture repo uses no `core.longpaths`. Its 122-character path (60+1+61) passed here under `%TEMP%`, so I judged the Windows-environment risk speculative and did not run it elsewhere. Optional.\n- Rejected from `/code-review`: the claim that removing ~134 tracked `.holyagent/` files could lose history. `holyagent/state` already holds all 134 base paths (0 base-only), with 190 `.holyagent/` paths in total. Three files differ in content, and `git diff --stat --diff-filter=M holyagent/state 7929f2d` shows 1 insertion and 66 deletions across them. I did not inspect which side is newer, so the state branch may hold newer versions. Because `be17c6d` is excluded from this review and is a pure deletion, nothing is lost, but the root should push `holyagent/state` before or with this PR.\n- I could only read, not run, the original failure. `removeUnpinned` and `unpinnedFiles` did not exist on the base, so the new tests cannot run against the old inline loop. The old line was `expected.has(file)` on raw scan paths, so the test that passes `\"\\\\\"` as the separator would fail on that comparison, as would `removeUnpinned` on Windows. I did not run `repo-paths.test.ts` on the base either. I only read that the base's 187-character paths and 134 `.holyagent` files would trip its two rules.\nevidence:\nThe repo-paths test fails naming each tracked path over 120 characters or under .holyagent/, passes on this branch, and skips cleanly outside a git work tree: `scripts/repo-paths.test.ts:23-34` `violations` names each offending path. The fixture tests at `:76-92` assert the long path and the `.holyagent/` path by name, and the boundary tests at `:68-73` pass at 120 and fail at 121. The repo test at `:99-101` passes here (0 paths over 120, 0 under `.holyagent/`). Outside a work tree, `describe.skipIf(!(await isWorkTreeRoot()))` skips it; `git rev-parse` exits 128 there.\nThe vendor cleanup keeps every pinned file and removes unpinned ones on Windows and POSIX alike, and the new test fails on the old comparison: `scripts/vendor.ts:24-47` converts each scanned path with `toPosix` (`packages/runtime/src/domain/paths.ts:47`) before checking the pins. `scripts/vendor.test.ts:9-21` passes `\"\\\\\"` as the separator to cover Windows. `:24-35` runs `removeUnpinned` on a real folder and keeps both pinned files; it passes on this Windows machine. The old comparison is described under notes.\nNo regression: the changed scripts and tests pass (`bun test scripts`, `bun check --no-script`, `bun lint --no-script`, `bun fmt --no-script --check`) on the branch head: `bun test scripts` exit 0 (50 pass, 0 fail); `bun check --no-script`, `bun lint --no-script` and `bun fmt --no-script --check` each exit 0, on head 935d4b3.\nChanges follow .claude/CLAUDE.md and AGENTS.md (Bun APIs, JSDoc on exports, Conventional Commits): Commit subjects \"test: keep tracked paths short and state off main\" and \"fix(scripts): keep vendored tools when cleaning on Windows\" are Conventional Commits with no agent attribution. `unpinnedFiles` and `removeUnpinned` have JSDoc at `scripts/vendor.ts:24-46`, and the test file has no exports. It uses Bun `$` and `Bun.Glob`, with the node fallbacks noted above. `docs/development.md:50` is updated and `.gitignore` adds `/.holyagent/`.\nchecks-run: see the `checks:` block above (`bun test scripts`, `bun check --no-script`, `bun lint --no-script` and `bun fmt --no-script --check` all exit 0; tracked-path scans clean).\nfindings: none blocking. The four optional notes are above, each with its file and line.",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Independent review of 7929f2d..935d4b3: no blockers; gates exit 0 on head; no tracked path over 120 or under .holyagent.",
+    "criteria": [
+      {
+        "criterion": "The repo-paths test fails naming each tracked path over 120 characters or under .holyagent/, passes on this branch, and skips cleanly outside a git work tree",
+        "support": "`scripts/repo-paths.test.ts:23-34` `violations` names each offending path. The fixture tests at `:76-92` assert the long path and the `.holyagent/` path by name, and the boundary tests at `:68-73` pass at 120 and fail at 121. The repo test at `:99-101` passes here (0 paths over 120, 0 under `.holyagent/`). Outside a work tree, `describe.skipIf(!(await isWorkTreeRoot()))` skips it; `git rev-parse` exits 128 there."
+      },
+      {
+        "criterion": "The vendor cleanup keeps every pinned file and removes unpinned ones on Windows and POSIX alike, and the new test fails on the old comparison",
+        "support": "`scripts/vendor.ts:24-47` converts each scanned path with `toPosix` (`packages/runtime/src/domain/paths.ts:47`) before checking the pins. `scripts/vendor.test.ts:9-21` passes `\"\\\\\"` as the separator to cover Windows. `:24-35` runs `removeUnpinned` on a real folder and keeps both pinned files; it passes on this Windows machine. The old comparison is described under notes."
+      },
+      {
+        "criterion": "No regression: the changed scripts and tests pass (`bun test scripts`, `bun check --no-script`, `bun lint --no-script`, `bun fmt --no-script --check`) on the branch head",
+        "support": "`bun test scripts` exit 0 (50 pass, 0 fail); `bun check --no-script`, `bun lint --no-script` and `bun fmt --no-script --check` each exit 0, on head 935d4b3."
+      },
+      {
+        "criterion": "Changes follow .claude/CLAUDE.md and AGENTS.md (Bun APIs, JSDoc on exports, Conventional Commits)",
+        "support": "Commit subjects \"test: keep tracked paths short and state off main\" and \"fix(scripts): keep vendored tools when cleaning on Windows\" are Conventional Commits with no agent attribution. `unpinnedFiles` and `removeUnpinned` have JSDoc at `scripts/vendor.ts:24-46`, and the test file has no exports. It uses Bun `$` and `Bun.Glob`, with the node fallbacks noted above. `docs/development.md:50` is updated and `.gitignore` adds `/.holyagent/`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "see the `checks:` block above (`bun test scripts`, `bun check --no-script`, `bun lint --no-script` and `bun fmt --no-script --check` all exit 0; tracked-path scans clean)."
+      },
+      {
+        "label": "findings",
+        "support": "none blocking. The four optional notes are above, each with its file and line."
+      }
+    ]
   },
   "createdAt": "2026-10-27T21:27:14.413Z"
 }
