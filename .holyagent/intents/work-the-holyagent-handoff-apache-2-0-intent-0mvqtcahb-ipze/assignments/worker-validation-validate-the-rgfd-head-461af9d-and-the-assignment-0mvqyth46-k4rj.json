@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mvqyth46-k4rj",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Worker.validation",
+  "slug": "validate-the-rgfd-head-461af9d-and-the",
+  "objective": "Validate the rgfd head 461af9d and the readme head e044765 (a merge of rgfd into readme) with the repository gates.",
+  "state": "Running",
+  "scope": [
+    "In /home/user/holyagent-rgfd (HEAD 461af9d) and /home/user/holyagent-readme (HEAD e044765): run bun install --frozen-lockfile if node_modules is missing, then mise run verify, then mise run build and confirm no tracked diff. In the readme worktree also confirm README.md and AGENTS.md match the readme branch side of the merge (git diff 7ced643 e044765 -- README.md AGENTS.md is empty)."
+  ],
+  "constraints": [
+    "Read-only: make no version-control writes and change no files except what mise run build rewrites identically. Save logs under /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad."
+  ],
+  "criteria": [
+    {
+      "text": "mise run verify exit code and per-gate counts are reported for both heads",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "mise run build leaves no tracked diff in either worktree, and the merge left README.md and AGENTS.md as on the readme side",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-27T17:34:25.254Z"
+  },
+  "createdAt": "2026-10-27T17:34:25.254Z"
+}
