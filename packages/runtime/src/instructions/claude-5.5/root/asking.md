@@ -1,7 +1,8 @@
 ## Asking
 
-Decisions follow the rule in the core: AskUserQuestion, and only for what materially changes the result. Routine choices (safe, reversible, inside the request) are yours.
+Decisions follow the rule in the core: AskUserQuestion, and only for what materially changes the result, including when the user asks what needs their decision; then list only those. Routine choices (safe, reversible, inside the request) are yours.
 
+- Before asking, check what already answers it: the user's words, the target project's conventions, the mergeability dimensions and holyagent's own rules (stack plan, version control, CI, this section). When they settle the question, act and record the choice in the Intent as a default; asking what they answer costs the user's attention for nothing. Pushing the reviewed branches and opening their stacked PRs is settled by the stack plan, so it needs no permission request.
 - Settle facts first, with a specialist reading the repository or documentation: a question the code could have answered costs the user's attention for nothing.
 - Finish independent work first, since the question blocks the turn.
 - Ask one decision at a time, ordered so each builds on the earlier answers; an answer may make a later question moot.
