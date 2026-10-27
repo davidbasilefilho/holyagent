@@ -1,11 +1,14 @@
 import { describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync } from "node:fs"
+import { mkdtemp, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { $ } from "bun"
 
 import { ROUTES } from "../../../runtime/src/domain/route.ts"
 import { ROOT_CORE_FILES } from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
+import { build } from "../build.ts"
 import packageJson from "../package.json" with { type: "json" }
 import {
   BUILTIN_TOOLS,
@@ -20,6 +23,7 @@ import {
   SPECIALIST_SECTIONS,
   WRITING_BAR_SECTION,
 } from "../src/agents.ts"
+import { DIST_DIRECTORY, VENDOR_DIRECTORY } from "../src/files.ts"
 import { generate, GENERATED_PATHS, MARKETPLACE_PATH } from "../src/generate.ts"
 import { fresh, PLUGIN, ROOT } from "./built.ts"
 
@@ -65,9 +69,32 @@ describe("the generated plugin is in step with its sources", () => {
     }
   })
 
-  test("the generated paths hold no file the build does not make", async () => {
-    const committed = (await Promise.all(GENERATED_PATHS.map(filesBelow))).flat().toSorted()
+  test("the generated paths hold no file the build does not make, except the vendored tools", async () => {
+    const committed = (await Promise.all(GENERATED_PATHS.map(filesBelow)))
+      .flat()
+      .filter((path) => !path.startsWith(`${VENDOR_DIRECTORY}/`))
+      .toSorted()
     expect(committed).toEqual(generated.map((file) => file.path))
+  })
+
+  test("a build keeps the vendored tools where they are and removes any other file of the plugin", async () => {
+    const root = await mkdtemp(join(tmpdir(), "holyagent-keep-"))
+    const kept = join(root, VENDOR_DIRECTORY, "linux-x64", "rg")
+    const stale = join(root, DIST_DIRECTORY, "scripts", "stale.txt")
+    await Bun.write(kept, "program")
+    await Bun.write(stale, "old")
+    await build(root)
+    expect({
+      kept: await Bun.file(kept).text(),
+      stale: await Bun.file(stale).exists(),
+      wrapper: await Bun.file(join(root, DIST_DIRECTORY, "scripts", "holyagent")).exists(),
+    }).toEqual({ kept: "program", stale: false, wrapper: true })
+    await rm(root, { recursive: true, force: true })
+  })
+
+  test("the plugin has no top-level bin folder, which claude.ai refuses", () => {
+    expect(readdirSync(PLUGIN)).not.toContain("bin")
+    expect(generated.filter((file) => file.path.startsWith(`${DIST_DIRECTORY}/bin/`))).toEqual([])
   })
 
   test("the plugin ships no prebuilt workflow: the root writes each script on the spot", () => {
@@ -412,10 +439,11 @@ describe("agents", () => {
     }
   })
 
-  test("each role keeps exactly its previous built-in tools, less the native web tools", () => {
+  test("each role keeps exactly its built-in tools, with Grep and Glob only where there is no Bash", () => {
     const reading = ["Read", "Grep", "Glob"]
-    const writing = [...reading, "Write", "Edit", "Bash", "Monitor"]
-    const shell = [...reading, "Bash", "Monitor"]
+    // A role with Bash searches with the bundled ripgrep and fd, so it has no Grep or Glob.
+    const writing = ["Read", "Write", "Edit", "Bash", "Monitor"]
+    const shell = ["Read", "Bash", "Monitor"]
     const previous: Record<string, ReadonlyArray<string>> = {
       holyagent: [
         "Agent",
@@ -428,7 +456,7 @@ describe("agents", () => {
         "TaskUpdate",
         "TaskList",
         "TaskGet",
-        ...reading,
+        "Read",
         "Bash",
       ],
       "explorer-map": reading,

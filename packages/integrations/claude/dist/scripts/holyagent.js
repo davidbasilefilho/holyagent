@@ -7321,6 +7321,8 @@ var HINTS = {
   MigrationRefused: "Run `holyagent migrate --dry-run` to see everything that blocks it. Settle a Running legacy Assignment with the legacy tool first; the command never overwrites an existing .holyagent record.",
   NothingToMigrate: "Run it in a project that has a .holyclaude or .holycodex folder with state in it, or check that you are in the project root.",
   MigrationUnverified: "The records were written but do not load back: delete the files this run wrote (git status lists them), fix the cause the message names and run `holyagent migrate --dry-run` again.",
+  UnsupportedPlatform: "Search with the programs of your system instead, or run holyagent on darwin-arm64, linux-x64 or windows-x64.",
+  ToolMissing: "The plugin was built without its vendored tools: run `mise run vendor`, then `mise run build`, and reinstall the plugin.",
   StateLocked: "Another process holds the state lock; retry in a moment.",
   StateIo: "Check what the message names: the permissions of the .holyagent folder of the state worktree (under the git directory, or in the project outside git), that git runs there, and that no branch already uses a name the state branch needs (holyagent/state needs no branch called holyagent; git config holyagent.stateBranch picks another name).",
   CorruptRecord: "Fix or delete the file the message names, or restore it from version control.",
@@ -7337,7 +7339,7 @@ var describeFailure = (error) => {
   };
 };
 
-import { join as join11 } from "path";
+import { join as join12 } from "path";
 
 var NULL_LITERAL = "null";
 var DELIMITERS = {
@@ -18868,16 +18870,81 @@ var MIGRATE_COMMANDS = [
   }
 ];
 
+import { join as join10 } from "path";
+var {$: $4 } = globalThis.Bun;
+var TARGETS = [
+  { id: "darwin-arm64", platform: "darwin", arch: "arm64", suffix: "" },
+  { id: "linux-x64", platform: "linux", arch: "x64", suffix: "" },
+  { id: "windows-x64", platform: "win32", arch: "x64", suffix: ".exe" }
+];
+var BUNDLED_TOOLS = join10(import.meta.dir, "vendor");
+
+class UnsupportedPlatform extends TaggedError2("UnsupportedPlatform") {
+  get message() {
+    return `No bundled search tools exist for ${this.platform} ${this.arch}; they exist for ${TARGETS.map((target) => target.id).join(", ")}`;
+  }
+}
+
+class ToolMissing extends TaggedError2("ToolMissing") {
+  get message() {
+    return `The bundled ${this.tool} is missing: ${this.path} does not exist`;
+  }
+}
+var selectTarget = (platform, arch) => {
+  const target = TARGETS.find((candidate) => candidate.platform === platform && candidate.arch === arch);
+  return target === undefined ? fail5(new UnsupportedPlatform({ platform, arch })) : succeed6(target);
+};
+var toolPath = (directory, tool, target) => join10(directory, target.id, `${tool}${target.suffix}`);
+var runTool = (options) => gen2(function* () {
+  const path = toolPath(options.directory, options.tool, options.target);
+  if (!(yield* promise2(() => Bun.file(path).exists())))
+    return yield* new ToolMissing({ tool: options.tool, path });
+  const env = Object.fromEntries(Object.entries(options.env).filter((entry) => entry[1] !== undefined));
+  const output = yield* promise2(() => $4`${path} ${options.args}`.cwd(options.cwd).env(env).nothrow());
+  return output.exitCode;
+});
+var toolCommand = (tool, summary) => ({
+  path: [tool],
+  usage: `${tool} <${tool === "rg" ? "ripgrep" : "fd"} arguments\u2026>`,
+  summary,
+  notes: [
+    `the arguments, stdin, stdout, stderr and exit code are the program's own, so \`holyagent ${tool} --help\` prints its help and its exit codes keep their meaning`,
+    "a failure of holyagent itself (ToolMissing, UnsupportedPlatform) exits 4 with an `error:` line on stderr"
+  ],
+  flags: {},
+  stateless: true,
+  raw: true,
+  passthrough: true,
+  positionals: 0,
+  run: (call) => gen2(function* () {
+    const target = yield* selectTarget(process.platform, process.arch);
+    const code = yield* runTool({
+      tool,
+      directory: call.tools,
+      target,
+      args: call.args.positionals,
+      cwd: call.cwd,
+      env: call.env
+    });
+    return new Verbatim("", "", code);
+  })
+});
+var TOOL_COMMANDS = [
+  toolCommand("rg", "Search file contents with the ripgrep bundled with the plugin; runs it for this platform with your arguments"),
+  toolCommand("fd", "Find files and folders by name with the fd bundled with the plugin; runs it for this platform with your arguments")
+];
+
 var COMMANDS = [
   ...INTENT_COMMANDS,
   ...ASSIGNMENT_COMMANDS,
   ...OVERVIEW_COMMANDS,
   ...MIGRATE_COMMANDS,
+  ...TOOL_COMMANDS,
   ...VCS_COMMANDS,
   ...HOOK_COMMANDS
 ];
 
-import { join as join10 } from "path";
+import { join as join11 } from "path";
 var TTL_VARIABLE = "HOLYAGENT_REUSE_TTL_MINUTES";
 var Minutes = NumberFromString.check(isFinite2(), isGreaterThanOrEqualTo2(0));
 var reuseTtl = (env) => {
@@ -18896,9 +18963,9 @@ var workflowsAvailable = (env, root) => {
   if (env.CLAUDE_CODE_DISABLE_WORKFLOWS === "1")
     return succeed6(false);
   const files = [
-    ...env.HOME === undefined ? [] : [join10(env.HOME, ".claude", "settings.json")],
-    join10(root, ".claude", "settings.json"),
-    join10(root, ".claude", "settings.local.json")
+    ...env.HOME === undefined ? [] : [join11(env.HOME, ".claude", "settings.json")],
+    join11(root, ".claude", "settings.json"),
+    join11(root, ".claude", "settings.local.json")
   ];
   return forEach2(files, disablesWorkflows).pipe(map4((disabled) => !disabled.includes(true)));
 };
@@ -18921,7 +18988,7 @@ var topHelp = () => [
 ].join(`
 `);
 var callFor = (args, host, emit, command) => gen2(function* () {
-  const { root, directory } = command.stateless === true ? { root: host.cwd, directory: join11(host.cwd, STATE_DIRECTORY) } : yield* resolveState(host.cwd, host.env, typeof command.state === "function" ? command.state(args) : command.state ?? "ifPresent");
+  const { root, directory } = command.stateless === true ? { root: host.cwd, directory: join12(host.cwd, STATE_DIRECTORY) } : yield* resolveState(host.cwd, host.env, typeof command.state === "function" ? command.state(args) : command.state ?? "ifPresent");
   const inline = stringFlag(args, INPUT_FLAG);
   return {
     args,
@@ -18934,6 +19001,7 @@ var callFor = (args, host, emit, command) => gen2(function* () {
     text: readReport(host),
     emit,
     vcs: host.vcs ?? vcsLive(root, host.env),
+    tools: host.tools ?? BUNDLED_TOOLS,
     input: (schema) => readInput(host, schema, inline),
     inputBy: (pick) => readInputBy(host, pick, inline)
   };
@@ -18961,7 +19029,7 @@ var execute = (given, host) => gen2(function* () {
     });
   }
   const rest = argv.slice(command.path.length);
-  if (rest.includes("--help") || rest.includes("-h"))
+  if (command.passthrough !== true && (rest.includes("--help") || rest.includes("-h")))
     return { stdout: `${help(command)}
 `, stderr: "", code: 0 };
   const args = command.raw === true ? { positionals: rest, flags: {} } : yield* parseArgs(rest, command.flags, command.usage);

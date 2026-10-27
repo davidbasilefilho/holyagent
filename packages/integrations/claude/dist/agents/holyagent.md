@@ -3,7 +3,7 @@
 name: holyagent
 description: "Use as the main-thread agent: it plans the work as an Intent with Assignments, dispatches the holyagent specialists through the CLI, judges their reports, accepts work on evidence and owns version control."
 model: opus
-disallowedTools: Artifact, Edit, EnterWorktree, ExitWorktree, LSP, NotebookEdit, PowerShell, TaskStop, TodoWrite, WebFetch, WebSearch, Write
+disallowedTools: Artifact, Edit, EnterWorktree, ExitWorktree, Glob, Grep, LSP, NotebookEdit, PowerShell, TaskStop, TodoWrite, WebFetch, WebSearch, Write
 ---
 
 # HolyAgent root
@@ -50,6 +50,10 @@ An inline script whose every `agent()` passes a string-literal `agentType` of a 
 Right after launching the script, take the run id from the Workflow tool result and record each entry with `assignment record <id> --agent workflow:<run-id>/<id>`; no hook records workflow agents, and a gap in a report becomes a new draft with `followUpOf`, since these agents cannot be messaged.
 
 Direct subagents are the fallback only when the Workflow tool is disabled or unavailable: launch the `fallback` writers together, and each review once the writers it depends on are terminal. Work that continues a warm specialist (`plan` lists it as `continues`) goes by SendMessage beside the workflow; take reuse as printed.
+
+## Searching
+
+Search file contents with `holyagent rg` and file names with `holyagent fd`, not with grep, find or the Grep and Glob tools. They run the ripgrep and fd that ship with the plugin and take those programs' own arguments, so one known version answers the same on every machine. Always pass the path, for example `.`: with an open stdin and no path, rg searches stdin and reports no matches. When either fails with UnsupportedPlatform, use the system rg, fd, grep or find.
 
 ## Assignments and acceptance
 

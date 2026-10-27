@@ -42,7 +42,8 @@ A new harness gets its own folder under `packages/integrations/`. It reuses the 
 | `fmt`       | `bun fmt`: format in place; extra arguments go to Bun    |
 | `fmt:check` | `bun fmt --check`                                        |
 | `test`      | `bun test`                                               |
-| `build`     | Generates the Claude plugin                              |
+| `vendor`    | Fetches the pinned ripgrep and fd into the plugin        |
+| `build`     | Generates the Claude plugin (runs `vendor` first)        |
 | `verify`    | `check`, `lint`, `fmt:check` and `test`, all read-only   |
 
 Done means `mise run verify` passes; after changing plugin sources, run `mise run build`.
@@ -76,11 +77,13 @@ Everything is configured in `bunfig.toml`. Bun's own `check`, `lint` and `fmt` a
 
 Every agent prompt is split into one file per section, and the order of the sections is fixed in `src/agents.ts`, not by file name; the sync test fails when a file in `root/`, `specialist/` or `roles/<agent>/` is not assembled or an assembled file is missing. The core of the root rules, which the SessionStart hook injects when the root is not the main thread, is the files named in `ROOT_CORE_FILES` (`root-core.ts`); a test caps it at 4,000 characters. `root/instruction-guidelines.md` holds the rules the root applies when it writes model-facing text, each tagged with the Anthropic prompting page it follows.
 
+**The bundled search tools.** `dist/scripts/vendor/<target>/` holds ripgrep (`rg`) and fd (`fd`) with their licenses (`licenses/<project>/`) for `darwin-arm64`, `linux-x64` and `windows-x64`; `holyagent rg …` and `holyagent fd …` run the one for the current platform with the caller's stdio and exit code (`packages/runtime/src/cli/tools.ts`). They sit under `scripts/` because claude.ai refuses a plugin with a top-level `bin/`. The pins live in `packages/integrations/claude/src/vendor.ts`: a release URL, the SHA-256 of each archive and the SHA-256 of the program inside, for ripgrep 15.2.0 and fd 10.5.0. ripgrep's archive hashes are the ones its release publishes; fd publishes none, so its hashes were taken from the downloads and are trusted on first use. `mise run vendor` (`scripts/vendor.ts`, which `build` depends on) downloads what is missing, checks the archive hash before reading it and the program hash after extracting, marks the programs executable, and removes files no pin names; with everything in place it does nothing, so a build needs no network. The vendor folder is committed, because the marketplace serves the plugin from `dist/`; `build.ts` leaves it in place while it regenerates the rest, and `vendor.test.ts` checks it against the pins offline. To upgrade a tool, change its version and hashes in `vendor.ts`, then run `mise run vendor` and `mise run build`.
+
 For how a rebuilt plugin reaches a session, see the Updates paragraph in [usage.md](usage.md#install).
 
 Do not edit generated files; each carries a note naming its source. `.prettierignore` and `.eslintignore` list them so the formatter leaves them as built.
 
-`packages/integrations/claude/tests/plugin.test.ts` is the sync test: every committed generated file equals a fresh build byte for byte, the generated paths hold nothing the build does not make, the build is deterministic, the wrapper is the one executable file, and the commit hook stages exactly `GENERATED_PATHS`. Other tests there cover the hooks (the `Workflow` hook's allowed and refused scripts among them) and the plugin manifest.
+`packages/integrations/claude/tests/plugin.test.ts` is the sync test: every committed generated file equals a fresh build byte for byte, the generated paths hold nothing the build does not make (apart from the vendored tools, which `vendor.test.ts` checks against their pins), the build is deterministic, the wrapper is the one executable file, and the commit hook stages exactly `GENERATED_PATHS`. Other tests there cover the hooks (the `Workflow` hook's allowed and refused scripts among them) and the plugin manifest.
 
 ## Versioning
 
