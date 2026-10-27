@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test"
+import { homedir } from "node:os"
 
 import { Effect, FileSystem, Path } from "effect"
 
-import { setupUser } from "../src/claude/user.ts"
+import { homeDirectory, setupUser } from "../src/claude/user.ts"
 import { envLayer, fakeShell, parseJson, run, tempDir } from "./support.ts"
 
 const both = { skipBillionContext: false, skipCtx7: false, dryRun: false }
@@ -149,22 +150,19 @@ describe("holyagent setup claude: user installs", () => {
       }),
     ))
 
-  test("an unreadable HOME fails its steps but keeps the lines already printed; an empty CONTEXT7_API_KEY counts as unset", () =>
+  test("without HOME the home directory is USERPROFILE, else the operating system's; an empty CONTEXT7_API_KEY counts as unset", () =>
     run(
       Effect.gen(function* () {
-        const h = yield* home
-        yield* h.markCtx7Skill
-        const shell = fakeShell({
-          commands: ["claude", "ctx7"],
-          respond: pluginList(["holyagent@holyagent"]),
-        })
-        const noHome = yield* setupUser(both).pipe(
-          Effect.provide(shell.layer),
-          Effect.provide(envLayer({})),
-        )
-        expect(noHome.ok).toBe(false)
-        expect(noHome.lines[0]).toBe("= plugin holyagent@holyagent: already installed")
-        expect(noHome.lines.filter((line) => line.startsWith("! "))).toHaveLength(2)
+        expect(
+          yield* homeDirectory.pipe(Effect.provide(envLayer({ USERPROFILE: "C:\\Users\\me" }))),
+        ).toBe("C:\\Users\\me")
+        expect(
+          yield* homeDirectory.pipe(Effect.provide(envLayer({ HOME: "/h", USERPROFILE: "/u" }))),
+        ).toBe("/h")
+        expect(
+          yield* homeDirectory.pipe(Effect.provide(envLayer({ HOME: "", USERPROFILE: "/u" }))),
+        ).toBe("/u")
+        expect(yield* homeDirectory.pipe(Effect.provide(envLayer({})))).toBe(homedir())
 
         const emptyKeyShell = fakeShell({
           commands: ["claude", "ctx7"],

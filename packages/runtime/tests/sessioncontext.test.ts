@@ -36,10 +36,12 @@ const bigStatus = (intents: number, assignments: number) => ({
 })
 
 describe("the core of the root rules", () => {
-  test("is made of its own files of root/ and about 4,000 characters at most", () => {
+  test("is made of its own files of root/ and about 4,100 characters at most", () => {
     const core = ROOT_CORE
     expect(core.length).toBeGreaterThan(1000)
-    expect(core.length).toBeLessThanOrEqual(4000)
+    // The cap is 4,100: the hand-run form of the CLI keeps `--no-env-file` and the empty bunfig so a
+    // project `.env` or `bunfig.toml` cannot change a call, and those flags cost about 100 characters.
+    expect(core.length).toBeLessThanOrEqual(4100)
     expect(core).toContain("You are the root.")
     expect(core).toContain("assignment dispatch")
     expect(core).not.toContain("core:start")

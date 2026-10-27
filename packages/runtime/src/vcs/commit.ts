@@ -1,7 +1,9 @@
+import { sep } from "node:path"
+
 import { Effect } from "effect"
 
 import { Usage } from "../cli/errors.ts"
-import { pathProblem } from "../domain/paths.ts"
+import { pathProblem, toPosix } from "../domain/paths.ts"
 import { STATE_DIRECTORY } from "../state/layout.ts"
 import { AgentIdentity, CloudAuthor, NothingToCommit, StagedOutsideScope } from "./errors.ts"
 import { currentBranch, git, gitMaybe, gitPaths } from "./git.ts"
@@ -53,9 +55,16 @@ const stagedPaths = git(["diff", "--cached", "--name-only", "--no-renames", "-z"
   Effect.map((names) => names.split("\0").filter((path) => path !== "")),
 )
 
-const validatedPaths = (paths: ReadonlyArray<string>) =>
+/**
+ * The commit scope for the named paths: each path in git's `/` form without a trailing slash, or a
+ * `Usage` failure for one that is not a portable project path or that is Intent state. A path
+ * written with the platform's separator (`src\a.ts` on Windows) names the same file as git's
+ * `src/a.ts`, so it is converted before the checks. The separator is a parameter so a test can
+ * stand in for Windows.
+ */
+export const commitScope = (paths: ReadonlyArray<string>, separator: string = sep) =>
   Effect.forEach(paths, (path) => {
-    const clean = path.replace(/\/+$/, "")
+    const clean = toPosix(path, separator).replace(/\/+$/, "")
     const problem = pathProblem(clean)
     if (problem !== undefined)
       return Effect.fail(
@@ -88,7 +97,7 @@ export const commit = (request: CommitRequest) =>
   Effect.gen(function* () {
     const { message } = request
     yield* request.cloud ? requireOwnAuthor : requireOwnIdentity
-    const scope = yield* validatedPaths(request.paths)
+    const scope = yield* commitScope(request.paths)
 
     const alreadyStaged = yield* stagedPaths
     const outside = alreadyStaged.filter((path) => !inScope(scope, path))

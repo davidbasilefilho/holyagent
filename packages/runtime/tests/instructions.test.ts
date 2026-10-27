@@ -88,6 +88,35 @@ describe("instruction sources", () => {
         expect({ path, found: pattern.exec(read(path))?.[0] }).toEqual({ path, found: undefined })
   })
 
+  test("start the bundled CLI only with the flags that keep the project's .env and bunfig.toml out", () => {
+    const invocations = FILES.flatMap((path) =>
+      [...read(path).matchAll(/\bbun\b([^`\n]*?)\s"[^"\n]*holyagent\.js"/g)].map((match) => ({
+        path,
+        flags: match[1] ?? "",
+      })),
+    )
+    expect(invocations.length).toBeGreaterThanOrEqual(2)
+    for (const { path, flags } of invocations) {
+      expect({ path, noEnvFile: flags.includes("--no-env-file") }).toEqual({
+        path,
+        noEnvFile: true,
+      })
+      expect({
+        path,
+        config: /--config="\$\{CLAUDE_PLUGIN_ROOT\}\/scripts\/empty-bunfig\.toml"/.test(flags),
+      }).toEqual({
+        path,
+        config: true,
+      })
+    }
+    // Every mention of the script is one of the invocations checked above.
+    for (const path of FILES)
+      expect({ path, mentions: read(path).match(/holyagent\.js/g)?.length ?? 0 }).toEqual({
+        path,
+        mentions: invocations.filter((invocation) => invocation.path === path).length,
+      })
+  })
+
   test("never mention the predecessor product", () => {
     for (const path of FILES)
       expect({ path, found: /holyclaude/i.test(read(path)) }).toEqual({ path, found: false })

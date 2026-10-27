@@ -1,5 +1,7 @@
 import { join } from "node:path"
 
+import { toPosix } from "../../../runtime/src/domain/paths.ts"
+
 /** The plugin's folder, relative to the repository root. */
 export const PLUGIN_DIRECTORY = "packages/integrations/claude"
 
@@ -39,9 +41,9 @@ export const readSource = (path: string): Promise<string> => Bun.file(join(REPOS
 
 /** The files below a folder of the repository, as paths relative to it, in a stable order. */
 export const listFiles = async (directory: string): Promise<ReadonlyArray<string>> =>
-  (
-    await Array.fromAsync(new Bun.Glob("**/*").scan({ cwd: join(REPOSITORY, directory) }))
-  ).toSorted()
+  (await Array.fromAsync(new Bun.Glob("**/*").scan({ cwd: join(REPOSITORY, directory) })))
+    .map((path) => toPosix(path))
+    .toSorted()
 
 /** The note a generated file carries, where its format allows one. */
 export const generatedNote = (source: string): string =>

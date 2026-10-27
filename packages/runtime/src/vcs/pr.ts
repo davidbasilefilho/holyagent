@@ -6,7 +6,7 @@ import { Effect, Schema } from "effect"
 
 import { Usage } from "../cli/errors.ts"
 import type { Call } from "../cli/types.ts"
-import { pathProblem } from "../domain/paths.ts"
+import { pathProblem, toPosix } from "../domain/paths.ts"
 import { hasCode, io } from "../state/files.ts"
 import { GitFailed, RemoteMismatch } from "./errors.ts"
 import { currentBranch, Git, originUrl, repoSlug } from "./git.ts"
@@ -36,10 +36,10 @@ const readBodyFile = (root: string, file: string) => {
       hint: "Write the body to a small, unignored file inside the project and name it relative to the project root.",
     })
   return Effect.gen(function* () {
-    const problem = pathProblem(file)
+    const problem = pathProblem(toPosix(file))
     if (problem !== undefined) return yield* refuse(`is not a project path (${problem})`)
     if (hasGitSegment(file)) return yield* refuse("is inside .git")
-    const path = join(root, file)
+    const path = join(root, toPosix(file))
     const resolve = io(path, () => realpath(path))
     const real = yield* resolve.pipe(
       Effect.catchIf(
@@ -50,7 +50,7 @@ const readBodyFile = (root: string, file: string) => {
     const base = yield* io(root, () => realpath(root))
     if (real !== base && !real.startsWith(`${base}${sep}`))
       return yield* refuse("resolves to a path outside the project")
-    const inside = relative(base, real)
+    const inside = toPosix(relative(base, real))
     if (hasGitSegment(inside)) return yield* refuse("is inside .git")
     const ignored = yield* Git.use((service) =>
       service.run(["check-ignore", "-q", "--no-index", "--", inside]),

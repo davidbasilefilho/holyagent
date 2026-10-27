@@ -190,13 +190,19 @@ describe("hooks", () => {
   }
   const command = (name: string, extra: Record<string, unknown> = {}) => ({
     type: "command",
-    command: "${CLAUDE_PLUGIN_ROOT}/scripts/holyagent",
-    args: ["hook", name],
+    command: "bun",
+    args: [
+      "--no-env-file",
+      "--config=${CLAUDE_PLUGIN_ROOT}/scripts/empty-bunfig.toml",
+      "${CLAUDE_PLUGIN_ROOT}/scripts/holyagent.js",
+      "hook",
+      name,
+    ],
     timeout: 10,
     ...extra,
   })
 
-  test("are exactly the session, subagent-start, reminder, workflow and launch hooks, in exec form through the wrapper", () => {
+  test("are exactly the session, subagent-start, reminder, workflow and launch hooks, in exec form that runs bun on the bundle, with no shell", () => {
     expect(hooks).toEqual({
       SessionStart: [
         { matcher: "startup|resume|clear|compact", hooks: [command("session-start")] },

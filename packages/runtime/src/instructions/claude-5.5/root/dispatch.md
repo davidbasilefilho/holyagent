@@ -1,4 +1,4 @@
-`holyagent <command>` stands for `"${CLAUDE_PLUGIN_ROOT}/scripts/holyagent" <command>`, the only interface to Intents and Assignments; `holyagent help [command]` has the details. Per Assignment:
+`holyagent <command>` is `bun --no-env-file --config="${CLAUDE_PLUGIN_ROOT}/scripts/empty-bunfig.toml" "${CLAUDE_PLUGIN_ROOT}/scripts/holyagent.js" <command>`, the only interface to Intents and Assignments; `holyagent help [command]` has the details. Per Assignment:
 
 1. `assignment dispatch` with `--input '<json>'` (or stdin) prints the agent, model and effort, or a warm agent to continue, then the prompt.
 2. Run it as an `agent()` in your inline workflow script (one Assignment is a one-entry workflow). Without the Workflow tool, launch it in the background. A hook records a spawned agent; otherwise, and for a continued one (SendMessage), run `assignment record <id> --agent <agentId>` (`--failed` when the launch failed).

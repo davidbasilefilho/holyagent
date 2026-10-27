@@ -1,10 +1,11 @@
-import { join, relative } from "node:path"
+import { join, relative, sep } from "node:path"
 
 import { Effect, Schedule } from "effect"
 
 import { Assignment } from "../domain/assignment.ts"
 import { Intent } from "../domain/intent.ts"
 import { BranchRecord, type Links, PullRecord } from "../domain/links.ts"
+import { toPosix } from "../domain/paths.ts"
 import type { Change, Project } from "../domain/project.ts"
 import { CorruptRecord, StateIo } from "./errors.ts"
 import { commitFile, encodeJson, type File, hasCode, io, readJson } from "./files.ts"
@@ -13,10 +14,20 @@ import { encodeLocal, type Local, type LocalChange, readLocal } from "./local.ts
 import { withStateLock } from "./lock.ts"
 import { commitState, type Environment } from "./tree.ts"
 
-/** The relative paths below the state folder that match, in a stable order. */
+/**
+ * A glob pattern for `pattern` below `folder`. Glob patterns are `/`-separated and read `\` as an
+ * escape, so a folder that `relative()` gave with Windows separators is converted first.
+ */
+export const globBelow = (folder: string, pattern: string, separator: string = sep) =>
+  `${toPosix(folder, separator)}/${pattern}`
+
+/**
+ * The relative paths below the state folder that match, in a stable order and `/`-separated on
+ * every platform.
+ */
 const scan = (directory: string, pattern: string) =>
   io(directory, () => Array.fromAsync(new Bun.Glob(pattern).scan({ cwd: directory }))).pipe(
-    Effect.map((paths) => paths.toSorted()),
+    Effect.map((paths) => paths.map((path) => toPosix(path)).toSorted()),
     // A project that never stored anything has no state folder yet.
     Effect.catchIf(
       (error) => hasCode(error.cause, "ENOENT"),
@@ -73,7 +84,7 @@ const loadLinks = (directory: string, intents: ReadonlyArray<Intent>) =>
     for (const intent of intents) {
       const folder = intentFolder(directory, intent)
       const prefix = relative(directory, folder)
-      for (const file of yield* scan(directory, join(prefix, "branches/*.json"))) {
+      for (const file of yield* scan(directory, globBelow(prefix, "branches/*.json"))) {
         const path = join(directory, file)
         const record = yield* readJson(BranchRecord, path)
         if (record === undefined) continue
@@ -82,7 +93,7 @@ const loadLinks = (directory: string, intents: ReadonlyArray<Intent>) =>
           return yield* new CorruptRecord({ path, reason: `the record belongs to ${intent.id}` })
         branches.push(record)
       }
-      for (const file of yield* scan(directory, join(prefix, "pulls/*.json"))) {
+      for (const file of yield* scan(directory, globBelow(prefix, "pulls/*.json"))) {
         const path = join(directory, file)
         const record = yield* readJson(PullRecord, path)
         if (record === undefined) continue
@@ -125,7 +136,7 @@ export const loadOpenProject = (directory: string) =>
     const relatives = yield* Effect.forEach(intents, (intent) =>
       scan(
         directory,
-        join(relative(directory, intentFolder(directory, intent)), "assignments/*.json"),
+        globBelow(relative(directory, intentFolder(directory, intent)), "assignments/*.json"),
       ),
     )
     const assignments = yield* loadAssignments(directory, relatives.flat(), intents)

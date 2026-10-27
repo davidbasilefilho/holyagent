@@ -6,8 +6,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/holyagent",
+            "command": "bun",
             "args": [
+              "--no-env-file",
+              "--config=${CLAUDE_PLUGIN_ROOT}/scripts/empty-bunfig.toml",
+              "${CLAUDE_PLUGIN_ROOT}/scripts/holyagent.js",
               "hook",
               "session-start"
             ],
@@ -21,8 +24,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/holyagent",
+            "command": "bun",
             "args": [
+              "--no-env-file",
+              "--config=${CLAUDE_PLUGIN_ROOT}/scripts/empty-bunfig.toml",
+              "${CLAUDE_PLUGIN_ROOT}/scripts/holyagent.js",
               "hook",
               "subagent-start"
             ],
@@ -37,8 +43,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/holyagent",
+            "command": "bun",
             "args": [
+              "--no-env-file",
+              "--config=${CLAUDE_PLUGIN_ROOT}/scripts/empty-bunfig.toml",
+              "${CLAUDE_PLUGIN_ROOT}/scripts/holyagent.js",
               "hook",
               "vcs-reminder"
             ],
@@ -47,8 +56,11 @@
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/holyagent",
+            "command": "bun",
             "args": [
+              "--no-env-file",
+              "--config=${CLAUDE_PLUGIN_ROOT}/scripts/empty-bunfig.toml",
+              "${CLAUDE_PLUGIN_ROOT}/scripts/holyagent.js",
               "hook",
               "vcs-reminder"
             ],
@@ -62,8 +74,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/holyagent",
+            "command": "bun",
             "args": [
+              "--no-env-file",
+              "--config=${CLAUDE_PLUGIN_ROOT}/scripts/empty-bunfig.toml",
+              "${CLAUDE_PLUGIN_ROOT}/scripts/holyagent.js",
               "hook",
               "workflow"
             ],
@@ -79,8 +94,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/holyagent",
+            "command": "bun",
             "args": [
+              "--no-env-file",
+              "--config=${CLAUDE_PLUGIN_ROOT}/scripts/empty-bunfig.toml",
+              "${CLAUDE_PLUGIN_ROOT}/scripts/holyagent.js",
               "hook",
               "agent-launch"
             ],

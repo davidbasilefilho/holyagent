@@ -1,17 +1,17 @@
 # Components
 
-What HolyAgent installs or configures, and why. The WSL installer (`install/wsl-install.sh`) and the public CLI (`holyagent setup claude`, `holyagent doctor`) both skip any step that is already right, so re-running changes nothing that is already set.
+What HolyAgent installs or configures, and why. The installers (`install/wsl-install.sh` for WSL Ubuntu, `install/windows-install.ps1` for native Windows) and the public CLI (`holyagent setup claude`, `holyagent doctor`) both skip any step that is already right, so re-running changes nothing that is already set.
 
-| Component        | Installed by                                               | Why                                                                         |
-| ---------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------- |
-| mise             | WSL installer                                              | Version manager and the source of the repository's commands                 |
-| Node.js LTS      | WSL installer (`mise use -g node@lts`)                     | Billion Context and ctx7 run on Node                                        |
-| Bun (canary)     | WSL installer (`mise use -g bun`, then canary)             | Runs the plugin CLI and the repository toolchain                            |
-| Claude Code      | WSL installer (`bun add -g @anthropic-ai/claude-code`)     | The harness                                                                 |
-| HolyAgent plugin | Marketplace, `holyagent setup claude`                      | The root agent, specialists, skills, hooks and runtime CLI                  |
-| Billion Context  | WSL installer, `holyagent setup claude`, plugin dependency | Compresses the conversation so long sessions stay inside the context window |
-| ctx7 and skill   | WSL installer, `holyagent setup claude`                    | Current library documentation for the agents                                |
-| Exa plugin       | Plugin dependency                                          | Web search and page reading for the Search specialists                      |
+| Component        | Installed by                                                        | Why                                                                         |
+| ---------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| mise             | WSL and Windows installers                                          | Version manager and the source of the repository's commands                 |
+| Node.js LTS      | WSL and Windows installers (`mise use -g node@lts`)                 | Billion Context and ctx7 run on Node                                        |
+| Bun (canary)     | WSL and Windows installers (`mise use -g bun`, then canary)         | Runs the plugin CLI and the repository toolchain                            |
+| Claude Code      | WSL and Windows installers (`bun add -g @anthropic-ai/claude-code`) | The harness                                                                 |
+| HolyAgent plugin | Marketplace, `holyagent setup claude`                               | The root agent, specialists, skills, hooks and runtime CLI                  |
+| Billion Context  | Installers, `holyagent setup claude`, plugin dependency             | Compresses the conversation so long sessions stay inside the context window |
+| ctx7 and skill   | Installers, `holyagent setup claude`                                | Current library documentation for the agents                                |
+| Exa plugin       | Plugin dependency                                                   | Web search and page reading for the Search specialists                      |
 
 ripgrep and fd ship inside the plugin rather than being installed; see [ripgrep and fd](#ripgrep-and-fd).
 
@@ -20,6 +20,8 @@ Pi is not installed: 0.1.0 has no Pi integration ([pi/README.md](pi/README.md)).
 ## mise, Node, Bun
 
 The installer first installs any missing apt packages (`curl`, `git`, `ca-certificates`, `unzip`, `build-essential`) with sudo. mise is installed with its official installer to `~/.local/bin/mise` and activated in `~/.bashrc` (the installer keeps a one-time copy as `~/.bashrc.pre-holyagent`). Node comes from `mise use -g node@lts` and the installer refuses a Node older than 22.13, the floor for ctx7.
+
+The Windows installer (`install/windows-install.ps1`) installs missing `git` and `mise` with `winget` instead of apt and mise's shell installer. It activates mise in your PowerShell profile (`$PROFILE.CurrentUserAllHosts`, with a one-time copy kept as `<profile>.pre-holyagent`), puts Bun's global bin folder on your user `PATH`, and writes the Billion Context setting through a temporary Node script because Windows PowerShell 5.1 mangles quotes in native arguments. Node, Bun, Claude Code, Billion Context and ctx7 are installed exactly as above.
 
 Bun is installed by mise as a stable build and upgraded to canary with `bun upgrade --canary` ([requirements.md](requirements.md) says why). The canary is re-applied rather than assumed: the installer checks `bun --revision` on every run, `holyagent doctor` reports a non-canary Bun and `holyagent doctor --fix` upgrades it (with `BUN_OPTIONS` unset), and the repository's `toolchain` task fails on a non-canary Bun. Installing the global packages below uses `bun add -g`; their commands live in `$BUN_INSTALL/bin` (`~/.bun/bin`), which the installer puts on `PATH`.
 
