@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mvqycgve-9lko",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-readme-review-findings-in-the",
+  "objective": "Repair the README review findings in the readme worktree.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-readme (branch ccr-046ad103-6qsvgx-readme). Review report: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-assignment-0mvqxgyye-ylxp.txt. Fix the blocker (README line 11: state the highest documented Claude Code minimum from docs/requirements.md and link that section) and the notes: Node.js prerequisite, `bun packages/cli/src/index.ts doctor` instead of bare holyagent doctor, setup claude configuring the directory and installing the plugin, WSL script run as your own user without sudo or arguments, link docs/requirements.md for desktop/web status, 'one long session', 'builds with or installs', the brief acknowledgment, link rather than repeat usage.md, and `mise install` before `mise run verify`. Keep the six sections and their order."
+  ],
+  "constraints": [
+    "Work only in your worktree; make no version-control writes (no commit, add, checkout, switch, merge, stash, push) and no edits under .git/ or .holyagent/.",
+    "Keep working until everything asked is done; when done and checked, stop and report; no unrequested features or refactors.",
+    "Write only README.md."
+  ],
+  "criteria": [
+    {
+      "text": "The Claude Code minimum matches the highest documented minimum and every note is fixed or answered in the report",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The six sections stay in order and mise run fmt:check passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "README.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvqw75te-qv26",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T17:21:11.786Z"
+  },
+  "createdAt": "2026-10-27T17:21:11.786Z"
+}
