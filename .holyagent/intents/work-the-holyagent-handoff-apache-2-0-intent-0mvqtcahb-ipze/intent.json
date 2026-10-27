@@ -21,6 +21,7 @@
     "Decision (user): the root does not reply to the claude.ai stop hook; when the harness then demands visible output after an empty reply, it gives one neutral line that does not mention the hook or what it asked. The root keeps the checkout clean (state on holyagent/state) so the hook has nothing to flag."
   ],
   "revision": 4,
-  "state": "Open",
+  "state": "Closed",
+  "closeReason": "All handoff items delivered and merged (#29-#34).",
   "createdAt": "2026-10-27T15:01:05.424Z"
 }
