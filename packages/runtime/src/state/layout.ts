@@ -35,5 +35,13 @@ export const assignmentFile = (
     `${routeFor(assignment.roleTask).agent}-${recordName(assignment.slug, assignment.id)}.json`,
   )
 
+/** The file of a branch record: `branches/<id>.json` in the folder of its Intent. */
+export const branchFile = (intentFolderPath: string, record: { readonly id: string }): string =>
+  join(intentFolderPath, "branches", `${record.id}.json`)
+
+/** The file of a pull request record: `pulls/<id>.json` in the folder of its Intent. */
+export const pullFile = (intentFolderPath: string, record: { readonly id: string }): string =>
+  join(intentFolderPath, "pulls", `${record.id}.json`)
+
 /** A per-clone file. Everything under `local/` stays out of version control. */
 export const localFile = (directory: string, name: string): string => join(directory, "local", name)

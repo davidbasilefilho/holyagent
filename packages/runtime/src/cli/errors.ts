@@ -123,7 +123,8 @@ const HINTS: Readonly<Record<string, string>> = {
   MigrationUnverified:
     "The records were written but do not load back: delete the files this run wrote (git status lists them), fix the cause the message names and run `holyagent migrate --dry-run` again.",
   StateLocked: "Another process holds the state lock; retry in a moment.",
-  StateIo: "Check the permissions of the .holyagent folder in the project root.",
+  StateIo:
+    "Check what the message names: the permissions of the .holyagent folder of the state worktree (under the git directory, or in the project outside git) and that git runs there.",
   CorruptRecord: "Fix or delete the file the message names, or restore it from version control.",
   ...VCS_HINTS,
 }

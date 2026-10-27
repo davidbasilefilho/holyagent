@@ -1,8 +1,6 @@
-import { $ } from "bun"
 import { Clock, Effect, Schema } from "effect"
 
 import { InvalidDraft } from "../domain/errors.ts"
-import { StateIo } from "../state/errors.ts"
 import { StdinMissing, Usage } from "./errors.ts"
 import type { Host } from "./types.ts"
 
@@ -10,28 +8,6 @@ import type { Host } from "./types.ts"
 export const nowIso = Clock.currentTimeMillis.pipe(
   Effect.map((millis) => new Date(millis).toISOString()),
 )
-
-const NOT_A_REPOSITORY = /not a git repository|command not found/i
-
-/**
- * The state root: the git top-level of the directory, else the directory itself when it is not in a
- * repository (or git is not installed). Any other git failure is reported, so state is not silently
- * written somewhere else.
- */
-export const stateRoot = (cwd: string) =>
-  Effect.tryPromise({
-    try: () => $`git rev-parse --show-toplevel`.cwd(cwd).quiet().nothrow(),
-    catch: (cause) => new StateIo({ path: cwd, cause }),
-  }).pipe(
-    Effect.flatMap((output) => {
-      const top = output.text().trim()
-      if (output.exitCode === 0 && top !== "") return Effect.succeed(top)
-      const complaint = output.stderr.toString().trim()
-      return NOT_A_REPOSITORY.test(complaint)
-        ? Effect.succeed(cwd)
-        : Effect.fail(new StateIo({ path: cwd, cause: `git: ${complaint}` }))
-    }),
-  )
 
 /** Reads stdin as raw text, failing with StdinMissing when it is a terminal or blank. */
 export const readReport = (host: Host) =>

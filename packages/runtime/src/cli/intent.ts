@@ -11,7 +11,7 @@ import {
   updateIntent,
 } from "../domain/intent.ts"
 import { findIntent, requireOpen } from "../domain/project.ts"
-import { readState, type Snapshot, updateState } from "../state/store.ts"
+import { readState, type Snapshot } from "../state/store.ts"
 import { booleanFlag, requiredFlag, stringFlag } from "./args.ts"
 import { nowIso } from "./context.ts"
 import { NoActiveIntent, Usage } from "./errors.ts"
@@ -65,12 +65,13 @@ export const INTENT_COMMANDS: ReadonlyArray<Command> = [
     input: "{objective, requirements?: [text]}",
     flags: { input: "string" },
     positionals: 0,
-    run: ({ directory, input }) =>
+    state: "create",
+    run: ({ update, input }) =>
       Effect.gen(function* () {
         const draft = yield* input(IntentInput)
         const id = yield* newId("intent")
         const now = yield* nowIso
-        const { intent } = yield* updateState(directory, ({ project }) =>
+        const { intent } = yield* update(({ project }) =>
           createIntent(project, { ...draft, id, now }).pipe(
             Effect.map((change) => ({ ...change, activeIntent: id })),
           ),
@@ -89,11 +90,11 @@ export const INTENT_COMMANDS: ReadonlyArray<Command> = [
       Effect.gen(function* () {
         const snapshot = yield* readState(directory)
         const [id] = args.positionals
-        return intentView(
+        const intent =
           id === undefined
             ? yield* resolveIntent(snapshot)
-            : yield* findIntent(snapshot.project, id),
-        )
+            : yield* findIntent(snapshot.project, id)
+        return intentView(intent, snapshot.links)
       }),
   },
   {
@@ -122,10 +123,10 @@ export const INTENT_COMMANDS: ReadonlyArray<Command> = [
     ],
     flags: { input: "string", material: "boolean" },
     positionals: 0,
-    run: ({ directory, args, input }) =>
+    run: ({ update, args, input }) =>
       Effect.gen(function* () {
         const edit = yield* input(IntentEdit)
-        const { intent } = yield* updateState(directory, (snapshot) =>
+        const { intent } = yield* update((snapshot) =>
           resolveIntent(snapshot).pipe(
             Effect.flatMap((current) =>
               updateIntent(snapshot.project, current.id, {
@@ -145,12 +146,12 @@ export const INTENT_COMMANDS: ReadonlyArray<Command> = [
     notes: ["pull before closing: another clone may hold work this one cannot see"],
     flags: { reason: "string", drop: "string" },
     positionals: 0,
-    run: ({ directory, args }) =>
+    run: ({ update, args }) =>
       Effect.gen(function* () {
         const reason = yield* requiredFlag(args, "reason", "intent close --reason <text>")
         const drop = stringFlag(args, "drop")
         const now = yield* nowIso
-        const closed = yield* updateState(directory, (snapshot) =>
+        const closed = yield* update((snapshot) =>
           resolveIntent(snapshot).pipe(
             Effect.flatMap((current) =>
               closeIntent(
@@ -176,9 +177,9 @@ export const INTENT_COMMANDS: ReadonlyArray<Command> = [
     flags: {},
     positionals: 1,
     optional: true,
-    run: ({ directory, args }) =>
+    run: ({ update, args }) =>
       Effect.gen(function* () {
-        const { intent } = yield* updateState(directory, (snapshot) =>
+        const { intent } = yield* update((snapshot) =>
           Effect.gen(function* () {
             const id = args.positionals[0] ?? snapshot.activeIntent
             if (id === undefined)
@@ -199,9 +200,9 @@ export const INTENT_COMMANDS: ReadonlyArray<Command> = [
     summary: "Put an open Intent in use in this clone",
     flags: {},
     positionals: 1,
-    run: ({ directory, args }) =>
+    run: ({ update, args }) =>
       Effect.gen(function* () {
-        const { intent } = yield* updateState(directory, ({ project }) =>
+        const { intent } = yield* update(({ project }) =>
           Effect.gen(function* () {
             const found = yield* findIntent(project, args.positionals[0] ?? "")
             yield* requireOpen(found)

@@ -5,11 +5,13 @@ import { Cause, Effect } from "effect"
 
 import packageJson from "../../package.json" with { type: "json" }
 import { STATE_DIRECTORY } from "../state/layout.ts"
+import { updateState } from "../state/store.ts"
+import { resolveState } from "../state/tree.ts"
 import { vcsLive } from "../vcs/live.ts"
 import { INPUT_FLAG, parseArgs, stringFlag } from "./args.ts"
 import { COMMANDS } from "./commands.ts"
 import { loadConfig } from "./config.ts"
-import { readInput, readInputBy, readReport, stateRoot } from "./context.ts"
+import { readInput, readInputBy, readReport } from "./context.ts"
 import { describeFailure, Usage } from "./errors.ts"
 import { type Call, type Command, type Host, Streamed, Verbatim, WithTrailer } from "./types.ts"
 
@@ -40,16 +42,27 @@ const topHelp = (): string =>
     "help [command] or <command> --help shows a command's input shape, stdout and rules",
   ].join("\n")
 
-const callFor = (args: Call["args"], host: Host, emit: Call["emit"], stateless: boolean) =>
+const callFor = (args: Call["args"], host: Host, emit: Call["emit"], command: Command) =>
   Effect.gen(function* () {
     // A stateless command never reads the state, so a git failure must not stop it.
-    const root = stateless ? host.cwd : yield* stateRoot(host.cwd)
+    const { root, directory } =
+      command.stateless === true
+        ? { root: host.cwd, directory: join(host.cwd, STATE_DIRECTORY) }
+        : yield* resolveState(
+            host.cwd,
+            host.env,
+            typeof command.state === "function"
+              ? command.state(args)
+              : (command.state ?? "ifPresent"),
+          )
     const inline = stringFlag(args, INPUT_FLAG)
     return {
       args,
       cwd: host.cwd,
       env: host.env,
-      directory: join(root, STATE_DIRECTORY),
+      root,
+      directory,
+      update: (transition) => updateState(directory, transition, host.env),
       config: loadConfig(host.env, root),
       text: readReport(host),
       emit,
@@ -107,7 +120,7 @@ const execute = (given: ReadonlyArray<string>, host: Host) =>
       })
     const emitted: Array<string> = []
     const emit = host.emit ?? ((text: string) => Effect.sync(() => void emitted.push(text)))
-    const output = yield* command.run(yield* callFor(args, host, emit, command.stateless === true))
+    const output = yield* command.run(yield* callFor(args, host, emit, command))
     if (output instanceof Verbatim) return output
     if (output instanceof Streamed)
       return { stdout: emitted.join(""), stderr: "", code: output.code }
