@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-the-fix-state-off-main-commits",
   "objective": "Review the fix/state-off-main commits 023a6fa and 935d4b3 (range 7929f2d..935d4b3, excluding the pure deletion of .holyagent/ in be17c6d) for correctness and regressions before they are pushed as the first PR of the stack.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-fix-state-off-main, branch fix/state-off-main. Review with `git diff 7929f2d..935d4b3 -- . ':!.holyagent'`.",
     "023a6fa: .gitignore ignores /.holyagent/; scripts/repo-paths.test.ts fails when a tracked path is longer than 120 characters or sits under .holyagent/ (requirement: main never carries .holyagent state again, checked in `mise run verify`; a test fails when any tracked path on main is longer than 120 characters); docs/development.md one sentence.",
@@ -48,5 +48,10 @@
     "assignment-0mvr5ftbl-g78k",
     "assignment-0mvr70a82-jd84"
   ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T21:27:15.291Z"
+  },
   "createdAt": "2026-10-27T21:27:14.413Z"
 }
