@@ -1,0 +1,84 @@
+{
+  "id": "assignment-0mvr5jcix-kkv9",
+  "intentId": "intent-0mvr4zvnq-k1q1",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "delete-packages-cli-and-every-reference",
+  "objective": "Delete packages/cli and every reference to it, shrink the installers to prerequisites, rewrite the install docs so HolyAgent installs with the three plugin commands only, and record in docs/decisions.md that the future pi extension installs with plain `pi install`.",
+  "state": "Ready",
+  "scope": [
+    "Worktree C:/Users/david.basile/dev/holyagent-feat-plugin-only-install (branch feat/plugin-only-install). Another specialist adds `holyagent setup` and `holyagent doctor [--fix]` to the plugin runtime and the /holyagent:setup command in parallel; packages/runtime, packages/integrations/claude, .claude-plugin/marketplace.json and docs/hooks.md are theirs, do not edit them.",
+    "Known references: bun.lock (workspace packages/cli, @holyagent/cli), bunfig.toml lint glob packages/cli/src/**, scripts/bump-version.ts manifest list and scripts/bump-version.test.ts fixtures, README.md install section, docs/usage.md, docs/requirements.md, docs/components.md, docs/commit-authorship.md (section on settings setup claude writes), docs/cache-and-workflows.md, docs/README.md (Public CLI row), docs/development.md (lint override), install/wsl-install.sh, install/windows-install.ps1. Search the tree for packages/cli, setup claude and @holyagent/cli to catch the rest (outside .holyagent/)."
+  ],
+  "constraints": [
+    "User requirements (binding): a user installs with `claude plugin marketplace add davidbasilefilho/holyagent`, `claude plugin marketplace add ranxianglei/billion-context`, `claude plugin install holyagent@holyagent` and nothing else: no clone, no `bun install`, no `holyagent setup claude`. Prerequisites left: Bun on PATH (the hooks run `bun`), Node LTS, git and an authenticated gh. The installers shrink to the prerequisites only: Bun, Node LTS, git, gh and, for development, mise; each ends by printing the three plugin commands. README How do I install it? shows the three commands, the prerequisites, and one line about running /holyagent:setup on first launch.",
+    "The new runtime commands, to describe in docs: `holyagent setup [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-billion-context] [--skip-ctx7]` installs bili (native mode, compress.rules) and ctx7 with its skill, and merges attribution, includeGitInstructions, subagentPromptCacheTtl, extraKnownMarketplaces, enabledPlugins and permissions.deny into the user settings (~/.claude/settings.json, or CLAUDE_CONFIG_DIR) without changing set values; `holyagent doctor [--fix]` checks bun, bili, ctx7 and those settings keys, and --fix runs the missing setup steps; /holyagent:setup runs setup from a session; a SessionStart check adds one line suggesting /holyagent:setup when setup is missing and is silent in claude.ai cloud sessions, where setup skips bili and ctx7. No plugin-registration step and no Bun canary check in setup or doctor; canary Bun stays a development requirement checked by mise.",
+    "AGENTS.md requires README.md to keep exactly these sections in order: # HolyAgent, ## How do I install it?, ## Why HolyAgent?, ## Development, ## Special thanks, ## License; detail goes in docs/ and is linked, not repeated.",
+    "Regenerate bun.lock with `bun install` after deleting the workspace. Follow .claude/CLAUDE.md (Bun, mise tasks).",
+    "Delete files with plain file deletion, not git rm. No version-control writes (no git add, rm, commit, checkout, stash), no edits under .git/ or .holyagent/; report changed paths.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report; do not add unrequested features, tests, files or refactors (name them in the report). Do not stop at a summary that announces a next step.",
+    "Decision to record in docs/decisions.md, in that file's existing format: packages/cli is deleted rather than kept for the pi port, because the pi extension will be installed with plain `pi install` and needs no separate setup CLI; Claude Code setup lives in the plugin runtime (`holyagent setup`, `holyagent doctor`, /holyagent:setup)."
+  ],
+  "criteria": [
+    {
+      "text": "packages/cli is gone and no file outside .holyagent/, packages/runtime, packages/integrations/claude and docs/hooks.md refers to packages/cli, @holyagent/cli or setup claude (show the search command and its empty result)",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "install/wsl-install.sh and install/windows-install.ps1 install only Bun, Node LTS, git, gh and (for development) mise, stay idempotent, and end by printing the three plugin commands; the shell script passes `bash -n` and the PowerShell script parses (show both checks)",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "README.md keeps the six required sections in order, and How do I install it? shows the three commands, the prerequisites and one line about /holyagent:setup on first launch",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "docs describe the plugin-only install and the new setup, doctor, /holyagent:setup and SessionStart check consistently with the constraints above",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "scripts/bump-version.ts and its test no longer list packages/cli/package.json, and `bun test scripts/bump-version.test.ts` passes",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "`mise run verify` passes except for failures inside the other specialist paths, which are named (command, exit code, counts)",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "docs/decisions.md records the decision that packages/cli is deleted and the pi extension installs with plain `pi install`, in the file's existing format",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/cli",
+    "bun.lock",
+    "bunfig.toml",
+    "scripts/bump-version.ts",
+    "scripts/bump-version.test.ts",
+    "README.md",
+    "docs/usage.md",
+    "docs/requirements.md",
+    "docs/components.md",
+    "docs/commit-authorship.md",
+    "docs/cache-and-workflows.md",
+    "docs/README.md",
+    "docs/development.md",
+    "install",
+    "docs/decisions.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-10-27T20:42:30.057Z"
+}
