@@ -11,9 +11,12 @@
     "5. Fix Windows install: move all .holyagent/ state off main onto holyagent/state; main never carries it again (gitignore on main, plus a check in `mise run verify`). Add a test that fails when any tracked path on main is longer than 120 characters.",
     "6. README 'How do I install it?' shows the three commands, the prerequisites, and one line about running /holyagent:setup on first launch; keep README's required sections and order.",
     "Follow .claude/CLAUDE.md and AGENTS.md: Effect and Effect Schema, Bun Shell, JSDoc, `mise run build` and `mise run verify` passing, Conventional Commits. Work in a worktree branch and open a PR.",
-    "Anything not compatible with claude.ai or Claude plugins is adapted or dropped depending on the situation; ask the user when that is the case."
+    "Anything not compatible with claude.ai or Claude plugins is adapted or dropped depending on the situation; ask the user when that is the case.",
+    "Decision (user): drop the plugin-registration step from setup and doctor (no claude plugin marketplace add/install/list); the README plugin commands do that job.",
+    "Decision (user): drop the Bun canary check and upgrade from the plugin doctor; doctor checks bun is on PATH, and doctor --fix runs the missing setup steps (bili, ctx7, user settings) instead of upgrading Bun.",
+    "Decision (user): in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) the SessionStart check says nothing and holyagent setup skips bili and ctx7 with a `-` line explaining why, while still merging the user-settings keys."
   ],
-  "revision": 1,
+  "revision": 2,
   "state": "Open",
   "createdAt": "2026-10-27T20:27:21.735Z"
 }
