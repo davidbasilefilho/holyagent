@@ -7,7 +7,9 @@ import { type Call, type Command } from "../cli/types.ts"
 import { present } from "../cli/views.ts"
 import { STATE_DIRECTORY } from "../state/layout.ts"
 import { type FlagShape, readArguments, requiredValue, valueOf } from "./arguments.ts"
+import { IDENTITY_USAGE, setAuthor } from "./author.ts"
 import { commit } from "./commit.ts"
+import { inCloudSession } from "./identity.ts"
 import { prepareMessage } from "./message.ts"
 import { pullRequest } from "./pr.ts"
 import { recordBranch } from "./record.ts"
@@ -43,18 +45,18 @@ const COMMIT_USAGE = "vcs commit -m <headline> [-m <body>] -- <paths…>"
 const PR_USAGE = "vcs pr --base <b> --title <t> [--body-file <f>] [--update <n>]"
 
 /**
- * The `vcs` commands: the two steps that carry a rule of their own. Branches, pushes, merges and CI
- * are plain git and gh.
+ * The `vcs` commands: the steps that carry a rule of their own. Branches, pushes, merges and CI are
+ * plain git and gh.
  */
 export const VCS_COMMANDS: ReadonlyArray<Command> = [
   {
     path: ["vcs", "commit"],
     usage: COMMIT_USAGE,
     summary:
-      "Commit exactly the named paths with the configured git identity, after the message check, and record the branch and commit on the Intent in use",
+      "Commit exactly the named paths with the configured git identity (in a claude.ai cloud session, with the user as author and the platform's committer), after the message check, and record the branch and commit on the Intent in use",
     notes: [
       "Intent state is never part of the commit: it is committed on the state branch as it changes, and a path under .holyagent/ is refused",
-      "the message is cleaned of agent attribution and refused when it talks about the user or the agent; an identity that looks like an agent's is refused",
+      "the message is cleaned of agent attribution and refused when it talks about the user or the agent; an identity that looks like an agent's is refused; in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) it is the author that is checked, and the committer is left as the platform set it",
       "the repository's own hooks run, a commit-msg hook that runs `holyagent hook commit-msg` included",
     ],
     flags: {},
@@ -77,13 +79,44 @@ export const VCS_COMMANDS: ReadonlyArray<Command> = [
           })
         const settings = yield* readSettings(settingsFolders(call))
         const message = yield* prepareMessage(messages, settings.allowWords ?? [])
-        const done = yield* commit({ message, paths: args.positionals })
+        const done = yield* commit({
+          message,
+          paths: args.positionals,
+          cloud: inCloudSession(call.env),
+        })
         return present({
           branch: done.branch,
           commit: short(done.commit),
           files: done.files,
           ...(yield* recordBranch(call, done)),
         })
+      }).pipe(Effect.provide(call.vcs)),
+  },
+  {
+    path: ["vcs", "identity"],
+    usage: IDENTITY_USAGE,
+    summary:
+      "Set the commit author of this clone in its local git config (author.name and author.email), so a commit has the user as author and keeps the committer",
+    notes: [
+      "for a claude.ai cloud session: take the name, id and login from the GitHub connector's get_me, and pass the email as <id>+<login>@users.noreply.github.com",
+      "it writes only those two keys of .git/config, never a file of the repository, and refuses an identity that looks like an agent's",
+    ],
+    flags: {},
+    raw: true,
+    positionals: 0,
+    run: (call) =>
+      Effect.gen(function* () {
+        const args = yield* arguments_(
+          call,
+          IDENTITY_USAGE,
+          { name: { kind: "one" }, email: { kind: "one" } },
+          0,
+        )
+        const author = yield* setAuthor({
+          name: yield* requiredValue(args, "name", IDENTITY_USAGE),
+          email: yield* requiredValue(args, "email", IDENTITY_USAGE),
+        })
+        return present({ author: `${author.name} <${author.email}>`, scope: "local git config" })
       }).pipe(Effect.provide(call.vcs)),
   },
   {

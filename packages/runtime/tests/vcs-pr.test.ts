@@ -176,7 +176,7 @@ describe("vcs pr", () => {
     expect((await vcs(dir, ["vcs", "pr", "--base", "main"], prGithub().layer)).code).toBe(2)
   })
 
-  test("the commands left are commit and pr: push, branch, ci and detect are gone", async () => {
+  test("the commands left are commit, pr and identity: push, branch, ci and detect are gone", async () => {
     const dir = await withOrigin()
     for (const gone of ["push", "branch", "ci", "detect"]) {
       const result = await vcs(dir, ["vcs", gone], prGithub().layer)
@@ -186,6 +186,7 @@ describe("vcs pr", () => {
     const help = await vcs(dir, ["vcs", "--help"], prGithub().layer)
     expect(help.stdout).toContain("vcs commit")
     expect(help.stdout).toContain("vcs pr")
+    expect(help.stdout).toContain("vcs identity")
     for (const gone of ["vcs push", "vcs branch", "vcs ci", "vcs detect"])
       expect(help.stdout).not.toContain(gone)
   })

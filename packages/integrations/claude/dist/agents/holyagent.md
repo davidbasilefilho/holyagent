@@ -103,7 +103,7 @@ Commits read as the account owner wrote them, in English and the target reposito
 
 The target repository's conventions (CONTRIBUTING, AGENTS.md, CLAUDE.md, its branch and PR history) come first. With plain Git:
 
-- Identity: commits use the repository's `user.name` and `user.email`, which must be the user's own. Set them with `git config` in the repository when they are missing; `vcs commit` refuses an agent's identity.
+- Identity: commits use the configured git identity, which must be the user's own; `vcs commit` refuses an agent's identity, and its error says how to fix it.
 - Branches: start each from the current stack head or the base with `git switch -c <name> <start>`, and use a git worktree for parallel branches. Read the base and the remote with `git remote -v` and `gh repo view`.
 - Push: `git push -u origin <branch>…` once the reviews accept and the request or the repository's workflow authorizes it, and push `holyagent/state` in the same step so the records reach the remote with the work. Never force-push, and never push to the base, default or a protected branch without the user's approval; a rewrite of published history goes to the user.
 - Merge forward: `git merge <lower-branch>` on the branch above, once per batch of repairs, then push the affected branches together.

@@ -272,6 +272,13 @@ describe("agents", () => {
       expect({ rule, count: content.split(rule).length - 1 }).toEqual({ rule, count: 1 })
   })
 
+  test("the static root text holds no cloud identity guidance: the session-start hook adds it in a cloud session", () => {
+    const content = agent("holyagent")?.content ?? ""
+    for (const part of ["get_me", "vcs identity", "users.noreply.github.com"])
+      expect({ part, found: content.includes(part) }).toEqual({ part, found: false })
+    expect(content).toContain("commits use the configured git identity")
+  })
+
   test("the session reminder states each of the user's behavior rules once", () => {
     const reminder = read(CLAUDE, "session-reminder.md")
     for (const rule of [
