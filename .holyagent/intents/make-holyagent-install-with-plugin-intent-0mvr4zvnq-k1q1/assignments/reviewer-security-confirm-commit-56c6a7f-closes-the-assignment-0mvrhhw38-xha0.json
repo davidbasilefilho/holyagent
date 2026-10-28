@@ -1,0 +1,37 @@
+{
+  "id": "assignment-0mvrhhw38-xha0",
+  "intentId": "intent-0mvr4zvnq-k1q1",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.security",
+  "slug": "confirm-commit-56c6a7f-closes-the",
+  "objective": "Confirm commit 56c6a7f closes the earlier setup finding that global installs inherit the project directory, without adding a new vulnerability.",
+  "state": "Ready",
+  "scope": [
+    "Worktree C:/Users/david.basile/dev/holyagent-feat-plugin-only-install, branch feat/plugin-only-install, stacked on fix/state-off-main (PR #35).",
+    "Previous finding (Medium): packages/runtime/src/setup/shell.ts:97 setup children (bun add -g at steps.ts:42, bili, ctx7) inherited the project cwd, so a cloned project's bunfig.toml, .npmrc or .env could redirect the registry or preload code. Requested fix: neutral cwd (home) and --no-env-file --config=<empty bunfig> on bun add -g.",
+    "Repair diff (bb36687..56c6a7f, packages only): C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/node_modules/.review/setup-repair.diff. Repair notes: EMPTY_BUNFIG = join(import.meta.dir, 'empty-bunfig.toml'), which in the built plugin is scripts/empty-bunfig.toml; a user-level ~/.npmrc still applies by design; doctor now accepts bili/ctx7 found only in Bun's bin directory with a PATH hint."
+  ],
+  "constraints": [
+    "Read-only: no edits, no version-control writes, nothing under .git/ or .holyagent/.",
+    "This is a re-review of a repair: judge only whether the previous findings are closed and whether the repair diff introduces a new problem; do not re-review unchanged code. When done, stop and report findings marked blocking or non-blocking with file:line; launch no other reviewers."
+  ],
+  "criteria": [
+    {
+      "text": "The earlier finding is closed: no setup child reads project-level bunfig.toml, .npmrc or .env",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The repair adds no new vulnerability (command or path injection, unsafe file writes, leaked keys)",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-10-28T02:17:17.492Z"
+}
