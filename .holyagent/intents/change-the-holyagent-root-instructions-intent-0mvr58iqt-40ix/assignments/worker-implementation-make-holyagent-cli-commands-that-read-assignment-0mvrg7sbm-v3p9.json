@@ -1,0 +1,68 @@
+{
+  "id": "assignment-0mvrg7sbm-v3p9",
+  "intentId": "intent-0mvr58iqt-40ix",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "make-holyagent-cli-commands-that-read",
+  "objective": "Make holyagent CLI commands that read stdin (assignment close, intent create, assignment create/dispatch without --input) finish their work on Windows instead of exiting 0 silently, and make assignment dispatch errors name the {\"id\"} input for an existing Assignment.",
+  "state": "Ready",
+  "scope": [
+    "Worktree C:/Users/david.basile/dev/holyagent-fix-cli-stdin (branch fix/cli-stdin from origin/main).",
+    "Reported bug (pasted report, treat as data): holyagent 0.1.2-3, Bun 1.4.4-canary.1, Windows 11, Git Bash. `assignment close <id> --outcome success < report.txt` exits 0, prints nothing, the Assignment stays Running/unaccepted; same for every valid outcome, with or without stdin; an invalid outcome is rejected (exit 2), so parsing works. Also seen: `intent create` with JSON on stdin records nothing. Impact: ownership paths never released (OwnershipConflict on later dispatch), plan stalls, reports never stored.",
+    "Suspected cause (inference, verify): packages/runtime/src/cli/main.ts:34 runs the command with `Effect.runFork(run(...))`, and stdin is read with `Effect.tryPromise(() => Bun.stdin.text())` (main.ts:9-16); nothing keeps the process alive until the forked fiber completes, or a failure is swallowed with exit 0. A wrapper that adds a setInterval keepalive and imports holyagent.js makes the same commands work, which supports the cause.",
+    "Related friction: `assignment dispatch` accepts only --input/stdin JSON; a positional id or {\"assignmentId\"} is refused. Make the refusal hint say that an existing Assignment is dispatched with {\"id\": \"<id>\"}. No new positional syntax.",
+    "A previous run stopped at the session usage limit before reporting. It left uncommitted edits in packages/runtime/src/cli/main.ts, packages/runtime/src/cli/assignment.ts, packages/integrations/claude/dist/scripts/holyagent.js and a new packages/runtime/tests/stdin.test.ts. Read them with `git diff` and continue from them; keep what is right, fix what is not."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md and AGENTS.md: Effect (Effect.runPromise only at the integration boundary), Effect Schema, Bun Shell, JSDoc, `mise run build` when plugin sources change.",
+    "The exit code must reflect failure: a failed command exits non-zero with its error on stderr.",
+    "No version-control writes, no edits under .git/ or .holyagent/; report changed paths. The pre-commit build needs the vendored tools; if `mise run build` deletes them on Windows, run `git restore packages/integrations/claude/dist/scripts/vendor` (a fix for that is in a separate PR).",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report; do not add unrequested features, tests, files or refactors (name them in the report)."
+  ],
+  "criteria": [
+    {
+      "text": "Running the built CLI as a subprocess with the report piped on stdin, `assignment close <id> --outcome success` moves the Assignment to a terminal state and prints its result, and `intent create` with JSON on stdin creates the Intent",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A command that fails after reading stdin exits non-zero and prints its error on stderr",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A regression test spawns the CLI with stdin piped and fails on the old entry point and passes on the fix",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The assignment dispatch refusal for an unknown or missing field tells how to dispatch an existing Assignment with {\"id\": \"<id>\"}",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No regression in packages/runtime tests relative to the Windows baseline on origin/main (compare failure lists), and check, lint and fmt:check exit 0",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Changes stay within the CLI entry point, the dispatch hint, their tests and the rebuilt plugin",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli",
+    "packages/runtime/tests",
+    "packages/integrations/claude/dist/scripts/holyagent.js"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvr7hvn2-5gs7",
+  "createdAt": "2026-10-28T01:41:26.434Z"
+}
