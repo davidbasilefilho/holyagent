@@ -5,7 +5,7 @@
   "roleTask": "Worker.validation",
   "slug": "run-the-repository-gates-on-head-fd6c9f6",
   "objective": "Run the repository gates on head fd6c9f6 of feat/plugin-only-install and report exact outcomes against the Windows baseline.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-feat-plugin-only-install, branch feat/plugin-only-install, head fd6c9f6, stacked on fix/state-off-main (PR #35).",
     "Gates: `mise run verify` (check, lint, fmt:check, test) and `mise run build` (must leave `git status` clean, i.e. the generated plugin matches its sources). Known Windows baseline: about 108 tests fail on untouched main on this machine (symlink EPERM, backslash paths, POSIX modes); earlier runs on this branch had 102 failures, none new. Compare failure names against a run on origin/main in a separate scratch worktree outside the repository (git worktree add of origin/main into $TEMP is fine; remove it afterwards), or report the comparison as not run.",
@@ -38,5 +38,10 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-28T02:26:35.630Z"
+  },
   "createdAt": "2026-10-28T02:26:35.038Z"
 }
