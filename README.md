@@ -8,7 +8,7 @@ HolyAgent ships today as a Claude Code plugin. The shared runtime underneath is 
 
 ## How do I install it?
 
-You need Claude Code 2.1.295 or later (the highest minimum the plugin documents, see [Claude Code version](docs/requirements.md#claude-code-version)), [Bun](https://bun.sh) on your `PATH` (the plugin's hooks run it), Node.js LTS (22.13 or later), `git` and an authenticated `gh`. On a clean WSL Ubuntu or native Windows machine, `install/wsl-install.sh` and `install/windows-install.ps1` install everything except Claude Code ([docs/usage.md](docs/usage.md#install)). The full list is in [docs/requirements.md](docs/requirements.md). Then, from a shell:
+You need Claude Code 2.1.295 or later (the highest minimum the plugin documents, see [Claude Code version](docs/requirements.md#claude-code-version)), [Bun](https://bun.sh) on your `PATH` (the plugin's hooks run it), Node.js LTS (22.13 or later), `git` and an authenticated `gh`. On a clean WSL Ubuntu or native Windows machine, `install/wsl-install.sh` and `install/windows-install.ps1` install everything except Claude Code, and install mise only when you pass `--dev` or `-Dev` ([docs/usage.md](docs/usage.md#install)). The full list is in [docs/requirements.md](docs/requirements.md). Then, from a shell:
 
 ```sh
 claude plugin marketplace add davidbasilefilho/holyagent

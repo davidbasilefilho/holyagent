@@ -20,8 +20,8 @@ packages/
     tests/
     dist/                       generated: the built plugin (.claude-plugin/, settings.json, agents/, skills/, hooks/, scripts/)
 .claude-plugin/marketplace.json generated; the marketplace entry for the plugin
-install/wsl-install.sh          prerequisites installer (WSL Ubuntu): Bun, Node LTS, git, gh, mise
-install/windows-install.ps1     the same for native Windows (PowerShell)
+install/wsl-install.sh          prerequisites installer (WSL Ubuntu): Bun, Node LTS, git, gh; --dev adds mise
+install/windows-install.ps1     the same for native Windows (PowerShell; -Dev adds mise)
 docs/                           these pages; docs/pi holds the Pi research
 mise.toml  bunfig.toml  lefthook.yml
 ```
