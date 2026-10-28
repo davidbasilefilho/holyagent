@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "confirm-commit-56c6a7f-closes-the",
   "objective": "Confirm commit 56c6a7f closes the earlier setup finding that global installs inherit the project directory, without adding a new vulnerability.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-feat-plugin-only-install, branch feat/plugin-only-install, stacked on fix/state-off-main (PR #35).",
     "Previous finding (Medium): packages/runtime/src/setup/shell.ts:97 setup children (bun add -g at steps.ts:42, bili, ctx7) inherited the project cwd, so a cloned project's bunfig.toml, .npmrc or .env could redirect the registry or preload code. Requested fix: neutral cwd (home) and --no-env-file --config=<empty bunfig> on bun add -g.",
@@ -33,5 +33,10 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-28T02:17:19.240Z"
+  },
   "createdAt": "2026-10-28T02:17:17.492Z"
 }
