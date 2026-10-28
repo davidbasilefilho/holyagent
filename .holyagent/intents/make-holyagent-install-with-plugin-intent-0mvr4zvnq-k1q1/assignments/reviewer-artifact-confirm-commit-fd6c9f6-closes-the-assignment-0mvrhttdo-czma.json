@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "confirm-commit-fd6c9f6-closes-the",
   "objective": "Confirm commit fd6c9f6 closes the blocking finding that docs/requirements.md:7 says Node comes from mise.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-feat-plugin-only-install, branch feat/plugin-only-install, head fd6c9f6, stacked on fix/state-off-main (PR #35).",
     "Previous blocking finding: docs/requirements.md:7 (Node.js LTS row) said \"mise's `lts` satisfies both\" though the installers get Node from NodeSource (install/wsl-install.sh) or winget (install/windows-install.ps1). Non-blocking ones also addressed: docs/usage.md:29 five steps without the --dev sixth; docs/usage.md:25 doctor finds bili and ctx7 only on PATH (doctor now also checks Bun's global bin directory).",
@@ -29,5 +29,10 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-28T02:26:34.426Z"
+  },
   "createdAt": "2026-10-28T02:26:33.852Z"
 }
