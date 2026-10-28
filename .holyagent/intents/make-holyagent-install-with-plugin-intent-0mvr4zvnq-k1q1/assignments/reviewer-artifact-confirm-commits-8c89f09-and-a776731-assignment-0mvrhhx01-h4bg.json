@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "confirm-commits-8c89f09-and-a776731",
   "objective": "Confirm commits 8c89f09 and a776731 close the earlier installer and docs findings.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-feat-plugin-only-install, branch feat/plugin-only-install, stacked on fix/state-off-main (PR #35).",
     "Previous blocking findings: install/wsl-install.sh:143 installed mise unconditionally and both installers used mise for Node, Bun and gh, though mise is for development only; packages/runtime/src/instructions/requirements/cache.md:7 said 'the public CLI sets subagentPromptCacheTtl' (now fixed in another commit); non-blocking docs/attributions.md:25 and docs/decisions.md:53. Requirement: installers install only Bun, Node LTS, git, gh and, for development, mise, and each ends by printing the three plugin commands `claude plugin marketplace add davidbasilefilho/holyagent`, `claude plugin marketplace add ranxianglei/billion-context`, `claude plugin install holyagent@holyagent`. README keeps sections # HolyAgent, ## How do I install it?, ## Why HolyAgent?, ## Development, ## Special thanks, ## License in that order.",
@@ -33,5 +33,10 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-28T02:17:20.402Z"
+  },
   "createdAt": "2026-10-28T02:17:18.673Z"
 }
