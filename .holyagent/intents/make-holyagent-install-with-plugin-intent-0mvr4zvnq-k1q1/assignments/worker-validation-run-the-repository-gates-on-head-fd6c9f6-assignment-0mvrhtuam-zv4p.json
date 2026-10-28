@@ -1,0 +1,42 @@
+{
+  "id": "assignment-0mvrhtuam-zv4p",
+  "intentId": "intent-0mvr4zvnq-k1q1",
+  "intentRevision": 4,
+  "roleTask": "Worker.validation",
+  "slug": "run-the-repository-gates-on-head-fd6c9f6",
+  "objective": "Run the repository gates on head fd6c9f6 of feat/plugin-only-install and report exact outcomes against the Windows baseline.",
+  "state": "Ready",
+  "scope": [
+    "Worktree C:/Users/david.basile/dev/holyagent-feat-plugin-only-install, branch feat/plugin-only-install, head fd6c9f6, stacked on fix/state-off-main (PR #35).",
+    "Gates: `mise run verify` (check, lint, fmt:check, test) and `mise run build` (must leave `git status` clean, i.e. the generated plugin matches its sources). Known Windows baseline: about 108 tests fail on untouched main on this machine (symlink EPERM, backslash paths, POSIX modes); earlier runs on this branch had 102 failures, none new. Compare failure names against a run on origin/main in a separate scratch worktree outside the repository (git worktree add of origin/main into $TEMP is fine; remove it afterwards), or report the comparison as not run.",
+    "Also run `bun test packages/runtime/tests/setup scripts` and report counts."
+  ],
+  "constraints": [
+    "Read-only on the branch: no edits, no version-control writes besides the scratch worktree add and remove, nothing under .holyagent/. If mise run build deletes vendored files, restore with `git restore packages/integrations/claude/dist/scripts/vendor` and report it.",
+    "When done, stop and report; name any check you could not run."
+  ],
+  "criteria": [
+    {
+      "text": "check, lint and fmt:check exit 0 on fd6c9f6",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "No test newly fails against the origin/main baseline, and the setup and scripts tests pass",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "mise run build leaves the working tree clean",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-10-28T02:26:35.038Z"
+}
