@@ -4,10 +4,10 @@ What HolyAgent installs or configures, and why. The installers (`install/wsl-ins
 
 | Component        | Installed by                                              | Why                                                                         |
 | ---------------- | --------------------------------------------------------- | --------------------------------------------------------------------------- |
-| mise             | WSL and Windows installers                                | Version manager and the source of the repository's commands (development)   |
-| Node.js LTS      | WSL and Windows installers (`mise use -g node@lts`)       | Billion Context and ctx7 run on Node                                        |
-| Bun              | WSL and Windows installers (`mise use -g bun`)            | Runs the plugin's hooks and CLI; development needs a canary build           |
-| git, gh          | WSL installer (apt, mise), Windows installer (winget)     | Every commit, branch and PR step runs them                                  |
+| mise             | Installers, only with `--dev` (`-Dev`)                    | Version manager and the source of the repository's commands (development)   |
+| Node.js LTS      | WSL and Windows installers (apt, winget)                  | Billion Context and ctx7 run on Node                                        |
+| Bun              | WSL and Windows installers (Bun's install script)         | Runs the plugin's hooks and CLI; development needs a canary build           |
+| git, gh          | WSL installer (apt), Windows installer (winget)           | Every commit, branch and PR step runs them                                  |
 | HolyAgent plugin | Marketplace (`claude plugin install holyagent@holyagent`) | The root agent, specialists, skills, hooks and runtime CLI                  |
 | Billion Context  | `holyagent setup`, plugin dependency                      | Compresses the conversation so long sessions stay inside the context window |
 | ctx7 and skill   | `holyagent setup`                                         | Current library documentation for the agents                                |
@@ -21,9 +21,11 @@ Pi is not installed: 0.1.0 has no Pi integration ([pi/README.md](pi/README.md)).
 
 ## mise, Node, Bun, gh
 
-The WSL installer first installs any missing apt packages (`curl`, `git`, `ca-certificates`, `unzip`) with sudo. mise is installed with its official installer to `~/.local/bin/mise` and activated in `~/.bashrc` (the installer keeps a one-time copy as `~/.bashrc.pre-holyagent`). Node, Bun and `gh` come from `mise use -g`, and the installer refuses a Node older than 22.13, the floor for ctx7.
+The WSL installer first installs any missing apt packages (`curl`, `git`, `ca-certificates`, `unzip`) with sudo. Node LTS comes from NodeSource's apt repository, Bun from its official install script into `~/.bun`, and `gh` from GitHub's apt repository. The installer refuses a Node older than 22.13, the floor for ctx7, and puts Bun's global bin directory on `PATH` through a line in `~/.bashrc` (a one-time copy is kept as `~/.bashrc.pre-holyagent`).
 
-The Windows installer (`install/windows-install.ps1`) installs missing `git`, `mise` and `gh` with `winget` instead of apt and mise's shell installer. It activates mise in your PowerShell profile (`$PROFILE.CurrentUserAllHosts`, with a one-time copy kept as `<profile>.pre-holyagent`) and puts Bun's global bin folder on your user `PATH`. Node and Bun are installed exactly as above.
+The Windows installer (`install/windows-install.ps1`) installs missing `git`, Node LTS and `gh` with `winget`, and Bun from its official install script into `~\.bun`. It refuses a Node older than 22.13 and puts Bun's global bin folder on your user `PATH`.
+
+mise is installed only with the development option (`--dev` for the WSL installer, `-Dev` for the Windows one), because only developing this repository needs it. The WSL installer runs mise's official installer into `~/.local/bin/mise` and activates it in `~/.bashrc`. The Windows installer installs `jdx.mise` with `winget` and activates it in your PowerShell profile (`$PROFILE.CurrentUserAllHosts`, with a one-time copy kept as `<profile>.pre-holyagent`). Without the option, neither installer installs or activates mise.
 
 The plugin needs only a stable Bun on `PATH`. Developing this repository needs a canary build ([requirements.md](requirements.md#why-bun-canary) says why), which the `postinstall` hook of `mise install` provides and the repository's `toolchain` task checks; `holyagent setup` and `holyagent doctor` do not look at the build. `holyagent setup` installs the global packages below with `bun add -g`; their commands live in `$BUN_INSTALL/bin` (`~/.bun/bin`), which the installers put on `PATH`, and setup prints a hint when that directory is not on `PATH`.
 

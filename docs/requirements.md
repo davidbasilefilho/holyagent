@@ -7,7 +7,7 @@
 | Node.js LTS          | Billion Context and ctx7                               | Billion Context needs Node 20 or later and ctx7 needs 22.13 or later; mise's `lts` satisfies both. ctx7's Context7 rule also calls `npx ctx7@latest` at runtime                                                                                                                    |
 | git                  | `holyagent vcs` and plain `git`                        | Every commit, branch and push step runs `git`                                                                                                                                                                                                                                      |
 | gh with a credential | `vcs pr`, and the root's `gh` calls (PRs, CI watching) | `gh auth login` or `GH_TOKEN`. Commits use the configured git identity, and `vcs commit` refuses one that looks like an agent (in a claude.ai cloud session the author is checked and set with `vcs identity`)                                                                     |
-| mise                 | Developing this repository, the installers             | Source of the repository's commands; `mise.toml` pins Bun (1.4.4, then upgraded to canary) and tracks Node as `lts`; its commands are Bun scripts, so they run on Windows too                                                                                                      |
+| mise                 | Developing this repository; installers with --dev      | Source of the repository's commands; `mise.toml` pins Bun (1.4.4, then upgraded to canary) and tracks Node as `lts`; its commands are Bun scripts, so they run on Windows too                                                                                                      |
 
 ## Why Bun canary
 
@@ -35,7 +35,7 @@ The plugin's runtime only calls `bun` and does not check the build, and neither 
 
 ## Native Windows
 
-Claude Code on native Windows runs the plugin without WSL and without a POSIX shell. `install/windows-install.ps1` mirrors the WSL installer in six steps (prerequisites with `winget`, mise, Node LTS, Bun, `gh`, verification); it needs Windows PowerShell 5.1 or PowerShell 7 and `winget` for `git`, `mise` and `gh`, and runs in a normal, not elevated, window.
+Claude Code on native Windows runs the plugin without WSL and without a POSIX shell. `install/windows-install.ps1` mirrors the WSL installer in five steps (prerequisites with `winget`, Node LTS, Bun, `gh`, verification), or six with `-Dev`, which adds mise; it needs Windows PowerShell 5.1 or PowerShell 7 and `winget` for `git`, Node LTS, `gh` and, with `-Dev`, `mise`, and runs in a normal, not elevated, window.
 
 - **Hooks.** Exec form needs a real executable on `PATH`, `bun.exe` here, so install Bun the usual way (the installer does) and start Claude Code from a window that sees it. Git Bash is not needed for the hooks; Claude Code's own Bash tool still uses Git Bash when it is installed, and falls back to PowerShell otherwise.
 - **Invoking the CLI by hand.** `bun --no-env-file --config="<plugin>/scripts/empty-bunfig.toml" "<plugin>/scripts/holyagent.js" <command>` runs unchanged in PowerShell, cmd and bash; the flags keep a `.env` file or `bunfig.toml` in the repository from changing how it starts, as for the hooks. The `sh` wrapper `scripts/holyagent` is for POSIX shells only.
