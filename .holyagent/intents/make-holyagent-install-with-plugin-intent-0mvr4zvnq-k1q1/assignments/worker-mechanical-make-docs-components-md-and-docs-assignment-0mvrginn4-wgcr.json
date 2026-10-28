@@ -1,0 +1,42 @@
+{
+  "id": "assignment-0mvrginn4-wgcr",
+  "intentId": "intent-0mvr4zvnq-k1q1",
+  "intentRevision": 4,
+  "roleTask": "Worker.mechanical",
+  "slug": "make-docs-components-md-and-docs",
+  "objective": "Make docs/components.md and docs/requirements.md describe the installers as they now are: Bun, Node LTS, git and gh installed directly, mise only behind --dev (-Dev on Windows).",
+  "state": "Ready",
+  "scope": [
+    "Worktree C:/Users/david.basile/dev/holyagent-feat-plugin-only-install, branch feat/plugin-only-install. Read install/wsl-install.sh and install/windows-install.ps1 for the current steps.",
+    "Stale text: docs/components.md lines 7-10 and docs/requirements.md lines 10 and 38 say the installers use mise for Node, Bun and gh and that the Windows installer has six steps (now five, six with -Dev). Search docs/ for other mentions of mise in an installer context and fix those in these two files only."
+  ],
+  "constraints": [
+    "Edit only docs/components.md and docs/requirements.md; keep the surrounding wording and size; US English for any model-facing text.",
+    "No version-control writes, nothing under .git/ or .holyagent/; report changed paths.",
+    "When done and checked, stop and report; add nothing unrequested."
+  ],
+  "criteria": [
+    {
+      "text": "docs/components.md and docs/requirements.md describe the installers' current steps and say mise is installed only with the development option",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Only docs/components.md and docs/requirements.md change, and the search for installer mentions of mise is shown",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "docs/components.md",
+    "docs/requirements.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-10-28T01:49:53.584Z"
+}
