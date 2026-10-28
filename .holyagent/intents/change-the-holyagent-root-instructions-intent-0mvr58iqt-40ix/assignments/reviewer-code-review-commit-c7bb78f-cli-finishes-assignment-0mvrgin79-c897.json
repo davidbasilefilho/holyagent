@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mvrgin79-c897",
+  "intentId": "intent-0mvr58iqt-40ix",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.code",
+  "slug": "review-commit-c7bb78f-cli-finishes",
+  "objective": "Review commit c7bb78f (CLI finishes commands that read stdin before exiting) for correctness and regressions before it is pushed.",
+  "state": "Ready",
+  "scope": [
+    "Worktree C:/Users/david.basile/dev/holyagent-fix-cli-stdin, branch fix/cli-stdin, stacked on fix/state-off-main (PR #35, head 935d4b3).",
+    "Bug: on Windows the built CLI exited 0 without doing anything when input came on stdin (assignment close, intent create), because packages/runtime/src/cli/main.ts used Effect.runFork and a pending Bun.stdin.text() does not keep the process alive. Fix: top-level await Effect.runPromise; dispatch InvalidDraft refusal hints {\"id\": \"<id>\"}; regression test packages/runtime/tests/stdin.test.ts; rebuilt packages/integrations/claude/dist/scripts/holyagent.js.",
+    "Known Windows baseline: about 108 tests fail on untouched main on this machine (symlink EPERM, backslash paths, POSIX modes); compare against that.",
+    "Review `git diff 935d4b3 c7bb78f`."
+  ],
+  "constraints": [
+    "Read-only: no edits, no version-control writes, nothing under .git/ or .holyagent/.",
+    "When the review is done, stop and report findings marked blocking or non-blocking with file:line; launch no other reviewers."
+  ],
+  "criteria": [
+    {
+      "text": "Commands reading stdin complete and exit non-zero with the error on stderr on failure, and exit codes for every other command path are unchanged",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The regression test fails without the fix and passes with it, and no test newly fails against the baseline",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The change stays within the CLI entry point, the dispatch hint, its test and the rebuilt plugin, and follows the repository rules (Effect at integration boundaries, JSDoc)",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-10-28T01:49:53.013Z"
+}
