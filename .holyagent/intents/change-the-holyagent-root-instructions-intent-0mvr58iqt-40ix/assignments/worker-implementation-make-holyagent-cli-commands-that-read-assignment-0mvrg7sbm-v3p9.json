@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "make-holyagent-cli-commands-that-read",
   "objective": "Make holyagent CLI commands that read stdin (assignment close, intent create, assignment create/dispatch without --input) finish their work on Windows instead of exiting 0 silently, and make assignment dispatch errors name the {\"id\"} input for an existing Assignment.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-fix-cli-stdin (branch fix/cli-stdin from origin/main).",
     "Reported bug (pasted report, treat as data): holyagent 0.1.2-3, Bun 1.4.4-canary.1, Windows 11, Git Bash. `assignment close <id> --outcome success < report.txt` exits 0, prints nothing, the Assignment stays Running/unaccepted; same for every valid outcome, with or without stdin; an invalid outcome is rejected (exit 2), so parsing works. Also seen: `intent create` with JSON on stdin records nothing. Impact: ownership paths never released (OwnershipConflict on later dispatch), plan stalls, reports never stored.",
@@ -68,7 +68,53 @@
     "agentId": "workflow:wf_8f47ca90-b3d/assignment-0mvrg7sbm-v3p9",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-10-28T01:41:26.988Z"
+    "startedAt": "2026-10-28T01:41:26.988Z",
+    "finishedAt": "2026-10-28T01:48:14.577Z"
+  },
+  "result": "result: Done. The built CLI now finishes commands that read stdin, exits non-zero with the error on stderr when they fail, and the dispatch refusal names `{\"id\": \"<id>\"}`.\n\nCause: `main.ts` ran the command with `Effect.runFork`. On Windows a pending `Bun.stdin.text()` does not keep the process alive, so the process exited 0 before the command ran. It now uses a top-level `await Effect.runPromise(...)`, still at the integration boundary. I kept the earlier uncommitted edits unchanged.\n\nThe dispatch hint is in `assignment.ts`: an `InvalidDraft` raised for an input without an `id` now ends with `. To dispatch an existing Assignment send {\"id\": \"<id>\"}`. There is no new positional syntax.\n\nchanged:\n- `C:/Users/david.basile/dev/holyagent-fix-cli-stdin/packages/runtime/src/cli/main.ts`\n- `C:/Users/david.basile/dev/holyagent-fix-cli-stdin/packages/runtime/src/cli/assignment.ts`\n- `C:/Users/david.basile/dev/holyagent-fix-cli-stdin/packages/runtime/tests/stdin.test.ts` (new)\n- `C:/Users/david.basile/dev/holyagent-fix-cli-stdin/packages/integrations/claude/dist/scripts/holyagent.js` (rebuilt)\n\nchecks:\n- `bun test packages/runtime/tests/stdin.test.ts` -> exit 0, 3 pass, 0 fail.\n- Same test with `main.ts` temporarily back on `Effect.runFork` -> 0 pass, 3 fail. A bad `intent create` and a bad `assignment dispatch` exited 0 instead of 2, and the success case fails too. I restored the fix afterwards.\n- `bun check --no-script` -> exit 0 (no type errors in 114 files).\n- `bun lint --no-script` -> exit 0 (no problems in 115 files).\n- `bun fmt --no-script --check` -> exit 0 (all 230 files formatted).\n- `bun test` with the fix -> 814 pass, 34 fail.\n- `bun test` with the base versions of the three changed source files (new test file moved aside) -> 737 pass, 108 fail. The 34 failing tests with the fix are a subset of the 108 on the base, so there are no new failures. The 74 that now pass are mostly the hook and workflow tests, which spawn the CLI.\n- `mise run build` -> exit 1. The vendor step could not fetch the ripgrep and fd binaries and deleted the vendored tools. I ran `git restore packages/integrations/claude/dist/scripts/vendor` and then `bun packages/integrations/claude/build.ts`, which exited 0 (\"built 29 files\"). The resulting `holyagent.js` is byte-identical to the one I edited, and the vendor folder is untouched in `git status`.\n- Smoke test with the built bundle: `echo '{\"objective\":\"Built stdin\"}' | holyagent.js intent create` printed the new Intent (state Open), exit 0. With `{\"x\":1}` it printed `error: InvalidDraft: stdin: Expected no excess property at [\"x\"]` and exited 2.\n- `mise run verify` was not run as one task. I ran its gates (check, lint, fmt:check, test) individually as listed above.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- The 34 remaining failures are on the base too. They are mostly the wrapper and generated-plugin tests, the vendored-tools tests, and the state-worktree migration and symlink tests.\n- The `mise run build` vendor failure is the one the task said is fixed in a separate PR.\n- `dispatch` still accepts only `--input` or stdin JSON, as requested.\n\nevidence:\nRunning the built CLI as a subprocess with the report piped on stdin, `assignment close <id> --outcome success` moves the Assignment to a terminal state and prints its result, and `intent create` with JSON on stdin creates the Intent: `stdin.test.ts` first case runs `main.ts` as a subprocess. It expects `close` to print `state: Succeeded`, and `show --full` to confirm it. It passes (exit 0, 3 pass). The built `holyagent.js` smoke test created an Intent from stdin and exited 0.\nA command that fails after reading stdin exits non-zero and prints its error on stderr: second test case expects exit 2, empty stdout and stderr starting `error: InvalidDraft:` or `error: StdinMissing:`. The built-bundle smoke test also exited 2 with the error on stderr.\nA regression test spawns the CLI with stdin piped and fails on the old entry point and passes on the fix: `C:/Users/david.basile/dev/holyagent-fix-cli-stdin/packages/runtime/tests/stdin.test.ts`. It gives 3 fail with `Effect.runFork` and 3 pass with `await Effect.runPromise`.\nThe assignment dispatch refusal for an unknown or missing field tells how to dispatch an existing Assignment with {\"id\": \"<id>\"}: `assignment.ts` appends the hint in the `InvalidDraft` mapError, and the third test checks `send {\"id\": \"<id>\"}` with exit 2.\nNo regression in packages/runtime tests relative to the Windows baseline on origin/main (compare failure lists), and check, lint and fmt:check exit 0: base 108 fail, fix 34 fail, `comm -13` of the two lists is empty (new failures: none). check, lint and fmt:check all exited 0.\nChanges stay within the CLI entry point, the dispatch hint, their tests and the rebuilt plugin: `git status` lists exactly the four changed paths above.\nchecks-run: see the checks list above.\nchanged-paths: see the changed list above.\ndiff-file: `/tmp/tmp.lwlgqSZJKh/fix-cli-stdin.diff` (229 lines, includes the new test file via `git diff --no-index`).",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Regression test fails 3/3 on runFork and passes 3/3 on runPromise; failures a subset of base (34 vs 108); gates exit 0.",
+    "criteria": [
+      {
+        "criterion": "Running the built CLI as a subprocess with the report piped on stdin, `assignment close <id> --outcome success` moves the Assignment to a terminal state and prints its result, and `intent create` with JSON on stdin creates the Intent",
+        "support": "`stdin.test.ts` first case runs `main.ts` as a subprocess. It expects `close` to print `state: Succeeded`, and `show --full` to confirm it. It passes (exit 0, 3 pass). The built `holyagent.js` smoke test created an Intent from stdin and exited 0."
+      },
+      {
+        "criterion": "A command that fails after reading stdin exits non-zero and prints its error on stderr",
+        "support": "second test case expects exit 2, empty stdout and stderr starting `error: InvalidDraft:` or `error: StdinMissing:`. The built-bundle smoke test also exited 2 with the error on stderr."
+      },
+      {
+        "criterion": "A regression test spawns the CLI with stdin piped and fails on the old entry point and passes on the fix",
+        "support": "`C:/Users/david.basile/dev/holyagent-fix-cli-stdin/packages/runtime/tests/stdin.test.ts`. It gives 3 fail with `Effect.runFork` and 3 pass with `await Effect.runPromise`."
+      },
+      {
+        "criterion": "The assignment dispatch refusal for an unknown or missing field tells how to dispatch an existing Assignment with {\"id\": \"<id>\"}",
+        "support": "`assignment.ts` appends the hint in the `InvalidDraft` mapError, and the third test checks `send {\"id\": \"<id>\"}` with exit 2."
+      },
+      {
+        "criterion": "No regression in packages/runtime tests relative to the Windows baseline on origin/main (compare failure lists), and check, lint and fmt:check exit 0",
+        "support": "base 108 fail, fix 34 fail, `comm -13` of the two lists is empty (new failures: none). check, lint and fmt:check all exited 0."
+      },
+      {
+        "criterion": "Changes stay within the CLI entry point, the dispatch hint, their tests and the rebuilt plugin",
+        "support": "`git status` lists exactly the four changed paths above."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "see the checks list above."
+      },
+      {
+        "label": "changed-paths",
+        "support": "see the changed list above."
+      },
+      {
+        "label": "diff-file",
+        "support": "`/tmp/tmp.lwlgqSZJKh/fix-cli-stdin.diff` (229 lines, includes the new test file via `git diff --no-index`)."
+      }
+    ]
   },
   "createdAt": "2026-10-28T01:41:26.434Z"
 }
