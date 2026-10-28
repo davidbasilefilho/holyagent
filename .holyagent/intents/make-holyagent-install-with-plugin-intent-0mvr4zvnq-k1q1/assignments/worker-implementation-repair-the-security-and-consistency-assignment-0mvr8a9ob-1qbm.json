@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-security-and-consistency",
   "objective": "Repair the security and consistency findings in holyagent setup and doctor so setup children ignore the current project's Bun and npm config and doctor agrees with setup about where tools are found.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-feat-plugin-only-install (branch feat/plugin-only-install, commit 450465c added packages/runtime/src/setup).",
     "Blocking security finding (Medium): packages/runtime/src/setup/shell.ts:97 runs `bun add -g billion-context`, `bun add -g ctx7`, `bili plugin install claude` and `ctx7 setup` with the process cwd (the user's project, cli/main.ts:36), so a project bunfig.toml, .npmrc or .env can redirect the install registry or preload code. Run every setup child from a neutral directory (the home directory), and start `bun add -g` with `--no-env-file` and `--config=<the plugin's empty-bunfig.toml>` so project config cannot change it; keep ignoring a project .npmrc (a neutral cwd covers it; set npm_config_userconfig only if needed).",
@@ -60,5 +60,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mvr5ftro-9wfh",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-28T01:50:06.461Z"
+  },
   "createdAt": "2026-10-27T21:59:25.308Z"
 }
