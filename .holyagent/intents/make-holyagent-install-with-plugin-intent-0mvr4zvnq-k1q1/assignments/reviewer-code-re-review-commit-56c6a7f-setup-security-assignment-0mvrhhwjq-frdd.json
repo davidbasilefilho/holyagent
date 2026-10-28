@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-commit-56c6a7f-setup-security",
   "objective": "Re-review commit 56c6a7f (setup security and doctor repairs) for correctness and regressions.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-feat-plugin-only-install, branch feat/plugin-only-install, stacked on fix/state-off-main (PR #35).",
     "Earlier code review of 450465c had no blockers. The repair: setup children run from the home directory; bun add -g runs with --no-env-file --config=EMPTY_BUNFIG (join(import.meta.dir,'empty-bunfig.toml'); the built plugin ships scripts/empty-bunfig.toml beside holyagent.js, and run from source the file does not exist); Shell.run now requires {cwd}; doctor accepts bili/ctx7 in Bun's bin dir with a PATH hint (matches packages/runtime/src/setup/check.ts); empty settings.json is {}; cache.md:7 names holyagent setup.",
@@ -39,5 +39,10 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-28T02:17:19.819Z"
+  },
   "createdAt": "2026-10-28T02:17:18.087Z"
 }
