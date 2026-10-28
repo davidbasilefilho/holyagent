@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "make-docs-components-md-and-docs",
   "objective": "Make docs/components.md and docs/requirements.md describe the installers as they now are: Bun, Node LTS, git and gh installed directly, mise only behind --dev (-Dev on Windows).",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-feat-plugin-only-install, branch feat/plugin-only-install. Read install/wsl-install.sh and install/windows-install.ps1 for the current steps.",
     "Stale text: docs/components.md lines 7-10 and docs/requirements.md lines 10 and 38 say the installers use mise for Node, Bun and gh and that the Windows installer has six steps (now five, six with -Dev). Search docs/ for other mentions of mise in an installer context and fix those in these two files only."
@@ -42,7 +42,37 @@
     "agentId": "workflow:wf_c943451a-36b/assignment-0mvrginn4-wgcr",
     "model": "haiku",
     "effort": "high",
-    "startedAt": "2026-10-28T01:50:07.045Z"
+    "startedAt": "2026-10-28T01:50:07.045Z",
+    "finishedAt": "2026-10-28T02:16:45.758Z"
+  },
+  "result": "result: docs/components.md and docs/requirements.md now describe the installers' current steps, with mise installed only under --dev (-Dev on Windows). Only those two files are mine to change.\nchanged: C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/docs/components.md, C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/docs/requirements.md. Not mine: C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/packages/runtime/src/setup/shell.ts is modified in the same tree by another worker and I did not touch it.\nchecks: `mise run fmt:check` -> exit 0, \"All 230 files are formatted.\" (134ms). `git diff --stat -- docs/components.md docs/requirements.md` -> 2 files, 10 insertions, 8 deletions. Not run: `mise run verify`, lint, type-check and tests, because the change is documentation only and no code path or test touches these files.\nblockers: none\nquestions: (1) Confirm assignment-0mvrginn4-wgcr is the open assignment for this worker. An earlier summary said I was on assignment-0mvr5ftbl-g78k (fix-state-off-main, cites m00309). That record is Worker.implementation, Succeeded, accepted false, so I did not pursue it. (2) The earlier summary's DONE list (installers rewritten, packages/cli removed, docs edited) is already in HEAD 8c89f09, not in uncommitted work. I did not verify who committed it and made no VCS writes.\nnotes: docs/decisions.md:53 already states the maintainer's direction (mise only behind --dev) and is out of my ownership, so I left it. docs/usage.md:31 and docs/development.md:23-24 already say --dev/-Dev, so no change. The compress tool failed three times with dead refs, so no compression was recorded; this report is complete without it.\nevidence:\ndocs/components.md and docs/requirements.md describe the installers' current steps and say mise is installed only with the development option: docs/components.md:7 \"Installers, only with `--dev` (`-Dev`)\"; docs/components.md:22-30 rewritten \"mise, Node, Bun, gh\" section (apt/winget prerequisites, Bun from its install script, \"mise is installed only with the development option (`--dev` ... `-Dev` ...)\", \"Without the option, neither installer installs or activates mise.\"); docs/requirements.md:10 \"Developing this repository; installers with --dev\"; docs/requirements.md:38 \"mirrors the WSL installer in five steps ..., or six with `-Dev`, which adds mise\". Installer ground truth: install/wsl-install.sh:44 TOTAL_STEPS=$((5 + DEV)), install/windows-install.ps1:44 TotalSteps 5+Dev.\nOnly docs/components.md and docs/requirements.md change, and the search for installer mentions of mise is shown: `git status --short` shows M docs/components.md, M docs/requirements.md, and M packages/runtime/src/setup/shell.ts (not mine). Mise search over docs/, install/, README.md: remaining hits are install/wsl-install.sh and install/windows-install.ps1 (implement --dev/-Dev, correct), README.md:11 and :34 (correct), docs/usage.md:31 and docs/development.md:23-24 (correct), docs/decisions.md:53 (maintainer direction, kept), docs/components.md:7,28 and docs/requirements.md:10,38 (now correct).\nchanged-paths: C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/docs/components.md, C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/docs/requirements.md\nchecks-run: mise run fmt:check -> exit 0, \"All 230 files are formatted.\"\ndiff-file: C:/Users/DAVID~1.BAS/AppData/Local/Temp/docs-mise-installers-0mvrginn4.diff (git diff of the two files; no new untracked files)",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Two docs files now describe mise only under --dev; fmt:check exit 0; only the two files changed.",
+    "criteria": [
+      {
+        "criterion": "docs/components.md and docs/requirements.md describe the installers' current steps and say mise is installed only with the development option",
+        "support": "docs/components.md:7 \"Installers, only with `--dev` (`-Dev`)\"; docs/components.md:22-30 rewritten \"mise, Node, Bun, gh\" section (apt/winget prerequisites, Bun from its install script, \"mise is installed only with the development option (`--dev` ... `-Dev` ...)\", \"Without the option, neither installer installs or activates mise.\"); docs/requirements.md:10 \"Developing this repository; installers with --dev\"; docs/requirements.md:38 \"mirrors the WSL installer in five steps ..., or six with `-Dev`, which adds mise\". Installer ground truth: install/wsl-install.sh:44 TOTAL_STEPS=$((5 + DEV)), install/windows-install.ps1:44 TotalSteps 5+Dev."
+      },
+      {
+        "criterion": "Only docs/components.md and docs/requirements.md change, and the search for installer mentions of mise is shown",
+        "support": "`git status --short` shows M docs/components.md, M docs/requirements.md, and M packages/runtime/src/setup/shell.ts (not mine). Mise search over docs/, install/, README.md: remaining hits are install/wsl-install.sh and install/windows-install.ps1 (implement --dev/-Dev, correct), README.md:11 and :34 (correct), docs/usage.md:31 and docs/development.md:23-24 (correct), docs/decisions.md:53 (maintainer direction, kept), docs/components.md:7,28 and docs/requirements.md:10,38 (now correct)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/docs/components.md, C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/docs/requirements.md"
+      },
+      {
+        "label": "checks-run",
+        "support": "mise run fmt:check -> exit 0, \"All 230 files are formatted.\""
+      },
+      {
+        "label": "diff-file",
+        "support": "C:/Users/DAVID~1.BAS/AppData/Local/Temp/docs-mise-installers-0mvrginn4.diff (git diff of the two files; no new untracked files)"
+      }
+    ]
   },
   "createdAt": "2026-10-28T01:49:53.584Z"
 }
