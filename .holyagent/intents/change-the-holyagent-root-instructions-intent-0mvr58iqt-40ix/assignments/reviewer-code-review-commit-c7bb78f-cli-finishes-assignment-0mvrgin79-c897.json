@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-commit-c7bb78f-cli-finishes",
   "objective": "Review commit c7bb78f (CLI finishes commands that read stdin before exiting) for correctness and regressions before it is pushed.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-fix-cli-stdin, branch fix/cli-stdin, stacked on fix/state-off-main (PR #35, head 935d4b3).",
     "Bug: on Windows the built CLI exited 0 without doing anything when input came on stdin (assignment close, intent create), because packages/runtime/src/cli/main.ts used Effect.runFork and a pending Bun.stdin.text() does not keep the process alive. Fix: top-level await Effect.runPromise; dispatch InvalidDraft refusal hints {\"id\": \"<id>\"}; regression test packages/runtime/tests/stdin.test.ts; rebuilt packages/integrations/claude/dist/scripts/holyagent.js.",
@@ -40,5 +40,10 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-28T01:50:07.632Z"
+  },
   "createdAt": "2026-10-28T01:49:53.013Z"
 }
