@@ -1,0 +1,48 @@
+{
+  "id": "assignment-0mvrhpqy7-xsx8",
+  "intentId": "intent-0mvr4zvnq-k1q1",
+  "intentRevision": 4,
+  "roleTask": "Worker.mechanical",
+  "slug": "fix-three-stale-lines-in-docs",
+  "objective": "Fix three stale lines in docs/requirements.md and docs/usage.md so they match the installers and doctor as they now are.",
+  "state": "Ready",
+  "scope": [
+    "Worktree C:/Users/david.basile/dev/holyagent-feat-plugin-only-install, branch feat/plugin-only-install. Read install/wsl-install.sh, install/windows-install.ps1 and packages/runtime/src/setup/doctor.ts for the current behavior.",
+    "1) docs/requirements.md:7 (Node.js LTS row, Detail column) says \"mise's `lts` satisfies both\"; the installers now get Node from NodeSource (WSL) and winget (Windows). Name those and keep mise out of the row. 2) docs/usage.md:29 says the WSL installer runs in five steps; add that --dev adds a sixth (mise), as docs/requirements.md:38 says for Windows. 3) docs/usage.md:25 says doctor checks bili and ctx7 on PATH; doctor now also finds them in Bun's global bin directory, passing with a hint to add it to PATH."
+  ],
+  "constraints": [
+    "Edit only docs/requirements.md and docs/usage.md; change only those lines and keep the surrounding wording and size.",
+    "No version-control writes, nothing under .git/ or .holyagent/; report changed paths.",
+    "When done and checked, stop and report; add nothing unrequested."
+  ],
+  "criteria": [
+    {
+      "text": "docs/requirements.md:7 names NodeSource and winget as the Node source and does not mention mise",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "docs/usage.md says --dev adds a mise step to the WSL installer and that doctor also finds bili and ctx7 in Bun's global bin directory",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Only docs/requirements.md and docs/usage.md change and mise run fmt:check exits 0",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "docs/requirements.md",
+    "docs/usage.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvrginn4-wgcr",
+  "createdAt": "2026-10-28T02:23:24.080Z"
+}
