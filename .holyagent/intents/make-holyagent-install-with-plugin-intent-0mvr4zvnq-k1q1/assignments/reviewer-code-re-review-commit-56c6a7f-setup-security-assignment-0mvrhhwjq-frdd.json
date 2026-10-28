@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mvrhhwjq-frdd",
+  "intentId": "intent-0mvr4zvnq-k1q1",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-commit-56c6a7f-setup-security",
+  "objective": "Re-review commit 56c6a7f (setup security and doctor repairs) for correctness and regressions.",
+  "state": "Ready",
+  "scope": [
+    "Worktree C:/Users/david.basile/dev/holyagent-feat-plugin-only-install, branch feat/plugin-only-install, stacked on fix/state-off-main (PR #35).",
+    "Earlier code review of 450465c had no blockers. The repair: setup children run from the home directory; bun add -g runs with --no-env-file --config=EMPTY_BUNFIG (join(import.meta.dir,'empty-bunfig.toml'); the built plugin ships scripts/empty-bunfig.toml beside holyagent.js, and run from source the file does not exist); Shell.run now requires {cwd}; doctor accepts bili/ctx7 in Bun's bin dir with a PATH hint (matches packages/runtime/src/setup/check.ts); empty settings.json is {}; cache.md:7 names holyagent setup.",
+    "Review `git diff bb36687 56c6a7f -- packages` (also C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/node_modules/.review/setup-repair.diff). Windows baseline: about 108 failing tests on untouched main (symlink EPERM, paths, POSIX modes); the writer reported 102 failing, none new."
+  ],
+  "constraints": [
+    "Read-only: no edits, no version-control writes, nothing under .git/ or .holyagent/.",
+    "This is a re-review of a repair: judge only whether the previous findings are closed and whether the repair diff introduces a new problem; do not re-review unchanged code. When done, stop and report findings marked blocking or non-blocking with file:line; launch no other reviewers."
+  ],
+  "criteria": [
+    {
+      "text": "The repair behaves as stated, including that the empty bunfig path resolves to an existing file in the built plugin, and doctor and setup agree on where they find bili and ctx7",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Tests cover the repaired behavior and no test is weakened or newly fails",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The change follows the repository rules (Effect, Bun Shell, JSDoc) and stays within the setup code, cache.md, their tests and the rebuilt plugin",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-10-28T02:17:18.087Z"
+}
