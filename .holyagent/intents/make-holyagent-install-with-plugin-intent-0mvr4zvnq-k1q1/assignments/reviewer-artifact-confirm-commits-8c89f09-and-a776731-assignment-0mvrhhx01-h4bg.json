@@ -1,0 +1,37 @@
+{
+  "id": "assignment-0mvrhhx01-h4bg",
+  "intentId": "intent-0mvr4zvnq-k1q1",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.artifact",
+  "slug": "confirm-commits-8c89f09-and-a776731",
+  "objective": "Confirm commits 8c89f09 and a776731 close the earlier installer and docs findings.",
+  "state": "Ready",
+  "scope": [
+    "Worktree C:/Users/david.basile/dev/holyagent-feat-plugin-only-install, branch feat/plugin-only-install, stacked on fix/state-off-main (PR #35).",
+    "Previous blocking findings: install/wsl-install.sh:143 installed mise unconditionally and both installers used mise for Node, Bun and gh, though mise is for development only; packages/runtime/src/instructions/requirements/cache.md:7 said 'the public CLI sets subagentPromptCacheTtl' (now fixed in another commit); non-blocking docs/attributions.md:25 and docs/decisions.md:53. Requirement: installers install only Bun, Node LTS, git, gh and, for development, mise, and each ends by printing the three plugin commands `claude plugin marketplace add davidbasilefilho/holyagent`, `claude plugin marketplace add ranxianglei/billion-context`, `claude plugin install holyagent@holyagent`. README keeps sections # HolyAgent, ## How do I install it?, ## Why HolyAgent?, ## Development, ## Special thanks, ## License in that order.",
+    "Repair diff (bb36687..a776731 for install, docs, README.md): C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/node_modules/.review/install-repair.diff; read the files in the worktree for context."
+  ],
+  "constraints": [
+    "Read-only: no edits, no version-control writes, nothing under .git/ or .holyagent/.",
+    "This is a re-review of a repair: judge only whether the previous findings are closed and whether the repair diff introduces a new problem; do not re-review unchanged code. When done, stop and report findings marked blocking or non-blocking with file:line; launch no other reviewers."
+  ],
+  "criteria": [
+    {
+      "text": "Without the development option neither installer installs or uses mise, each installs Bun, Node LTS, git and gh and ends by printing the three plugin commands",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The docs and README describe the installers as they now are and keep the README sections in order",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-10-28T02:17:18.673Z"
+}
