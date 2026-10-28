@@ -49,6 +49,8 @@ export interface Ran {
   readonly command: string
   readonly args: ReadonlyArray<string>
   readonly line: string
+  /** The working directory the command was asked to run in. */
+  readonly cwd: string
 }
 
 const packageCommands: Readonly<Record<string, string>> = {
@@ -63,24 +65,31 @@ const packageCommands: Readonly<Record<string, string>> = {
  */
 export const fakeShell = (options: {
   readonly commands: ReadonlyArray<string>
+  /** Commands found only in Bun's global bin directory, not on PATH. */
+  readonly bunBinCommands?: ReadonlyArray<string>
   readonly respond?: (line: string) => Partial<ShellResult> | undefined
 }) => {
   const available = new Set(options.commands)
+  const inBunBin = new Set(options.bunBinCommands ?? [])
   const calls: Array<Ran> = []
   const layer = Layer.succeed(
     Shell,
     Shell.of({
-      which: (command) =>
+      which: (command, whichOptions) =>
         Effect.succeed(
-          available.has(command) ? Option.some(`/fake/bin/${command}`) : Option.none(),
+          available.has(command)
+            ? Option.some(`/fake/bin/${command}`)
+            : whichOptions?.includeBunBin && inBunBin.has(command)
+              ? Option.some(`/fake/.bun/bin/${command}`)
+              : Option.none(),
         ),
-      run: (command, args) =>
+      run: (command, args, runOptions) =>
         Effect.sync(() => {
           const line = [command, ...args].join(" ")
-          calls.push({ command, args, line })
+          calls.push({ command, args, line, cwd: runOptions.cwd })
           const result = { exitCode: 0, stdout: "", stderr: "", ...options.respond?.(line) }
-          const global =
-            command === "bun" && args[0] === "add" && args[1] === "-g" ? args[2] : undefined
+          const add = command === "bun" ? args.indexOf("add") : -1
+          const global = add >= 0 && args[add + 1] === "-g" ? args[add + 2] : undefined
           const installed = global === undefined ? undefined : packageCommands[global]
           if (installed !== undefined && result.exitCode === 0) available.add(installed)
           return result

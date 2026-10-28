@@ -23,8 +23,16 @@ describe("the JSON files setup edits", () => {
     expect(await Effect.runPromise(readJsonObject(join(directory, "none.json")))).toEqual({})
   })
 
+  test("an empty or whitespace-only file is an empty object, as a missing file is", async () => {
+    for (const text of ["", "  \n\t\n"]) {
+      const file = join(directory, "blank.json")
+      await writeFile(file, text)
+      expect(await Effect.runPromise(readJsonObject(file))).toEqual({})
+    }
+  })
+
   test("a file that is not a JSON object fails naming the file, and is not touched", async () => {
-    for (const text of ["[1]", "null", '"x"', "{", ""]) {
+    for (const text of ["[1]", "null", '"x"', "{"]) {
       const file = join(directory, "bad.json")
       await writeFile(file, text)
       const error = await Effect.runPromise(Effect.flip(readJsonObject(file)))

@@ -12114,6 +12114,8 @@ var readJsonObject = (path) => gen2(function* () {
   if (!(yield* fileOperation(path, "read", () => Bun.file(path).exists())))
     return empty3;
   const text = yield* fileOperation(path, "read", () => Bun.file(path).text());
+  if (text.trim() === "")
+    return empty3;
   return yield* decodeUnknownEffect2(JsonObjectText)(text, strict2).pipe(mapError2((error) => new SetupFailure({ message: `${path} is not a JSON object: ${error.message}` })));
 });
 var writeJsonObject = (path, value, options) => gen2(function* () {
@@ -12241,14 +12243,15 @@ var findCommand = (env, command, options) => {
     PATH: options?.includeBunBin ? bunBin.value : env[bunBin.key] ?? ""
   }));
 };
+var EMPTY_BUNFIG = join10(import.meta.dir, "empty-bunfig.toml");
 
 class Shell extends Service()("holyagent/Shell") {
   static live = (env) => {
     const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory(env), bunInstall: env.BUN_INSTALL });
     return succeed5(Shell, Shell.of({
       which: (command, options) => sync2(() => findCommand(env, command, options)),
-      run: (command, args) => tryPromise2({
-        try: () => $3`${command} ${args}`.env(Object.fromEntries(Object.entries({ ...env, [bunBin.key]: bunBin.value }).filter((entry) => entry[1] !== undefined))).quiet().nothrow().then((result) => ({
+      run: (command, args, options) => tryPromise2({
+        try: () => $3`${command} ${args}`.cwd(options.cwd).env(Object.fromEntries(Object.entries({ ...env, [bunBin.key]: bunBin.value }).filter((entry) => entry[1] !== undefined))).quiet().nothrow().then((result) => ({
           exitCode: result.exitCode,
           stdout: result.stdout.toString(),
           stderr: result.stderr.toString()
@@ -19407,7 +19410,8 @@ var MIGRATE_COMMANDS = [
 
 import { join as join14 } from "path";
 var CLOUD_SKIP = "skipped in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true), which has no machine of yours to install it on";
-var ensureGlobal = fn2("ensureGlobal")(function* (command, packageName, dryRun) {
+var neutralDirectory = (env) => homeDirectory(env);
+var ensureGlobal = fn2("ensureGlobal")(function* (env, command, packageName, dryRun) {
   const shell = yield* Shell;
   if (isSome2(yield* shell.which(command, { includeBunBin: true }))) {
     return { usable: true, lines: [present2(`${command}: already installed`)] };
@@ -19418,7 +19422,7 @@ var ensureGlobal = fn2("ensureGlobal")(function* (command, packageName, dryRun) 
       lines: [added(`${command}: would install with bun add -g ${packageName}`)]
     };
   }
-  const result = yield* shell.run("bun", ["add", "-g", packageName]);
+  const result = yield* shell.run("bun", ["--no-env-file", `--config=${EMPTY_BUNFIG}`, "add", "-g", packageName], { cwd: neutralDirectory(env) });
   if (result.exitCode !== 0)
     return { usable: false, lines: [failed2(`bun add -g ${packageName}`, result)] };
   const lines = [added(`${command}: installed with bun add -g ${packageName}`)];
@@ -19432,11 +19436,11 @@ var ensureGlobal = fn2("ensureGlobal")(function* (command, packageName, dryRun) 
 var installBillionContext = fn2("installBillionContext")(function* (env, dryRun) {
   const shell = yield* Shell;
   const files = userFiles(env);
-  const global = yield* ensureGlobal("bili", "billion-context", dryRun);
+  const global = yield* ensureGlobal(env, "bili", "billion-context", dryRun);
   if (!global.usable)
     return global.lines;
   const nativeReady = (yield* fileContains(files.settings, "claude-native-bootstrap")) && (yield* fileExists2(join14(files.claudeDir, "commands", "acp-cache.md"))) && (yield* fileContains(files.claudeJson, '"bili"'));
-  const native = nativeReady ? present2("bili native mode: already configured") : dryRun ? added("bili native mode: would configure with bili plugin install claude") : yield* shell.run("bili", ["plugin", "install", "claude"]).pipe(map4((result) => result.exitCode === 0 ? added("bili native mode: configured with bili plugin install claude") : failed2("bili plugin install claude", result)));
+  const native = nativeReady ? present2("bili native mode: already configured") : dryRun ? added("bili native mode: would configure with bili plugin install claude") : yield* shell.run("bili", ["plugin", "install", "claude"], { cwd: neutralDirectory(env) }).pipe(map4((result) => result.exitCode === 0 ? added("bili native mode: configured with bili plugin install claude") : failed2("bili plugin install claude", result)));
   const config = yield* readJsonObject(files.biliConfig).pipe(flatMap2((existing) => {
     const { merged, entries } = applyDefaults(existing, [
       { path: ["compress", "rules"], value: true }
@@ -19455,7 +19459,7 @@ var installBillionContext = fn2("installBillionContext")(function* (env, dryRun)
 var installCtx7 = fn2("installCtx7")(function* (env, dryRun) {
   const shell = yield* Shell;
   const files = userFiles(env);
-  const global = yield* ensureGlobal("ctx7", "ctx7", dryRun);
+  const global = yield* ensureGlobal(env, "ctx7", "ctx7", dryRun);
   if (!global.usable)
     return global.lines;
   const skillReady = (yield* fileExists2(join14(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join14(files.claudeDir, "rules", "context7.md")));
@@ -19473,7 +19477,7 @@ var installCtx7 = fn2("installCtx7")(function* (env, dryRun) {
   if (dryRun) {
     return [...global.lines, added("ctx7 skill: would install with ctx7 setup --cli --claude")];
   }
-  const result = yield* shell.run("ctx7", args);
+  const result = yield* shell.run("ctx7", args, { cwd: neutralDirectory(env) });
   return [
     ...global.lines,
     result.exitCode === 0 ? added("ctx7 skill: installed with ctx7 setup --cli --claude") : failed2("ctx7 setup", result)
@@ -19502,8 +19506,11 @@ var checkCommand = (env, command) => gen2(function* () {
   if (inCloudSession(env))
     return pass(command, "not installed in a claude.ai cloud session, by design");
   const shell = yield* Shell;
-  const found = yield* shell.which(command);
-  return isSome2(found) ? pass(command, found.value) : fail6(command, `not found on PATH; ${FIX}`);
+  const onPath = yield* shell.which(command);
+  if (isSome2(onPath))
+    return pass(command, onPath.value);
+  const anywhere = yield* shell.which(command, { includeBunBin: true });
+  return isSome2(anywhere) ? pass(command, `${anywhere.value} (not on PATH; add its directory to PATH)`) : fail6(command, `not found on PATH or in Bun's bin directory; ${FIX}`);
 });
 var checkSettings = (env) => missingSettingKeys(env).pipe(map4((missing) => missing.length === 0 ? pass("settings", userFiles(env).settings) : fail6("settings", `${userFiles(env).settings} lacks ${missing.join(", ")}; ${FIX}`)), catchTag2("SetupFailure", (error) => succeed6(fail6("settings", error.message))));
 var checks = (env) => all2([checkBun, checkCommand(env, "bili"), checkCommand(env, "ctx7"), checkSettings(env)]);

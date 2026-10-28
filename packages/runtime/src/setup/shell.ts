@@ -64,6 +64,13 @@ export const findCommand = (
 }
 
 /**
+ * The empty Bun config the plugin ships beside the CLI script (`scripts/empty-bunfig.toml`), found
+ * the way the bundled tools are: in the folder of the running bundle. `bun add -g` takes it as
+ * `--config`, so no bunfig.toml of a project can change an install.
+ */
+export const EMPTY_BUNFIG: string = join(import.meta.dir, "empty-bunfig.toml")
+
+/**
  * The external commands setup drives (`bun`, `bili`, `ctx7`). Commands see Bun's global bin
  * directory on PATH, because a `bun add -g` in the same run puts new commands there.
  */
@@ -75,8 +82,16 @@ export class Shell extends Context.Service<
       command: string,
       options?: { readonly includeBunBin?: boolean },
     ) => Effect.Effect<Option.Option<string>>
-    /** Runs a command to completion without a terminal; stdout and stderr are captured. */
-    readonly run: (command: string, args: ReadonlyArray<string>) => Effect.Effect<ShellResult>
+    /**
+     * Runs a command to completion without a terminal; stdout and stderr are captured. The command
+     * runs in `cwd`, which setup sets to a neutral directory because the process directory is the
+     * user's project, whose .npmrc, bunfig.toml and .env must not steer an install.
+     */
+    readonly run: (
+      command: string,
+      args: ReadonlyArray<string>,
+      options: { readonly cwd: string },
+    ) => Effect.Effect<ShellResult>
   }
 >()("holyagent/Shell") {
   /** The real implementation, backed by the Bun Shell, for the environment of the process. */
@@ -91,10 +106,11 @@ export class Shell extends Context.Service<
       Shell,
       Shell.of({
         which: (command, options) => Effect.sync(() => findCommand(env, command, options)),
-        run: (command, args) =>
+        run: (command, args, options) =>
           Effect.tryPromise({
             try: () =>
               $`${command} ${args}`
+                .cwd(options.cwd)
                 .env(
                   Object.fromEntries(
                     Object.entries({ ...env, [bunBin.key]: bunBin.value }).filter(

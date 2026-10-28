@@ -5,8 +5,13 @@ import { dirname, join } from "node:path"
 import { Effect } from "effect"
 
 import { doctor } from "../src/setup/doctor.ts"
+import { EMPTY_BUNFIG } from "../src/setup/shell.ts"
 import { setup, type SetupOptions } from "../src/setup/steps.ts"
 import { fakeShell, scratch, writeCompleteSettings } from "./setup-fixture.ts"
+
+/** The command line of a global install: no env file, the plugin's empty config, then the add. */
+const bunAdd = (packageName: string) =>
+  `bun --no-env-file --config=${EMPTY_BUNFIG} add -g ${packageName}`
 
 const BOTH: SetupOptions = {
   subagentCacheTtl: "1h",
@@ -73,9 +78,9 @@ describe("holyagent setup", () => {
     const shell = fakeShell({ commands: ["bun"] })
     const report = await Effect.runPromise(setup(env(), BOTH).pipe(Effect.provide(shell.layer)))
     expect(shell.lines()).toEqual([
-      "bun add -g billion-context",
+      bunAdd("billion-context"),
       "bili plugin install claude",
-      "bun add -g ctx7",
+      bunAdd("ctx7"),
     ])
     expect(report.ok).toBe(true)
     expect(report.lines.filter((line) => line.startsWith("- "))).toEqual([
@@ -91,6 +96,17 @@ describe("holyagent setup", () => {
     expect(settings.subagentPromptCacheTtl).toBe("1h")
     expect(settings.enabledPlugins).toEqual({ "holyagent@holyagent": true })
     expect(settings.permissions).toEqual({ deny: ["WebSearch", "WebFetch"] })
+  })
+
+  test("every child runs from the home directory, and bun add -g reads no env file and only the empty config", async () => {
+    const shell = fakeShell({ commands: ["bun"] })
+    await Effect.runPromise(
+      setup(env({ CONTEXT7_API_KEY: "ctx7sk-test" }), BOTH).pipe(Effect.provide(shell.layer)),
+    )
+    expect(shell.calls.map((call) => call.command)).toEqual(["bun", "bili", "bun", "ctx7"])
+    for (const call of shell.calls) expect(call.cwd).toBe(home)
+    for (const call of shell.calls.filter((entry) => entry.command === "bun"))
+      expect(call.args.slice(0, 3)).toEqual(["--no-env-file", `--config=${EMPTY_BUNFIG}`, "add"])
   })
 
   test("a second run with everything in place prints only = lines and changes nothing", async () => {
@@ -201,14 +217,14 @@ describe("holyagent setup", () => {
     const shell = fakeShell({
       commands: ["bun"],
       respond: (line) =>
-        line === "bun add -g billion-context"
+        line === bunAdd("billion-context")
           ? { exitCode: 1, stderr: "network down\nmore" }
           : undefined,
     })
     const report = await Effect.runPromise(setup(env(), BOTH).pipe(Effect.provide(shell.layer)))
     expect(report.ok).toBe(false)
     expect(report.lines[0]).toBe("! bun add -g billion-context: failed (exit 1): network down")
-    expect(shell.lines()).toContain("bun add -g ctx7")
+    expect(shell.lines()).toContain(bunAdd("ctx7"))
     expect(report.lines.at(-1)).toBe(`added ${SETTINGS_KEYS.length}`)
     expect(await Bun.file(settingsFile()).exists()).toBe(true)
   })
@@ -237,7 +253,7 @@ describe("holyagent setup", () => {
       "is not a JSON object",
     )
     expect(await read(settingsFile())).toBe("[1]")
-    expect(shell.lines()).toContain("bun add -g ctx7")
+    expect(shell.lines()).toContain(bunAdd("ctx7"))
   })
 
   test("a Billion Context config that is not a JSON object is reported and left alone", async () => {
@@ -352,6 +368,35 @@ describe("holyagent doctor", () => {
     expect(shell.calls).toEqual([])
   })
 
+  test("finds bili and ctx7 in Bun's bin directory as setup does, with a PATH hint", async () => {
+    await writeCompleteSettings(claudeDirectory())
+    const shell = fakeShell({ commands: ["bun"], bunBinCommands: ["bili", "ctx7"] })
+    const report = await Effect.runPromise(
+      doctor(env(), { fix: false }).pipe(Effect.provide(shell.layer)),
+    )
+    expect(report.ok).toBe(true)
+    expect(report.lines[1]).toBe(
+      "ok   bili: /fake/.bun/bin/bili (not on PATH; add its directory to PATH)",
+    )
+    expect(report.lines[2]).toStartWith("ok   ctx7: /fake/.bun/bin/ctx7")
+    expect(shell.calls).toEqual([])
+  })
+
+  test("an empty settings.json counts as an empty object: doctor names the missing keys, --fix fills them", async () => {
+    await mkdir(claudeDirectory(), { recursive: true })
+    await writeFile(settingsFile(), "")
+    const shell = fakeShell({ commands: ["bun", "bili", "ctx7"] })
+    const before = await Effect.runPromise(
+      doctor(env(), { fix: false }).pipe(Effect.provide(shell.layer)),
+    )
+    expect(before.lines.at(-1)).toContain("lacks attribution.commit")
+    const fixed = await Effect.runPromise(
+      doctor(env(), { fix: true }).pipe(Effect.provide(shell.layer)),
+    )
+    expect(fixed.ok).toBe(true)
+    expect((await readJson(settingsFile())).subagentPromptCacheTtl).toBe("1h")
+  })
+
   test("fails on each missing piece, checks the user settings, and has no plugin or canary check", async () => {
     const shell = fakeShell({ commands: [] })
     const cwdSettings = join(process.cwd(), ".claude", "settings.json")
@@ -391,9 +436,9 @@ describe("holyagent doctor", () => {
       ),
     )
     expect(shell.lines()).toEqual([
-      "bun add -g billion-context",
+      bunAdd("billion-context"),
       "bili plugin install claude",
-      "bun add -g ctx7",
+      bunAdd("ctx7"),
       "ctx7 setup --cli --claude --yes --api-key ctx7sk-test",
     ])
     expect(report.ok).toBe(true)
@@ -420,7 +465,7 @@ describe("holyagent doctor", () => {
     const shell = fakeShell({
       commands: ["bun"],
       respond: (line) =>
-        line.startsWith("bun add -g") ? { exitCode: 1, stderr: "offline" } : undefined,
+        line.includes(" add -g ") ? { exitCode: 1, stderr: "offline" } : undefined,
     })
     const report = await Effect.runPromise(
       doctor(env(), { fix: true }).pipe(Effect.provide(shell.layer)),

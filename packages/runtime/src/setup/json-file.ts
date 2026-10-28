@@ -46,13 +46,15 @@ export const fileContains = (path: string, needle: string) =>
   )
 
 /**
- * Reads a JSON object file. A missing file is an empty object, and a file that is not a JSON object
- * fails with a message naming the file, so a hand-edited file is never overwritten.
+ * Reads a JSON object file. A missing file, and a file that is empty or only whitespace, is an
+ * empty object; a file that is not a JSON object fails with a message naming the file, so a
+ * hand-edited file is never overwritten.
  */
 export const readJsonObject = (path: string) =>
   Effect.gen(function* () {
     if (!(yield* fileOperation(path, "read", () => Bun.file(path).exists()))) return empty
     const text = yield* fileOperation(path, "read", () => Bun.file(path).text())
+    if (text.trim() === "") return empty
     return yield* Schema.decodeUnknownEffect(JsonObjectText)(text, strict).pipe(
       Effect.mapError(
         (error) => new SetupFailure({ message: `${path} is not a JSON object: ${error.message}` }),

@@ -3,7 +3,7 @@ import { join } from "node:path"
 import { Effect, Option } from "effect"
 
 import { inCloudSession } from "../vcs/identity.ts"
-import { type Env, userFiles } from "./environment.ts"
+import { type Env, homeDirectory, userFiles } from "./environment.ts"
 import type { SetupFailure } from "./errors.ts"
 import {
   applyDefaults,
@@ -14,17 +14,24 @@ import {
 } from "./json-file.ts"
 import { added, failed, hint, present, type Report, show, skipped } from "./report.ts"
 import { type CacheTtl, mergeUserSettings } from "./settings.ts"
-import { Shell } from "./shell.ts"
+import { EMPTY_BUNFIG, Shell } from "./shell.ts"
 
 /** Why Billion Context and ctx7 are left out of a claude.ai cloud session. */
 const CLOUD_SKIP =
   "skipped in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true), which has no machine of yours to install it on"
 
 /**
+ * The directory every setup child runs in: the home directory, not the process directory, which is
+ * the user's project and may hold a .npmrc, bunfig.toml or .env that would steer an install.
+ */
+const neutralDirectory = (env: Env) => homeDirectory(env)
+
+/**
  * Installs a command with `bun add -g` unless it is already available. Returns the report lines and
  * whether the command can be used afterwards (on a dry run, whether it would be).
  */
 const ensureGlobal = Effect.fn("ensureGlobal")(function* (
+  env: Env,
   command: string,
   packageName: string,
   dryRun: boolean,
@@ -39,7 +46,12 @@ const ensureGlobal = Effect.fn("ensureGlobal")(function* (
       lines: [added(`${command}: would install with bun add -g ${packageName}`)],
     }
   }
-  const result = yield* shell.run("bun", ["add", "-g", packageName])
+  // Bun reads no .env and the empty config, so a project's own files cannot redirect the install.
+  const result = yield* shell.run(
+    "bun",
+    ["--no-env-file", `--config=${EMPTY_BUNFIG}`, "add", "-g", packageName],
+    { cwd: neutralDirectory(env) },
+  )
   if (result.exitCode !== 0)
     return { usable: false, lines: [failed(`bun add -g ${packageName}`, result)] }
   const lines = [added(`${command}: installed with bun add -g ${packageName}`)]
@@ -58,7 +70,7 @@ export const installBillionContext = Effect.fn("installBillionContext")(function
 ) {
   const shell = yield* Shell
   const files = userFiles(env)
-  const global = yield* ensureGlobal("bili", "billion-context", dryRun)
+  const global = yield* ensureGlobal(env, "bili", "billion-context", dryRun)
   if (!global.usable) return global.lines
 
   // Native mode merges a proxy URL, a hook and an MCP server into Claude Code's settings, and every
@@ -72,7 +84,7 @@ export const installBillionContext = Effect.fn("installBillionContext")(function
     : dryRun
       ? added("bili native mode: would configure with bili plugin install claude")
       : yield* shell
-          .run("bili", ["plugin", "install", "claude"])
+          .run("bili", ["plugin", "install", "claude"], { cwd: neutralDirectory(env) })
           .pipe(
             Effect.map((result) =>
               result.exitCode === 0
@@ -113,7 +125,7 @@ export const installBillionContext = Effect.fn("installBillionContext")(function
 export const installCtx7 = Effect.fn("installCtx7")(function* (env: Env, dryRun: boolean) {
   const shell = yield* Shell
   const files = userFiles(env)
-  const global = yield* ensureGlobal("ctx7", "ctx7", dryRun)
+  const global = yield* ensureGlobal(env, "ctx7", "ctx7", dryRun)
   if (!global.usable) return global.lines
 
   const skillReady =
@@ -143,7 +155,7 @@ export const installCtx7 = Effect.fn("installCtx7")(function* (env: Env, dryRun:
   if (dryRun) {
     return [...global.lines, added("ctx7 skill: would install with ctx7 setup --cli --claude")]
   }
-  const result = yield* shell.run("ctx7", args)
+  const result = yield* shell.run("ctx7", args, { cwd: neutralDirectory(env) })
   return [
     ...global.lines,
     result.exitCode === 0

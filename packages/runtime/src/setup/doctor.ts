@@ -20,16 +20,22 @@ const checkBun = Effect.gen(function* () {
     : fail("bun", "not found on PATH; install Bun (https://bun.sh), which runs the plugin hooks")
 })
 
-/** A command setup installs: on PATH, or skipped by design in a claude.ai cloud session. */
+/**
+ * A command setup installs: on PATH or in Bun's global bin directory (where setup and the
+ * SessionStart check look too), or skipped by design in a claude.ai cloud session. A command found
+ * only in Bun's bin directory passes with a hint to add that directory to PATH.
+ */
 const checkCommand = (env: Env, command: string) =>
   Effect.gen(function* () {
     if (inCloudSession(env))
       return pass(command, "not installed in a claude.ai cloud session, by design")
     const shell = yield* Shell
-    const found = yield* shell.which(command)
-    return Option.isSome(found)
-      ? pass(command, found.value)
-      : fail(command, `not found on PATH; ${FIX}`)
+    const onPath = yield* shell.which(command)
+    if (Option.isSome(onPath)) return pass(command, onPath.value)
+    const anywhere = yield* shell.which(command, { includeBunBin: true })
+    return Option.isSome(anywhere)
+      ? pass(command, `${anywhere.value} (not on PATH; add its directory to PATH)`)
+      : fail(command, `not found on PATH or in Bun's bin directory; ${FIX}`)
   })
 
 const checkSettings = (env: Env) =>
