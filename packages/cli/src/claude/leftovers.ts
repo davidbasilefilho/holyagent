@@ -1,6 +1,11 @@
 import { Effect, FileSystem, Option, Path } from "effect"
 
-import { isJsonObject, type JsonObject, readJsonObject, writeJsonObject } from "../json-file.ts"
+import {
+  isJsonObject,
+  type JsonObject,
+  readJsonObjectSnapshot,
+  writeJsonObjectIfUnchanged,
+} from "../json-file.ts"
 import { Shell } from "../shell.ts"
 
 /** Where the current user's Claude Code files live, as far as the leftovers scan needs them. */
@@ -19,17 +24,64 @@ const HOOK_MARKER = "claude-native-bootstrap"
 const BILI_PLUGIN = "billion-context@billion-context"
 const BILI_MARKETPLACE = "billion-context"
 
-/** Whether a shell command line starts with the `bili` executable (with or without a path). */
-const isBiliCommand = (command: unknown): boolean => {
-  if (typeof command !== "string") return false
-  const program = (command.trim().split(/\s+/)[0] ?? "").replace(/^["']|["']$/g, "")
-  return /^(?:.*[\\/])?bili(?:\.(?:cmd|exe|ps1))?$/i.test(program)
+/** What `commands/acp-cache.md` says when Billion Context wrote it. */
+const COMMAND_MARKER = /billion[- ]?context|\bbili\b|claude-native-bootstrap/i
+
+/** Splits a command line into words, keeping quoted text (such as a path with spaces) in one. */
+const words = (command: string): ReadonlyArray<string> => {
+  const found: Array<string> = []
+  let current = ""
+  let quote: string | undefined
+  let started = false
+  for (const char of command.trim()) {
+    if (quote !== undefined) {
+      if (char === quote) quote = undefined
+      else current += char
+    } else if (char === '"' || char === "'") {
+      quote = char
+      started = true
+    } else if (/\s/.test(char)) {
+      if (started || current !== "") found.push(current)
+      current = ""
+      started = false
+    } else current += char
+  }
+  if (started || current !== "") found.push(current)
+  return found
 }
 
-const isBiliHook = (handler: unknown): handler is JsonObject & { readonly command: string } =>
-  isJsonObject(handler) &&
-  typeof handler["command"] === "string" &&
-  (handler["command"].includes(HOOK_MARKER) || isBiliCommand(handler["command"]))
+/** The program a command line runs, after `VAR=value` assignments and an `env` wrapper. */
+const programOf = (command: string): string | undefined => {
+  const tokens = words(command)
+  let index = 0
+  while (index < tokens.length) {
+    const token = tokens[index] ?? ""
+    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(token)) index += 1
+    else if (/^(?:.*[\\/])?env(?:\.exe)?$/i.test(token)) {
+      index += 1
+      while ((tokens[index] ?? "").startsWith("-")) {
+        index += /^(?:-u|--unset|-C|--chdir)$/.test(tokens[index] ?? "") ? 2 : 1
+      }
+    } else return token
+  }
+  return undefined
+}
+
+/** Whether a shell command line runs the `bili` executable (with or without a path or wrapper). */
+const isBiliCommand = (command: unknown): boolean =>
+  typeof command === "string" &&
+  /^(?:.*[\\/])?bili(?:\.(?:cmd|exe|ps1))?$/i.test(programOf(command) ?? "")
+
+/** What a hook command matched, for the report line: the marker or `bili`, never the command. */
+const hookMatch = (handler: unknown): string | undefined => {
+  if (!isJsonObject(handler) || typeof handler["command"] !== "string") return undefined
+  if (handler["command"].includes(HOOK_MARKER)) return HOOK_MARKER
+  return isBiliCommand(handler["command"]) ? "bili" : undefined
+}
+
+/** Whether `ANTHROPIC_BASE_URL` is the Billion Context proxy: that origin, with any path. */
+const isProxyUrl = (value: unknown): boolean =>
+  typeof value === "string" && URL.canParse(value) && new URL(value).origin === PROXY_ORIGIN
 
 const without = (object: JsonObject, key: string): JsonObject =>
   Object.fromEntries(Object.entries(object).filter(([name]) => name !== key))
@@ -70,8 +122,9 @@ const dropHooks = (root: JsonObject): Plan => {
         continue
       }
       const handlers = (group["hooks"] as ReadonlyArray<unknown>).filter((handler) => {
-        if (!isBiliHook(handler)) return true
-        removed.push(`hooks.${event} command ${handler.command}`)
+        const matched = hookMatch(handler)
+        if (matched === undefined) return true
+        removed.push(`hooks.${event} command matching ${matched}`)
         return false
       })
       if (handlers.length === group["hooks"].length) kept.push(group)
@@ -99,15 +152,22 @@ const chain = (start: JsonObject, steps: ReadonlyArray<(root: JsonObject) => Pla
 /**
  * Plans the removal from `~/.claude/settings.json`: the proxy base URL, the native-mode hook, and
  * the Billion Context plugin and marketplace entries. `DISABLE_AUTO_COMPACT=1` goes only when some
- * other native-mode artifact shows Billion Context set it (`nativeMode`), because a person can set
- * that variable for their own reasons.
+ * other Billion Context entry shows it set it (`nativeMode`, or the proxy URL, a hook, or a plugin
+ * or marketplace entry in these settings), because a person can set that variable for their own
+ * reasons.
  */
 const planSettings = (settings: JsonObject, nativeMode: boolean): Plan => {
   const env = settings["env"]
-  const proxyUrl = isJsonObject(env) ? env["ANTHROPIC_BASE_URL"] : undefined
-  const proxied = typeof proxyUrl === "string" && proxyUrl.startsWith(PROXY_ORIGIN)
+  const proxied = isJsonObject(env) && isProxyUrl(env["ANTHROPIC_BASE_URL"])
   const hooks = dropHooks(settings)
-  const evidence = nativeMode || proxied || hooks.removed.length > 0
+  const plugins = settings["enabledPlugins"]
+  const markets = settings["extraKnownMarketplaces"]
+  const evidence =
+    nativeMode ||
+    proxied ||
+    hooks.removed.length > 0 ||
+    (isJsonObject(plugins) && Object.hasOwn(plugins, BILI_PLUGIN)) ||
+    (isJsonObject(markets) && Object.hasOwn(markets, BILI_MARKETPLACE))
   const compact = isJsonObject(env) ? env["DISABLE_AUTO_COMPACT"] : undefined
   return chain(settings, [
     (root) =>
@@ -122,27 +182,83 @@ const planSettings = (settings: JsonObject, nativeMode: boolean): Plan => {
   ])
 }
 
-/** Plans the removal of the `bili` MCP server from `~/.claude.json`. */
-const planClaudeJson = (config: JsonObject): Plan => {
-  const servers = config["mcpServers"]
+/** Removes the `bili` MCP server from `node` when its command is `bili`; `where` prefixes the line. */
+const dropBiliServer = (node: JsonObject, where: string): Plan => {
+  const servers = node["mcpServers"]
   const server = isJsonObject(servers) ? servers["bili"] : undefined
   if (!isJsonObject(server) || !isBiliCommand(server["command"])) {
-    return { merged: config, removed: [] }
+    return { merged: node, removed: [] }
   }
-  const plan = dropKey(config, "mcpServers", "bili")
-  return { ...plan, removed: [`mcpServers.bili command ${String(server["command"])}`] }
+  const plan = dropKey(node, "mcpServers", "bili")
+  return { ...plan, removed: [`${where}mcpServers.bili command bili`] }
+}
+
+/**
+ * Plans the removal of the `bili` MCP server from `~/.claude.json`, both the user-level one and the
+ * ones under `projects.<path>`.
+ */
+const planClaudeJson = (config: JsonObject): Plan => {
+  const top = dropBiliServer(config, "")
+  const projects = top.merged["projects"]
+  if (!isJsonObject(projects)) return top
+  const removed = [...top.removed]
+  const kept: Record<string, unknown> = {}
+  for (const [name, project] of Object.entries(projects)) {
+    const plan = isJsonObject(project)
+      ? dropBiliServer(project, `projects.${name}.`)
+      : { merged: project, removed: [] }
+    removed.push(...plan.removed)
+    kept[name] = plan.merged
+  }
+  return removed.length === top.removed.length
+    ? top
+    : { merged: { ...top.merged, projects: kept }, removed }
+}
+
+/** One place Claude Code has the Billion Context plugin installed. */
+export interface PluginInstall {
+  readonly scope: "user" | "project" | "local"
+  /** The project the plugin is installed for; `claude plugin uninstall` runs there. */
+  readonly projectPath: string | undefined
+}
+
+/** The installs of the Billion Context plugin recorded in `installed_plugins.json`. */
+const pluginInstalls = (record: JsonObject): ReadonlyArray<PluginInstall> => {
+  const plugins = record["plugins"]
+  if (!isJsonObject(plugins) || !Object.hasOwn(plugins, BILI_PLUGIN)) return []
+  const entries: ReadonlyArray<unknown> = Array.isArray(plugins[BILI_PLUGIN])
+    ? (plugins[BILI_PLUGIN] as ReadonlyArray<unknown>)
+    : [plugins[BILI_PLUGIN]]
+  const installs = entries.map((entry): PluginInstall => {
+    const scope = isJsonObject(entry) ? entry["scope"] : undefined
+    const projectPath = isJsonObject(entry) ? entry["projectPath"] : undefined
+    return {
+      scope: scope === "project" || scope === "local" ? scope : "user",
+      projectPath: typeof projectPath === "string" && projectPath !== "" ? projectPath : undefined,
+    }
+  })
+  const distinct = new Map(
+    installs.map((install) => [`${install.scope}\0${install.projectPath ?? ""}`, install]),
+  )
+  return distinct.size === 0 ? [{ scope: "user", projectPath: undefined }] : [...distinct.values()]
 }
 
 /** What an earlier Billion Context setup left behind, and the plans to remove it. */
 export interface Leftovers {
   readonly settingsFile: string
   readonly settings: Plan
+  /** The text `settings` was planned from, or `undefined` when the file is missing. */
+  readonly settingsText: string | undefined
   readonly claudeJsonFile: string
   readonly claudeJson: Plan
-  /** The `commands/acp-cache.md` path when it exists. */
+  /** The text `claudeJson` was planned from, or `undefined` when the file is missing. */
+  readonly claudeJsonText: string | undefined
+  /** The `commands/acp-cache.md` path when it exists and says it is Billion Context's. */
   readonly command: string | undefined
-  /** Whether Claude Code has the Billion Context plugin installed. */
-  readonly pluginInstalled: boolean
+  /** The `commands/acp-cache.md` path when it exists but does not say so; it is left alone. */
+  readonly foreignCommand: string | undefined
+  /** Where Claude Code has the Billion Context plugin installed. */
+  readonly pluginInstalls: ReadonlyArray<PluginInstall>
   /** Whether Claude Code has the Billion Context marketplace registered. */
   readonly marketplaceRegistered: boolean
   /** Files that could not be read; they are left alone. */
@@ -151,14 +267,17 @@ export interface Leftovers {
   readonly found: ReadonlyArray<string>
 }
 
-const none: JsonObject = {}
+const none = { value: {} as JsonObject, text: undefined }
 
 /** Reads a JSON object file; one that cannot be read is empty and its message is returned. */
 const readOrReport = (file: string) =>
-  readJsonObject(file).pipe(
-    Effect.map((value) => ({ value, error: undefined as string | undefined })),
-    Effect.catchTag("CliFailure", (error) => Effect.succeed({ value: none, error: error.message })),
+  readJsonObjectSnapshot(file).pipe(
+    Effect.map((snapshot) => ({ ...snapshot, error: undefined as string | undefined })),
+    Effect.catchTag("CliFailure", (error) => Effect.succeed({ ...none, error: error.message })),
   )
+
+const installLabel = (install: PluginInstall) =>
+  `plugin ${BILI_PLUGIN}${install.scope === "user" ? "" : ` (${install.scope} scope)`}`
 
 /**
  * Finds what an earlier Billion Context setup left in the Claude Code files. Only entries that
@@ -178,48 +297,91 @@ export const findLeftovers = (files: ClaudeFiles) =>
       path.join(files.claudeDir, "plugins", "known_marketplaces.json"),
     )
     const commandFile = path.join(files.claudeDir, "commands", "acp-cache.md")
-    const command = (yield* fs.exists(commandFile).pipe(Effect.orElseSucceed(() => false)))
-      ? commandFile
-      : undefined
+    // The file is Billion Context's only when its text says so; a missing or unreadable file is not.
+    const commandText = yield* fs.readFileString(commandFile).pipe(
+      Effect.map((text) => ({ text, error: undefined as string | undefined })),
+      Effect.catch((error) =>
+        Effect.succeed({
+          text: undefined,
+          error:
+            error.reason._tag === "NotFound"
+              ? undefined
+              : `cannot read ${commandFile}: ${error.message}`,
+        }),
+      ),
+    )
+    const mine = commandText.text !== undefined && COMMAND_MARKER.test(commandText.text)
+    const command = mine ? commandFile : undefined
+    const foreignCommand = commandText.text !== undefined && !mine ? commandFile : undefined
 
     const claudeJson = planClaudeJson(config.value)
+    const installs = pluginInstalls(plugins.value)
+    const marketplaceRegistered = Object.hasOwn(markets.value, BILI_MARKETPLACE)
     const settingsPlan = planSettings(
       settings.value,
-      command !== undefined || claudeJson.removed.length > 0,
+      command !== undefined ||
+        claudeJson.removed.length > 0 ||
+        installs.length > 0 ||
+        marketplaceRegistered,
     )
-    const installed = plugins.value["plugins"]
-    const pluginInstalled = isJsonObject(installed) && Object.hasOwn(installed, BILI_PLUGIN)
-    const marketplaceRegistered = Object.hasOwn(markets.value, BILI_MARKETPLACE)
     const found = [
       ...settingsPlan.removed.map((item) => `${item} in ${settingsFile}`),
       ...claudeJson.removed.map((item) => `${item} in ${files.claudeJson}`),
       ...(command === undefined ? [] : [command]),
-      ...(pluginInstalled ? [`plugin ${BILI_PLUGIN}`] : []),
+      ...installs.map(installLabel),
       ...(marketplaceRegistered ? [`marketplace ${BILI_MARKETPLACE}`] : []),
     ]
     return {
       settingsFile,
       settings: settingsPlan,
+      settingsText: settings.text,
       claudeJsonFile: files.claudeJson,
       claudeJson,
+      claudeJsonText: config.text,
       command,
-      pluginInstalled,
+      foreignCommand,
+      pluginInstalls: installs,
       marketplaceRegistered,
-      unreadable: [settings, config].flatMap((read) =>
+      unreadable: [settings, config, plugins, markets, commandText].flatMap((read) =>
         read.error === undefined ? [] : [read.error],
       ),
       found,
     } satisfies Leftovers
   })
 
-/** Rewrites a JSON file with the plan applied, reporting what was (or would be) removed. */
-const applyPlan = (file: string, plan: Plan, dryRun: boolean) =>
+/** How often a file that changed under the cleanup is re-read and re-planned before it is skipped. */
+const WRITE_ATTEMPTS = 3
+
+/**
+ * Rewrites a JSON file with the plan applied, reporting what was (or would be) removed. The file is
+ * checked again just before it is replaced; one that changed meanwhile (Claude Code rewrites
+ * `~/.claude.json` while it runs) is planned again from its new content, and after
+ * {@link WRITE_ATTEMPTS} changes it is skipped with a note.
+ */
+const applyPlan = (
+  files: ClaudeFiles,
+  first: Leftovers,
+  pick: (leftovers: Leftovers) => {
+    readonly file: string
+    readonly plan: Plan
+    readonly text: string | undefined
+  },
+  dryRun: boolean,
+) =>
   Effect.gen(function* () {
-    if (plan.removed.length === 0) return []
-    if (!dryRun) yield* writeJsonObject(file, plan.merged)
-    return plan.removed.map(
-      (item) => `+ billion-context: ${dryRun ? "would remove" : "removed"} ${item} from ${file}`,
-    )
+    for (let attempt = 1; attempt <= WRITE_ATTEMPTS; attempt += 1) {
+      const { file, plan, text } = pick(attempt === 1 ? first : yield* findLeftovers(files))
+      if (plan.removed.length === 0 || text === undefined) return []
+      if (dryRun || (yield* writeJsonObjectIfUnchanged(file, plan.merged, text))) {
+        return plan.removed.map(
+          (item) =>
+            `+ billion-context: ${dryRun ? "would remove" : "removed"} ${item} from ${file}`,
+        )
+      }
+    }
+    return [
+      `~ billion-context: ${pick(first).file} kept changing while it was cleaned and was left as it is; run holyagent setup claude again`,
+    ]
   }).pipe(
     Effect.catchTag("CliFailure", (error) =>
       Effect.succeed([`! billion-context: ${error.message}`]),
@@ -244,8 +406,22 @@ export const cleanupLeftovers = Effect.fn("cleanupLeftovers")(function* (
     (message) => `! billion-context: ${message}; its entries were not checked`,
   )
 
-  lines.push(...(yield* applyPlan(leftovers.settingsFile, leftovers.settings, dryRun)))
-  lines.push(...(yield* applyPlan(leftovers.claudeJsonFile, leftovers.claudeJson, dryRun)))
+  lines.push(
+    ...(yield* applyPlan(
+      files,
+      leftovers,
+      (l) => ({ file: l.settingsFile, plan: l.settings, text: l.settingsText }),
+      dryRun,
+    )),
+  )
+  lines.push(
+    ...(yield* applyPlan(
+      files,
+      leftovers,
+      (l) => ({ file: l.claudeJsonFile, plan: l.claudeJson, text: l.claudeJsonText }),
+      dryRun,
+    )),
+  )
 
   if (leftovers.command !== undefined) {
     const file = leftovers.command
@@ -261,21 +437,29 @@ export const cleanupLeftovers = Effect.fn("cleanupLeftovers")(function* (
       )
     }
   }
+  if (leftovers.foreignCommand !== undefined) {
+    lines.push(
+      `~ billion-context: ${leftovers.foreignCommand} does not mention Billion Context and stays; delete it yourself if it is a leftover`,
+    )
+  }
 
   const removals = [
-    ...(leftovers.pluginInstalled
-      ? [
-          {
-            what: `plugin ${BILI_PLUGIN}`,
-            args: ["plugin", "uninstall", BILI_PLUGIN],
-          },
-        ]
-      : []),
+    ...leftovers.pluginInstalls.map((install) => ({
+      what: installLabel(install),
+      args: [
+        "plugin",
+        "uninstall",
+        BILI_PLUGIN,
+        ...(install.scope === "user" ? [] : ["--scope", install.scope]),
+      ],
+      cwd: install.scope === "user" ? undefined : install.projectPath,
+    })),
     ...(leftovers.marketplaceRegistered
       ? [
           {
             what: `marketplace ${BILI_MARKETPLACE}`,
             args: ["plugin", "marketplace", "remove", BILI_MARKETPLACE],
+            cwd: undefined,
           },
         ]
       : []),
@@ -283,21 +467,25 @@ export const cleanupLeftovers = Effect.fn("cleanupLeftovers")(function* (
   if (removals.length > 0) {
     const claude = yield* shell.which("claude", { includeBunBin: true })
     for (const removal of removals) {
+      const command = `claude ${removal.args.join(" ")}`
+      const where = removal.cwd === undefined ? "" : ` (in ${removal.cwd})`
       if (Option.isNone(claude)) {
         lines.push(
-          `~ billion-context: ${removal.what} stays; \`claude\` not found, run: claude ${removal.args.join(" ")}`,
+          `~ billion-context: ${removal.what} stays; \`claude\` not found, run${where}: ${command}`,
         )
       } else if (dryRun) {
-        lines.push(
-          `+ billion-context: ${verb} ${removal.what} with claude ${removal.args.join(" ")}`,
-        )
+        lines.push(`+ billion-context: ${verb} ${removal.what} with ${command}${where}`)
       } else {
-        const result = yield* shell.run("claude", removal.args)
+        const result = yield* shell.run(
+          "claude",
+          removal.args,
+          removal.cwd === undefined ? undefined : { cwd: removal.cwd },
+        )
         const detail = (result.stderr || result.stdout).trim().split("\n")[0] ?? ""
         lines.push(
           result.exitCode === 0
             ? `+ billion-context: ${verb} ${removal.what}`
-            : `! billion-context: claude ${removal.args.join(" ")} failed (exit ${result.exitCode})${detail === "" ? "" : `: ${detail}`}`,
+            : `! billion-context: ${command} failed (exit ${result.exitCode})${detail === "" ? "" : `: ${detail}`}`,
         )
       }
     }

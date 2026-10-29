@@ -25,10 +25,14 @@ The output has one line per step: `+` done now, `=` already done, `-` skipped, `
 
 **If you ran an earlier setup.** Earlier versions of `holyagent setup claude` and the installers set up Billion Context, which HolyAgent no longer uses. `holyagent setup claude` removes what it left in your Claude Code files, prints each entry it removes, and shows them without removing on `--dry-run`:
 
-- in `~/.claude/settings.json` (or `$CLAUDE_CONFIG_DIR/settings.json`): `env.ANTHROPIC_BASE_URL` when it points at the local proxy `http://127.0.0.1:18787`, `env.DISABLE_AUTO_COMPACT=1` when another Billion Context entry shows it set it, hook commands containing `claude-native-bootstrap` or starting with `bili`, `enabledPlugins["billion-context@billion-context"]` and `extraKnownMarketplaces["billion-context"]`;
-- in `~/.claude.json`: the `bili` MCP server, when its command is `bili`;
-- `~/.claude/commands/acp-cache.md`;
-- the `billion-context@billion-context` plugin and the `billion-context` marketplace, through `claude plugin uninstall` and `claude plugin marketplace remove`.
+- in `~/.claude/settings.json` (or `$CLAUDE_CONFIG_DIR/settings.json`): `env.ANTHROPIC_BASE_URL` when its origin is exactly the local proxy `http://127.0.0.1:18787` (any path), `env.DISABLE_AUTO_COMPACT=1` when another Billion Context entry shows it set it, hook commands containing `claude-native-bootstrap` or running `bili` (also behind quotes, `env` or `VAR=` prefixes), `enabledPlugins["billion-context@billion-context"]` and `extraKnownMarketplaces["billion-context"]`;
+- in `~/.claude.json`: the `bili` MCP server, at the top level and under each `projects.<path>`, when its command runs `bili`;
+- `~/.claude/commands/acp-cache.md`, when its text mentions Billion Context, `bili` or `claude-native-bootstrap`; a file of that name that does not is kept and reported;
+- the `billion-context@billion-context` plugin, at every scope it is installed (`claude plugin uninstall`, with `--scope` and from the project folder for project and local scope), and the `billion-context` marketplace (`claude plugin marketplace remove`).
+
+The `DISABLE_AUTO_COMPACT=1` setting counts as set by Billion Context when any of these is present: the proxy `ANTHROPIC_BASE_URL`, a Billion Context hook, the `bili` MCP server, `commands/acp-cache.md` as above, the plugin, the marketplace, or the plugin or marketplace entry in `settings.json`. Without one of them it is yours and stays.
+
+The report lines name the matched program or marker (`bili`, `claude-native-bootstrap`), never a whole command line. `~/.claude.json` is checked again just before it is replaced; if Claude Code rewrote it meanwhile, the cleanup re-reads it and tries again, and after three changes it leaves the file as it is and says so. A Claude Code file that cannot be read is reported and left alone, by `holyagent setup claude` (`!` line) and by `holyagent doctor` (`warn`, naming the file).
 
 Everything else is kept: a different `ANTHROPIC_BASE_URL`, a `DISABLE_AUTO_COMPACT` you set yourself, your other hooks and servers. `holyagent doctor` prints a `warn billion-context` line while any of these remain; the warning does not change the exit code. The `bili` package and its own configuration under `~/.config/billion-context` are not touched; remove them with `bun remove -g billion-context` if you want them gone.
 

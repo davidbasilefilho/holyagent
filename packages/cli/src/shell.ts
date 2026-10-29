@@ -49,6 +49,8 @@ export const pathWithBunBin = (
 export interface RunOptions {
   /** Environment variables to remove for this command only. */
   readonly unsetEnv?: ReadonlyArray<string>
+  /** The working directory for this command; the current one when unset. */
+  readonly cwd?: string
 }
 
 /**
@@ -106,8 +108,8 @@ export class Shell extends Context.Service<
                 [bunBin.key]: bunBin.value,
               }
               for (const name of options?.unsetEnv ?? []) env[name] = undefined
-              return $`${command} ${args}`
-                .env(env)
+              const pending = $`${command} ${args}`.env(env)
+              return (options?.cwd === undefined ? pending : pending.cwd(options.cwd))
                 .quiet()
                 .nothrow()
                 .then((result) => ({

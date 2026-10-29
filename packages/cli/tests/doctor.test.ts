@@ -184,4 +184,31 @@ describe("holyagent doctor", () => {
         expect(report.ok).toBe(true)
       }),
     ))
+
+  test("warns that it could not check when a Claude Code file cannot be read, instead of saying no leftovers", () =>
+    run(
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem
+        const directory = yield* configuredProject
+        const home = yield* tempDir
+        yield* fs.makeDirectory(`${home}/.claude/plugins`, { recursive: true })
+        yield* fs.writeFileString(`${home}/.claude/settings.json`, "[1]")
+        yield* fs.writeFileString(`${home}/.claude/plugins/installed_plugins.json`, "not json")
+        yield* fs.writeFileString(`${home}/.claude/plugins/known_marketplaces.json`, "[]")
+        const shell = fakeShell({
+          commands: allTools,
+          respond: answers(() => CANARY, ["holyagent@holyagent"]),
+        })
+        const report = yield* doctor({ directory, fix: false }).pipe(
+          Effect.provide(shell.layer),
+          Effect.provide(envLayer({ HOME: home })),
+        )
+        const line = report.lines.find((entry) => entry.includes("billion-context"))
+        expect(line).toStartWith("warn billion-context: not checked")
+        expect(line).toContain("settings.json")
+        expect(line).toContain("installed_plugins.json")
+        expect(line).toContain("known_marketplaces.json")
+        expect(report.ok).toBe(true)
+      }),
+    ))
 })

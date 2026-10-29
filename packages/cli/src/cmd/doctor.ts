@@ -56,15 +56,25 @@ const checkSettings = (directory: string) =>
 
 const warn = (name: string, detail: string) => `warn ${name}: ${detail}`
 
-/** Warns when an earlier Billion Context setup left entries in the Claude Code files. */
+/**
+ * Warns when an earlier Billion Context setup left entries in the Claude Code files, and when a
+ * file could not be read, because then its entries were not checked.
+ */
 const checkLeftovers = Effect.gen(function* () {
   const leftovers = yield* findLeftovers(yield* userFiles)
-  return leftovers.found.length === 0
+  const notes = [
+    ...(leftovers.found.length === 0
+      ? []
+      : [
+          `${leftovers.found.length} leftover(s) from an earlier setup: ${leftovers.found.join("; ")}; run: holyagent setup claude`,
+        ]),
+    ...(leftovers.unreadable.length === 0
+      ? []
+      : [`not checked, ${leftovers.unreadable.join("; ")}`]),
+  ]
+  return notes.length === 0
     ? pass("billion-context", "no leftovers from an earlier setup")
-    : warn(
-        "billion-context",
-        `${leftovers.found.length} leftover(s) from an earlier setup: ${leftovers.found.join("; ")}; run: holyagent setup claude`,
-      )
+    : warn("billion-context", notes.join(" | "))
 }).pipe(
   Effect.catchTag("CliFailure", (error) => Effect.succeed(fail("billion-context", error.message))),
 )

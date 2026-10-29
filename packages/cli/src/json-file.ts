@@ -20,15 +20,29 @@ export const isJsonObject = (value: unknown): value is JsonObject =>
  * fails with a message naming the file, so a hand-edited file is never overwritten.
  */
 export const readJsonObject = (path: string) =>
+  readJsonObjectSnapshot(path).pipe(Effect.map((snapshot) => snapshot.value))
+
+/** A JSON object file as read: the object, and the text it came from (`undefined` when missing). */
+export interface JsonSnapshot {
+  readonly value: JsonObject
+  readonly text: string | undefined
+}
+
+/**
+ * Reads a JSON object file like {@link readJsonObject} and also returns its text, so a later write
+ * can check that the file did not change in between (see {@link writeJsonObjectIfUnchanged}).
+ */
+export const readJsonObjectSnapshot = (path: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem
-    if (!(yield* fs.exists(path))) return empty
+    if (!(yield* fs.exists(path))) return { value: empty, text: undefined } satisfies JsonSnapshot
     const text = yield* fs.readFileString(path)
-    return yield* Schema.decodeUnknownEffect(JsonObjectText)(text).pipe(
+    const value = yield* Schema.decodeUnknownEffect(JsonObjectText)(text).pipe(
       Effect.mapError(
         (error) => new CliFailure({ message: `${path} is not a JSON object: ${error.message}` }),
       ),
     )
+    return { value, text } satisfies JsonSnapshot
   }).pipe(
     Effect.catchTag(
       "PlatformError",
@@ -44,6 +58,25 @@ export const writeJsonObject = (
   path: string,
   value: JsonObject,
   options?: { readonly mode?: number },
+) => replaceJsonObject(path, value, options).pipe(Effect.asVoid)
+
+/**
+ * Like {@link writeJsonObject}, but writes only when the file still has the text `unchangedSince`
+ * (from {@link readJsonObjectSnapshot}); the check runs just before the rename, so the window in
+ * which another program's update could be lost is the rename itself. Returns whether it wrote.
+ */
+export const writeJsonObjectIfUnchanged = (
+  path: string,
+  value: JsonObject,
+  unchangedSince: string,
+  options?: { readonly mode?: number },
+) => replaceJsonObject(path, value, options, unchangedSince)
+
+const replaceJsonObject = (
+  path: string,
+  value: JsonObject,
+  options?: { readonly mode?: number },
+  unchangedSince?: string,
 ) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem
@@ -60,10 +93,15 @@ export const writeJsonObject = (
       flag: "wx",
       ...(mode === undefined ? {} : { mode }),
     })
-    yield* Effect.gen(function* () {
+    return yield* Effect.gen(function* () {
       // The open call applies the umask; chmod sets the exact mode.
       if (mode !== undefined) yield* fs.chmod(temporary, mode)
+      if (unchangedSince !== undefined && (yield* fs.readFileString(target)) !== unchangedSince) {
+        yield* fs.remove(temporary)
+        return false
+      }
       yield* fs.rename(temporary, target)
+      return true
     }).pipe(Effect.onError(() => Effect.ignore(fs.remove(temporary))))
   }).pipe(
     Effect.catchTags({
