@@ -30,6 +30,7 @@
     "assignment-0mvtpd8i1-ayjz"
   ],
   "specialist": {
+    "agentId": "workflow:wf_52d895ab-075/assignment-0mvtq10oh-g7dy",
     "model": "haiku",
     "effort": "high",
     "startedAt": "2026-10-29T15:51:39.186Z"
