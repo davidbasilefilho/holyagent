@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mvtv8vib-ckal",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 2,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-the-stack-rule-change-to",
+  "objective": "Review the stack-rule change to holyagent's root instructions and docs for correctness, consistency and instruction quality.",
+  "state": "Ready",
+  "scope": [
+    "Diff file: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule.diff (worktree /home/user/holyagent-stack-rule; files packages/runtime/src/instructions/claude-5.5/root/stack-plan.md, packages/runtime/src/instructions/requirements.md, docs/usage.md, docs/decisions.md, regenerated packages/integrations/claude/dist/agents/holyagent.md).",
+    "Requirement (maintainer decision): in a stacked-PR repository new work stacks on the top of the open stack; when the stack lags the base, the base is merged forward into it first (merge commits, review before push); work branches from the base only when no PR is open or the conventions ask for independent PRs; the CI-PR-first rule and the rest of the stack plan stay.",
+    "Check: the new rule is stated consistently in all places and does not contradict other root sections (version-control.md, R-STATE, R-MERGEREVIEW, the CI-first bullet, 'a PR is finished and reviewed before the next stacks on it'); the text follows the repository's instruction-writing rules (imperative, calm, reason beside the rule, concrete, US English, about the size of the replaced text); the generated holyagent.md matches the sources; edge cases a root would hit (several open chains, draft PRs, PRs from other authors or forks, the stack's PRs being someone else's) are either handled or not made worse."
+  ],
+  "constraints": [
+    "Read-only. Report findings as blocking or non-blocking with file:line and why; stop and report when done."
+  ],
+  "criteria": [
+    {
+      "text": "The rule is consistent across all changed places and with the rest of the root instructions",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The text meets the repository's instruction-writing rules and size limit",
+      "blocking": true,
+      "dimension": "style"
+    }
+  ],
+  "evidence": [
+    "files-reviewed",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvtuyc3t-cplg"
+  ],
+  "createdAt": "2026-10-29T18:17:43.812Z"
+}
