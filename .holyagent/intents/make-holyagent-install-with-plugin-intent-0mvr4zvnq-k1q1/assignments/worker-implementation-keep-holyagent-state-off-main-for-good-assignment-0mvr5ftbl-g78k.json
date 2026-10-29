@@ -1,0 +1,62 @@
+{
+  "id": "assignment-0mvr5ftbl-g78k",
+  "intentId": "intent-0mvr4zvnq-k1q1",
+  "intentRevision": 2,
+  "roleTask": "Worker.implementation",
+  "slug": "keep-holyagent-state-off-main-for-good",
+  "objective": "Keep .holyagent/ state off main for good and guard the Windows install: gitignore .holyagent/ and add a test, run by `mise run verify`, that fails when any tracked path is longer than 120 characters or is under .holyagent/.",
+  "state": "Succeeded",
+  "scope": [
+    "Worktree C:/Users/david.basile/dev/holyagent-fix-state-off-main (branch fix/state-off-main). Its last commit already deletes the tracked .holyagent/ files.",
+    "Why: `claude plugin marketplace add davidbasilefilho/holyagent` clones the repository on Windows into %USERPROFILE%/.claude/plugins/marketplaces/davidbasilefilho-holyagent..clone/, and state paths of up to 187 characters passed MAX_PATH. Intent state belongs on the holyagent/state branch (AGENTS.md)."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md and AGENTS.md: Effect, Bun Shell from bun to spawn git, JSDoc on exports, mise tasks as the source of commands.",
+    "The test must pass outside a git work tree (for example a `git archive` export): skip cleanly there, as scripts/prepare.ts does for hooks.",
+    "No version-control writes (no git add, rm, commit, checkout, stash), no edits under .git/ or .holyagent/; report changed paths.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report; do not add unrequested features, tests, files or refactors (name them in the report). Do not stop at a summary that announces a next step."
+  ],
+  "criteria": [
+    {
+      "text": ".gitignore ignores .holyagent/ at the repository root",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A test in the repository test layout lists tracked paths with `git ls-files` and fails naming each path longer than 120 characters and each path under .holyagent/; it passes on this branch and is shown failing when either rule is broken (for example against a temporary fixture repository)",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "`mise run verify` runs the new test and passes on this branch (command, exit code, test counts)",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Only .gitignore, the new test file and at most one line in docs/development.md change",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    ".gitignore",
+    "scripts/repo-paths.test.ts",
+    "docs/development.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "workflow:wf_11d5ea10-129/assignment-0mvr5ftbl-g78k",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T20:39:55.604Z",
+    "finishedAt": "2026-10-27T21:22:15.548Z"
+  },
+  "result": "result: `.holyagent/` is now ignored and a new repo-paths test is in place and passes. `mise run verify` does not pass on this branch because 114 other tests fail on this Windows machine. I could not run the base tree for comparison.\n\nchanged:\n- `C:/Users/david.basile/dev/holyagent-fix-state-off-main/.gitignore` (added `/.holyagent/`)\n- `C:/Users/david.basile/dev/holyagent-fix-state-off-main/scripts/repo-paths.test.ts` (new)\n- `C:/Users/david.basile/dev/holyagent-fix-state-off-main/docs/development.md` (the existing \"Done means…\" line gained one sentence)\n\nchecks:\n- `bun test scripts/repo-paths.test.ts` -> exit 0, 5 pass, 0 fail, 9 expects.\n- `bun test scripts` -> exit 0, 47 pass, 0 fail.\n- `bun check --no-script` -> exit 0, no type errors in 114 files.\n- `bun lint --no-script` -> exit 0, no problems in 115 files.\n- `bun fmt --no-script --check` -> exit 0, all 230 files formatted. It first flagged the new test file, which I fixed with `bun fmt`.\n- `mise run verify` -> exit 1 on the test step only: 736 pass, 3 skip, 114 fail, 6 errors, 853 tests in 32 files. The other three gates pass. None of the failures are in `scripts/repo-paths.test.ts`.\n- `git check-ignore -v .holyagent/x` -> matched by `.gitignore:3:/.holyagent/`.\n- The first `mise run verify` failed because `node_modules` was missing in this worktree. I ran `bun install --frozen-lockfile`, which only touches the gitignored `node_modules`.\n\nblockers:\n- `mise run verify` is red on this Windows machine for reasons unrelated to my change. The failures in the full run:\n  - vendored tools missing from the worktree (`packages/integrations/claude/dist/scripts/vendor/*` is listed by `git ls-files` but the files are not on disk)\n  - symlink creation refused with EPERM\n  - backslash vs forward-slash path assertions\n  - `cp -r` unsupported in the Bun shell\n  - 5-second timeouts and `EBUSY` temp-directory cleanup errors\n  - POSIX file-mode checks\n- The failing groups are hook workflow (43), hook agent-launch (10), session-start (15), state worktree and merge (about 14), the vendored-tools tests, and a few others.\n- In the main checkout, `bun test` ran 33 tests across 31 files with 31 failing, because `node_modules` is not installed there, so it is no baseline. I did not install into it. I could not run the base tree for a clean comparison.\n- On Linux or macOS CI, I expect these environment failures to disappear and the new test to behave the same.\n\nquestions: none\n\nnotes:\n- The test skips cleanly outside a git work tree. It uses `describe.skipIf` with a `git rev-parse --show-prefix` check, so a `git archive` export skips it. The fixture-based tests still run there because they build their own temporary repository. I did not run it against a real `git archive` export.\n- The 120-character limit applies to the whole tracked path. The longest tracked path today is 92 characters.\n- I ignored `/.holyagent/` with a leading slash so only the root folder is ignored. I did not add a negation.\n- I did not run the new test against the base commit. Instead, the fixture tests show it fails when either rule is broken. One fixture tracks a path of 122 characters, and the other tracks `.holyagent/intents/a.json`. In each, the failure message names the path.\n\nevidence:\n- .gitignore ignores .holyagent/ at the repository root: `.gitignore` line 3 is `/.holyagent/`, and `git check-ignore -v .holyagent/x` reports `.gitignore:3:/.holyagent/`.\n- A test in the repository test layout lists tracked paths with `git ls-files` and fails naming each path longer than 120 characters and each path under .holyagent/; it passes on this branch and is shown failing when either rule is broken (for example against a temporary fixture repository): `scripts/repo-paths.test.ts` has 5 tests and `bun test scripts/repo-paths.test.ts` exits 0 with 5 pass. The two fixture tests \"reports a tracked path longer than the limit by name\" and \"reports a tracked path under .holyagent/ by name\" build a temporary repository, run `git ls-files -z` on it, and assert the violation message names the offending path. The test on this repository passes because the longest tracked path is 92 characters and nothing is tracked under `.holyagent/`.\n- `mise run verify` runs the new test and passes on this branch (command, exit code, test counts): not met. `mise run verify` exits 1 with 736 pass, 3 skip, 114 fail, 6 errors. `bun test` picks up `scripts/repo-paths.test.ts` as part of the `test` task, and it passes there. `check`, `lint` and `fmt:check` pass. The 114 failures are Windows environment failures in other packages (see blockers).\n- Only .gitignore, the new test file and at most one line in docs/development.md change: `git status --short` shows ` M .gitignore`, ` M docs/development.md` and `?? scripts/repo-paths.test.ts`. The `docs/development.md` change is one line.\n- checks-run: the commands and counts listed under checks.\n- changed-paths: `.gitignore`, `scripts/repo-paths.test.ts` (new), `docs/development.md`, all under `C:/Users/david.basile/dev/holyagent-fix-state-off-main/`.\n- diff-file: `/tmp/state-off-main.diff` (127 lines; the new test file is appended through `git diff --no-index`).",
+  "createdAt": "2026-10-27T20:39:45.201Z"
+}

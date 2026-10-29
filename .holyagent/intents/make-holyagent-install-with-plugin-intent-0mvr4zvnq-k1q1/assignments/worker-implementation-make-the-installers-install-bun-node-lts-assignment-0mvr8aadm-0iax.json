@@ -1,0 +1,72 @@
+{
+  "id": "assignment-0mvr8aadm-0iax",
+  "intentId": "intent-0mvr4zvnq-k1q1",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-installers-install-bun-node-lts",
+  "objective": "Make the installers install Bun, Node LTS, git and gh without mise, and install mise only when development is asked for, then fix the two stale CLI mentions in the docs.",
+  "state": "Failed",
+  "scope": [
+    "Worktree C:/Users/david.basile/dev/holyagent-feat-plugin-only-install (branch feat/plugin-only-install, commit bb36687 rewrote install/ and docs).",
+    "Blocking: install/wsl-install.sh:143 and install/windows-install.ps1 (mise step) install mise on every run and use it to install Node, Bun and gh (wsl-install.sh:166-187). The requirement is: installers shrink to the prerequisites only: Bun, Node LTS, git, gh and, for development, mise. Install Bun, Node LTS, git and gh with each platform's usual installer (for example Bun's official install script, the distribution or NodeSource/winget packages, the GitHub CLI apt repository or winget), and install mise only behind an explicit development option (a flag such as --dev / -Dev); keep the scripts idempotent and keep printing the three plugin commands and the /holyagent:setup line at the end. Update README.md, docs/usage.md or docs/development.md only where they describe the installer options.",
+    "Non-blocking, fix alongside: docs/attributions.md:25 says \"in the runtime and the public CLI\" (drop \"and the public CLI\"); docs/decisions.md:53 names \"the public CLI\" without its path, name packages/cli."
+  ],
+  "constraints": [
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report; do not add unrequested features, tests, files or refactors (name them in the report).",
+    "No version-control writes, no edits under .git/ or .holyagent/; report changed paths. If `mise run build` removes the vendored tools, run `git restore packages/integrations/claude/dist/scripts/vendor`.",
+    "Follow .claude/CLAUDE.md and AGENTS.md (Effect, Effect Schema, Bun Shell, JSDoc, mise run build after plugin source changes).",
+    "Look up the current official install commands for Bun, Node LTS, gh and mise rather than relying on memory."
+  ],
+  "criteria": [
+    {
+      "text": "Without the development option, neither installer installs or uses mise, and each installs Bun, Node LTS, git and gh, is idempotent, and ends by printing the three plugin commands",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "With the development option, each installer also installs mise",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "`bash -n install/wsl-install.sh` exits 0 and the PowerShell parser reports 0 errors for install/windows-install.ps1",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "docs/attributions.md no longer mentions the public CLI and docs/decisions.md names packages/cli",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "README keeps its six required sections in order, and changes stay within install/, README.md, docs/usage.md, docs/development.md, docs/attributions.md and docs/decisions.md",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "install",
+    "README.md",
+    "docs/usage.md",
+    "docs/development.md",
+    "docs/attributions.md",
+    "docs/decisions.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvr5jcix-kkv9",
+  "specialist": {
+    "agentId": "workflow:wf_f11f794c-2bb/assignment-0mvr8aadm-0iax",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T21:59:26.788Z",
+    "finishedAt": "2026-10-28T01:41:25.439Z"
+  },
+  "result": "errored: Agent stopped by the session usage limit after 5 tool calls; no files changed.\n",
+  "createdAt": "2026-10-27T21:59:26.218Z"
+}

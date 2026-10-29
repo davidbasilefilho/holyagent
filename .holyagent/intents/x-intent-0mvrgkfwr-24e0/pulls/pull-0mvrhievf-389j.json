@@ -1,0 +1,10 @@
+{
+  "id": "pull-0mvrhievf-389j",
+  "intentId": "intent-0mvrgkfwr-24e0",
+  "number": 36,
+  "url": "https://github.com/davidbasilefilho/holyagent/pull/36",
+  "branch": "fix/cli-stdin",
+  "base": "fix/state-off-main",
+  "created": true,
+  "recordedAt": "2026-10-28T02:17:41.836Z"
+}
