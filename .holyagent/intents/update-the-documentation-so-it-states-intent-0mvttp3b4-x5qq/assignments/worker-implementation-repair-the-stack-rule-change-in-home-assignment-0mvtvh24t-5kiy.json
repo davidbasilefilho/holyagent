@@ -1,0 +1,60 @@
+{
+  "id": "assignment-0mvtvh24t-5kiy",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-stack-rule-change-in-home",
+  "objective": "Repair the stack-rule change in /home/user/holyagent-stack-rule so it closes the review's blocking findings and states the recorded defaults compactly.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-stack-rule holds the uncommitted rule change (diff /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule.diff). The review report is /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-revrule.txt: blocking findings 1-4 and the notes.",
+    "Settled defaults to state (the maintainer is away; they are recorded as defaults): (a) 'the open stack' is the account owner's own non-draft PRs from branches of this repository; forks, bots and other authors' PRs do not count, so the root never stacks on or merges into a branch it does not own; (b) new work stacks on the open stack's top even while those PRs wait for human review: 'a PR is finished and reviewed before the next stacks on it' means holyagent's own independent review accepted it, so make that line say so; (c) a change that adds CI still goes first, from the base, as today; (d) with several open chains, stack on the one the work depends on, else the most recent; (e) when the stack lags the base, merge the base into the stack's lowest branch and forward up the chain with merge commits, reviewed before push, before stacking; put the trigger beside the existing Merge forward line in version-control.md and R-GIT if that is where it reads naturally.",
+    "Size: the review measured stack-plan.md:3 at about 2.5 times the replaced text. Rewrite so the net addition across stack-plan.md is at most about 60 words, with no duplicated independent-PR condition and no undefined term (define 'open stack' once, use it consistently: 'open stack', 'its top', 'its lowest branch'). Keep the merge cadence clause unambiguous.",
+    "docs: docs/usage.md Stacks paragraph keeps the conventions condition; docs/decisions.md: keep the new decision paragraph short, and make the '## Kept' bullet point to it instead of restating the rule. requirements.md R-STACK in one clause consistent with the above.",
+    "Rebuild dist and run gates with the canary Bun /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/canary/x/bun-linux-x64/bun: install --frozen-lockfile --ignore-scripts if needed, scripts/vendor.ts, packages/integrations/claude/build.ts, check --no-script, lint --no-script, fmt --no-script --check, test. Write the new full diff (git diff) to /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule-v2.diff."
+  ],
+  "constraints": [
+    "Model-facing text in US English, imperative, calm, reason beside each rule.",
+    "Edit only in /home/user/holyagent-stack-rule: packages/runtime/src/instructions, packages/integrations/claude/dist, docs/usage.md (Stacks paragraph only), docs/decisions.md, tests that pin the changed text.",
+    "No git writes; no edits under .git/ or .holyagent/; no other worktree.",
+    "Keep working until done; stop and report when done and checked."
+  ],
+  "criteria": [
+    {
+      "text": "Review findings 1-4 are closed: no contradiction with the review gate or CI-first rule, only the owner's own non-draft non-fork PRs count, and the net addition in stack-plan.md is at most about 60 words",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The rule reads the same in stack-plan.md, version-control.md if touched, R-STACK, docs/usage.md and docs/decisions.md, with consistent terms",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "dist rebuilt; check, lint, fmt --check and test pass with the canary Bun",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/integrations/claude/dist",
+    "packages/runtime/tests",
+    "docs/usage.md",
+    "docs/decisions.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvtuyc3t-cplg",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T18:24:05.645Z"
+  },
+  "createdAt": "2026-10-29T18:24:05.645Z"
+}
