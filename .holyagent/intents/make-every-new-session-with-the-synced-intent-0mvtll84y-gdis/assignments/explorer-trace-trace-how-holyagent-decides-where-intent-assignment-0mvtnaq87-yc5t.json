@@ -1,0 +1,31 @@
+{
+  "id": "assignment-0mvtnaq87-yc5t",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 2,
+  "roleTask": "Explorer.trace",
+  "slug": "trace-how-holyagent-decides-where-intent",
+  "objective": "Trace how holyagent decides where Intent, Assignment and state records live (the holyagent/state branch versus anything else), so the state branch can become the default only for projects that use stacked PRs while other projects follow their own convention.",
+  "state": "Ready",
+  "scope": [
+    "Repository /home/user/holyagent at origin/main (read files from /home/user/holyagent-bili, which is origin/main plus unrelated removals, or with git show origin/main:<path>).",
+    "Key places: packages/runtime/src/state (tree.ts, resolveState, worktree creation), the CLI commands that write state, config (.holyagent/config.json schema), docs/state.md or similar, and the root and specialist instruction text about the state branch and the stack plan (packages/runtime/src/instructions). Also how state worked before PR #28 (git log -p for the state-branch change) and whether .holyagent/ was committed on work branches, gitignored, or local-only then.",
+    "Answer: (1) the current decision path and every place that assumes the state branch; (2) what modes or config already exist or existed (for example a state location setting); (3) which signals could tell a project uses stacked PRs (stack plan text, repo conventions, config) and which are reliable; (4) what alternatives exist for a non-stack project (state committed in .holyagent on the work branch, gitignored local-only, or the state branch anyway) and what each costs for mergeability (the merge-ready rubric) and for resume across sessions."
+  ],
+  "constraints": [
+    "Read-only for the repository: write no files and make no version-control writes. Scratch files only under /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad."
+  ],
+  "criteria": [
+    {
+      "text": "Each of the four questions is answered with file:line evidence, separating sourced facts from inference",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources-read"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-10-29T14:35:13.351Z"
+}
