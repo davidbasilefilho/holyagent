@@ -1,0 +1,56 @@
+{
+  "id": "assignment-0mvtr43wd-1ce3",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 5,
+  "roleTask": "Worker.implementation",
+  "slug": "finish-round-for-the-instruction-branch",
+  "objective": "Finish round for the instruction branch: close the open notes of the last re-review.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-instr-finish at bbe8eff. Re-review: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-gvrq.txt.",
+    "Fix: R-FINISH (requirements.md:30) restores the visual-preference exclusion; give 'what remains' in PR text one owner (assignments.md:17 or the PR-text rule in root/version-control.md), the other points to it; keep the round-three rule in root/visual.md only with pointers elsewhere (requirements.md:31 and :61, roles/worker-visual/purpose.md) and the finish rule in assignments.md only with R-FINISH as a pointer, keeping the R-WVI and R-FINISH anchors in packages/integrations/claude/src/agents.ts matching. Net size at or below bbe8eff."
+  ],
+  "constraints": [
+    "User (verbatim): \"não deve ter nada pendente / outra coisa: arrume esse comportamento, o que ficar pendente que o agente pode resolver deve ser resolvido\". This is the finish round: fix every listed item; the added tests and checks are requested work.",
+    "Follow /home/user/holyagent/.claude/CLAUDE.md and /home/user/holyagent/AGENTS.md. Do not edit .claude/CLAUDE.md or AGENTS.md.",
+    "Make no version-control writes and no edits under .git/ or .holyagent/ of the repository; tests use temp folders.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done and checked, stop and report."
+  ],
+  "criteria": [
+    {
+      "text": "Every listed item is fixed, with a test that fails without it for code changes, or named with a concrete reason",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Net instruction word count is at or below bbe8eff",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "mise run build leaves no diff after the change and mise run verify passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/integrations/claude/src",
+    "packages/integrations/claude/tests",
+    "packages/integrations/claude/dist/agents"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvtqsnhm-gvrq",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T16:22:02.941Z"
+  },
+  "createdAt": "2026-10-29T16:22:02.941Z"
+}
