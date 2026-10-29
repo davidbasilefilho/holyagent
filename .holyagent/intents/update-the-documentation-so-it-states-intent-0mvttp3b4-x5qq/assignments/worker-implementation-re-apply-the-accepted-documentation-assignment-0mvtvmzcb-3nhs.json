@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "re-apply-the-accepted-documentation",
   "objective": "Re-apply the accepted documentation changes (Windows tested by the maintainer, running the root on Sonnet, the broader use cases) on top of the merged PR 37 docs, in the worktree /home/user/holyagent-docs.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Work only in /home/user/holyagent-docs (branch claude/intelligent-dijkstra-x7njap at fd6c9f6, the old PR 37 head). The real base is the merge of main into PR 37, which is resolved but not yet committed in /home/user/holyagent-plugin-only-install. First copy README.md, docs/usage.md, docs/requirements.md and docs/hooks.md from /home/user/holyagent-plugin-only-install (its working copy) into /home/user/holyagent-docs, so you edit the merged text.",
     "Then apply the same intent as the earlier patch /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/docs-v1.patch (written against main; read it for wording): (1) native Windows reads as supported and tested by the maintainer on a Windows machine; remove every 'not tested'/'not verified'/'has not been run on a Windows machine' claim in README.md and docs/ (outside docs/pi/), keeping troubleshooting facts as plain notes; (2) a '## Run the root on Sonnet' section in docs/usage.md: the root runs on Opus by default (frontmatter `model: opus`); to use Sonnet set `\"env\": { \"ANTHROPIC_DEFAULT_OPUS_MODEL\": \"claude-sonnet-5-5\" }` in ~/.claude/settings.json or .claude/settings.local.json and restart; the variable is global (also /model opus, --model opus, other opus agents); specialists are pinned to haiku/sonnet routes and unchanged; check with /status; one-sentence trade-off; source https://code.claude.com/docs/en/model-config; the 'root agent (Opus, the main thread)' sentence points to it; README links it in one short clause; (3) a '## What it fits' section in docs/usage.md covering a one-line fix or small feature through stacked multi-PR deliveries, codebase questions with no edits, debugging unknown causes, reviewing a PR or branch, refactors and mechanical changes, UI work with visual inspection, docs and configuration, and personal, coursework or solo repositories (state mode local or work; repository conventions first), each grounded in documented behavior; README gets one 'Why HolyAgent?' bullet linking it.",
@@ -70,7 +70,53 @@
     "agentId": "workflow:wf_921e8b73-635/assignment-0mvtvmzcb-3nhs",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-10-29T18:28:49.933Z"
+    "startedAt": "2026-10-29T18:28:49.933Z",
+    "finishedAt": "2026-10-29T18:31:46.574Z"
+  },
+  "result": "result: The four files now start from the merged PR 37 text and carry the three requested edits. The format check passes on all four.\n\nchanged:\n- /home/user/holyagent-docs/README.md\n- /home/user/holyagent-docs/docs/usage.md\n- /home/user/holyagent-docs/docs/requirements.md\n- /home/user/holyagent-docs/docs/hooks.md\n\nchecks:\n- `<canary bun> fmt --no-script --check README.md docs/usage.md docs/requirements.md docs/hooks.md` -> exit 0, \"All 4 files are formatted\". An earlier run exited 1 because the Windows table row in `requirements.md` changed width. I fixed that with `<canary bun> fmt --no-script docs/requirements.md`, which reformatted only that table, then re-ran the check.\n- ripgrep for `not tested|untested|not verified|not been run|no windows machine|were not run` over README.md and docs/ (outside docs/pi/). The only hit is `docs/requirements.md` line 32, \"not tested in a Cowork session\", which is about Cowork, not Windows, and I left it.\n- I did not run `mise run verify`, since mise is not available. I ran only the format check, so type-check, lint and tests were not run (the edits touch docs only).\n\nblockers: none\n\nquestions: none\n\nnotes:\n- The Windows install text in the merged PR 37 files differs from main's. In `docs/usage.md` it is the \"prerequisites on a clean machine\" bullet, which I edited in place. In `docs/requirements.md` the \"Native Windows\" section already describes the five-step prerequisites-only installer, and I only changed the testing claims.\n- The `### Why HolyAgent?` bullet and the \"What it fits\" section are grounded in the agent files. I checked the specialist models (haiku and sonnet only; the root is `model: opus`) and the descriptions of the workers and `reviewer-artifact`.\n- I adjusted two lines from the old patch to match documented behavior:\n  - The \"personal and solo repositories\" bullet now says to keep the clone out of `work` in a repository you do not control, instead of \"the state stays local\". It links to `#user-settings`, where the state-mode text lives in the merged file.\n  - The Sonnet section says \"one for each model alias\" instead of listing alias names I could not verify.\n- I did not touch the `**Stacks.**` paragraph in `docs/usage.md`.\n- Unrequested idea: other `docs/` pages may carry stale install wording from PR 37. I did not check.\n\nevidence:\nThe four files start from the merged PR 37 text and keep all of its changes apart from the requested edits: I copied the four working-copy files from /home/user/holyagent-plugin-only-install. The diff against them (/tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/docs-v2.diff) holds only the requested edits plus the `requirements.md` table re-pad.\nNo statement in README.md or docs/ (outside docs/pi/) says native Windows is untested or unverified, and the Windows status says it was tested by the maintainer: the status row and \"Native Windows\" section in `docs/requirements.md` (the old \"Not tested\" bullet is now \"Notes\"), \"Windows and Git Bash\" in `docs/hooks.md`, and the \"Native Windows\" install bullet in `docs/usage.md` all say it was tested by the maintainer. The ripgrep above finds no remaining claim.\ndocs/usage.md has the Run the root on Sonnet section with the variable, its global effect, unaffected specialists, the /status check and the source link, and README links to it: section \"Run the root on Sonnet\" in `docs/usage.md` before \"claude.ai\". It has the `ANTHROPIC_DEFAULT_OPUS_MODEL` JSON, the global effect, specialists unchanged, `/status`, the model-config link and a one-sentence trade-off. The \"How a session works\" sentence points to it, and README has a short clause linking `docs/usage.md#run-the-root-on-sonnet`.\ndocs/usage.md has the What it fits section covering the listed use cases grounded in documented behavior, and README links to it: section \"What it fits\" at the top of `docs/usage.md`, with nine bullets covering the listed use cases plus larger deliveries. The README \"Why HolyAgent?\" bullet links `docs/usage.md#what-it-fits`.\nREADME.md keeps exactly its six sections in the required order: `grep \"^## \" README.md` gives How do I install it?, Why HolyAgent?, Development, Special thanks, License, plus the `# HolyAgent` title.\nThe format check passes on the four files with the canary Bun: the check above, exit 0.\nchecks-run: only the format check above and the ripgrep; I did not run `mise run verify`.\nchanged-paths: the four files listed under changed, all under /home/user/holyagent-docs.\ndiff-file: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/docs-v2.diff (changes relative to the merged PR 37 working copies).",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Diff against merged 37 text holds only the requested edits; Windows claims gone; Sonnet and What-it-fits sections present and linked; fmt check green. Artifact review follows.",
+    "criteria": [
+      {
+        "criterion": "The four files start from the merged PR 37 text and keep all of its changes apart from the requested edits",
+        "support": "I copied the four working-copy files from /home/user/holyagent-plugin-only-install. The diff against them (/tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/docs-v2.diff) holds only the requested edits plus the `requirements.md` table re-pad."
+      },
+      {
+        "criterion": "No statement in README.md or docs/ (outside docs/pi/) says native Windows is untested or unverified, and the Windows status says it was tested by the maintainer",
+        "support": "the status row and \"Native Windows\" section in `docs/requirements.md` (the old \"Not tested\" bullet is now \"Notes\"), \"Windows and Git Bash\" in `docs/hooks.md`, and the \"Native Windows\" install bullet in `docs/usage.md` all say it was tested by the maintainer. The ripgrep above finds no remaining claim."
+      },
+      {
+        "criterion": "docs/usage.md has the Run the root on Sonnet section with the variable, its global effect, unaffected specialists, the /status check and the source link, and README links to it",
+        "support": "section \"Run the root on Sonnet\" in `docs/usage.md` before \"claude.ai\". It has the `ANTHROPIC_DEFAULT_OPUS_MODEL` JSON, the global effect, specialists unchanged, `/status`, the model-config link and a one-sentence trade-off. The \"How a session works\" sentence points to it, and README has a short clause linking `docs/usage.md#run-the-root-on-sonnet`."
+      },
+      {
+        "criterion": "docs/usage.md has the What it fits section covering the listed use cases grounded in documented behavior, and README links to it",
+        "support": "section \"What it fits\" at the top of `docs/usage.md`, with nine bullets covering the listed use cases plus larger deliveries. The README \"Why HolyAgent?\" bullet links `docs/usage.md#what-it-fits`."
+      },
+      {
+        "criterion": "README.md keeps exactly its six sections in the required order",
+        "support": "`grep \"^## \" README.md` gives How do I install it?, Why HolyAgent?, Development, Special thanks, License, plus the `# HolyAgent` title."
+      },
+      {
+        "criterion": "The format check passes on the four files with the canary Bun",
+        "support": "the check above, exit 0."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "only the format check above and the ripgrep; I did not run `mise run verify`."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the four files listed under changed, all under /home/user/holyagent-docs."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/docs-v2.diff (changes relative to the merged PR 37 working copies)."
+      }
+    ]
   },
   "createdAt": "2026-10-29T18:28:41.963Z"
 }
