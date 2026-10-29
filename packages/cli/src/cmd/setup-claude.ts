@@ -6,9 +6,9 @@ import { asStep, setupUser } from "../claude/user.ts"
 import { CliFailure, type Report } from "../report.ts"
 
 /**
- * Sets up Claude Code for HolyAgent: the plugin and ctx7 for the current user, then the project
- * settings. Every step is idempotent, a step that fails does not stop the next one, and on a dry
- * run nothing is installed or written.
+ * Sets up Claude Code for HolyAgent: the plugin and ctx7 for the current user, the cleanup of
+ * Billion Context leftovers, then the project settings. Every step is idempotent, a step that fails
+ * does not stop the next one, and on a dry run nothing is installed or written.
  */
 export const setupClaude = Effect.fn("setupClaude")(function* (options: {
   readonly directory: string
@@ -67,6 +67,9 @@ export const setupClaudeCommand = Command.make(
         "subagentPromptCacheTtl, and the marketplace entry and the plugin entry that offer the plugin to",
         "teammates, and permissions.deny for WebSearch and WebFetch,",
         "since web work goes through the Exa connector.",
+        "It also removes what an earlier Billion Context setup left in your Claude Code files",
+        "(the local proxy base URL and DISABLE_AUTO_COMPACT in settings.json, its hook, the bili MCP server,",
+        "commands/acp-cache.md, and its plugin and marketplace), and prints each entry it removes.",
         "A failed step is reported and the rest still run; the exit code is 1 when any step failed.",
       ].join(" "),
     ),
