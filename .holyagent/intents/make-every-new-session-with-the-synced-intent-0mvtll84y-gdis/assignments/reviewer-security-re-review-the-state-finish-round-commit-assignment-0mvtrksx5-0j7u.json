@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mvtrksx5-0j7u",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.security",
+  "slug": "re-review-the-state-finish-round-commit",
+  "objective": "Re-review the state finish-round commit 2ef397c for security against the notes it targets.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-state-edges. Diff: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/f-B.diff. Targeted notes: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-l2nw.txt. Writer report: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-vqzg.txt."
+  ],
+  "constraints": [
+    "Read-only: write no files and make no version-control writes.",
+    "Judge only this finish-round diff against the findings it targets; it is the last review round, so rank anything new precisely."
+  ],
+  "criteria": [
+    {
+      "text": "Each targeted security finding is stated closed or open with file:line, and any new finding traces source to sink with a fix, or its absence is stated",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources-read"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvtr445w-vqzg"
+  ],
+  "followUpOf": "assignment-0mvtqso0z-l2nw",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T16:35:01.866Z"
+  },
+  "createdAt": "2026-10-29T16:35:01.866Z"
+}
