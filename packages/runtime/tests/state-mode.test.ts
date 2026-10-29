@@ -213,8 +213,9 @@ describe("changing the mode of a clone that has records", () => {
     const local = await holy(dir, ["state", "mode", "local"])
     expect(local.code).toBe(3)
     expect(local.stderr).toContain("the repository tracks state")
-    expect(local.stderr).toContain("holyagent state mode")
-    expect(local.stderr).toContain("docs/usage.md")
+    expect(local.stderr).toContain("removed from git")
+    expect(local.stderr).toContain("repository its owner controls")
+    expect(local.stderr).toContain("ask the owner")
     expect(local.stderr).not.toContain("use the work mode")
     expect(await excludeFile(dir)).not.toContain(".holyagent")
 
@@ -381,6 +382,17 @@ describe("local mode and files that git tracks under .holyagent", () => {
 
     toon(await holy(dir, ["vcs", "commit", "-m", "Real", "--", "ab~1"]))
     expect(await filesOf(dir, "HEAD")).toEqual(["ab~1/b.txt"])
+  })
+
+  test("vcs commit takes a short-shaped folder whose removal is staged, since HEAD still has it", async () => {
+    const dir = await repoIn("local")
+    await seed(dir, { "ab~1/b.txt": "b\n" })
+    await sh(dir, ["git", "rm", "-r", "-q", "ab~1"])
+
+    toon(await holy(dir, ["vcs", "commit", "-m", "Remove", "--", "ab~1"]))
+
+    expect(await filesOf(dir, "HEAD")).toEqual(["ab~1/b.txt"])
+    expect((await sh(dir, ["git", "ls-tree", "-r", "--name-only", "HEAD"])).trim()).toBe("a.txt")
   })
 
   test("in the work mode a staged path in another case is in scope when core.ignorecase is on", async () => {
@@ -564,8 +576,12 @@ describe("the exclude file edge cases", () => {
 
     const leaving = holy(dir, ["state", "mode", "work"])
     // The mode is written first; the removal of the entry then waits for the exclude lock.
-    while ((await sh(dir, ["git", "config", "--local", "holyagent.stateMode"])).trim() !== "work")
+    const deadline = Date.now() + 10_000
+    while ((await sh(dir, ["git", "config", "--local", "holyagent.stateMode"])).trim() !== "work") {
+      if (Date.now() > deadline)
+        throw new Error("the mode was not written to work within 10 seconds of leaving local")
       await Bun.sleep(25)
+    }
     await writeFile(join(dir, ".git", "config.lock"), "")
     await rm(lock)
     const result = await leaving
