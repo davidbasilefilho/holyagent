@@ -1,0 +1,63 @@
+{
+  "id": "assignment-0mvtpczuk-c24j",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 5,
+  "roleTask": "Worker.implementation",
+  "slug": "clean-up-billion-context-leftovers-on",
+  "objective": "Clean up Billion Context leftovers on machines that ran an earlier holyagent setup, add a CI parse check of both installers, and fix the two doc nits from the removal review.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-setup-cleanup (branch ccr-046ad103-6qsvgx-bili-cleanup from origin/main eaed3fd).",
+    "Leftovers an earlier setup or installer left (see the git history of PR #40, commit 383531b's removed installBillionContext, and the review note in /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-kayy.txt): in ~/.claude/settings.json an env ANTHROPIC_BASE_URL pointing at the local proxy http://127.0.0.1:18787 and DISABLE_AUTO_COMPACT=1, the claude-native-bootstrap hook and the bili MCP server entries written by bili plugin install claude, ~/.claude/commands/acp-cache.md, and the billion-context marketplace and plugin entries. Make holyagent setup claude remove exactly those entries when they match what Billion Context wrote (leave anything else, keep the user's other settings, print what it removed, --dry-run shows it), and make holyagent doctor warn when any remain. Read how bili plugin install claude writes them from the removed code and docs in git history (git show 383531b^:packages/cli/src/claude/user.ts, docs/components.md at that commit); where the exact shape is unknown, match only the unambiguous keys (the 127.0.0.1:18787 base URL, acp-cache.md, a server or hook whose command is bili). Tests with temp homes.",
+    "CI: add a job or step to .github/workflows/ci.yml that runs bash -n install/wsl-install.sh and parses install/windows-install.ps1 with pwsh ([System.Management.Automation.Language.Parser]::ParseFile, failing on errors) on ubuntu-latest, which ships pwsh; keep existing jobs and pinned action versions unchanged.",
+    "Docs: README.md the link labeled docs/usage.md that points to docs/components.md#exa (fix label or target); docs/components.md the comma splice in the Windows installer sentence ('..., and puts Bun's global bin folder on your user PATH.'). Document the cleanup in docs/usage.md."
+  ],
+  "constraints": [
+    "User (verbatim): \"não deve ter nada pendente / outra coisa: arrume esse comportamento, o que ficar pendente que o agente pode resolver deve ser resolvido\".",
+    "Follow /home/user/holyagent/.claude/CLAUDE.md and /home/user/holyagent/AGENTS.md (Effect with tagged errors, no try/catch/new Promise/async in runtime and CLI source, Schema at boundaries, Bun APIs and Bun Shell, JSDoc). Do not edit .claude/CLAUDE.md or AGENTS.md.",
+    "Make no version-control writes and no edits under .git/ or .holyagent/ of the repository; tests use temp folders.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done and checked, stop and report; add no unrequested features (name ideas in the report)."
+  ],
+  "criteria": [
+    {
+      "text": "setup claude removes only the Billion Context leftovers and doctor warns on them, proven by tests that fail without the change",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "CI parses both installers and existing CI jobs are unchanged",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The two doc nits are fixed and the cleanup is documented",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build leaves no diff after the change and mise run verify passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/cli",
+    "install",
+    "docs",
+    "README.md",
+    ".github"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T15:32:58.364Z"
+  },
+  "createdAt": "2026-10-29T15:32:58.364Z"
+}
