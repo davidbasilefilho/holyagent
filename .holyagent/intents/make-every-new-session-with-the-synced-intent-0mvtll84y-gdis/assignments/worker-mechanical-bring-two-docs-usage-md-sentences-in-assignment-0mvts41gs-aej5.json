@@ -41,5 +41,25 @@
     "finishedAt": "2026-10-29T16:52:16.282Z"
   },
   "result": "result: Both docs/usage.md sentences are updated as specified, and `mise run verify` exits 0 in the worktree.\nchanged: docs/usage.md\nchecks: `mise run verify` (in /home/user/holyagent-setup-cleanup) -> exit 0. bun test: 949 pass, 1 skip, 0 fail, 950 tests across 33 files. check: no type errors in 119 files. lint: no problems in 120 files. fmt:check: all 235 files formatted.\nblockers: none\nquestions: none\nnotes: none. Only the two sentences changed. The diff contains two hunks: the Windows 8.3 name sentence (line 73) and the project-scope plugin uninstall sentence (line 31). Each gained the requested clause, and nothing else in the file moved.\nevidence:\nBoth sentences are updated as described and mise run verify passes: `mise run verify` in /home/user/holyagent-setup-cleanup -> exit 0 (lint, fmt:check, check and bun test all passed; 949 pass, 0 fail). Diff at /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/usage-md.diff\nchanged-paths: docs/usage.md (`git status --short` shows only ` M docs/usage.md`); diff saved to /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/usage-md.diff\nchecks-run: `mise run verify` -> exit 0, counts as above",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "Reviewed through the final code and security re-reviews with no open blocker; verify passes on the stack head e544a87",
+    "criteria": [
+      {
+        "criterion": "Both sentences are updated as described and mise run verify passes",
+        "support": "`mise run verify` in /home/user/holyagent-setup-cleanup -> exit 0 (lint, fmt:check, check and bun test all passed; 949 pass, 0 fail). Diff at /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/usage-md.diff"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "docs/usage.md (`git status --short` shows only ` M docs/usage.md`); diff saved to /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/usage-md.diff"
+      },
+      {
+        "label": "checks-run",
+        "support": "`mise run verify` -> exit 0, counts as above"
+      }
+    ]
+  },
   "createdAt": "2026-10-29T16:49:59.404Z"
 }
