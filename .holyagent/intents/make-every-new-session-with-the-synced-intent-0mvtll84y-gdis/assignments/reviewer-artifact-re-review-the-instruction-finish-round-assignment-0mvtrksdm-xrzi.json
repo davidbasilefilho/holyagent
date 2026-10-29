@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mvtrksdm-xrzi",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.artifact",
+  "slug": "re-review-the-instruction-finish-round",
+  "objective": "Re-review the instruction finish-round commit against the notes it targets.",
+  "state": "Running",
+  "scope": [
+    "Diff: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/f-A.diff (bbe8eff..head of ccr-046ad103-6qsvgx-pending-autofix in /home/user/holyagent-instr-finish). Targeted notes: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-gvrq.txt. Writer report: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-1ce3.txt."
+  ],
+  "constraints": [
+    "Read-only: write no files and make no version-control writes.",
+    "Judge only this finish-round diff against the findings it targets; it is the last review round, so rank anything new precisely."
+  ],
+  "criteria": [
+    {
+      "text": "Each targeted finding is stated closed or open with file and line, and any new blocking issue is named with a fix or its absence is stated",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources-read"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvtr43wd-1ce3"
+  ],
+  "followUpOf": "assignment-0mvtqsnhm-gvrq",
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-29T16:35:01.162Z"
+  },
+  "createdAt": "2026-10-29T16:35:01.162Z"
+}
