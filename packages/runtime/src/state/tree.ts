@@ -125,10 +125,12 @@ const EXCLUDE_LINE = `/${STATE_DIRECTORY}/`
 /** The comment above the line holyagent adds, which lets it remove only what it put there. */
 const EXCLUDE_MARK = "# added by holyagent (state mode local)"
 
-// Git ignores trailing whitespace in an exclude line but keeps a leading space or tab as part of
-// the pattern, so only the end is trimmed: " /.holyagent/" is another pattern and hides nothing.
-const isMark = (line: string) => line.trimEnd() === EXCLUDE_MARK
-const isEntry = (line: string) => line.trimEnd() === EXCLUDE_LINE
+// Git strips one trailing carriage return and then trailing spaces from an exclude line, and keeps
+// everything else as part of the pattern: " /.holyagent/" (leading space) and "/.holyagent/\t"
+// (trailing tab) are other patterns that hide nothing, so exactly those two are removed here.
+const gitPattern = (line: string) => line.replace(/\r$/, "").replace(/ +$/, "")
+const isMark = (line: string) => gitPattern(line) === EXCLUDE_MARK
+const isEntry = (line: string) => gitPattern(line) === EXCLUDE_LINE
 
 /** True when the exclude line is there, with or without the comment above it. */
 const hasEntry = (lines: ReadonlyArray<string>) => lines.some(isEntry)
@@ -908,6 +910,19 @@ export const readStateMode = (cwd: string, env: Environment) =>
   })
 
 /**
+ * The command that puts the clone's mode back to what it is now: the previous value when the clone
+ * has its own, else no value at all, so a clone that chose none stays unconfigured.
+ */
+const modeRestore = (top: string, env: Environment, previous: StateMode) =>
+  gitSucceeds(top, env, ["config", "--local", "--get", STATE_MODE_KEY]).pipe(
+    Effect.map((configured) =>
+      configured
+        ? gitText(top, env, ["config", "--local", STATE_MODE_KEY, previous])
+        : gitText(top, env, ["config", "--local", "--unset", STATE_MODE_KEY]),
+    ),
+  )
+
+/**
  * Sets the state mode in the clone's git config, holding the worktree lock that creating the state
  * branch also holds, so a branch is not made between the checks and the write. The records are
  * never moved or deleted: a change away from `branch` is refused once the state branch exists, and
@@ -946,19 +961,12 @@ export const setStateMode = (cwd: string, env: Environment, mode: StateMode) =>
           (yield* gitText(top, env, ["ls-files", "--", ...TRACKED_STATE_PATHSPEC])) !== ""
         )
           return yield* new StateModeRefused({
-            reason: `git tracks state in ${STATE_DIRECTORY}/, which an exclude entry cannot hide; use the work mode`,
+            reason: `the repository tracks state in ${STATE_DIRECTORY}/, which an exclude entry cannot hide; choose the mode with holyagent state mode, and see docs/usage.md for what each one does to a repository you do not control`,
           })
         if (mode === "local") yield* excludeState(top, common, env)
-        // A failure after the entry was added or the mode written leaves the clone as it was.
-        const configured = yield* gitSucceeds(top, env, [
-          "config",
-          "--local",
-          "--get",
-          STATE_MODE_KEY,
-        ])
-        const restoreMode = configured
-          ? git(top, env, ["config", "--local", STATE_MODE_KEY, previous])
-          : git(top, env, ["config", "--local", "--unset", STATE_MODE_KEY])
+        // Leaving local removes the entry after the mode write, so a failure there must put the
+        // mode back; the way back is read before the write, and only where it can be needed.
+        const restoreMode = mode === "local" ? undefined : yield* modeRestore(top, env, previous)
         yield* gitText(top, env, ["config", "--local", STATE_MODE_KEY, mode]).pipe(
           Effect.tapError(() =>
             mode === "local" && previous !== "local"
@@ -966,9 +974,22 @@ export const setStateMode = (cwd: string, env: Environment, mode: StateMode) =>
               : Effect.void,
           ),
         )
-        if (mode !== "local")
+        if (restoreMode !== undefined)
           yield* unexcludeState(top, common, env).pipe(
-            Effect.tapError(() => restoreMode.pipe(Effect.ignore)),
+            Effect.catch((error) =>
+              restoreMode.pipe(
+                Effect.matchEffect({
+                  onSuccess: () => Effect.fail(error),
+                  onFailure: (restoreError) =>
+                    Effect.fail(
+                      new StateIo({
+                        path: top,
+                        cause: `${error.message}; the mode could not be put back to ${previous} either (${restoreError.message}); set git config ${STATE_MODE_KEY} by hand`,
+                      }),
+                    ),
+                }),
+              ),
+            ),
           )
         return { previous, mode }
       }),

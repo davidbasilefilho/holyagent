@@ -212,7 +212,10 @@ describe("changing the mode of a clone that has records", () => {
 
     const local = await holy(dir, ["state", "mode", "local"])
     expect(local.code).toBe(3)
-    expect(local.stderr).toContain("work mode")
+    expect(local.stderr).toContain("the repository tracks state")
+    expect(local.stderr).toContain("holyagent state mode")
+    expect(local.stderr).toContain("docs/usage.md")
+    expect(local.stderr).not.toContain("use the work mode")
     expect(await excludeFile(dir)).not.toContain(".holyagent")
 
     expect(toon(await holy(dir, ["state", "mode", "work"]))).toMatchObject({ mode: "work" })
@@ -304,6 +307,9 @@ describe("local mode and files that git tracks under .holyagent", () => {
     expect(result.code).toBe(2)
     expect(result.stderr).toContain("files under .holyagent/ are staged")
     expect(result.stderr).not.toContain("git tracks")
+    expect(result.stderr).toContain("The repository tracks state")
+    expect(result.stderr).toContain("docs/usage.md")
+    expect(result.stderr).not.toContain("switch to the work mode")
     expect(await sh(dir, ["git", "log", "--format=%s"])).toBe("track\nseed\n")
   })
 
@@ -347,6 +353,34 @@ describe("local mode and files that git tracks under .holyagent", () => {
     expect(await Effect.runPromise(commitScope(["src/HOLYAG~1"], "/", "local"))).toEqual([
       "src/HOLYAG~1",
     ])
+  })
+
+  test("a hashed 8.3 name is refused too, unless it is a real entry of the work tree", async () => {
+    for (const mode of ["local", "branch", "work"] as const)
+      for (const path of ["HOA3F2~1", "hoa3f2~1/x", "a~1/b", "ab~12/c/d"]) {
+        const failure = await Effect.runPromise(Effect.flip(commitScope([path], "/", mode)))
+        expect(failure.message).toContain("short name")
+      }
+    const real = new Set(["ab~1"])
+    expect(await Effect.runPromise(commitScope(["ab~1/b"], "/", "local", false, real))).toEqual([
+      "ab~1/b",
+    ])
+    // Not of the shape: seven characters before the tilde, no digits after it, or not the first segment.
+    expect(
+      await Effect.runPromise(commitScope(["abcdefg~1", "ab~x", "a/b~1", "~1"], "/", "local")),
+    ).toEqual(["abcdefg~1", "ab~x", "a/b~1", "~1"])
+  })
+
+  test("vcs commit refuses an alias-shaped name that is not in the work tree and takes a real one", async () => {
+    const dir = await repoIn("local")
+    await put(dir, { "ab~1/b.txt": "b\n", "a.txt": "a2\n" })
+
+    const alias = await holy(dir, ["vcs", "commit", "-m", "Alias", "--", "HOA3F2~1/x"])
+    expect(alias.code).toBe(2)
+    expect(alias.stderr).toContain("short name")
+
+    toon(await holy(dir, ["vcs", "commit", "-m", "Real", "--", "ab~1"]))
+    expect(await filesOf(dir, "HEAD")).toEqual(["ab~1/b.txt"])
   })
 
   test("in the work mode a staged path in another case is in scope when core.ignorecase is on", async () => {
@@ -474,6 +508,19 @@ describe("the exclude file edge cases", () => {
     expect(await excludeFile(dir)).toBe("/.holyagent/ \r\n")
   })
 
+  test("a trailing tab is part of the pattern, so the entry is added and only it is removed", async () => {
+    const dir = await repoIn()
+    await writeExclude(dir, "/.holyagent/\t\n/.holyagent/\r \n")
+
+    toon(await holy(dir, ["state", "mode", "local"]))
+
+    expect(await excludeFile(dir)).toBe(`/.holyagent/\t\n/.holyagent/\r \n${MARK}\n/.holyagent/\n`)
+    await put(dir, { ".holyagent/x": "x\n" })
+    expect(await sh(dir, ["git", "status", "--porcelain", "--", ".holyagent"])).toBe("")
+    toon(await holy(dir, ["state", "mode", "work"]))
+    expect(await excludeFile(dir)).toBe("/.holyagent/\t\n/.holyagent/\r \n")
+  })
+
   // The exclude file read fine, but the temporary file next to it has a name too long to create,
   // so the removal of the entry fails after the mode was written.
   const withUnwritableExclude = async (dir: string, text: string) => {
@@ -508,6 +555,25 @@ describe("the exclude file edge cases", () => {
       mode: "branch",
       configured: false,
     })
+  })
+
+  test("a failed restore of the mode is reported with the failure that needed it", async () => {
+    const dir = await repoIn("local")
+    await withUnwritableExclude(dir, `${MARK}\n/.holyagent/\n`)
+    const lock = await holdExcludeLock(dir)
+
+    const leaving = holy(dir, ["state", "mode", "work"])
+    // The mode is written first; the removal of the entry then waits for the exclude lock.
+    while ((await sh(dir, ["git", "config", "--local", "holyagent.stateMode"])).trim() !== "work")
+      await Bun.sleep(25)
+    await writeFile(join(dir, ".git", "config.lock"), "")
+    await rm(lock)
+    const result = await leaving
+
+    expect(result.code).not.toBe(0)
+    expect(result.stderr).toContain("could not be put back to local")
+    expect(result.stderr).toContain("holyagent.stateMode")
+    await rm(join(dir, ".git", "config.lock"))
   })
 
   test("the exclude edit waits as long as the worktree lock for a command that holds the lock", async () => {

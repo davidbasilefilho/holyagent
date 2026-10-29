@@ -4125,6 +4125,7 @@ var ignore2 = ignore;
 var orElseSucceed2 = orElseSucceed;
 var filter3 = filter2;
 var filterOrFail2 = filterOrFail;
+var matchEffect3 = matchEffect;
 var provide3 = provide2;
 var provideService2 = provideService;
 var acquireUseRelease2 = acquireUseRelease;
@@ -9834,8 +9835,9 @@ var NOT_A_REPOSITORY = /not a git repository|command not found/i;
 var stateModeOf = (top, env) => git(top, env, ["config", "--get", STATE_MODE_KEY]).pipe(flatMap2((ran) => parseStateMode(ran.code === 0 ? ran.stdout : undefined)));
 var EXCLUDE_LINE = `/${STATE_DIRECTORY}/`;
 var EXCLUDE_MARK = "# added by holyagent (state mode local)";
-var isMark = (line) => line.trimEnd() === EXCLUDE_MARK;
-var isEntry = (line) => line.trimEnd() === EXCLUDE_LINE;
+var gitPattern = (line) => line.replace(/\r$/, "").replace(/ +$/, "");
+var isMark = (line) => gitPattern(line) === EXCLUDE_MARK;
+var isEntry = (line) => gitPattern(line) === EXCLUDE_LINE;
 var hasEntry = (lines) => lines.some(isEntry);
 var withEntry = (lines) => {
   if (hasEntry(lines))
@@ -10225,6 +10227,7 @@ var readStateMode = (cwd, env) => gen2(function* () {
   const { directory } = yield* resolveState(cwd, env, "peek");
   return { mode, configured, directory };
 });
+var modeRestore = (top, env, previous) => gitSucceeds(top, env, ["config", "--local", "--get", STATE_MODE_KEY]).pipe(map4((configured) => configured ? gitText(top, env, ["config", "--local", STATE_MODE_KEY, previous]) : gitText(top, env, ["config", "--local", "--unset", STATE_MODE_KEY])));
 var setStateMode = (cwd, env, mode) => gen2(function* () {
   const { top, common } = yield* requireRepository(cwd, env);
   return yield* withFileLock(join2(common, "holyagent", "worktree.lock"), gen2(function* () {
@@ -10242,20 +10245,20 @@ var setStateMode = (cwd, env, mode) => gen2(function* () {
       });
     if (mode === "local" && (yield* gitText(top, env, ["ls-files", "--", ...TRACKED_STATE_PATHSPEC])) !== "")
       return yield* new StateModeRefused({
-        reason: `git tracks state in ${STATE_DIRECTORY}/, which an exclude entry cannot hide; use the work mode`
+        reason: `the repository tracks state in ${STATE_DIRECTORY}/, which an exclude entry cannot hide; choose the mode with holyagent state mode, and see docs/usage.md for what each one does to a repository you do not control`
       });
     if (mode === "local")
       yield* excludeState(top, common, env);
-    const configured = yield* gitSucceeds(top, env, [
-      "config",
-      "--local",
-      "--get",
-      STATE_MODE_KEY
-    ]);
-    const restoreMode = configured ? git(top, env, ["config", "--local", STATE_MODE_KEY, previous]) : git(top, env, ["config", "--local", "--unset", STATE_MODE_KEY]);
+    const restoreMode = mode === "local" ? undefined : yield* modeRestore(top, env, previous);
     yield* gitText(top, env, ["config", "--local", STATE_MODE_KEY, mode]).pipe(tapError2(() => mode === "local" && previous !== "local" ? unexcludeState(top, common, env).pipe(ignore2) : void_3));
-    if (mode !== "local")
-      yield* unexcludeState(top, common, env).pipe(tapError2(() => restoreMode.pipe(ignore2)));
+    if (restoreMode !== undefined)
+      yield* unexcludeState(top, common, env).pipe(catch_2((error) => restoreMode.pipe(matchEffect3({
+        onSuccess: () => fail5(error),
+        onFailure: (restoreError) => fail5(new StateIo({
+          path: top,
+          cause: `${error.message}; the mode could not be put back to ${previous} either (${restoreError.message}); set git config ${STATE_MODE_KEY} by hand`
+        }))
+      }))));
     return { previous, mode };
   }), "long");
 });
@@ -10705,9 +10708,13 @@ var inStateFolder = (path, foldCase) => {
   return folded === STATE_DIRECTORY || folded.startsWith(`${STATE_DIRECTORY}/`);
 };
 var isConfigFile = (path) => path.toLowerCase() === `${STATE_DIRECTORY}/${CONFIG_FILE}`;
-var isShortStateName = (path) => /^holyag~\d+$/i.test(path.split("/")[0] ?? "");
+var SHORT_NAME = /^[^/~]{1,6}~\d+$/;
+var shortNames = (paths, separator) => [
+  ...new Set(paths.map((path) => toPosix(path, separator).split("/")[0] ?? "").filter((name) => SHORT_NAME.test(name)))
+];
+var realEntries = (names) => forEach2(names, (name) => gitPaths(["ls-files", "-z", "--cached", "--others", "--directory"], [name]).pipe(map4((listing) => listing === "" ? [] : [name]))).pipe(map4((found) => new Set(found.flat())));
 var ignoresCase = gitMaybe(["config", "--type=bool", "--get", "core.ignorecase"]).pipe(map4((value) => value === "true"));
-var commitScope = (paths, separator = sep4, mode = "branch", ignoreCase = false) => forEach2(paths, (path) => {
+var commitScope = (paths, separator = sep4, mode = "branch", ignoreCase = false, existing = new Set) => forEach2(paths, (path) => {
   const clean = toPosix(path, separator).replace(/\/+$/, "");
   const problem = pathProblem(clean);
   if (problem !== undefined)
@@ -10715,10 +10722,11 @@ var commitScope = (paths, separator = sep4, mode = "branch", ignoreCase = false)
       message: `Invalid path "${path}": ${problem}`,
       hint: "Name files or folders relative to the project root."
     }));
-  if (isShortStateName(clean))
+  const first = clean.split("/")[0] ?? "";
+  if (SHORT_NAME.test(first) && !existing.has(first))
     return fail5(new Usage({
-      message: `Invalid path "${path}": it is the short name of the ${STATE_DIRECTORY} folder`,
-      hint: "Name the state folder as .holyagent, or leave Intent state out of `vcs commit`."
+      message: `Invalid path "${path}": "${first}" looks like the Windows short name of a folder, which could be the ${STATE_DIRECTORY} state folder`,
+      hint: "Name the folder by its full name, or leave Intent state out of `vcs commit`."
     }));
   if (!inStateFolder(clean, ignoreCase || mode !== "work"))
     return succeed6(clean);
@@ -10752,7 +10760,7 @@ var requireNoStagedState = (staged) => {
   const state = staged.filter((path) => inStateFolder(path, true) && !isConfigFile(path));
   return state.length === 0 ? void_3 : fail5(new Usage({
     message: `files under ${STATE_DIRECTORY}/ are staged (${state.join(", ")}), which state mode local cannot keep out of a commit`,
-    hint: "Unstage them with `git restore --staged`, switch to the work mode with `holyagent state mode work`, or untrack the files."
+    hint: "Unstage them with `git restore --staged`. The repository tracks state; see `holyagent state mode` and docs/usage.md before changing the mode or untracking files."
   }));
 };
 var commit = (request) => gen2(function* () {
@@ -10760,7 +10768,8 @@ var commit = (request) => gen2(function* () {
   yield* request.cloud ? requireOwnAuthor : requireOwnIdentity;
   const mode = yield* stateMode;
   const ignoreCase = yield* ignoresCase;
-  const named = yield* commitScope(request.paths, sep4, mode, ignoreCase);
+  const real = yield* realEntries(shortNames(request.paths, sep4));
+  const named = yield* commitScope(request.paths, sep4, mode, ignoreCase, real);
   const scope = mode === "work" && !named.includes(STATE_DIRECTORY) ? [...named, ...yield* changedState] : named;
   const alreadyStaged = yield* stagedPaths;
   if (mode === "local")
