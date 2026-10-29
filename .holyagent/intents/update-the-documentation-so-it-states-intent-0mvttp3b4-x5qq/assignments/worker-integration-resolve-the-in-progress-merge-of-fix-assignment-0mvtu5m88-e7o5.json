@@ -5,7 +5,7 @@
   "roleTask": "Worker.integration",
   "slug": "resolve-the-in-progress-merge-of-fix",
   "objective": "Resolve the in-progress merge of fix/state-off-main (which now contains main through 7d8c8bc) into feat/plugin-only-install so the result keeps both sides' behavior and passes the gates.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Work only in the git worktree /home/user/holyagent-plugin-only-install, which is on branch feat/plugin-only-install (PR 37: 'feat!: install with plugin commands only', moving setup and doctor into the plugin runtime) with `git merge --no-commit fix/state-off-main` already started and stopped on 23 conflicted files (`git diff --name-only --diff-filter=U`): README.md, docs/{components,development,hooks,requirements,usage}.md, install/windows-install.ps1, install/wsl-install.sh, packages/cli/src/{claude/user.ts,cmd/doctor.ts,cmd/setup-claude.ts,json-file.ts,shell.ts}, packages/cli/tests/{claude-project,claude-user,cli,doctor,setup-claude}.test.ts, packages/cli/tests/support.ts, packages/integrations/claude/dist/scripts/holyagent.js, packages/runtime/src/cli/{commands,hook}.ts, packages/runtime/src/setup/leftovers.ts.",
     "The incoming side brings main's PRs 38-45: root rules on the first main-thread hook (#38), visual autofix instructions (#39), removal of Billion Context and the Exa connector (#40), per-clone state mode (#41), state edge cases (#42), resolve-every-fixable-item instructions (#43), and Billion Context leftovers cleanup plus installer parsing in CI (#45, e.g. packages/cli/src/claude/leftovers.ts and its test). PR 37's side moves setup/doctor into the plugin runtime (packages/runtime/src/setup/...) and installs with plugin commands only. Read both sides' commits (`git log --oneline 7929f2d..MERGE_HEAD`, `git log --oneline 7929f2d..HEAD`, `git show <sha>`) to understand each change's intent.",
@@ -58,5 +58,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T17:47:20.191Z"
+  },
   "createdAt": "2026-10-29T17:47:12.201Z"
 }
