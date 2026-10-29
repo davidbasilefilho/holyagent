@@ -1,0 +1,62 @@
+{
+  "id": "assignment-0mvtu5m88-e7o5",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 2,
+  "roleTask": "Worker.integration",
+  "slug": "resolve-the-in-progress-merge-of-fix",
+  "objective": "Resolve the in-progress merge of fix/state-off-main (which now contains main through 7d8c8bc) into feat/plugin-only-install so the result keeps both sides' behavior and passes the gates.",
+  "state": "Ready",
+  "scope": [
+    "Work only in the git worktree /home/user/holyagent-plugin-only-install, which is on branch feat/plugin-only-install (PR 37: 'feat!: install with plugin commands only', moving setup and doctor into the plugin runtime) with `git merge --no-commit fix/state-off-main` already started and stopped on 23 conflicted files (`git diff --name-only --diff-filter=U`): README.md, docs/{components,development,hooks,requirements,usage}.md, install/windows-install.ps1, install/wsl-install.sh, packages/cli/src/{claude/user.ts,cmd/doctor.ts,cmd/setup-claude.ts,json-file.ts,shell.ts}, packages/cli/tests/{claude-project,claude-user,cli,doctor,setup-claude}.test.ts, packages/cli/tests/support.ts, packages/integrations/claude/dist/scripts/holyagent.js, packages/runtime/src/cli/{commands,hook}.ts, packages/runtime/src/setup/leftovers.ts.",
+    "The incoming side brings main's PRs 38-45: root rules on the first main-thread hook (#38), visual autofix instructions (#39), removal of Billion Context and the Exa connector (#40), per-clone state mode (#41), state edge cases (#42), resolve-every-fixable-item instructions (#43), and Billion Context leftovers cleanup plus installer parsing in CI (#45, e.g. packages/cli/src/claude/leftovers.ts and its test). PR 37's side moves setup/doctor into the plugin runtime (packages/runtime/src/setup/...) and installs with plugin commands only. Read both sides' commits (`git log --oneline 7929f2d..MERGE_HEAD`, `git log --oneline 7929f2d..HEAD`, `git show <sha>`) to understand each change's intent.",
+    "Resolve so that every behavior from both sides survives: where PR 37 moved or deleted code that main changed, port main's change into PR 37's new location (for example Billion Context leftover cleanup and setup changes go into the runtime setup code if that is where setup now lives). Docs must describe the merged behavior consistently. Regenerate the generated plugin (packages/integrations/claude/dist) with `mise run build`, never by hand-merging holyagent.js.",
+    "Run the gates with mise: the toolchain may still be installing in parallel by another agent (mise into ~/.local/bin and a canary Bun). If `~/.local/bin/mise` is missing or `mise run toolchain` fails, finish the resolution first and retry the gates later; if still unavailable at the end, report the gates as not run with the error."
+  ],
+  "constraints": [
+    "Do not commit, run `git merge --continue`, `git commit`, `git checkout`, `git reset`, `git stash` or any other git write except `git add` of resolved files in that worktree (staging marks resolution). Make no edits under .git/ or .holyagent/. The root commits the merge.",
+    "Edit only files inside /home/user/holyagent-plugin-only-install, and only what resolving the merge and regenerating dist needs; no unrelated refactors or features (name them in the report).",
+    "Do not touch /home/user/holyagent or the other worktrees.",
+    "Keep working until the merge is fully resolved and checked; stop to ask only if both sides changed the same logic so that picking either would lose behavior and porting is impossible; then report the exact choice needed."
+  ],
+  "criteria": [
+    {
+      "text": "No conflicted files remain and no conflict markers exist in the worktree",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Every behavior from both sides survives, with main's changes ported into PR 37's new locations where PR 37 moved code",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "mise run verify passes in the worktree",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "mise run build leaves no diff in packages/integrations/claude/dist",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Only merge resolution and regenerated dist changed; nothing beyond the merge",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "resolution-notes"
+  ],
+  "ownershipPaths": [
+    "README.md",
+    "docs",
+    "install",
+    "packages"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-10-29T17:47:12.201Z"
+}
