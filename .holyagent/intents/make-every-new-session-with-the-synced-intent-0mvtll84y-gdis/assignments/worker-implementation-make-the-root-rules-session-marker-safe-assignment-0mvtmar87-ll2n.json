@@ -1,0 +1,51 @@
+{
+  "id": "assignment-0mvtmar87-ll2n",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-root-rules-session-marker-safe",
+  "objective": "Make the root-rules session marker safe and per user so the late-delivery hook never fails on every call or follows a symlink.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-root (head 673c38a). Reviews: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-assignment-0mvtm1tfc-a04n.txt (code, blocker B1) and /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-assignment-0mvtm1tnb-sg3e.txt (security findings 1 and 2).",
+    "Fix in packages/runtime/src/state/delivery.ts and its callers: (1) scope the marker folder per user (for example os.tmpdir()/holyagent-sessions-<uid>, or the user name where process.getuid is missing on Windows), created with mode 0700; check with lstat that it is a real directory owned by the current user, and treat anything else as unavailable; (2) open markers with 'wx' in markRulesDelivered too and treat EEXIST as success, so no write follows a symlink; (3) when the marker folder is unavailable or unwritable, root-rules exits 0 with no output (degrade quietly, never a per-call error), and update the test that asserts exit 1 accordingly.",
+    "Optional while here, only if small: replace the replaceAll string replacer for CLAUDE_PLUGIN_ROOT in hook.ts with a function replacer."
+  ],
+  "constraints": [
+    "Follow /home/user/holyagent/.claude/CLAUDE.md.",
+    "Work only in that worktree; make no version-control writes and no edits under .git/ or .holyagent/. Finish with mise run build and mise run verify.",
+    "When done and checked, stop and report; no unrequested changes."
+  ],
+  "criteria": [
+    {
+      "text": "The marker folder is per user, mode 0700 and owner-checked, markers never follow symlinks, and an unusable folder makes root-rules exit 0 silently, each with a test that fails without the fix",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify passes and mise run build leaves no diff",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli",
+    "packages/runtime/src/state",
+    "packages/runtime/tests",
+    "packages/integrations/claude",
+    "docs"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvtlrfnt-fomd",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T14:07:15.031Z"
+  },
+  "createdAt": "2026-10-29T14:07:15.031Z"
+}
