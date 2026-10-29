@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mvts7ekb-enjh",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-last-small-round-on-the-three",
+  "objective": "Review the last small round on the three stacked branches (instruction wording, short-name and refusal fixes, project-folder reporting, docs) for correctness and regressions.",
+  "state": "Running",
+  "scope": [
+    "Diff of the four commits e28e9b7 (instructions), 56abf21 (state), 762af00 (setup) and e544a87 (docs): /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/last.diff. Stack head with everything: /home/user/holyagent-setup-cleanup at e544a87.",
+    "Targets: r-xrzi.txt N1 and N3, r-726e.txt optional notes, r-1abu.txt claim 7, all in /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad. Note: the state writer also changed vcs commit to skip git add for a scope path that is in HEAD but gone from the work tree; check that change.",
+    "Run mise run verify on /home/user/holyagent-setup-cleanup."
+  ],
+  "constraints": [
+    "Read-only: write no files and make no version-control writes."
+  ],
+  "criteria": [
+    {
+      "text": "Findings are ranked blocking or non-blocking with file, line and fix, or their absence is stated, with mise run verify run on the head",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvtru9oy-97fb",
+    "assignment-0mvtru9y9-dlhq",
+    "assignment-0mvtrua7j-yv3z",
+    "assignment-0mvts41gs-aej5"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T16:52:36.348Z"
+  },
+  "createdAt": "2026-10-29T16:52:36.348Z"
+}
