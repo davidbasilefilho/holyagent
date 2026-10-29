@@ -4112,6 +4112,7 @@ var tap2 = tap;
 var exit2 = exit;
 var map4 = map2;
 var as2 = as;
+var asVoid2 = asVoid;
 var catch_2 = catch_;
 var catchTag2 = catchTag;
 var catchCause2 = catchCause;
@@ -7339,7 +7340,7 @@ var describeFailure = (error) => {
   };
 };
 
-import { join as join12 } from "path";
+import { join as join13 } from "path";
 
 var NULL_LITERAL = "null";
 var DELIMITERS = {
@@ -11729,7 +11730,7 @@ var ASSIGNMENT_COMMANDS = [
 ];
 
 import { stat as stat2 } from "fs/promises";
-import { join as join8 } from "path";
+import { join as join9 } from "path";
 
 var delegating_default = `## Delegating
 
@@ -11751,7 +11752,26 @@ var ROOT_CORE = [identity_default, delegating_default, dispatch_default, task_li
 
 var state_changes_default = "## Leave state changes to the root\n\nLeave to the root every command that changes git, GitHub or holyagent state (`git commit`, `branch`, `push`, `checkout`, `stash`, `merge`, `reset`, `gh` writes, and `holyagent vcs`, `assignment` and `intent` commands), and anything under `.git/` or `.holyagent/`. The root owns the branch, PR and state records and records your changed paths from the report, and other workers share the tree, so a stray write corrupts their work; nothing blocks one, so it rests on you. When you need such a change, say so in the report. Read-only commands are open: `git status`, `diff`, `log`, `show`, `blame`, `fetch`, and `holyagent status`, `plan`, `assignment show` and `assignment list`. To undo your own edit, edit the file back.\n";
 
+import { lstat as lstat2, mkdir as mkdir3, open as open3 } from "fs/promises";
+import { tmpdir, userInfo } from "os";
 import { join as join7 } from "path";
+var SAFE_SESSION = /^[\w.-]{1,80}$/;
+var isSessionId = (id) => id !== undefined && SAFE_SESSION.test(id) && !/^\.+$/.test(id);
+var markers = () => join7(tmpdir(), `holyagent-sessions-${(process.getuid?.() ?? userInfo().username).toString().replace(/[^\w.-]/g, "_")}`);
+var markerOf = (sessionId) => join7(markers(), sessionId);
+var ensureMarkers = () => {
+  const folder = markers();
+  const uid = process.getuid?.();
+  return io(folder, () => mkdir3(folder, { recursive: true, mode: 448 })).pipe(andThen2(io(folder, () => lstat2(folder))), filterOrFail2((found) => found.isDirectory() && (uid === undefined || found.uid === uid && (found.mode & 18) === 0), () => new StateIo({
+    path: folder,
+    cause: new Error("not a private directory owned by the current user")
+  })));
+};
+var create = (sessionId) => ensureMarkers().pipe(andThen2(io(markerOf(sessionId), () => open3(markerOf(sessionId), "wx").then((file) => file.close()))), as2(true), catchIf2((error) => error.path === markerOf(sessionId) && hasCode(error.cause, "EEXIST"), () => succeed6(false)));
+var markRulesDelivered = (sessionId) => create(sessionId).pipe(asVoid2);
+var claimRulesDelivery = create;
+
+import { join as join8 } from "path";
 var LEGACY_FOLDERS = {
   holyclaude: ".holyclaude",
   holycodex: ".holycodex"
@@ -11907,7 +11927,7 @@ var byFolder = (paths) => {
   return folders;
 };
 var convertibleFolders = (source, files) => byFolder(source === "holyclaude" ? files.filter((path) => path.startsWith("intents/")).map((path) => path.slice(8)) : files.filter((path) => !path.startsWith(".")));
-var legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join7(root, LEGACY_FOLDERS[source])).pipe(map4((files) => convertibleFolders(source, files).size > 0))).pipe(map4((sources) => sources.map((source) => LEGACY_FOLDERS[source])));
+var legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join8(root, LEGACY_FOLDERS[source])).pipe(map4((files) => convertibleFolders(source, files).size > 0))).pipe(map4((sources) => sources.map((source) => LEGACY_FOLDERS[source])));
 var isoOf = (millis) => {
   const date = new Date(millis);
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
@@ -12028,13 +12048,13 @@ var holyclaudeAssignment = (legacy, roleTask, siblings) => {
 };
 var gatherHolyclaude = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holyclaude;
-  const legacy = join7(root, folderName);
+  const legacy = join8(root, folderName);
   const intents = convertibleFolders("holyclaude", yield* listFiles(legacy));
   if (intents.size === 0)
     return;
   const state = collector("holyclaude");
   for (const [folder, inside] of intents) {
-    const base = join7(legacy, "intents", folder);
+    const base = join8(legacy, "intents", folder);
     const shown = (relative) => `${folderName}/intents/${folder}/${relative}`;
     if (!inside.includes("intent.json")) {
       unconvertible(state, shown("").slice(0, -1), "the folder has no intent.json");
@@ -12042,7 +12062,7 @@ var gatherHolyclaude = (root, directory) => gen2(function* () {
     }
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.json$/.test(path));
     const notes = inside.filter((path) => path !== "intent.json" && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join7(base, "intent.json"));
+    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join8(base, "intent.json"));
     const intent = yield* intentRecord(directory, shown("intent.json"), "problem" in read ? read : holyclaudeIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.json"), intent.problem);
@@ -12053,10 +12073,10 @@ var gatherHolyclaude = (root, directory) => gen2(function* () {
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join7(base, path), to: join7(target, path) });
+      state.notes.push({ from: join8(base, path), to: join8(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join7(base, path));
+      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join8(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (assignment.value.intent_id !== intent.value.intent.id)
@@ -12158,13 +12178,13 @@ var holycodexAssignment = (legacy, roleTask, intent, siblings) => {
 var TRANSACTION_FILE = ".holycodex-transaction.toon";
 var gatherHolycodex = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holycodex;
-  const legacy = join7(root, folderName);
+  const legacy = join8(root, folderName);
   const folders = convertibleFolders("holycodex", yield* listFiles(legacy));
   if (folders.size === 0)
     return;
   const state = collector("holycodex");
   for (const [folder, inside] of folders) {
-    const base = join7(legacy, folder);
+    const base = join8(legacy, folder);
     const shown = (relative) => `${folderName}/${folder}/${relative}`;
     if (!inside.includes("intent.toon")) {
       unconvertible(state, `${folderName}/${folder}`, "the folder has no intent.toon");
@@ -12178,7 +12198,7 @@ var gatherHolycodex = (root, directory) => gen2(function* () {
       });
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.toon$/.test(path));
     const notes = inside.filter((path) => path !== "intent.toon" && path !== TRANSACTION_FILE && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join7(base, "intent.toon"));
+    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join8(base, "intent.toon"));
     const intent = yield* intentRecord(directory, shown("intent.toon"), "problem" in read ? read : holycodexIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.toon"), intent.problem);
@@ -12189,10 +12209,10 @@ var gatherHolycodex = (root, directory) => gen2(function* () {
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join7(base, path), to: join7(target, path) });
+      state.notes.push({ from: join8(base, path), to: join8(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join7(base, path));
+      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join8(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (mapId("intent", assignment.value.intent_id) !== intent.value.intent.id)
@@ -18561,6 +18581,9 @@ var Payload = Struct({
   tool_name: optionalKey2(String4),
   tool_input: optionalKey2(Record(String4, Unknown2)),
   agent_type: optionalKey2(String4),
+  agent_id: optionalKey2(String4),
+  session_id: optionalKey2(String4),
+  hook_event_name: optionalKey2(String4),
   source: optionalKey2(String4),
   tool_response: optionalKey2(Unknown2)
 });
@@ -18611,31 +18634,50 @@ var commentPrefix = gen2(function* () {
   return configured === undefined || configured === "" || configured === "auto" ? "#" : configured;
 });
 var INLINE_INPUTS = new Set(["script", "args"]);
-var HOOK_COMMANDS = [
-  hook("session-start", "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread, and in a claude.ai cloud session, `CLAUDE_CODE_REMOTE=true`, the steps that set the commit author to the user), always ending with a short block of the root rules most often missed; for a project with no .holyagent and a .holyclaude or .holycodex folder that holds state to convert, a notice naming the folder and `holyagent migrate`, with the same rules; for a project with none of the three, the core root rules with that line and the reminder when the holyagent agent is not the main thread, otherwise nothing", (payload, call) => gen2(function* () {
-    const pluginRoot = call.env.CLAUDE_PLUGIN_ROOT;
-    const core = ROOT_AGENTS.has(payload.agent_type) ? undefined : [ROOT_CORE, ROOT_TAKEOVER].join(`
+var rootCore = (payload, call) => ROOT_AGENTS.has(payload.agent_type) ? undefined : [ROOT_CORE, ROOT_TAKEOVER].join(`
 
-`).replaceAll("${CLAUDE_PLUGIN_ROOT}", pluginRoot ?? "${CLAUDE_PLUGIN_ROOT}");
+`).replaceAll("${CLAUDE_PLUGIN_ROOT}", () => call.env.CLAUDE_PLUGIN_ROOT ?? "${CLAUDE_PLUGIN_ROOT}");
+var isMainThread = (payload) => payload.agent_id === undefined && !isSpecialist(payload.agent_type);
+var HOOK_COMMANDS = [
+  hook("session-start", "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread, and in a claude.ai cloud session, `CLAUDE_CODE_REMOTE=true`, the steps that set the commit author to the user), always ending with a short block of the root rules most often missed; for a project with no .holyagent and a .holyclaude or .holycodex folder that holds state to convert, a notice naming the folder and `holyagent migrate`, with the same rules; for a project with none of the three, the core root rules with that line and the reminder when the holyagent agent is not the main thread, otherwise nothing", (payload, call) => {
+    const core = rootCore(payload, call);
     const cloud = inCloudSession(call.env) ? CLOUD_IDENTITY : undefined;
-    if (!(yield* hasStateFolder(call.directory))) {
-      const found = yield* legacyFoldersWithState(call.root);
-      if (found.length === 0)
-        return core === undefined ? NOTHING : output({
+    return gen2(function* () {
+      if (!(yield* hasStateFolder(call.directory))) {
+        const found = yield* legacyFoldersWithState(call.root);
+        if (found.length === 0)
+          return core === undefined ? NOTHING : output({
+            hookEventName: "SessionStart",
+            additionalContext: bareContext(core, cloud)
+          });
+        return output({
           hookEventName: "SessionStart",
-          additionalContext: bareContext(core, cloud)
+          additionalContext: legacyContext(found, core, cloud)
         });
+      }
+      const { status, reconcile } = RESUMED.has(payload.source) ? yield* resumeOf(call.directory) : { status: yield* statusOf(call.directory), reconcile: undefined };
       return output({
         hookEventName: "SessionStart",
-        additionalContext: legacyContext(found, core, cloud)
+        additionalContext: sessionContext(status, core, reconcile, RESUMED.has(payload.source) ? yield* requirementsOf(call.directory) : undefined, cloud)
       });
-    }
-    const { status, reconcile } = RESUMED.has(payload.source) ? yield* resumeOf(call.directory) : { status: yield* statusOf(call.directory), reconcile: undefined };
-    return output({
+    }).pipe(core === undefined ? (effect) => effect : catch_2((error) => succeed6(output({
       hookEventName: "SessionStart",
-      additionalContext: sessionContext(status, core, reconcile, RESUMED.has(payload.source) ? yield* requirementsOf(call.directory) : undefined, cloud)
-    });
-  })),
+      additionalContext: [
+        bareContext(core, cloud),
+        `holyagent: the project state could not be read (${describeFailure(error).tag}), so no status is shown. Run \`holyagent status\` to see the error.`
+      ].join(`
+
+`)
+    }))), tap2(() => core !== undefined && isSessionId(payload.session_id) ? markRulesDelivered(payload.session_id).pipe(ignore2) : void_3));
+  }),
+  hook("root-rules", "UserPromptSubmit and PreToolUse: on the first event of a main thread that is not the root and has not been given the rules (its SessionStart output never came, or came late), add the core root rules with the takeover line as context, once per session; nothing for later events, the root, a subagent or a payload with no usable session id", (payload, call) => {
+    const core = rootCore(payload, call);
+    const event = payload.hook_event_name;
+    if (core === undefined || event !== "UserPromptSubmit" && event !== "PreToolUse" || !isMainThread(payload) || !isSessionId(payload.session_id))
+      return succeed6(NOTHING);
+    const cloud = inCloudSession(call.env) ? CLOUD_IDENTITY : undefined;
+    return claimRulesDelivery(payload.session_id).pipe(map4((first) => first ? output({ hookEventName: event, additionalContext: bareContext(core, cloud) }) : NOTHING), catch_2(() => succeed6(NOTHING)));
+  }, true),
   hook("agent-launch", "PostToolUse for Agent: when the prompt came from assignment dispatch, record the launched agent (assignment record <id> --agent <agentId>) and say so; on failure ask the root to record it; nothing for any other launch", (payload, call) => {
     const prompt = payload.tool_name === "Agent" ? payload.tool_input?.prompt : undefined;
     const id = typeof prompt === "string" ? dispatchedAssignment(prompt) : undefined;
@@ -18692,7 +18734,7 @@ var HOOK_COMMANDS = [
       const message = cleaned.split(`
 `).filter((line) => !line.startsWith(comment)).join(`
 `);
-      const phrases = forbiddenPhrases(message, (yield* readSettings([join8(call.root, STATE_DIRECTORY)])).allowWords);
+      const phrases = forbiddenPhrases(message, (yield* readSettings([join9(call.root, STATE_DIRECTORY)])).allowWords);
       if (phrases.length > 0)
         return yield* new MessageRefused({ phrases });
       if (cleaned !== above.trim() || cleanedBelow !== below.trim())
@@ -18713,7 +18755,7 @@ ${cleanedBelow}
   }, true)
 ];
 
-import { join as join9, relative as relative3 } from "path";
+import { join as join10, relative as relative3 } from "path";
 var {$: $3 } = globalThis.Bun;
 class NothingToMigrate extends TaggedError2("NothingToMigrate") {
   get message() {
@@ -18801,7 +18843,7 @@ var mentionsOf = (root, folders) => gen2(function* () {
   const names = yield* io(root, () => Array.fromAsync(new Bun.Glob("*").scan({ cwd: root, dot: true, onlyFiles: true })));
   const hits = [];
   for (const name of names.toSorted()) {
-    const text = yield* readText(join9(root, name));
+    const text = yield* readText(join10(root, name));
     if (text !== undefined && folders.some((folder) => text.includes(folder)))
       hits.push(name);
   }
@@ -18875,14 +18917,14 @@ var MIGRATE_COMMANDS = [
   }
 ];
 
-import { join as join10 } from "path";
+import { join as join11 } from "path";
 var {$: $4 } = globalThis.Bun;
 var TARGETS = [
   { id: "darwin-arm64", platform: "darwin", arch: "arm64", suffix: "" },
   { id: "linux-x64", platform: "linux", arch: "x64", suffix: "" },
   { id: "windows-x64", platform: "win32", arch: "x64", suffix: ".exe" }
 ];
-var BUNDLED_TOOLS = join10(import.meta.dir, "vendor");
+var BUNDLED_TOOLS = join11(import.meta.dir, "vendor");
 
 class UnsupportedPlatform extends TaggedError2("UnsupportedPlatform") {
   get message() {
@@ -18899,7 +18941,7 @@ var selectTarget = (platform, arch) => {
   const target = TARGETS.find((candidate) => candidate.platform === platform && candidate.arch === arch);
   return target === undefined ? fail5(new UnsupportedPlatform({ platform, arch })) : succeed6(target);
 };
-var toolPath = (directory, tool, target) => join10(directory, target.id, `${tool}${target.suffix}`);
+var toolPath = (directory, tool, target) => join11(directory, target.id, `${tool}${target.suffix}`);
 var runTool = (options) => gen2(function* () {
   const path = toolPath(options.directory, options.tool, options.target);
   if (!(yield* promise2(() => Bun.file(path).exists())))
@@ -18950,7 +18992,7 @@ var COMMANDS = [
 ];
 
 import { homedir } from "os";
-import { join as join11 } from "path";
+import { join as join12 } from "path";
 var TTL_VARIABLE = "HOLYAGENT_REUSE_TTL_MINUTES";
 var Minutes = NumberFromString.check(isFinite2(), isGreaterThanOrEqualTo2(0));
 var reuseTtl = (env) => {
@@ -18970,15 +19012,15 @@ var claudeConfigDirectory = (env, home = homedir) => {
   const configured = env.CLAUDE_CONFIG_DIR;
   if (configured !== undefined && configured !== "")
     return configured;
-  return join11(firstNonEmpty(env.HOME, env.USERPROFILE) ?? home(), ".claude");
+  return join12(firstNonEmpty(env.HOME, env.USERPROFILE) ?? home(), ".claude");
 };
 var workflowsAvailable = (env, root) => {
   if (env.CLAUDE_CODE_DISABLE_WORKFLOWS === "1")
     return succeed6(false);
   const files = [
-    join11(claudeConfigDirectory(env), "settings.json"),
-    join11(root, ".claude", "settings.json"),
-    join11(root, ".claude", "settings.local.json")
+    join12(claudeConfigDirectory(env), "settings.json"),
+    join12(root, ".claude", "settings.json"),
+    join12(root, ".claude", "settings.local.json")
   ];
   return forEach2(files, disablesWorkflows).pipe(map4((disabled) => !disabled.includes(true)));
 };
@@ -19001,7 +19043,7 @@ var topHelp = () => [
 ].join(`
 `);
 var callFor = (args, host, emit, command) => gen2(function* () {
-  const { root, directory } = command.stateless === true ? { root: host.cwd, directory: join12(host.cwd, STATE_DIRECTORY) } : yield* resolveState(host.cwd, host.env, typeof command.state === "function" ? command.state(args) : command.state ?? "ifPresent");
+  const { root, directory } = command.stateless === true ? { root: host.cwd, directory: join13(host.cwd, STATE_DIRECTORY) } : yield* resolveState(host.cwd, host.env, typeof command.state === "function" ? command.state(args) : command.state ?? "ifPresent");
   const inline = stringFlag(args, INPUT_FLAG);
   return {
     args,
