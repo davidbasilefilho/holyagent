@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-documentation-review-findings",
   "objective": "Repair the documentation review findings in /home/user/holyagent-docs.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Review report: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-revdocs.txt.",
     "Blocking: docs/usage.md:14 implies that saying the repository is yours makes local or work keep no second branch; per version-control.md's signal order the user's own words choose the mode, so say: tell the root which state mode you want (local keeps state out of every commit and branch; work commits it with the work), otherwise an owned repository gets branch mode with its holyagent/state branch.",
@@ -54,5 +54,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mvtvmzcb-3nhs",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T18:36:34.891Z"
+  },
   "createdAt": "2026-10-29T18:36:27.039Z"
 }
