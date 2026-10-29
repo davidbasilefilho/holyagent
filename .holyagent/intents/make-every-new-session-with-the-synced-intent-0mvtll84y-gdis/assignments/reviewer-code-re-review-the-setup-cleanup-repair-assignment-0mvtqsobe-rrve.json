@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mvtqsobe-rrve",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-setup-cleanup-repair",
+  "objective": "Re-review the setup cleanup repair 8acf8d5 against the previous code review's findings.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-setup-cleanup (head 0ed1d28 stacks the other two branches). Repair diff: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/rr-C.diff (976e6ff..8acf8d5). Previous review: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-mvy2.txt; writer report: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-t818.txt.",
+    "Run mise run verify on the head."
+  ],
+  "constraints": [
+    "Read-only: write no files and make no version-control writes.",
+    "Judge only the repair diff against the previous findings."
+  ],
+  "criteria": [
+    {
+      "text": "Each previous finding is stated closed or open with file and line, any new blocking issue is named with a fix or its absence is stated, with mise run verify run on the head",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvtqdcrc-t818"
+  ],
+  "followUpOf": "assignment-0mvtq11j4-mvy2",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T16:13:09.530Z"
+  },
+  "createdAt": "2026-10-29T16:13:09.530Z"
+}
