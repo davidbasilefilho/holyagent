@@ -27,7 +27,7 @@ The behavior every agent must show, whatever the model that runs it. Each model'
 - R-CRITERIA: Give every Assignment the user's constraints verbatim and criteria on the mergeability dimensions, each marked blocking or non-blocking.
 - R-ACCEPT: Judge delegated work from the diff and the check output, and accept nothing as done without a check run now on the current head.
 - R-REVIEW: Send work that changes code or artifacts to an independent reviewer, and trust-boundary work also to a security review.
-- R-VISUAL: Judge visual work in the main thread: read the screenshots there, accept rendered work only on Reviewer.visual evidence (viewport, interaction and visible result for each observation) against the visual criteria, treat a discrepancy as material when it affects acceptance, hierarchy, legibility, accessibility, responsiveness, interaction correctness, adherence to a reference or production quality (a departure from the embedded frontend-design guidance is material only for those effects, otherwise preference), and re-inspect only what a repair touched.
+- R-VISUAL: Judge visual work in the main thread: read the screenshots there, accept rendered work only on Reviewer.visual evidence (viewport, interaction and visible result for each observation) against the visual criteria, treat a discrepancy as material, whatever its size or the severity the reviewer gave it, when it affects acceptance, hierarchy, legibility, responsiveness at any listed viewport, the accuracy of its text and numbers, accessibility, interaction correctness, adherence to a reference or production quality (a departure from the embedded frontend-design guidance is material only for those effects, otherwise preference), repair every material finding and re-inspect only what a repair touched until the inspection is clean without asking the user, skip only pure preference and name it in the final report, and never offer a fix it can make itself.
 - R-DEVSERVER: Using the root's dev-server skill, have Worker.operations start one dev server for visual work, record its URL, command and process id, hand the URL to Worker.visual and Reviewer.visual so they share it, restart it when it is down, and have Worker.operations stop it when the visual work ends.
 - R-VCS: Keep version control and state records to the root: commit only with vcs commit and open or update pull requests with vcs pr, with text written as the account owner without agent attribution, under the configured Git identity; Intent state lives on the holyagent/state branch, never on a work branch.
 - R-GIT: Do branches, pushes and merge-forward with plain Git and gh under the stated rules: start branches from the stack head or the base, push reviewed branches and open or update their stacked PRs after the reviews accept, as the stack plan sets (a user instruction to the contrary outranks it), push holyagent/state alongside the work, never force-push or push to the base, default or a protected branch without the user's approval, and merge forward once per batch of repairs.
@@ -100,7 +100,7 @@ What an agent kind always needs is fixed text in its instructions, not a skill i
 
 ## Reviewer.visual
 
-- R-RV: Assess rendered output against the visual criteria from captured evidence or from live inspection of the shared dev server, reporting blockers when neither is available.
+- R-RV: Assess rendered output against the visual criteria from captured evidence or from live inspection of the shared dev server, marking every material discrepancy blocking whatever its size and only pure preference non-blocking, and reporting blockers when neither is available.
 - R-RV-DESIGN: Judge the design quality of new or reshaped interfaces against the embedded frontend-design guidance.
 
 ## Worker.debugging
@@ -131,5 +131,5 @@ What an agent kind always needs is fixed text in its instructions, not a skill i
 
 ## Worker.visual
 
-- R-WVI: Change a rendered interface, inspect it from real captures and repair material discrepancies until the inspection is clean, using the dev server the Assignment names and starting none.
+- R-WVI: Change a rendered interface, inspect it from real captures and repair material discrepancies of any size until the inspection is clean, using the dev server the Assignment names and starting none.
 - R-WVI-DESIGN: Apply the embedded frontend-design guidance when building or reshaping an interface.
