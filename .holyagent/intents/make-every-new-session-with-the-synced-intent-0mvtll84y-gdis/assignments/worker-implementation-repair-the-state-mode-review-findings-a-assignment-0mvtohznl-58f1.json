@@ -1,0 +1,56 @@
+{
+  "id": "assignment-0mvtohznl-58f1",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-state-mode-review-findings-a",
+  "objective": "Repair the state-mode review findings: a tracked .holyagent/config.json must not count as tracked state, plus the listed correctness, help-text and docs gaps.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-state-mode, branch ccr-046ad103-6qsvgx-state-mode at d6234b3. Reviews: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-di6x.txt (code) and r-oi0p.txt (security) in the same folder.",
+    "Blocking (security 1): a repository that tracks only .holyagent/config.json (project settings, not state) would make the root pick work and vcs commit stage untracked Intent records. Exclude config.json from the tracked-state signal in R-STATE and the root State rule (for example git ls-files .holyagent ':!.holyagent/config.json'), and apply the same exclusion in setStateMode's tracked check (tree.ts:862) so local is allowed there; in work mode stage only state records, not config.json changes the caller did not name. Add tests.",
+    "Ride along: code 2 (setStateMode's holdsRecords checks only the current work tree; scan every listed worktree as keepsState does; test); code 3 (vcs commit --help text at vcs/commands.ts:58 mode-aware); code 4 (migrate.ts:159,229 hints worded by mode); code 1 (docs/decisions.md:51 retitle and state the four-step signal order; docs/usage.md point to it); code 7 and security 4 (setExcluded: write .git/info/exclude atomically via temp file and rename, and remove only a line holyagent added, for example when leaving local); security 3 (run setStateMode's checks and write under the state lock, or re-check after writing; test where practical); security 5 (in local mode, refuse vcs commit when git tracks files under .holyagent, and match the .holyagent prefix case-insensitively in commitScope's refusal); code 6 (write the exclude before the config when entering local and after when leaving)."
+  ],
+  "constraints": [
+    "Requirements unchanged: default branch; mode only from git config; signal order: owner's words, tracked .holyagent/ (excluding config.json) -> work, independent-PR conventions or a repository the owner does not control -> local, else branch.",
+    "Follow /home/user/holyagent/.claude/CLAUDE.md (Effect with tagged errors, no try/catch/new Promise/async in runtime source, Schema at boundaries, Bun APIs and Bun Shell, JSDoc). Keep instruction size at or below the current text.",
+    "Work only in that worktree; make no version-control writes and no edits under .git/ or .holyagent/ of the repository (tests use temp repos).",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done and checked, stop and report; skip code findings 5, 8 and 9."
+  ],
+  "criteria": [
+    {
+      "text": "A repository tracking only .holyagent/config.json is not treated as tracked state, and work mode never stages untracked config or unnamed settings, proven by tests that fail without the fix",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Each ride-along finding is fixed or named as skipped with a reason, with tests for the code changes",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "mise run build leaves no diff after the change and mise run verify passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime",
+    "packages/integrations/claude",
+    "docs"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvto7zbl-oi0p",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T15:08:51.778Z"
+  },
+  "createdAt": "2026-10-29T15:08:51.778Z"
+}
