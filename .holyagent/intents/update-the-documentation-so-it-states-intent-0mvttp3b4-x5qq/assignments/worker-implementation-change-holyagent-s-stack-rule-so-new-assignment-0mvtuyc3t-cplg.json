@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "change-holyagent-s-stack-rule-so-new",
   "objective": "Change holyagent's stack rule so new work stacks on the top of the repository's open stack, after bringing the base into a stack that lags it, and branches from the base only when the repository asks for independent PRs.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Work only in the worktree /home/user/holyagent-stack-rule (branch claude/intelligent-dijkstra-x7njap-stack-rule at f837317, which has main's instruction files).",
     "Problem: the root's rules say 'Work that is not part of the delivery branches from the base' (packages/runtime/src/instructions/claude-5.5/root/stack-plan.md line 3; R-STACK in packages/runtime/src/instructions/requirements.md line 8; docs/usage.md '**Stacks.**' paragraph; docs/decisions.md line ~64). In this maintainer's repository the convention is stacked PRs, yet PRs 31-45 were all opened from main while an open stack (PR 35 -> 36, 35 -> 37) sat unmerged and fell 7 commits behind main. The maintainer decided: new work stacks on the top of the open stack, and branches from the base only when the repository's conventions ask for independent PRs.",
@@ -63,5 +63,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T18:10:00.869Z"
+  },
   "createdAt": "2026-10-29T18:09:32.105Z"
 }
