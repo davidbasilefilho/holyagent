@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "apply-two-exact-wording-fixes-in-home",
   "objective": "Apply two exact wording fixes in /home/user/holyagent-docs.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "In docs/usage.md line 14, replace the sentence 'Without a stated mode, an owned repository gets `branch` mode, with its `holyagent/state` branch.' with 'Without a stated mode, the root follows the order under [User settings](#user-settings): an owned repository with no tracked state and no independent-PR convention gets `branch` mode, with its `holyagent/state` branch.'",
     "In install/windows-install.ps1 line 23, replace '# Tested by the maintainer on a Windows machine; what it covers and what it does not: see docs/requirements.md.' with '# Tested by the maintainer on a Windows machine; see docs/requirements.md.'",
@@ -42,7 +42,33 @@
     "agentId": "workflow:wf_80d2cf26-1ac/assignment-0mvtw4jd5-yrya",
     "model": "haiku",
     "effort": "high",
-    "startedAt": "2026-10-29T18:42:22.287Z"
+    "startedAt": "2026-10-29T18:42:22.287Z",
+    "finishedAt": "2026-10-29T18:43:22.881Z"
+  },
+  "result": "result: Both wording fixes applied once each. The canary fmt check passes on docs/usage.md, and the five-file diff is regenerated.\nchanged: docs/usage.md, install/windows-install.ps1\nchecks:\n- rg -F for the old usage sentence -> 0 matches; new sentence -> 1 match (docs/usage.md:14)\n- rg -F for the old ps1 comment -> 0 matches; new comment -> 1 match (install/windows-install.ps1:23)\n- `/tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/canary/x/bun-linux-x64/bun fmt --no-script --check docs/usage.md` -> exit 0, \"1 file is formatted.\"\n- `git status --short` -> README.md, docs/hooks.md, docs/requirements.md, docs/usage.md, install/windows-install.ps1 modified. README.md, docs/hooks.md and docs/requirements.md are other workers' edits and I did not touch them.\n- diff -u of the five files against /home/user/holyagent-plugin-only-install -> written to /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/docs-v4.diff (136 lines). Each file's diff exits 1, as expected for differing files.\nblockers: none\nquestions: none\nnotes: The \"Not covered\" comment in the plugin-only-install copy of install/windows-install.ps1 differs from the worktree's old text, so the ps1 hunk in docs-v4.diff shows that difference as well as my edit. The usage.md and ps1 hunks in that diff are the only ones from my edits.\nevidence:\nBoth replacements are applied exactly once and nothing else changes (scope): rg -F counts: old usage sentence 0, new usage sentence 1 (docs/usage.md:14); old ps1 comment 0, new ps1 comment 1 (install/windows-install.ps1:23). Only the two Edit calls wrote to these files; git status lists no other path of mine.\nfmt check passes on docs/usage.md (style): canary bun fmt --no-script --check docs/usage.md, exit 0, \"1 file is formatted.\"\nchecks-run: rg counts above; canary fmt check exit 0; git status --short.\ndiff-file: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/docs-v4.diff",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Both exact replacements applied once; fmt green.",
+    "criteria": [
+      {
+        "criterion": "Both replacements are applied exactly once and nothing else changes",
+        "support": "rg -F counts: old usage sentence 0, new usage sentence 1 (docs/usage.md:14); old ps1 comment 0, new ps1 comment 1 (install/windows-install.ps1:23). Only the two Edit calls wrote to these files; git status lists no other path of mine."
+      },
+      {
+        "criterion": "fmt check passes on docs/usage.md",
+        "support": "canary bun fmt --no-script --check docs/usage.md, exit 0, \"1 file is formatted.\""
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "rg counts above; canary fmt check exit 0; git status --short."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/docs-v4.diff"
+      }
+    ]
   },
   "createdAt": "2026-10-29T18:42:21.066Z"
 }
