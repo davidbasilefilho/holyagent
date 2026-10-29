@@ -1,0 +1,57 @@
+{
+  "id": "assignment-0mvtr445w-vqzg",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 5,
+  "roleTask": "Worker.implementation",
+  "slug": "finish-round-for-the-state-branch-close",
+  "objective": "Finish round for the state branch: close the open notes of the last code and security re-reviews.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-state-edges at c4f16b5. Re-reviews: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-xpzx.txt and /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-l2nw.txt.",
+    "Fix: exclude-line matching strips only one trailing CR and trailing ASCII spaces, as git does (test with a tab-suffixed entry); build restoreMode lazily only where used and report a failed restore instead of swallowing it; the refusal hints in tree.ts (~884) and commit.ts (~154) stop telling the user to 'use the work mode' unconditionally: say that the repository tracks state and point to holyagent state mode and the docs, since work mode is wrong for a repository the owner does not control; refuse Windows hashed short names for the state folder too (first segment matching an 8.3 name ending in ~<digit> whose long form cannot be known: refuse any first segment of the form <1-6 chars>~<digits> that is not a real directory other than .holyagent, or document why that is unsafe and name it); leave a clear note in docs/usage.md for clones that ran the unreleased earlier build and keep an unmarked /.holyagent/ line (how to remove it)."
+  ],
+  "constraints": [
+    "User (verbatim): \"não deve ter nada pendente / outra coisa: arrume esse comportamento, o que ficar pendente que o agente pode resolver deve ser resolvido\". This is the finish round: fix every listed item; the added tests and checks are requested work.",
+    "Follow /home/user/holyagent/.claude/CLAUDE.md and /home/user/holyagent/AGENTS.md. Do not edit .claude/CLAUDE.md or AGENTS.md.",
+    "Make no version-control writes and no edits under .git/ or .holyagent/ of the repository; tests use temp folders.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done and checked, stop and report."
+  ],
+  "criteria": [
+    {
+      "text": "Every listed item is fixed, with a test that fails without it for code changes, or named with a concrete reason",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Existing state-mode and vcs commit behavior and tests are unchanged apart from the fixed edges",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "mise run build leaves no diff after the change and mise run verify passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/state",
+    "packages/runtime/src/vcs",
+    "packages/runtime/tests",
+    "packages/integrations/claude/dist/scripts",
+    "docs/usage.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvtqso0z-l2nw",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T16:22:03.284Z"
+  },
+  "createdAt": "2026-10-29T16:22:03.284Z"
+}
