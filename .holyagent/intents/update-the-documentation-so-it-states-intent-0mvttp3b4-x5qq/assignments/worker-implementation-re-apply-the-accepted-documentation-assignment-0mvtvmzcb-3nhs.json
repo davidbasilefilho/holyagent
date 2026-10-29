@@ -1,0 +1,70 @@
+{
+  "id": "assignment-0mvtvmzcb-3nhs",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "re-apply-the-accepted-documentation",
+  "objective": "Re-apply the accepted documentation changes (Windows tested by the maintainer, running the root on Sonnet, the broader use cases) on top of the merged PR 37 docs, in the worktree /home/user/holyagent-docs.",
+  "state": "Ready",
+  "scope": [
+    "Work only in /home/user/holyagent-docs (branch claude/intelligent-dijkstra-x7njap at fd6c9f6, the old PR 37 head). The real base is the merge of main into PR 37, which is resolved but not yet committed in /home/user/holyagent-plugin-only-install. First copy README.md, docs/usage.md, docs/requirements.md and docs/hooks.md from /home/user/holyagent-plugin-only-install (its working copy) into /home/user/holyagent-docs, so you edit the merged text.",
+    "Then apply the same intent as the earlier patch /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/docs-v1.patch (written against main; read it for wording): (1) native Windows reads as supported and tested by the maintainer on a Windows machine; remove every 'not tested'/'not verified'/'has not been run on a Windows machine' claim in README.md and docs/ (outside docs/pi/), keeping troubleshooting facts as plain notes; (2) a '## Run the root on Sonnet' section in docs/usage.md: the root runs on Opus by default (frontmatter `model: opus`); to use Sonnet set `\"env\": { \"ANTHROPIC_DEFAULT_OPUS_MODEL\": \"claude-sonnet-5-5\" }` in ~/.claude/settings.json or .claude/settings.local.json and restart; the variable is global (also /model opus, --model opus, other opus agents); specialists are pinned to haiku/sonnet routes and unchanged; check with /status; one-sentence trade-off; source https://code.claude.com/docs/en/model-config; the 'root agent (Opus, the main thread)' sentence points to it; README links it in one short clause; (3) a '## What it fits' section in docs/usage.md covering a one-line fix or small feature through stacked multi-PR deliveries, codebase questions with no edits, debugging unknown causes, reviewing a PR or branch, refactors and mechanical changes, UI work with visual inspection, docs and configuration, and personal, coursework or solo repositories (state mode local or work; repository conventions first), each grounded in documented behavior; README gets one 'Why HolyAgent?' bullet linking it.",
+    "Adapt to PR 37's install changes (setup now runs as plugin commands such as /holyagent:setup, installers are prerequisites-only); do not reintroduce removed text from main's version of these files.",
+    "Gates: mise is not available. Run the same commands the mise tasks run with the canary Bun at /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/canary/x/bun-linux-x64/bun: `<bun> fmt --no-script --check` on the four files at least (run `<bun> install --frozen-lockfile --ignore-scripts` first if needed)."
+  ],
+  "constraints": [
+    "User: Windows support was tested by the maintainer; remove the claims that it is untested.",
+    "User: document that switching the root to Sonnet is all it takes, for those who want it.",
+    "User: it must cover more use cases within software development, not only multi-PR projects.",
+    "Edit only README.md, docs/usage.md, docs/requirements.md and docs/hooks.md in /home/user/holyagent-docs. Do not change the line in docs/usage.md's '**Stacks.**' paragraph about work outside the delivery; another change owns it.",
+    "README.md keeps exactly its six sections in order: # HolyAgent, ## How do I install it?, ## Why HolyAgent?, ## Development, ## Special thanks, ## License.",
+    "No git writes of any kind (no add, commit, checkout, stash), no edits under .git/ or .holyagent/; do not touch other worktrees except reading /home/user/holyagent-plugin-only-install.",
+    "Keep working until done; stop and report when done and checked; name unrequested ideas instead of doing them."
+  ],
+  "criteria": [
+    {
+      "text": "The four files start from the merged PR 37 text and keep all of its changes apart from the requested edits",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "No statement in README.md or docs/ (outside docs/pi/) says native Windows is untested or unverified, and the Windows status says it was tested by the maintainer",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "docs/usage.md has the Run the root on Sonnet section with the variable, its global effect, unaffected specialists, the /status check and the source link, and README links to it",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "docs/usage.md has the What it fits section covering the listed use cases grounded in documented behavior, and README links to it",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "README.md keeps exactly its six sections in the required order",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "The format check passes on the four files with the canary Bun",
+      "blocking": true,
+      "dimension": "style"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "README.md",
+    "docs/usage.md",
+    "docs/requirements.md",
+    "docs/hooks.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-10-29T18:28:41.963Z"
+}
