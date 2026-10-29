@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "give-the-stack-rule-s-base-cases-one",
   "objective": "Give the stack rule's base cases one source so a CI change and independent-PR conventions still branch from the base, in /home/user/holyagent-stack-rule.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Re-review report: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-rerev2.txt (one blocking finding and notes). File: packages/runtime/src/instructions/claude-5.5/root/stack-plan.md.",
     "Fix: in bullet 1 state the start point once, e.g. 'Every new PR, a delivery's first included, starts from the open stack's top: ... ; it starts from the base only when it adds CI (next bullet), when no stack is open, or when the conventions ask for independent PRs.' Then bullet 4 says 'A delivery's first PR targets its start point and each later one its immediate predecessor', and bullet 5 says 'Writers start from that start point' (or the PR's base branch) instead of 'the open stack's top'. Replace 'else the latest' with 'else the most recently updated'.",
@@ -48,7 +48,37 @@
     "agentId": "workflow:wf_9aa4b72f-3b6/assignment-0mvtvzspb-b24u",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-10-29T18:38:47.893Z"
+    "startedAt": "2026-10-29T18:38:47.893Z",
+    "finishedAt": "2026-10-29T18:42:05.112Z"
+  },
+  "result": "result: Both base cases (CI change, independent-PR conventions) now start from the base in every bullet that names a start point or a first PR's target, and the base cases are stated once, in bullet 1. The gates all pass with the canary Bun.\n\nchanged:\n- /home/user/holyagent-stack-rule/packages/runtime/src/instructions/claude-5.5/root/stack-plan.md\n  - Bullet 1 states the start point once: \"Every new PR, a delivery's first included, starts from the open stack's top: … else the most recently updated; it starts from the base only when it adds CI, when no stack is open, or when the conventions ask for independent PRs.\"\n  - Bullet 1 no longer repeats \"branch each from the base\" for independent PRs. It keeps \"set the state mode as Version control says.\"\n  - Bullet 4 reads \"A delivery's first PR targets its start point and each later one its immediate predecessor.\"\n  - Bullet 5 reads \"Writers start from that point.\"\n  - Net addition against the original is +63 words (336 to 399), over the 60 target by 3.\n- /home/user/holyagent-stack-rule/packages/runtime/src/instructions/requirements.md: R-STACK now ends \"only a CI change, work with no open stack, or a repository with independent-PR conventions branches from the base.\"\n- /home/user/holyagent-stack-rule/docs/usage.md: the Stacks paragraph now says \"it branches from the base only when it adds CI (that PR goes first, so every later PR runs it), when none is open, or when the conventions ask for independent PRs.\" I removed the earlier CI sentence and the independent-PR clause so each case appears once.\n- /home/user/holyagent-stack-rule/packages/integrations/claude/dist/agents/holyagent.md: rebuilt.\n- /home/user/holyagent-stack-rule/docs/decisions.md: no edit. Line 53 already lists the three base cases (\"Only a change that adds CI … as does work with no open stack or in a repository whose conventions ask for independent PRs\").\n\nchecks:\n- `bun scripts/vendor.ts` -> 0\n- `bun packages/integrations/claude/build.ts` -> 0 (\"built 29 files\")\n- `bun check --no-script` -> 0\n- `bun lint --no-script` -> 0\n- `bun fmt --no-script --check` -> 0\n- `bun test` -> 0 (957 pass, 1 skip, 0 fail, 958 tests across 35 files)\n\nAll commands ran with the canary Bun.\n\nblockers: none\nquestions: none\n\nnotes:\n- The v4 diff shows only a 20-insertion, 18-deletion summary because it is the full change against HEAD. The repair diff covers the four files this repair touched.\n- decisions.md:66 still cross-references the bold lead-in \"New PRs stack on the open stack.\" I left it.\n\nevidence:\nA CI change and independent-PR conventions still start from the base in every bullet that names a start point or a first PR's target, with the base cases stated once: stack-plan.md bullet 1 states the start point and the base cases once. Bullet 2 (CI, from the base, even with a stack open) is unchanged. Bullets 4 and 5 now refer to the \"start point\" instead of the open stack's top. R-STACK in requirements.md and the Stacks paragraph in usage.md carry the same three base cases.\ndist rebuilt; check, lint, fmt --check and test pass with the canary Bun: build.ts exit 0; check, lint, fmt --check and test all exit 0; 957 pass, 0 fail.\nchecks-run: vendor, build, check, lint, fmt --check and test, all exit 0 (listed under checks).\nchanged-paths: stack-plan.md, requirements.md, docs/usage.md and dist/agents/holyagent.md, all under /home/user/holyagent-stack-rule.\ndiff-file: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule-repair4.diff (this repair alone, 58 lines) and /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule-v4.diff (full change, 126 lines).",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Base cases stated once in bullet 1, bullets 4-5 point to the start point, R-STACK and usage mirror it; gates green (957 pass).",
+    "criteria": [
+      {
+        "criterion": "A CI change and independent-PR conventions still start from the base in every bullet that names a start point or a first PR's target, with the base cases stated once",
+        "support": "stack-plan.md bullet 1 states the start point and the base cases once. Bullet 2 (CI, from the base, even with a stack open) is unchanged. Bullets 4 and 5 now refer to the \"start point\" instead of the open stack's top. R-STACK in requirements.md and the Stacks paragraph in usage.md carry the same three base cases."
+      },
+      {
+        "criterion": "dist rebuilt; check, lint, fmt --check and test pass with the canary Bun",
+        "support": "build.ts exit 0; check, lint, fmt --check and test all exit 0; 957 pass, 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "vendor, build, check, lint, fmt --check and test, all exit 0 (listed under checks)."
+      },
+      {
+        "label": "changed-paths",
+        "support": "stack-plan.md, requirements.md, docs/usage.md and dist/agents/holyagent.md, all under /home/user/holyagent-stack-rule."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule-repair4.diff (this repair alone, 58 lines) and /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule-v4.diff (full change, 126 lines)."
+      }
+    ]
   },
   "createdAt": "2026-10-29T18:38:39.887Z"
 }
