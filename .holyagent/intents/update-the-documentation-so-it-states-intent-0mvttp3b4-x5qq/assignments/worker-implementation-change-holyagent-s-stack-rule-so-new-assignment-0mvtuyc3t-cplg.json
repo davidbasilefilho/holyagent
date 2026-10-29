@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "change-holyagent-s-stack-rule-so-new",
   "objective": "Change holyagent's stack rule so new work stacks on the top of the repository's open stack, after bringing the base into a stack that lags it, and branches from the base only when the repository asks for independent PRs.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Work only in the worktree /home/user/holyagent-stack-rule (branch claude/intelligent-dijkstra-x7njap-stack-rule at f837317, which has main's instruction files).",
     "Problem: the root's rules say 'Work that is not part of the delivery branches from the base' (packages/runtime/src/instructions/claude-5.5/root/stack-plan.md line 3; R-STACK in packages/runtime/src/instructions/requirements.md line 8; docs/usage.md '**Stacks.**' paragraph; docs/decisions.md line ~64). In this maintainer's repository the convention is stacked PRs, yet PRs 31-45 were all opened from main while an open stack (PR 35 -> 36, 35 -> 37) sat unmerged and fell 7 commits behind main. The maintainer decided: new work stacks on the top of the open stack, and branches from the base only when the repository's conventions ask for independent PRs.",
@@ -67,7 +67,49 @@
     "agentId": "workflow:wf_c301ebf5-c1c/assignment-0mvtuyc3t-cplg",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-10-29T18:10:00.869Z"
+    "startedAt": "2026-10-29T18:10:00.869Z",
+    "finishedAt": "2026-10-29T18:17:20.940Z"
+  },
+  "result": "result: the stack rule is rewritten in all five places and the plugin is rebuilt. check, lint, fmt --check and test all pass with the canary Bun. The only remaining mention of the old rule is the new decisions.md paragraph that describes it as history.\n\nchanged:\n- /home/user/holyagent-stack-rule/packages/runtime/src/instructions/claude-5.5/root/stack-plan.md\n- /home/user/holyagent-stack-rule/packages/runtime/src/instructions/requirements.md\n- /home/user/holyagent-stack-rule/docs/usage.md\n- /home/user/holyagent-stack-rule/docs/decisions.md\n- /home/user/holyagent-stack-rule/packages/integrations/claude/dist/agents/holyagent.md (regenerated)\n\nThe new text, place by place:\n- **stack-plan.md line 3:** the old sentence \"Work that is not part of the delivery branches from the base.\" becomes two sentences. They say to list the open PRs and their bases before branching, and to stack new work on the top of the open stack. The top is the newest open head whose chain reaches the base; with several chains, use the one the work depends on, else the most recent. Branch from the base only when no PR is open or the conventions ask for independent PRs.\n- **stack-plan.md merge-forward line:** it now also covers a stack that lags the base. The base is merged into the lowest stack branch first, then up the chain with merge commits, and the branches are pushed together before new work stacks. The existing merge review stays. This is the extra clause in that bullet; it adds no new sentence.\n- **R-STACK, docs/usage.md and the decisions.md summary bullet:** the same rule in one clause each.\n- **decisions.md:** I added one short decision paragraph, \"New work stacks on the open stack\", saying why. The old rule let new PRs bypass an open stack, which then fell behind the base.\n- **Other copies:** no other model sets exist, only `claude-5.5` and `pi`. No test pinned the old text, so none changed. `.claude-plugin/marketplace.json` did not change. The lines mentioning independent PRs \"from the base\" in version-control.md and R-STATE are about the state mode and are untouched.\n\nchecks:\n- `bun install --frozen-lockfile --ignore-scripts` -> exit 0\n- `bun scripts/vendor.ts` -> exit 0, vendored 21 files\n- `bun packages/integrations/claude/build.ts` -> exit 0, built 29 files\n- `bun check --no-script` -> exit 0, no type errors in 121 files\n- `bun lint --no-script` -> exit 0, no problems in 122 files\n- `bun fmt --no-script --check` -> exit 0, 237 files formatted\n- `bun test` -> exit 0, 957 pass, 1 skip, 0 fail\n\nblockers: none\nquestions: none\nnotes:\n- The decisions.md paragraph is a full decision paragraph, not an extra sentence in an existing place. I added it because you said \"if fitting\".\n- I used `grep -rn` for the final sweep for leftover copies of the old rule, instead of the bundled `holyagent rg`. It is the same pattern search and found nothing else.\n- Idea not done: a runtime helper that computes the stack top from `gh pr list`. The instruction text alone does not enforce the rule.\n\nevidence:\n- The root instructions, R-STACK, docs/usage.md and docs/decisions.md state the new rule: stack new work on the top of the open stack, merge the base forward first when the stack lags it, branch from the base only for independent-PR conventions or no open PR: edits at stack-plan.md lines 3 and 7, requirements.md line 8, docs/usage.md line 96, and decisions.md lines 53 and 64 or so (the bullet shifted when I added the paragraph). The full diff is in the diff file.\n- No remaining copy of the rule that work outside the delivery branches from the base, outside history: `grep -rn -i \"not part of the delivery\\|outside the delivery\\|branch work outside\"` excluding node_modules and .git matches only the new decisions.md paragraph at line 53, which describes the old rule as history.\n- The generated plugin is rebuilt and in step with the sources: after vendor and build, `git diff` of `dist/agents/holyagent.md` shows only the two changed bullets, matching stack-plan.md.\n- check, lint, fmt --check and test pass with the canary Bun: all four exit 0 as listed under checks.\n- Replacement text stays about the size of what it replaces, at most two extra sentences per place: stack-plan.md line 3 goes from 1 to 2 sentences. The merge-forward bullet gains a clause and no sentence. R-STACK, usage.md and the summary bullet each stay one sentence with one longer clause.\n- checks-run: the seven commands listed under checks.\n- changed-paths: the five files listed under changed.\n- diff-file: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule.diff",
+  "acceptance": {
+    "revision": 2,
+    "rationale": "Diff read: rule rewritten in stack-plan, R-STACK, usage, decisions; dist rebuilt; check/lint/fmt/test green on canary Bun.",
+    "criteria": [
+      {
+        "criterion": "The root instructions, R-STACK, docs/usage.md and docs/decisions.md state the new rule: stack new work on the top of the open stack, merge the base forward first when the stack lags it, branch from the base only for independent-PR conventions or no open PR",
+        "support": "edits at stack-plan.md lines 3 and 7, requirements.md line 8, docs/usage.md line 96, and decisions.md lines 53 and 64 or so (the bullet shifted when I added the paragraph). The full diff is in the diff file."
+      },
+      {
+        "criterion": "No remaining copy of the rule that work outside the delivery branches from the base, outside history",
+        "support": "`grep -rn -i \"not part of the delivery\\|outside the delivery\\|branch work outside\"` excluding node_modules and .git matches only the new decisions.md paragraph at line 53, which describes the old rule as history."
+      },
+      {
+        "criterion": "The generated plugin is rebuilt and in step with the sources",
+        "support": "after vendor and build, `git diff` of `dist/agents/holyagent.md` shows only the two changed bullets, matching stack-plan.md."
+      },
+      {
+        "criterion": "check, lint, fmt --check and test pass with the canary Bun",
+        "support": "all four exit 0 as listed under checks."
+      },
+      {
+        "criterion": "Replacement text stays about the size of what it replaces, at most two extra sentences per place",
+        "support": "stack-plan.md line 3 goes from 1 to 2 sentences. The merge-forward bullet gains a clause and no sentence. R-STACK, usage.md and the summary bullet each stay one sentence with one longer clause."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "the seven commands listed under checks."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the five files listed under changed."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule.diff"
+      }
+    ]
   },
   "createdAt": "2026-10-29T18:09:32.105Z"
 }
