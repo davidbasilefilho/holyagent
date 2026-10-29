@@ -6,15 +6,14 @@ import { asStep, setupUser } from "../claude/user.ts"
 import { CliFailure, type Report } from "../report.ts"
 
 /**
- * Sets up Claude Code for HolyAgent: the plugin, Billion Context and ctx7 for the current user,
- * then the project settings. Every step is idempotent, a step that fails does not stop the next
- * one, and on a dry run nothing is installed or written.
+ * Sets up Claude Code for HolyAgent: the plugin and ctx7 for the current user, then the project
+ * settings. Every step is idempotent, a step that fails does not stop the next one, and on a dry
+ * run nothing is installed or written.
  */
 export const setupClaude = Effect.fn("setupClaude")(function* (options: {
   readonly directory: string
   readonly subagentCacheTtl: (typeof CACHE_TTLS)[number]
   readonly dryRun: boolean
-  readonly skipBillionContext: boolean
   readonly skipCtx7: boolean
 }) {
   const user = yield* setupUser(options)
@@ -42,10 +41,6 @@ export const setupClaudeCommand = Command.make(
       Flag.withDescription("Show what would change and install or write nothing"),
       Flag.withDefault(false),
     ),
-    skipBillionContext: Flag.Boolean("skip-billion-context").pipe(
-      Flag.withDescription("Do not install Billion Context"),
-      Flag.withDefault(false),
-    ),
     skipCtx7: Flag.Boolean("skip-ctx7").pipe(
       Flag.withDescription("Do not install ctx7 or its skill"),
       Flag.withDefault(false),
@@ -64,22 +59,20 @@ export const setupClaudeCommand = Command.make(
     Command.withDescription(
       [
         "Install and configure HolyAgent for Claude Code, skipping every step that is already done.",
-        "For your user: the plugin (claude plugin marketplace add + install), Billion Context with Bun and its",
-        "Claude Code native mode (it routes Claude Code traffic through a local proxy and turns off",
-        "auto-compact) with compress.rules set only when absent, and ctx7 with the Context7 skill (needs",
-        "CONTEXT7_API_KEY or a saved login; the key is passed on the command line to ctx7 setup).",
+        "For your user: the plugin (claude plugin marketplace add + install), and ctx7 with the Context7",
+        "skill (needs CONTEXT7_API_KEY or a saved login; the key is passed on the command line to ctx7 setup).",
         "For the project: .claude/settings.json gets the keys a plugin cannot set, without changing anything",
         "already set: attribution (empty commit and PR text, no session URL), includeGitInstructions false",
         "(removes the built-in commit/PR instructions and the git status snapshot from context),",
-        "subagentPromptCacheTtl, and the marketplace entries (HolyAgent and Billion Context) and the",
-        "plugin entry that offer the plugin to teammates, and permissions.deny for WebSearch and WebFetch,",
-        "since web work goes through the Exa plugin.",
+        "subagentPromptCacheTtl, and the marketplace entry and the plugin entry that offer the plugin to",
+        "teammates, and permissions.deny for WebSearch and WebFetch,",
+        "since web work goes through the Exa connector.",
         "A failed step is reported and the rest still run; the exit code is 1 when any step failed.",
       ].join(" "),
     ),
   )
   .pipe(
     Command.withShortDescription(
-      "Install the HolyAgent plugin, Billion Context and ctx7, and configure this project",
+      "Install the HolyAgent plugin and ctx7, and configure this project",
     ),
   )
