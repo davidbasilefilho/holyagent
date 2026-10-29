@@ -1,0 +1,58 @@
+{
+  "id": "assignment-0mvtnapzd-go9r",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 2,
+  "roleTask": "Worker.implementation",
+  "slug": "drop-the-exa-claude-plugins-official",
+  "objective": "Drop the exa@claude-plugins-official plugin dependency so holyagent's web work goes through the claude.ai Exa connector, and update the generator, setup text, tests and docs to match.",
+  "state": "Ready",
+  "scope": [
+    "Worktree /home/user/holyagent-bili, branch ccr-046ad103-6qsvgx-drop-bili at 383531b (Billion Context already removed there).",
+    "Remove the exa dependency from packages/integrations/claude/src/generate.ts; with no dependencies left, emit no dependencies field and no cross-marketplace allow-list unless something else still needs it; regenerate dist with mise run build. Update packages/integrations/claude/tests/plugin.test.ts expectations; keep the test that librarians are told to search with the Exa tools (the bare tool names web_search_exa/web_fetch_exa match every surface).",
+    "Keep Claude Code's WebSearch and WebFetch denied (NATIVE_WEB_TOOLS and the permissions.deny written by holyagent setup claude): the connector is now the only web path. Reword comments and help text that say web work goes through the Exa plugin (packages/integrations/claude/src/agents.ts, packages/cli/src/cmd/setup-claude.ts and any other hit) to say the Exa connector.",
+    "Docs (README.md, docs/usage.md, docs/components.md and any other hit, found with the plugin rg for exa@|Exa plugin|plugin:exa|mcp.exa.ai): describe connecting Exa once at claude.ai/customize/connectors; it then loads in claude.ai cloud sessions and in local Claude Code (terminal, IDE, desktop) signed in with that claude.ai account, where its tools are named mcp__claude_ai_Exa__web_search_exa and mcp__claude_ai_Exa__web_fetch_exa (source: https://code.claude.com/docs/en/mcp section 'Use MCP servers from claude.ai' and https://code.claude.com/docs/en/permissions). State that holyagent supports only claude.ai account login, so API keys, Bedrock and Vertex are out of scope. Keep the existing 'Why Exa' rationale."
+  ],
+  "constraints": [
+    "User (verbatim): \"????? remova esse plugin então / é para usarmos o conector. esse conector funcionaria no claude code sem ser no claude.ai?\" and \"chave de api não é suportado no projeto\".",
+    "Follow /home/user/holyagent/.claude/CLAUDE.md and /home/user/holyagent/AGENTS.md.",
+    "Add no fallback web route and no unrequested feature; name ideas in the report.",
+    "Work only in that worktree; make no version-control writes and no edits under .git/ or .holyagent/.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done and checked, stop and report."
+  ],
+  "criteria": [
+    {
+      "text": "The generated plugin has no exa dependency and no doc or help text tells the reader to install the Exa plugin; docs say to connect the Exa connector on claude.ai",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "WebSearch and WebFetch stay denied and existing tests pass, updated rather than weakened",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "mise run build leaves no diff after the change and mise run verify passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Only the Exa plugin dependency and its text change",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/claude",
+    "packages/cli",
+    "docs",
+    "README.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-10-29T14:35:13.034Z"
+}
