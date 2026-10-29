@@ -1,0 +1,75 @@
+{
+  "id": "assignment-0mvttqof8-qga4",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "update-readme-md-and-docs-so-native",
+  "objective": "Update README.md and docs/ so native Windows reads as tested by the maintainer, a section documents running the root on Sonnet, and HolyAgent is presented for a broad range of software development work rather than only multi-PR projects.",
+  "state": "Running",
+  "scope": [
+    "Windows: the maintainer tested native Windows support. Replace every statement that native Windows is untested or not verified: docs/requirements.md (Supported environments table row 'Claude Code on native Windows' and the '**Not tested.**' bullet under '## Native Windows'), docs/usage.md line ~43 ('It has not been run on a Windows machine yet ...'), docs/hooks.md ('**Not verified on Windows.**' paragraph near line 103). Say it is supported and tested by the maintainer on native Windows. Keep useful troubleshooting facts as plain notes (the open Claude Code issue about exec form under Git Bash and its symptom; ctx7 file locations following ~/.config) without claiming lack of testing. Do not invent specifics of what was tested beyond 'tested by the maintainer on a Windows machine'. Search all of README.md and docs/ (excluding docs/pi/) with `holyagent rg -n -i \"windows\" README.md docs` for any other untested claim.",
+    "Sonnet root: add a subsection to docs/usage.md (under '## How a session works' or a new '## Run the root on Sonnet' section placed after it) saying the root runs on Opus by default (its agent frontmatter is `model: opus`), and that to run it on Sonnet you only change what the `opus` alias resolves to: add `\"env\": { \"ANTHROPIC_DEFAULT_OPUS_MODEL\": \"claude-sonnet-5-5\" }` to `~/.claude/settings.json` (all projects) or `.claude/settings.local.json` (one project, not committed), then restart Claude Code. Facts to state, sourced from https://code.claude.com/docs/en/model-config ('Environment variables': ANTHROPIC_DEFAULT_*_MODEL control what the sonnet, opus, haiku and fable aliases resolve to): the variable is global, so `/model opus`, `--model opus` and any other agent using `opus` also get Sonnet; the specialists are pinned to haiku and sonnet routes, so they are unchanged; check the active model with `/status`. Mention the trade-off in one sentence: Sonnet uses less of the plan's usage, Opus is the default because the root judges reports and plans. Link the source URL. Update the 'The root agent (Opus, the main thread)' sentence to point to the new section. In README.md add one short clause or sentence (inside an existing section, e.g. the install section) linking to the new section.",
+    "Use cases: add a section to docs/usage.md (e.g. '## What it fits', placed before '## Install' or right after it) describing the range of software development work HolyAgent handles, each with how the root scales to it, grounded in existing behavior: a one-file fix or small feature (one Assignment run as a one-entry workflow, one branch and PR, or a local commit when the repository does not use PRs, following its conventions); bug hunting with an unknown cause (Worker.debugging); questions about a codebase or library with no edits (explorers and librarians answer, nothing is committed); reviewing an existing PR or branch (reviewers); refactors and mechanical changes (Worker.mechanical); front-end and UI work with visual inspection (Worker.visual, Reviewer.visual); docs and configuration; personal, coursework and solo repositories with a single branch (state mode `local` or `work` keeps no extra branch; independent-PR conventions are respected); larger multi-PR deliveries as stacks. Check each claim against docs/usage.md, docs/decisions.md and the specialist list before writing it; do not claim behavior the docs do not support. In README.md, adjust the pitch or the 'Why HolyAgent?' list with one bullet that says it fits work from a one-line fix to a stacked multi-PR delivery and links to the new section."
+  ],
+  "constraints": [
+    "User: Windows support was tested by the maintainer; remove the claims that it is untested.",
+    "User: document that switching the root to Sonnet is all it takes, for those who want it.",
+    "User: it must cover more use cases within software development, not only multi-PR projects.",
+    "Documentation only: edit only README.md, docs/usage.md, docs/requirements.md, docs/hooks.md. No code, plugin, generated dist or behavior change.",
+    "README.md keeps exactly its six sections in this order: # HolyAgent, ## How do I install it?, ## Why HolyAgent?, ## Development, ## Special thanks, ## License. Detail goes in docs/, linked from the README.",
+    "English, matching the existing docs' plain, calm style; README additions stay at most about 3 lines; each new docs section stays under about 25 lines.",
+    "Make no git commits, checkouts or edits under .git/ or .holyagent/; report changed paths.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done and checked, stop and report; do not add unrequested features, files or refactors (name them in the report)."
+  ],
+  "criteria": [
+    {
+      "text": "No statement in README.md or docs/ (outside docs/pi/) says native Windows is untested or unverified, and the Windows status says it was tested by the maintainer",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "docs/usage.md has a section explaining how to run the root on Sonnet with ANTHROPIC_DEFAULT_OPUS_MODEL, its global effect, unaffected specialists, the /status check and the source link, and README links to it",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "docs/usage.md has a use-cases section covering small fixes through multi-PR stacks, codebase questions, debugging, reviews, refactors, UI work and solo or coursework repositories, each grounded in documented behavior, and README links to it",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "README.md keeps exactly its six sections in the required order",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Only README.md, docs/usage.md, docs/requirements.md and docs/hooks.md change",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "mise run verify passes (format check included)",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "README.md",
+    "docs/usage.md",
+    "docs/requirements.md",
+    "docs/hooks.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T17:35:35.205Z"
+  },
+  "createdAt": "2026-10-29T17:35:35.205Z"
+}
