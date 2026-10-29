@@ -1,5 +1,16 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
+import {
+  chmod,
+  chown,
+  lstat,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
@@ -1834,23 +1845,119 @@ describe("hook root-rules, a main thread whose SessionStart output never arrived
     })
   })
 
-  test("a marker that cannot be written is a visible failure, not a repeated delivery", async () => {
+  /** The marker folder of this user inside a temporary folder. */
+  const folderIn = (temporary: string) =>
+    join(temporary, `holyagent-sessions-${process.getuid?.()}`)
+  /** Runs the hook with a temporary folder in which `prepare` may set up a bad marker folder. */
+  const withBlocked = async (
+    prepare: (temporary: string) => Promise<void>,
+    run: (env: Record<string, string>, temporary: string) => Promise<void>,
+  ) => {
     const blocked = await mkdtemp(join(tmpdir(), "holyagent-hook-blocked-"))
     try {
-      await writeFile(join(blocked, "holyagent-sessions"), "a file where the folder should be")
-      const result = await root("root-rules", tool("s9"), { ...PLUGIN, TMPDIR: blocked })
-      expect(result.code).toBe(1)
-      expect(result.stdout).toBe("")
-      expect(result.stderr).toStartWith("holyagent hook root-rules: ")
+      await prepare(blocked)
+      await run({ ...PLUGIN, TMPDIR: blocked }, blocked)
     } finally {
       await rm(blocked, { recursive: true, force: true })
     }
+  }
+
+  test("keeps the markers in a folder of this user that only this user can use", async () => {
+    await withMarkers(async (env) => {
+      expect(await root("root-rules", prompt("m1"), env)).toEqual(delivery("UserPromptSubmit"))
+      const folder = folderIn(env.TMPDIR!)
+      const found = await lstat(folder)
+      expect(found.isDirectory()).toBe(true)
+      expect(found.mode & 0o777).toBe(0o700)
+      expect(found.uid).toBe(process.getuid?.() ?? found.uid)
+      expect(await readdir(env.TMPDIR!)).toEqual([`holyagent-sessions-${process.getuid?.()}`])
+    })
+  })
+
+  test("a marker folder that cannot be used is quiet on every call, not a repeated delivery", async () => {
+    const folderIsAFile = (temporary: string) =>
+      writeFile(folderIn(temporary), "a file where the folder should be")
+    await withBlocked(folderIsAFile, async (env) => {
+      for (const payload of [tool("s9"), tool("s9"), prompt("s9")])
+        expect(await root("root-rules", payload, env)).toEqual(nothing)
+    })
+  })
+
+  test("a marker folder that is a link is not used and nothing is written through it", async () => {
+    let target = ""
+    await withBlocked(
+      async (temporary) => {
+        target = join(temporary, "elsewhere")
+        await mkdir(target, { mode: 0o700 })
+        await symlink(target, folderIn(temporary))
+      },
+      async (env) => {
+        expect(await root("root-rules", tool("s11"), env)).toEqual(nothing)
+        const started = await hook("session-start", start("s11"), project, env)
+        expect({ code: started.code, stderr: started.stderr }).toEqual({ code: 0, stderr: "" })
+        expect(await readdir(target)).toEqual([])
+      },
+    )
+  })
+
+  test("a marker folder open to other users is not used", async () => {
+    await withBlocked(
+      async (temporary) => {
+        await mkdir(folderIn(temporary))
+        await chmod(folderIn(temporary), 0o777)
+      },
+      async (env, temporary) => {
+        expect(await root("root-rules", tool("s12"), env)).toEqual(nothing)
+        expect(await readdir(folderIn(temporary))).toEqual([])
+      },
+    )
+  })
+
+  test.skipIf(process.getuid?.() !== 0)(
+    "a marker folder owned by another user is not used",
+    async () => {
+      await withBlocked(
+        async (temporary) => {
+          await mkdir(folderIn(temporary), { mode: 0o700 })
+          await chown(folderIn(temporary), 12345, 12345)
+        },
+        async (env, temporary) => {
+          expect(await root("root-rules", tool("s13"), env)).toEqual(nothing)
+          expect(await readdir(folderIn(temporary))).toEqual([])
+        },
+      )
+    },
+  )
+
+  test("a marker replaced by a link is not followed when session-start records the delivery", async () => {
+    let victim = ""
+    await withBlocked(
+      async (temporary) => {
+        victim = join(temporary, "victim.txt")
+        await writeFile(victim, "keep me")
+        // The shared folder of earlier versions gets the same link, so the test also fails on them.
+        for (const folder of [folderIn(temporary), join(temporary, "holyagent-sessions")]) {
+          await mkdir(folder, { mode: 0o700 })
+          await symlink(victim, join(folder, "s14"))
+        }
+      },
+      async (env) => {
+        const started = await hook("session-start", start("s14"), project, env)
+        expect({ code: started.code, stderr: started.stderr }).toEqual({ code: 0, stderr: "" })
+        expect(additionalOf(started.stdout)).toContain("You are the root.")
+        expect(await readFile(victim, "utf8")).toBe("keep me")
+        expect(await root("root-rules", prompt("s14"), env)).toEqual(nothing)
+      },
+    )
   })
 
   test("session-start still answers when its marker cannot be written", async () => {
     const blocked = await mkdtemp(join(tmpdir(), "holyagent-hook-blocked-"))
     try {
-      await writeFile(join(blocked, "holyagent-sessions"), "a file where the folder should be")
+      await writeFile(
+        join(blocked, `holyagent-sessions-${process.getuid?.()}`),
+        "a file where the folder should be",
+      )
       const result = await hook("session-start", start("s10"), project, {
         ...PLUGIN,
         TMPDIR: blocked,

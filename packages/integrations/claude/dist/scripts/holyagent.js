@@ -4112,6 +4112,7 @@ var tap2 = tap;
 var exit2 = exit;
 var map4 = map2;
 var as2 = as;
+var asVoid2 = asVoid;
 var catch_2 = catch_;
 var catchTag2 = catchTag;
 var catchCause2 = catchCause;
@@ -11751,16 +11752,24 @@ var ROOT_CORE = [identity_default, delegating_default, dispatch_default, task_li
 
 var state_changes_default = "## Leave state changes to the root\n\nLeave to the root every command that changes git, GitHub or holyagent state (`git commit`, `branch`, `push`, `checkout`, `stash`, `merge`, `reset`, `gh` writes, and `holyagent vcs`, `assignment` and `intent` commands), and anything under `.git/` or `.holyagent/`. The root owns the branch, PR and state records and records your changed paths from the report, and other workers share the tree, so a stray write corrupts their work; nothing blocks one, so it rests on you. When you need such a change, say so in the report. Read-only commands are open: `git status`, `diff`, `log`, `show`, `blame`, `fetch`, and `holyagent status`, `plan`, `assignment show` and `assignment list`. To undo your own edit, edit the file back.\n";
 
-import { mkdir as mkdir3, open as open3 } from "fs/promises";
-import { tmpdir } from "os";
+import { lstat as lstat2, mkdir as mkdir3, open as open3 } from "fs/promises";
+import { tmpdir, userInfo } from "os";
 import { join as join7 } from "path";
 var SAFE_SESSION = /^[\w.-]{1,80}$/;
 var isSessionId = (id) => id !== undefined && SAFE_SESSION.test(id) && !/^\.+$/.test(id);
-var markers = () => join7(tmpdir(), "holyagent-sessions");
+var markers = () => join7(tmpdir(), `holyagent-sessions-${(process.getuid?.() ?? userInfo().username).toString().replace(/[^\w.-]/g, "_")}`);
 var markerOf = (sessionId) => join7(markers(), sessionId);
-var mark = (sessionId, flag) => io(markers(), () => mkdir3(markers(), { recursive: true })).pipe(andThen2(io(markerOf(sessionId), () => open3(markerOf(sessionId), flag).then((file) => file.close()))));
-var markRulesDelivered = (sessionId) => mark(sessionId, "w");
-var claimRulesDelivery = (sessionId) => mark(sessionId, "wx").pipe(as2(true), catchIf2((error) => error.path === markerOf(sessionId) && hasCode(error.cause, "EEXIST"), () => succeed6(false)));
+var ensureMarkers = () => {
+  const folder = markers();
+  const uid = process.getuid?.();
+  return io(folder, () => mkdir3(folder, { recursive: true, mode: 448 })).pipe(andThen2(io(folder, () => lstat2(folder))), filterOrFail2((found) => found.isDirectory() && (uid === undefined || found.uid === uid && (found.mode & 18) === 0), () => new StateIo({
+    path: folder,
+    cause: new Error("not a private directory owned by the current user")
+  })));
+};
+var create = (sessionId) => ensureMarkers().pipe(andThen2(io(markerOf(sessionId), () => open3(markerOf(sessionId), "wx").then((file) => file.close()))), as2(true), catchIf2((error) => error.path === markerOf(sessionId) && hasCode(error.cause, "EEXIST"), () => succeed6(false)));
+var markRulesDelivered = (sessionId) => create(sessionId).pipe(asVoid2);
+var claimRulesDelivery = create;
 
 import { join as join8 } from "path";
 var LEGACY_FOLDERS = {
@@ -18627,7 +18636,7 @@ var commentPrefix = gen2(function* () {
 var INLINE_INPUTS = new Set(["script", "args"]);
 var rootCore = (payload, call) => ROOT_AGENTS.has(payload.agent_type) ? undefined : [ROOT_CORE, ROOT_TAKEOVER].join(`
 
-`).replaceAll("${CLAUDE_PLUGIN_ROOT}", call.env.CLAUDE_PLUGIN_ROOT ?? "${CLAUDE_PLUGIN_ROOT}");
+`).replaceAll("${CLAUDE_PLUGIN_ROOT}", () => call.env.CLAUDE_PLUGIN_ROOT ?? "${CLAUDE_PLUGIN_ROOT}");
 var isMainThread = (payload) => payload.agent_id === undefined && !isSpecialist(payload.agent_type);
 var HOOK_COMMANDS = [
   hook("session-start", "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread, and in a claude.ai cloud session, `CLAUDE_CODE_REMOTE=true`, the steps that set the commit author to the user), always ending with a short block of the root rules most often missed; for a project with no .holyagent and a .holyclaude or .holycodex folder that holds state to convert, a notice naming the folder and `holyagent migrate`, with the same rules; for a project with none of the three, the core root rules with that line and the reminder when the holyagent agent is not the main thread, otherwise nothing", (payload, call) => {
@@ -18667,7 +18676,7 @@ var HOOK_COMMANDS = [
     if (core === undefined || event !== "UserPromptSubmit" && event !== "PreToolUse" || !isMainThread(payload) || !isSessionId(payload.session_id))
       return succeed6(NOTHING);
     const cloud = inCloudSession(call.env) ? CLOUD_IDENTITY : undefined;
-    return claimRulesDelivery(payload.session_id).pipe(map4((first) => first ? output({ hookEventName: event, additionalContext: bareContext(core, cloud) }) : NOTHING));
+    return claimRulesDelivery(payload.session_id).pipe(map4((first) => first ? output({ hookEventName: event, additionalContext: bareContext(core, cloud) }) : NOTHING), catch_2(() => succeed6(NOTHING)));
   }, true),
   hook("agent-launch", "PostToolUse for Agent: when the prompt came from assignment dispatch, record the launched agent (assignment record <id> --agent <agentId>) and say so; on failure ask the root to record it; nothing for any other launch", (payload, call) => {
     const prompt = payload.tool_name === "Agent" ? payload.tool_input?.prompt : undefined;

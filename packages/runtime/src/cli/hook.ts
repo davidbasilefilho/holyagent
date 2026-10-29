@@ -203,7 +203,10 @@ const rootCore = (payload: typeof Payload.Type, call: Call): string | undefined 
     ? undefined
     : [ROOT_CORE, ROOT_TAKEOVER]
         .join("\n\n")
-        .replaceAll("${CLAUDE_PLUGIN_ROOT}", call.env.CLAUDE_PLUGIN_ROOT ?? "${CLAUDE_PLUGIN_ROOT}")
+        .replaceAll(
+          "${CLAUDE_PLUGIN_ROOT}",
+          () => call.env.CLAUDE_PLUGIN_ROOT ?? "${CLAUDE_PLUGIN_ROOT}",
+        )
 
 /**
  * True for the main thread: the payload of a subagent carries an `agent_id`, and its `agent_type`
@@ -300,6 +303,9 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
             ? output({ hookEventName: event, additionalContext: bareContext(core, cloud) })
             : NOTHING,
         ),
+        // This runs on every tool call, so a marker folder that cannot be used (another account's,
+        // a link, read-only or full) must not fail each call: the late delivery is skipped quietly.
+        Effect.catch(() => Effect.succeed(NOTHING)),
       )
     },
     true,
