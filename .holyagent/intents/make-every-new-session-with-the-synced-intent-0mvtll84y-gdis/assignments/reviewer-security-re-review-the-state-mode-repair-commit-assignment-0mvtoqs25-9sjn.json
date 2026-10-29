@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mvtoqs25-9sjn",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.security",
+  "slug": "re-review-the-state-mode-repair-commit",
+  "objective": "Re-review the state-mode repair commit abbef7a: confirm the config.json blocker and the lock, exclude-file and local-commit findings are closed without new issues.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-state-mode, branch ccr-046ad103-6qsvgx-state-mode at abbef7a. Judge only the repair commit d6234b3..abbef7a; diff without the minified bundle: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/state-repair.diff. Repair report: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-58f1.txt.",
+    "Previous findings: code review /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-di6x.txt and security review /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-oi0p.txt. Code findings 5, 8, 9 and security finding 2 (signal order fixed by the requirements) were deliberately skipped."
+  ],
+  "constraints": [
+    "Read-only: write no files and make no version-control writes."
+  ],
+  "criteria": [
+    {
+      "text": "Each previous security finding is stated closed or open with file:line, and any new finding traces source to sink with a fix, or its absence is stated",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources-read"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvtohznl-58f1"
+  ],
+  "followUpOf": "assignment-0mvto7zbl-oi0p",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T15:15:41.837Z"
+  },
+  "createdAt": "2026-10-29T15:15:41.837Z"
+}
