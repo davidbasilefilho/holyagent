@@ -1,0 +1,58 @@
+{
+  "id": "assignment-0mvtvwy72-aspo",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-documentation-review-findings",
+  "objective": "Repair the documentation review findings in /home/user/holyagent-docs.",
+  "state": "Ready",
+  "scope": [
+    "Review report: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-revdocs.txt.",
+    "Blocking: docs/usage.md:14 implies that saying the repository is yours makes local or work keep no second branch; per version-control.md's signal order the user's own words choose the mode, so say: tell the root which state mode you want (local keeps state out of every commit and branch; work commits it with the work), otherwise an owned repository gets branch mode with its holyagent/state branch.",
+    "Non-blocking, fix in the same pass: (1) docs/usage.md Sonnet section: state precisely what is documented: ANTHROPIC_DEFAULT_OPUS_MODEL controls what the opus alias resolves to (model-config page), and the root's frontmatter uses that alias, so the root runs on the model you set; drop 'one for each model alias' in favor of naming the documented opus/sonnet/haiku variables only if certain, else just name ANTHROPIC_DEFAULT_OPUS_MODEL; keep the model id claude-sonnet-5-5 (the current Sonnet 5.5 id); drop the unsourced 'uses less of your plan's usage' claim or phrase it as 'a cheaper model' without numbers. (2) install/windows-install.ps1:23 comment saying it is not tested on a real Windows machine: change to say it was tested by the maintainer, pointing to docs/requirements.md (comment text only). (3) docs/hooks.md:117: say the Git Bash report applies when Git Bash is installed, without claiming what the maintainer's machine had. Cowork 'not tested' statements stay (they are not about Windows).",
+    "Gates with canary Bun /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/canary/x/bun-linux-x64/bun in /home/user/holyagent-docs: fmt --no-script --check on the changed files. For the .ps1, keep the change to the comment line. Write the full diff relative to the merged PR 37 copies in /home/user/holyagent-plugin-only-install to /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/docs-v3.diff (diff each changed file against its counterpart there)."
+  ],
+  "constraints": [
+    "Edit only README.md, docs/usage.md, docs/requirements.md, docs/hooks.md and install/windows-install.ps1 in /home/user/holyagent-docs; for install/windows-install.ps1 first copy it from /home/user/holyagent-plugin-only-install so the edit starts from the merged text.",
+    "No git writes; no edits under .git/ or .holyagent/; no other worktree except reading /home/user/holyagent-plugin-only-install.",
+    "Keep working until done; stop and report when done and checked."
+  ],
+  "criteria": [
+    {
+      "text": "docs/usage.md no longer implies ownership alone selects local or work; it matches version-control.md's signal order",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The Sonnet section states only what the model-config page documents and drops the unsourced usage claim",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "install/windows-install.ps1 no longer says Windows is untested, and hooks.md conditions the Git Bash note",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "fmt check passes on the changed Markdown files",
+      "blocking": true,
+      "dimension": "style"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "README.md",
+    "docs/usage.md",
+    "docs/requirements.md",
+    "docs/hooks.md",
+    "install/windows-install.ps1"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvtvmzcb-3nhs",
+  "createdAt": "2026-10-29T18:36:27.039Z"
+}
