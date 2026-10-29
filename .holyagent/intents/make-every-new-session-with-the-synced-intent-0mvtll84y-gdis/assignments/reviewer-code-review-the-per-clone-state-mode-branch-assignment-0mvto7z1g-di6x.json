@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mvto7z1g-di6x",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-per-clone-state-mode-branch",
+  "objective": "Review the per-clone state mode (branch, work, local) and the root's signal-order rule for correctness and regressions.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-state-mode, branch ccr-046ad103-6qsvgx-state-mode at d6234b3; review git diff 85a8560..d6234b3 (main to head: commits 6b5883d and the signal-order follow-up, plus a clean merge of main). Full diff without the minified bundle: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/state-all.diff.",
+    "Requirements: the holyagent/state branch stays the default; a per-clone mode (git config holyagent.stateMode = branch|work|local, never a repository file) lets a project without stacked PRs keep state on the work branch (work) or local-only, excluded via .git/info/exclude (local); the root picks the mode once per clone from this order: the account owner's words; a tracked .holyagent/ -> work; conventions asking for independent PRs, or a repository the owner does not control -> local; no signal -> branch. Mode changes move no records and refuse when records would be stranded.",
+    "Known for checking: docs/decisions.md around line 51 and docs/usage.md around line 61 may still describe the earlier 'stack convention' wording rather than the signal order.",
+    "Check resolveState and commitState per mode, vcs commit staging and refusals, .git/info/exclude handling, the state mode CLI and its refusals, tests (do they fail without the change), docs and instruction accuracy. Run mise run verify."
+  ],
+  "constraints": [
+    "Read-only: write no files and make no version-control writes."
+  ],
+  "criteria": [
+    {
+      "text": "Findings are ranked blocking or non-blocking with file, line and fix, or their absence is stated, with mise run verify run on the head",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvtnnrr3-wg92",
+    "assignment-0mvto3a2x-7and"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T15:01:04.420Z"
+  },
+  "createdAt": "2026-10-29T15:01:04.420Z"
+}
