@@ -1,0 +1,34 @@
+{
+  "id": "assignment-0mvtmzk2x-4tie",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.artifact",
+  "slug": "re-review-the-repair-commit-42f4646-of",
+  "objective": "Re-review the repair commit 42f4646 of the visual auto-repair instructions and confirm the previous review's findings are closed without new contradictions.",
+  "state": "Ready",
+  "scope": [
+    "Repair diff only: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/repair-r1.diff (a644b9d..42f4646 on ccr-046ad103-6qsvgx-visual-autofix in /home/user/holyagent-visual). Previous findings: the result field of assignment-0mvtmmulv-rh4f, saved at /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-rh4f.txt (one blocker: visual.md repair-without-asking had no route for fixes that change a user requirement or need a choice; notes: ride-along of preference, endless loop, duplication/size, wording drift, obsolete 'small' phrase, merge-ready visual row, vague final-report sentence).",
+    "Intent: visual findings with a material effect are repaired and re-inspected automatically without asking; only choices or requirement changes go to AskUserQuestion with a default; pure preference is named in the final report without a fix."
+  ],
+  "constraints": [
+    "Read-only: write no files.",
+    "Judge only the repair diff against the previous findings; do not reopen accepted text outside it."
+  ],
+  "criteria": [
+    {
+      "text": "Each previous finding is stated closed or open with file and line, and any new blocking issue in the repair diff is named with a fix, or its absence is stated",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources-read"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvtmqaml-r1zo"
+  ],
+  "followUpOf": "assignment-0mvtmmulv-rh4f",
+  "createdAt": "2026-10-29T14:26:32.170Z"
+}
