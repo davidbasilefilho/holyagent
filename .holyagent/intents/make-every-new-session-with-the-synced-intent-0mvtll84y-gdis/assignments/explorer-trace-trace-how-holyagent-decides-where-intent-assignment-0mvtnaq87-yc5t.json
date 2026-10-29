@@ -5,7 +5,7 @@
   "roleTask": "Explorer.trace",
   "slug": "trace-how-holyagent-decides-where-intent",
   "objective": "Trace how holyagent decides where Intent, Assignment and state records live (the holyagent/state branch versus anything else), so the state branch can become the default only for projects that use stacked PRs while other projects follow their own convention.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Repository /home/user/holyagent at origin/main (read files from /home/user/holyagent-bili, which is origin/main plus unrelated removals, or with git show origin/main:<path>).",
     "Key places: packages/runtime/src/state (tree.ts, resolveState, worktree creation), the CLI commands that write state, config (.holyagent/config.json schema), docs/state.md or similar, and the root and specialist instruction text about the state branch and the stack plan (packages/runtime/src/instructions). Also how state worked before PR #28 (git log -p for the state-branch change) and whether .holyagent/ was committed on work branches, gitignored, or local-only then.",
@@ -27,5 +27,10 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-10-29T14:35:21.347Z"
+  },
   "createdAt": "2026-10-29T14:35:13.351Z"
 }
