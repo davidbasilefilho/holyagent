@@ -19,6 +19,24 @@
         ]
       }
     ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun",
+            "args": [
+              "--no-env-file",
+              "--config=${CLAUDE_PLUGIN_ROOT}/scripts/empty-bunfig.toml",
+              "${CLAUDE_PLUGIN_ROOT}/scripts/holyagent.js",
+              "hook",
+              "root-rules"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
     "SubagentStart": [
       {
         "hooks": [
@@ -84,6 +102,22 @@
             ],
             "timeout": 10,
             "onFailure": "block"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun",
+            "args": [
+              "--no-env-file",
+              "--config=${CLAUDE_PLUGIN_ROOT}/scripts/empty-bunfig.toml",
+              "${CLAUDE_PLUGIN_ROOT}/scripts/holyagent.js",
+              "hook",
+              "root-rules"
+            ],
+            "timeout": 10
           }
         ]
       }

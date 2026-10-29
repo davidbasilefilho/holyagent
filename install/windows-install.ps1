@@ -10,8 +10,6 @@
 # a normal (not elevated) window.
 #
 # What you are opting into:
-# - Billion Context routes all Claude Code traffic through a local proxy (127.0.0.1:18787), turns
-#   off Claude Code's auto-compact, and auto-updates itself from npm by default.
 # - `ctx7 setup` downloads a skill and a rule from Context7's servers into ~\.claude.
 # - Bun runs a canary build (`bun upgrade --canary`), because the toolchain needs `bun lint`,
 #   `bun fmt` and `bun check`.
@@ -38,7 +36,7 @@ if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator))
   exit 1
 }
 
-$script:TotalSteps = 8
+$script:TotalSteps = 7
 $script:StepNumber = 0
 $script:CurrentStep = 'startup'
 
@@ -105,10 +103,9 @@ Set-Location $HOME
 $BunInstall = if ($env:BUN_INSTALL) { $env:BUN_INSTALL } else { Join-Path $HOME '.bun' }
 $env:BUN_INSTALL = $BunInstall
 $ClaudeDir = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $HOME '.claude' }
-$ClaudeJson = Join-Path $(if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { $HOME }) '.claude.json'
 $Mise = $null
 
-# Puts the tools mise has selected globally (node, bun) and Bun's global bin directory (claude, bili,
+# Puts the tools mise has selected globally (node, bun) and Bun's global bin directory (claude,
 # ctx7) ahead of the rest of PATH for the remaining steps.
 function Update-SessionPath {
   $paths = @()
@@ -222,7 +219,7 @@ try {
   Add-ProfileLine '^\s*[^#\s].*mise.*\bactivate\b.*pwsh' "(& $quotedMise activate pwsh) | Out-String | Invoke-Expression"
 
   # ---------------------------------------------------------------------------------------------
-  Step 'Node.js LTS (Billion Context and ctx7 run on Node)'
+  Step 'Node.js LTS (ctx7 runs on Node)'
 
   if ((Invoke-Probe $Mise @('where', 'node')).ExitCode -eq 0) { Note 'node already selected globally' } else { Invoke-Native $Mise use -g node@lts }
   Update-SessionPath
@@ -264,75 +261,6 @@ try {
   Install-BunGlobal claude '@anthropic-ai/claude-code'
 
   # ---------------------------------------------------------------------------------------------
-  Step 'Billion Context (via Bun) with Claude Code native mode'
-
-  # Billion Context (https://github.com/ranxianglei/billion-context) documents npm only; Bun works
-  # and the bins run on Node.
-  Install-BunGlobal bili billion-context
-
-  # Native mode merges a proxy base URL, a SessionStart hook and an MCP server into the Claude Code
-  # settings and sets DISABLE_AUTO_COMPACT=1: bili owns compression, so Claude Code's auto-compact
-  # stays off (manual /compact still works). Every re-run of the command writes another settings
-  # backup, so it runs only when one of its artifacts is missing.
-  function Test-BiliNativeReady {
-    $settings = Join-Path $ClaudeDir 'settings.json'
-    return (Test-Path $settings) -and
-      (Select-String -Path $settings -Pattern 'claude-native-bootstrap' -SimpleMatch -Quiet) -and
-      (Test-Path (Join-Path $ClaudeDir 'commands\acp-cache.md')) -and
-      (Test-Path $ClaudeJson) -and
-      (Select-String -Path $ClaudeJson -Pattern '"bili"' -SimpleMatch -Quiet)
-  }
-  if (Test-BiliNativeReady) {
-    Note 'Claude Code native mode already configured'
-  } else {
-    Invoke-Native bili plugin install claude
-  }
-
-  # compress.rules protects persistent reminders (rules text) from being folded. It is set only when
-  # the key is absent, so a value the user chose and every other key stay untouched. The Node script
-  # goes to node on stdin, never through a file another process could replace, because PowerShell 5.1
-  # mangles double quotes in native command arguments.
-  $xdg = if ($env:XDG_CONFIG_HOME) { $env:XDG_CONFIG_HOME } else { Join-Path $HOME '.config' }
-  $env:BILI_CONFIG = if ($env:BILI_CONFIG_FILE) { $env:BILI_CONFIG_FILE } else { Join-Path $xdg 'billion-context\billion-context.json' }
-  $configScript = @'
-const fs = require("node:fs")
-const path = require("node:path")
-const file = process.env.BILI_CONFIG
-const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value)
-const refuse = (message) => {
-  console.error("    error: " + message)
-  process.exit(1)
-}
-let config = {}
-if (fs.existsSync(file)) {
-  try {
-    config = JSON.parse(fs.readFileSync(file, "utf8"))
-  } catch (error) {
-    refuse(file + " is not valid JSON (" + error.message + "); fix or remove it, then re-run")
-  }
-  if (!isObject(config)) refuse(file + " must contain a JSON object; fix it, then re-run")
-}
-const compress = config.compress ?? {}
-if (!isObject(compress)) refuse("compress in " + file + " is not an object; fix it, then re-run")
-if (compress.rules !== undefined) {
-  console.log("    compress.rules already set (" + compress.rules + ") in " + file)
-  process.exit(0)
-}
-config.compress = { ...compress, rules: true }
-const directory = path.dirname(file)
-fs.mkdirSync(directory, { recursive: true })
-const temporary = path.join(directory, "." + path.basename(file) + "." + process.pid + ".tmp")
-fs.writeFileSync(temporary, JSON.stringify(config, null, 2) + "\n", { mode: 0o600 })
-fs.renameSync(temporary, file)
-console.log("    set compress.rules=true in " + file)
-'@
-  $ErrorActionPreference = 'Continue'
-  $configScript | & node -
-  $configExit = $LASTEXITCODE
-  $ErrorActionPreference = 'Stop'
-  if ($configExit -ne 0) { throw "the Billion Context config step exited $configExit" }
-
-  # ---------------------------------------------------------------------------------------------
   Step 'ctx7 (Context7 CLI via Bun) and its Claude Code skill'
 
   # ctx7 needs Node >= 22.13, checked in the Node step.
@@ -367,7 +295,6 @@ console.log("    set compress.rules=true in " + file)
   Test-Tool 'node' 'node' @('--version')
   Test-Tool 'bun' 'bun' @('--revision')
   Test-Tool 'claude' 'claude' @('--version')
-  Test-Tool 'bili' 'bili' @('--version')
   Test-Tool 'ctx7' 'ctx7' @('--version')
   if ((Have bun) -and -not (Test-Canary)) {
     [Console]::Error.WriteLine('    bun is not a canary build')

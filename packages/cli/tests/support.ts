@@ -37,10 +37,11 @@ export interface Call {
   readonly command: string
   readonly args: ReadonlyArray<string>
   readonly unsetEnv: ReadonlyArray<string>
+  readonly cwd: string | undefined
   readonly line: string
 }
 
-const packageCommands: Record<string, string> = { "billion-context": "bili", ctx7: "ctx7" }
+const packageCommands: Record<string, string> = { ctx7: "ctx7" }
 
 /**
  * A fake {@link Shell} that records every `run` and knows which commands are on PATH. A `bun add -g
@@ -63,7 +64,13 @@ export const fakeShell = (options: {
       run: (command, args, runOptions) =>
         Effect.sync(() => {
           const line = [command, ...args].join(" ")
-          calls.push({ command, args, unsetEnv: runOptions?.unsetEnv ?? [], line })
+          calls.push({
+            command,
+            args,
+            unsetEnv: runOptions?.unsetEnv ?? [],
+            cwd: runOptions?.cwd,
+            line,
+          })
           const global =
             command === "bun" && args[0] === "add" && args[1] === "-g" ? args[2] : undefined
           const installed = global === undefined ? undefined : packageCommands[global]

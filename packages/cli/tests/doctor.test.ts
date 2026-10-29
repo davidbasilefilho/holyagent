@@ -4,11 +4,11 @@ import { Effect, FileSystem, Path } from "effect"
 
 import { setupProject } from "../src/claude/project.ts"
 import { doctor } from "../src/cmd/doctor.ts"
-import { fakeShell, run, tempDir } from "./support.ts"
+import { envLayer, fakeShell, run, tempDir } from "./support.ts"
 
 const CANARY = "1.4.4-canary.1+a8fcd319b"
 const STABLE = "1.4.4+38afee6c8"
-const allTools = ["claude", "bili", "ctx7", "bun"]
+const allTools = ["claude", "ctx7", "bun"]
 
 const answers = (bun: () => string, plugins: ReadonlyArray<string>) => (line: string) =>
   line === "bun --revision"
@@ -32,15 +32,18 @@ describe("holyagent doctor", () => {
           commands: allTools,
           respond: answers(() => CANARY, ["holyagent@holyagent"]),
         })
-        const report = yield* doctor({ directory, fix: false }).pipe(Effect.provide(shell.layer))
+        const report = yield* doctor({ directory, fix: false }).pipe(
+          Effect.provide(shell.layer),
+          Effect.provide(envLayer({ HOME: yield* tempDir })),
+        )
         expect(report.ok).toBe(true)
         expect(report.lines.map((line) => line.split(":")[0])).toEqual([
           "ok   bun",
           "ok   claude",
-          "ok   bili",
           "ok   ctx7",
           "ok   settings",
           "ok   plugin",
+          "ok   billion-context",
         ])
       }),
     ))
@@ -53,7 +56,10 @@ describe("holyagent doctor", () => {
           commands: allTools,
           respond: answers(() => STABLE, ["holyagent@holyagent"]),
         })
-        const report = yield* doctor({ directory, fix: false }).pipe(Effect.provide(shell.layer))
+        const report = yield* doctor({ directory, fix: false }).pipe(
+          Effect.provide(shell.layer),
+          Effect.provide(envLayer({ HOME: yield* tempDir })),
+        )
         expect(report.ok).toBe(false)
         expect(report.lines[0]).toBe(
           `FAIL bun: ${STABLE} is not a canary build; run: holyagent doctor --fix`,
@@ -74,7 +80,10 @@ describe("holyagent doctor", () => {
             return answers(() => revision, ["holyagent@holyagent"])(line)
           },
         })
-        const report = yield* doctor({ directory, fix: true }).pipe(Effect.provide(shell.layer))
+        const report = yield* doctor({ directory, fix: true }).pipe(
+          Effect.provide(shell.layer),
+          Effect.provide(envLayer({ HOME: yield* tempDir })),
+        )
         const upgrade = shell.calls.find((call) => call.line === "bun upgrade --canary")
         expect(upgrade?.unsetEnv).toEqual(["BUN_OPTIONS"])
         expect(report.ok).toBe(true)
@@ -93,7 +102,10 @@ describe("holyagent doctor", () => {
               ? { exitCode: 1 }
               : answers(() => STABLE, ["holyagent@holyagent"])(line),
         })
-        const report = yield* doctor({ directory, fix: true }).pipe(Effect.provide(shell.layer))
+        const report = yield* doctor({ directory, fix: true }).pipe(
+          Effect.provide(shell.layer),
+          Effect.provide(envLayer({ HOME: yield* tempDir })),
+        )
         expect(report.ok).toBe(false)
         expect(report.lines[0]).toStartWith("FAIL bun:")
       }),
@@ -111,15 +123,17 @@ describe("holyagent doctor", () => {
           '{"includeGitInstructions":false}',
         )
         const shell = fakeShell({ commands: ["bun", "claude"], respond: answers(() => CANARY, []) })
-        const report = yield* doctor({ directory, fix: false }).pipe(Effect.provide(shell.layer))
+        const report = yield* doctor({ directory, fix: false }).pipe(
+          Effect.provide(shell.layer),
+          Effect.provide(envLayer({ HOME: yield* tempDir })),
+        )
         expect(report.ok).toBe(false)
-        expect(report.lines).toContain("FAIL bili: not found on PATH")
         expect(report.lines).toContain("FAIL ctx7: not found on PATH")
         const settings = report.lines.find((line) => line.startsWith("FAIL settings"))
         expect(settings).toContain("attribution.commit")
         expect(settings).not.toContain("includeGitInstructions")
         expect(settings).toEndWith("run: holyagent setup claude")
-        expect(report.lines.at(-1)).toBe(
+        expect(report.lines).toContain(
           "FAIL plugin: holyagent@holyagent not installed; run: holyagent setup claude",
         )
       }),
@@ -135,10 +149,66 @@ describe("holyagent doctor", () => {
         })
         const report = yield* doctor({ directory: missing, fix: false }).pipe(
           Effect.provide(shell.layer),
+          Effect.provide(envLayer({ HOME: yield* tempDir })),
         )
         expect(report.lines.find((line) => line.startsWith("FAIL settings"))).toContain(
           "run: holyagent setup claude",
         )
+      }),
+    ))
+
+  test("warns, without failing, when Billion Context leftovers remain, and says how to clear them", () =>
+    run(
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem
+        const directory = yield* configuredProject
+        const home = yield* tempDir
+        yield* fs.makeDirectory(`${home}/.claude`, { recursive: true })
+        yield* fs.writeFileString(
+          `${home}/.claude/settings.json`,
+          JSON.stringify({
+            env: { ANTHROPIC_BASE_URL: "http://127.0.0.1:18787/bili/https://api.anthropic.com" },
+          }),
+        )
+        const shell = fakeShell({
+          commands: allTools,
+          respond: answers(() => CANARY, ["holyagent@holyagent"]),
+        })
+        const report = yield* doctor({ directory, fix: false }).pipe(
+          Effect.provide(shell.layer),
+          Effect.provide(envLayer({ HOME: home })),
+        )
+        const line = report.lines.find((entry) => entry.startsWith("warn billion-context"))
+        expect(line).toContain("env.ANTHROPIC_BASE_URL")
+        expect(line).toEndWith("run: holyagent setup claude")
+        expect(report.ok).toBe(true)
+      }),
+    ))
+
+  test("warns that it could not check when a Claude Code file cannot be read, instead of saying no leftovers", () =>
+    run(
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem
+        const directory = yield* configuredProject
+        const home = yield* tempDir
+        yield* fs.makeDirectory(`${home}/.claude/plugins`, { recursive: true })
+        yield* fs.writeFileString(`${home}/.claude/settings.json`, "[1]")
+        yield* fs.writeFileString(`${home}/.claude/plugins/installed_plugins.json`, "not json")
+        yield* fs.writeFileString(`${home}/.claude/plugins/known_marketplaces.json`, "[]")
+        const shell = fakeShell({
+          commands: allTools,
+          respond: answers(() => CANARY, ["holyagent@holyagent"]),
+        })
+        const report = yield* doctor({ directory, fix: false }).pipe(
+          Effect.provide(shell.layer),
+          Effect.provide(envLayer({ HOME: home })),
+        )
+        const line = report.lines.find((entry) => entry.includes("billion-context"))
+        expect(line).toStartWith("warn billion-context: not checked")
+        expect(line).toContain("settings.json")
+        expect(line).toContain("installed_plugins.json")
+        expect(line).toContain("known_marketplaces.json")
+        expect(report.ok).toBe(true)
       }),
     ))
 })

@@ -53,8 +53,8 @@ export const BUILTIN_TOOLS: ReadonlyArray<string> = [
 ]
 
 /**
- * Claude Code's own web tools, denied to every agent: web work goes through Exa, whose tools every
- * agent inherits as MCP tools.
+ * Claude Code's own web tools, denied to every agent: web work goes through the Exa connector,
+ * whose tools every agent inherits as MCP tools.
  */
 export const NATIVE_WEB_TOOLS: ReadonlyArray<string> = ["WebSearch", "WebFetch"]
 
@@ -243,6 +243,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
     phrase: "judged from the diff and the check output",
   },
   "R-REVIEW": { section: "root/assignments.md", phrase: "gets an independent reviewer" },
+  "R-FINISH": { section: "root/assignments.md", phrase: "one more repair round" },
   "R-VISUAL": { section: "root/visual.md", phrase: "Read screenshots yourself in the main thread" },
   "R-DEVSERVER": {
     section: "root/skills.md",
@@ -255,6 +256,10 @@ export const REQUIREMENT_SECTIONS: Readonly<
   "R-GIT": {
     section: "root/version-control.md",
     phrase: "Never force-push, and never push to the base, default or a protected branch",
+  },
+  "R-STATE": {
+    section: "root/version-control.md",
+    phrase: "set the mode with `holyagent state mode <mode>`",
   },
   "R-CI": {
     section: "root/ci.md",
@@ -344,7 +349,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
   "R-WV": { section: "roles/worker-validation/method.md", phrase: "choose the real check" },
   "R-WVI": {
     section: "roles/worker-visual/purpose.md",
-    phrase: "repair material discrepancies",
+    phrase: "The Assignment names the repair round",
   },
   "R-WVI-DESIGN": {
     section: "roles/worker-visual/frontend-design.md",
@@ -369,10 +374,11 @@ const BUILTIN_REVIEW: ReadonlySet<string> = new Set(["Reviewer.code", "Reviewer.
 
 /**
  * The built-in tools of a specialist: reading for all, then what its capabilities call for. The
- * Search capability grants none, since the Exa tools come as MCP tools. Reviewer.code keeps Bash
- * without a Shell capability, since it reads diffs with git. The roles of {@link BUILTIN_REVIEW}
- * get Skill, and a role with Bash gets Monitor for its long commands. A role with Bash searches
- * with the bundled ripgrep and fd and so gets neither Grep nor Glob; a role without it keeps both.
+ * Search capability grants none, since the Exa connector's tools come as MCP tools. Reviewer.code
+ * keeps Bash without a Shell capability, since it reads diffs with git. The roles of
+ * {@link BUILTIN_REVIEW} get Skill, and a role with Bash gets Monitor for its long commands. A role
+ * with Bash searches with the bundled ripgrep and fd and so gets neither Grep nor Glob; a role
+ * without it keeps both.
  */
 const builtinsOf = (route: Route): ReadonlyArray<string> => {
   const shell = route.capabilities.includes("Shell") || route.roleTask === "Reviewer.code"

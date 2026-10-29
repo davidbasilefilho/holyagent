@@ -1,7 +1,9 @@
 import { Console, Effect, Option, Schema } from "effect"
 import { Command, Flag } from "effect/cli"
 
+import { findLeftovers } from "../claude/leftovers.ts"
 import { PLUGIN_ID, projectDefaults, settingsPath } from "../claude/project.ts"
+import { userFiles } from "../claude/user.ts"
 import { applyDefaults, readJsonObject } from "../json-file.ts"
 import { CliFailure, type Report } from "../report.ts"
 import { Shell } from "../shell.ts"
@@ -52,6 +54,31 @@ const checkSettings = (directory: string) =>
       : fail("settings", `${file} lacks ${missing.join(", ")}; run: holyagent setup claude`)
   }).pipe(Effect.catchTag("CliFailure", (error) => Effect.succeed(fail("settings", error.message))))
 
+const warn = (name: string, detail: string) => `warn ${name}: ${detail}`
+
+/**
+ * Warns when an earlier Billion Context setup left entries in the Claude Code files, and when a
+ * file could not be read, because then its entries were not checked.
+ */
+const checkLeftovers = Effect.gen(function* () {
+  const leftovers = yield* findLeftovers(yield* userFiles)
+  const notes = [
+    ...(leftovers.found.length === 0
+      ? []
+      : [
+          `${leftovers.found.length} leftover(s) from an earlier setup: ${leftovers.found.join("; ")}; run: holyagent setup claude`,
+        ]),
+    ...(leftovers.unreadable.length === 0
+      ? []
+      : [`not checked, ${leftovers.unreadable.join("; ")}`]),
+  ]
+  return notes.length === 0
+    ? pass("billion-context", "no leftovers from an earlier setup")
+    : warn("billion-context", notes.join(" | "))
+}).pipe(
+  Effect.catchTag("CliFailure", (error) => Effect.succeed(fail("billion-context", error.message))),
+)
+
 const checkPlugin = Effect.gen(function* () {
   const shell = yield* Shell
   if (Option.isNone(yield* shell.which("claude")))
@@ -70,9 +97,10 @@ const checkPlugin = Effect.gen(function* () {
 })
 
 /**
- * Checks the environment HolyAgent needs, one line per check: a canary Bun, `claude`, `bili` and
- * `ctx7` on PATH, the project settings from `holyagent setup claude`, and the installed plugin.
- * With `fix`, a Bun that is not canary is upgraded.
+ * Checks the environment HolyAgent needs, one line per check: a canary Bun, `claude` and `ctx7` on
+ * PATH, the project settings from `holyagent setup claude`, the installed plugin, and leftovers of
+ * an earlier Billion Context setup (a warning, not a failure). With `fix`, a Bun that is not canary
+ * is upgraded.
  */
 export const doctor = Effect.fn("doctor")(function* (options: {
   readonly directory: string
@@ -81,12 +109,13 @@ export const doctor = Effect.fn("doctor")(function* (options: {
   const lines = [
     yield* checkBun(options.fix),
     yield* checkCommand("claude"),
-    yield* checkCommand("bili"),
     yield* checkCommand("ctx7"),
     yield* checkSettings(options.directory),
     yield* checkPlugin,
+    yield* checkLeftovers,
   ]
-  return { lines, ok: lines.every((line) => line.startsWith("ok ")) } satisfies Report
+  // A warning is shown but does not fail the run.
+  return { lines, ok: !lines.some((line) => line.startsWith("FAIL ")) } satisfies Report
 })
 
 /** The `holyagent doctor` command. */
@@ -109,7 +138,7 @@ export const doctorCommand = Command.make(
 )
   .pipe(
     Command.withDescription(
-      "Check Bun (canary), claude, bili, ctx7, this project's settings and the HolyAgent plugin; exit 1 when a check fails.",
+      "Check Bun (canary), claude, ctx7, this project's settings and the HolyAgent plugin, and warn about Billion Context leftovers; exit 1 when a check fails.",
     ),
   )
   .pipe(

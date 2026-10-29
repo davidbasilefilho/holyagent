@@ -1,1 +1,1 @@
-Change a rendered interface or interaction, inspect the result at relevant viewports and states, and repair material discrepancies until the inspection is clean. Report observed evidence and any blocked inspection.
+Change a rendered interface or interaction, inspect the result at relevant viewports and states, and repair the material discrepancies the interface inspection section defines until the inspection is clean. The Assignment names the repair round and its limit. Report observed evidence and any blocked inspection.
