@@ -1,0 +1,56 @@
+{
+  "id": "assignment-0mvtpddfi-1i5u",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 5,
+  "roleTask": "Worker.implementation",
+  "slug": "fix-the-state-exclude-file-edge-cases",
+  "objective": "Fix the state exclude-file edge cases left by the last state-mode reviews and make the runtime check ownership before the tracked-state signal wherever it encodes the order.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-state-edges (branch ccr-046ad103-6qsvgx-state-edges from origin/main eaed3fd).",
+    "Findings to fix, from /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-yjjl.txt (code re-review notes 1, 2, 4-8) and /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-9sjn.txt (security re-review notes): setExcluded removes an unmarked /.holyagent/ line written by the earlier unreleased build only when leaving local (packages/runtime/src/state/tree.ts ~150); local-mode vcs commit refusal applies only when the staged set touches tracked state, not to every commit (commit.ts ~175); commitScope's case-insensitive .holyagent match only when core.ignorecase is true (commit.ts ~90); setExcluded read-modify-write under a lock (tree.ts ~154); an orphan marker comment without its line is repaired instead of duplicated (tree.ts ~145); roll back the exclude entry if the config write fails after it (tree.ts ~877); naming .HolyAgent in work mode is recognized as the whole folder where the file system ignores case (commit.ts ~172). Read both reports for exact wording and the security re-review's remaining notes, and fix every one the reports call non-blocking, or name it with a concrete reason it cannot be fixed.",
+    "Tests for each fix that fail without it. Regenerate with mise run build."
+  ],
+  "constraints": [
+    "User (verbatim): \"não deve ter nada pendente / outra coisa: arrume esse comportamento, o que ficar pendente que o agente pode resolver deve ser resolvido\".",
+    "Follow /home/user/holyagent/.claude/CLAUDE.md and /home/user/holyagent/AGENTS.md (Effect with tagged errors, no try/catch/new Promise/async in runtime and CLI source, Schema at boundaries, Bun APIs and Bun Shell, JSDoc). Do not edit .claude/CLAUDE.md or AGENTS.md.",
+    "Make no version-control writes and no edits under .git/ or .holyagent/ of the repository; tests use temp folders.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done and checked, stop and report; add no unrequested features (name ideas in the report)."
+  ],
+  "criteria": [
+    {
+      "text": "Each listed re-review note is fixed with a test that fails without the fix, or named with a concrete reason",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Existing state-mode and vcs commit behavior and tests are unchanged apart from the fixed edges",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "mise run build leaves no diff after the change and mise run verify passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/state",
+    "packages/runtime/src/vcs",
+    "packages/runtime/tests",
+    "packages/integrations/claude/dist/scripts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T15:33:15.966Z"
+  },
+  "createdAt": "2026-10-29T15:33:15.966Z"
+}
