@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "review-the-stack-rule-change-to",
   "objective": "Review the stack-rule change to holyagent's root instructions and docs for correctness, consistency and instruction quality.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Diff file: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule.diff (worktree /home/user/holyagent-stack-rule; files packages/runtime/src/instructions/claude-5.5/root/stack-plan.md, packages/runtime/src/instructions/requirements.md, docs/usage.md, docs/decisions.md, regenerated packages/integrations/claude/dist/agents/holyagent.md).",
     "Requirement (maintainer decision): in a stacked-PR repository new work stacks on the top of the open stack; when the stack lags the base, the base is merged forward into it first (merge commits, review before push); work branches from the base only when no PR is open or the conventions ask for independent PRs; the CI-PR-first rule and the rest of the stack plan stay.",
@@ -35,5 +35,10 @@
   "independentFrom": [
     "assignment-0mvtuyc3t-cplg"
   ],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-29T18:17:54.199Z"
+  },
   "createdAt": "2026-10-29T18:17:43.812Z"
 }
