@@ -64,3 +64,29 @@ jobs:
           if [ -f install/wsl-install.sh ]; then
             shellcheck install/wsl-install.sh
           fi
+
+  installers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Syntax only: neither installer runs, since both change the machine they run on.
+      - name: Parse the WSL installer
+        run: bash -n install/wsl-install.sh
+
+      # ubuntu-latest ships PowerShell (pwsh), so the Windows installer is parsed there too.
+      - name: Parse the Windows installer
+        shell: pwsh
+        run: |
+          $errors = $null
+          $tokens = $null
+          $file = Join-Path $PWD 'install/windows-install.ps1'
+          [System.Management.Automation.Language.Parser]::ParseFile($file, [ref]$tokens, [ref]$errors) | Out-Null
+          foreach ($e in $errors) {
+            Write-Host "::error file=install/windows-install.ps1,line=$($e.Extent.StartLineNumber)::$($e.Message)"
+          }
+          if ($errors.Count -gt 0) { exit 1 }

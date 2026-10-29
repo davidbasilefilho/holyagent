@@ -15,7 +15,7 @@ claude plugin marketplace add davidbasilefilho/holyagent
 claude plugin install holyagent@holyagent
 ```
 
-Restart Claude Code afterwards. Web search needs the Exa connector, which you connect once at [claude.ai/customize/connectors](https://claude.ai/customize/connectors) (see [docs/usage.md](docs/components.md#exa)); HolyAgent supports only claude.ai account login. The same steps as slash commands are in [docs/usage.md](docs/usage.md#install).
+Restart Claude Code afterwards. Web search needs the Exa connector, which you connect once at [claude.ai/customize/connectors](https://claude.ai/customize/connectors) (see [docs/components.md](docs/components.md#exa)); HolyAgent supports only claude.ai account login. The same steps as slash commands are in [docs/usage.md](docs/usage.md#install).
 
 This route installs only the plugin. To also set up ctx7 and the project settings in one go, run the public CLI from a checkout, after `bun install` there. `setup claude` adds the marketplace, installs the plugin and configures the directory it runs in (or the one passed with `--dir <path>`):
 

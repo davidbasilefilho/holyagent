@@ -20,7 +20,7 @@ Pi is not installed: 0.1.0 has no Pi integration ([pi/README.md](pi/README.md)).
 
 The installer first installs any missing apt packages (`curl`, `git`, `ca-certificates`, `unzip`, `build-essential`) with sudo. mise is installed with its official installer to `~/.local/bin/mise` and activated in `~/.bashrc` (the installer keeps a one-time copy as `~/.bashrc.pre-holyagent`). Node comes from `mise use -g node@lts` and the installer refuses a Node older than 22.13, the floor for ctx7.
 
-The Windows installer (`install/windows-install.ps1`) installs missing `git` and `mise` with `winget` instead of apt and mise's shell installer. It activates mise in your PowerShell profile (`$PROFILE.CurrentUserAllHosts`, with a one-time copy kept as `<profile>.pre-holyagent`), puts Bun's global bin folder on your user `PATH`. Node, Bun, Claude Code and ctx7 are installed exactly as above.
+The Windows installer (`install/windows-install.ps1`) installs missing `git` and `mise` with `winget` instead of apt and mise's shell installer. It activates mise in your PowerShell profile (`$PROFILE.CurrentUserAllHosts`, with a one-time copy kept as `<profile>.pre-holyagent`), and puts Bun's global bin folder on your user `PATH`. Node, Bun, Claude Code and ctx7 are installed exactly as above.
 
 Bun is installed by mise as a stable build and upgraded to canary with `bun upgrade --canary` ([requirements.md](requirements.md) says why). The canary is re-applied rather than assumed: the installer checks `bun --revision` on every run, `holyagent doctor` reports a non-canary Bun and `holyagent doctor --fix` upgrades it (with `BUN_OPTIONS` unset), and the repository's `toolchain` task fails on a non-canary Bun. Installing the global packages below uses `bun add -g`; their commands live in `$BUN_INSTALL/bin` (`~/.bun/bin`), which the installer puts on `PATH`.
 
@@ -48,9 +48,10 @@ Hosted setup needs a login or API key. With neither, `ctx7 setup --yes` would bl
 
 ## What `holyagent doctor` checks
 
-One line per check, exit 1 when any fails:
+One line per check, exit 1 when any check fails:
 
 - Bun is a canary build (`--fix` upgrades it);
 - `claude` and `ctx7` are on `PATH`;
 - the project's `.claude/settings.json` has the keys `holyagent setup claude` writes;
-- the `holyagent@holyagent` plugin is installed.
+- the `holyagent@holyagent` plugin is installed;
+- no leftovers of an earlier Billion Context setup remain in your Claude Code files (a warning that does not fail the run; `holyagent setup claude` removes them, see [usage.md](usage.md#install)).

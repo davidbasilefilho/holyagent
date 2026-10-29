@@ -19,9 +19,18 @@ Inside Claude Code the same steps are `/plugin marketplace add davidbasilefilho/
 holyagent setup claude [--dir <path>] [--subagent-cache-ttl 1h|5m] [--dry-run] [--skip-ctx7]
 ```
 
-The steps run in this order: plugin, ctx7, project settings. Every step checks its own result first, so a re-run changes nothing that is already set, and a failed step does not stop the others; the command exits 1 at the end if any step failed. `--dry-run` shows what would change and installs and writes nothing. `setup` is the parent command for per-harness setups; `claude` is the only one so far.
+The steps run in this order: plugin, Billion Context cleanup, ctx7, project settings. Every step checks its own result first, so a re-run changes nothing that is already set, and a failed step does not stop the others; the command exits 1 at the end if any step failed. `--dry-run` shows what would change and installs and writes nothing. `setup` is the parent command for per-harness setups; `claude` is the only one so far.
 
 The output has one line per step: `+` done now, `=` already done, `-` skipped, `~` a hint (such as a directory to add to `PATH`), `!` failed (exit 1). The ctx7 skill needs `CONTEXT7_API_KEY` or a saved `ctx7 login`; without either that step is skipped with a hint. What each piece is and why it is installed is in [components.md](components.md).
+
+**If you ran an earlier setup.** Earlier versions of `holyagent setup claude` and the installers set up Billion Context, which HolyAgent no longer uses. `holyagent setup claude` removes what it left in your Claude Code files, prints each entry it removes, and shows them without removing on `--dry-run`:
+
+- in `~/.claude/settings.json` (or `$CLAUDE_CONFIG_DIR/settings.json`): `env.ANTHROPIC_BASE_URL` when it points at the local proxy `http://127.0.0.1:18787`, `env.DISABLE_AUTO_COMPACT=1` when another Billion Context entry shows it set it, hook commands containing `claude-native-bootstrap` or starting with `bili`, `enabledPlugins["billion-context@billion-context"]` and `extraKnownMarketplaces["billion-context"]`;
+- in `~/.claude.json`: the `bili` MCP server, when its command is `bili`;
+- `~/.claude/commands/acp-cache.md`;
+- the `billion-context@billion-context` plugin and the `billion-context` marketplace, through `claude plugin uninstall` and `claude plugin marketplace remove`.
+
+Everything else is kept: a different `ANTHROPIC_BASE_URL`, a `DISABLE_AUTO_COMPACT` you set yourself, your other hooks and servers. `holyagent doctor` prints a `warn billion-context` line while any of these remain; the warning does not change the exit code. The `bili` package and its own configuration under `~/.config/billion-context` are not touched; remove them with `bun remove -g billion-context` if you want them gone.
 
 **A clean WSL Ubuntu.** From a checkout, run `bash install/wsl-install.sh` as your own user, not through sudo; it takes no arguments and calls sudo itself only for missing apt packages (`curl`, `git`, `ca-certificates`, `unzip`, `build-essential`). Its seven steps run in this order, and a re-run skips what is already right: prerequisites, mise, Node LTS, Bun (canary), Claude Code, ctx7 and a final verification. It warns, and continues, on a system that is not WSL or not Ubuntu. It does not install the plugin; use one of the routes above afterwards. Open a new shell when it finishes so `PATH` picks up mise and Bun. The script's header lists what you opt into: the Context7 skill download; the Bun canary; and two lines added to `~/.bashrc`.
 
