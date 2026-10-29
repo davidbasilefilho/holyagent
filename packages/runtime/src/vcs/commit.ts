@@ -4,7 +4,7 @@ import { Effect } from "effect"
 
 import { Usage } from "../cli/errors.ts"
 import { pathProblem, toPosix } from "../domain/paths.ts"
-import { STATE_DIRECTORY, TRACKED_STATE_PATHSPEC } from "../state/layout.ts"
+import { CONFIG_FILE, STATE_DIRECTORY, TRACKED_STATE_PATHSPEC } from "../state/layout.ts"
 import { parseStateMode, STATE_MODE_KEY, type StateMode } from "../state/mode.ts"
 import {
   AgentIdentity,
@@ -63,16 +63,38 @@ const stagedPaths = git(["diff", "--cached", "--name-only", "--no-renames", "-z"
 )
 
 /**
+ * True when the git path is the state folder or inside it. Where the file system ignores case
+ * (`core.ignorecase`) `.HolyAgent` is the same folder, so the match folds case there and only
+ * there.
+ */
+const inStateFolder = (path: string, ignoreCase: boolean) => {
+  const folded = ignoreCase ? path.toLowerCase() : path
+  return folded === STATE_DIRECTORY || folded.startsWith(`${STATE_DIRECTORY}/`)
+}
+
+/** True when the git path is the project's settings file in the state folder. */
+const isConfigFile = (path: string, ignoreCase: boolean) =>
+  (ignoreCase ? path.toLowerCase() : path) === `${STATE_DIRECTORY}/${CONFIG_FILE}`
+
+/** True when `core.ignorecase` is on: the file system treats names that differ in case as one. */
+const ignoresCase = gitMaybe(["config", "--type=bool", "--get", "core.ignorecase"]).pipe(
+  Effect.map((value) => value === "true"),
+)
+
+/**
  * The commit scope for the named paths: each path in git's `/` form without a trailing slash, or a
  * `Usage` failure for one that is not a portable project path or that is Intent state while the
  * state mode keeps it out of work commits (every mode but `work`). A path written with the
  * platform's separator (`src\a.ts` on Windows) names the same file as git's `src/a.ts`, so it is
  * converted before the checks. The separator is a parameter so a test can stand in for Windows.
+ * Where the file system ignores case (`ignoreCase`) a path in the state folder is matched whatever
+ * its case, and one that is allowed (the `work` mode) comes back in the folder's own case.
  */
 export const commitScope = (
   paths: ReadonlyArray<string>,
   separator: string = sep,
   mode: StateMode = "branch",
+  ignoreCase: boolean = false,
 ) =>
   Effect.forEach(paths, (path) => {
     const clean = toPosix(path, separator).replace(/\/+$/, "")
@@ -84,10 +106,9 @@ export const commitScope = (
           hint: "Name files or folders relative to the project root.",
         }),
       )
-    // Git on a case-insensitive file system treats `.HolyAgent` as the same folder.
-    const folded = clean.toLowerCase()
-    const state = folded === STATE_DIRECTORY || folded.startsWith(`${STATE_DIRECTORY}/`)
-    if (!state || mode === "work") return Effect.succeed(clean)
+    if (!inStateFolder(clean, ignoreCase)) return Effect.succeed(clean)
+    if (mode === "work")
+      return Effect.succeed(`${STATE_DIRECTORY}${clean.slice(STATE_DIRECTORY.length)}`)
     // On the state branch a work branch that carried the state could conflict with it when the two
     // are merged or stacked; in the local mode no commit carries it.
     return Effect.fail(
@@ -141,38 +162,41 @@ const changedState = Effect.gen(function* () {
 })
 
 /**
- * In the local mode, refuses a commit while git tracks state files, which the exclude entry cannot
- * hide.
+ * In the local mode, refuses a commit that stages state files, which the exclude entry cannot keep
+ * out once git tracks them (or once they were added by force). A commit that stages none of them is
+ * not affected by state git tracks. The project's settings are not state.
  */
-const requireUntrackedState = git(["ls-files", "--", ...TRACKED_STATE_PATHSPEC]).pipe(
-  Effect.flatMap((tracked) =>
-    tracked === ""
-      ? Effect.void
-      : Effect.fail(
-          new Usage({
-            message: `git tracks files under ${STATE_DIRECTORY}/, which state mode local cannot keep out of a commit`,
-            hint: "Switch to the work mode with `holyagent state mode work`, or untrack the files.",
-          }),
-        ),
-  ),
-)
+const requireNoStagedState = (staged: ReadonlyArray<string>, ignoreCase: boolean) => {
+  const state = staged.filter(
+    (path) => inStateFolder(path, ignoreCase) && !isConfigFile(path, ignoreCase),
+  )
+  return state.length === 0
+    ? Effect.void
+    : Effect.fail(
+        new Usage({
+          message: `git tracks files under ${STATE_DIRECTORY}/ that are staged (${state.join(", ")}), which state mode local cannot keep out of a commit`,
+          hint: "Unstage them with `git restore --staged`, switch to the work mode with `holyagent state mode work`, or untrack the files.",
+        }),
+      )
+}
 
 /**
  * Commits exactly the named paths with the configured git identity (an agent's is refused). In a
  * claude.ai cloud session the author is checked instead and the committer is the platform's. In the
  * default `branch` mode Intent state is not part of it: it is committed on the state branch as it
  * changes, and a path under `.holyagent/` is refused (as in `local`, which commits it nowhere). In
- * the `work` mode the changed state files (not the project's settings) are staged with the work.
- * Changes staged beforehand outside the named paths refuse the commit, so the commit is never wider
- * than the request. The repository's own hooks run, the commit-msg hook among them.
+ * the `work` mode the changed state files (not the project's settings) are staged with the work. In
+ * the `local` mode a commit that stages state files git tracks is refused. Changes staged
+ * beforehand outside the named paths refuse the commit, so the commit is never wider than the
+ * request. The repository's own hooks run, the commit-msg hook among them.
  */
 export const commit = (request: CommitRequest) =>
   Effect.gen(function* () {
     const { message } = request
     yield* request.cloud ? requireOwnAuthor : requireOwnIdentity
     const mode = yield* stateMode
-    const named = yield* commitScope(request.paths, sep, mode)
-    if (mode === "local") yield* requireUntrackedState
+    const ignoreCase = yield* ignoresCase
+    const named = yield* commitScope(request.paths, sep, mode, ignoreCase)
     // In the work mode the state rides the work commit: the changed state files join the scope.
     const scope =
       mode === "work" && !named.includes(STATE_DIRECTORY)
@@ -180,6 +204,7 @@ export const commit = (request: CommitRequest) =>
         : named
 
     const alreadyStaged = yield* stagedPaths
+    if (mode === "local") yield* requireNoStagedState(alreadyStaged, ignoreCase)
     const outside = alreadyStaged.filter((path) => !inScope(scope, path))
     if (outside.length > 0) return yield* new StagedOutsideScope({ paths: outside })
 

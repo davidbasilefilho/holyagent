@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises"
+import { lstat, mkdir, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import { Effect } from "effect"
@@ -286,12 +286,18 @@ describe("a repository that tracks only the project's config.json", () => {
 })
 
 describe("local mode and files that git tracks under .holyagent", () => {
-  test("vcs commit is refused while git tracks state there, whatever the path's case", async () => {
+  const trackedNote = async () => {
     const dir = await repoIn("local")
     await put(dir, { ".holyagent/note.md": "x\n", "a.txt": "a2\n" })
     await sh(dir, ["git", "add", "-f", ".holyagent/note.md"])
     await sh(dir, ["git", "commit", "-q", "-m", "track"])
-    await put(dir, { "a.txt": "a3\n" })
+    return dir
+  }
+
+  test("vcs commit is refused while the staged set holds state git tracks", async () => {
+    const dir = await trackedNote()
+    await put(dir, { ".holyagent/note.md": "y\n", "a.txt": "a3\n" })
+    await sh(dir, ["git", "add", "-f", ".holyagent/note.md"])
 
     const result = await holy(dir, ["vcs", "commit", "-m", "Change a", "--", "a.txt"])
 
@@ -300,11 +306,65 @@ describe("local mode and files that git tracks under .holyagent", () => {
     expect(await sh(dir, ["git", "log", "--format=%s"])).toBe("track\nseed\n")
   })
 
-  test("a path under .holyagent is refused in any letter case", async () => {
+  test("vcs commit is not refused when the staged set touches none of the state git tracks", async () => {
+    const dir = await trackedNote()
+    await put(dir, { ".holyagent/note.md": "y\n", "a.txt": "a3\n" })
+
+    toon(await holy(dir, ["vcs", "commit", "-m", "Change a", "--", "a.txt"]))
+
+    expect(await filesOf(dir, "HEAD")).toEqual(["a.txt"])
+  })
+
+  test("a path under .holyagent is refused in any letter case where the file system ignores case", async () => {
     for (const path of [".HolyAgent/x", ".HOLYAGENT"]) {
-      const failure = await Effect.runPromise(Effect.flip(commitScope([path], "/", "local")))
+      const failure = await Effect.runPromise(Effect.flip(commitScope([path], "/", "local", true)))
       expect(failure.message).toContain("Intent state")
     }
+  })
+
+  test("a differently cased folder is another folder where the file system tells case apart", async () => {
+    expect(await Effect.runPromise(commitScope([".HolyAgent/x"], "/", "local", false))).toEqual([
+      ".HolyAgent/x",
+    ])
+    expect(await Effect.runPromise(commitScope([".HolyAgent/x"], "/", "branch"))).toEqual([
+      ".HolyAgent/x",
+    ])
+  })
+
+  test("the commit reads core.ignorecase to decide which spelling is the state folder", async () => {
+    const dir = await repoIn("local")
+    await put(dir, { ".HolyAgent/x": "x\n" })
+
+    await sh(dir, ["git", "config", "core.ignorecase", "false"])
+    toon(await holy(dir, ["vcs", "commit", "-m", "Other folder", "--", ".HolyAgent/x"]))
+    expect(await filesOf(dir, "HEAD")).toEqual([".HolyAgent/x"])
+
+    await sh(dir, ["git", "config", "core.ignorecase", "true"])
+    await put(dir, { ".HolyAgent/x": "y\n" })
+    const refused = await holy(dir, ["vcs", "commit", "-m", "State", "--", ".HolyAgent/x"])
+    expect(refused.code).toBe(2)
+    expect(refused.stderr).toContain("Intent state")
+  })
+
+  test("in the work mode the state folder named in another case is the whole folder", async () => {
+    expect(await Effect.runPromise(commitScope([".HolyAgent"], "/", "work", true))).toEqual([
+      ".holyagent",
+    ])
+    expect(await Effect.runPromise(commitScope([".HolyAgent/a"], "/", "work", true))).toEqual([
+      ".holyagent/a",
+    ])
+    expect(await Effect.runPromise(commitScope([".HolyAgent"], "/", "work", false))).toEqual([
+      ".HolyAgent",
+    ])
+
+    const dir = await repoIn("work")
+    await createIntent(dir)
+    await sh(dir, ["git", "config", "core.ignorecase", "true"])
+    await put(dir, { "a.txt": "a2\n", ".holyagent/config.json": "{}\n" })
+
+    toon(await holy(dir, ["vcs", "commit", "-m", "All state", "--", "a.txt", ".HolyAgent"]))
+
+    expect(await filesOf(dir, "HEAD")).toContain(".holyagent/config.json")
   })
 })
 
@@ -343,6 +403,124 @@ describe("the exclude file", () => {
 
     expect(result.code).not.toBe(0)
     expect(toon(await holy(dir, ["state", "mode"]))).toMatchObject({ mode: "branch" })
+  })
+})
+
+describe("the exclude file edge cases", () => {
+  const MARK = "# added by holyagent (state mode local)"
+  const writeExclude = async (dir: string, text: string) => {
+    await mkdir(join(dir, ".git", "info"), { recursive: true })
+    await writeFile(join(dir, ".git", "info", "exclude"), text)
+  }
+  const holdExcludeLock = async (dir: string) => {
+    const lock = join(dir, ".git", "holyagent", "exclude.lock")
+    await mkdir(join(dir, ".git", "holyagent"), { recursive: true })
+    await writeFile(lock, JSON.stringify({ pid: process.pid, token: "held", acquiredAt: 0 }))
+    return lock
+  }
+
+  test("an unmarked line from an earlier build goes when the clone leaves local", async () => {
+    const dir = await repoIn()
+    await writeExclude(dir, "*.log\n/.holyagent/\n")
+    await sh(dir, ["git", "config", "holyagent.stateMode", "local"])
+
+    toon(await holy(dir, ["state", "mode", "work"]))
+
+    expect(await excludeFile(dir)).toBe("*.log\n")
+  })
+
+  test("a line the user had before local stays when the clone leaves it, and a line from branch stays", async () => {
+    const dir = await repoIn()
+    await writeExclude(dir, "/.holyagent/\n")
+
+    toon(await holy(dir, ["state", "mode", "work"]))
+    expect(await excludeFile(dir)).toBe("/.holyagent/\n")
+    toon(await holy(dir, ["state", "mode", "local"]))
+    toon(await holy(dir, ["state", "mode", "local"]))
+    toon(await holy(dir, ["state", "mode", "branch"]))
+
+    expect(await excludeFile(dir)).toBe("/.holyagent/\n")
+  })
+
+  test("a marker comment whose line was deleted gets the line back instead of a second pair", async () => {
+    const dir = await repoIn()
+    await writeExclude(dir, `*.log\n${MARK}\n*.tmp\n`)
+
+    toon(await holy(dir, ["state", "mode", "local"]))
+
+    expect(await excludeFile(dir)).toBe(`*.log\n${MARK}\n/.holyagent/\n*.tmp\n`)
+    toon(await holy(dir, ["state", "mode", "work"]))
+    expect(await excludeFile(dir)).toBe("*.log\n*.tmp\n")
+  })
+
+  test("a stray marker comment goes when the clone leaves local", async () => {
+    const dir = await repoIn()
+    toon(await holy(dir, ["state", "mode", "local"]))
+    await writeExclude(dir, `*.log\n${MARK}\n`)
+
+    toon(await holy(dir, ["state", "mode", "work"]))
+
+    expect(await excludeFile(dir)).toBe("*.log\n")
+  })
+
+  test("editing the exclude file waits for the lock another command holds", async () => {
+    const dir = await repoIn()
+    const lock = await holdExcludeLock(dir)
+
+    let finished = false
+    const change = holy(dir, ["state", "mode", "local"]).then((result) => {
+      finished = true
+      return result
+    })
+    await Bun.sleep(300)
+    expect(finished).toBe(false)
+    await rm(lock)
+
+    expect(toon(await change)).toMatchObject({ mode: "local" })
+    expect(await excludeFile(dir)).toContain("/.holyagent/")
+  })
+
+  test("a command that waited for the lock does not bring the entry back after the mode left local", async () => {
+    const dir = await repoIn("local")
+    await writeExclude(dir, "")
+    const lock = await holdExcludeLock(dir)
+
+    const created = holy(dir, ["intent", "create"], { objective: "Ship the parser" })
+    await Bun.sleep(300)
+    await sh(dir, ["git", "config", "holyagent.stateMode", "work"])
+    await rm(lock)
+
+    expect((await created).code).toBe(0)
+    expect(await excludeFile(dir)).toBe("")
+  })
+
+  test("a failed mode write takes the entry it was preceded by out again", async () => {
+    const dir = await repoIn()
+    await writeExclude(dir, "*.log\n")
+    await writeFile(join(dir, ".git", "config.lock"), "")
+
+    const result = await holy(dir, ["state", "mode", "local"])
+
+    expect(result.code).not.toBe(0)
+    expect(await excludeFile(dir)).toBe("*.log\n")
+    await rm(join(dir, ".git", "config.lock"))
+    expect(toon(await holy(dir, ["state", "mode"]))).toMatchObject({ mode: "branch" })
+  })
+
+  test("a symbolic link at the exclude file is kept and the file it names is edited", async () => {
+    const dir = await repoIn()
+    const target = join(await scratch(), "shared-exclude")
+    await writeFile(target, "*.log\n")
+    await mkdir(join(dir, ".git", "info"), { recursive: true })
+    await rm(join(dir, ".git", "info", "exclude"), { force: true })
+    await symlink(target, join(dir, ".git", "info", "exclude"))
+
+    toon(await holy(dir, ["state", "mode", "local"]))
+
+    expect((await lstat(join(dir, ".git", "info", "exclude"))).isSymbolicLink()).toBe(true)
+    expect(await readFile(target, "utf8")).toContain("/.holyagent/")
+    toon(await holy(dir, ["state", "mode", "work"]))
+    expect(await readFile(target, "utf8")).toBe("*.log\n")
   })
 })
 
