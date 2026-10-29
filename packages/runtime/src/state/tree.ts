@@ -6,25 +6,25 @@ import { Effect } from "effect"
 
 import { fromGitPath, toPosix } from "../domain/paths.ts"
 import { looksLikeAgent } from "../vcs/identity.ts"
-import { StateIo } from "./errors.ts"
-import { hasCode, io } from "./files.ts"
-import { STATE_DIRECTORY } from "./layout.ts"
+import { StateIo, StateModeRefused } from "./errors.ts"
+import { hasCode, io, readText } from "./files.ts"
+import { CONFIG_FILE, STATE_DIRECTORY, TRACKED_STATE_PATHSPEC } from "./layout.ts"
 import { withFileLock, withStateLock } from "./lock.ts"
+import { parseStateMode, STATE_MODE_KEY, type StateMode } from "./mode.ts"
 
-// The Intent state lives on one branch of its own, checked out in one linked worktree that every
-// worktree of the clone shares. Work branches never carry `.holyagent/`, and the state branch
-// carries nothing else, so merging either into the other, or into a branch stacked on it, cannot
-// conflict. Every state transition is committed on the state branch, locally: pushing is the
-// root's, with plain git.
+// In the default `branch` mode the Intent state lives on one branch of its own, checked out in one
+// linked worktree that every worktree of the clone shares. Work branches never carry `.holyagent/`,
+// and the state branch carries nothing else, so merging either into the other, or into a branch
+// stacked on it, cannot conflict. Every state transition is committed on the state branch,
+// locally: pushing is the root's, with plain git. The `work` and `local` modes (git config
+// `holyagent.stateMode`, see mode.ts) keep the state in the `.holyagent/` of the work tree instead,
+// for a project whose PRs do not stack: `work` commits it with the work, `local` keeps it out of git.
 
 /** The branch that holds the Intent state unless git config names another. */
 export const DEFAULT_STATE_BRANCH = "holyagent/state"
 
 /** The git config key that names the state branch. */
 const BRANCH_KEY = "holyagent.stateBranch"
-
-/** The project's settings in the state folder of a work tree. They are not state and never move. */
-const CONFIG_FILE = "config.json"
 
 /**
  * How far a command may go to find the state: `create` makes the state worktree (and the branch)
@@ -112,6 +112,56 @@ const gitSucceeds = (cwd: string, env: Environment, args: ReadonlyArray<string>)
 const BOOKKEEPING = ["-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false"] as const
 
 const NOT_A_REPOSITORY = /not a git repository|command not found/i
+
+/** The mode of the clone: git config `holyagent.stateMode`, else `branch`. */
+const stateModeOf = (top: string, env: Environment) =>
+  git(top, env, ["config", "--get", STATE_MODE_KEY]).pipe(
+    Effect.flatMap((ran) => parseStateMode(ran.code === 0 ? ran.stdout : undefined)),
+  )
+
+/** The line in `.git/info/exclude` that keeps the state folder out of git in `local` mode. */
+const EXCLUDE_LINE = `/${STATE_DIRECTORY}/`
+
+/** The comment above the line holyagent adds, which lets it remove only what it put there. */
+const EXCLUDE_MARK = "# added by holyagent (state mode local)"
+
+/**
+ * Adds or removes the state folder's line in the clone's `.git/info/exclude`, which every work tree
+ * of the clone shares. It is the clone's own ignore file, so the repository's `.gitignore` is never
+ * touched and no PR carries the entry. Only the line holyagent added, marked by a comment above it,
+ * is removed; one the user wrote stays. The file is replaced through a temporary file and a rename,
+ * so a concurrent `git add` never reads it half written.
+ */
+const setExcluded = (top: string, env: Environment, excluded: boolean) =>
+  Effect.gen(function* () {
+    const path = fromGitPath(
+      yield* gitText(top, env, [
+        "rev-parse",
+        "--path-format=absolute",
+        "--git-path",
+        "info/exclude",
+      ]),
+    )
+    const lines = ((yield* readText(path)) ?? "").split("\n")
+    const there = lines.some((line) => line.trim() === EXCLUDE_LINE)
+    const marked = lines.findIndex((line) => line.trim() === EXCLUDE_MARK)
+    if (excluded ? there : marked < 0 || lines[marked + 1]?.trim() !== EXCLUDE_LINE) return
+    const kept = excluded
+      ? lines
+      : lines.filter((_, index) => index !== marked && index !== marked + 1)
+    const head = kept.join("\n")
+    const body = excluded
+      ? `${head}${head === "" || head.endsWith("\n") ? "" : "\n"}${EXCLUDE_MARK}\n${EXCLUDE_LINE}\n`
+      : head
+    const temporary = `${path}.${process.pid}.${crypto.randomUUID()}.tmp`
+    yield* io(path, () => mkdir(dirname(path), { recursive: true }))
+    yield* io(temporary, () => Bun.write(temporary, body))
+    yield* io(path, () => rename(temporary, path)).pipe(
+      Effect.tapError(() =>
+        io(temporary, () => rm(temporary, { force: true })).pipe(Effect.ignore),
+      ),
+    )
+  })
 
 const isDirectory = (path: string) =>
   io(path, () => stat(path)).pipe(
@@ -231,6 +281,24 @@ const baseStart = (top: string, env: Environment) =>
   })
 
 /**
+ * True when the `.holyagent` folder of the work tree at `top` or of any listed work tree holds
+ * anything besides the project's config.
+ */
+const holdsRecords = (top: string, listed: ReadonlyArray<Listed>) =>
+  Effect.gen(function* () {
+    for (const entry of [
+      top,
+      ...listed.filter((tree) => !tree.prunable).map((tree) => tree.path),
+    ]) {
+      const folder = join(entry, STATE_DIRECTORY)
+      if (!(yield* isDirectory(folder))) continue
+      const names = yield* io(folder, () => readdir(folder))
+      if (names.some((name) => name !== CONFIG_FILE)) return true
+    }
+    return false
+  })
+
+/**
  * True when the clone keeps state: a state branch, its remote copy or a state folder in any of its
  * work trees.
  */
@@ -241,17 +309,7 @@ const keepsState = (top: string, env: Environment, branch: string, listed: Reado
       (yield* refExists(top, env, `refs/remotes/origin/${branch}`))
     )
       return true
-    for (const entry of [
-      top,
-      ...listed.filter((tree) => !tree.prunable).map((tree) => tree.path),
-    ]) {
-      const folder = join(entry, STATE_DIRECTORY)
-      if (!(yield* isDirectory(folder))) continue
-      // The config file is the project's settings, not state.
-      const names = yield* io(folder, () => readdir(folder))
-      if (names.some((name) => name !== CONFIG_FILE)) return true
-    }
-    return false
+    return yield* holdsRecords(top, listed)
   })
 
 /** The folder of a branch's state worktree: the branch name as a readable slug and a hash of it. */
@@ -318,6 +376,8 @@ const ensureWorktree = (
         return { kind: "ready", path: again, created: false } satisfies Ensured
       }
       if (!options.make) return { kind: "absent" } satisfies Ensured
+      // A mode change made while this command waited for the lock leaves no state branch to make.
+      if ((yield* stateModeOf(top, env)) !== "branch") return { kind: "deferred" } satisfies Ensured
       yield* git(top, env, ["worktree", "prune"])
       yield* requireFree(yield* listWorktrees(top, env), path, branch)
       const add = [...BOOKKEEPING, "worktree", "add", "-q"]
@@ -613,9 +673,10 @@ const migrateWorkTree = (
 
 /**
  * Commits what changed under `.holyagent/` of the state worktree on the state branch, with the
- * identity git has for the repository, and returns whether a commit was made. Nothing happens when
- * the folder is not in a worktree on the state branch (outside git, or on another branch), or when
- * nothing changed. Call it under the state lock.
+ * identity git has for the repository, and returns whether a commit was made. Nothing happens in
+ * the `work` and `local` modes (the work commit or nobody carries the state), when the folder is
+ * not in a worktree on the state branch (outside git, or on another branch), or when nothing
+ * changed. Call it under the state lock.
  */
 export const commitState = (directory: string, env: Environment, message: string) =>
   Effect.gen(function* () {
@@ -628,6 +689,7 @@ export const commitState = (directory: string, env: Environment, message: string
       io(worktree, () => realpath(fromGitPath(top.stdout.trim()))),
     ]).pipe(Effect.map(([a, b]) => a === b))
     if (!own) return false
+    if ((yield* stateModeOf(worktree, env)) !== "branch") return false
     // Only a worktree on the state branch takes the commit, wherever it is: the one under the git
     // directory can have been switched, and a commit there would land on the wrong branch.
     const current = yield* git(worktree, env, ["symbolic-ref", "--short", "-q", "HEAD"])
@@ -649,17 +711,8 @@ export const commitState = (directory: string, env: Environment, message: string
     return true
   })
 
-/**
- * Finds the state a command works on. Inside a repository that is the `.holyagent` folder of the
- * state worktree, the same from the main checkout and from any linked worktree on any branch; it is
- * made (see {@link Ensure}) from `origin/<branch>` when that exists, else from the base branch
- * head, and the state found in a work tree is moved into it once. Outside a repository, without
- * git, or while the base branch has no commit to start from, the state is the `.holyagent` folder
- * of the work tree, and moves into the state worktree as soon as that can be made. A worktree at
- * the state folder that is on another branch is reported, never used. Any other git failure is
- * reported, so state is not silently written somewhere else.
- */
-export const resolveState = (cwd: string, env: Environment, ensure: Ensure) =>
+/** The top-level folder and git directory of the repository `cwd` is in; undefined outside one. */
+const locate = (cwd: string, env: Environment) =>
   Effect.gen(function* () {
     const located = yield* git(cwd, env, [
       "rev-parse",
@@ -669,8 +722,7 @@ export const resolveState = (cwd: string, env: Environment, ensure: Ensure) =>
     ])
     if (located.code !== 0) {
       const complaint = located.stderr.trim()
-      if (NOT_A_REPOSITORY.test(complaint))
-        return { root: cwd, directory: join(cwd, STATE_DIRECTORY) } satisfies StateTree
+      if (NOT_A_REPOSITORY.test(complaint)) return undefined
       return yield* new StateIo({ path: cwd, cause: `git: ${complaint}` })
     }
     // Git prints `/`-separated paths even on Windows (`C:/repo`); the rest of this file compares
@@ -679,6 +731,32 @@ export const resolveState = (cwd: string, env: Environment, ensure: Ensure) =>
       .trim()
       .split("\n")
       .map((path) => fromGitPath(path))
+    return { top, common }
+  })
+
+/**
+ * Finds the state a command works on. Inside a repository in the default `branch` mode that is the
+ * `.holyagent` folder of the state worktree, the same from the main checkout and from any linked
+ * worktree on any branch; it is made (see {@link Ensure}) from `origin/<branch>` when that exists,
+ * else from the base branch head, and the state found in a work tree is moved into it once. In the
+ * `work` and `local` modes it is the `.holyagent` folder of the work tree (`local` also keeps it
+ * out of git through the clone's exclude file). Outside a repository, without git, or while the
+ * base branch has no commit to start from, the state is the `.holyagent` folder of the work tree,
+ * and in `branch` mode moves into the state worktree as soon as that can be made. A worktree at the
+ * state folder that is on another branch is reported, never used. Any other git failure is
+ * reported, so state is not silently written somewhere else.
+ */
+export const resolveState = (cwd: string, env: Environment, ensure: Ensure) =>
+  Effect.gen(function* () {
+    const repository = yield* locate(cwd, env)
+    if (repository === undefined)
+      return { root: cwd, directory: join(cwd, STATE_DIRECTORY) } satisfies StateTree
+    const { top, common } = repository
+    const mode = yield* stateModeOf(top, env)
+    if (mode !== "branch") {
+      if (mode === "local" && ensure !== "peek") yield* setExcluded(top, env, true)
+      return { root: top, directory: join(top, STATE_DIRECTORY) } satisfies StateTree
+    }
     const branch = yield* stateBranch(top, env)
     const listed = yield* listWorktrees(top, env)
     const found = yield* checkedOut(listed, branch)
@@ -728,4 +806,88 @@ export const resolveState = (cwd: string, env: Environment, ensure: Ensure) =>
           )
     }
     return { root: top, directory } satisfies StateTree
+  })
+
+/** The state mode of a clone and where its state lives. */
+export interface StateModeView {
+  readonly mode: StateMode
+  /** True when git config names the mode, false when it is the default. */
+  readonly configured: boolean
+  /** The `.holyagent` folder the commands use in this mode. */
+  readonly directory: string
+}
+
+const requireRepository = (cwd: string, env: Environment) =>
+  locate(cwd, env).pipe(
+    Effect.flatMap((repository) =>
+      repository === undefined
+        ? Effect.fail(
+            new StateIo({
+              path: cwd,
+              cause:
+                "not a git repository; the state modes apply inside one, and outside it the state is the .holyagent folder of the project",
+            }),
+          )
+        : Effect.succeed(repository),
+    ),
+  )
+
+/** Reads the state mode of the clone `cwd` is in and the state folder it gives. */
+export const readStateMode = (cwd: string, env: Environment) =>
+  Effect.gen(function* () {
+    const { top } = yield* requireRepository(cwd, env)
+    const configured = yield* gitSucceeds(top, env, ["config", "--get", STATE_MODE_KEY])
+    const mode = yield* stateModeOf(top, env)
+    const { directory } = yield* resolveState(cwd, env, "peek")
+    return { mode, configured, directory } satisfies StateModeView
+  })
+
+/**
+ * Sets the state mode in the clone's git config, holding the worktree lock that creating the state
+ * branch also holds, so a branch is not made between the checks and the write. The records are
+ * never moved or deleted: a change away from `branch` is refused once the state branch exists, and
+ * one onto it while any work tree's `.holyagent/` holds records, since the new mode would not look
+ * where the records are; `local` is refused while git tracks state in `.holyagent/` (its config
+ * file is settings), which an exclude entry cannot hide. Setting `local` adds the exclude entry
+ * before the mode, so the records are never exposed to git, and any other mode removes it after.
+ */
+export const setStateMode = (cwd: string, env: Environment, mode: StateMode) =>
+  Effect.gen(function* () {
+    const { top, common } = yield* requireRepository(cwd, env)
+    return yield* withFileLock(
+      join(common, "holyagent", "worktree.lock"),
+      Effect.gen(function* () {
+        const previous = yield* stateModeOf(top, env)
+        if (previous === "branch" && mode !== "branch") {
+          const branch = yield* stateBranch(top, env)
+          if (
+            (yield* refExists(top, env, `refs/heads/${branch}`)) ||
+            (yield* refExists(top, env, `refs/remotes/origin/${branch}`))
+          )
+            return yield* new StateModeRefused({
+              reason: `this clone already has the ${branch} branch, and its records are not moved into the work tree`,
+            })
+        }
+        if (
+          previous !== "branch" &&
+          mode === "branch" &&
+          (yield* holdsRecords(top, yield* listWorktrees(top, env)))
+        )
+          return yield* new StateModeRefused({
+            reason: `${STATE_DIRECTORY}/ of a work tree already holds records, and they are not moved onto the state branch`,
+          })
+        if (
+          mode === "local" &&
+          (yield* gitText(top, env, ["ls-files", "--", ...TRACKED_STATE_PATHSPEC])) !== ""
+        )
+          return yield* new StateModeRefused({
+            reason: `git tracks state in ${STATE_DIRECTORY}/, which an exclude entry cannot hide; use the work mode`,
+          })
+        if (mode === "local") yield* setExcluded(top, env, true)
+        yield* gitText(top, env, ["config", "--local", STATE_MODE_KEY, mode])
+        if (mode !== "local") yield* setExcluded(top, env, false)
+        return { previous, mode }
+      }),
+      "long",
+    )
   })

@@ -240,6 +240,7 @@ describe("migrating .holyclaude", () => {
       reloaded: { intents: 3, assignments: 5 },
     })
     expect(String(result["next"])).toContain("delete")
+    expect(String(result["next"])).toContain("state mode")
 
     const intents = data(await cli(["intent", "list"]))["intents"] as Array<{ id: string }>
     expect(intents.map((row) => row.id).toSorted()).toEqual(

@@ -6,6 +6,19 @@ import { recordName } from "../domain/slug.ts"
 /** The versioned state folder at the project root. */
 export const STATE_DIRECTORY = ".holyagent"
 
+/** The project's settings in the state folder: not state, so tracking them says nothing about it. */
+export const CONFIG_FILE = "config.json"
+
+/**
+ * Pathspec of the state folder without the project's settings: what git tracking makes
+ * `.holyagent/` tracked state. Pass it after `--` to `git ls-files` or `git status`, without
+ * literal pathspecs.
+ */
+export const TRACKED_STATE_PATHSPEC: ReadonlyArray<string> = [
+  STATE_DIRECTORY,
+  `:(exclude)${STATE_DIRECTORY}/${CONFIG_FILE}`,
+]
+
 /** The state folder of a project. */
 export const stateDirectory = (root: string): string => join(root, STATE_DIRECTORY)
 

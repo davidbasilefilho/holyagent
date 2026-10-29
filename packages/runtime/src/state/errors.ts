@@ -31,3 +31,13 @@ export class StateLocked extends Data.TaggedError("StateLocked")<{
     return `State is locked by another process. If none is running, delete ${this.lockFile}`
   }
 }
+
+/** The state mode cannot change now: the records would be left where the new mode does not look. */
+export class StateModeRefused extends Data.TaggedError("StateModeRefused")<{
+  readonly reason: string
+}> {
+  /** The description shown to the user. */
+  override get message() {
+    return `The state mode stays as it is: ${this.reason}`
+  }
+}
