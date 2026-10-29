@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mvtuypsw-8ne5",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 2,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-conflict-resolution-of-main",
+  "objective": "Review the conflict resolution of main (via fix/state-off-main) merged into feat/plugin-only-install for lost behavior and regressions.",
+  "state": "Ready",
+  "scope": [
+    "The merge is resolved and staged but not committed in the worktree /home/user/holyagent-plugin-only-install (commit hook blocked on a missing tool). Review `git diff --cached` there against each parent: HEAD (fd6c9f6, PR 37 'install with plugin commands only', which moves setup and doctor from packages/cli into packages/runtime/src/setup) and MERGE_HEAD (f837317, main through 7d8c8bc: PRs 38-45). Focus on the 23 files that conflicted and on the ported code: packages/runtime/src/setup/{leftovers,steps,doctor,check,environment,json-file,shell}.ts, packages/runtime/src/cli/{setup,hook,commands}.ts, the new packages/runtime/tests/setup-leftovers.test.ts and edited setup tests, install/*.sh/.ps1, packages/integrations/claude/src/setup-command.md, and docs. The resolver's notes: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-integ.txt.",
+    "Check: every behavior main added (Billion Context removal and leftover cleanup #40/#45, root-rules hook #38, state mode commands #41/#42) survives in PR 37's structure; PR 37's behavior is kept; ported code follows the repo rules in .claude/CLAUDE.md (Effect for effects and tagged errors, no try/catch or async functions in runtime source, Schema at boundaries, Bun APIs, JSDoc on exports); tests still assert main's behavior; docs describe the merged behavior.",
+    "Built-in /code-review cannot see an uncommitted merge; review the staged diff directly. Gates: mise is unavailable; the canary Bun at /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/canary/x/bun-linux-x64/bun can run `test`, `check --no-script`, `lint --no-script` in that worktree if you need to confirm a finding."
+  ],
+  "constraints": [
+    "Read-only: no edits, no git writes, no edits under .git/ or .holyagent/.",
+    "Report each finding as blocking or non-blocking with file:line and a concrete failure scenario; stop and report when the review is done."
+  ],
+  "criteria": [
+    {
+      "text": "Every conflicted file and ported module is reviewed against both parents with findings marked blocking or non-blocking",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Lost behavior from either side is identified or ruled out with evidence",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "files-reviewed",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvtu5m88-e7o5"
+  ],
+  "createdAt": "2026-10-29T18:09:49.856Z"
+}
