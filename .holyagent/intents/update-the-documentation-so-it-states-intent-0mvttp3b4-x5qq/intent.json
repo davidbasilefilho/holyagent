@@ -6,10 +6,12 @@
     "User: Windows support was tested by the maintainer; remove the claims that it is untested.",
     "User: document that switching the root to Sonnet is all it takes, for those who want it.",
     "User: it must cover more use cases within software development, not only multi-PR projects.",
-    "Default (not asked): the change is documentation only (README, docs/); no behavior change to the root or runtime.",
-    "README keeps exactly its six sections in order (AGENTS.md); detail goes in docs/ and the README links to it."
+    "Default (not asked): the docs change is documentation only (README, docs/).",
+    "README keeps exactly its six sections in order (AGENTS.md); detail goes in docs/ and the README links to it.",
+    "User decision: this repository is the maintainer's and its convention is stacked PRs. The docs PR stacks on top of the open stack (PR 35 -> 36 -> 37, head feat/plugin-only-install).",
+    "User decision: fix the holyagent stack rule in a separate PR, stacked on the docs PR: new work stacks on the top of the open stack in the repository, and branches from the base only when the repository asks for independent PRs; the rule that work outside the delivery branches from the base is wrong."
   ],
-  "revision": 1,
+  "revision": 2,
   "state": "Open",
   "createdAt": "2026-10-29T17:34:21.186Z"
 }
