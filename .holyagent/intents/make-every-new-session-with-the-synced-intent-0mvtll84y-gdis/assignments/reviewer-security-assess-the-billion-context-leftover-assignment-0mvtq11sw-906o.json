@@ -1,0 +1,37 @@
+{
+  "id": "assignment-0mvtq11sw-906o",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.security",
+  "slug": "assess-the-billion-context-leftover",
+  "objective": "Assess the Billion Context leftover cleanup and the CI change for security issues: edits to the user's ~/.claude files, commands it runs, and the new CI job (privileged surface).",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-setup-cleanup; review commit 1cf5225 (eaed3fd..1cf5225); diff: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/rv-C.diff.",
+    "Writer report /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-c24j.txt."
+  ],
+  "constraints": [
+    "Read-only: write no files and make no version-control writes."
+  ],
+  "criteria": [
+    {
+      "text": "Each finding traces a source to a sink with file:line and a fix, or the absence of findings is stated",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources-read"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvtpczuk-c24j"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T15:51:40.640Z"
+  },
+  "createdAt": "2026-10-29T15:51:40.640Z"
+}
