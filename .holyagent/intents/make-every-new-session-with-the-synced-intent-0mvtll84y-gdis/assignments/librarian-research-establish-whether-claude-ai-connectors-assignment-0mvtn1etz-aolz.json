@@ -1,0 +1,32 @@
+{
+  "id": "assignment-0mvtn1etz-aolz",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 1,
+  "roleTask": "Librarian.research",
+  "slug": "establish-whether-claude-ai-connectors",
+  "objective": "Establish whether claude.ai connectors (such as the Exa connector) are usable in Claude Code outside claude.ai (local CLI, desktop, IDE), under which login and settings, and what MCP tool names they get there.",
+  "state": "Ready",
+  "scope": [
+    "Context: holyagent currently depends on the exa@claude-plugins-official plugin (hosted MCP at https://mcp.exa.ai/mcp) and denies the built-in WebSearch and WebFetch so web work goes through Exa. The plan is to drop the plugin and rely on the user's claude.ai Exa connector. In this claude.ai cloud session the connector tools are named mcp__Exa__web_search_exa and mcp__Exa__web_fetch_exa.",
+    "Questions: (1) Does Claude Code CLI/desktop load claude.ai connectors, and only with a claude.ai subscription login (not API key, Bedrock, Vertex)? Which setting or env var turns it on or off (for example ENABLE_CLAUDEAI_MCP_SERVERS)? (2) What tool-name prefix do those connectors get in the local CLI versus cloud sessions? (3) With no connector available, what web tools remain if WebSearch and WebFetch are denied? (4) Can Exa's hosted MCP be added without the plugin (claude mcp add) and does it work without OAuth?",
+    "Use official Anthropic docs (code.claude.com/docs, docs.claude.com, support.claude.com) and Exa's docs; look facts up even if they seem known, since they change often."
+  ],
+  "constraints": [
+    "Read-only: write no files.",
+    "Separate sourced facts (with URL and date) from inference."
+  ],
+  "criteria": [
+    {
+      "text": "Each of the four questions is answered with a cited source or stated as unverified",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources-read"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-10-29T14:27:58.680Z"
+}
