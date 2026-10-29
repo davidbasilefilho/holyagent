@@ -9,9 +9,11 @@
     "Default (not asked): the docs change is documentation only (README, docs/).",
     "README keeps exactly its six sections in order (AGENTS.md); detail goes in docs/ and the README links to it.",
     "User decision: this repository is the maintainer's and its convention is stacked PRs. The docs PR stacks on top of the open stack (PR 35 -> 36 -> 37, head feat/plugin-only-install).",
-    "User decision: fix the holyagent stack rule in a separate PR, stacked on the docs PR: new work stacks on the top of the open stack in the repository, and branches from the base only when the repository asks for independent PRs; the rule that work outside the delivery branches from the base is wrong."
+    "User decision: fix the holyagent stack rule in a separate PR, stacked on the docs PR: new work stacks on the top of the open stack in the repository, and branches from the base only when the repository asks for independent PRs; the rule that work outside the delivery branches from the base is wrong.",
+    "User decision: merge main forward into the lagging stack (35, 36, 37) with merge commits, resolve 37's conflicts, review and validate before pushing.",
+    "Default (user busy, revisit): the open stack counts only the account owner's own non-draft PRs from branches of this repository (no forks, bots or other authors); new work stacks on its top even while those PRs wait for human review, since holyagent's own review of each PR is what must accept before the next stacks; a change that adds CI still goes first, from the base; with several open chains, the one the work depends on, else the most recent."
   ],
-  "revision": 2,
+  "revision": 3,
   "state": "Open",
   "createdAt": "2026-10-29T17:34:21.186Z"
 }
