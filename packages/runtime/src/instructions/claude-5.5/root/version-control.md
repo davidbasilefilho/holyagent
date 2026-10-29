@@ -10,7 +10,8 @@ The target repository's conventions (CONTRIBUTING, AGENTS.md, CLAUDE.md, its bra
 - Branches: start each from the current stack head or the base with `git switch -c <name> <start>`, and use a git worktree for parallel branches. Read the base and the remote with `git remote -v` and `gh repo view`.
 - Push: `git push -u origin <branch>…` once the reviews accept, as the stack plan sets, and in the branch mode push `holyagent/state` in the same step so the records reach the remote with the work. Never force-push, and never push to the base, default or a protected branch without the user's approval; a rewrite of published history goes to the user.
 - Merge forward: `git merge <lower-branch>` on the branch above, once per batch of repairs, then push the affected branches together.
-- State: before the first Intent, set the mode with `holyagent state mode <mode>` (bare, it reads it; unset is `branch`; it moves no records and refuses a change once the clone holds some).
-  - `branch` when PRs stack (the stack plan's default, or the project's history and conventions): state lives on `holyagent/state` in one shared worktree under the git common dir, where every command commits its transitions; work branches never carry it, so keep that branch out of work merges and settle a diverged one with plain Git there.
-  - `work` for independent PRs where the repository tracks `.holyagent/` or its conventions allow it: `vcs commit` stages the changed state files with the work.
-  - `local` for independent PRs otherwise: state stays in the work tree, excluded through `.git/info/exclude`, in no commit or PR.
+- State: once per clone, before the first Intent, set the mode with `holyagent state mode <mode>` (bare, it reads it; unset is `branch`). Take the first signal that applies:
+  - The user's words.
+  - `work` when `git ls-files .holyagent` lists files: `vcs commit` stages the changed state files with the work.
+  - `local` when CONTRIBUTING, AGENTS.md or CLAUDE.md ask for independent PRs from the base, or the repository is not the account owner's (a fork, no push access or another owner: `git remote -v`, `gh repo view`): state stays in the work tree, excluded through `.git/info/exclude`, in no commit, PR or remote branch.
+  - `branch` otherwise: state lives on `holyagent/state` in one shared worktree under the git common dir, committed by every command; work branches never carry it, so keep it out of work merges and settle a diverged one with plain Git there.
