@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mvtvrepm-n8vt",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-the-documentation-change-windows",
+  "objective": "Review the documentation change (Windows tested by the maintainer, running the root on Sonnet, broader use cases) for correctness and completeness.",
+  "state": "Ready",
+  "scope": [
+    "Diff: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/docs-v2.diff (relative to the merged PR 37 docs; files in /home/user/holyagent-docs: README.md, docs/usage.md, docs/requirements.md, docs/hooks.md). The surrounding merged text is in /home/user/holyagent-docs.",
+    "Requirements: native Windows reads as tested by the maintainer, with no remaining 'untested/not verified' claim in README.md or docs/ outside docs/pi/; a 'Run the root on Sonnet' section in docs/usage.md says the root runs on Opus by default, that setting env ANTHROPIC_DEFAULT_OPUS_MODEL to a Sonnet model id in ~/.claude/settings.json or .claude/settings.local.json is all it takes, the variable's global effect, specialists unchanged, /status to check, source https://code.claude.com/docs/en/model-config; a 'What it fits' section covers small fixes through stacked deliveries, codebase questions, debugging, reviews, refactors, UI work, docs/config, and solo or coursework repositories, each grounded in documented behavior (check claims against the agent files under packages/integrations/claude/dist/agents and docs/decisions.md); README keeps exactly # HolyAgent, ## How do I install it?, ## Why HolyAgent?, ## Development, ## Special thanks, ## License and links both sections; plain calm English matching the docs.",
+    "Note: the claim that ANTHROPIC_DEFAULT_OPUS_MODEL remaps the alias used in agent frontmatter is documented for aliases in general, not verified for frontmatter; flag wording that overstates it."
+  ],
+  "constraints": [
+    "Read-only. Findings blocking or non-blocking with file:line; stop and report when done."
+  ],
+  "criteria": [
+    {
+      "text": "Every requirement is judged met or not with file:line evidence",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No claim in the new text contradicts the repository's documented behavior",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvtvmzcb-3nhs"
+  ],
+  "createdAt": "2026-10-29T18:32:08.507Z"
+}
