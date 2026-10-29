@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "apply-two-exact-wording-fixes-in-home",
   "objective": "Apply two exact wording fixes in /home/user/holyagent-docs.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "In docs/usage.md line 14, replace the sentence 'Without a stated mode, an owned repository gets `branch` mode, with its `holyagent/state` branch.' with 'Without a stated mode, the root follows the order under [User settings](#user-settings): an owned repository with no tracked state and no independent-PR convention gets `branch` mode, with its `holyagent/state` branch.'",
     "In install/windows-install.ps1 line 23, replace '# Tested by the maintainer on a Windows machine; what it covers and what it does not: see docs/requirements.md.' with '# Tested by the maintainer on a Windows machine; see docs/requirements.md.'",
@@ -38,5 +38,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mvtvwy72-aspo",
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-29T18:42:22.287Z"
+  },
   "createdAt": "2026-10-29T18:42:21.066Z"
 }
