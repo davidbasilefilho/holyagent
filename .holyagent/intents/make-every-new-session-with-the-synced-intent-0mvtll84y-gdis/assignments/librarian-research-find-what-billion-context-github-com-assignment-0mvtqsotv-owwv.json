@@ -1,0 +1,35 @@
+{
+  "id": "assignment-0mvtqsotv-owwv",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 5,
+  "roleTask": "Librarian.research",
+  "slug": "find-what-billion-context-github-com",
+  "objective": "Find what Billion Context (github.com/ranxianglei/billion-context) writes into ~/.claude when 'bili plugin install claude' runs: the exact content or a distinctive line of commands/acp-cache.md, the hook it adds (claude-native-bootstrap) and its command, the MCP server entry, and the settings env keys.",
+  "state": "Running",
+  "scope": [
+    "Read the project's source and docs on GitHub (repository ranxianglei/billion-context, its npm package billion-context) with the available web tools; quote exact strings with file paths and commit or version.",
+    "Use: holyagent setup claude removes these leftovers and must match only what Billion Context wrote; it currently guesses a marker for acp-cache.md from the words billion-context, bili or claude-native-bootstrap."
+  ],
+  "constraints": [
+    "Read-only: write no files."
+  ],
+  "criteria": [
+    {
+      "text": "Each of the four items is quoted from a cited source with path and version, or stated as not found",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources-read"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-10-29T16:13:10.195Z"
+  },
+  "createdAt": "2026-10-29T16:13:10.195Z"
+}
