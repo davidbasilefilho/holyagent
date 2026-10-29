@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "bring-two-docs-usage-md-sentences-in",
   "objective": "Bring two docs/usage.md sentences in line with the last code changes.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-setup-cleanup (head 042e8a9). File docs/usage.md only.",
     "1) Where it says a short-shaped first path segment is accepted only if it is a real entry of the work tree, add that a name still in HEAD's tree (for example a folder whose removal is staged) also counts.",
@@ -37,7 +37,9 @@
     "agentId": "workflow:wf_5f2ed4a2-419/assignment-0mvts41gs-aej5",
     "model": "haiku",
     "effort": "high",
-    "startedAt": "2026-10-29T16:49:59.404Z"
+    "startedAt": "2026-10-29T16:49:59.404Z",
+    "finishedAt": "2026-10-29T16:52:16.282Z"
   },
+  "result": "result: Both docs/usage.md sentences are updated as specified, and `mise run verify` exits 0 in the worktree.\nchanged: docs/usage.md\nchecks: `mise run verify` (in /home/user/holyagent-setup-cleanup) -> exit 0. bun test: 949 pass, 1 skip, 0 fail, 950 tests across 33 files. check: no type errors in 119 files. lint: no problems in 120 files. fmt:check: all 235 files formatted.\nblockers: none\nquestions: none\nnotes: none. Only the two sentences changed. The diff contains two hunks: the Windows 8.3 name sentence (line 73) and the project-scope plugin uninstall sentence (line 31). Each gained the requested clause, and nothing else in the file moved.\nevidence:\nBoth sentences are updated as described and mise run verify passes: `mise run verify` in /home/user/holyagent-setup-cleanup -> exit 0 (lint, fmt:check, check and bun test all passed; 949 pass, 0 fail). Diff at /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/usage-md.diff\nchanged-paths: docs/usage.md (`git status --short` shows only ` M docs/usage.md`); diff saved to /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/usage-md.diff\nchecks-run: `mise run verify` -> exit 0, counts as above",
   "createdAt": "2026-10-29T16:49:59.404Z"
 }
