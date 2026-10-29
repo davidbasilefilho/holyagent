@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mvtq10xb-qq7y",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-state-exclude-file-and-commit",
+  "objective": "Review the state exclude-file and commit-scope edge-case fixes for correctness and regressions.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-state-edges (head e185f22, which merges the instruction branch); review commit 32b1d25 (eaed3fd..32b1d25); diff without the generated dist: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/rv-B.diff.",
+    "User (verbatim): \"não deve ter nada pendente / outra coisa: arrume esse comportamento, o que ficar pendente que o agente pode resolver deve ser resolvido\".",
+    "The fixes answer the earlier re-review notes in /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-yjjl.txt and /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-9sjn.txt; writer report /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-1i5u.txt.",
+    "Run mise run verify on the worktree head."
+  ],
+  "constraints": [
+    "Read-only: write no files and make no version-control writes."
+  ],
+  "criteria": [
+    {
+      "text": "Findings are ranked blocking or non-blocking with file, line and fix, or their absence is stated, with mise run verify run on the head",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvtpddfi-1i5u"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T15:51:39.504Z"
+  },
+  "createdAt": "2026-10-29T15:51:39.504Z"
+}
