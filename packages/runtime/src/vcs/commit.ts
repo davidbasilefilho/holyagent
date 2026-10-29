@@ -32,8 +32,15 @@ export interface Committed {
   readonly files: number
 }
 
-const inScope = (scope: ReadonlyArray<string>, path: string) =>
-  scope.some((entry) => path === entry || path.startsWith(`${entry}/`))
+/** True when the git path is a scope entry or inside it; folds case where the file system does. */
+const inScope = (scope: ReadonlyArray<string>, path: string, ignoreCase: boolean) => {
+  const fold = (text: string) => (ignoreCase ? text.toLowerCase() : text)
+  const candidate = fold(path)
+  return scope.some((entry) => {
+    const folded = fold(entry)
+    return candidate === folded || candidate.startsWith(`${folded}/`)
+  })
+}
 
 /** Refuses to commit as an agent: the identity git would use must be the user's own. */
 const requireOwnIdentity = Effect.gen(function* () {
@@ -63,18 +70,23 @@ const stagedPaths = git(["diff", "--cached", "--name-only", "--no-renames", "-z"
 )
 
 /**
- * True when the git path is the state folder or inside it. Where the file system ignores case
- * (`core.ignorecase`) `.HolyAgent` is the same folder, so the match folds case there and only
- * there.
+ * True when the git path is the state folder or inside it, in any letter case when `foldCase` is
+ * set: on a file system that ignores case `.HolyAgent` is the same folder, and `core.ignorecase`
+ * does not always say so (a clone copied from another system keeps its value).
  */
-const inStateFolder = (path: string, ignoreCase: boolean) => {
-  const folded = ignoreCase ? path.toLowerCase() : path
+const inStateFolder = (path: string, foldCase: boolean) => {
+  const folded = foldCase ? path.toLowerCase() : path
   return folded === STATE_DIRECTORY || folded.startsWith(`${STATE_DIRECTORY}/`)
 }
 
-/** True when the git path is the project's settings file in the state folder. */
-const isConfigFile = (path: string, ignoreCase: boolean) =>
-  (ignoreCase ? path.toLowerCase() : path) === `${STATE_DIRECTORY}/${CONFIG_FILE}`
+/** True when the git path is the project's settings file in the state folder, in any case. */
+const isConfigFile = (path: string) => path.toLowerCase() === `${STATE_DIRECTORY}/${CONFIG_FILE}`
+
+/**
+ * True when the first segment is the NTFS 8.3 short name of the state folder (`HOLYAG~1`), which
+ * Windows resolves to `.holyagent`, so it would name the state folder past the checks by name.
+ */
+const isShortStateName = (path: string) => /^holyag~\d+$/i.test(path.split("/")[0] ?? "")
 
 /** True when `core.ignorecase` is on: the file system treats names that differ in case as one. */
 const ignoresCase = gitMaybe(["config", "--type=bool", "--get", "core.ignorecase"]).pipe(
@@ -87,8 +99,10 @@ const ignoresCase = gitMaybe(["config", "--type=bool", "--get", "core.ignorecase
  * state mode keeps it out of work commits (every mode but `work`). A path written with the
  * platform's separator (`src\a.ts` on Windows) names the same file as git's `src/a.ts`, so it is
  * converted before the checks. The separator is a parameter so a test can stand in for Windows.
- * Where the file system ignores case (`ignoreCase`) a path in the state folder is matched whatever
- * its case, and one that is allowed (the `work` mode) comes back in the folder's own case.
+ * Outside the `work` mode the state folder is refused in any letter case, since a file system that
+ * ignores case may not say so in `core.ignorecase`; in the `work` mode a path is matched whatever
+ * its case only where the file system ignores case (`ignoreCase`) and comes back in the folder's
+ * own case. The short name of the state folder (`HOLYAG~1`) is refused in every mode.
  */
 export const commitScope = (
   paths: ReadonlyArray<string>,
@@ -106,7 +120,14 @@ export const commitScope = (
           hint: "Name files or folders relative to the project root.",
         }),
       )
-    if (!inStateFolder(clean, ignoreCase)) return Effect.succeed(clean)
+    if (isShortStateName(clean))
+      return Effect.fail(
+        new Usage({
+          message: `Invalid path "${path}": it is the short name of the ${STATE_DIRECTORY} folder`,
+          hint: "Name the state folder as .holyagent, or leave Intent state out of `vcs commit`.",
+        }),
+      )
+    if (!inStateFolder(clean, ignoreCase || mode !== "work")) return Effect.succeed(clean)
     if (mode === "work")
       return Effect.succeed(`${STATE_DIRECTORY}${clean.slice(STATE_DIRECTORY.length)}`)
     // On the state branch a work branch that carried the state could conflict with it when the two
@@ -166,15 +187,13 @@ const changedState = Effect.gen(function* () {
  * out once git tracks them (or once they were added by force). A commit that stages none of them is
  * not affected by state git tracks. The project's settings are not state.
  */
-const requireNoStagedState = (staged: ReadonlyArray<string>, ignoreCase: boolean) => {
-  const state = staged.filter(
-    (path) => inStateFolder(path, ignoreCase) && !isConfigFile(path, ignoreCase),
-  )
+const requireNoStagedState = (staged: ReadonlyArray<string>) => {
+  const state = staged.filter((path) => inStateFolder(path, true) && !isConfigFile(path))
   return state.length === 0
     ? Effect.void
     : Effect.fail(
         new Usage({
-          message: `git tracks files under ${STATE_DIRECTORY}/ that are staged (${state.join(", ")}), which state mode local cannot keep out of a commit`,
+          message: `files under ${STATE_DIRECTORY}/ are staged (${state.join(", ")}), which state mode local cannot keep out of a commit`,
           hint: "Unstage them with `git restore --staged`, switch to the work mode with `holyagent state mode work`, or untrack the files.",
         }),
       )
@@ -204,8 +223,8 @@ export const commit = (request: CommitRequest) =>
         : named
 
     const alreadyStaged = yield* stagedPaths
-    if (mode === "local") yield* requireNoStagedState(alreadyStaged, ignoreCase)
-    const outside = alreadyStaged.filter((path) => !inScope(scope, path))
+    if (mode === "local") yield* requireNoStagedState(alreadyStaged)
+    const outside = alreadyStaged.filter((path) => !inScope(scope, path, ignoreCase))
     if (outside.length > 0) return yield* new StagedOutsideScope({ paths: outside })
 
     yield* gitPaths(["add", "-A"], scope)

@@ -12,7 +12,7 @@ The target repository's conventions (CONTRIBUTING, AGENTS.md, CLAUDE.md, its bra
 - Merge forward: `git merge <lower-branch>` on the branch above, once per batch of repairs, then push the affected branches together.
 - State: once per clone, before the first Intent, set the mode with `holyagent state mode <mode>` (bare, it reads it; unset is `branch`). Take the first signal that applies:
   - The user's words.
-  - `local` when the repository is not the account owner's (a fork, no push access or another owner: `git remote -v`, `gh repo view`): state stays in the work tree, excluded through `.git/info/exclude`, in no commit, PR or remote branch.
+  - `local` when the repository is not the account owner's (a fork, no push access or another owner: `git remote -v`, `gh repo view`): state stays in the work tree, excluded through `.git/info/exclude`, in no commit, PR or remote branch. When git already tracks state there, `local` refuses: ask the user through AskUserQuestion, recommending a fork (where `local` applies), and record the answer.
   - `work` when `git ls-files .holyagent ':!.holyagent/config.json'` lists files: `vcs commit` stages changed state files with the work.
   - `local`, likewise, when CONTRIBUTING, AGENTS.md or CLAUDE.md ask for independent PRs from the base.
   - `branch` otherwise: state lives on `holyagent/state` in one shared worktree, committed by every command; work branches never carry it, so keep it out of work merges and settle a diverged one with plain Git there.
