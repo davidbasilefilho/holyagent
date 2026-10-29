@@ -1,0 +1,56 @@
+{
+  "id": "assignment-0mvtqdcrc-t818",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 5,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-every-finding-of-the-code-and",
+  "objective": "Repair every finding of the code and security reviews of the Billion Context leftover cleanup commit 1cf5225.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-setup-cleanup, branch ccr-046ad103-6qsvgx-bili-cleanup at 976e6ff. Reviews: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-mvy2.txt (code findings 1-6) and /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-906o.txt (security notes).",
+    "Fix: doctor reports unreadable files instead of 'no leftovers', and readOrReport errors for installed_plugins.json and known_marketplaces.json join unreadable; uninstall a project- or local-scope plugin with --scope and the entry's projectPath as working directory; count the plugin, marketplace, enabledPlugins and extraKnownMarketplaces entries as evidence for DISABLE_AUTO_COMPACT and make docs/usage.md say which entries count; shrink the ~/.claude.json read-modify-write window (re-read and compare just before the rename, retry or skip with a printed note when it changed); isBiliCommand handles quoted paths and env or VAR= wrappers; scan projects.<path>.mcpServers.bili too; match the proxy URL exactly (origin equal to http://127.0.0.1:18787, path allowed); delete commands/acp-cache.md only when its content carries a Billion Context marker taken from the old docs or installer, else report it; print only the matched program or marker, never full command strings. Tests for each that fail without the fix."
+  ],
+  "constraints": [
+    "User (verbatim): \"não deve ter nada pendente / outra coisa: arrume esse comportamento, o que ficar pendente que o agente pode resolver deve ser resolvido\".",
+    "Follow /home/user/holyagent/.claude/CLAUDE.md and /home/user/holyagent/AGENTS.md. Do not edit .claude/CLAUDE.md or AGENTS.md.",
+    "Make no version-control writes and no edits under .git/ or .holyagent/ of the repository; tests use temp folders.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done and checked, stop and report; add no unrequested features."
+  ],
+  "criteria": [
+    {
+      "text": "Every listed finding is fixed with a test that fails without it, or named with a concrete reason",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The cleanup still removes only Billion Context leftovers and existing setup and doctor tests pass",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "mise run build leaves no diff after the change and mise run verify passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/cli",
+    "docs",
+    "README.md",
+    ".github"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvtq11sw-906o",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T16:01:14.712Z"
+  },
+  "createdAt": "2026-10-29T16:01:14.712Z"
+}
