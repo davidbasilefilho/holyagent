@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mvtq11j4-mvy2",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-billion-context-leftover",
+  "objective": "Review the Billion Context leftover cleanup in setup and doctor, the CI installer parse job and the doc fixes.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-setup-cleanup (head 976e6ff, which stacks the state and instruction branches); review commit 1cf5225 (eaed3fd..1cf5225); diff without the generated dist: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/rv-C.diff.",
+    "User (verbatim): \"não deve ter nada pendente / outra coisa: arrume esse comportamento, o que ficar pendente que o agente pode resolver deve ser resolvido\".",
+    "Writer report /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-c24j.txt (names guessed hook and server shapes and the DISABLE_AUTO_COMPACT rule). Check the removal matches only what Billion Context wrote, the plugin and marketplace removal commands, and that the pwsh ParseFile step fails on parse errors.",
+    "Run mise run verify on the worktree head."
+  ],
+  "constraints": [
+    "Read-only: write no files and make no version-control writes."
+  ],
+  "criteria": [
+    {
+      "text": "Findings are ranked blocking or non-blocking with file, line and fix, or their absence is stated, with mise run verify run on the head",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvtpczuk-c24j"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T15:51:40.289Z"
+  },
+  "createdAt": "2026-10-29T15:51:40.289Z"
+}
