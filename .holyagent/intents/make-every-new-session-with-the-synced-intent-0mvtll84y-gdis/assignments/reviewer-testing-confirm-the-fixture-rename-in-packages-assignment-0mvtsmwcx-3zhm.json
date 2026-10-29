@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.testing",
   "slug": "confirm-the-fixture-rename-in-packages",
   "objective": "Confirm the fixture rename in packages/cli/tests/leftovers.test.ts keeps every test's purpose and leaves no credential-shaped fixture.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Diff: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/fx.diff (worktree /home/user/holyagent-setup-cleanup at bc70064). Context: GitGuardian flagged TOKEN=S3CRET-style fixtures as a Generic CLI Secret; they were renamed to LABEL=hidden-value-* forms.",
     "Run bun test packages/cli/tests/leftovers.test.ts there."
@@ -32,7 +32,25 @@
     "agentId": "workflow:wf_de05deff-9a6/assignment-0mvtsmwcx-3zhm",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-10-29T17:04:39.250Z"
+    "startedAt": "2026-10-29T17:04:39.250Z",
+    "finishedAt": "2026-10-29T17:05:13.066Z"
+  },
+  "result": "result: The rename keeps each test's purpose and leaves no credential-shaped fixture. 30 tests pass on head bc70064.\nchanged: none\nchecks: `bun test packages/cli/tests/leftovers.test.ts` in /home/user/holyagent-setup-cleanup at bc70064 -> exit 0, 30 pass, 0 fail, 181 expect() calls. `git status --short` printed nothing, so the tree was clean.\nblockers: none\nquestions: none\nnotes:\n- I did not run the tests on the base, so I did not confirm that the old fixtures also passed. This is a pure rename with no behavior change, so a failing-on-base test does not apply.\n- The `not.toContain(\"hidden-value\")` assertion would fail if either fixture value leaked into the output. The test writes both `hidden-value-one` (in a hook command) and `hidden-value-three` (in `mcpServers.bili.env`), and the substring covers both.\n- The two positive assertions on `claude-native-bootstrap` and `mcpServers.bili` are unchanged, so the test still shows the entries are reported without their values.\n- In the kept-entries list, `--token x` became `--label x`. The entry stays a look-alike, because it is the same `claude-native-bootstrap.js` path with an extra argument, so it is still kept.\n- I did not check whether the repository has a secret scanner, so I did not run one.\n\nevidence:\nThe renamed tests still prove that hidden command text is not printed and that look-alike entries are kept, with the test run on the head: `bun test packages/cli/tests/leftovers.test.ts` on head bc70064 exited 0 with 30 pass and 0 fail. The diff is at /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/fx.diff. Lines 36 and 37 keep the no-leak assertion with the generic `hidden-value` substring, and the kept-entry line 10 is still a look-alike.\nchecks-run: `bun test packages/cli/tests/leftovers.test.ts` -> exit 0, 30 pass, 0 fail, 181 expect() calls. I ran no other checks (`mise run verify`, lint and type-check were not run).",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "Rename keeps purpose; tests pass on bc70064",
+    "criteria": [
+      {
+        "criterion": "The renamed tests still prove that hidden command text is not printed and that look-alike entries are kept, with the test run on the head",
+        "support": "`bun test packages/cli/tests/leftovers.test.ts` on head bc70064 exited 0 with 30 pass and 0 fail. The diff is at /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/fx.diff. Lines 36 and 37 keep the no-leak assertion with the generic `hidden-value` substring, and the kept-entry line 10 is still a look-alike."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bun test packages/cli/tests/leftovers.test.ts` -> exit 0, 30 pass, 0 fail, 181 expect() calls. I ran no other checks (`mise run verify`, lint and type-check were not run)."
+      }
+    ]
   },
   "createdAt": "2026-10-29T17:04:39.250Z"
 }
