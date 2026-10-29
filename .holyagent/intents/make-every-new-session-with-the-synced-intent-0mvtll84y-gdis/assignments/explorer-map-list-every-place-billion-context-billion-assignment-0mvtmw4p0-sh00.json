@@ -1,0 +1,35 @@
+{
+  "id": "assignment-0mvtmw4p0-sh00",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 1,
+  "roleTask": "Explorer.map",
+  "slug": "list-every-place-billion-context-billion",
+  "objective": "List every place Billion Context (billion-context, bili, acp-kernel) is referenced in the holyagent repository so it can be removed completely.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-bili at origin/main 0d84b37. Search code, generated plugin, installers (install/*.sh, install/*.ps1), docs, README, AGENTS.md, mise.toml, package.json files, tests, the setup and doctor CLI (packages/cli), instruction text and .claude settings. Exclude .git, node_modules and .holyagent records.",
+    "For each hit give file:line, what it does (plugin dependency, marketplace add, install step, doctor check, config file, docs, attribution, test), and whether removing it needs a test or doc change."
+  ],
+  "constraints": [
+    "Read-only: write no files."
+  ],
+  "criteria": [
+    {
+      "text": "Every reference is listed with file:line and its role, grouped by component",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources-read"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-10-29T14:23:52.261Z"
+  },
+  "createdAt": "2026-10-29T14:23:52.261Z"
+}
