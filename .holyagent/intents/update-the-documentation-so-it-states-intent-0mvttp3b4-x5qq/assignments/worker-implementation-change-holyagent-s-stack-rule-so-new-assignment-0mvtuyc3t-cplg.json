@@ -1,0 +1,67 @@
+{
+  "id": "assignment-0mvtuyc3t-cplg",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 2,
+  "roleTask": "Worker.implementation",
+  "slug": "change-holyagent-s-stack-rule-so-new",
+  "objective": "Change holyagent's stack rule so new work stacks on the top of the repository's open stack, after bringing the base into a stack that lags it, and branches from the base only when the repository asks for independent PRs.",
+  "state": "Ready",
+  "scope": [
+    "Work only in the worktree /home/user/holyagent-stack-rule (branch claude/intelligent-dijkstra-x7njap-stack-rule at f837317, which has main's instruction files).",
+    "Problem: the root's rules say 'Work that is not part of the delivery branches from the base' (packages/runtime/src/instructions/claude-5.5/root/stack-plan.md line 3; R-STACK in packages/runtime/src/instructions/requirements.md line 8; docs/usage.md '**Stacks.**' paragraph; docs/decisions.md line ~64). In this maintainer's repository the convention is stacked PRs, yet PRs 31-45 were all opened from main while an open stack (PR 35 -> 36, 35 -> 37) sat unmerged and fell 7 commits behind main. The maintainer decided: new work stacks on the top of the open stack, and branches from the base only when the repository's conventions ask for independent PRs.",
+    "Required behavior to state in the instructions: (a) before branching, find the open PRs of the repository (`gh pr list` / the REST API) and their bases; new work, whether part of the current delivery or not, stacks on the top of the open stack (the newest open PR head whose chain reaches the base); when several open chains exist, stack on the one the work depends on, else the most recent; (b) when the stack lags the base, first merge the base forward into the lowest stack branch and up the chain with merge commits, with a review of each merged head before any push (the existing merge-forward rule), before stacking new work; (c) branch from the base only when the repository's conventions ask for independent PRs, or when no PR is open; (d) the CI-PR-first rule and the rest of the stack plan stay as they are. Keep the rules concise and in the existing calm style; the replacement should be about the same size as the text it replaces, at most two extra sentences.",
+    "Update every place that states the old rule: stack-plan.md, requirements.md R-STACK, docs/usage.md Stacks paragraph, docs/decisions.md (the summary bullet and, if fitting, a short decision paragraph explaining why: the stack fell behind main while new work bypassed it). Search for any other copy (`holyagent rg -n -i \"branches from the base|not part of the delivery|outside the delivery\" .` excluding dist) and check other models' instruction sets under packages/runtime/src/instructions if any.",
+    "Rebuild the generated plugin so packages/integrations/claude/dist/agents/holyagent.md reflects it: mise is unavailable, so run `<bun> install --frozen-lockfile --ignore-scripts` then `<bun> scripts/vendor.ts && <bun> packages/integrations/claude/build.ts` with the canary Bun at /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/canary/x/bun-linux-x64/bun. Then run the gates' commands with it: `<bun> check --no-script`, `<bun> lint --no-script`, `<bun> fmt --no-script --check`, `<bun> test`. If a test pins instruction text (e.g. snapshot or content tests of the root prompt), update it to the new rule and say so."
+  ],
+  "constraints": [
+    "User decision: this repository's convention is stacked PRs; new work stacks on the top of the open stack, and branches from the base only when the repository asks for independent PRs.",
+    "Model-facing text in US English, imperative, calm, reason beside each rule (the repository's 'Writing instructions' rules).",
+    "Edit only inside /home/user/holyagent-stack-rule: packages/runtime/src/instructions, packages/integrations/claude/dist, .claude-plugin/marketplace.json if the build changes it, docs/usage.md (only the Stacks paragraph), docs/decisions.md, and tests that pin the changed text.",
+    "No git writes (no add, commit, checkout, stash), no edits under .git/ or .holyagent/, no other worktree.",
+    "Keep working until done; stop and report when done and checked; name unrequested ideas instead of doing them."
+  ],
+  "criteria": [
+    {
+      "text": "The root instructions, R-STACK, docs/usage.md and docs/decisions.md state the new rule: stack new work on the top of the open stack, merge the base forward first when the stack lags it, branch from the base only for independent-PR conventions or no open PR",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No remaining copy of the rule that work outside the delivery branches from the base, outside history",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The generated plugin is rebuilt and in step with the sources",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "check, lint, fmt --check and test pass with the canary Bun",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Replacement text stays about the size of what it replaces, at most two extra sentences per place",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/integrations/claude/dist",
+    "packages/runtime/tests",
+    "packages/integrations/claude/tests",
+    ".claude-plugin/marketplace.json",
+    "docs/decisions.md",
+    "docs/usage.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-10-29T18:09:32.105Z"
+}
