@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "re-review-the-repaired-stack-rule-change",
   "objective": "Re-review the repaired stack-rule change against the previous review's blocking findings.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Previous findings: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-revrule.txt (blocking 1-4). Repair report: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-rulefix.txt. Full current diff: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule-v2.diff (worktree /home/user/holyagent-stack-rule).",
     "Recorded defaults the text must state (maintainer away): only the account owner's own non-draft PRs from this repository's branches count as the open stack; new work stacks on its top even while those PRs wait for human review, since holyagent's independent review is what must accept before the next stacks; a CI change still goes first from the base; with several chains, the one the work depends on, else the most recent; a lagging stack gets the base merged forward (lowest branch first, merge commits, reviewed before push) before stacking.",
@@ -36,5 +36,10 @@
     "assignment-0mvtuyc3t-cplg"
   ],
   "followUpOf": "assignment-0mvtv8vib-ckal",
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-29T18:28:49.585Z"
+  },
   "createdAt": "2026-10-29T18:28:27.433Z"
 }
