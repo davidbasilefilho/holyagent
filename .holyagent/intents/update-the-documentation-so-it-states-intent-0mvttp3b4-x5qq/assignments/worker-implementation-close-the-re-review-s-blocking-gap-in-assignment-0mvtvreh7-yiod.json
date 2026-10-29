@@ -1,0 +1,53 @@
+{
+  "id": "assignment-0mvtvreh7-yiod",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "close-the-re-review-s-blocking-gap-in",
+  "objective": "Close the re-review's blocking gap in the stack rule and its fixable non-blocking notes, in /home/user/holyagent-stack-rule.",
+  "state": "Ready",
+  "scope": [
+    "Re-review report: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-rerev.txt (B1 blocking, plus non-blocking notes). Current diff: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule-v2.diff.",
+    "B1, settled default (maintainer away): every new PR, a new delivery's first PR included, stacks on the open stack's top; only a change that adds CI goes first from the base; the base is the target only when no open stack exists or the conventions ask for independent PRs. Make stack-plan.md line 3 say this for all new work (not 'Other work'), and line 6 'The first PR of a stack targets the base' say the first PR targets the open stack's top, or the base when there is none. Keep R-STACK (requirements.md) and decisions.md consistent.",
+    "Non-blocking notes to fix in the same pass: define or drop 'the chain'; use one term ('open stack', 'its top', 'its lowest branch') instead of 'current stack head'; drop redundant 'bots'; docs/usage.md Stacks paragraph adds the independent-review-not-human-review point in a few words; decisions.md '## Kept' bullet points to the decision paragraph rather than restating. Keep the net addition in stack-plan.md at about 60 words or less compared with the original (before this change).",
+    "Rebuild dist and run gates with the canary Bun /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/canary/x/bun-linux-x64/bun: scripts/vendor.ts, packages/integrations/claude/build.ts, check --no-script, lint --no-script, fmt --no-script --check, test. Write the full git diff to /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule-v3.diff and the diff of this repair alone (against the v2 state, e.g. by diffing the files you changed before and after) to /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule-repair3.diff."
+  ],
+  "constraints": [
+    "Model-facing text in US English, imperative, calm.",
+    "Edit only in /home/user/holyagent-stack-rule: packages/runtime/src/instructions, packages/integrations/claude/dist, docs/usage.md (Stacks paragraph), docs/decisions.md.",
+    "No git writes; no edits under .git/ or .holyagent/; no other worktree.",
+    "Keep working until done; stop and report when done and checked."
+  ],
+  "criteria": [
+    {
+      "text": "A new delivery's first PR stacks on the open stack's top, with CI-first and no-open-stack or independent-PR conventions as the only base cases, stated consistently in stack-plan.md, R-STACK and decisions.md",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "dist rebuilt; check, lint, fmt --check and test pass with the canary Bun",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The non-blocking notes listed are addressed",
+      "blocking": false,
+      "dimension": "style"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/integrations/claude/dist",
+    "docs/decisions.md",
+    "docs/usage.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvtvh24t-5kiy",
+  "createdAt": "2026-10-29T18:32:08.203Z"
+}
