@@ -1,0 +1,64 @@
+{
+  "id": "assignment-0mvtv8vac-gliy",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 2,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-fixable-non-blocking-review",
+  "objective": "Repair the fixable non-blocking review findings in the staged merge resolution of PR 37, in /home/user/holyagent-plugin-only-install.",
+  "state": "Ready",
+  "scope": [
+    "The worktree /home/user/holyagent-plugin-only-install holds a resolved, staged, uncommitted merge (main via fix/state-off-main into feat/plugin-only-install). The review report is /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-rev37.txt; fix these findings from it:",
+    "Finding 1 (regression from the port): packages/runtime/src/setup/leftovers.ts applyPlan retry (attempt > 1) treats a blank settings or .claude.json file as an empty object because readJsonObjectSnapshot returns text '' for a blank file, so the text === undefined guard does not fire. Restore main's behavior (packages/cli/src/claude/leftovers.ts at MERGE_HEAD: a file that is no longer a JSON object is reported as 'changed while it was cleaned ... left as it is'). Add a test in packages/runtime/tests/setup-leftovers.test.ts that fails without the fix.",
+    "Finding 2 (repository rule: prefer Bun APIs): leftovers.ts findLeftovers/ownedDirectory use readFile and stat from node:fs/promises; use Bun.file().text() / .stat() as json-file.ts does, where Bun has the API, keeping Effect composition and tagged SetupFailure errors.",
+    "Finding 3: docs/usage.md gets one line saying user-scope plugin uninstall and marketplace removal during setup run in the home directory (as global installs do).",
+    "Do not change findings 4 and 5 (they predate the merge or are product choices).",
+    "Gates with the canary Bun at /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/canary/x/bun-linux-x64/bun, in that worktree: check --no-script, lint --no-script, fmt --no-script --check, test; then '/tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/canary/x/bun-linux-x64/bun scripts/vendor.ts && /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/canary/x/bun-linux-x64/bun packages/integrations/claude/build.ts' so dist is in step. After editing, git add only the files you changed (staging is part of the merge resolution)."
+  ],
+  "constraints": [
+    "Edit only inside /home/user/holyagent-plugin-only-install, only the paths needed for these findings plus the regenerated dist.",
+    "Git writes limited to 'git add' of the files you changed; no commit, checkout, reset, stash; no edits under .git/ or .holyagent/.",
+    "Repository rules from .claude/CLAUDE.md: Effect for effects and tagged errors, no try/catch, async functions or new Promise in runtime source, Bun APIs first, JSDoc on exports.",
+    "Keep working until done; stop and report when done and checked; name unrequested ideas instead of doing them."
+  ],
+  "criteria": [
+    {
+      "text": "A blank settings or .claude.json file on retry is reported as changed and left as it is, as on main, with a test that fails without the fix",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "leftovers.ts uses Bun file APIs where Bun has them, with Effect and tagged errors kept",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "docs/usage.md states that user-scope uninstall and marketplace removal during setup run in the home directory",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "check, lint, fmt --check and test pass with the canary Bun, and the rebuild leaves dist in step",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Nothing beyond these findings changes",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/setup",
+    "packages/runtime/tests",
+    "docs/usage.md",
+    "packages/integrations/claude/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-10-29T18:17:43.525Z"
+}
