@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { Effect, FileSystem, Option, Path } from "effect"
+import { Effect, FileSystem, Option, Path, PlatformError } from "effect"
 
 import { cleanupLeftovers, findLeftovers } from "../src/claude/leftovers.ts"
 import { userFiles } from "../src/claude/user.ts"
@@ -341,6 +341,74 @@ describe("Billion Context leftovers", () => {
           expect(line).toEndWith(
             "run in that project: claude plugin uninstall billion-context@billion-context --scope project",
           )
+        }
+      }),
+    ))
+
+  test("a project folder that cannot be inspected is reported with the cause and claude is not run there", () =>
+    run(
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem
+        const h = yield* home
+        const root = yield* tempDir
+        yield* h.write(h.installed, {
+          plugins: { "billion-context@billion-context": [{ scope: "project", projectPath: root }] },
+        })
+        const unreadable = {
+          ...fs,
+          stat: (target: string) =>
+            target === root
+              ? Effect.fail(
+                  PlatformError.systemError({
+                    _tag: "PermissionDenied",
+                    module: "FileSystem",
+                    method: "stat",
+                    pathOrDescriptor: target,
+                    description: "permission denied",
+                  }),
+                )
+              : fs.stat(target),
+        } as FileSystem.FileSystem
+        const shell = fakeShell({ commands: ["claude"] })
+        const lines = yield* cleanupLeftovers(h.files, false).pipe(
+          Effect.provide(shell.layer),
+          Effect.provideService(FileSystem.FileSystem, unreadable),
+        )
+        expect(shell.lines()).toEqual([])
+        expect(lines.length).toBe(1)
+        expect(lines[0]).toStartWith(
+          `~ billion-context: plugin billion-context@billion-context (project scope in ${root}) stays; cannot check ${root}: `,
+        )
+        expect(lines[0]).toContain("permission denied")
+        expect(lines[0]).not.toContain("not an existing folder of yours")
+        expect(lines[0]).toEndWith(
+          "run in that project: claude plugin uninstall billion-context@billion-context --scope project",
+        )
+      }),
+    ))
+
+  test("where the system has no user ids the removal runs and its line says the owner was not checked", () =>
+    run(
+      Effect.gen(function* () {
+        const h = yield* home
+        const root = yield* tempDir
+        yield* h.write(h.installed, {
+          plugins: { "billion-context@billion-context": [{ scope: "project", projectPath: root }] },
+        })
+        const getuid = process.getuid
+        // Windows has no `process.getuid`.
+        ;(process as { getuid?: unknown }).getuid = undefined
+        try {
+          for (const dryRun of [true, false]) {
+            const shell = fakeShell({ commands: ["claude"] })
+            const lines = yield* cleanupLeftovers(h.files, dryRun).pipe(Effect.provide(shell.layer))
+            expect(lines.length).toBe(1)
+            expect(lines[0]).toStartWith("+ billion-context: ")
+            expect(lines[0]).toContain("owner was not checked")
+            expect(shell.lines().length).toBe(dryRun ? 0 : 1)
+          }
+        } finally {
+          ;(process as { getuid?: unknown }).getuid = getuid
         }
       }),
     ))

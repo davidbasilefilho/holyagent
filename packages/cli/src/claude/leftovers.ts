@@ -410,22 +410,44 @@ const applyPlan = (
     ),
   )
 
+/** What `ownedDirectory` found out about a project folder. */
+type DirectoryOwnership =
+  | { readonly _tag: "Owned" }
+  /** The system has no user ids (Windows), so only the folder's existence was checked. */
+  | { readonly _tag: "Unchecked" }
+  /** Not absolute, missing, not a folder, or owned by someone else. */
+  | { readonly _tag: "Refused" }
+  /** The folder could not be inspected for a reason other than being absent. */
+  | { readonly _tag: "Failed"; readonly message: string }
+
+const owned: DirectoryOwnership = { _tag: "Owned" }
+const unchecked: DirectoryOwnership = { _tag: "Unchecked" }
+const refused: DirectoryOwnership = { _tag: "Refused" }
+
 /**
- * Whether `directory` is an existing absolute folder owned by the current user. `claude` reads the
- * project settings of the folder it runs in, so it runs only in a folder nobody else controls.
+ * Checks that `directory` is an existing absolute folder owned by the current user. `claude` reads
+ * the project settings of the folder it runs in, so it runs only in a folder nobody else controls.
+ * A stat error other than not-found is reported as `Failed` instead of as a plain refusal.
  */
 const ownedDirectory = (directory: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
-    if (!path.isAbsolute(directory)) return false
+    if (!path.isAbsolute(directory)) return refused
     const info = yield* fs.stat(directory)
+    if (info.type !== "Directory") return refused
     const user = process.getuid?.()
-    return (
-      info.type === "Directory" &&
-      (user === undefined || (Option.isSome(info.uid) && info.uid.value === user))
-    )
-  }).pipe(Effect.catch(() => Effect.succeed(false)))
+    if (user === undefined) return unchecked
+    return Option.isSome(info.uid) && info.uid.value === user ? owned : refused
+  }).pipe(
+    Effect.catch((error) =>
+      Effect.succeed(
+        error.reason._tag === "NotFound"
+          ? refused
+          : ({ _tag: "Failed", message: error.message } satisfies DirectoryOwnership),
+      ),
+    ),
+  )
 
 /**
  * Removes what an earlier Billion Context setup left in the Claude Code files: the proxy base URLs
@@ -486,6 +508,8 @@ export const cleanupLeftovers = Effect.fn("cleanupLeftovers")(function* (
     readonly what: string
     readonly args: ReadonlyArray<string>
     readonly cwd: string | undefined
+    /** Said on the printed line when the removal runs without a full check of its folder. */
+    readonly note?: string
   }> = []
   for (const install of leftovers.pluginInstalls) {
     const args = [
@@ -500,11 +524,27 @@ export const cleanupLeftovers = Effect.fn("cleanupLeftovers")(function* (
       lines.push(
         `~ billion-context: ${what} stays; its install records no project folder, run in that project: claude ${args.join(" ")}`,
       )
-    } else if (!(yield* ownedDirectory(install.projectPath))) {
-      lines.push(
-        `~ billion-context: ${what} stays; ${install.projectPath} is not an existing folder of yours, so claude is not run there; run in that project: claude ${args.join(" ")}`,
-      )
-    } else removals.push({ what, args, cwd: install.projectPath })
+    } else {
+      const owner = yield* ownedDirectory(install.projectPath)
+      if (owner._tag === "Failed") {
+        lines.push(
+          `~ billion-context: ${what} stays; cannot check ${install.projectPath}: ${owner.message}, so claude is not run there; run in that project: claude ${args.join(" ")}`,
+        )
+      } else if (owner._tag === "Refused") {
+        lines.push(
+          `~ billion-context: ${what} stays; ${install.projectPath} is not an existing folder of yours, so claude is not run there; run in that project: claude ${args.join(" ")}`,
+        )
+      } else {
+        removals.push({
+          what,
+          args,
+          cwd: install.projectPath,
+          ...(owner._tag === "Unchecked"
+            ? { note: "; this system has no user ids, so the folder's owner was not checked" }
+            : {}),
+        })
+      }
+    }
   }
   if (leftovers.marketplaceRegistered) {
     removals.push({
@@ -523,7 +563,9 @@ export const cleanupLeftovers = Effect.fn("cleanupLeftovers")(function* (
           `~ billion-context: ${removal.what} stays; \`claude\` not found, run${where}: ${command}`,
         )
       } else if (dryRun) {
-        lines.push(`+ billion-context: ${verb} ${removal.what} with ${command}${where}`)
+        lines.push(
+          `+ billion-context: ${verb} ${removal.what} with ${command}${where}${removal.note ?? ""}`,
+        )
       } else {
         const result = yield* shell.run(
           "claude",
@@ -533,7 +575,7 @@ export const cleanupLeftovers = Effect.fn("cleanupLeftovers")(function* (
         const detail = (result.stderr || result.stdout).trim().split("\n")[0] ?? ""
         lines.push(
           result.exitCode === 0
-            ? `+ billion-context: ${verb} ${removal.what}`
+            ? `+ billion-context: ${verb} ${removal.what}${removal.note ?? ""}`
             : `! billion-context: ${command} failed (exit ${result.exitCode})${detail === "" ? "" : `: ${detail}`}`,
         )
       }
