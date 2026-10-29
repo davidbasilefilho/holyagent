@@ -1,0 +1,63 @@
+{
+  "id": "assignment-0mvtmzz8a-huh1",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "remove-billion-context-billion-context",
+  "objective": "Remove Billion Context (billion-context, bili, acp-kernel) from holyagent completely: plugin dependency, marketplace declarations, setup and doctor CLI, both installers, repository tooling, docs, README, attributions and tests.",
+  "state": "Ready",
+  "scope": [
+    "Worktree /home/user/holyagent-bili (branch ccr-046ad103-6qsvgx-drop-bili, from origin/main 0d84b37). Run bun install --frozen-lockfile there if node_modules is missing.",
+    "Reference map with file:line for every hit: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-sh00.txt. Search again with the plugin rg (holyagent rg -i 'billion|\\bbili\\b|acp-kernel|acp_status|acp-cache|18787|compress\\.rules|BILI_|bili-setup' .) to catch anything the map missed, excluding .git, node_modules and .holyagent.",
+    "Delete the plugin dependency and its marketplace allow-list entry in packages/integrations/claude/src/generate.ts (keep the exa dependency and claude-plugins-official), the billion-context entry in .claude/settings.json and .claude-plugin/marketplace.json, the marketplace written by holyagent setup claude (packages/cli/src/claude/project.ts), the user install step installBillionContext, BILI_CONFIG_FILE handling and the --skip-billion-context flag with its help text (packages/cli/src/claude/user.ts, packages/cli/src/cmd/setup-claude.ts), the bili doctor check, the Billion Context steps, checks and comments of install/wsl-install.sh and install/windows-install.ps1 (renumber their step counts), and the mise.toml comment (keep node for ctx7).",
+    "Update tests to the new behavior (no bili step, no flag, no marketplace entry) rather than deleting coverage of the remaining steps; rewrite docs (README.md, docs/usage.md, docs/components.md, docs/requirements.md, docs/decisions.md, docs/attributions.md, docs/pi/claude-parity.md and any other hit) so nothing mentions Billion Context; README keeps its six required sections.",
+    "Regenerate the plugin with mise run build."
+  ],
+  "constraints": [
+    "User (verbatim): \"outra coisa: testei no windows / remove o billion context completamente\".",
+    "Follow /home/user/holyagent/.claude/CLAUDE.md (Effect with tagged errors, Schema at boundaries, Bun APIs, JSDoc, no try/catch or async in runtime and CLI source) and /home/user/holyagent/AGENTS.md.",
+    "Do not add uninstall logic for existing Billion Context installs or any other unrequested feature; name such ideas in the report.",
+    "Work only in that worktree; make no version-control writes and no edits under .git/ or .holyagent/.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done and checked, stop and report."
+  ],
+  "criteria": [
+    {
+      "text": "No reference to Billion Context, bili or acp-kernel remains in tracked files outside .holyagent, shown by an rg search with zero hits",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Setup, doctor, installers and the generated plugin still work for the remaining components, with tests updated to the new behavior and none weakened",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "mise run build leaves no diff after the change and mise run verify passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Only Billion Context is removed; no unrelated changes",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/claude",
+    "packages/cli",
+    "install",
+    "docs",
+    "README.md",
+    "mise.toml",
+    ".claude/settings.json",
+    ".claude-plugin"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-10-29T14:26:51.803Z"
+}
