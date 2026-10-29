@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-documentation-review-findings",
   "objective": "Repair the documentation review findings in /home/user/holyagent-docs.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Review report: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-revdocs.txt.",
     "Blocking: docs/usage.md:14 implies that saying the repository is yours makes local or work keep no second branch; per version-control.md's signal order the user's own words choose the mode, so say: tell the root which state mode you want (local keeps state out of every commit and branch; work commits it with the work), otherwise an owned repository gets branch mode with its holyagent/state branch.",
@@ -58,7 +58,45 @@
     "agentId": "workflow:wf_95ccb7d1-209/assignment-0mvtvwy72-aspo",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-10-29T18:36:34.891Z"
+    "startedAt": "2026-10-29T18:36:34.891Z",
+    "finishedAt": "2026-10-29T18:38:20.598Z"
+  },
+  "result": "result: all four findings repaired; the fmt check passes on the four Markdown files.\nchanged: /home/user/holyagent-docs/docs/usage.md, /home/user/holyagent-docs/docs/hooks.md, /home/user/holyagent-docs/install/windows-install.ps1 (copied from the merged PR 37 text, then only the comment line changed). README.md and docs/requirements.md are unchanged by this pass.\nchecks: `bun fmt --no-script --check README.md docs/usage.md docs/requirements.md docs/hooks.md` with the canary Bun -> exit 0, \"All 4 files are formatted\". I did not run `mise run verify`, and I did not run a format check on the .ps1 file.\nblockers: none\nquestions: none\nnotes:\n- I did not find a `docs/version-control.md`; the signal order is in `docs/decisions.md`. The usage.md text matches that order: your words first, then a repository you do not control, tracked state, independent-PR conventions, else `branch`.\n- The Git Bash edit is on `docs/hooks.md` line 104 in the docs worktree (the merged copy has it on line 104 too, not 117). It now reads \"This report applies only when Git Bash is installed: one open report says...\". The first sentence about the maintainer testing on a Windows machine is kept, as are the Cowork \"not tested\" statements.\n- I named only `ANTHROPIC_DEFAULT_OPUS_MODEL` in the Sonnet section and dropped the \"one for each model alias\" sentence.\n- The model id `claude-sonnet-5-5` is kept, and \"uses less of your plan's usage\" became \"Sonnet is a cheaper model.\"\n\nevidence:\ndocs/usage.md no longer implies ownership alone selects local or work; it matches version-control.md's signal order: docs/usage.md line 14 now says to tell the root which mode you want (`local` keeps state out of every commit and branch, `work` commits it with the work), otherwise an owned repository gets `branch` mode with its `holyagent/state` branch. Line 87 already cites the signal order in decisions.md.\nThe Sonnet section states only what the model-config page documents and drops the unsourced usage claim: docs/usage.md lines 118-130. It names only `ANTHROPIC_DEFAULT_OPUS_MODEL`, says the root's `opus` alias then resolves to the model you set, and no longer says \"less of your plan's usage\".\ninstall/windows-install.ps1 no longer says Windows is untested, and hooks.md conditions the Git Bash note: the ps1 comment on line 23 now says it was tested by the maintainer and points to docs/requirements.md. The hooks.md Git Bash note on line 104 now applies only when Git Bash is installed.\nfmt check passes on the changed Markdown files: the canary `bun fmt --no-script --check` run above exited 0.\nchecks-run: `bun fmt --no-script --check README.md docs/usage.md docs/requirements.md docs/hooks.md` -> exit 0. `mise run verify` was not run.\nchanged-paths: docs/usage.md, docs/hooks.md, install/windows-install.ps1 (all under /home/user/holyagent-docs).\ndiff-file: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/docs-v3.diff (131 lines), a diff of each of the five files against its counterpart in /home/user/holyagent-plugin-only-install.",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Ownership/state-mode text matches the signal order; Sonnet section limited to documented scope; ps1 comment and Git Bash note fixed; fmt green. Re-review follows.",
+    "criteria": [
+      {
+        "criterion": "docs/usage.md no longer implies ownership alone selects local or work; it matches version-control.md's signal order",
+        "support": "docs/usage.md line 14 now says to tell the root which mode you want (`local` keeps state out of every commit and branch, `work` commits it with the work), otherwise an owned repository gets `branch` mode with its `holyagent/state` branch. Line 87 already cites the signal order in decisions.md."
+      },
+      {
+        "criterion": "The Sonnet section states only what the model-config page documents and drops the unsourced usage claim",
+        "support": "docs/usage.md lines 118-130. It names only `ANTHROPIC_DEFAULT_OPUS_MODEL`, says the root's `opus` alias then resolves to the model you set, and no longer says \"less of your plan's usage\"."
+      },
+      {
+        "criterion": "install/windows-install.ps1 no longer says Windows is untested, and hooks.md conditions the Git Bash note",
+        "support": "the ps1 comment on line 23 now says it was tested by the maintainer and points to docs/requirements.md. The hooks.md Git Bash note on line 104 now applies only when Git Bash is installed."
+      },
+      {
+        "criterion": "fmt check passes on the changed Markdown files",
+        "support": "the canary `bun fmt --no-script --check` run above exited 0."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bun fmt --no-script --check README.md docs/usage.md docs/requirements.md docs/hooks.md` -> exit 0. `mise run verify` was not run."
+      },
+      {
+        "label": "changed-paths",
+        "support": "docs/usage.md, docs/hooks.md, install/windows-install.ps1 (all under /home/user/holyagent-docs)."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/docs-v3.diff (131 lines), a diff of each of the five files against its counterpart in /home/user/holyagent-plugin-only-install."
+      }
+    ]
   },
   "createdAt": "2026-10-29T18:36:27.039Z"
 }
