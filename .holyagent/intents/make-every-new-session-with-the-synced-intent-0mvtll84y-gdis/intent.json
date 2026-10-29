@@ -7,9 +7,11 @@
     "The plugin sync date shown is 2026-10-27 (the day #28-#34 merged).",
     "Read other sessions only; never message, interrupt or archive them.",
     "User (verbatim): \"ele terminou, viu problemas e não concertou automaticamente. é esse o ponto de revisão visual, arrumar automaticamente. resolva no holyagent\".",
-    "User (verbatim): \"outra coisa: testei no windows / remove o billion context completamente\"."
+    "User (verbatim): \"outra coisa: testei no windows / remove o billion context completamente\".",
+    "User (verbatim): \"????? remova esse plugin então / é para usarmos o conector. esse conector funcionaria no claude code sem ser no claude.ai?\" -- drop the exa@claude-plugins-official plugin dependency and do web work through the claude.ai Exa connector.",
+    "User (verbatim): \"chave de api não é suportado no projeto\" -- holyagent supports only claude.ai account login, so API-key, Bedrock and Vertex setups need no fallback."
   ],
-  "revision": 1,
+  "revision": 2,
   "state": "Open",
   "createdAt": "2026-10-29T13:47:23.891Z"
 }
