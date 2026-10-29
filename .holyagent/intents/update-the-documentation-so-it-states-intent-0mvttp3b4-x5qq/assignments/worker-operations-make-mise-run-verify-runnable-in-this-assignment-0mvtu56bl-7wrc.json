@@ -1,0 +1,46 @@
+{
+  "id": "assignment-0mvtu56bl-7wrc",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 2,
+  "roleTask": "Worker.operations",
+  "slug": "make-mise-run-verify-runnable-in-this",
+  "objective": "Make `mise run verify` runnable in this container by installing mise and the canary Bun the repository's toolchain needs.",
+  "state": "Ready",
+  "scope": [
+    "The repository's gates run through mise (`mise.toml`): it pins bun 1.4.4 and a postinstall hook upgrades it to canary (`bun scripts/toolchain.ts upgrade`); the `toolchain` task fails on a non-canary Bun. Currently `mise` is not installed and `bun --version` is 1.4.4 stable.",
+    "Install mise for the current user (official installer `curl https://mise.run | sh`, which puts it in ~/.local/bin; outbound HTTPS goes through a proxy, see /root/.ccr/README.md if TLS or 403 problems). Then in /home/user/holyagent run `mise trust`, `mise install`, and confirm `mise exec -- bun --version` is a canary build and `mise run toolchain` passes. Then run `mise run verify` once in /home/user/holyagent (branch claude/intelligent-dijkstra-x7njap, clean tree at main's 7d8c8bc) to prove the gates run, and report its pass/fail counts as the baseline.",
+    "Report the exact command a later agent should use to run the gates (e.g. `~/.local/bin/mise run verify` or a PATH export)."
+  ],
+  "constraints": [
+    "Do not edit any tracked repository file. `bun install` creating or updating node_modules is fine. Make no git commits, checkouts, merges or edits under .git/ or .holyagent/.",
+    "Do not touch the worktrees ../holyagent-state-off-main, ../holyagent-cli-stdin or ../holyagent-plugin-only-install.",
+    "Keep working until done; stop and report when the toolchain works. If installation is blocked (network, proxy), report the exact error."
+  ],
+  "criteria": [
+    {
+      "text": "mise run toolchain passes in /home/user/holyagent with a canary Bun",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify ran to completion in /home/user/holyagent and its result is reported as the baseline",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No tracked repository file changed",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "gate-command"
+  ],
+  "ownershipPaths": [
+    "node_modules"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-10-29T17:46:51.586Z"
+}
