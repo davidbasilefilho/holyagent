@@ -243,6 +243,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
     phrase: "judged from the diff and the check output",
   },
   "R-REVIEW": { section: "root/assignments.md", phrase: "gets an independent reviewer" },
+  "R-FINISH": { section: "root/assignments.md", phrase: "one more repair round" },
   "R-VISUAL": { section: "root/visual.md", phrase: "Read screenshots yourself in the main thread" },
   "R-DEVSERVER": {
     section: "root/skills.md",
@@ -348,7 +349,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
   "R-WV": { section: "roles/worker-validation/method.md", phrase: "choose the real check" },
   "R-WVI": {
     section: "roles/worker-visual/purpose.md",
-    phrase: "repair material discrepancies",
+    phrase: "stop repairing a finding after round three",
   },
   "R-WVI-DESIGN": {
     section: "roles/worker-visual/frontend-design.md",
