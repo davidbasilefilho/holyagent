@@ -36,6 +36,7 @@
   ],
   "followUpOf": "assignment-0mvtvrepm-n8vt",
   "specialist": {
+    "agentId": "workflow:wf_9aa4b72f-3b6/assignment-0mvtvzsxh-k0xd",
     "model": "haiku",
     "effort": "high",
     "startedAt": "2026-10-29T18:38:48.211Z"
