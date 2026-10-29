@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mvtqsnqt-xpzx",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-state-repair-31c4d2e",
+  "objective": "Re-review the state repair 31c4d2e against the previous code review's findings.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-state-edges (head c4f16b5 merges the instruction repair). Repair diff: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/rr-B.diff (e185f22..31c4d2e). Previous review: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-qq7y.txt; writer report: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-o3r1.txt (it dropped the legacy unmarked-line heuristic instead of recording a keep note; judge that).",
+    "Run mise run verify on the head."
+  ],
+  "constraints": [
+    "Read-only: write no files and make no version-control writes.",
+    "Judge only the repair diff against the previous findings."
+  ],
+  "criteria": [
+    {
+      "text": "Each previous finding is stated closed or open with file and line, any new blocking issue is named with a fix or its absence is stated, with mise run verify run on the head",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvtqdcfu-o3r1"
+  ],
+  "followUpOf": "assignment-0mvtq10xb-qq7y",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T16:13:08.789Z"
+  },
+  "createdAt": "2026-10-29T16:13:08.789Z"
+}
