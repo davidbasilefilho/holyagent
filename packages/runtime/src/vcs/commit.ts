@@ -100,16 +100,32 @@ const shortNames = (paths: ReadonlyArray<string>, separator: string) => [
   ),
 ]
 
+/** True when git lists the path in the index or as an untracked entry of the work tree. */
+const inWorkTree = (path: string) =>
+  gitPaths(["ls-files", "-z", "--cached", "--others", "--directory"], [path]).pipe(
+    Effect.map((listing) => listing !== ""),
+  )
+
 /**
- * Which of the names are real entries of the work tree (a tracked file or folder, or one git sees
- * untracked), not an alias for another name. A listing from git holds long names only, so an 8.3
- * alias is never in it.
+ * True when HEAD's tree holds the path, which covers one whose removal is staged (`git rm`) and so
+ * is in neither the index nor the work tree. An unborn HEAD has no tree, so the lookup fails and
+ * the answer is no.
+ */
+const inHead = (path: string) =>
+  gitMaybe(["--literal-pathspecs", "ls-tree", "--name-only", "HEAD", "--", path]).pipe(
+    Effect.map((listing) => listing !== undefined && listing !== ""),
+  )
+
+/**
+ * Which of the names are real entries of the work tree (tracked, untracked, or removed with a
+ * deletion that is staged), not an alias for another name. A listing from git holds long names
+ * only, so an 8.3 alias is never in it.
  */
 const realEntries = (names: ReadonlyArray<string>) =>
   Effect.forEach(names, (name) =>
-    gitPaths(["ls-files", "-z", "--cached", "--others", "--directory"], [name]).pipe(
-      Effect.map((listing) => (listing === "" ? [] : [name])),
-    ),
+    Effect.gen(function* () {
+      return (yield* inWorkTree(name)) || (yield* inHead(name)) ? [name] : []
+    }),
   ).pipe(Effect.map((found) => new Set(found.flat())))
 
 /** True when `core.ignorecase` is on: the file system treats names that differ in case as one. */
@@ -221,7 +237,7 @@ const requireNoStagedState = (staged: ReadonlyArray<string>) => {
     : Effect.fail(
         new Usage({
           message: `files under ${STATE_DIRECTORY}/ are staged (${state.join(", ")}), which state mode local cannot keep out of a commit`,
-          hint: "Unstage them with `git restore --staged`. The repository tracks state; see `holyagent state mode` and docs/usage.md before changing the mode or untracking files.",
+          hint: "Unstage them with `git restore --staged`. The repository tracks state: use local only after removing the tracked state from git, work only in a repository its owner controls, or ask the owner (docs/usage.md).",
         }),
       )
 }
@@ -255,7 +271,14 @@ export const commit = (request: CommitRequest) =>
     const outside = alreadyStaged.filter((path) => !inScope(scope, path, ignoreCase))
     if (outside.length > 0) return yield* new StagedOutsideScope({ paths: outside })
 
-    yield* gitPaths(["add", "-A"], scope)
+    // A path whose removal is already staged is in neither the index nor the work tree, so `git add`
+    // would not match it; its deletion is part of the commit as it is.
+    const addable = yield* Effect.filter(scope, (path) =>
+      Effect.gen(function* () {
+        return (yield* inWorkTree(path)) || !(yield* inHead(path))
+      }),
+    )
+    if (addable.length > 0) yield* gitPaths(["add", "-A"], addable)
     const files = (yield* stagedPaths).length
     if (files === 0) return yield* new NothingToCommit({ paths: scope })
 

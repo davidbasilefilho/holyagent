@@ -961,7 +961,7 @@ export const setStateMode = (cwd: string, env: Environment, mode: StateMode) =>
           (yield* gitText(top, env, ["ls-files", "--", ...TRACKED_STATE_PATHSPEC])) !== ""
         )
           return yield* new StateModeRefused({
-            reason: `the repository tracks state in ${STATE_DIRECTORY}/, which an exclude entry cannot hide; choose the mode with holyagent state mode, and see docs/usage.md for what each one does to a repository you do not control`,
+            reason: `the repository tracks state in ${STATE_DIRECTORY}/, which an exclude entry cannot hide; use local only after the tracked state is removed from git, work only in a repository its owner controls (it commits the state with the work), or ask the owner; see docs/usage.md`,
           })
         if (mode === "local") yield* excludeState(top, common, env)
         // Leaving local removes the entry after the mode write, so a failure there must put the

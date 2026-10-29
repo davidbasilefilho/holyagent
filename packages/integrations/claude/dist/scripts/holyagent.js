@@ -10245,7 +10245,7 @@ var setStateMode = (cwd, env, mode) => gen2(function* () {
       });
     if (mode === "local" && (yield* gitText(top, env, ["ls-files", "--", ...TRACKED_STATE_PATHSPEC])) !== "")
       return yield* new StateModeRefused({
-        reason: `the repository tracks state in ${STATE_DIRECTORY}/, which an exclude entry cannot hide; choose the mode with holyagent state mode, and see docs/usage.md for what each one does to a repository you do not control`
+        reason: `the repository tracks state in ${STATE_DIRECTORY}/, which an exclude entry cannot hide; use local only after the tracked state is removed from git, work only in a repository its owner controls (it commits the state with the work), or ask the owner; see docs/usage.md`
       });
     if (mode === "local")
       yield* excludeState(top, common, env);
@@ -10712,7 +10712,11 @@ var SHORT_NAME = /^[^/~]{1,6}~\d+$/;
 var shortNames = (paths, separator) => [
   ...new Set(paths.map((path) => toPosix(path, separator).split("/")[0] ?? "").filter((name) => SHORT_NAME.test(name)))
 ];
-var realEntries = (names) => forEach2(names, (name) => gitPaths(["ls-files", "-z", "--cached", "--others", "--directory"], [name]).pipe(map4((listing) => listing === "" ? [] : [name]))).pipe(map4((found) => new Set(found.flat())));
+var inWorkTree = (path) => gitPaths(["ls-files", "-z", "--cached", "--others", "--directory"], [path]).pipe(map4((listing) => listing !== ""));
+var inHead = (path) => gitMaybe(["--literal-pathspecs", "ls-tree", "--name-only", "HEAD", "--", path]).pipe(map4((listing) => listing !== undefined && listing !== ""));
+var realEntries = (names) => forEach2(names, (name) => gen2(function* () {
+  return (yield* inWorkTree(name)) || (yield* inHead(name)) ? [name] : [];
+})).pipe(map4((found) => new Set(found.flat())));
 var ignoresCase = gitMaybe(["config", "--type=bool", "--get", "core.ignorecase"]).pipe(map4((value) => value === "true"));
 var commitScope = (paths, separator = sep4, mode = "branch", ignoreCase = false, existing = new Set) => forEach2(paths, (path) => {
   const clean = toPosix(path, separator).replace(/\/+$/, "");
@@ -10760,7 +10764,7 @@ var requireNoStagedState = (staged) => {
   const state = staged.filter((path) => inStateFolder(path, true) && !isConfigFile(path));
   return state.length === 0 ? void_3 : fail5(new Usage({
     message: `files under ${STATE_DIRECTORY}/ are staged (${state.join(", ")}), which state mode local cannot keep out of a commit`,
-    hint: "Unstage them with `git restore --staged`. The repository tracks state; see `holyagent state mode` and docs/usage.md before changing the mode or untracking files."
+    hint: "Unstage them with `git restore --staged`. The repository tracks state: use local only after removing the tracked state from git, work only in a repository its owner controls, or ask the owner (docs/usage.md)."
   }));
 };
 var commit = (request) => gen2(function* () {
@@ -10777,7 +10781,11 @@ var commit = (request) => gen2(function* () {
   const outside = alreadyStaged.filter((path) => !inScope(scope, path, ignoreCase));
   if (outside.length > 0)
     return yield* new StagedOutsideScope({ paths: outside });
-  yield* gitPaths(["add", "-A"], scope);
+  const addable = yield* filter3(scope, (path) => gen2(function* () {
+    return (yield* inWorkTree(path)) || !(yield* inHead(path));
+  }));
+  if (addable.length > 0)
+    yield* gitPaths(["add", "-A"], addable);
   const files = (yield* stagedPaths).length;
   if (files === 0)
     return yield* new NothingToCommit({ paths: scope });
