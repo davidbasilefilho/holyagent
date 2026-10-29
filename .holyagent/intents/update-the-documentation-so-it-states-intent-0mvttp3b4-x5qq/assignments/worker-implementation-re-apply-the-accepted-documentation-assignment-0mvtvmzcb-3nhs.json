@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "re-apply-the-accepted-documentation",
   "objective": "Re-apply the accepted documentation changes (Windows tested by the maintainer, running the root on Sonnet, the broader use cases) on top of the merged PR 37 docs, in the worktree /home/user/holyagent-docs.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Work only in /home/user/holyagent-docs (branch claude/intelligent-dijkstra-x7njap at fd6c9f6, the old PR 37 head). The real base is the merge of main into PR 37, which is resolved but not yet committed in /home/user/holyagent-plugin-only-install. First copy README.md, docs/usage.md, docs/requirements.md and docs/hooks.md from /home/user/holyagent-plugin-only-install (its working copy) into /home/user/holyagent-docs, so you edit the merged text.",
     "Then apply the same intent as the earlier patch /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/docs-v1.patch (written against main; read it for wording): (1) native Windows reads as supported and tested by the maintainer on a Windows machine; remove every 'not tested'/'not verified'/'has not been run on a Windows machine' claim in README.md and docs/ (outside docs/pi/), keeping troubleshooting facts as plain notes; (2) a '## Run the root on Sonnet' section in docs/usage.md: the root runs on Opus by default (frontmatter `model: opus`); to use Sonnet set `\"env\": { \"ANTHROPIC_DEFAULT_OPUS_MODEL\": \"claude-sonnet-5-5\" }` in ~/.claude/settings.json or .claude/settings.local.json and restart; the variable is global (also /model opus, --model opus, other opus agents); specialists are pinned to haiku/sonnet routes and unchanged; check with /status; one-sentence trade-off; source https://code.claude.com/docs/en/model-config; the 'root agent (Opus, the main thread)' sentence points to it; README links it in one short clause; (3) a '## What it fits' section in docs/usage.md covering a one-line fix or small feature through stacked multi-PR deliveries, codebase questions with no edits, debugging unknown causes, reviewing a PR or branch, refactors and mechanical changes, UI work with visual inspection, docs and configuration, and personal, coursework or solo repositories (state mode local or work; repository conventions first), each grounded in documented behavior; README gets one 'Why HolyAgent?' bullet linking it.",
@@ -66,5 +66,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T18:28:49.933Z"
+  },
   "createdAt": "2026-10-29T18:28:41.963Z"
 }
