@@ -1,0 +1,42 @@
+{
+  "id": "assignment-0mvtm1tfc-a04n",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.code",
+  "slug": "review-commit-673c38a-root-rules-on-the",
+  "objective": "Review commit 673c38a (root rules on the first main-thread hook) for correctness and regressions.",
+  "state": "Running",
+  "scope": [
+    "The change is commit 673c38a on ccr-046ad103-6qsvgx-mandatory-root in /home/user/holyagent-root (base origin/main 7929f2d); diff without the bundle: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/rootrules-commit.diff. Intent: a main thread that loads the holyagent plugin gets the root rules even when SessionStart output arrives late or never: a new root-rules hook on UserPromptSubmit and catch-all PreToolUse delivers bareContext once per session via an exclusive marker at os.tmpdir()/holyagent-sessions/<session_id>; subagents and a root main thread get nothing; session-start for a non-root main thread now emits the rules plus a failure line instead of exiting 1.",
+    "Check main-thread vs subagent detection from the payload fields Claude Code actually sends (agent_id, agent_type) and cite the hooks reference with the Exa tools if needed; compaction re-delivery; per-call cost of a catch-all PreToolUse; hooks.json shape; tests failing without the change."
+  ],
+  "constraints": [
+    "Read-only: write no repository files; make no version-control writes."
+  ],
+  "criteria": [
+    {
+      "text": "Findings are ranked blocking or non-blocking with file:line and a failure scenario",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Tests are judged for whether they fail without the change",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvtlrfnt-fomd"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T14:00:17.976Z"
+  },
+  "createdAt": "2026-10-29T14:00:17.976Z"
+}
