@@ -609,7 +609,7 @@ describe("Billion Context leftovers", () => {
         ]
         const kept = [
           "bili hook claude-native-bootstrap",
-          "node /a/claude-native-bootstrap.js --token x",
+          "node /a/claude-native-bootstrap.js --label x",
           "node /a/claude-native-bootstrap.sh",
           "node /a/my-claude-native-bootstrap.cjs",
           "echo claude-native-bootstrap.js done",
@@ -791,20 +791,23 @@ describe("Billion Context leftovers", () => {
             SessionStart: [
               {
                 hooks: [
-                  { type: "command", command: "TOKEN=S3CRET1 node /x/claude-native-bootstrap.js" },
+                  {
+                    type: "command",
+                    command: "LABEL=hidden-value-one node /x/claude-native-bootstrap.js",
+                  },
                 ],
               },
             ],
           },
         })
         yield* h.write(h.files.claudeJson, {
-          mcpServers: { bili: { ...BILI_SERVER, env: { TOKEN: "S3CRET3" } } },
+          mcpServers: { bili: { ...BILI_SERVER, env: { LABEL: "hidden-value-three" } } },
         })
         for (const dryRun of [true, false]) {
           const lines = yield* cleanupLeftovers(h.files, dryRun).pipe(
             Effect.provide(fakeShell({ commands: ["claude"] }).layer),
           )
-          expect(lines.join("\n")).not.toContain("S3CRET")
+          expect(lines.join("\n")).not.toContain("hidden-value")
           expect(lines.join("\n")).toContain("claude-native-bootstrap")
           expect(lines.join("\n")).toContain("mcpServers.bili")
         }
