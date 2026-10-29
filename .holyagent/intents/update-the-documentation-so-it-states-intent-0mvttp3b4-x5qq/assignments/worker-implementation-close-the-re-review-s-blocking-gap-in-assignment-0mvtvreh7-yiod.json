@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "close-the-re-review-s-blocking-gap-in",
   "objective": "Close the re-review's blocking gap in the stack rule and its fixable non-blocking notes, in /home/user/holyagent-stack-rule.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Re-review report: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-rerev.txt (B1 blocking, plus non-blocking notes). Current diff: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule-v2.diff.",
     "B1, settled default (maintainer away): every new PR, a new delivery's first PR included, stacks on the open stack's top; only a change that adds CI goes first from the base; the base is the target only when no open stack exists or the conventions ask for independent PRs. Make stack-plan.md line 3 say this for all new work (not 'Other work'), and line 6 'The first PR of a stack targets the base' say the first PR targets the open stack's top, or the base when there is none. Keep R-STACK (requirements.md) and decisions.md consistent.",
@@ -53,7 +53,37 @@
     "agentId": "workflow:wf_1045a1b7-111/assignment-0mvtvreh7-yiod",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-10-29T18:32:16.081Z"
+    "startedAt": "2026-10-29T18:32:16.081Z",
+    "finishedAt": "2026-10-29T18:36:26.472Z"
+  },
+  "result": "result: B1 closed and the non-blocking notes addressed. A delivery's first PR now stacks on the open stack's top. The base is the target only for a CI change, when no stack is open, or under independent-PR conventions. All gates pass.\nchanged:\n- /home/user/holyagent-stack-rule/packages/runtime/src/instructions/claude-5.5/root/stack-plan.md\n- /home/user/holyagent-stack-rule/packages/runtime/src/instructions/claude-5.5/root/version-control.md\n- /home/user/holyagent-stack-rule/packages/runtime/src/instructions/requirements.md\n- /home/user/holyagent-stack-rule/packages/integrations/claude/dist/agents/holyagent.md (rebuilt)\n- /home/user/holyagent-stack-rule/docs/decisions.md\n- /home/user/holyagent-stack-rule/docs/usage.md\n\nchecks (canary Bun, in /home/user/holyagent-stack-rule):\n- `scripts/vendor.ts` -> 0\n- `packages/integrations/claude/build.ts` -> 0, 29 files built\n- `check --no-script` -> 0, no type errors in 121 files\n- `lint --no-script` -> 0, no problems in 122 files\n- `fmt --no-script --check` -> 0, 237 files formatted\n- `test` -> 0, 957 pass, 1 skip, 0 fail\n\nblockers: none\nquestions: none\nnotes:\n- stack-plan.md net addition against the original (336 words) is +62, at the \"about 60\" target.\n- I also changed `version-control.md` (\"current stack head\" -> \"open stack's top\", \"up the chain\" -> \"up the stack\") and R-GIT in `requirements.md` (\"stack head\" -> \"open stack's top\"), so one term is used throughout. Both are inside the instructions ownership path.\n- I edited with a small Python script using exact-match replacements, not Edit; each replacement asserted a single match.\n\nevidence:\nA new delivery's first PR stacks on the open stack's top, with CI-first and no-open-stack or independent-PR conventions as the only base cases, stated consistently in stack-plan.md, R-STACK and decisions.md: stack-plan.md line 3 says \"Every new PR, a delivery's first included, stacks on the top of the open stack… with none open, branch from the base\". Line 4 keeps CI first from the base, and line 6 says \"A delivery's first PR targets the open stack's top (else the base)\". R-STACK in `requirements.md` says \"stack every new PR, a new delivery's first included… only a change that adds CI, work with no open stack and independent-PR conventions branch from the base\". The decisions.md paragraph \"New PRs stack on the open stack\" states the same cases, and the \"## Kept\" bullet now points to it. The usage.md Stacks paragraph adds \"waiting for the independent review, not human review\". The dist copy `packages/integrations/claude/dist/agents/holyagent.md` carries the new text (3 matches of \"open stack's top\").\ndist rebuilt; check, lint, fmt --check and test pass with the canary Bun: see checks above; build exit 0 and git status shows the dist file regenerated.\nchecks-run: vendor 0, build 0, check 0, lint 0, fmt --check 0, test 0 (957 pass, 1 skip, 0 fail).\nchanged-paths: the six files listed under changed.\ndiff-file: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule-v3.diff (full diff) and /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule-repair3.diff (this repair alone, against the v2 snapshot files).",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "B1 closed consistently across stack-plan, R-STACK, decisions; notes addressed; gates green (957 pass); final re-review follows.",
+    "criteria": [
+      {
+        "criterion": "A new delivery's first PR stacks on the open stack's top, with CI-first and no-open-stack or independent-PR conventions as the only base cases, stated consistently in stack-plan.md, R-STACK and decisions.md",
+        "support": "stack-plan.md line 3 says \"Every new PR, a delivery's first included, stacks on the top of the open stack… with none open, branch from the base\". Line 4 keeps CI first from the base, and line 6 says \"A delivery's first PR targets the open stack's top (else the base)\". R-STACK in `requirements.md` says \"stack every new PR, a new delivery's first included… only a change that adds CI, work with no open stack and independent-PR conventions branch from the base\". The decisions.md paragraph \"New PRs stack on the open stack\" states the same cases, and the \"## Kept\" bullet now points to it. The usage.md Stacks paragraph adds \"waiting for the independent review, not human review\". The dist copy `packages/integrations/claude/dist/agents/holyagent.md` carries the new text (3 matches of \"open stack's top\")."
+      },
+      {
+        "criterion": "dist rebuilt; check, lint, fmt --check and test pass with the canary Bun",
+        "support": "see checks above; build exit 0 and git status shows the dist file regenerated."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "vendor 0, build 0, check 0, lint 0, fmt --check 0, test 0 (957 pass, 1 skip, 0 fail)."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the six files listed under changed."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule-v3.diff (full diff) and /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule-repair3.diff (this repair alone, against the v2 snapshot files)."
+      }
+    ]
   },
   "createdAt": "2026-10-29T18:32:08.203Z"
 }
