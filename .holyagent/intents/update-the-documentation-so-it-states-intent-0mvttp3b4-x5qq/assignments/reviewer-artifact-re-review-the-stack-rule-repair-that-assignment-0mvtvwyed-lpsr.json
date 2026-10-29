@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mvtvwyed-lpsr",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.artifact",
+  "slug": "re-review-the-stack-rule-repair-that",
+  "objective": "Re-review the stack-rule repair that closed finding B1.",
+  "state": "Ready",
+  "scope": [
+    "Previous finding B1 and notes: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-rerev.txt. This repair alone: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule-repair3.diff; full diff: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule-v3.diff (worktree /home/user/holyagent-stack-rule). Repair report: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-rulefix3.txt.",
+    "Recorded defaults: every new PR, a delivery's first included, stacks on the open stack's top (the owner's own non-draft PRs from this repository's branches); only a CI change, no open stack, or independent-PR conventions branch from the base; stacking waits for holyagent's independent review, not human review; a lagging stack gets the base merged forward first.",
+    "Judge whether B1 is closed and whether the repair introduced a new contradiction; consider only the repair's diff plus what it must stay consistent with."
+  ],
+  "constraints": [
+    "Read-only. Findings blocking or non-blocking with file:line; stop and report when done."
+  ],
+  "criteria": [
+    {
+      "text": "B1 is judged closed or open with evidence",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No new contradiction introduced by the repair",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvtvreh7-yiod"
+  ],
+  "followUpOf": "assignment-0mvtvmo4p-xh29",
+  "createdAt": "2026-10-29T18:36:27.301Z"
+}
