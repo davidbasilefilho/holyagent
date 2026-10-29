@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-the-state-exclude-file-and-commit",
   "objective": "Review the state exclude-file and commit-scope edge-case fixes for correctness and regressions.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-state-edges (head e185f22, which merges the instruction branch); review commit 32b1d25 (eaed3fd..32b1d25); diff without the generated dist: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/rv-B.diff.",
     "User (verbatim): \"não deve ter nada pendente / outra coisa: arrume esse comportamento, o que ficar pendente que o agente pode resolver deve ser resolvido\".",
@@ -34,7 +34,25 @@
     "agentId": "workflow:wf_52d895ab-075/assignment-0mvtq10xb-qq7y",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-10-29T15:51:39.504Z"
+    "startedAt": "2026-10-29T15:51:39.504Z",
+    "finishedAt": "2026-10-29T16:01:12.329Z"
+  },
+  "result": "result: No blockers. The edge-case fixes in 32b1d25 are correct, and `mise run verify` passes on head e185f22. The built-in `/code-review` found 9 claims: 2 rejected, 5 optional, 2 optional or rejected.\n\nchanged: none. I wrote only a verify log in the scratchpad and removed a throwaway probe repo.\n\nchecks:\n- `/code-review eaed3fd...32b1d25` (built-in, run through the Skill tool, loaded as the built-in) -> 9 claims. I read each against the code and classified it below.\n- `mise run verify` in /home/user/holyagent-state-edges at e185f22 -> exit 0. Format clean on 233 files, type-check clean on 117, lint clean on 118, tests 905 pass, 1 skip, 0 fail. Log: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/verify-rv.txt\n- The worktree was clean (`git status --short` empty).\n- Probes with the built bundle `dist/scripts/holyagent.js` in a throwaway repo:\n  - A CRLF exclude file keeps its existing lines through the `local` and `work` cycle, and holyagent appends its own lines with LF.\n  - A line the user wrote and then entered `local` by command survives leaving `local` (the keep note works).\n  - A line the user wrote with `holyagent.stateMode` set by hand to `local` is removed on `state mode work`.\n- Not run: Windows paths, and the concurrency races, which I only read.\n\nblockers: none\n\nquestions: none\n\nnotes:\n\nBuilt-in claims classified (all non-blocking):\n1. Rejected. `version-control.md:14-15` says the claim is stale, but head has the ownership-first order in `version-control.md`, `requirements.md` R-STATE, `docs/decisions.md`, `docs/usage.md` and `dist/agents/holyagent.md:123`. The instruction edits arrive through the merged instruction branch (be35f58), which is outside the range the tool diffed.\n2. Rejected, same reason: `requirements.md` R-STATE at head already lists the ownership-first order.\n3. Optional, `packages/runtime/src/state/tree.ts:258` (the `legacy` heuristic). When `holyagent.stateMode` was set to `local` by hand with a user-written `/.holyagent/` line, leaving `local` deletes that line. The probe confirmed it and a test enshrines it. It is the deliberate trade-off for lines from the earlier unreleased build, and the command path writes the keep note. Fix if wanted: have `ensureExcluded` write the note when it sees an unmarked line.\n4. Optional, `tree.ts:1000` (`setStateMode`). A failure in `unexcludeState` after the mode write reports an error although the mode has changed. The base had the same order, so it is a baseline. A retry converges for the marked-pair case.\n5. Optional, `tree.ts:178`. A user line added after entering `local`, with no note recorded, is removed when leaving `local`. This is the same class as claim 3.\n6. Optional, `packages/runtime/src/vcs/commit.ts:207`. The new check refuses a `local` commit only when state files are staged. The invariant still holds: commit paths must be explicit, portable and not under `.holyagent/` in `local`, `.` is rejected, and `StagedOutsideScope` catches anything else staged. The error text \"git tracks files under .holyagent/ that are staged\" is a bit imprecise for force-added untracked files, which is cosmetic.\n7. Optional, `commit.ts:183`. With `core.ignorecase` on and an index path cased `.HolyAgent/x` in `work` mode, `inScope` compares case-sensitively. This only matters for a state folder tracked under another spelling.\n8. Rejected for `editExclude` (a writer that does not hold the lock). The lock covers only holyagent commands, which is inherent to any lock on a file git and editors also write. The symlink part did not reproduce.\n9. Rejected for the CRLF and trailing-newline claim. Git strips the trailing CR from exclude patterns, existing lines are preserved, and the newline policy applies only to a file that is edited.\n\nevidence:\nFindings are ranked blocking or non-blocking with file, line and fix, or their absence is stated, with mise run verify run on the head: There is no blocking finding. The 9 built-in claims are classified above (rejected: 1, 2, 8 (symlink part), 9; optional: 3-7, with file and line). `mise run verify` -> exit 0 at e185f22 (905 pass, 1 skip, 0 fail; type-check, lint and format clean); log at /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/verify-rv.txt.\nchecks-run: `/code-review eaed3fd...32b1d25` (built-in, 9 claims classified); `mise run verify` exit 0 on e185f22; read `rv-B.diff`, the head sources, r-1i5u.txt, r-yjjl.txt and r-9sjn.txt; three throwaway-repo probes of the bundle (CRLF exclude file, user line entered by command, user line with hand-set mode).",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "Findings ranked with file, line and fix",
+    "criteria": [
+      {
+        "criterion": "Findings are ranked blocking or non-blocking with file, line and fix, or their absence is stated, with mise run verify run on the head",
+        "support": "There is no blocking finding. The 9 built-in claims are classified above (rejected: 1, 2, 8 (symlink part), 9; optional: 3-7, with file and line). `mise run verify` -> exit 0 at e185f22 (905 pass, 1 skip, 0 fail; type-check, lint and format clean); log at /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/verify-rv.txt."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`/code-review eaed3fd...32b1d25` (built-in, 9 claims classified); `mise run verify` exit 0 on e185f22; read `rv-B.diff`, the head sources, r-1i5u.txt, r-yjjl.txt and r-9sjn.txt; three throwaway-repo probes of the bundle (CRLF exclude file, user line entered by command, user line with hand-set mode)."
+      }
+    ]
   },
   "createdAt": "2026-10-29T15:51:39.504Z"
 }
