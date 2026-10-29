@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mvtng21i-kayy",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 2,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-removal-of-billion-context",
+  "objective": "Review the removal of Billion Context and the switch from the Exa plugin to the Exa connector (commits 383531b and ac664bc, plus the clean merge 7aef81f of main) on branch ccr-046ad103-6qsvgx-drop-bili.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-bili; review git diff 1277474..7aef81f (main after #39 to the branch head), which is exactly the two commits.",
+    "Requirements: remove Billion Context (billion-context, bili, acp-kernel) completely; drop the exa@claude-plugins-official dependency and do web work through the claude.ai Exa connector; WebSearch and WebFetch stay denied; holyagent supports only claude.ai account login (no API key, Bedrock or Vertex fallback).",
+    "Check the setup and doctor CLI behavior and tests (packages/cli), the generator and plugin tests (packages/integrations/claude), both installers (install/wsl-install.sh, install/windows-install.ps1: step numbering, variables left unused or still needed, PowerShell syntax by reading), docs accuracy, and that no test was weakened. Run mise run verify and the plugin rg for billion|\\bbili\\b|acp-kernel|exa@|Exa plugin."
+  ],
+  "constraints": [
+    "Read-only: write no files and make no version-control writes.",
+    "Follow the merge-ready rubric; findings need file:line and a concrete fix."
+  ],
+  "criteria": [
+    {
+      "text": "Findings are ranked blocking or non-blocking with file, line and fix, or their absence is stated, with mise run verify run on the head",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvtmzz8a-huh1",
+    "assignment-0mvtnapzd-go9r"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T14:39:21.943Z"
+  },
+  "createdAt": "2026-10-29T14:39:21.943Z"
+}
