@@ -54,4 +54,4 @@ One line per check, exit 1 when any check fails:
 - `claude` and `ctx7` are on `PATH`;
 - the project's `.claude/settings.json` has the keys `holyagent setup claude` writes;
 - the `holyagent@holyagent` plugin is installed;
-- no leftovers of an earlier Billion Context setup remain in your Claude Code files, and those files can be read (a warning that does not fail the run; `holyagent setup claude` removes them, see [usage.md](usage.md#install)).
+- no leftovers of an earlier Billion Context setup remain in your Claude Code files (matched by Billion Context's own install rules, listed in [usage.md](usage.md#install)), and those files can be read (a warning that does not fail the run; `holyagent setup claude` removes them).
