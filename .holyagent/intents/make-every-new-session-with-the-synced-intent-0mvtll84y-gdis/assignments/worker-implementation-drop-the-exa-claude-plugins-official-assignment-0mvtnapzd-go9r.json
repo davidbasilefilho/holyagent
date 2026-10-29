@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "drop-the-exa-claude-plugins-official",
   "objective": "Drop the exa@claude-plugins-official plugin dependency so holyagent's web work goes through the claude.ai Exa connector, and update the generator, setup text, tests and docs to match.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree /home/user/holyagent-bili, branch ccr-046ad103-6qsvgx-drop-bili at 383531b (Billion Context already removed there).",
     "Remove the exa dependency from packages/integrations/claude/src/generate.ts; with no dependencies left, emit no dependencies field and no cross-marketplace allow-list unless something else still needs it; regenerate dist with mise run build. Update packages/integrations/claude/tests/plugin.test.ts expectations; keep the test that librarians are told to search with the Exa tools (the bare tool names web_search_exa/web_fetch_exa match every surface).",
@@ -54,5 +54,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T14:35:20.989Z"
+  },
   "createdAt": "2026-10-29T14:35:13.034Z"
 }
