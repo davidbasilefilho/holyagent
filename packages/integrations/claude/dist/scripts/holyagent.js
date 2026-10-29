@@ -9834,21 +9834,14 @@ var NOT_A_REPOSITORY = /not a git repository|command not found/i;
 var stateModeOf = (top, env) => git(top, env, ["config", "--get", STATE_MODE_KEY]).pipe(flatMap2((ran) => parseStateMode(ran.code === 0 ? ran.stdout : undefined)));
 var EXCLUDE_LINE = `/${STATE_DIRECTORY}/`;
 var EXCLUDE_MARK = "# added by holyagent (state mode local)";
-var EXCLUDE_KEPT_KEY = "holyagent.stateExcludeKept";
-var isMark = (line) => line.trim() === EXCLUDE_MARK;
-var isEntry = (line) => line.trim() === EXCLUDE_LINE;
-var markedPair = (lines) => lines.findIndex((line, index) => isMark(line) && isEntry(lines[index + 1] ?? ""));
+var isMark = (line) => line.trimEnd() === EXCLUDE_MARK;
+var isEntry = (line) => line.trimEnd() === EXCLUDE_LINE;
 var hasEntry = (lines) => lines.some(isEntry);
 var withEntry = (lines) => {
-  if (markedPair(lines) >= 0)
-    return { lines, kept: false };
   if (hasEntry(lines))
-    return { lines, kept: true };
+    return lines;
   const orphan = lines.findIndex(isMark);
-  return {
-    lines: orphan >= 0 ? [...lines.slice(0, orphan + 1), EXCLUDE_LINE, ...lines.slice(orphan + 1)] : [...lines, EXCLUDE_MARK, EXCLUDE_LINE],
-    kept: false
-  };
+  return orphan >= 0 ? [...lines.slice(0, orphan + 1), EXCLUDE_LINE, ...lines.slice(orphan + 1)] : [...lines, EXCLUDE_MARK, EXCLUDE_LINE];
 };
 var withoutMarked = (lines) => lines.filter((line, index) => {
   if (isMark(line))
@@ -9872,26 +9865,12 @@ var editExclude = (top, common, env, edit, done) => gen2(function* () {
     const body = lines.length === 0 ? "" : `${lines.join(`
 `)}
 `;
-    const temporary = `${path}.${process.pid}.${crypto.randomUUID()}.tmp`;
-    yield* io(path, () => mkdir2(dirname2(path), { recursive: true }));
-    yield* io(temporary, () => Bun.write(temporary, body));
-    yield* io(path, () => rename2(temporary, path)).pipe(tapError2(() => io(temporary, () => rm3(temporary, { force: true })).pipe(ignore2)));
-  }));
+    yield* commitFile(path, body);
+  }), "long");
 });
-var ensureExcluded = (top, common, env) => editExclude(top, common, env, (lines) => stateModeOf(top, env).pipe(map4((mode) => mode === "local" ? withEntry(lines).lines : lines)), hasEntry);
-var excludeState = (top, common, env, previous) => editExclude(top, common, env, (lines) => gen2(function* () {
-  const next = withEntry(lines);
-  if (previous !== "local")
-    yield* next.kept ? gitText(top, env, ["config", "--local", EXCLUDE_KEPT_KEY, "true"]) : git(top, env, ["config", "--local", "--unset", EXCLUDE_KEPT_KEY]);
-  return next.lines;
-}));
-var unexcludeState = (top, common, env, previous) => editExclude(top, common, env, (lines) => gen2(function* () {
-  const kept = yield* gitSucceeds(top, env, ["config", "--get", EXCLUDE_KEPT_KEY]);
-  const marked = lines.some(isMark);
-  yield* git(top, env, ["config", "--local", "--unset", EXCLUDE_KEPT_KEY]);
-  const legacy = previous === "local" && !marked && !kept;
-  return withoutMarked(lines).filter((line) => !(legacy && isEntry(line)));
-}));
+var ensureExcluded = (top, common, env) => editExclude(top, common, env, (lines) => stateModeOf(top, env).pipe(map4((mode) => mode === "local" ? withEntry(lines) : lines)), hasEntry);
+var excludeState = (top, common, env) => editExclude(top, common, env, (lines) => succeed6(withEntry(lines)));
+var unexcludeState = (top, common, env) => editExclude(top, common, env, (lines) => succeed6(withoutMarked(lines)));
 var isDirectory = (path) => io(path, () => stat(path)).pipe(map4((info) => info.isDirectory()), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
 var stateBranch = (top, env) => gen2(function* () {
   const configured = yield* git(top, env, ["config", "--get", BRANCH_KEY]);
@@ -10266,10 +10245,17 @@ var setStateMode = (cwd, env, mode) => gen2(function* () {
         reason: `git tracks state in ${STATE_DIRECTORY}/, which an exclude entry cannot hide; use the work mode`
       });
     if (mode === "local")
-      yield* excludeState(top, common, env, previous);
-    yield* gitText(top, env, ["config", "--local", STATE_MODE_KEY, mode]).pipe(tapError2(() => mode === "local" && previous !== "local" ? unexcludeState(top, common, env, previous).pipe(ignore2) : void_3));
+      yield* excludeState(top, common, env);
+    const configured = yield* gitSucceeds(top, env, [
+      "config",
+      "--local",
+      "--get",
+      STATE_MODE_KEY
+    ]);
+    const restoreMode = configured ? git(top, env, ["config", "--local", STATE_MODE_KEY, previous]) : git(top, env, ["config", "--local", "--unset", STATE_MODE_KEY]);
+    yield* gitText(top, env, ["config", "--local", STATE_MODE_KEY, mode]).pipe(tapError2(() => mode === "local" && previous !== "local" ? unexcludeState(top, common, env).pipe(ignore2) : void_3));
     if (mode !== "local")
-      yield* unexcludeState(top, common, env, previous);
+      yield* unexcludeState(top, common, env).pipe(tapError2(() => restoreMode.pipe(ignore2)));
     return { previous, mode };
   }), "long");
 });
@@ -10689,7 +10675,14 @@ var setAuthor = (request) => gen2(function* () {
 });
 
 import { sep as sep4 } from "path";
-var inScope = (scope, path) => scope.some((entry) => path === entry || path.startsWith(`${entry}/`));
+var inScope = (scope, path, ignoreCase) => {
+  const fold = (text) => ignoreCase ? text.toLowerCase() : text;
+  const candidate = fold(path);
+  return scope.some((entry) => {
+    const folded = fold(entry);
+    return candidate === folded || candidate.startsWith(`${folded}/`);
+  });
+};
 var requireOwnIdentity = gen2(function* () {
   const identity = {
     name: (yield* gitMaybe(["config", "user.name"])) ?? "",
@@ -10707,11 +10700,12 @@ var requireOwnAuthor = gen2(function* () {
     return yield* new CloudAuthor({ author: `${author.name} <${author.email}>` });
 });
 var stagedPaths = git2(["diff", "--cached", "--name-only", "--no-renames", "-z"]).pipe(map4((names) => names.split("\x00").filter((path) => path !== "")));
-var inStateFolder = (path, ignoreCase) => {
-  const folded = ignoreCase ? path.toLowerCase() : path;
+var inStateFolder = (path, foldCase) => {
+  const folded = foldCase ? path.toLowerCase() : path;
   return folded === STATE_DIRECTORY || folded.startsWith(`${STATE_DIRECTORY}/`);
 };
-var isConfigFile = (path, ignoreCase) => (ignoreCase ? path.toLowerCase() : path) === `${STATE_DIRECTORY}/${CONFIG_FILE}`;
+var isConfigFile = (path) => path.toLowerCase() === `${STATE_DIRECTORY}/${CONFIG_FILE}`;
+var isShortStateName = (path) => /^holyag~\d+$/i.test(path.split("/")[0] ?? "");
 var ignoresCase = gitMaybe(["config", "--type=bool", "--get", "core.ignorecase"]).pipe(map4((value) => value === "true"));
 var commitScope = (paths, separator = sep4, mode = "branch", ignoreCase = false) => forEach2(paths, (path) => {
   const clean = toPosix(path, separator).replace(/\/+$/, "");
@@ -10721,7 +10715,12 @@ var commitScope = (paths, separator = sep4, mode = "branch", ignoreCase = false)
       message: `Invalid path "${path}": ${problem}`,
       hint: "Name files or folders relative to the project root."
     }));
-  if (!inStateFolder(clean, ignoreCase))
+  if (isShortStateName(clean))
+    return fail5(new Usage({
+      message: `Invalid path "${path}": it is the short name of the ${STATE_DIRECTORY} folder`,
+      hint: "Name the state folder as .holyagent, or leave Intent state out of `vcs commit`."
+    }));
+  if (!inStateFolder(clean, ignoreCase || mode !== "work"))
     return succeed6(clean);
   if (mode === "work")
     return succeed6(`${STATE_DIRECTORY}${clean.slice(STATE_DIRECTORY.length)}`);
@@ -10749,10 +10748,10 @@ var changedState = gen2(function* () {
     return yield* new GitFailed({ args, code: ran.code, output: ran.stderr.trim() });
   return ran.stdout.split("\x00").filter((entry) => entry.length > 3).map((entry) => entry.slice(3));
 });
-var requireNoStagedState = (staged, ignoreCase) => {
-  const state = staged.filter((path) => inStateFolder(path, ignoreCase) && !isConfigFile(path, ignoreCase));
+var requireNoStagedState = (staged) => {
+  const state = staged.filter((path) => inStateFolder(path, true) && !isConfigFile(path));
   return state.length === 0 ? void_3 : fail5(new Usage({
-    message: `git tracks files under ${STATE_DIRECTORY}/ that are staged (${state.join(", ")}), which state mode local cannot keep out of a commit`,
+    message: `files under ${STATE_DIRECTORY}/ are staged (${state.join(", ")}), which state mode local cannot keep out of a commit`,
     hint: "Unstage them with `git restore --staged`, switch to the work mode with `holyagent state mode work`, or untrack the files."
   }));
 };
@@ -10765,8 +10764,8 @@ var commit = (request) => gen2(function* () {
   const scope = mode === "work" && !named.includes(STATE_DIRECTORY) ? [...named, ...yield* changedState] : named;
   const alreadyStaged = yield* stagedPaths;
   if (mode === "local")
-    yield* requireNoStagedState(alreadyStaged, ignoreCase);
-  const outside = alreadyStaged.filter((path) => !inScope(scope, path));
+    yield* requireNoStagedState(alreadyStaged);
+  const outside = alreadyStaged.filter((path) => !inScope(scope, path, ignoreCase));
   if (outside.length > 0)
     return yield* new StagedOutsideScope({ paths: outside });
   yield* gitPaths(["add", "-A"], scope);
