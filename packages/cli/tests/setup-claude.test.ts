@@ -151,4 +151,45 @@ describe("holyagent setup claude", () => {
         expect(yield* fs.readFileString(`${directory}/.claude/settings.json`)).toBe("[1]")
       }),
     ))
+
+  test("removes Billion Context leftovers from the user's files, and --dry-run only lists them", () =>
+    run(
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem
+        const home = yield* tempDir
+        const directory = yield* tempDir
+        const settings = `${home}/.claude/settings.json`
+        yield* fs.makeDirectory(`${home}/.claude`, { recursive: true })
+        yield* fs.writeFileString(
+          settings,
+          JSON.stringify({
+            theme: "dark",
+            env: { ANTHROPIC_BASE_URL: "http://127.0.0.1:18787/bili/https://api.anthropic.com" },
+          }),
+        )
+        const shell = () =>
+          fakeShell({ commands: ["claude"], respond: pluginList(["holyagent@holyagent"]) })
+        const skip = { ...options, skipCtx7: true }
+
+        const dry = shell()
+        const dryReport = yield* setupClaude({ directory, ...skip, dryRun: true }).pipe(
+          Effect.provide(dry.layer),
+          Effect.provide(envLayer({ HOME: home })),
+        )
+        expect(dryReport.lines).toContain(
+          `+ billion-context: would remove env.ANTHROPIC_BASE_URL from ${settings}`,
+        )
+        expect(parseJson(yield* fs.readFileString(settings)).env).toBeDefined()
+
+        const real = yield* setupClaude({ directory, ...skip }).pipe(
+          Effect.provide(shell().layer),
+          Effect.provide(envLayer({ HOME: home })),
+        )
+        expect(real.ok).toBe(true)
+        expect(real.lines).toContain(
+          `+ billion-context: removed env.ANTHROPIC_BASE_URL from ${settings}`,
+        )
+        expect(parseJson(yield* fs.readFileString(settings))).toEqual({ theme: "dark" })
+      }),
+    ))
 })

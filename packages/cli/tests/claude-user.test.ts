@@ -260,6 +260,7 @@ describe("holyagent setup claude: user installs", () => {
         expect(report.ok).toBe(true)
         expect(report.lines).toEqual([
           "+ plugin holyagent@holyagent: would install",
+          "= billion-context: no leftovers",
           "+ ctx7: would install with bun add -g ctx7",
           "= ctx7 skill: already installed",
         ])

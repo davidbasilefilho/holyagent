@@ -4,6 +4,7 @@ import { Config, Effect, FileSystem, Option, Path, Schema } from "effect"
 
 import { CliFailure, type Report } from "../report.ts"
 import { Shell, type ShellResult } from "../shell.ts"
+import { cleanupLeftovers } from "./leftovers.ts"
 import { MARKETPLACE, PLUGIN_ID } from "./project.ts"
 
 const InstalledPlugins = Schema.Array(Schema.Struct({ id: Schema.String }))
@@ -33,7 +34,7 @@ export const homeDirectory = Effect.gen(function* () {
 })
 
 /** Where the current user's Claude Code and Context7 files live. */
-const userFiles = Effect.gen(function* () {
+export const userFiles = Effect.gen(function* () {
   const path = yield* Path.Path
   const home = yield* homeDirectory
   const claudeConfigDir = yield* Config.option(Config.String("CLAUDE_CONFIG_DIR"))
@@ -184,9 +185,10 @@ export const asStep = <R>(
   )
 
 /**
- * Installs HolyAgent for the current user: the Claude Code plugin and ctx7. Every step checks its
- * own result first, and a step that fails does not stop the others. On a dry run nothing is
- * installed or written, and the lines say what would be.
+ * Installs HolyAgent for the current user: the Claude Code plugin and ctx7, and removes what an
+ * earlier Billion Context setup left in the Claude Code files. Every step checks its own result
+ * first, and a step that fails does not stop the others. On a dry run nothing is installed, removed
+ * or written, and the lines say what would be.
  */
 export const setupUser = Effect.fn("setupUser")(function* (options: {
   readonly skipCtx7: boolean
@@ -194,6 +196,10 @@ export const setupUser = Effect.fn("setupUser")(function* (options: {
 }) {
   const lines = [
     ...(yield* installPlugin(options.dryRun)),
+    ...(yield* asStep(
+      "billion-context",
+      userFiles.pipe(Effect.flatMap((files) => cleanupLeftovers(files, options.dryRun))),
+    )),
     ...(options.skipCtx7
       ? [skipped("ctx7: skipped by flag")]
       : yield* asStep("ctx7", installCtx7(options.dryRun))),
