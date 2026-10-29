@@ -7,7 +7,7 @@ import { Effect } from "effect"
 import { fromGitPath, toPosix } from "../domain/paths.ts"
 import { looksLikeAgent } from "../vcs/identity.ts"
 import { StateIo, StateModeRefused } from "./errors.ts"
-import { hasCode, io, readText } from "./files.ts"
+import { commitFile, hasCode, io, readText } from "./files.ts"
 import { CONFIG_FILE, STATE_DIRECTORY, TRACKED_STATE_PATHSPEC } from "./layout.ts"
 import { withFileLock, withStateLock } from "./lock.ts"
 import { parseStateMode, STATE_MODE_KEY, type StateMode } from "./mode.ts"
@@ -125,43 +125,110 @@ const EXCLUDE_LINE = `/${STATE_DIRECTORY}/`
 /** The comment above the line holyagent adds, which lets it remove only what it put there. */
 const EXCLUDE_MARK = "# added by holyagent (state mode local)"
 
+// Git strips one trailing carriage return and then trailing spaces from an exclude line, and keeps
+// everything else as part of the pattern: " /.holyagent/" (leading space) and "/.holyagent/\t"
+// (trailing tab) are other patterns that hide nothing, so exactly those two are removed here.
+const gitPattern = (line: string) => line.replace(/\r$/, "").replace(/ +$/, "")
+const isMark = (line: string) => gitPattern(line) === EXCLUDE_MARK
+const isEntry = (line: string) => gitPattern(line) === EXCLUDE_LINE
+
+/** True when the exclude line is there, with or without the comment above it. */
+const hasEntry = (lines: ReadonlyArray<string>) => lines.some(isEntry)
+
 /**
- * Adds or removes the state folder's line in the clone's `.git/info/exclude`, which every work tree
- * of the clone shares. It is the clone's own ignore file, so the repository's `.gitignore` is never
- * touched and no PR carries the entry. Only the line holyagent added, marked by a comment above it,
- * is removed; one the user wrote stays. The file is replaced through a temporary file and a rename,
- * so a concurrent `git add` never reads it half written.
+ * The lines with holyagent's entry in place: nothing changes when the marked pair or a line the
+ * user wrote is there, a marker comment whose line was deleted gets the line back, and otherwise a
+ * new marked pair is appended.
  */
-const setExcluded = (top: string, env: Environment, excluded: boolean) =>
+const withEntry = (lines: ReadonlyArray<string>): ReadonlyArray<string> => {
+  if (hasEntry(lines)) return lines
+  const orphan = lines.findIndex(isMark)
+  return orphan >= 0
+    ? [...lines.slice(0, orphan + 1), EXCLUDE_LINE, ...lines.slice(orphan + 1)]
+    : [...lines, EXCLUDE_MARK, EXCLUDE_LINE]
+}
+
+/** The lines without any marker comment of ours or the exclude line directly below it. */
+const withoutMarked = (lines: ReadonlyArray<string>) =>
+  lines.filter((line, index) => {
+    if (isMark(line)) return false
+    return !(isEntry(line) && isMark(lines[index - 1] ?? ""))
+  })
+
+/** The clone's exclude file; git resolves a symbolic link at it, so a rename replaces its target. */
+const excludePath = (top: string, env: Environment) =>
+  gitText(top, env, ["rev-parse", "--path-format=absolute", "--git-path", "info/exclude"]).pipe(
+    Effect.map((path) => fromGitPath(path)),
+  )
+
+/** The lines of a file; the empty file and the missing one have none. */
+const linesOf = (text: string | undefined) =>
+  text === undefined || text === "" ? [] : text.replace(/\n$/, "").split("\n")
+
+/**
+ * Edits the clone's `.git/info/exclude`, which every work tree of the clone shares, under the
+ * clone's exclude lock so two commands never lose each other's change. `edit` receives the lines
+ * and returns the new ones (or the same to leave the file) and a result. It is the clone's own
+ * ignore file, so the repository's `.gitignore` is never touched and no PR carries the entry. The
+ * file is replaced through a temporary file and a rename (removed again when either fails), so a
+ * concurrent `git add` never reads it half written. The lock is waited for as long as the worktree
+ * lock, since a holder that died leaves it until it is found stale. When `done` holds for the lines
+ * read before the lock, the lock is not taken.
+ */
+const editExclude = <E, R>(
+  top: string,
+  common: string,
+  env: Environment,
+  edit: (lines: ReadonlyArray<string>) => Effect.Effect<ReadonlyArray<string>, E, R>,
+  done?: (lines: ReadonlyArray<string>) => boolean,
+) =>
   Effect.gen(function* () {
-    const path = fromGitPath(
-      yield* gitText(top, env, [
-        "rev-parse",
-        "--path-format=absolute",
-        "--git-path",
-        "info/exclude",
-      ]),
-    )
-    const lines = ((yield* readText(path)) ?? "").split("\n")
-    const there = lines.some((line) => line.trim() === EXCLUDE_LINE)
-    const marked = lines.findIndex((line) => line.trim() === EXCLUDE_MARK)
-    if (excluded ? there : marked < 0 || lines[marked + 1]?.trim() !== EXCLUDE_LINE) return
-    const kept = excluded
-      ? lines
-      : lines.filter((_, index) => index !== marked && index !== marked + 1)
-    const head = kept.join("\n")
-    const body = excluded
-      ? `${head}${head === "" || head.endsWith("\n") ? "" : "\n"}${EXCLUDE_MARK}\n${EXCLUDE_LINE}\n`
-      : head
-    const temporary = `${path}.${process.pid}.${crypto.randomUUID()}.tmp`
-    yield* io(path, () => mkdir(dirname(path), { recursive: true }))
-    yield* io(temporary, () => Bun.write(temporary, body))
-    yield* io(path, () => rename(temporary, path)).pipe(
-      Effect.tapError(() =>
-        io(temporary, () => rm(temporary, { force: true })).pipe(Effect.ignore),
-      ),
+    const path = yield* excludePath(top, env)
+    if (done?.(linesOf(yield* readText(path))) === true) return
+    yield* withFileLock(
+      join(common, "holyagent", "exclude.lock"),
+      Effect.gen(function* () {
+        const before = linesOf(yield* readText(path))
+        const lines = yield* edit(before)
+        if (lines.join("\n") === before.join("\n")) return
+        const body = lines.length === 0 ? "" : `${lines.join("\n")}\n`
+        yield* commitFile(path, body)
+      }),
+      "long",
     )
   })
+
+/**
+ * Puts the state folder in the clone's exclude file when a command resolves the `local` state,
+ * unless the clone has left `local` since the command read its mode: the mode is read again under
+ * the lock, so a command that waited cannot bring the entry back after a mode change removed it.
+ */
+const ensureExcluded = (top: string, common: string, env: Environment) =>
+  editExclude(
+    top,
+    common,
+    env,
+    (lines) =>
+      stateModeOf(top, env).pipe(
+        Effect.map((mode) => (mode === "local" ? withEntry(lines) : lines)),
+      ),
+    hasEntry,
+  )
+
+/**
+ * Puts the state folder in the clone's exclude file as the clone enters `local`, before the mode is
+ * written. A line the user already had stays theirs and is never removed.
+ */
+const excludeState = (top: string, common: string, env: Environment) =>
+  editExclude(top, common, env, (lines) => Effect.succeed(withEntry(lines)))
+
+/**
+ * Takes the state folder out of the clone's exclude file as the clone leaves `local`. Only what
+ * holyagent added goes: the marked pair, and a stray marker comment. An unmarked line is the
+ * user's, whenever it was written, since nothing proves that holyagent wrote it.
+ */
+const unexcludeState = (top: string, common: string, env: Environment) =>
+  editExclude(top, common, env, (lines) => Effect.succeed(withoutMarked(lines)))
 
 const isDirectory = (path: string) =>
   io(path, () => stat(path)).pipe(
@@ -754,7 +821,7 @@ export const resolveState = (cwd: string, env: Environment, ensure: Ensure) =>
     const { top, common } = repository
     const mode = yield* stateModeOf(top, env)
     if (mode !== "branch") {
-      if (mode === "local" && ensure !== "peek") yield* setExcluded(top, env, true)
+      if (mode === "local" && ensure !== "peek") yield* ensureExcluded(top, common, env)
       return { root: top, directory: join(top, STATE_DIRECTORY) } satisfies StateTree
     }
     const branch = yield* stateBranch(top, env)
@@ -843,6 +910,19 @@ export const readStateMode = (cwd: string, env: Environment) =>
   })
 
 /**
+ * The command that puts the clone's mode back to what it is now: the previous value when the clone
+ * has its own, else no value at all, so a clone that chose none stays unconfigured.
+ */
+const modeRestore = (top: string, env: Environment, previous: StateMode) =>
+  gitSucceeds(top, env, ["config", "--local", "--get", STATE_MODE_KEY]).pipe(
+    Effect.map((configured) =>
+      configured
+        ? gitText(top, env, ["config", "--local", STATE_MODE_KEY, previous])
+        : gitText(top, env, ["config", "--local", "--unset", STATE_MODE_KEY]),
+    ),
+  )
+
+/**
  * Sets the state mode in the clone's git config, holding the worktree lock that creating the state
  * branch also holds, so a branch is not made between the checks and the write. The records are
  * never moved or deleted: a change away from `branch` is refused once the state branch exists, and
@@ -881,11 +961,36 @@ export const setStateMode = (cwd: string, env: Environment, mode: StateMode) =>
           (yield* gitText(top, env, ["ls-files", "--", ...TRACKED_STATE_PATHSPEC])) !== ""
         )
           return yield* new StateModeRefused({
-            reason: `git tracks state in ${STATE_DIRECTORY}/, which an exclude entry cannot hide; use the work mode`,
+            reason: `the repository tracks state in ${STATE_DIRECTORY}/, which an exclude entry cannot hide; use local only after the tracked state is removed from git, work only in a repository its owner controls (it commits the state with the work), or ask the owner; see docs/usage.md`,
           })
-        if (mode === "local") yield* setExcluded(top, env, true)
-        yield* gitText(top, env, ["config", "--local", STATE_MODE_KEY, mode])
-        if (mode !== "local") yield* setExcluded(top, env, false)
+        if (mode === "local") yield* excludeState(top, common, env)
+        // Leaving local removes the entry after the mode write, so a failure there must put the
+        // mode back; the way back is read before the write, and only where it can be needed.
+        const restoreMode = mode === "local" ? undefined : yield* modeRestore(top, env, previous)
+        yield* gitText(top, env, ["config", "--local", STATE_MODE_KEY, mode]).pipe(
+          Effect.tapError(() =>
+            mode === "local" && previous !== "local"
+              ? unexcludeState(top, common, env).pipe(Effect.ignore)
+              : Effect.void,
+          ),
+        )
+        if (restoreMode !== undefined)
+          yield* unexcludeState(top, common, env).pipe(
+            Effect.catch((error) =>
+              restoreMode.pipe(
+                Effect.matchEffect({
+                  onSuccess: () => Effect.fail(error),
+                  onFailure: (restoreError) =>
+                    Effect.fail(
+                      new StateIo({
+                        path: top,
+                        cause: `${error.message}; the mode could not be put back to ${previous} either (${restoreError.message}); set git config ${STATE_MODE_KEY} by hand`,
+                      }),
+                    ),
+                }),
+              ),
+            ),
+          )
         return { previous, mode }
       }),
       "long",
