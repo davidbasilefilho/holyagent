@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mvtmi74n-ud4q",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "make-holyagent-repair-every-visual",
+  "objective": "Make holyagent repair every visual review finding that affects what renders, and re-inspect, without asking the user, so rendered work only reaches the user once the inspection is clean.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-visual (branch ccr-046ad103-6qsvgx-visual-autofix, from 673c38a).",
+    "User (verbatim): 'ele terminou, viu problemas e não concertou automaticamente. é esse o ponto de revisão visual, arrumar automaticamente. resolva no holyagent'. Case: the session 'Obsidian 3 prediction artifact' published a page; Reviewer.visual passed the blocking criteria and listed three small findings (cramped line labels in a chart, effort labels disappearing at 400px width, a 'All 24 models' title over a 25-row table); the root reported them and asked 'Se quiser, corrijo esses três' instead of repairing.",
+    "Rules to state (requirements.md first, then the claude-5.5 root visual and assignments sections, and the Reviewer.visual and Worker.visual role text): every visual finding about legibility, overlap or cramped text, responsiveness at any listed viewport, text or numbers that misstate the content, accessibility, or interaction is a repair, not an optional note, whatever severity the reviewer gave it; the root dispatches the repair and the re-inspection of only what it touched, and repeats until the inspection is clean, without asking; only pure taste with none of those effects is skipped, and it is named in the final report, not offered as a question. Reviewer.visual marks such findings blocking. The final report never offers fixes the root can make itself.",
+    "Follow the Writing instructions rules in packages/integrations/claude/dist/agents/holyagent.md (calm, the reason beside each rule, no larger than needed); mind the root-core budget test."
+  ],
+  "constraints": [
+    "Follow /home/user/holyagent/.claude/CLAUDE.md.",
+    "Work only in that worktree; run bun install --frozen-lockfile if node_modules is missing; make no version-control writes and no edits under .git/ or .holyagent/. Edit only packages/runtime/src/instructions: do not rebuild dist or edit tests (another writer owns those paths now). Run mise run verify and report which failures, if any, come only from the stale generated dist; name any test that needs updating.",
+    "When done and checked, stop and report; no unrequested changes."
+  ],
+  "criteria": [
+    {
+      "text": "The instruction text makes the root repair and re-inspect every visual finding with a legibility, responsiveness, accuracy, accessibility or interaction effect without asking, in requirements.md, the root sections and the visual role texts",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify shows no failures other than the stale generated dist, and any needed test change is named",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T14:13:02.231Z"
+  },
+  "createdAt": "2026-10-29T14:13:02.231Z"
+}
