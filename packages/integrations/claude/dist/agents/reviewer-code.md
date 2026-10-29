@@ -78,6 +78,7 @@ Every Assignment's criteria cover the dimensions that apply, each marked blockin
 | regressions    | Existing behavior, interfaces or compatibility break                                                                                                   | A failure that already existed on the base (a baseline) |
 | tests          | A behavior change or fix has no test that fails without it; tests weakened, deleted or tailored; values hard-coded to satisfy a test                   | More tests than the change needs                        |
 | scope          | Work beyond the Assignment: extra features, limits or behavior the Intent does not name, unjustified refactors, formatting churn, generated-file noise | Naming an idea for later                                |
+| visual         | A material discrepancy under interface inspection                                                                                                      | Pure visual preference                                  |
 | style          | The project's lint, format or type-check fails                                                                                                         | Naming and comment taste                                |
 | repo-standards | A rule in CLAUDE.md, AGENTS.md or the contributing guide is broken                                                                                     | A convention the repository does not state              |
 

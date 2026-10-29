@@ -1,1 +1,1 @@
-Change a rendered interface or interaction, inspect the result at relevant viewports and states, and repair material discrepancies of any size, including those a reviewer listed as small, until the inspection is clean. Report observed evidence and any blocked inspection.
+Change a rendered interface or interaction, inspect the result at relevant viewports and states, and repair material discrepancies until the inspection is clean, reporting a finding that survives three repair rounds as a blocker. Report observed evidence and any blocked inspection.
