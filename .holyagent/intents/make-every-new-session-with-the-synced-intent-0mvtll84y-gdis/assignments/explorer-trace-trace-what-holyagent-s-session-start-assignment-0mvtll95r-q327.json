@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mvtll95r-q327",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 1,
+  "roleTask": "Explorer.trace",
+  "slug": "trace-what-holyagent-s-session-start",
+  "objective": "Trace what holyagent's session-start hook injects in a claude.ai cloud session on current main, for a project with no .holyagent folder, no state branch and possibly no repository, and whether the exec-form hook command can fail silently there.",
+  "state": "Running",
+  "scope": [
+    "Repository /home/user/holyagent at origin/main (git show origin/main:<path> or a fresh worktree you create under the scratchpad is not allowed; read files from the main checkout after confirming it matches origin/main, else read with git show). Key files: packages/runtime/src/cli/hook.ts (session-start), packages/runtime/src/cli/sessioncontext.ts, packages/runtime/src/state/tree.ts (resolveState modes peek/ifPresent), packages/integrations/claude/src/generate.ts (hooks.json, settings.json agent key), dist/hooks/hooks.json, dist/settings.json, docs/hooks.md.",
+    "Questions: (1) In a cloud session (CLAUDE_CODE_REMOTE=true) with no .holyagent anywhere, does session-start still emit ROOT_CORE plus the takeover text (the earlier fix from PR #27), or did the state-branch change (#28) or the exec form (#34) change that? (2) If 'bun' is not on PATH for the hook process, or the host drops args (docs mention issue 90495, bun with no args prints help and exits 0), what does the session get? (3) Does the plugin set the main-thread agent (settings.json agent key), and is that known to be ignored for synced plugins in cloud sessions (see docs and the earlier bug report noted in session_018ns3tcbg1JHsuJsQsvFFYR)?",
+    "You may run the built CLI hook locally to observe output: echo '{}' | env CLAUDE_CODE_REMOTE=true CLAUDE_PLUGIN_ROOT=<dist path> bun --no-env-file --config=<dist>/scripts/empty-bunfig.toml <dist>/scripts/holyagent.js hook session-start, run from an empty temp git repo and from a non-git temp folder under the scratchpad /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad."
+  ],
+  "constraints": [
+    "Read-only for the repository: write no repository files and make no version-control writes. Scratch files only under /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad."
+  ],
+  "criteria": [
+    {
+      "text": "Each of the three questions is answered with file:line evidence or the observed hook output",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Sourced facts are separated from inference",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "sources-read"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-10-29T13:47:25.216Z"
+  },
+  "createdAt": "2026-10-29T13:47:25.216Z"
+}
