@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "re-review-the-stack-rule-repair-that",
   "objective": "Re-review the stack-rule repair that closed finding B1.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Previous finding B1 and notes: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-rerev.txt. This repair alone: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule-repair3.diff; full diff: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule-v3.diff (worktree /home/user/holyagent-stack-rule). Repair report: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-rulefix3.txt.",
     "Recorded defaults: every new PR, a delivery's first included, stacks on the open stack's top (the owner's own non-draft PRs from this repository's branches); only a CI change, no open stack, or independent-PR conventions branch from the base; stacking waits for holyagent's independent review, not human review; a lagging stack gets the base merged forward first.",
@@ -35,5 +35,10 @@
     "assignment-0mvtvreh7-yiod"
   ],
   "followUpOf": "assignment-0mvtvmo4p-xh29",
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-29T18:36:35.211Z"
+  },
   "createdAt": "2026-10-29T18:36:27.301Z"
 }
