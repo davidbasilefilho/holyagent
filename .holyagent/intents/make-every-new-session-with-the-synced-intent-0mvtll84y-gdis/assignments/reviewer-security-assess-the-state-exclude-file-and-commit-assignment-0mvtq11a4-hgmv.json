@@ -1,0 +1,37 @@
+{
+  "id": "assignment-0mvtq11a4-hgmv",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.security",
+  "slug": "assess-the-state-exclude-file-and-commit",
+  "objective": "Assess the state exclude-file and commit-scope fixes for security issues: lock handling, writes under .git, case folding, and anything that could commit state the project does not accept.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-state-edges; review commit 32b1d25 (eaed3fd..32b1d25); diff: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/rv-B.diff.",
+    "Earlier security notes: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-9sjn.txt; writer report /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-1i5u.txt."
+  ],
+  "constraints": [
+    "Read-only: write no files and make no version-control writes."
+  ],
+  "criteria": [
+    {
+      "text": "Each finding traces a source to a sink with file:line and a fix, or the absence of findings is stated",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources-read"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvtpddfi-1i5u"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T15:51:39.965Z"
+  },
+  "createdAt": "2026-10-29T15:51:39.965Z"
+}
