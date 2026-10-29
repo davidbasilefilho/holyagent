@@ -1,0 +1,59 @@
+{
+  "id": "assignment-0mvtpczds-yw54",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 5,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-holyagent-root-resolve-every",
+  "objective": "Make the holyagent root resolve every open item it can before it finishes, so its final report lists only what needs the user, and apply the instruction-side leftovers from the last reviews.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-instr-finish (branch ccr-046ad103-6qsvgx-pending-autofix from origin/main eaed3fd).",
+    "Behavior: today the root text says only blocking findings start a repair and non-blocking ones ride along with a blocker repair, and its final report names leftovers. Change it so that before finishing the root runs one more repair round for every open item a specialist can fix (non-blocking review findings, doc nits, edge cases, checks that can be run or added), then the usual re-review of that repair, and its final report and PR text list only items that need the user (a decision, an access or account action, a device it cannot reach) with the reason each needs them. Visual preference stays unrepaired and named, as now. Keep the loop bounded: a finding still open after its repair round becomes a blocker for the user, as the visual three-round rule does; do not let 'resolve everything' mean unrequested features or refactors (those are still named, not built). Update requirements.md first (the R- lines on findings, finishing and the final report), then claude-5.5 root sections (assignments.md 'Only blocking findings start a repair…' and 'Finish when…', the final-report rules wherever they are) and any specialist text that tells reviewers or workers how non-blocking findings are handled, keeping size about the same as the text replaced.",
+    "Instruction leftovers: (1) the visual material definition is duplicated in roles/worker-visual/purpose.md and roles/reviewer-visual/purpose.md: cut each to a pointer to the interface inspection section; (2) root/visual.md: say to stop repairing a finding after three rounds and report it as a blocker, with the root counting the rounds across Worker.visual dispatches (R-WVI and the worker-visual purpose to match); (3) restore the concrete legibility examples (cramped, overlapping, clipped or disappearing text) and the text-accuracy example (a title that misstates what it covers) in specialist/interface-inspection.md only; (4) state-mode signal order in R-STATE and root/version-control.md: check ownership before the tracked-state signal: owner's words; a repository the owner does not control (fork, no push access, another owner) -> local; tracked .holyagent/ besides config.json -> work; conventions asking for independent PRs -> local; else branch. Regenerate with mise run build."
+  ],
+  "constraints": [
+    "User (verbatim): \"não deve ter nada pendente / outra coisa: arrume esse comportamento, o que ficar pendente que o agente pode resolver deve ser resolvido\".",
+    "Follow /home/user/holyagent/.claude/CLAUDE.md and /home/user/holyagent/AGENTS.md (Effect with tagged errors, no try/catch/new Promise/async in runtime and CLI source, Schema at boundaries, Bun APIs and Bun Shell, JSDoc). Do not edit .claude/CLAUDE.md or AGENTS.md.",
+    "Make no version-control writes and no edits under .git/ or .holyagent/ of the repository; tests use temp folders.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done and checked, stop and report; add no unrequested features (name ideas in the report)."
+  ],
+  "criteria": [
+    {
+      "text": "The root instructions and requirements make the root resolve every agent-fixable open item before finishing and report only user-only items, bounded by a blocker rule and excluding unrequested features",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The four instruction leftovers are applied as described",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Instruction size stays about the same as the text replaced, measured with wc -w",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "mise run build leaves no diff after the change and mise run verify passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/integrations/claude"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T15:32:57.760Z"
+  },
+  "createdAt": "2026-10-29T15:32:57.760Z"
+}
