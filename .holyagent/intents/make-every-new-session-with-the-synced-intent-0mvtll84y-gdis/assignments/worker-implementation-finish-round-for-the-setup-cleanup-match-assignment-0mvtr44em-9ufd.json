@@ -1,0 +1,57 @@
+{
+  "id": "assignment-0mvtr44em-9ufd",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 5,
+  "roleTask": "Worker.implementation",
+  "slug": "finish-round-for-the-setup-cleanup-match",
+  "objective": "Finish round for the setup cleanup: match Billion Context's own ownership rules exactly and close the open notes of the last re-reviews.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-setup-cleanup at 0ed1d28. Re-reviews: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-rrve.txt and /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-w639.txt. Billion Context's own install and remove rules, quoted from its source at commit 3a5d532 (src/plugin-install.ts): /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-owwv.txt (evidence section).",
+    "Adopt those rules: acp-cache.md deleted only when its trimEnd text equals the quoted template exactly (else kept and reported); the SessionStart hook entry is Billion Context's when a hook command matches /claude-native-bootstrap\\.(?:js|mjs|ts)[\"']?$/; mcpServers.bili is Billion Context's when its command basename is node, node.exe or node.cmd and an arg matches /dist[\\\\/]claude-mcp-entry\\.(?:js|mjs)$/ or the legacy /dist[\\\\/]mcp\\.(?:js|mjs)$/; ANTHROPIC_BASE_URL and ANTHROPIC_VERTEX_BASE_URL are removed only when they match /^http:\\/\\/127\\.0\\.0\\.1:\\d{1,5}\\/bili\\/(?:[a-z][a-z0-9-]*\\/)?https?:\\/\\// (any port); DISABLE_AUTO_COMPACT removed only when it equals \"1\" and other Billion Context evidence exists, restoring a pre-install value from settings.json.bili-bak when that backup holds one; honor CLAUDE_CONFIG_DIR for settings.json, commands/ and .claude.json as Billion Context does. Replace the earlier guessed matches (bili-prefixed commands, any-bili-word marker) with these.",
+    "Open notes: a project- or local-scope install without projectPath is skipped with a note naming the manual command; installLabel includes the project path; an empty install array is no install; run the scoped uninstall only when projectPath is an existing directory owned by the current user, else print the manual command; build planClaudeJson's map with Object.fromEntries or a Map; a retry that re-reads invalid JSON prints a note. Update docs/usage.md and docs/components.md to the exact rules. Tests for each change."
+  ],
+  "constraints": [
+    "User (verbatim): \"não deve ter nada pendente / outra coisa: arrume esse comportamento, o que ficar pendente que o agente pode resolver deve ser resolvido\". This is the finish round: fix every listed item; the added tests and checks are requested work.",
+    "Follow /home/user/holyagent/.claude/CLAUDE.md and /home/user/holyagent/AGENTS.md. Do not edit .claude/CLAUDE.md or AGENTS.md.",
+    "Make no version-control writes and no edits under .git/ or .holyagent/ of the repository; tests use temp folders.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done and checked, stop and report."
+  ],
+  "criteria": [
+    {
+      "text": "Every listed item is fixed, with a test that fails without it for code changes, or named with a concrete reason",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The cleanup removes only what Billion Context's own rules claim, proven by tests including foreign look-alike entries that are kept",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "mise run build leaves no diff after the change and mise run verify passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/cli",
+    "docs/components.md",
+    "README.md",
+    ".github"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvtqsol2-w639",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T16:22:03.598Z"
+  },
+  "createdAt": "2026-10-29T16:22:03.598Z"
+}
