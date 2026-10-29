@@ -8,8 +8,6 @@
 # only to install missing apt packages. Run it as your own user, not through sudo.
 #
 # What you are opting into:
-# - Billion Context routes all Claude Code traffic through a local proxy (127.0.0.1:18787), turns
-#   off Claude Code's auto-compact, and auto-updates itself from npm by default.
 # - `ctx7 setup` downloads a skill and a rule from Context7's servers into ~/.claude.
 # - Bun runs a canary build (`bun upgrade --canary`), because the toolchain needs `bun lint`,
 #   `bun fmt` and `bun check`.
@@ -26,7 +24,7 @@ if [[ $EUID -eq 0 && -n "${SUDO_USER:-}" ]]; then
   exit 1
 fi
 
-TOTAL_STEPS=8
+TOTAL_STEPS=7
 CURRENT_STEP="startup"
 STEP_NUMBER=0
 MISE_INSTALLER=""
@@ -55,10 +53,9 @@ MISE="${MISE_INSTALL_PATH:-$HOME/.local/bin/mise}"
 export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
 BASHRC="$HOME/.bashrc"
 CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-CLAUDE_JSON="${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json"
 
 # Puts the tools mise has selected globally (node, bun) and Bun's global bin directory (claude,
-# bili, ctx7) ahead of the rest of PATH for the remaining steps.
+# ctx7) ahead of the rest of PATH for the remaining steps.
 refresh_path() {
   local dir mise_paths=""
   while IFS= read -r dir; do
@@ -168,7 +165,7 @@ printf -v mise_line 'eval "$(%q activate bash)"' "$MISE"
 ensure_bashrc_line '^[[:space:]]*eval .*mise.* activate bash' "$mise_line"
 
 # ---------------------------------------------------------------------------------------------
-step "Node.js LTS (Billion Context and ctx7 run on Node)"
+step "Node.js LTS (ctx7 runs on Node)"
 
 if "$MISE" where node >/dev/null 2>&1; then
   note "node already selected globally"
@@ -211,64 +208,6 @@ step "Claude Code (via Bun)"
 # Bun. Installing the same npm package with Bun works but is not an officially documented method,
 # and its auto-update behavior is undocumented. `claude doctor` reports the install type.
 install_bun_global claude @anthropic-ai/claude-code
-
-# ---------------------------------------------------------------------------------------------
-step "Billion Context (via Bun) with Claude Code native mode"
-
-# Billion Context (https://github.com/ranxianglei/billion-context) documents npm only; Bun works
-# and the bins run on Node through their shebang.
-install_bun_global bili billion-context
-
-# Native mode merges a proxy base URL, a SessionStart hook and an MCP server into the Claude Code
-# settings and sets DISABLE_AUTO_COMPACT=1: bili owns compression, so Claude Code's auto-compact
-# stays off (manual /compact still works). Every re-run of the command writes another settings
-# backup, so it runs only when one of its artifacts is missing.
-bili_native_ready() {
-  grep -q 'claude-native-bootstrap' "$CLAUDE_DIR/settings.json" 2>/dev/null &&
-    [[ -f "$CLAUDE_DIR/commands/acp-cache.md" ]] &&
-    grep -q '"bili"' "$CLAUDE_JSON" 2>/dev/null
-}
-if bili_native_ready; then
-  note "Claude Code native mode already configured"
-else
-  bili plugin install claude
-fi
-
-# compress.rules protects persistent reminders (rules text) from being folded. It is set only when
-# the key is absent, so a value the user chose and every other key stay untouched.
-bili_config="${BILI_CONFIG_FILE:-${XDG_CONFIG_HOME:-$HOME/.config}/billion-context/billion-context.json}"
-BILI_CONFIG="$bili_config" node -e '
-  const fs = require("node:fs")
-  const path = require("node:path")
-  const file = process.env.BILI_CONFIG
-  const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value)
-  const refuse = (message) => {
-    console.error("    error: " + message)
-    process.exit(1)
-  }
-  let config = {}
-  if (fs.existsSync(file)) {
-    try {
-      config = JSON.parse(fs.readFileSync(file, "utf8"))
-    } catch (error) {
-      refuse(file + " is not valid JSON (" + error.message + "); fix or remove it, then re-run")
-    }
-    if (!isObject(config)) refuse(file + " must contain a JSON object; fix it, then re-run")
-  }
-  const compress = config.compress ?? {}
-  if (!isObject(compress)) refuse("compress in " + file + " is not an object; fix it, then re-run")
-  if (compress.rules !== undefined) {
-    console.log("    compress.rules already set (" + compress.rules + ") in " + file)
-    process.exit(0)
-  }
-  config.compress = { ...compress, rules: true }
-  const directory = path.dirname(file)
-  fs.mkdirSync(directory, { recursive: true })
-  const temporary = path.join(directory, "." + path.basename(file) + "." + process.pid + ".tmp")
-  fs.writeFileSync(temporary, JSON.stringify(config, null, 2) + "\n", { mode: 0o600 })
-  fs.renameSync(temporary, file)
-  console.log("    set compress.rules=true in " + file)
-'
 
 # ---------------------------------------------------------------------------------------------
 step "ctx7 (Context7 CLI via Bun) and its Claude Code skill"
@@ -315,7 +254,6 @@ verify mise "$MISE" --version
 verify node node --version
 verify bun bun --revision
 verify claude claude --version
-verify bili bili --version
 verify ctx7 ctx7 --version
 
 if have bun && ! bun --revision | grep -q canary; then

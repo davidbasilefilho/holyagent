@@ -52,8 +52,8 @@ export interface RunOptions {
 }
 
 /**
- * The external commands the CLI drives (`claude`, `bun`, `bili`, `ctx7`). Commands see Bun's global
- * bin directory on PATH, because a `bun add -g` in the same run puts new commands there.
+ * The external commands the CLI drives (`claude`, `bun`, `ctx7`). Commands see Bun's global bin
+ * directory on PATH, because a `bun add -g` in the same run puts new commands there.
  */
 export class Shell extends Context.Service<
   Shell,

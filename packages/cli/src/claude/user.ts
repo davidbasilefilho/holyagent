@@ -2,10 +2,9 @@ import { homedir } from "node:os"
 
 import { Config, Effect, FileSystem, Option, Path, Schema } from "effect"
 
-import { applyDefaults, readJsonObject, writeJsonObject } from "../json-file.ts"
-import { CliFailure, type Report, show } from "../report.ts"
+import { CliFailure, type Report } from "../report.ts"
 import { Shell, type ShellResult } from "../shell.ts"
-import { BILLION_CONTEXT_MARKETPLACE, MARKETPLACE, PLUGIN_ID } from "./project.ts"
+import { MARKETPLACE, PLUGIN_ID } from "./project.ts"
 
 const InstalledPlugins = Schema.Array(Schema.Struct({ id: Schema.String }))
 const Marketplaces = Schema.Array(Schema.Struct({ name: Schema.String }))
@@ -33,15 +32,12 @@ export const homeDirectory = Effect.gen(function* () {
   )
 })
 
-/** Where the current user's Claude Code, Billion Context and Context7 files live. */
+/** Where the current user's Claude Code and Context7 files live. */
 const userFiles = Effect.gen(function* () {
   const path = yield* Path.Path
   const home = yield* homeDirectory
   const claudeConfigDir = yield* Config.option(Config.String("CLAUDE_CONFIG_DIR"))
-  const xdgConfigHome = yield* Config.option(Config.String("XDG_CONFIG_HOME"))
-  const biliConfigFile = yield* Config.option(Config.String("BILI_CONFIG_FILE"))
   const claudeDir = Option.getOrElse(claudeConfigDir, () => path.join(home, ".claude"))
-  const xdg = Option.getOrElse(xdgConfigHome, () => path.join(home, ".config"))
   return {
     claudeDir,
     // Claude Code keeps .claude.json inside CLAUDE_CONFIG_DIR when that is set, else in $HOME.
@@ -49,18 +45,9 @@ const userFiles = Effect.gen(function* () {
       Option.getOrElse(claudeConfigDir, () => home),
       ".claude.json",
     ),
-    biliConfig: Option.getOrElse(biliConfigFile, () =>
-      path.join(xdg, "billion-context", "billion-context.json"),
-    ),
     ctx7Credentials: path.join(home, ".config", "context7", "credentials.json"),
   }
 }).pipe(Effect.mapError((error) => new CliFailure({ message: `environment: ${error.message}` })))
-
-const fileContains = (path: string, needle: string) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem
-    return (yield* fs.readFileString(path)).includes(needle)
-  }).pipe(Effect.catch(() => Effect.succeed(false)))
 
 const fileExists = (path: string) =>
   Effect.gen(function* () {
@@ -87,9 +74,9 @@ const installPlugin = Effect.fn("installPlugin")(function* (dryRun: boolean) {
     return [present(`plugin ${PLUGIN_ID}: already installed`)]
   }
   if (dryRun) return [added(`plugin ${PLUGIN_ID}: would install`)]
-  // The plugin's own marketplace and the one its Billion Context dependency comes from must both be
-  // registered before the install. `marketplace add` is skipped for a registered one; a listing that
-  // cannot be read falls through to the adds, which Claude Code also accepts for a known marketplace.
+  // The plugin's own marketplace must be registered before the install. `marketplace add` is skipped
+  // for a registered one; a listing that cannot be read falls through to the add, which Claude Code
+  // also accepts for a known marketplace.
   const known = yield* shell.run("claude", ["plugin", "marketplace", "list", "--json"])
   const registered =
     known.exitCode === 0
@@ -98,11 +85,10 @@ const installPlugin = Effect.fn("installPlugin")(function* (dryRun: boolean) {
           Effect.orElseSucceed(() => new Set<string>()),
         )
       : new Set<string>()
-  for (const marketplace of [MARKETPLACE, BILLION_CONTEXT_MARKETPLACE]) {
-    if (registered.has(marketplace.name)) continue
-    const result = yield* shell.run("claude", ["plugin", "marketplace", "add", marketplace.repo])
+  if (!registered.has(MARKETPLACE.name)) {
+    const result = yield* shell.run("claude", ["plugin", "marketplace", "add", MARKETPLACE.repo])
     if (result.exitCode !== 0)
-      return [failed(`claude plugin marketplace add ${marketplace.repo}`, result)]
+      return [failed(`claude plugin marketplace add ${MARKETPLACE.repo}`, result)]
   }
   const install = yield* shell.run("claude", ["plugin", "install", PLUGIN_ID])
   if (install.exitCode !== 0) return [failed("claude plugin install", install)]
@@ -138,62 +124,6 @@ const ensureGlobal = Effect.fn("ensureGlobal")(function* (
     lines.push(hint(`${command}: ${anywhere.value} is not on PATH; add its directory to PATH`))
   }
   return { usable: true, lines }
-})
-
-/** Billion Context: the package, its Claude Code native mode, and `compress.rules`. */
-const installBillionContext = Effect.fn("installBillionContext")(function* (dryRun: boolean) {
-  const shell = yield* Shell
-  const path = yield* Path.Path
-  const files = yield* userFiles
-  const global = yield* ensureGlobal("bili", "billion-context", dryRun)
-  if (!global.usable) return global.lines
-
-  // Native mode merges a proxy URL, a hook and an MCP server into Claude Code's settings, and every
-  // run writes another settings backup, so it runs only when one of its artifacts is missing.
-  const nativeReady =
-    (yield* fileContains(path.join(files.claudeDir, "settings.json"), "claude-native-bootstrap")) &&
-    (yield* fileExists(path.join(files.claudeDir, "commands", "acp-cache.md"))) &&
-    (yield* fileContains(files.claudeJson, '"bili"'))
-  const native = nativeReady
-    ? present("bili native mode: already configured")
-    : dryRun
-      ? added("bili native mode: would configure with bili plugin install claude")
-      : yield* shell
-          .run("bili", ["plugin", "install", "claude"])
-          .pipe(
-            Effect.map((result) =>
-              result.exitCode === 0
-                ? added("bili native mode: configured with bili plugin install claude")
-                : failed("bili plugin install claude", result),
-            ),
-          )
-
-  // compress.rules protects persistent reminders from being folded; it is set only when absent.
-  const config = yield* readJsonObject(files.biliConfig).pipe(
-    Effect.flatMap((existing) => {
-      const { merged, entries } = applyDefaults(existing, [
-        { path: ["compress", "rules"], value: true },
-      ])
-      const [entry] = entries
-      if (entry?.status !== "added") {
-        return Effect.succeed(
-          present(
-            `bili config: ${entry?.path} already ${show(entry?.value)} in ${files.biliConfig}`,
-          ),
-        )
-      }
-      if (dryRun) {
-        return Effect.succeed(
-          added(`bili config: would set compress.rules=true in ${files.biliConfig}`),
-        )
-      }
-      return writeJsonObject(files.biliConfig, merged, { mode: 0o600 }).pipe(
-        Effect.as(added(`bili config: set compress.rules=true in ${files.biliConfig}`)),
-      )
-    }),
-    Effect.catchTag("CliFailure", (error) => Effect.succeed(`! bili config: ${error.message}`)),
-  )
-  return [...global.lines, native, config]
 })
 
 /** Ctx7 and the Context7 skill; the skill is skipped, with a hint, when no login or key exists. */
@@ -254,20 +184,16 @@ export const asStep = <R>(
   )
 
 /**
- * Installs HolyAgent for the current user: the Claude Code plugin, Billion Context and ctx7. Every
- * step checks its own result first, and a step that fails does not stop the others. On a dry run
- * nothing is installed or written, and the lines say what would be.
+ * Installs HolyAgent for the current user: the Claude Code plugin and ctx7. Every step checks its
+ * own result first, and a step that fails does not stop the others. On a dry run nothing is
+ * installed or written, and the lines say what would be.
  */
 export const setupUser = Effect.fn("setupUser")(function* (options: {
-  readonly skipBillionContext: boolean
   readonly skipCtx7: boolean
   readonly dryRun: boolean
 }) {
   const lines = [
     ...(yield* installPlugin(options.dryRun)),
-    ...(options.skipBillionContext
-      ? [skipped("billion-context: skipped by flag")]
-      : yield* asStep("billion-context", installBillionContext(options.dryRun))),
     ...(options.skipCtx7
       ? [skipped("ctx7: skipped by flag")]
       : yield* asStep("ctx7", installCtx7(options.dryRun))),

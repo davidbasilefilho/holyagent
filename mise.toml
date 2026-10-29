@@ -1,5 +1,5 @@
 [tools]
-# Billion Context and ctx7 run on Node.
+# ctx7 runs on Node.
 node = "lts"
 # The toolchain is Bun's builtin `bun check`, `bun lint` and `bun fmt`, which exist only in canary
 # builds, and mise cannot install bun@canary. mise installs the stable base and the postinstall hook
