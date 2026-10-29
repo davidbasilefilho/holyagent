@@ -157,7 +157,7 @@ describe("manifests", () => {
       version: packageJson.version,
       author: { name: "davidbasilefilho" },
       license: "Apache-2.0",
-      dependencies: ["billion-context@billion-context", "exa@claude-plugins-official"],
+      dependencies: ["exa@claude-plugins-official"],
     })
   })
 
@@ -165,7 +165,7 @@ describe("manifests", () => {
     expect(marketplace).toMatchObject({
       name: "holyagent",
       owner: { name: "davidbasilefilho" },
-      allowCrossMarketplaceDependenciesOn: ["billion-context", "claude-plugins-official"],
+      allowCrossMarketplaceDependenciesOn: ["claude-plugins-official"],
       plugins: [
         {
           name: "holyagent",

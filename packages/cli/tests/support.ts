@@ -40,7 +40,7 @@ export interface Call {
   readonly line: string
 }
 
-const packageCommands: Record<string, string> = { "billion-context": "bili", ctx7: "ctx7" }
+const packageCommands: Record<string, string> = { ctx7: "ctx7" }
 
 /**
  * A fake {@link Shell} that records every `run` and knows which commands are on PATH. A `bun add -g

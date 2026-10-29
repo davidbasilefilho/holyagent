@@ -8,7 +8,7 @@ import { fakeShell, run, tempDir } from "./support.ts"
 
 const CANARY = "1.4.4-canary.1+a8fcd319b"
 const STABLE = "1.4.4+38afee6c8"
-const allTools = ["claude", "bili", "ctx7", "bun"]
+const allTools = ["claude", "ctx7", "bun"]
 
 const answers = (bun: () => string, plugins: ReadonlyArray<string>) => (line: string) =>
   line === "bun --revision"
@@ -37,7 +37,6 @@ describe("holyagent doctor", () => {
         expect(report.lines.map((line) => line.split(":")[0])).toEqual([
           "ok   bun",
           "ok   claude",
-          "ok   bili",
           "ok   ctx7",
           "ok   settings",
           "ok   plugin",
@@ -113,7 +112,6 @@ describe("holyagent doctor", () => {
         const shell = fakeShell({ commands: ["bun", "claude"], respond: answers(() => CANARY, []) })
         const report = yield* doctor({ directory, fix: false }).pipe(Effect.provide(shell.layer))
         expect(report.ok).toBe(false)
-        expect(report.lines).toContain("FAIL bili: not found on PATH")
         expect(report.lines).toContain("FAIL ctx7: not found on PATH")
         const settings = report.lines.find((line) => line.startsWith("FAIL settings"))
         expect(settings).toContain("attribution.commit")

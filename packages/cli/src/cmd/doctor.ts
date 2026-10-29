@@ -70,9 +70,9 @@ const checkPlugin = Effect.gen(function* () {
 })
 
 /**
- * Checks the environment HolyAgent needs, one line per check: a canary Bun, `claude`, `bili` and
- * `ctx7` on PATH, the project settings from `holyagent setup claude`, and the installed plugin.
- * With `fix`, a Bun that is not canary is upgraded.
+ * Checks the environment HolyAgent needs, one line per check: a canary Bun, `claude` and `ctx7` on
+ * PATH, the project settings from `holyagent setup claude`, and the installed plugin. With `fix`, a
+ * Bun that is not canary is upgraded.
  */
 export const doctor = Effect.fn("doctor")(function* (options: {
   readonly directory: string
@@ -81,7 +81,6 @@ export const doctor = Effect.fn("doctor")(function* (options: {
   const lines = [
     yield* checkBun(options.fix),
     yield* checkCommand("claude"),
-    yield* checkCommand("bili"),
     yield* checkCommand("ctx7"),
     yield* checkSettings(options.directory),
     yield* checkPlugin,
@@ -109,7 +108,7 @@ export const doctorCommand = Command.make(
 )
   .pipe(
     Command.withDescription(
-      "Check Bun (canary), claude, bili, ctx7, this project's settings and the HolyAgent plugin; exit 1 when a check fails.",
+      "Check Bun (canary), claude, ctx7, this project's settings and the HolyAgent plugin; exit 1 when a check fails.",
     ),
   )
   .pipe(

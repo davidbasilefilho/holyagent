@@ -8,7 +8,6 @@ import { envLayer, fakeShell, parseJson, run, tempDir } from "./support.ts"
 const options = {
   subagentCacheTtl: "1h",
   dryRun: false,
-  skipBillionContext: false,
   skipCtx7: false,
 } as const
 
@@ -18,7 +17,7 @@ const pluginList = (ids: ReadonlyArray<string>) => (line: string) =>
     : undefined
 
 describe("holyagent setup claude", () => {
-  test("installs the plugin, Billion Context and ctx7, then writes the project settings", () =>
+  test("installs the plugin and ctx7, then writes the project settings", () =>
     run(
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem
@@ -34,19 +33,16 @@ describe("holyagent setup claude", () => {
           "claude plugin list --json",
           "claude plugin marketplace list --json",
           "claude plugin marketplace add davidbasilefilho/holyagent",
-          "claude plugin marketplace add ranxianglei/billion-context",
           "claude plugin install holyagent@holyagent",
-          "bun add -g billion-context",
-          "bili plugin install claude",
           "bun add -g ctx7",
         ])
         expect(report.ok).toBe(true)
         const lines = report.lines
         const at = (prefix: string) => lines.findIndex((line) => line.startsWith(prefix))
-        expect(at("+ plugin")).toBeLessThan(at("+ bili:"))
-        expect(at("+ bili config")).toBeLessThan(at("- ctx7 skill"))
+        expect(at("+ plugin")).toBeLessThan(at("+ ctx7:"))
+        expect(at("+ ctx7:")).toBeLessThan(at("- ctx7 skill"))
         expect(at("- ctx7 skill")).toBeLessThan(at(directory))
-        expect(lines.at(-1)).toBe("added 9")
+        expect(lines.at(-1)).toBe("added 8")
         expect(
           parseJson(yield* fs.readFileString(path.join(directory, ".claude", "settings.json")))
             .enabledPlugins,
@@ -62,7 +58,7 @@ describe("holyagent setup claude", () => {
         const home = yield* tempDir
         const directory = yield* tempDir
         const file = path.join(directory, ".claude", "settings.json")
-        const skip = { ...options, skipBillionContext: true, skipCtx7: true }
+        const skip = { ...options, skipCtx7: true }
         const first = fakeShell({ commands: ["claude"], respond: pluginList([]) })
         yield* setupClaude({ directory, ...skip }).pipe(
           Effect.provide(first.layer),
@@ -98,7 +94,7 @@ describe("holyagent setup claude", () => {
         expect(shell.lines()).toEqual(["claude plugin list --json"])
         expect(report.ok).toBe(true)
         expect(report.lines).toContain("+ plugin holyagent@holyagent: would install")
-        expect(report.lines.at(-1)).toBe("dry run: would add 9, nothing written")
+        expect(report.lines.at(-1)).toBe("dry run: would add 8, nothing written")
         expect(yield* fs.exists(`${directory}/.claude`)).toBe(false)
         expect(yield* fs.readDirectory(home)).toEqual([])
       }),
@@ -120,14 +116,13 @@ describe("holyagent setup claude", () => {
         const report = yield* setupClaude({
           directory,
           ...options,
-          skipBillionContext: true,
           skipCtx7: true,
         }).pipe(Effect.provide(shell.layer), Effect.provide(envLayer({ HOME: home })))
         expect(report.ok).toBe(false)
         expect(report.lines[0]).toBe(
           "! claude plugin install: failed (exit 1): marketplace not found",
         )
-        expect(report.lines.at(-1)).toBe("added 9")
+        expect(report.lines.at(-1)).toBe("added 8")
         expect(yield* fs.exists(`${directory}/.claude/settings.json`)).toBe(true)
       }),
     ))
@@ -147,7 +142,6 @@ describe("holyagent setup claude", () => {
         const report = yield* setupClaude({
           directory,
           ...options,
-          skipBillionContext: true,
           skipCtx7: true,
         }).pipe(Effect.provide(shell.layer), Effect.provide(envLayer({ HOME: home })))
         expect(report.ok).toBe(false)
