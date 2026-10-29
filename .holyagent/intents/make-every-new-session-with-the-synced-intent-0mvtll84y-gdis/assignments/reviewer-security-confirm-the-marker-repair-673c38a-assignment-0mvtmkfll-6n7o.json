@@ -1,0 +1,37 @@
+{
+  "id": "assignment-0mvtmkfll-6n7o",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.security",
+  "slug": "confirm-the-marker-repair-673c38a",
+  "objective": "Confirm the marker repair (673c38a..09b7866) closes the shared-tmp findings and the per-call failure without new problems.",
+  "state": "Running",
+  "scope": [
+    "Repair diff: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/marker-fix.diff; files in /home/user/holyagent-root. Earlier findings: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-assignment-0mvtm1tnb-sg3e.txt (1 symlink truncation, 2 shared folder lockout) and code-review blocker B1 in /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-assignment-0mvtm1tfc-a04n.txt (per-call failure). Judge only the repair."
+  ],
+  "constraints": [
+    "Read-only: write no files."
+  ],
+  "criteria": [
+    {
+      "text": "Each earlier finding is marked closed or open with file:line, and new findings are traced and rated or their absence stated",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources-read"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvtmar87-ll2n"
+  ],
+  "followUpOf": "assignment-0mvtm1tnb-sg3e",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T14:14:46.522Z"
+  },
+  "createdAt": "2026-10-29T14:14:46.522Z"
+}
