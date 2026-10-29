@@ -1,0 +1,37 @@
+{
+  "id": "assignment-0mvtsmwcx-3zhm",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.testing",
+  "slug": "confirm-the-fixture-rename-in-packages",
+  "objective": "Confirm the fixture rename in packages/cli/tests/leftovers.test.ts keeps every test's purpose and leaves no credential-shaped fixture.",
+  "state": "Running",
+  "scope": [
+    "Diff: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/fx.diff (worktree /home/user/holyagent-setup-cleanup at bc70064). Context: GitGuardian flagged TOKEN=S3CRET-style fixtures as a Generic CLI Secret; they were renamed to LABEL=hidden-value-* forms.",
+    "Run bun test packages/cli/tests/leftovers.test.ts there."
+  ],
+  "constraints": [
+    "Read-only: write no files and make no version-control writes."
+  ],
+  "criteria": [
+    {
+      "text": "The renamed tests still prove that hidden command text is not printed and that look-alike entries are kept, with the test run on the head",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvtsiphg-lzce"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-10-29T17:04:39.250Z"
+  },
+  "createdAt": "2026-10-29T17:04:39.250Z"
+}
