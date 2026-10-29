@@ -1,0 +1,42 @@
+{
+  "id": "assignment-0mvtw4jd5-yrya",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 3,
+  "roleTask": "Worker.mechanical",
+  "slug": "apply-two-exact-wording-fixes-in-home",
+  "objective": "Apply two exact wording fixes in /home/user/holyagent-docs.",
+  "state": "Ready",
+  "scope": [
+    "In docs/usage.md line 14, replace the sentence 'Without a stated mode, an owned repository gets `branch` mode, with its `holyagent/state` branch.' with 'Without a stated mode, the root follows the order under [User settings](#user-settings): an owned repository with no tracked state and no independent-PR convention gets `branch` mode, with its `holyagent/state` branch.'",
+    "In install/windows-install.ps1 line 23, replace '# Tested by the maintainer on a Windows machine; what it covers and what it does not: see docs/requirements.md.' with '# Tested by the maintainer on a Windows machine; see docs/requirements.md.'",
+    "Then run the canary Bun /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/canary/x/bun-linux-x64/bun fmt --no-script --check docs/usage.md in /home/user/holyagent-docs, and regenerate the diff of the five files against /home/user/holyagent-plugin-only-install into /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/docs-v4.diff."
+  ],
+  "constraints": [
+    "Change nothing else. No git writes; no edits under .git/ or .holyagent/; no other worktree.",
+    "Stop and report when done."
+  ],
+  "criteria": [
+    {
+      "text": "Both replacements are applied exactly once and nothing else changes",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "fmt check passes on docs/usage.md",
+      "blocking": true,
+      "dimension": "style"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "docs/usage.md",
+    "install/windows-install.ps1"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvtvwy72-aspo",
+  "createdAt": "2026-10-29T18:42:21.066Z"
+}
