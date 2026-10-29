@@ -1,0 +1,42 @@
+{
+  "id": "assignment-0mvts41gs-aej5",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 5,
+  "roleTask": "Worker.mechanical",
+  "slug": "bring-two-docs-usage-md-sentences-in",
+  "objective": "Bring two docs/usage.md sentences in line with the last code changes.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-setup-cleanup (head 042e8a9). File docs/usage.md only.",
+    "1) Where it says a short-shaped first path segment is accepted only if it is a real entry of the work tree, add that a name still in HEAD's tree (for example a folder whose removal is staged) also counts.",
+    "2) Where it describes the project-scope plugin ownership rule (around line 31), add: a project folder that cannot be inspected is named with the cause and left alone; where the system has no user ids the owner cannot be checked and the printed line says so.",
+    "Run mise run verify (format check included)."
+  ],
+  "constraints": [
+    "Change only those sentences; keep the surrounding wording and format.",
+    "Make no version-control writes and no edits under .git/ or .holyagent/.",
+    "When done and checked, stop and report."
+  ],
+  "criteria": [
+    {
+      "text": "Both sentences are updated as described and mise run verify passes",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "docs/usage.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-29T16:49:59.404Z"
+  },
+  "createdAt": "2026-10-29T16:49:59.404Z"
+}
