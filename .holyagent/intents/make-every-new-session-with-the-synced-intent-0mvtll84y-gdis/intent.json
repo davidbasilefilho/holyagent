@@ -5,7 +5,9 @@
   "requirements": [
     "User (verbatim): \"fui rodar uma sessão nova (o plugin está configurado para sincronizar) para fazer um negócio aleatório, e ele não seguiu por padrão o holyagent way. o holyagent way é obrigatório\". Session: session_012tBKnb2s5Pj2Z6LXoSmUTW, created 2026-10-29 13:42 UTC from claude.ai web; it only followed holyagent after the user typed \"follow the holyagent way\".",
     "The plugin sync date shown is 2026-10-27 (the day #28-#34 merged).",
-    "Read other sessions only; never message, interrupt or archive them."
+    "Read other sessions only; never message, interrupt or archive them.",
+    "User (verbatim): \"ele terminou, viu problemas e não concertou automaticamente. é esse o ponto de revisão visual, arrumar automaticamente. resolva no holyagent\".",
+    "User (verbatim): \"outra coisa: testei no windows / remove o billion context completamente\"."
   ],
   "revision": 1,
   "state": "Open",
