@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "re-review-the-documentation-repair",
   "objective": "Re-review the documentation repair against the previous review's findings.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Previous findings: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-revdocs.txt. Repair report: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-docsfix.txt. Full diff against the merged PR 37 text: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/docs-v3.diff (files in /home/user/holyagent-docs: README.md, docs/usage.md, docs/requirements.md, docs/hooks.md, install/windows-install.ps1).",
     "Judge the blocking finding (docs/usage.md solo-repository bullet vs the state-mode signal order in docs/decisions.md and packages/runtime/src/instructions/claude-5.5/root/version-control.md) and the non-blocking notes closed or open, and whether the repair introduced a new contradiction."
@@ -35,5 +35,10 @@
     "assignment-0mvtvmzcb-3nhs"
   ],
   "followUpOf": "assignment-0mvtvrepm-n8vt",
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-29T18:38:48.211Z"
+  },
   "createdAt": "2026-10-29T18:38:40.181Z"
 }
