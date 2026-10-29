@@ -35,6 +35,7 @@
     "assignment-0mvtvmzcb-3nhs"
   ],
   "specialist": {
+    "agentId": "workflow:wf_1045a1b7-111/assignment-0mvtvrepm-n8vt",
     "model": "haiku",
     "effort": "high",
     "startedAt": "2026-10-29T18:32:16.409Z"
