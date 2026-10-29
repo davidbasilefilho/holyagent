@@ -1,0 +1,48 @@
+{
+  "id": "assignment-0mvtmqaml-r1zo",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-visual-auto-repair",
+  "objective": "Repair the visual auto-repair instruction review findings: the decision-rule conflict, the endless loop, ride-along preference, duplication and wording drift.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-visual (head a644b9d). Review: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-rh4f.txt. Fix the blocker: scope 'repair without asking' in root/visual.md and requirements.md R-VISUAL to repairs that keep the user's requirements and need no choice between fixes; a finding whose only fix changes an explicit requirement or needs a choice goes through AskUserQuestion with a recommended default. Fold in every note: exclude visual preference from ride-along in root/assignments.md; after three failed repair rounds on one finding, stop and report it as a blocker (visual.md and worker-visual purpose); keep the material definition in one wording (visual.md:5) and point to it from assignments.md, the purposes and reviewer-visual/frontend-design.md where the fixed specialist copy is not required; delete 'including those a reviewer listed as small'; add a visual row to specialist/merge-ready.md saying a material discrepancy under interface inspection is blocking; 'name each skipped preference in the final report, without a fix'.",
+    "Then run mise run build and mise run verify in that worktree."
+  ],
+  "constraints": [
+    "Follow /home/user/holyagent/.claude/CLAUDE.md and the Writing instructions rules.",
+    "Work only in that worktree; make no version-control writes and no edits under .git/ or .holyagent/.",
+    "When done and checked, stop and report."
+  ],
+  "criteria": [
+    {
+      "text": "The blocker and every note are fixed, and the visual text is no larger than before the repair",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify passes and mise run build leaves no diff",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/integrations/claude",
+    "packages/runtime/tests"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvtmi74n-ud4q",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T14:19:20.013Z"
+  },
+  "createdAt": "2026-10-29T14:19:20.013Z"
+}
