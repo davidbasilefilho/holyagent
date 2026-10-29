@@ -1,0 +1,63 @@
+{
+  "id": "assignment-0mvtnnrr3-wg92",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "make-where-holyagent-keeps-intent",
+  "objective": "Make where holyagent keeps Intent, Assignment and state records follow the project: the holyagent/state branch stays the default for stacked-PR projects, while a project without stacked PRs keeps them on the work branch when it already tracks .holyagent/ or its conventions allow it, and local-only (ignored by git, out of every PR) otherwise.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-state-mode (branch ccr-046ad103-6qsvgx-state-mode from origin/main 1277474; node_modules installed).",
+    "Current design, traced with file:line in /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-yc5t.txt: resolveState in packages/runtime/src/state/tree.ts:662-731 always uses the state branch in a git repo (name from git config holyagent.stateBranch, tree.ts:130-144); commitState (tree.ts:620-650) commits there; vcs commit refuses .holyagent/ paths (packages/runtime/src/vcs/commit.ts:76-85); migrateWorkTree moves work-tree state into the state worktree; before PR #28 state rode the work commits (docs/decisions.md:9,49).",
+    "Add a per-clone state mode read from git config (for example holyagent.stateMode = branch | work | local), never from a repository file, for the same trust reason holyagent.stateBranch gives (tree.ts:126-129, vcs/settings.ts:14-19). Unset means branch, so existing clones and stacked projects keep today's behavior. work: state lives in the work tree's .holyagent/ and is committed with the work (vcs commit accepts and stages the changed state paths alongside the work paths, as before #28; no state-branch worktree, no migration away). local: state lives in the work tree's .holyagent/, kept out of git through .git/info/exclude (not the repository .gitignore), and nothing commits it. Add a CLI command for the root to read and set the mode with help text (for example holyagent state mode [branch|work|local]); decide what happens to existing records when the mode changes (keep it simple and safe: refuse or move once, documented).",
+    "Instruction text: update the model-agnostic requirements (packages/runtime/src/instructions/requirements.md, R-VCS and related) first, then the claude-5.5 root sections (version-control.md, stack-plan.md and any other mention of holyagent/state) so the root chooses the mode at the start of work in a project: stacked PRs (holyagent's default stack plan, or the project's history/conventions) -> branch; the project's conventions ask for independent PRs from the base -> work when the repository already tracks .holyagent/ or its conventions allow it, else local; it records the choice with the CLI and pushes holyagent/state only in branch mode. Keep instruction size about the same as the text replaced. Update the session-start hook text only if it states the state branch unconditionally.",
+    "Docs: docs/decisions.md (new entry; fix the stale 'below' cross-reference at :65), docs/hooks.md or the state docs that describe the branch. Tests for each mode: resolution, commit behavior (vcs commit with .holyagent paths in work mode, refusal in branch and local mode), exclude entry in local mode, default unchanged when unset, CLI get/set. Regenerate with mise run build."
+  ],
+  "constraints": [
+    "User (verbatim): \"outra coisa: a branch pra intents/assignments/estado deve ser apenas para projetos que usam pr stacks e como o comportamento padrão, mas mergeability é necessário, deve seguir o padrão do projeto\"; decision: follow the project (work branch if it tracks or allows .holyagent/, else local-only).",
+    "Follow /home/user/holyagent/.claude/CLAUDE.md (Effect with tagged errors, no try/catch/new Promise/async in runtime and CLI source, Schema at boundaries with onExcessProperty error, Bun APIs and Bun Shell, JSDoc on exports) and /home/user/holyagent/AGENTS.md. Do not edit .claude/CLAUDE.md or AGENTS.md.",
+    "Work only in that worktree; make no version-control writes and no edits under .git/ or .holyagent/ of the repository (tests use temp repos).",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done and checked, stop and report; no unrequested features (name ideas in the report)."
+  ],
+  "criteria": [
+    {
+      "text": "With the mode unset, behavior and existing tests are unchanged (state branch)",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "work and local modes store, commit or exclude state as specified, each proven by tests that fail without the change",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The root instructions and requirements say how to pick the mode from the project's stack convention and when to push holyagent/state, at about the same size",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build leaves no diff after the change and mise run verify passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime",
+    "packages/integrations/claude",
+    "packages/cli",
+    "docs"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T14:45:21.855Z"
+  },
+  "createdAt": "2026-10-29T14:45:21.855Z"
+}
