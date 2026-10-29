@@ -11,9 +11,10 @@
     "User (verbatim): \"????? remova esse plugin então / é para usarmos o conector. esse conector funcionaria no claude code sem ser no claude.ai?\" -- drop the exa@claude-plugins-official plugin dependency and do web work through the claude.ai Exa connector.",
     "User (verbatim): \"chave de api não é suportado no projeto\" -- holyagent supports only claude.ai account login, so API-key, Bedrock and Vertex setups need no fallback.",
     "User (verbatim): \"outra coisa: a branch pra intents/assignments/estado deve ser apenas para projetos que usam pr stacks e como o comportamento padrão, mas mergeability é necessário, deve seguir o padrão do projeto\".",
-    "Decision (AskUserQuestion, chosen 'Seguir o projeto'): in a project that does not use stacked PRs, state records follow the project: if the repository already tracks .holyagent/ or its conventions allow it, they ride the work branch's commits; otherwise they stay local, ignored by git and out of every PR. The holyagent/state branch stays the default for stacked-PR projects. A PR never carries files the project does not accept."
+    "Decision (AskUserQuestion, chosen 'Seguir o projeto'): in a project that does not use stacked PRs, state records follow the project: if the repository already tracks .holyagent/ or its conventions allow it, they ride the work branch's commits; otherwise they stay local, ignored by git and out of every PR. The holyagent/state branch stays the default for stacked-PR projects. A PR never carries files the project does not accept.",
+    "User (verbatim): \"mas o problema é: como o agente vai saber se o projeto não usa pr stacks e não deve usar o comportamento padrão da branch holyagent/state\". Decision (AskUserQuestion, 'Sinais em ordem'): the root picks the mode once per clone, stored in local git config, from these signals in order: (1) the user's words; (2) the repository already tracks .holyagent/ -> work; (3) the project's written conventions (CONTRIBUTING, AGENTS.md, CLAUDE.md) ask for independent PRs from the base, or the repository is not the account owner's (a fork or third-party repository without push access or with another owner) -> local, no extra branch on the remote; (4) no signal -> holyagent/state (the default)."
   ],
-  "revision": 3,
+  "revision": 4,
   "state": "Open",
   "createdAt": "2026-10-29T13:47:23.891Z"
 }
