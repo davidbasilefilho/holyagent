@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-stack-rule-change-in-home",
   "objective": "Repair the stack-rule change in /home/user/holyagent-stack-rule so it closes the review's blocking findings and states the recorded defaults compactly.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-stack-rule holds the uncommitted rule change (diff /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule.diff). The review report is /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-revrule.txt: blocking findings 1-4 and the notes.",
     "Settled defaults to state (the maintainer is away; they are recorded as defaults): (a) 'the open stack' is the account owner's own non-draft PRs from branches of this repository; forks, bots and other authors' PRs do not count, so the root never stacks on or merges into a branch it does not own; (b) new work stacks on the open stack's top even while those PRs wait for human review: 'a PR is finished and reviewed before the next stacks on it' means holyagent's own independent review accepted it, so make that line say so; (c) a change that adds CI still goes first, from the base, as today; (d) with several open chains, stack on the one the work depends on, else the most recent; (e) when the stack lags the base, merge the base into the stack's lowest branch and forward up the chain with merge commits, reviewed before push, before stacking; put the trigger beside the existing Merge forward line in version-control.md and R-GIT if that is where it reads naturally.",
@@ -55,7 +55,41 @@
     "agentId": "workflow:wf_a0658627-123/assignment-0mvtvh24t-5kiy",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-10-29T18:24:05.645Z"
+    "startedAt": "2026-10-29T18:24:05.645Z",
+    "finishedAt": "2026-10-29T18:28:27.115Z"
+  },
+  "result": "result: Findings 1-4 are closed. Net addition in stack-plan.md is +63 words (336 to 399), and all four gates pass with the canary Bun.\n\nchanged:\n- /home/user/holyagent-stack-rule/packages/runtime/src/instructions/claude-5.5/root/stack-plan.md\n- /home/user/holyagent-stack-rule/packages/runtime/src/instructions/claude-5.5/root/version-control.md\n- /home/user/holyagent-stack-rule/packages/runtime/src/instructions/requirements.md\n- /home/user/holyagent-stack-rule/packages/integrations/claude/dist/agents/holyagent.md (rebuilt)\n- /home/user/holyagent-stack-rule/docs/usage.md (Stacks paragraph)\n- /home/user/holyagent-stack-rule/docs/decisions.md\n\nchecks (all with the canary Bun, in /home/user/holyagent-stack-rule):\n- `scripts/vendor.ts` -> vendored 21 files.\n- `packages/integrations/claude/build.ts` -> built 29 files.\n- `check --no-script` -> exit 0, no type errors in 121 files.\n- `lint --no-script` -> exit 0, no problems in 122 files.\n- `fmt --no-script --check` -> exit 0, all 237 files formatted.\n- `test` -> exit 0, 957 pass, 1 skip, 0 fail.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- The \"(a)-(e)\" defaults appear in these places:\n  - stack-plan.md line 3 defines \"open stack\" once, using the account owner's own non-draft PRs from branches of this repository, and covers (a), (d) and the base fallback.\n  - stack-plan.md line 4 covers (c) with \"even with a stack open\".\n  - stack-plan.md line 8 covers (b): \"the next PR stacks on one once the independent review accepts it, not human review\".\n  - stack-plan.md line 7 holds the lag trigger, kept as a separate sentence so \"once per batch of repairs\" still applies only to the lower-PR merge-forward.\n  - version-control.md (Merge forward) and R-GIT carry the lag merge: the base goes into the lowest branch, then forward up the chain, reviewed before any push.\n  - R-STACK is one clause.\n  - decisions.md has a short paragraph, and its \"## Kept\" bullet points to it (\"see above\").\n- I stated (a) as \"never forks, bots or other authors', since the root pushes only to branches it owns\", not as the exact \"never stacks on or merges into\" wording. The behavior is the same. decisions.md uses the \"never stacks on or pushes to\" form.\n- The usage.md Stacks paragraph keeps the conventions condition, but it does not mention the human-review point from (b).\n- The stack-plan.md sentence \"Bring ... lagging\" is now \"Merge the base forward into a lagging open stack before stacking on it.\" The step order (lowest branch first) is spelled out only in version-control.md and R-GIT.\n\nevidence:\nReview findings 1-4 are closed: no contradiction with the review gate or CI-first rule, only the owner's own non-draft non-fork PRs count, and the net addition in stack-plan.md is at most about 60 words: stack-plan.md line 8 states the review gate, line 4 states CI-first with a stack open, line 3 defines the open stack once, and `wc -w` shows 336 to 399 (+63) on `/home/user/holyagent-stack-rule/packages/runtime/src/instructions/claude-5.5/root/stack-plan.md`.\nThe rule reads the same in stack-plan.md, version-control.md if touched, R-STACK, docs/usage.md and docs/decisions.md, with consistent terms: \"open stack\", \"its top\" and \"lowest branch\" are used throughout; see the diff file. The documents were read side by side by me, with no independent review.\ndist rebuilt; check, lint, fmt --check and test pass with the canary Bun: build.ts built 29 files; check, lint and fmt exit 0; test exit 0 with 957 pass, 0 fail.\nchecks-run: vendor.ts, build.ts, check --no-script, lint --no-script, fmt --no-script --check and test, all exit 0 as listed above. Not run: `mise run verify`.\nchanged-paths: the six paths listed under `changed:` above.\ndiff-file: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule-v2.diff",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Rule restated compactly with the recorded defaults; gates green on canary Bun (957 pass); re-review follows.",
+    "criteria": [
+      {
+        "criterion": "Review findings 1-4 are closed: no contradiction with the review gate or CI-first rule, only the owner's own non-draft non-fork PRs count, and the net addition in stack-plan.md is at most about 60 words",
+        "support": "stack-plan.md line 8 states the review gate, line 4 states CI-first with a stack open, line 3 defines the open stack once, and `wc -w` shows 336 to 399 (+63) on `/home/user/holyagent-stack-rule/packages/runtime/src/instructions/claude-5.5/root/stack-plan.md`."
+      },
+      {
+        "criterion": "The rule reads the same in stack-plan.md, version-control.md if touched, R-STACK, docs/usage.md and docs/decisions.md, with consistent terms",
+        "support": "\"open stack\", \"its top\" and \"lowest branch\" are used throughout; see the diff file. The documents were read side by side by me, with no independent review."
+      },
+      {
+        "criterion": "dist rebuilt; check, lint, fmt --check and test pass with the canary Bun",
+        "support": "build.ts built 29 files; check, lint and fmt exit 0; test exit 0 with 957 pass, 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "vendor.ts, build.ts, check --no-script, lint --no-script, fmt --no-script --check and test, all exit 0 as listed above. Not run: `mise run verify`."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the six paths listed under `changed:` above."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule-v2.diff"
+      }
+    ]
   },
   "createdAt": "2026-10-29T18:24:05.645Z"
 }
