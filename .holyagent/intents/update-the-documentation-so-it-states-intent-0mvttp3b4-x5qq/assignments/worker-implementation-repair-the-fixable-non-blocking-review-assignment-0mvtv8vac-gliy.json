@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-fixable-non-blocking-review",
   "objective": "Repair the fixable non-blocking review findings in the staged merge resolution of PR 37, in /home/user/holyagent-plugin-only-install.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "The worktree /home/user/holyagent-plugin-only-install holds a resolved, staged, uncommitted merge (main via fix/state-off-main into feat/plugin-only-install). The review report is /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-rev37.txt; fix these findings from it:",
     "Finding 1 (regression from the port): packages/runtime/src/setup/leftovers.ts applyPlan retry (attempt > 1) treats a blank settings or .claude.json file as an empty object because readJsonObjectSnapshot returns text '' for a blank file, so the text === undefined guard does not fire. Restore main's behavior (packages/cli/src/claude/leftovers.ts at MERGE_HEAD: a file that is no longer a JSON object is reported as 'changed while it was cleaned ... left as it is'). Add a test in packages/runtime/tests/setup-leftovers.test.ts that fails without the fix.",
@@ -60,5 +60,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T18:17:53.843Z"
+  },
   "createdAt": "2026-10-29T18:17:43.525Z"
 }
