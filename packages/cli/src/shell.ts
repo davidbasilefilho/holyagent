@@ -49,11 +49,13 @@ export const pathWithBunBin = (
 export interface RunOptions {
   /** Environment variables to remove for this command only. */
   readonly unsetEnv?: ReadonlyArray<string>
+  /** The working directory for this command; the current one when unset. */
+  readonly cwd?: string
 }
 
 /**
- * The external commands the CLI drives (`claude`, `bun`, `bili`, `ctx7`). Commands see Bun's global
- * bin directory on PATH, because a `bun add -g` in the same run puts new commands there.
+ * The external commands the CLI drives (`claude`, `bun`, `ctx7`). Commands see Bun's global bin
+ * directory on PATH, because a `bun add -g` in the same run puts new commands there.
  */
 export class Shell extends Context.Service<
   Shell,
@@ -106,8 +108,8 @@ export class Shell extends Context.Service<
                 [bunBin.key]: bunBin.value,
               }
               for (const name of options?.unsetEnv ?? []) env[name] = undefined
-              return $`${command} ${args}`
-                .env(env)
+              const pending = $`${command} ${args}`.env(env)
+              return (options?.cwd === undefined ? pending : pending.cwd(options.cwd))
                 .quiet()
                 .nothrow()
                 .then((result) => ({

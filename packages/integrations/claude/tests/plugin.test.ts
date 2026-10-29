@@ -157,15 +157,18 @@ describe("manifests", () => {
       version: packageJson.version,
       author: { name: "davidbasilefilho" },
       license: "Apache-2.0",
-      dependencies: ["billion-context@billion-context", "exa@claude-plugins-official"],
     })
+  })
+
+  test("nothing depends on another plugin: web work goes through the Exa connector", () => {
+    expect(manifest).not.toHaveProperty("dependencies")
+    expect(marketplace).not.toHaveProperty("allowCrossMarketplaceDependenciesOn")
   })
 
   test("the marketplace points at the built plugin with the same version", () => {
     expect(marketplace).toMatchObject({
       name: "holyagent",
       owner: { name: "davidbasilefilho" },
-      allowCrossMarketplaceDependenciesOn: ["billion-context", "claude-plugins-official"],
       plugins: [
         {
           name: "holyagent",
@@ -202,11 +205,12 @@ describe("hooks", () => {
     ...extra,
   })
 
-  test("are exactly the session, subagent-start, reminder, workflow and launch hooks, in exec form that runs bun on the bundle, with no shell", () => {
+  test("are exactly the session, rules, subagent-start, reminder, workflow and launch hooks, in exec form that runs bun on the bundle, with no shell", () => {
     expect(hooks).toEqual({
       SessionStart: [
         { matcher: "startup|resume|clear|compact", hooks: [command("session-start")] },
       ],
+      UserPromptSubmit: [{ hooks: [command("root-rules")] }],
       SubagentStart: [{ hooks: [command("subagent-start")] }],
       PreToolUse: [
         {
@@ -217,6 +221,7 @@ describe("hooks", () => {
           ],
         },
         { matcher: "Workflow", hooks: [command("workflow", { onFailure: "block" })] },
+        { hooks: [command("root-rules")] },
       ],
       PostToolUse: [{ matcher: "Agent", hooks: [command("agent-launch")] }],
     })
@@ -229,10 +234,23 @@ describe("hooks", () => {
       expect(hook).not.toHaveProperty("onFailure")
   })
 
+  test("the rules hook runs for every prompt and every tool and never blocks", () => {
+    const rules = [...(hooks.UserPromptSubmit ?? []), ...(hooks.PreToolUse ?? [])].filter((group) =>
+      group.hooks.some((hook) => (hook.args as Array<string>).at(-1) === "root-rules"),
+    )
+    expect(rules.map((group) => [group.matcher, group.hooks.length])).toEqual([
+      [undefined, 1],
+      [undefined, 1],
+    ])
+    for (const hook of rules.flatMap((group) => group.hooks))
+      expect(hook).not.toHaveProperty("onFailure")
+  })
+
   test("no hook that carries version-control rules can block, and no hook is a Bash guard", () => {
     const carriers = [...(hooks.SubagentStart ?? []), ...(hooks.PreToolUse ?? [])]
       .filter((group) => group.matcher !== "Workflow")
       .flatMap((group) => group.hooks)
+      .filter((hook) => (hook.args as Array<string>).at(-1) !== "root-rules")
     expect(carriers).toHaveLength(3)
     for (const hook of carriers) expect(hook).not.toHaveProperty("onFailure")
     expect(JSON.stringify(hooks)).not.toContain("redirect")

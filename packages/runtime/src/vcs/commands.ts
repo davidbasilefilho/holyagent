@@ -55,7 +55,7 @@ export const VCS_COMMANDS: ReadonlyArray<Command> = [
     summary:
       "Commit exactly the named paths with the configured git identity (in a claude.ai cloud session, with the user as author and the platform's committer), after the message check, and record the branch and commit on the Intent in use",
     notes: [
-      "Intent state is never part of the commit: it is committed on the state branch as it changes, and a path under .holyagent/ is refused",
+      "state mode (holyagent state mode): in branch, the default, Intent state is committed on the state branch as it changes and a path under .holyagent/ is refused; in local it is in no commit and such a path is refused; in work the changed state files (not config.json unless named) are staged with the named paths",
       "the message is cleaned of agent attribution and refused when it talks about the user or the agent; an identity that looks like an agent's is refused; in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) it is the author that is checked, and the committer is left as the platform set it",
       "the repository's own hooks run, a commit-msg hook that runs `holyagent hook commit-msg` included",
     ],
