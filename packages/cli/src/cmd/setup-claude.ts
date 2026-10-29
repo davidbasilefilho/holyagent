@@ -66,7 +66,7 @@ export const setupClaudeCommand = Command.make(
         "(removes the built-in commit/PR instructions and the git status snapshot from context),",
         "subagentPromptCacheTtl, and the marketplace entry and the plugin entry that offer the plugin to",
         "teammates, and permissions.deny for WebSearch and WebFetch,",
-        "since web work goes through the Exa plugin.",
+        "since web work goes through the Exa connector.",
         "A failed step is reported and the rest still run; the exit code is 1 when any step failed.",
       ].join(" "),
     ),

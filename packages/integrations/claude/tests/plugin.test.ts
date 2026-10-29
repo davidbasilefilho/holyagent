@@ -157,15 +157,18 @@ describe("manifests", () => {
       version: packageJson.version,
       author: { name: "davidbasilefilho" },
       license: "Apache-2.0",
-      dependencies: ["exa@claude-plugins-official"],
     })
+  })
+
+  test("nothing depends on another plugin: web work goes through the Exa connector", () => {
+    expect(manifest).not.toHaveProperty("dependencies")
+    expect(marketplace).not.toHaveProperty("allowCrossMarketplaceDependenciesOn")
   })
 
   test("the marketplace points at the built plugin with the same version", () => {
     expect(marketplace).toMatchObject({
       name: "holyagent",
       owner: { name: "davidbasilefilho" },
-      allowCrossMarketplaceDependenciesOn: ["claude-plugins-official"],
       plugins: [
         {
           name: "holyagent",

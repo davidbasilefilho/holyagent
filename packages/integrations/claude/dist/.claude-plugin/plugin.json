@@ -5,8 +5,5 @@
   "author": {
     "name": "davidbasilefilho"
   },
-  "license": "Apache-2.0",
-  "dependencies": [
-    "exa@claude-plugins-official"
-  ]
+  "license": "Apache-2.0"
 }

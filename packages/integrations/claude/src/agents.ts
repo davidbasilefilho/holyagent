@@ -53,8 +53,8 @@ export const BUILTIN_TOOLS: ReadonlyArray<string> = [
 ]
 
 /**
- * Claude Code's own web tools, denied to every agent: web work goes through Exa, whose tools every
- * agent inherits as MCP tools.
+ * Claude Code's own web tools, denied to every agent: web work goes through the Exa connector,
+ * whose tools every agent inherits as MCP tools.
  */
 export const NATIVE_WEB_TOOLS: ReadonlyArray<string> = ["WebSearch", "WebFetch"]
 
@@ -369,10 +369,11 @@ const BUILTIN_REVIEW: ReadonlySet<string> = new Set(["Reviewer.code", "Reviewer.
 
 /**
  * The built-in tools of a specialist: reading for all, then what its capabilities call for. The
- * Search capability grants none, since the Exa tools come as MCP tools. Reviewer.code keeps Bash
- * without a Shell capability, since it reads diffs with git. The roles of {@link BUILTIN_REVIEW}
- * get Skill, and a role with Bash gets Monitor for its long commands. A role with Bash searches
- * with the bundled ripgrep and fd and so gets neither Grep nor Glob; a role without it keeps both.
+ * Search capability grants none, since the Exa connector's tools come as MCP tools. Reviewer.code
+ * keeps Bash without a Shell capability, since it reads diffs with git. The roles of
+ * {@link BUILTIN_REVIEW} get Skill, and a role with Bash gets Monitor for its long commands. A role
+ * with Bash searches with the bundled ripgrep and fd and so gets neither Grep nor Glob; a role
+ * without it keeps both.
  */
 const builtinsOf = (route: Route): ReadonlyArray<string> => {
   const shell = route.capabilities.includes("Shell") || route.roleTask === "Reviewer.code"
