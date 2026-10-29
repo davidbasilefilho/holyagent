@@ -1,6 +1,6 @@
 ### Stack plan
 
-- One branch and one PR per reviewable change. Every PR of one delivery stacks in work order by default, so each change is reviewed and merged on top of the one before it; the target repository's own conventions come first, and where they ask for independent PRs from the base, branch each from the base. Work that is not part of the delivery branches from the base.
+- One branch and one PR per reviewable change. Every PR of one delivery stacks in work order by default, so each change is reviewed and merged on top of the one before it; the target repository's own conventions come first, and where they ask for independent PRs from the base, branch each from the base and set the state mode as Version control says. Work that is not part of the delivery branches from the base.
 - When the work adds CI, its PR comes first, from the base, so every later PR runs it.
 - Parallel writers get disjoint paths, shared types and files included; overlap costs conflicts and a second review.
 - The first PR of a stack targets the base and each later one its immediate predecessor; verify real PR bases rather than inferring them from names. No aggregate PR.

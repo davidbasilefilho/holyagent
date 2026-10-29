@@ -7158,6 +7158,12 @@ class StateLocked extends TaggedError2("StateLocked") {
   }
 }
 
+class StateModeRefused extends TaggedError2("StateModeRefused") {
+  get message() {
+    return `The state mode stays as it is: ${this.reason}`;
+  }
+}
+
 var io = (path, run) => tryPromise2({ try: run, catch: (cause) => new StateIo({ path, cause }) });
 var hasCode = (cause, code) => typeof cause === "object" && cause !== null && ("code" in cause) && cause.code === code;
 var readText = (path) => io(path, () => Bun.file(path).exists()).pipe(flatMap2((exists) => exists ? io(path, () => Bun.file(path).text()) : succeed6(undefined)));
@@ -7300,6 +7306,7 @@ var REFUSED_ERRORS = new Set([
   "SpecialistNotRecorded",
   "MigrationRefused",
   "NothingToMigrate",
+  "StateModeRefused",
   ...VCS_REFUSED_ERRORS
 ]);
 var HINTS = {
@@ -7324,6 +7331,7 @@ var HINTS = {
   MigrationUnverified: "The records were written but do not load back: delete the files this run wrote (git status lists them), fix the cause the message names and run `holyagent migrate --dry-run` again.",
   UnsupportedPlatform: "Search with the programs of your system instead, or run holyagent on darwin-arm64, linux-x64 or windows-x64.",
   ToolMissing: "The plugin was built without its vendored tools: run `mise run vendor`, then `mise run build`, and reinstall the plugin.",
+  StateModeRefused: "Leave the mode as it is and work with it. To change it deliberately, move the records by hand first: the command never moves or deletes them.",
   StateLocked: "Another process holds the state lock; retry in a moment.",
   StateIo: "Check what the message names: the permissions of the .holyagent folder of the state worktree (under the git directory, or in the project outside git), that git runs there, and that no branch already uses a name the state branch needs (holyagent/state needs no branch called holyagent; git config holyagent.stateBranch picks another name).",
   CorruptRecord: "Fix or delete the file the message names, or restore it from version control.",
@@ -9777,6 +9785,14 @@ var parseIdent = (line) => {
   return match === null ? undefined : { name: match[1] ?? "", email: match[2] ?? "" };
 };
 
+var StateMode = Literals(["branch", "work", "local"]);
+var DEFAULT_STATE_MODE = "branch";
+var STATE_MODE_KEY = "holyagent.stateMode";
+var parseStateMode = (value) => value === undefined || value.trim() === "" ? succeed6(DEFAULT_STATE_MODE) : decodeUnknownEffect2(StateMode)(value.trim()).pipe(mapError2(() => new StateIo({
+  path: STATE_MODE_KEY,
+  cause: `"${value.trim()}" is not a state mode; set ${STATE_MODE_KEY} in git config to branch, work or local`
+})));
+
 var DEFAULT_STATE_BRANCH = "holyagent/state";
 var BRANCH_KEY = "holyagent.stateBranch";
 var CONFIG_FILE = "config.json";
@@ -9811,6 +9827,29 @@ var gitText = (cwd, env, args) => git(cwd, env, args).pipe(flatMap2((ran) => ran
 var gitSucceeds = (cwd, env, args) => git(cwd, env, args).pipe(map4((ran) => ran.code === 0));
 var BOOKKEEPING = ["-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false"];
 var NOT_A_REPOSITORY = /not a git repository|command not found/i;
+var stateModeOf = (top, env) => git(top, env, ["config", "--get", STATE_MODE_KEY]).pipe(flatMap2((ran) => parseStateMode(ran.code === 0 ? ran.stdout : undefined)));
+var EXCLUDE_LINE = `/${STATE_DIRECTORY}/`;
+var setExcluded = (top, env, excluded) => gen2(function* () {
+  const path = fromGitPath(yield* gitText(top, env, [
+    "rev-parse",
+    "--path-format=absolute",
+    "--git-path",
+    "info/exclude"
+  ]));
+  const text = (yield* readText(path)) ?? "";
+  const lines = text.split(`
+`);
+  if (lines.some((line) => line.trim() === EXCLUDE_LINE) === excluded)
+    return;
+  const kept = lines.filter((line) => line.trim() !== EXCLUDE_LINE).join(`
+`);
+  const body = excluded ? `${kept}${kept === "" || kept.endsWith(`
+`) ? "" : `
+`}${EXCLUDE_LINE}
+` : kept;
+  yield* io(path, () => mkdir2(dirname2(path), { recursive: true }));
+  yield* io(path, () => Bun.write(path, body));
+});
 var isDirectory = (path) => io(path, () => stat(path)).pipe(map4((info) => info.isDirectory()), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
 var stateBranch = (top, env) => gen2(function* () {
   const configured = yield* git(top, env, ["config", "--get", BRANCH_KEY]);
@@ -9883,6 +9922,10 @@ var keepsState = (top, env, branch, listed) => gen2(function* () {
   }
   return false;
 });
+var holdsRecords = (top) => {
+  const folder = join2(top, STATE_DIRECTORY);
+  return isDirectory(folder).pipe(flatMap2((there) => there ? io(folder, () => readdir(folder)).pipe(map4((names) => names.some((name) => name !== CONFIG_FILE))) : succeed6(false)));
+};
 var worktreeFolder = (branch) => `${branch.replace(/[^\w.-]+/g, "-").slice(0, 40)}-${new Bun.CryptoHasher("sha1").update(branch).digest("hex").slice(0, 10)}`;
 var canonical = (path) => io(path, () => realpath(path)).pipe(orElseSucceed2(() => path));
 var samePath = (a, b) => all2([canonical(a), canonical(b)]).pipe(map4(([left, right]) => left === right));
@@ -10071,6 +10114,8 @@ var commitState = (directory, env, message) => gen2(function* () {
   ]).pipe(map4(([a, b]) => a === b));
   if (!own)
     return false;
+  if ((yield* stateModeOf(worktree, env)) !== "branch")
+    return false;
   const current = yield* git(worktree, env, ["symbolic-ref", "--short", "-q", "HEAD"]);
   if (current.code !== 0 || current.stdout.trim() !== (yield* stateBranch(worktree, env)))
     return false;
@@ -10089,7 +10134,7 @@ var commitState = (directory, env, message) => gen2(function* () {
   ]);
   return true;
 });
-var resolveState = (cwd, env, ensure) => gen2(function* () {
+var locate = (cwd, env) => gen2(function* () {
   const located = yield* git(cwd, env, [
     "rev-parse",
     "--path-format=absolute",
@@ -10099,11 +10144,24 @@ var resolveState = (cwd, env, ensure) => gen2(function* () {
   if (located.code !== 0) {
     const complaint = located.stderr.trim();
     if (NOT_A_REPOSITORY.test(complaint))
-      return { root: cwd, directory: join2(cwd, STATE_DIRECTORY) };
+      return;
     return yield* new StateIo({ path: cwd, cause: `git: ${complaint}` });
   }
   const [top = cwd, common = join2(cwd, ".git")] = located.stdout.trim().split(`
 `).map((path) => fromGitPath(path));
+  return { top, common };
+});
+var resolveState = (cwd, env, ensure) => gen2(function* () {
+  const repository = yield* locate(cwd, env);
+  if (repository === undefined)
+    return { root: cwd, directory: join2(cwd, STATE_DIRECTORY) };
+  const { top, common } = repository;
+  const mode = yield* stateModeOf(top, env);
+  if (mode !== "branch") {
+    if (mode === "local" && ensure !== "peek")
+      yield* setExcluded(top, env, true);
+    return { root: top, directory: join2(top, STATE_DIRECTORY) };
+  }
   const branch = yield* stateBranch(top, env);
   const listed = yield* listWorktrees(top, env);
   const found = yield* checkedOut(listed, branch);
@@ -10133,6 +10191,39 @@ var resolveState = (cwd, env, ensure) => gen2(function* () {
         yield* migrateWorkTree(source, common, worktree, env, (message) => commitState(directory, env, message));
   }
   return { root: top, directory };
+});
+var requireRepository = (cwd, env) => locate(cwd, env).pipe(flatMap2((repository) => repository === undefined ? fail5(new StateIo({
+  path: cwd,
+  cause: "not a git repository; the state modes apply inside one, and outside it the state is the .holyagent folder of the project"
+})) : succeed6(repository)));
+var readStateMode = (cwd, env) => gen2(function* () {
+  const { top } = yield* requireRepository(cwd, env);
+  const configured = yield* gitSucceeds(top, env, ["config", "--get", STATE_MODE_KEY]);
+  const mode = yield* stateModeOf(top, env);
+  const { directory } = yield* resolveState(cwd, env, "peek");
+  return { mode, configured, directory };
+});
+var setStateMode = (cwd, env, mode) => gen2(function* () {
+  const { top } = yield* requireRepository(cwd, env);
+  const previous = yield* stateModeOf(top, env);
+  if (previous === "branch" && mode !== "branch") {
+    const branch = yield* stateBranch(top, env);
+    if ((yield* refExists(top, env, `refs/heads/${branch}`)) || (yield* refExists(top, env, `refs/remotes/origin/${branch}`)))
+      return yield* new StateModeRefused({
+        reason: `this clone already has the ${branch} branch, and its records are not moved into the work tree`
+      });
+  }
+  if (previous !== "branch" && mode === "branch" && (yield* holdsRecords(top)))
+    return yield* new StateModeRefused({
+      reason: `${STATE_DIRECTORY}/ of the work tree already holds records, and they are not moved onto the state branch`
+    });
+  if (mode === "local" && (yield* gitText(top, env, ["ls-files", "--", STATE_DIRECTORY])) !== "")
+    return yield* new StateModeRefused({
+      reason: `git tracks ${STATE_DIRECTORY}/, which an exclude entry cannot hide; use the work mode`
+    });
+  yield* gitText(top, env, ["config", "--local", STATE_MODE_KEY, mode]);
+  yield* setExcluded(top, env, mode === "local");
+  return { previous, mode };
 });
 
 var globBelow = (folder, pattern, separator = sep3) => `${toPosix(folder, separator)}/${pattern}`;
@@ -10568,7 +10659,7 @@ var requireOwnAuthor = gen2(function* () {
     return yield* new CloudAuthor({ author: `${author.name} <${author.email}>` });
 });
 var stagedPaths = git2(["diff", "--cached", "--name-only", "--no-renames", "-z"]).pipe(map4((names) => names.split("\x00").filter((path) => path !== "")));
-var commitScope = (paths, separator = sep4) => forEach2(paths, (path) => {
+var commitScope = (paths, separator = sep4, mode = "branch") => forEach2(paths, (path) => {
   const clean = toPosix(path, separator).replace(/\/+$/, "");
   const problem = pathProblem(clean);
   if (problem !== undefined)
@@ -10576,15 +10667,31 @@ var commitScope = (paths, separator = sep4) => forEach2(paths, (path) => {
       message: `Invalid path "${path}": ${problem}`,
       hint: "Name files or folders relative to the project root."
     }));
-  return clean === STATE_DIRECTORY || clean.startsWith(`${STATE_DIRECTORY}/`) ? fail5(new Usage({
-    message: `"${path}" is Intent state, which is committed on the state branch by the holyagent commands`,
-    hint: "Commit only work files with `vcs commit`; Intent state never goes on a work branch."
-  })) : succeed6(clean);
+  const state = clean === STATE_DIRECTORY || clean.startsWith(`${STATE_DIRECTORY}/`);
+  if (!state || mode === "work")
+    return succeed6(clean);
+  return fail5(new Usage({
+    message: mode === "local" ? `"${path}" is Intent state, which this clone keeps out of git (state mode local)` : `"${path}" is Intent state, which is committed on the state branch by the holyagent commands`,
+    hint: mode === "local" ? "Commit only work files with `vcs commit`; `holyagent state mode work` would put the state in the work commits." : "Commit only work files with `vcs commit`; Intent state never goes on a work branch in the branch mode."
+  }));
 });
+var stateMode = gitMaybe(["config", "--get", STATE_MODE_KEY]).pipe(flatMap2(parseStateMode), mapError2((error) => new Usage({
+  message: error.message,
+  hint: `Set git config ${STATE_MODE_KEY} to branch, work or local, or unset it.`
+})));
+var stateChanged = git2([
+  "status",
+  "--porcelain",
+  "--untracked-files=all",
+  "--",
+  STATE_DIRECTORY
+]).pipe(map4((text) => text !== ""));
 var commit = (request) => gen2(function* () {
   const { message } = request;
   yield* request.cloud ? requireOwnAuthor : requireOwnIdentity;
-  const scope = yield* commitScope(request.paths);
+  const mode = yield* stateMode;
+  const named = yield* commitScope(request.paths, sep4, mode);
+  const scope = mode === "work" && !named.includes(STATE_DIRECTORY) && (yield* stateChanged) ? [...named, STATE_DIRECTORY] : named;
   const alreadyStaged = yield* stagedPaths;
   const outside = alreadyStaged.filter((path) => !inScope(scope, path));
   if (outside.length > 0)
@@ -18917,6 +19024,34 @@ var MIGRATE_COMMANDS = [
   }
 ];
 
+var STATE_COMMANDS = [
+  {
+    path: ["state", "mode"],
+    usage: "state mode [branch|work|local]",
+    summary: "Show where this clone keeps Intent, Assignment and state records, or set it: branch (the holyagent/state branch, the default, for projects whose PRs stack), work (the work tree's .holyagent/, committed with the work) or local (the same folder, kept out of git)",
+    notes: [
+      "the mode is stored in this clone's git config (holyagent.stateMode), never in a file of the repository; unset means branch",
+      "branch: every transition is committed on the state branch in one shared worktree, and the root pushes that branch; work: `vcs commit` stages the changed .holyagent/ files with the work; local: .holyagent/ is added to .git/info/exclude (not .gitignore), so no commit and no PR carries it",
+      "set the mode before the first Intent of a project. Records are never moved or deleted: changing away from branch is refused once the state branch exists, changing onto it is refused while the work tree's .holyagent/ holds records, and local is refused while git tracks .holyagent/ (use work). work and local switch freely"
+    ],
+    flags: {},
+    stateless: true,
+    positionals: 1,
+    optional: true,
+    run: ({ args, cwd, env }) => gen2(function* () {
+      const [given] = args.positionals;
+      if (given === undefined)
+        return present({ ...yield* readStateMode(cwd, env) });
+      const mode = yield* decodeUnknownEffect2(StateMode)(given).pipe(mapError2(() => new Usage({
+        message: `"${given}" is not a state mode`,
+        hint: "Usage: holyagent state mode [branch|work|local]"
+      })));
+      const { previous } = yield* setStateMode(cwd, env, mode);
+      return present({ ...yield* readStateMode(cwd, env), previous });
+    })
+  }
+];
+
 import { join as join11 } from "path";
 var {$: $4 } = globalThis.Bun;
 var TARGETS = [
@@ -18986,6 +19121,7 @@ var COMMANDS = [
   ...ASSIGNMENT_COMMANDS,
   ...OVERVIEW_COMMANDS,
   ...MIGRATE_COMMANDS,
+  ...STATE_COMMANDS,
   ...TOOL_COMMANDS,
   ...VCS_COMMANDS,
   ...HOOK_COMMANDS

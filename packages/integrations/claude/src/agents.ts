@@ -256,6 +256,10 @@ export const REQUIREMENT_SECTIONS: Readonly<
     section: "root/version-control.md",
     phrase: "Never force-push, and never push to the base, default or a protected branch",
   },
+  "R-STATE": {
+    section: "root/version-control.md",
+    phrase: "set the mode with `holyagent state mode <mode>`",
+  },
   "R-CI": {
     section: "root/ci.md",
     phrase: "Watch with Monitor running `gh pr checks <n> --watch`",
