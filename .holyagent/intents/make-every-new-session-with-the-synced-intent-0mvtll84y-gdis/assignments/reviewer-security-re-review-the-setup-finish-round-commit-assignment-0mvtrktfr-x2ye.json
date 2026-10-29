@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mvtrktfr-x2ye",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.security",
+  "slug": "re-review-the-setup-finish-round-commit",
+  "objective": "Re-review the setup finish-round commit a0842af for security against the notes it targets.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-setup-cleanup. Diff: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/f-C.diff. Targeted notes: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-w639.txt. Billion Context's rules: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-owwv.txt. Writer report: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-9ufd.txt."
+  ],
+  "constraints": [
+    "Read-only: write no files and make no version-control writes.",
+    "Judge only this finish-round diff against the findings it targets; it is the last review round, so rank anything new precisely."
+  ],
+  "criteria": [
+    {
+      "text": "Each targeted security finding is stated closed or open with file:line, and any new finding traces source to sink with a fix, or its absence is stated",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources-read"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvtr44em-9ufd"
+  ],
+  "followUpOf": "assignment-0mvtqsol2-w639",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T16:35:02.535Z"
+  },
+  "createdAt": "2026-10-29T16:35:02.535Z"
+}
