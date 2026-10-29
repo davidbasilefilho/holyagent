@@ -1,0 +1,58 @@
+{
+  "id": "assignment-0mvtlrfnt-fomd",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "make-every-main-thread-that-loads-the",
+  "objective": "Make every main thread that loads the holyagent plugin receive the root rules even when the SessionStart hook output arrives late or never, so the holyagent way is the default with no user nudge.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-root (branch ccr-046ad103-6qsvgx-mandatory-root, from origin/main 7929f2d).",
+    "Evidence from session_012tBKnb2s5Pj2Z6LXoSmUTW (claude.ai web, default cloud environment, no repository): the main thread ran as the default agent for its first 13 actions; holyagent 0.1.2-3 loaded and its CLI worked; no SessionStart hook output is in the feed; the init event shows hooks_init_ms 47165 and new_plugin_hooks_join_ms 81167, so the synced plugin's hooks joined after the first prompt (13:42:51) and the plugin settings.json agent key did not make the main thread the root. Audit: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-assignment-0mvtll8wn-y0nb.txt.",
+    "Design: deliver the root core rules (the same text session-start injects: ROOT_CORE plus the takeover line and the absolute CLI form) on the first main-thread hook event of a session that has not received them yet: SessionStart, UserPromptSubmit and PreToolUse (any tool, main thread only: skip when the payload carries an agent_id/agent_type of a subagent or when agent_type is holyagent). Record per session_id that the rules were delivered, in a small marker outside the repository (for example under ${CLAUDE_PLUGIN_DATA} or os.tmpdir()/holyagent-sessions/<session_id>), so each session gets them once; also re-deliver after compaction (SessionStart source compact) as today. UserPromptSubmit and PreToolUse return the text as hookSpecificOutput.additionalContext. Add a UserPromptSubmit hook to hooks.json in packages/integrations/claude/src/generate.ts and extend the existing PreToolUse entry (or add a catch-all one) without changing what the existing PreToolUse hooks already do.",
+    "Make failures visible to the model where possible: if session-start fails, emit a short context line saying the holyagent rules could not load and where to read them, instead of exiting with nothing.",
+    "Tests: a session whose first hook is UserPromptSubmit gets the rules once; a later PreToolUse in the same session gets nothing extra; a subagent PreToolUse gets nothing; SessionStart then UserPromptSubmit delivers once; compaction re-delivers. Update docs/hooks.md."
+  ],
+  "constraints": [
+    "Follow /home/user/holyagent/.claude/CLAUDE.md (Effect with tagged errors, no try/catch/new Promise/async in runtime source, Schema at boundaries, Bun APIs, JSDoc).",
+    "Work only in that worktree; run bun install --frozen-lockfile there if node_modules is missing; make no version-control writes and no edits under .git/ or .holyagent/. Finish with mise run build and mise run verify.",
+    "Keep the root-core size budget test passing. Keep working until done; when done and checked, stop and report; no unrequested changes."
+  ],
+  "criteria": [
+    {
+      "text": "A main thread whose SessionStart output never arrives still gets the root rules on its first UserPromptSubmit or PreToolUse, exactly once per session, proven by tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Subagents and a main thread already running as holyagent get no extra text, and existing hook behavior and tests are unchanged",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "mise run build leaves no diff after the change and mise run verify passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli",
+    "packages/runtime/src/state",
+    "packages/runtime/tests",
+    "packages/integrations/claude",
+    "docs"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T13:52:13.577Z"
+  },
+  "createdAt": "2026-10-29T13:52:13.577Z"
+}
