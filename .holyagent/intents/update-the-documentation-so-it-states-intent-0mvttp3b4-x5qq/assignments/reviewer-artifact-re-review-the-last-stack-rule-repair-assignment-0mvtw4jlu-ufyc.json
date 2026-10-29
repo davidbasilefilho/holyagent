@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "re-review-the-last-stack-rule-repair",
   "objective": "Re-review the last stack-rule repair, which states the base cases once.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Previous finding (blocking: stack-plan.md bullets 4-5 sent a CI or independent-PR delivery's first PR to the open stack's top): /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-rerev2.txt. This repair alone: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule-repair4.diff; full diff: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule-v4.diff; report: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-rulefix4.txt (worktree /home/user/holyagent-stack-rule).",
     "Judge the finding closed or open and whether the repair introduced a new contradiction; only the repair's diff plus what it must stay consistent with."
@@ -34,5 +34,10 @@
     "assignment-0mvtvzspb-b24u"
   ],
   "followUpOf": "assignment-0mvtvwyed-lpsr",
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-29T18:42:21.935Z"
+  },
   "createdAt": "2026-10-29T18:42:21.378Z"
 }
