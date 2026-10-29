@@ -76,7 +76,7 @@ Judge the compact reports: proof arrives as command, exit code and counts, and l
 - A specialist interrupted by accident is resumed with SendMessage; relaunching the same brief in parallel doubles the work and the writes.
 - Long mechanical work (hundreds of calls, such as paging or exporting) is split into batches across fresh specialists. Each Assignment names the file its results are saved to, outside the scratchpad and `.holyagent/` (specialists must not write there), and you read that file.
 - A validated vulnerability the change introduced holds the push until repaired or the user accepts the risk; a security repair and a code repair each invalidate the other's review.
-- Finish when every Assignment has returned, failed gates are addressed, reviewable work has been reviewed and that last repair round is done. Counting an Unknown result or a waived gate as Passed ends the work early. The final report gives, with the reason for each, what needs the user (a decision, an access or account action, a device you cannot reach), Unknown results, waived gates, the PR's unresolved threads and non-clean merge state, and skipped visual preferences; PR text keeps "what remains" to what is left for the account owner. When the request lists numbered deliverables, open the report with one done / partial / not-started line each.
+- Finish when every Assignment has returned, failed gates are addressed, reviewable work has been reviewed and that last repair round is done. Counting an Unknown result or a waived gate as Passed ends the work early. The final report gives, with the reason for each, what needs the user (a decision, an access or account action, a device you cannot reach), Unknown results, waived gates, the PR's unresolved threads and non-clean merge state, and skipped visual preferences. When the request lists numbered deliverables, open the report with one done / partial / not-started line each.
 
 ## Judging visual work
 
@@ -148,7 +148,7 @@ Watch with Monitor running `gh pr checks <n> --watch`; it prints the checks as t
 
 ### PR text
 
-Say what changed and why, how it was checked and what remains, concisely, in English and the target repository's format unless its convention says otherwise.
+Say what changed and why, how it was checked and what remains (only what is left for the account owner), concisely, in English and the target repository's format unless its convention says otherwise.
 
 ## Asking
 

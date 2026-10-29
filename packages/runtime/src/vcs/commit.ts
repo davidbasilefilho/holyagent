@@ -82,11 +82,35 @@ const inStateFolder = (path: string, foldCase: boolean) => {
 /** True when the git path is the project's settings file in the state folder, in any case. */
 const isConfigFile = (path: string) => path.toLowerCase() === `${STATE_DIRECTORY}/${CONFIG_FILE}`
 
+/** A first segment shaped like an NTFS 8.3 short name: up to six characters, `~`, digits. */
+const SHORT_NAME = /^[^/~]{1,6}~\d+$/
+
 /**
- * True when the first segment is the NTFS 8.3 short name of the state folder (`HOLYAG~1`), which
- * Windows resolves to `.holyagent`, so it would name the state folder past the checks by name.
+ * The first segments of the paths that look like an 8.3 short name. Windows resolves such a name to
+ * a folder whose long form cannot be known from the text: `HOLYAG~1` is `.holyagent`, and after
+ * several collisions it is a hashed name (`HOA3F2~1`) that matches no pattern of the long name. The
+ * state folder reached through one would pass the checks by name, so a name of this shape is
+ * refused unless it is a real entry of the work tree.
  */
-const isShortStateName = (path: string) => /^holyag~\d+$/i.test(path.split("/")[0] ?? "")
+const shortNames = (paths: ReadonlyArray<string>, separator: string) => [
+  ...new Set(
+    paths
+      .map((path) => toPosix(path, separator).split("/")[0] ?? "")
+      .filter((name) => SHORT_NAME.test(name)),
+  ),
+]
+
+/**
+ * Which of the names are real entries of the work tree (a tracked file or folder, or one git sees
+ * untracked), not an alias for another name. A listing from git holds long names only, so an 8.3
+ * alias is never in it.
+ */
+const realEntries = (names: ReadonlyArray<string>) =>
+  Effect.forEach(names, (name) =>
+    gitPaths(["ls-files", "-z", "--cached", "--others", "--directory"], [name]).pipe(
+      Effect.map((listing) => (listing === "" ? [] : [name])),
+    ),
+  ).pipe(Effect.map((found) => new Set(found.flat())))
 
 /** True when `core.ignorecase` is on: the file system treats names that differ in case as one. */
 const ignoresCase = gitMaybe(["config", "--type=bool", "--get", "core.ignorecase"]).pipe(
@@ -102,13 +126,15 @@ const ignoresCase = gitMaybe(["config", "--type=bool", "--get", "core.ignorecase
  * Outside the `work` mode the state folder is refused in any letter case, since a file system that
  * ignores case may not say so in `core.ignorecase`; in the `work` mode a path is matched whatever
  * its case only where the file system ignores case (`ignoreCase`) and comes back in the folder's
- * own case. The short name of the state folder (`HOLYAG~1`) is refused in every mode.
+ * own case. A first segment shaped like an 8.3 short name (`HOLYAG~1`, a hashed `HOA3F2~1`) is
+ * refused in every mode unless `existing` names it as a real entry of the work tree.
  */
 export const commitScope = (
   paths: ReadonlyArray<string>,
   separator: string = sep,
   mode: StateMode = "branch",
   ignoreCase: boolean = false,
+  existing: ReadonlySet<string> = new Set(),
 ) =>
   Effect.forEach(paths, (path) => {
     const clean = toPosix(path, separator).replace(/\/+$/, "")
@@ -120,11 +146,12 @@ export const commitScope = (
           hint: "Name files or folders relative to the project root.",
         }),
       )
-    if (isShortStateName(clean))
+    const first = clean.split("/")[0] ?? ""
+    if (SHORT_NAME.test(first) && !existing.has(first))
       return Effect.fail(
         new Usage({
-          message: `Invalid path "${path}": it is the short name of the ${STATE_DIRECTORY} folder`,
-          hint: "Name the state folder as .holyagent, or leave Intent state out of `vcs commit`.",
+          message: `Invalid path "${path}": "${first}" looks like the Windows short name of a folder, which could be the ${STATE_DIRECTORY} state folder`,
+          hint: "Name the folder by its full name, or leave Intent state out of `vcs commit`.",
         }),
       )
     if (!inStateFolder(clean, ignoreCase || mode !== "work")) return Effect.succeed(clean)
@@ -194,7 +221,7 @@ const requireNoStagedState = (staged: ReadonlyArray<string>) => {
     : Effect.fail(
         new Usage({
           message: `files under ${STATE_DIRECTORY}/ are staged (${state.join(", ")}), which state mode local cannot keep out of a commit`,
-          hint: "Unstage them with `git restore --staged`, switch to the work mode with `holyagent state mode work`, or untrack the files.",
+          hint: "Unstage them with `git restore --staged`. The repository tracks state; see `holyagent state mode` and docs/usage.md before changing the mode or untracking files.",
         }),
       )
 }
@@ -215,7 +242,8 @@ export const commit = (request: CommitRequest) =>
     yield* request.cloud ? requireOwnAuthor : requireOwnIdentity
     const mode = yield* stateMode
     const ignoreCase = yield* ignoresCase
-    const named = yield* commitScope(request.paths, sep, mode, ignoreCase)
+    const real = yield* realEntries(shortNames(request.paths, sep))
+    const named = yield* commitScope(request.paths, sep, mode, ignoreCase, real)
     // In the work mode the state rides the work commit: the changed state files join the scope.
     const scope =
       mode === "work" && !named.includes(STATE_DIRECTORY)

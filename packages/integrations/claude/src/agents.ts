@@ -349,7 +349,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
   "R-WV": { section: "roles/worker-validation/method.md", phrase: "choose the real check" },
   "R-WVI": {
     section: "roles/worker-visual/purpose.md",
-    phrase: "stop repairing a finding after round three",
+    phrase: "The Assignment names the repair round",
   },
   "R-WVI-DESIGN": {
     section: "roles/worker-visual/frontend-design.md",
