@@ -4,10 +4,16 @@ import { Effect } from "effect"
 
 import { Usage } from "../cli/errors.ts"
 import { pathProblem, toPosix } from "../domain/paths.ts"
-import { STATE_DIRECTORY } from "../state/layout.ts"
+import { STATE_DIRECTORY, TRACKED_STATE_PATHSPEC } from "../state/layout.ts"
 import { parseStateMode, STATE_MODE_KEY, type StateMode } from "../state/mode.ts"
-import { AgentIdentity, CloudAuthor, NothingToCommit, StagedOutsideScope } from "./errors.ts"
-import { currentBranch, git, gitMaybe, gitPaths } from "./git.ts"
+import {
+  AgentIdentity,
+  CloudAuthor,
+  GitFailed,
+  NothingToCommit,
+  StagedOutsideScope,
+} from "./errors.ts"
+import { currentBranch, Git, git, gitMaybe, gitPaths } from "./git.ts"
 import { looksLikeAgent, parseIdent } from "./identity.ts"
 import type { Message } from "./message.ts"
 
@@ -78,7 +84,9 @@ export const commitScope = (
           hint: "Name files or folders relative to the project root.",
         }),
       )
-    const state = clean === STATE_DIRECTORY || clean.startsWith(`${STATE_DIRECTORY}/`)
+    // Git on a case-insensitive file system treats `.HolyAgent` as the same folder.
+    const folded = clean.toLowerCase()
+    const state = folded === STATE_DIRECTORY || folded.startsWith(`${STATE_DIRECTORY}/`)
     if (!state || mode === "work") return Effect.succeed(clean)
     // On the state branch a work branch that carried the state could conflict with it when the two
     // are merged or stacked; in the local mode no commit carries it.
@@ -108,23 +116,55 @@ const stateMode = gitMaybe(["config", "--get", STATE_MODE_KEY]).pipe(
   ),
 )
 
-/** True when the state folder has a change git would stage (an ignored file is not one). */
-const stateChanged = git([
-  "status",
-  "--porcelain",
-  "--untracked-files=all",
-  "--",
-  STATE_DIRECTORY,
-]).pipe(Effect.map((text) => text !== ""))
+/**
+ * The state files git sees changed (an ignored file is not one) and the project's settings are not:
+ * the work mode stages the former with the work, and the settings only when the caller names them.
+ */
+const changedState = Effect.gen(function* () {
+  const args = [
+    "status",
+    "--porcelain",
+    "-z",
+    "--no-renames",
+    "--untracked-files=all",
+    "--",
+    ...TRACKED_STATE_PATHSPEC,
+  ]
+  // Not through `git()`, which trims the leading space of the first status code.
+  const ran = yield* Git.use((service) => service.run(args))
+  if (ran.code !== 0)
+    return yield* new GitFailed({ args, code: ran.code, output: ran.stderr.trim() })
+  return ran.stdout
+    .split("\0")
+    .filter((entry) => entry.length > 3)
+    .map((entry) => entry.slice(3))
+})
+
+/**
+ * In the local mode, refuses a commit while git tracks state files, which the exclude entry cannot
+ * hide.
+ */
+const requireUntrackedState = git(["ls-files", "--", ...TRACKED_STATE_PATHSPEC]).pipe(
+  Effect.flatMap((tracked) =>
+    tracked === ""
+      ? Effect.void
+      : Effect.fail(
+          new Usage({
+            message: `git tracks files under ${STATE_DIRECTORY}/, which state mode local cannot keep out of a commit`,
+            hint: "Switch to the work mode with `holyagent state mode work`, or untrack the files.",
+          }),
+        ),
+  ),
+)
 
 /**
  * Commits exactly the named paths with the configured git identity (an agent's is refused). In a
  * claude.ai cloud session the author is checked instead and the committer is the platform's. In the
  * default `branch` mode Intent state is not part of it: it is committed on the state branch as it
  * changes, and a path under `.holyagent/` is refused (as in `local`, which commits it nowhere). In
- * the `work` mode the changed state files are staged with the work. Changes staged beforehand
- * outside the named paths refuse the commit, so the commit is never wider than the request. The
- * repository's own hooks run, the commit-msg hook among them.
+ * the `work` mode the changed state files (not the project's settings) are staged with the work.
+ * Changes staged beforehand outside the named paths refuse the commit, so the commit is never wider
+ * than the request. The repository's own hooks run, the commit-msg hook among them.
  */
 export const commit = (request: CommitRequest) =>
   Effect.gen(function* () {
@@ -132,10 +172,11 @@ export const commit = (request: CommitRequest) =>
     yield* request.cloud ? requireOwnAuthor : requireOwnIdentity
     const mode = yield* stateMode
     const named = yield* commitScope(request.paths, sep, mode)
+    if (mode === "local") yield* requireUntrackedState
     // In the work mode the state rides the work commit: the changed state files join the scope.
     const scope =
-      mode === "work" && !named.includes(STATE_DIRECTORY) && (yield* stateChanged)
-        ? [...named, STATE_DIRECTORY]
+      mode === "work" && !named.includes(STATE_DIRECTORY)
+        ? [...named, ...(yield* changedState)]
         : named
 
     const alreadyStaged = yield* stagedPaths

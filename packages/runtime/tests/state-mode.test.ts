@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { readdir, readFile } from "node:fs/promises"
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
+import { Effect } from "effect"
+
+import { commitScope } from "../src/vcs/commit.ts"
 import { cleanup, fakeGitHub, initRepo, put, scratch, seed, sh, toon, vcs } from "./vcs-fixtures.ts"
 
 afterEach(cleanup)
@@ -223,5 +226,184 @@ describe("changing the mode of a clone that has records", () => {
     expect(toon(await holy(dir, ["intent", "show", intent]))).toMatchObject({ id: intent })
     toon(await holy(dir, ["state", "mode", "local"]))
     expect(toon(await holy(dir, ["intent", "show", intent]))).toMatchObject({ id: intent })
+  })
+})
+
+describe("a repository that tracks only the project's config.json", () => {
+  const configOnly = async (mode?: string) => {
+    const dir = await initRepo(OWNER)
+    await seed(dir, { "a.txt": "a\n", ".holyagent/config.json": "{}\n" })
+    if (mode !== undefined) toon(await holy(dir, ["state", "mode", mode]))
+    return dir
+  }
+
+  test("is not tracked state, so the local mode is allowed and hides the records", async () => {
+    const dir = await configOnly("local")
+    await createIntent(dir)
+
+    expect(await excludeFile(dir)).toContain("/.holyagent/")
+    expect(await sh(dir, ["git", "status", "--porcelain"])).toBe("")
+    await put(dir, { "a.txt": "a2\n" })
+    toon(await holy(dir, ["vcs", "commit", "-m", "Change a", "--", "a.txt"]))
+    expect(await filesOf(dir, "HEAD")).toEqual(["a.txt"])
+  })
+
+  test("work mode stages the records but not a config change nobody named", async () => {
+    const dir = await configOnly("work")
+    const intent = await createIntent(dir)
+    await put(dir, { "a.txt": "a2\n", ".holyagent/config.json": '{"vcs":{"allowWords":["x"]}}\n' })
+
+    toon(await holy(dir, ["vcs", "commit", "-m", "Change a", "--", "a.txt"]))
+
+    const files = await filesOf(dir, "HEAD")
+    expect(files.some((file) => file.includes(`${intent}/intent.json`))).toBe(true)
+    expect(files).not.toContain(".holyagent/config.json")
+    expect(await sh(dir, ["git", "status", "--porcelain"])).toContain(".holyagent/config.json")
+  })
+
+  test("work mode never stages an untracked config.json either, but stages it when named", async () => {
+    const dir = await repoIn("work")
+    await createIntent(dir)
+    await put(dir, { "a.txt": "a2\n", ".holyagent/config.json": "{}\n" })
+
+    toon(await holy(dir, ["vcs", "commit", "-m", "Change a", "--", "a.txt"]))
+    expect(await filesOf(dir, "HEAD")).not.toContain(".holyagent/config.json")
+
+    await put(dir, { "a.txt": "a3\n" })
+    toon(
+      await holy(dir, [
+        "vcs",
+        "commit",
+        "-m",
+        "Change a again",
+        "--",
+        "a.txt",
+        ".holyagent/config.json",
+      ]),
+    )
+    expect(await filesOf(dir, "HEAD")).toContain(".holyagent/config.json")
+  })
+})
+
+describe("local mode and files that git tracks under .holyagent", () => {
+  test("vcs commit is refused while git tracks state there, whatever the path's case", async () => {
+    const dir = await repoIn("local")
+    await put(dir, { ".holyagent/note.md": "x\n", "a.txt": "a2\n" })
+    await sh(dir, ["git", "add", "-f", ".holyagent/note.md"])
+    await sh(dir, ["git", "commit", "-q", "-m", "track"])
+    await put(dir, { "a.txt": "a3\n" })
+
+    const result = await holy(dir, ["vcs", "commit", "-m", "Change a", "--", "a.txt"])
+
+    expect(result.code).toBe(2)
+    expect(result.stderr).toContain("tracks files under .holyagent")
+    expect(await sh(dir, ["git", "log", "--format=%s"])).toBe("track\nseed\n")
+  })
+
+  test("a path under .holyagent is refused in any letter case", async () => {
+    for (const path of [".HolyAgent/x", ".HOLYAGENT"]) {
+      const failure = await Effect.runPromise(Effect.flip(commitScope([path], "/", "local")))
+      expect(failure.message).toContain("Intent state")
+    }
+  })
+})
+
+describe("the exclude file", () => {
+  test("a line the user wrote stays through every mode change, and none is added twice", async () => {
+    const dir = await repoIn()
+    await mkdir(join(dir, ".git", "info"), { recursive: true })
+    await writeFile(join(dir, ".git", "info", "exclude"), "# mine\n/.holyagent/\n")
+
+    for (const mode of ["local", "work", "local", "work"])
+      toon(await holy(dir, ["state", "mode", mode]))
+
+    expect(await excludeFile(dir)).toBe("# mine\n/.holyagent/\n")
+  })
+
+  test("only the line holyagent added is removed, the rest of the file is kept, and no temporary file stays", async () => {
+    const dir = await repoIn()
+    await mkdir(join(dir, ".git", "info"), { recursive: true })
+    await writeFile(join(dir, ".git", "info", "exclude"), "*.log\n")
+
+    toon(await holy(dir, ["state", "mode", "local"]))
+    expect(await excludeFile(dir)).toContain("*.log\n")
+    expect(await excludeFile(dir)).toContain("/.holyagent/")
+    toon(await holy(dir, ["state", "mode", "work"]))
+
+    expect(await excludeFile(dir)).toBe("*.log\n")
+    expect(await readdir(join(dir, ".git", "info"))).toEqual(["exclude"])
+  })
+
+  test("entering local writes the exclude entry first: a failure leaves the mode unchanged", async () => {
+    const dir = await repoIn()
+    await rm(join(dir, ".git", "info", "exclude"), { force: true, recursive: true })
+    await mkdir(join(dir, ".git", "info", "exclude"), { recursive: true })
+
+    const result = await holy(dir, ["state", "mode", "local"])
+
+    expect(result.code).not.toBe(0)
+    expect(toon(await holy(dir, ["state", "mode"]))).toMatchObject({ mode: "branch" })
+  })
+})
+
+describe("changing the mode across work trees and under the lock", () => {
+  test("records in another linked work tree stop a move onto the state branch", async () => {
+    const dir = await repoIn("work")
+    await createIntent(dir)
+    const other = join(await scratch(), "linked")
+    await sh(dir, ["git", "worktree", "add", "-q", "-b", "other", other])
+
+    const result = await holy(other, ["state", "mode", "branch"])
+
+    expect(result.code).toBe(3)
+    expect(result.stderr).toContain("StateModeRefused")
+    expect(toon(await holy(dir, ["state", "mode"]))).toMatchObject({ mode: "work" })
+    expect(await sh(dir, ["git", "branch", "--list", "holyagent/*"])).toBe("")
+  })
+
+  const holdLock = async (dir: string) => {
+    const lock = join(dir, ".git", "holyagent", "worktree.lock")
+    await mkdir(join(dir, ".git", "holyagent"), { recursive: true })
+    await writeFile(lock, JSON.stringify({ pid: process.pid, token: "held", acquiredAt: 0 }))
+    return lock
+  }
+
+  test("a mode change waits for the command that holds the worktree lock", async () => {
+    const dir = await repoIn()
+    const lock = await holdLock(dir)
+
+    let finished = false
+    const change = holy(dir, ["state", "mode", "work"]).then((result) => {
+      finished = true
+      return result
+    })
+    await Bun.sleep(300)
+    expect(finished).toBe(false)
+    await rm(lock)
+
+    expect(toon(await change)).toMatchObject({ mode: "work" })
+  })
+
+  test("a command that waited for the lock makes no state branch once the mode changed", async () => {
+    const dir = await repoIn()
+    const lock = await holdLock(dir)
+
+    const created = holy(dir, ["intent", "create"], { objective: "Ship the parser" })
+    await Bun.sleep(300)
+    await sh(dir, ["git", "config", "holyagent.stateMode", "work"])
+    await rm(lock)
+
+    expect((await created).code).toBe(0)
+    expect(await sh(dir, ["git", "branch", "--list", "holyagent/*"])).toBe("")
+    expect(await stateFolder(dir)).toContain("intents")
+  })
+})
+
+describe("the help of vcs commit", () => {
+  test("describes the commit by state mode", async () => {
+    const help = await holy(await repoIn(), ["vcs", "commit", "--help"])
+
+    expect(help.stdout).toContain("state mode")
+    expect(help.stdout).not.toContain("never part of the commit")
   })
 })

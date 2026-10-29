@@ -156,7 +156,7 @@ const mentionsOf = (root: string, folders: ReadonlyArray<string>) =>
   })
 
 const NOTES: ReadonlyArray<string> = [
-  "reads .holyclaude/ and .holycodex/ at the state root, whichever exist, and writes .holyagent/ records the CLI loads. It deletes nothing: the records are committed on the state branch (the legacy folders are read at the work tree root, the records written in the state worktree), and removing the legacy folders is left to the root. It lists the project files that name a legacy folder (lint and format ignore lists, for example) without editing them, so the root can point them at .holyagent/",
+  "reads .holyclaude/ and .holycodex/ at the state root, whichever exist, and writes .holyagent/ records the CLI loads. It deletes nothing: the records are written where the state mode keeps them, on the state branch in the branch mode (the legacy folders are read at the work tree root, the records written in the state worktree) and in the work tree's .holyagent/ otherwise, and removing the legacy folders is left to the root. It lists the project files that name a legacy folder (lint and format ignore lists, for example) without editing them, so the root can point them at .holyagent/",
   "--dry-run prints the counts per source (intents, assignments, notes), every record it cannot convert with the reason, and everything a real run would refuse; it writes nothing. A real run first checks the same things and writes nothing unless all are clear: every record converts, no target file or id exists in .holyagent/ (nothing is overwritten), no Assignment is Running (holyclaude) or executing (holycodex) and no holycodex transaction is pending. A Running or executing Assignment is named with how to settle it: finish or cancel it with the legacy tool, then migrate again. It then reloads .holyagent/ and fails if any record does not decode",
   "records are decoded strictly: a field the legacy schema does not list makes the record unconvertible, and every record is written through the holyagent schemas, so one that breaks a holyagent rule is reported with that rule. Files ending in .tmp are skipped",
   "holyclaude, Intent: the id and revision are kept; the slug comes from the objective; requirements become one entry (none when blank); the state is Open, or Closed with its close_reason (closed_at is dropped); createdAt is the time in the id (the epoch for an early counter id such as intent-0001, which carries none). Notes in the Intent folder (resume-notes.md, notes/) are copied unchanged",
@@ -226,7 +226,7 @@ export const MIGRATE_COMMANDS: ReadonlyArray<Command> = [
           ...counts,
           reloaded: loaded,
           mentions,
-          next: `Nothing was deleted; in a git repository the records are committed on the state branch. Check the result with \`holyagent intent list\`, point the files under mentions at .holyagent/, then delete ${folders.join(" and ")} (the root does it)`,
+          next: `Nothing was deleted; the records are written where the state mode keeps them (on the state branch in the branch mode, committed there; in the work tree otherwise, where the work mode commits them with the work and the local mode keeps them out of git). Check the result with \`holyagent intent list\`, point the files under mentions at .holyagent/, then delete ${folders.join(" and ")} (the root does it)`,
         })
       }),
   },
