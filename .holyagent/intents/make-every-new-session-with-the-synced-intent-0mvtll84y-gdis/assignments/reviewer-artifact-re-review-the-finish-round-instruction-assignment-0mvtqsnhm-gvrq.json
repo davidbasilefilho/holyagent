@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mvtqsnhm-gvrq",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.artifact",
+  "slug": "re-review-the-finish-round-instruction",
+  "objective": "Re-review the finish-round instruction repair bbe8eff against the previous review's findings.",
+  "state": "Running",
+  "scope": [
+    "Repair diff: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/rr-A.diff (be35f58..bbe8eff on ccr-046ad103-6qsvgx-pending-autofix in /home/user/holyagent-instr-finish). Previous review: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-g7dy.txt. Writer report: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-vlvf.txt."
+  ],
+  "constraints": [
+    "Read-only: write no files and make no version-control writes.",
+    "Judge only the repair diff against the previous findings."
+  ],
+  "criteria": [
+    {
+      "text": "Each previous finding is stated closed or open with file and line, and any new blocking issue is named with a fix or its absence is stated",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources-read"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvtqdc5g-vlvf"
+  ],
+  "followUpOf": "assignment-0mvtq10oh-g7dy",
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-29T16:13:08.459Z"
+  },
+  "createdAt": "2026-10-29T16:13:08.459Z"
+}
