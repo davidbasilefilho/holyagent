@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mvtrksnk-726e",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-state-finish-round-commit",
+  "objective": "Re-review the state finish-round commit 2ef397c against the notes it targets.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-state-edges (head merges the instruction branch). Diff: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/f-B.diff. Targeted notes: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-xpzx.txt and /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-l2nw.txt. Writer report: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-vqzg.txt.",
+    "Run mise run verify on the head."
+  ],
+  "constraints": [
+    "Read-only: write no files and make no version-control writes.",
+    "Judge only this finish-round diff against the findings it targets; it is the last review round, so rank anything new precisely."
+  ],
+  "criteria": [
+    {
+      "text": "Each targeted finding is stated closed or open with file and line, any new blocking issue is named with a fix or its absence is stated, with mise run verify run on the head",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvtr445w-vqzg"
+  ],
+  "followUpOf": "assignment-0mvtqsnqt-xpzx",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T16:35:01.520Z"
+  },
+  "createdAt": "2026-10-29T16:35:01.520Z"
+}
