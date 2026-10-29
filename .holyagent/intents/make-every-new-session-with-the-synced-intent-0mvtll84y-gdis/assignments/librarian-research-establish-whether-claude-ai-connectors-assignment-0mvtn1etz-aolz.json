@@ -5,7 +5,7 @@
   "roleTask": "Librarian.research",
   "slug": "establish-whether-claude-ai-connectors",
   "objective": "Establish whether claude.ai connectors (such as the Exa connector) are usable in Claude Code outside claude.ai (local CLI, desktop, IDE), under which login and settings, and what MCP tool names they get there.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Context: holyagent currently depends on the exa@claude-plugins-official plugin (hosted MCP at https://mcp.exa.ai/mcp) and denies the built-in WebSearch and WebFetch so web work goes through Exa. The plan is to drop the plugin and rely on the user's claude.ai Exa connector. In this claude.ai cloud session the connector tools are named mcp__Exa__web_search_exa and mcp__Exa__web_fetch_exa.",
     "Questions: (1) Does Claude Code CLI/desktop load claude.ai connectors, and only with a claude.ai subscription login (not API key, Bedrock, Vertex)? Which setting or env var turns it on or off (for example ENABLE_CLAUDEAI_MCP_SERVERS)? (2) What tool-name prefix do those connectors get in the local CLI versus cloud sessions? (3) With no connector available, what web tools remain if WebSearch and WebFetch are denied? (4) Can Exa's hosted MCP be added without the plugin (claude mcp add) and does it work without OAuth?",
@@ -28,5 +28,10 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-10-29T14:28:05.448Z"
+  },
   "createdAt": "2026-10-29T14:27:58.680Z"
 }
