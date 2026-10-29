@@ -1,0 +1,37 @@
+{
+  "id": "assignment-0mvtm1tnb-sg3e",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.security",
+  "slug": "assess-commit-673c38a-for-security",
+  "objective": "Assess commit 673c38a for security problems in the new hook and its session marker.",
+  "state": "Running",
+  "scope": [
+    "The change is commit 673c38a on ccr-046ad103-6qsvgx-mandatory-root in /home/user/holyagent-root (base origin/main 7929f2d); diff without the bundle: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/rootrules-commit.diff. Intent: a main thread that loads the holyagent plugin gets the root rules even when SessionStart output arrives late or never: a new root-rules hook on UserPromptSubmit and catch-all PreToolUse delivers bareContext once per session via an exclusive marker at os.tmpdir()/holyagent-sessions/<session_id>; subagents and a root main thread get nothing; session-start for a non-root main thread now emits the rules plus a failure line instead of exiting 1.",
+    "Focus: session_id validation and path building for the marker (traversal, symlinks in a shared tmp dir, another local user pre-creating markers to suppress delivery), the catch-all PreToolUse hook (it runs on every tool call; it must never block or alter a tool call), and the session-start fallback text."
+  ],
+  "constraints": [
+    "Read-only: write no files."
+  ],
+  "criteria": [
+    {
+      "text": "Each finding traces source to sink with file:line and a severity, or absence is stated per surface",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources-read"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvtlrfnt-fomd"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T14:00:18.263Z"
+  },
+  "createdAt": "2026-10-29T14:00:18.263Z"
+}
