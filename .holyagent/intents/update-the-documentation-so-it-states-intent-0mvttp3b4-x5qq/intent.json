@@ -1,0 +1,15 @@
+{
+  "id": "intent-0mvttp3b4-x5qq",
+  "slug": "update-the-documentation-so-it-states",
+  "objective": "Update the documentation so it states that native Windows support was tested by the maintainer, documents how to run the root on Sonnet instead of Opus, and presents HolyAgent for a broader range of software development use cases.",
+  "requirements": [
+    "User: Windows support was tested by the maintainer; remove the claims that it is untested.",
+    "User: document that switching the root to Sonnet is all it takes, for those who want it.",
+    "User: it must cover more use cases within software development, not only multi-PR projects.",
+    "Default (not asked): the change is documentation only (README, docs/); no behavior change to the root or runtime.",
+    "README keeps exactly its six sections in order (AGENTS.md); detail goes in docs/ and the README links to it."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-10-29T17:34:21.186Z"
+}
