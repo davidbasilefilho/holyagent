@@ -1,0 +1,62 @@
+{
+  "id": "assignment-0mvv0k6w6-hwhf",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "fix-the-four-non-blocking-findings-from",
+  "objective": "Fix the four non-blocking findings from the review of PR 37's repair, in /home/user/holyagent-plugin-only-install.",
+  "state": "Ready",
+  "scope": [
+    "Review: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-rev37b.txt, non-blocking findings 1-4.",
+    "1: the session-start notice must count only leftovers that /holyagent:setup can remove, so it does not repeat forever for ones setup only reports (for example a project-scope install whose project folder is gone or not yours); keep the notice for removable ones. Add a test.",
+    "2: json-file.ts: remove the temporary file when the exclusive write itself fails after creating it (ENOSPC/EIO), so a later run with the same pid is not blocked; keep the stale-file refusal test meaning (a pre-existing temp file is refused and left untouched). Add a test where practical.",
+    "3: update the stale descriptions that say the session-start line appears only when ctx7 or a key is missing: packages/runtime/src/cli/hook.ts (~226) and docs/components.md (~70).",
+    "4: json-file.ts: a mkdir failure reports the directory, not the temp path; fix the comment that overclaims 'never readable with default permissions' to say it holds when the target's mode is known.",
+    "Gates with the canary Bun /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/canary/x/bun-linux-x64/bun: check --no-script, lint --no-script, fmt --no-script --check, test; then scripts/vendor.ts and packages/integrations/claude/build.ts. git add only your changed files. Save pre-change copies to /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/orig37c/ and write the diff of your changes (excluding the dist bundle) to /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/fix37c.diff."
+  ],
+  "constraints": [
+    "Repository rules: Effect and tagged errors, no try/catch, async functions or new Promise in runtime source, Bun APIs where Bun has them, JSDoc on exports.",
+    "Edit only in /home/user/holyagent-plugin-only-install: packages/runtime/src/setup, packages/runtime/src/cli, packages/runtime/tests, packages/integrations/claude/dist/scripts, docs/components.md, docs/hooks.md.",
+    "Git writes limited to git add of your changed files; no edits under .git/ or .holyagent/.",
+    "Keep working until done; stop and report when done and checked."
+  ],
+  "criteria": [
+    {
+      "text": "The notice ignores leftovers setup cannot remove, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A failed exclusive write removes its own temp file while a pre-existing temp file is still refused and untouched",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Stale descriptions and the mkdir message and comment are fixed",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "check, lint, fmt --check and test pass with the canary Bun and dist is in step",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/setup",
+    "packages/runtime/src/cli",
+    "packages/runtime/tests",
+    "packages/integrations/claude/dist/scripts",
+    "docs/components.md",
+    "docs/hooks.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvuzydo3-llyl",
+  "createdAt": "2026-10-30T13:34:16.039Z"
+}
