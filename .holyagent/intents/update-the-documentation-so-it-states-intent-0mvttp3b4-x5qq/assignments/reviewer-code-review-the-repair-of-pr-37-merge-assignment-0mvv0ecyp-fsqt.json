@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-the-repair-of-pr-37-merge",
   "objective": "Review the repair of PR 37 merge findings 4 and 5 (exclusive temp-file creation, leftovers notice).",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Staged in /home/user/holyagent-plugin-only-install (uncommitted merge). Diff of this repair: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/fix37b.diff (most of it is the regenerated dist bundle; focus on packages/runtime/src/setup/json-file.ts, packages/runtime/src/setup/check.ts, packages/runtime/tests/setup-files.test.ts, setup-check.test.ts, setup-leftovers.test.ts, docs/hooks.md). Pre-change copies: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/orig37b/. Report: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-fix37b.txt. Original findings: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-rev37.txt items 4 and 5.",
     "Check correctness and error paths: temp file created with flag wx and mode, cleanup of a temp file on failure, behavior when the temp path exists (stale file, symlink), Windows behavior of mode, the session-start notice cost and silence (10s hook timeout, cloud sessions, non-JSON files), Effect and tagged-error rules from .claude/CLAUDE.md, and the race-test spy change keeping the same assertions. The canary Bun at /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/canary/x/bun-linux-x64/bun can run tests in that worktree."
@@ -34,5 +34,10 @@
   "independentFrom": [
     "assignment-0mvuzydo3-llyl"
   ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-30T13:29:53.219Z"
+  },
   "createdAt": "2026-10-30T13:29:43.970Z"
 }
