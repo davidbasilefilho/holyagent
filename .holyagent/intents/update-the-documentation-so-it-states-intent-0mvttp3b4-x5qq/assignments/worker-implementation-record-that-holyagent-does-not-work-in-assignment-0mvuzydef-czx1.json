@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "record-that-holyagent-does-not-work-in",
   "objective": "Record that holyagent does not work in claude.ai unified chat/Cowork sessions and close the open optional documentation findings, in /home/user/holyagent-docs.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Maintainer statement: holyagent was tested in a claude.ai unified chat/Cowork session and does not work there, because of the way hooks are activated in those sessions. Replace the 'not tested in a Cowork session' claims: docs/requirements.md line 32 (Supported environments row for claude.ai chat and Cowork) and docs/usage.md line 134 (the claude.ai section's 'HolyAgent has not been tested in a Cowork session of the unified Claude'). Say it was tested and does not work there because of how hooks are activated in those sessions; keep the rest of the section's sourced facts, and keep 'For the full workflow use Claude Code.' Do not invent further detail about the hook mechanism.",
     "Optional findings from /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-revdocs2.txt to close: (1) docs/usage.md Sonnet section ~line 126: word the scope exactly: the documented effect is that ANTHROPIC_DEFAULT_OPUS_MODEL sets what the opus alias resolves to; the root's frontmatter is model: opus, so the root resolves to the model you set; say to confirm with /status after restarting; phrase the global effect as 'anything else that selects the opus alias'. (2) 'Sonnet is a cheaper model' needs a source: cite Anthropic's pricing page https://platform.claude.com/docs/en/about-claude/pricing if you can confirm it there, else drop the sentence. (3) Keep the model id claude-sonnet-5-5; it is the current Sonnet 5.5 id.",
@@ -49,7 +49,41 @@
     "agentId": "workflow:wf_b09dd4ba-60e/assignment-0mvuzydef-czx1",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-10-30T13:17:26.762Z"
+    "startedAt": "2026-10-30T13:17:26.762Z",
+    "finishedAt": "2026-10-30T13:29:07.701Z"
+  },
+  "result": "result: Both Cowork claims now say the maintainer tested HolyAgent in a unified chat/Cowork session, it does not work there, and the cause is how hooks are activated. The Sonnet section is reworded and the cheaper-model sentence is sourced from the pricing page.\nchanged: /home/user/holyagent-docs/docs/usage.md, /home/user/holyagent-docs/docs/requirements.md\nchecks: `bun fmt --no-script --check README.md docs/usage.md docs/requirements.md docs/hooks.md` (canary Bun) -> first run exit 1 (requirements.md table needed realigning), `bun fmt --no-script docs/requirements.md` fixed it, re-run exit 0 (\"All 4 files are formatted\"). A search for \"not tested\", \"untested\" and \"has not been tested\" over README.md, docs and install returns nothing.\nblockers: none\nquestions: none\nnotes:\n- The formatter realigned the whole Supported environments table in docs/requirements.md, so that diff touches more lines than the one row that changed. This follows from the longer row text.\n- I added no detail about the hook mechanism beyond \"because of how hooks are activated in those sessions\".\n- I fetched the pricing page directly. It lists Claude Sonnet 5.5 at $2 / $10 per million input / output tokens and Claude Opus 5.5 at $4 / $20. The sentence cites that page with a \"read 2026-10-30\" date.\n- I kept `claude-sonnet-5-5`. The pricing page lists the model as Claude Sonnet 5.5, but I did not check the id string itself against a models page.\n- The Sonnet section now says the root resolves to the model you set. The variable \"applies to anything else that selects the `opus` alias\", and the bullet says to confirm with `/status` after restarting.\n- The paragraph in docs/usage.md that says a hook \"records an agent started through the `Agent` tool\" is unrelated and I did not touch it.\n\nevidence:\nNo doc says holyagent is untested in Cowork; requirements.md and usage.md say it was tested and does not work there because of how hooks are activated: docs/requirements.md:32 and docs/usage.md:134 carry the new wording, and the search above finds no remaining \"not tested\" or \"untested\" claim.\nThe Sonnet section states only the documented alias effect, and the cheaper-model sentence is sourced or removed: docs/usage.md:~123-130. It cites the model-config page for the alias, says the root resolves to the model you set, says to confirm with `/status` after restarting, and cites the pricing page for the cost sentence.\nfmt check passes: the four-file `bun fmt --check` above exited 0.\nchecks-run: the formatter check above, the pricing-page fetch via curl (HTTP 200), and the \"not tested\" search.\nchanged-paths: /home/user/holyagent-docs/docs/usage.md, /home/user/holyagent-docs/docs/requirements.md\ndiff-file: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/docs-v5.diff (135 lines; README.md, docs/usage.md, docs/requirements.md, docs/hooks.md and install/windows-install.ps1 against /home/user/holyagent-plugin-only-install)",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Cowork wording per maintainer, Sonnet scope precise and pricing sourced; fmt green.",
+    "criteria": [
+      {
+        "criterion": "No doc says holyagent is untested in Cowork; requirements.md and usage.md say it was tested and does not work there because of how hooks are activated",
+        "support": "docs/requirements.md:32 and docs/usage.md:134 carry the new wording, and the search above finds no remaining \"not tested\" or \"untested\" claim."
+      },
+      {
+        "criterion": "The Sonnet section states only the documented alias effect, and the cheaper-model sentence is sourced or removed",
+        "support": "docs/usage.md:~123-130. It cites the model-config page for the alias, says the root resolves to the model you set, says to confirm with `/status` after restarting, and cites the pricing page for the cost sentence."
+      },
+      {
+        "criterion": "fmt check passes",
+        "support": "the four-file `bun fmt --check` above exited 0."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "the formatter check above, the pricing-page fetch via curl (HTTP 200), and the \"not tested\" search."
+      },
+      {
+        "label": "changed-paths",
+        "support": "/home/user/holyagent-docs/docs/usage.md, /home/user/holyagent-docs/docs/requirements.md"
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/docs-v5.diff (135 lines; README.md, docs/usage.md, docs/requirements.md, docs/hooks.md and install/windows-install.ps1 against /home/user/holyagent-plugin-only-install)"
+      }
+    ]
   },
   "createdAt": "2026-10-30T13:17:18.039Z"
 }
