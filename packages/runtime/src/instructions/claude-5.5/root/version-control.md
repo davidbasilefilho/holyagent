@@ -7,9 +7,9 @@ Commits read as the account owner wrote them, in English and the target reposito
 The target repository's conventions (CONTRIBUTING, AGENTS.md, CLAUDE.md, its branch and PR history) come first. With plain Git:
 
 - Identity: commits use the configured git identity, which must be the user's own; `vcs commit` refuses an agent's identity, and its error says how to fix it.
-- Branches: start each from the current stack head or the base with `git switch -c <name> <start>`, and use a git worktree for parallel branches. Read the base and the remote with `git remote -v` and `gh repo view`.
+- Branches: start each from the open stack's top or the base with `git switch -c <name> <start>`, and use a git worktree for parallel branches. Read the base and the remote with `git remote -v` and `gh repo view`.
 - Push: `git push -u origin <branch>…` once the reviews accept, as the stack plan sets, and in the branch mode push `holyagent/state` in the same step so the records reach the remote with the work. Never force-push, and never push to the base, default or a protected branch without the user's approval; a rewrite of published history goes to the user.
-- Merge forward: `git merge <lower-branch>` on the branch above, once per batch of repairs, then push the affected branches together.
+- Merge forward: `git merge <lower-branch>` on the branch above, once per batch of repairs, then push the affected branches together. A lagging open stack gets `git merge <base>` as the stack plan sets.
 - State: once per clone, before the first Intent, set the mode with `holyagent state mode <mode>` (bare, it reads it; unset is `branch`). Take the first signal that applies:
   - The user's words.
   - `local` when the repository is not the account owner's (a fork, no push access or another owner: `git remote -v`, `gh repo view`): state stays in the work tree, excluded through `.git/info/exclude`, in no commit, PR or remote branch. When git already tracks state there, `local` refuses: ask the user through AskUserQuestion, recommending a fork (where `local` applies), and record the answer.
