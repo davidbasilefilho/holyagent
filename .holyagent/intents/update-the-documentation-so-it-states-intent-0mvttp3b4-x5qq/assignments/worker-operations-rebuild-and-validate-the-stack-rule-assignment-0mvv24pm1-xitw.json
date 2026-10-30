@@ -1,0 +1,32 @@
+{
+  "id": "assignment-0mvv24pm1-xitw",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 5,
+  "roleTask": "Worker.operations",
+  "slug": "rebuild-and-validate-the-stack-rule",
+  "objective": "Rebuild and validate the stack-rule change on top of the docs branch in /home/user/holyagent-stack-rule.",
+  "state": "Ready",
+  "scope": [
+    "The worktree is on claude/intelligent-dijkstra-x7njap-stack-rule at 45290bd (docs branch head) with the uncommitted stack-rule edits applied. Run `bun install --frozen-lockfile` (the docs branch added @jdxcode/mise as a trusted devDependency, so node_modules/.bin/mise should appear; if its script is denied, report it and use PATH=/home/user/holyagent/node_modules/@jdxcode/mise-linux-x64/bin:$PATH instead), then `mise run build` (regenerates packages/integrations/claude/dist/agents/holyagent.md from the instruction sources), then `mise run verify`. Report counts and `git status --short` after the build."
+  ],
+  "constraints": [
+    "Only generated files may change through the build; no hand edits; no git writes; no edits under .git/ or .holyagent/. Stop and report."
+  ],
+  "criteria": [
+    {
+      "text": "mise run build ran and mise run verify passes with counts",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/claude/dist",
+    "node_modules"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-10-30T14:18:13.034Z"
+}
