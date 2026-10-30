@@ -30,7 +30,7 @@ A new harness gets its own folder under `packages/integrations/`. It reuses the 
 
 ## Getting mise
 
-mise is a dev dependency (`@jdxcode/mise` in `package.json`, listed in `trustedDependencies`), so `bun install` installs it into `node_modules/.bin`. Bun runs a package's install script only when the package is trusted, and the trust entry lets this one fetch the `mise` binary for your platform and link it; that script comes from npm and runs on your machine when you install. Run the commands through Bun, which finds the local binary:
+mise is a dev dependency (`mise` in `package.json`, the npm package mise's own docs recommend, pinned exactly and listed in `trustedDependencies`), so `bun install` installs it into `node_modules/.bin`. Bun runs a package's install script only when the package is trusted, and the trust entry lets this one fetch the `mise` binary for your platform and link it; that script runs `npm` through `node`, so both must be on `PATH` when you install, and it comes from npm and runs on your machine. Because `trustedDependencies` replaces Bun's default list, `@anthropic-ai/claude-code` and `lefthook` are listed there too. Run the commands through Bun, which finds the local binary (`bunx --no-install mise` fails rather than fetching mise from the registry when the local one is missing):
 
 ```sh
 bun install --frozen-lockfile
@@ -38,11 +38,11 @@ bunx mise install
 bunx mise run verify
 ```
 
-`mise install` installs the pinned Bun and upgrades it to canary, and `mise run verify` runs the gates. The `package.json` scripts (`bun run verify`, `bun run build`) do the same, since Bun puts `node_modules/.bin` on their `PATH`. A mise already on `PATH` works too: the installers' `--dev` option (`-Dev` on Windows) installs one, and `bun add -g --trust @jdxcode/mise` installs it globally (after a plain `bun add -g`, run `bun pm -g trust @jdxcode/mise`). The rest of this page writes `mise run ...` for either. CI installs its own mise with `jdx/mise-action`. These commands are described here, not verified on Windows.
+`mise install` installs the pinned Bun and upgrades it to canary, and `mise run verify` runs the gates. The `package.json` scripts (`bun run verify`, `bun run build`) do the same, since Bun puts `node_modules/.bin` on their `PATH`. A mise already on `PATH` works too: the installers' `--dev` option (`-Dev` on Windows) installs one, and `bun add -g --trust mise` installs it globally (after a plain `bun add -g`, run `bun pm -g trust mise`). The rest of this page writes `mise run ...` for either. CI installs its own mise with `jdx/mise-action`. These commands are described here, not verified on Windows.
 
 ## Commands
 
-`mise.toml` is the single source of commands. `package.json` scripts and the git hooks only delegate to it, and `--no-script` makes Bun run its own tool rather than a same-named script. Run gates through mise (`bunx mise run <task>` with the local one) so the `toolchain` task can first confirm a canary Bun.
+`mise.toml` is the single source of commands. `package.json` scripts and the git hooks only delegate to it, and `--no-script` makes Bun run its own tool rather than a same-named script. Run gates through mise (`bunx --no-install mise run <task>` with the local one) so the `toolchain` task can first confirm a canary Bun.
 
 | Task        | Does                                                     |
 | ----------- | -------------------------------------------------------- |
@@ -71,11 +71,11 @@ Everything is configured in `bunfig.toml`. Bun's own `check`, `lint` and `fmt` a
 
 ## Git hooks
 
-`lefthook.yml` runs on `pre-commit`, piped (the first failing job stops the rest). Its commands go through `bunx`, which resolves the dev dependency in `node_modules/.bin` on POSIX and Windows alike, so a hook needs no mise on `PATH`:
+`lefthook.yml` runs on `pre-commit`, piped (the first failing job stops the rest). Its commands go through `bunx --no-install`, which resolves the dev dependency in `node_modules/.bin` and never fetches it, so a hook needs no mise on `PATH`:
 
-1. `lint`: `bunx mise run lint:fix -- --staged`, then `stage_fixed` re-stages what lint changed (the `bun lint` docs do not say that `--staged --fix` stages again).
-2. `fmt`: `bunx mise run fmt -- --staged`, re-staged (Bun leaves a partly staged file unwritten rather than committing its unstaged changes).
-3. `build`: `bunx mise run build`, then `git add -A --` on exactly the generated paths, deletions included, so a commit always carries a plugin in step with its sources.
+1. `lint`: `bunx --no-install mise run lint:fix -- --staged`, then `stage_fixed` re-stages what lint changed (the `bun lint` docs do not say that `--staged --fix` stages again).
+2. `fmt`: `bunx --no-install mise run fmt -- --staged`, re-staged (Bun leaves a partly staged file unwritten rather than committing its unstaged changes).
+3. `build`: `bunx --no-install mise run build`, then `git add -A --` on exactly the generated paths, deletions included, so a commit always carries a plugin in step with its sources.
 
 ## The generated plugin
 

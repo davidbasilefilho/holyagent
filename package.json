@@ -24,13 +24,15 @@
   },
   "devDependencies": {
     "@anthropic-ai/claude-code": "2.1.300",
-    "@jdxcode/mise": "^2026.10.24",
     "@types/bun": "^1.0.0",
     "effect": "^4.0.0",
     "eslint-plugin-jsdoc": "^65.4.2",
-    "lefthook": "^2.0.0"
+    "lefthook": "^2.0.0",
+    "mise": "2026.10.24"
   },
   "trustedDependencies": [
-    "@jdxcode/mise"
+    "@anthropic-ai/claude-code",
+    "lefthook",
+    "mise"
   ]
 }
