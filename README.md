@@ -32,9 +32,9 @@ The contributing rules are in [.claude/CLAUDE.md](.claude/CLAUDE.md) and the pit
 
 ```sh
 bun install --frozen-lockfile   # also installs mise, a dev dependency
-bunx mise install
-bunx mise run build    # regenerate the Claude plugin after changing its sources
-bunx mise run verify   # type-check, lint, format check and tests
+bunx --no-install mise install
+bunx --no-install mise run build    # regenerate the Claude plugin after changing its sources
+bunx --no-install mise run verify   # type-check, lint, format check and tests
 ```
 
 `mise.toml` is the source of commands, and the repository toolchain needs a canary Bun, which the `toolchain` task checks for you. Commits follow Conventional Commits.

@@ -30,12 +30,12 @@ A new harness gets its own folder under `packages/integrations/`. It reuses the 
 
 ## Getting mise
 
-mise is a dev dependency (`mise` in `package.json`, the npm package mise's own docs recommend, pinned exactly and listed in `trustedDependencies`), so `bun install` installs it into `node_modules/.bin`. Bun runs a package's install script only when the package is trusted, and the trust entry lets this one fetch the `mise` binary for your platform and link it; that script runs `npm` through `node`, so both must be on `PATH` when you install, and it comes from npm and runs on your machine. Because `trustedDependencies` replaces Bun's default list, `@anthropic-ai/claude-code` and `lefthook` are listed there too. Run the commands through Bun, which finds the local binary (`bunx --no-install mise` fails rather than fetching mise from the registry when the local one is missing):
+mise is a dev dependency (`mise` in `package.json`, the npm package mise's own docs recommend, pinned exactly and listed in `trustedDependencies`), so `bun install` installs it into `node_modules/.bin`. Bun runs a package's install script only when the package is trusted, and the trust entry lets this one fetch the `mise` binary for your platform and link it; that script runs `npm` through `node`, so both must be on `PATH` when you install, and it comes from npm and runs on your machine. Because `trustedDependencies` replaces Bun's default list, `@anthropic-ai/claude-code` and `lefthook` are listed there too. Run the commands through Bun, which finds the local binary. `bunx --no-install mise` never fetches a missing local mise from the registry: Bun uses a mise on `PATH` if there is one, and otherwise the command fails:
 
 ```sh
 bun install --frozen-lockfile
-bunx mise install
-bunx mise run verify
+bunx --no-install mise install
+bunx --no-install mise run verify
 ```
 
 `mise install` installs the pinned Bun and upgrades it to canary, and `mise run verify` runs the gates. The `package.json` scripts (`bun run verify`, `bun run build`) do the same, since Bun puts `node_modules/.bin` on their `PATH`. A mise already on `PATH` works too: the installers' `--dev` option (`-Dev` on Windows) installs one, and `bun add -g --trust mise` installs it globally (after a plain `bun add -g`, run `bun pm -g trust mise`). The rest of this page writes `mise run ...` for either. CI installs its own mise with `jdx/mise-action`. These commands are described here, not verified on Windows.
