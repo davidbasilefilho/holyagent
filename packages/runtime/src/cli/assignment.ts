@@ -8,6 +8,7 @@ import {
   type Outcome,
 } from "../domain/assignment.ts"
 import { type Directive, isWorkflowAgent, WORKFLOW_AGENT_PREFIX } from "../domain/directive.ts"
+import { InvalidDraft } from "../domain/errors.ts"
 import { AssignmentId, IntentId, newId } from "../domain/ids.ts"
 import { closeAssignment, dispatch, record } from "../domain/lifecycle.ts"
 import { Revision } from "../domain/primitives.ts"
@@ -177,6 +178,15 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
       Effect.gen(function* () {
         const request = yield* inputBy((raw) =>
           typeof raw === "object" && raw !== null && "id" in raw ? ExistingRef : AssignmentInput,
+        ).pipe(
+          // A positional id or {"assignmentId"} reads as a malformed draft; say what is accepted.
+          Effect.mapError((error) =>
+            error instanceof InvalidDraft
+              ? new InvalidDraft({
+                  message: `${error.message}. To dispatch an existing Assignment send {"id": "<id>"}`,
+                })
+              : error,
+          ),
         )
         const settings = yield* config
         const newAssignmentId = yield* newId("assignment")
