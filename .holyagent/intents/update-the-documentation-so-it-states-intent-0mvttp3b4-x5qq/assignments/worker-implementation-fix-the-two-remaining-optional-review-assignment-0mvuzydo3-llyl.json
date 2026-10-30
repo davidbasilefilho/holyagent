@@ -1,0 +1,53 @@
+{
+  "id": "assignment-0mvuzydo3-llyl",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "fix-the-two-remaining-optional-review",
+  "objective": "Fix the two remaining optional review findings of PR 37's merge resolution in /home/user/holyagent-plugin-only-install.",
+  "state": "Ready",
+  "scope": [
+    "Review report: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-rev37.txt, findings 4 and 5. The worktree holds the resolved, staged, uncommitted merge.",
+    "Finding 4: packages/runtime/src/setup/json-file.ts writes the temp file with Bun.write, which overwrites a stale temp file and applies the mode afterwards with chmod; main's CLI created it exclusively (flag 'wx') with the mode at creation. Restore exclusive creation with the mode at creation (node:fs with flag 'wx' and mode, inside Effect, tagged errors), so an existing temp file is never followed or overwritten and the file is never briefly readable with default permissions. Add a test that fails without the fix. Covers writeJsonObjectIfUnchanged too.",
+    "Finding 5: the session-start setupNotice fires only for a missing ctx7 or a missing settings key, so a user upgrading from a setup that left Billion Context leftovers is never prompted. Make the notice also fire when Billion Context leftovers exist, telling them to run /holyagent:setup; keep it cheap (10-second hook timeout) and silent when there is nothing to fix. Add a test. Update docs/hooks.md where it describes the setup notice.",
+    "Gates with the canary Bun /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/canary/x/bun-linux-x64/bun in that worktree: check --no-script, lint --no-script, fmt --no-script --check, test; then scripts/vendor.ts and packages/integrations/claude/build.ts so dist is in step. git add only the files you changed. Save copies of the files before you change them and write the diff of your changes to /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/fix37b.diff."
+  ],
+  "constraints": [
+    "Repository rules (.claude/CLAUDE.md): Effect and tagged errors, no try/catch, async functions or new Promise in runtime source, Bun APIs where Bun has them (node:fs where it does not), JSDoc on exports.",
+    "Edit only in /home/user/holyagent-plugin-only-install: packages/runtime/src/setup, packages/runtime/src/cli, packages/runtime/tests, packages/integrations/claude/dist/scripts, docs/hooks.md.",
+    "Git writes limited to git add of the files you changed; no commit, checkout, reset or stash; no edits under .git/ or .holyagent/.",
+    "Keep working until done; stop and report when done and checked."
+  ],
+  "criteria": [
+    {
+      "text": "The JSON temp file is created exclusively with its mode at creation, with a test that fails without the fix",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The session-start notice fires when Billion Context leftovers exist, stays silent otherwise, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "check, lint, fmt --check and test pass with the canary Bun and dist is in step",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/setup",
+    "packages/runtime/src/cli",
+    "packages/runtime/tests",
+    "packages/integrations/claude/dist/scripts",
+    "docs/hooks.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-10-30T13:17:18.388Z"
+}
