@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "document-installing-mise-through-bun-for",
   "objective": "Document installing mise through Bun for developing this repository, in /home/user/holyagent-docs.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "The maintainer asked to document that mise can be installed through Bun. Facts established in this container: the npm package @jdxcode/mise (2026.10.24) ships the mise binary (bin 'mise'); 'bun add -g @jdxcode/mise' installs the package, but Bun blocks its preinstall script (node installArchSpecificPackage.js, which installs the platform package such as @jdxcode/mise-linux-x64 and links bin/mise) unless the package is trusted, so the command is 'bun add -g --trust @jdxcode/mise' (or 'bun pm -g trust @jdxcode/mise' after a plain install). Bun's global bin folder (~/.bun/bin) must be on PATH, as it already is after the Bun installer. After mise is installed, 'mise install' in the checkout installs the pinned Bun and its postinstall upgrades it to canary, and 'mise run verify' runs the gates.",
     "First copy docs/development.md from /home/user/holyagent-plugin-only-install into /home/user/holyagent-docs (docs/requirements.md there already starts from the merged text). Add the Bun route where development.md says how to get mise (one short paragraph or a line next to the existing install route), and mention it in docs/requirements.md's mise row in a few words if that row says how mise is installed. State that trusting runs the package's install script from npm. Do not claim it was verified end to end here; describe the commands.",
@@ -40,5 +40,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-30T13:29:52.910Z"
+  },
   "createdAt": "2026-10-30T13:29:43.648Z"
 }
