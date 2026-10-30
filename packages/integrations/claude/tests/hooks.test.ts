@@ -24,6 +24,7 @@ import {
 } from "../../../runtime/src/cli/sessioncontext.ts"
 import { ROUTES } from "../../../runtime/src/domain/route.ts"
 import { ROOT_CORE } from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
+import { completeSetup } from "../../../runtime/tests/setup-fixture.ts"
 import { freshPlugin } from "./built.ts"
 
 const core = ROOT_CORE
@@ -36,6 +37,8 @@ let home: string
 beforeAll(async () => {
   project = await mkdtemp(join(tmpdir(), "holyagent-hook-project-"))
   home = await mkdtemp(join(tmpdir(), "holyagent-hook-home-"))
+  // A set-up home keeps the SessionStart setup line out of the exact contexts asserted below.
+  await completeSetup(home)
 })
 afterAll(() =>
   Promise.all([

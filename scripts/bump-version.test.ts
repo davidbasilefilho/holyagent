@@ -79,8 +79,8 @@ const lockfile = (version: string) => `{
         "effect": "^4.0.0",
       },
     },
-    "packages/cli": {
-      "name": "@scope/cli",
+    "packages/integrations/claude": {
+      "name": "@scope/claude",
       "version": "${version}",
       "dependencies": {
         "effect": "^4.0.0",
@@ -178,10 +178,10 @@ describe("bumpVersions", () => {
   })
 
   test("fails with ManifestError naming a file that is missing", async () => {
-    rmSync(join(root, "packages/cli/package.json"))
+    rmSync(join(root, "packages/integrations/claude/package.json"))
     const error = await Effect.runPromise(Effect.flip(bumpVersions(root, "patch")))
     expect(error).toBeInstanceOf(ManifestError)
-    expect(error.message).toContain("packages/cli/package.json")
+    expect(error.message).toContain("packages/integrations/claude/package.json")
   })
 
   test.each([
@@ -189,10 +189,10 @@ describe("bumpVersions", () => {
     ["has a non-string version", `{ "version": 1 }\n`],
     ["is not JSON", "nope"],
   ])("fails with ManifestError when a file %s", async (_name, text) => {
-    write("packages/cli/package.json", text)
+    write("packages/integrations/claude/package.json", text)
     const error = await Effect.runPromise(Effect.flip(bumpVersions(root, "patch")))
     expect(error).toBeInstanceOf(ManifestError)
-    expect(error.message).toContain("packages/cli/package.json")
+    expect(error.message).toContain("packages/integrations/claude/package.json")
   })
 
   test.each([
@@ -225,11 +225,11 @@ describe("the command line", () => {
   })
 
   test("prints the tagged error and exits 1 on disagreement", async () => {
-    write("packages/cli/package.json", manifest("cli", "0.3.1"))
+    write("packages/integrations/claude/package.json", manifest("claude", "0.3.1"))
     const { code, err } = await run("patch", root)
     expect(code).toBe(1)
     expect(err).toContain("error: VersionMismatch")
-    expect(err).toContain("packages/cli/package.json 0.3.1")
+    expect(err).toContain("packages/integrations/claude/package.json 0.3.1")
   })
 
   test("prints usage and exits 1 on an unknown bump", async () => {

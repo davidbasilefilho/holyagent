@@ -1,34 +1,51 @@
 #!/usr/bin/env bash
-# Sets up the HolyAgent development environment on a clean WSL Ubuntu install.
+# Installs the prerequisites of HolyAgent on a clean WSL Ubuntu install: git, Node LTS, Bun and gh.
+# With --dev it also installs mise, which developing this repository needs. HolyAgent itself installs
+# as a Claude Code plugin; the script ends by printing those commands.
 #
-# Usage: bash install/wsl-install.sh
+# Usage: bash install/wsl-install.sh [--dev]
 #
 # Every step checks its own result first, so a re-run changes nothing that is already right. The
-# script touches only $HOME (mise, Bun globals, Claude Code settings, ~/.bashrc) and runs sudo
-# only to install missing apt packages. Run it as your own user, not through sudo.
+# script touches $HOME (Bun, ~/.bashrc, and mise with --dev) and runs sudo only to install apt
+# packages. Run it as your own user, not through sudo.
 #
 # What you are opting into:
-# - `ctx7 setup` downloads a skill and a rule from Context7's servers into ~/.claude.
-# - Bun runs a canary build (`bun upgrade --canary`), because the toolchain needs `bun lint`,
-#   `bun fmt` and `bun check`.
-# - ~/.bashrc gains two lines (a one-time copy is kept as ~/.bashrc.pre-holyagent).
+# - git, curl, ca-certificates and unzip come from Ubuntu's apt; Node LTS comes from NodeSource's apt
+#   repository (https://github.com/nodesource/distributions); gh comes from GitHub's apt repository
+#   (https://github.com/cli/cli/blob/trunk/docs/install_linux.md). The last two add a repository to apt.
+# - Bun comes from its official install script (https://bun.com/install) into ~/.bun.
+# - ~/.bashrc gains a line that puts Bun's global bin directory on PATH, where `holyagent setup` puts
+#   ctx7 (a one-time copy is kept as ~/.bashrc.pre-holyagent).
+# - --dev adds mise (https://mise.run) and a line in ~/.bashrc that activates it. Bun stays a stable
+#   build; developing this repository needs a canary build, which `mise install` in the checkout
+#   upgrades to.
 set -Eeuo pipefail
 
-if [[ $# -gt 0 ]]; then
-  echo "usage: bash ${0##*/}   (takes no arguments)" >&2
+USAGE="usage: bash ${0##*/} [--dev]   (--dev also installs mise, for developing HolyAgent)"
+DEV=0
+if [[ $# -gt 1 ]]; then
+  echo "$USAGE" >&2
   exit 2
 fi
+case "${1:-}" in
+  "") ;;
+  --dev) DEV=1 ;;
+  *)
+    echo "$USAGE" >&2
+    exit 2
+    ;;
+esac
 
 if [[ $EUID -eq 0 && -n "${SUDO_USER:-}" ]]; then
   echo "error: run this as ${SUDO_USER}, not through sudo; it installs into the home directory and calls sudo itself when apt needs it" >&2
   exit 1
 fi
 
-TOTAL_STEPS=7
+TOTAL_STEPS=$((5 + DEV))
 CURRENT_STEP="startup"
 STEP_NUMBER=0
-MISE_INSTALLER=""
-trap 'rm -f "$MISE_INSTALLER"' EXIT
+TMP_FILES=()
+trap 'rm -f "${TMP_FILES[@]:-}"' EXIT
 
 on_error() {
   local status=$? line=$1
@@ -46,24 +63,19 @@ note() { echo "    $*"; }
 warn() { echo "    warning: $*" >&2; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
-# Work from $HOME so a repository mise.toml never changes what the global installs below resolve.
-cd "$HOME"
-
-MISE="${MISE_INSTALL_PATH:-$HOME/.local/bin/mise}"
-export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
-BASHRC="$HOME/.bashrc"
-CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-
-# Puts the tools mise has selected globally (node, bun) and Bun's global bin directory (claude,
-# ctx7) ahead of the rest of PATH for the remaining steps.
-refresh_path() {
-  local dir mise_paths=""
-  while IFS= read -r dir; do
-    [[ -n "$dir" ]] && mise_paths+="${dir}:"
-  done < <("$MISE" bin-paths 2>/dev/null || true)
-  PATH="${mise_paths}${BUN_INSTALL}/bin:${PATH}"
-  export PATH
+# Downloads a URL to a temporary file that is removed on exit, so a failed download runs nothing.
+# The path is left in REPLY (a command substitution would lose the cleanup list).
+download() {
+  local file
+  file=$(mktemp)
+  TMP_FILES+=("$file")
+  curl -fsSL "$1" -o "$file"
+  REPLY=$file
 }
+
+export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
+MISE="${MISE_INSTALL_PATH:-$HOME/.local/bin/mise}"
+BASHRC="$HOME/.bashrc"
 
 # Appends a line to ~/.bashrc unless an uncommented line matching the extended regex $1 is already
 # there. Keeps a one-time backup and starts on a fresh line when the file lacks a final newline.
@@ -82,20 +94,28 @@ ensure_bashrc_line() {
   note "added to ${BASHRC}: ${line}"
 }
 
-# Installs a Bun global package unless its command is already on PATH, then prints the version.
-install_bun_global() {
-  local command_name=$1 package=$2
-  if have "$command_name"; then
-    note "${command_name} already installed"
+# Runs a command as root: directly when this is root already, through sudo otherwise.
+as_root() {
+  if [[ $EUID -eq 0 ]]; then
+    "$@"
+  elif have sudo; then
+    sudo "$@"
   else
-    bun add -g "$package"
-    refresh_path
+    echo "error: need root to run '$*', but sudo is not available" >&2
+    exit 1
   fi
-  note "${command_name} $("$command_name" --version 2>&1 | head -n 1)"
 }
 
+# Whether node is installed at a version ctx7 supports (22.13 or later).
+node_is_current() {
+  have node && node -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit(major > 22 || (major === 22 && minor >= 13) ? 0 : 1)' 2>/dev/null
+}
+
+# Bun's global bin directory comes first for the rest of this run.
+export PATH="${BUN_INSTALL}/bin:${HOME}/.local/bin:${PATH}"
+
 # ---------------------------------------------------------------------------------------------
-step "Prerequisites (platform, apt packages)"
+step "Prerequisites (platform, apt packages, git)"
 
 if grep -qiE 'microsoft|wsl' /proc/version 2>/dev/null || [[ -n "${WSL_DISTRO_NAME:-}" ]]; then
   note "WSL detected (${WSL_DISTRO_NAME:-unnamed distro})"
@@ -111,128 +131,106 @@ if [[ "$distro_id" != "ubuntu" ]]; then
   warn "distribution is '${distro_id:-unknown}', not Ubuntu; apt packages may differ"
 fi
 
-if have apt-get && have dpkg-query; then
-  missing=()
-  for pkg in curl git ca-certificates unzip build-essential; do
-    if ! dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q 'install ok installed'; then
-      missing+=("$pkg")
-    fi
-  done
-  if [[ ${#missing[@]} -eq 0 ]]; then
-    note "apt packages already installed"
-  else
-    note "missing apt packages: ${missing[*]}"
-    if [[ $EUID -eq 0 ]]; then
-      sudo_cmd=()
-    elif have sudo; then
-      note "using sudo to install them (you may be asked for your password)"
-      sudo_cmd=(sudo)
-    else
-      echo "error: need root to install ${missing[*]}, but sudo is not available" >&2
-      exit 1
-    fi
-    "${sudo_cmd[@]}" env DEBIAN_FRONTEND=noninteractive apt-get update -qq
-    "${sudo_cmd[@]}" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${missing[@]}"
+if ! have apt-get || ! have dpkg-query; then
+  echo "error: this installer needs apt-get and dpkg-query (Ubuntu or Debian)" >&2
+  exit 1
+fi
+
+missing=()
+for pkg in curl git ca-certificates unzip; do
+  if ! dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q 'install ok installed'; then
+    missing+=("$pkg")
   fi
+done
+if [[ ${#missing[@]} -eq 0 ]]; then
+  note "apt packages already installed"
 else
-  warn "apt-get not found; checking for the commands only"
-  for cmd in curl git unzip make gcc; do
-    have "$cmd" || { echo "error: '${cmd}' is required and apt-get is unavailable to install it" >&2; exit 1; }
-  done
+  note "missing apt packages: ${missing[*]} (using sudo; you may be asked for your password)"
+  as_root env DEBIAN_FRONTEND=noninteractive apt-get update -qq
+  as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${missing[@]}"
 fi
-
-# ---------------------------------------------------------------------------------------------
-step "mise (version manager)"
-
-if [[ -x "$MISE" ]]; then
-  note "mise already installed: $("$MISE" --version)"
-else
-  # Official installer: https://mise.jdx.dev/getting-started.html (installs to ~/.local/bin/mise,
-  # or to MISE_INSTALL_PATH). Downloaded to a file first so a failed download runs nothing.
-  MISE_INSTALLER=$(mktemp)
-  curl -fsSL https://mise.run -o "$MISE_INSTALLER"
-  sh "$MISE_INSTALLER"
-fi
-[[ -x "$MISE" ]] || { echo "error: mise not found at ${MISE} after install" >&2; exit 1; }
-
-# Bun's global bin comes first so mise's activation, appended after it, still wins for node and bun.
-# The patterns skip commented-out lines; the lines carry the paths this run actually uses.
-# shellcheck disable=SC2016
-printf -v bun_line 'export BUN_INSTALL=%q; export PATH="$BUN_INSTALL/bin:$PATH"' "$BUN_INSTALL"
-ensure_bashrc_line '^[[:space:]]*(export[[:space:]]+)?BUN_INSTALL=' "$bun_line"
-# shellcheck disable=SC2016
-printf -v mise_line 'eval "$(%q activate bash)"' "$MISE"
-ensure_bashrc_line '^[[:space:]]*eval .*mise.* activate bash' "$mise_line"
+note "$(git --version)"
 
 # ---------------------------------------------------------------------------------------------
 step "Node.js LTS (ctx7 runs on Node)"
 
-if "$MISE" where node >/dev/null 2>&1; then
-  note "node already selected globally"
+if node_is_current; then
+  note "node $(node --version) already installed"
 else
-  "$MISE" use -g node@lts
+  if have node; then
+    note "node $(node --version) is older than 22.13 (needed by ctx7); installing the LTS release"
+  fi
+  # NodeSource's setup script adds its apt repository for the current LTS line.
+  download https://deb.nodesource.com/setup_lts.x
+  as_root env DEBIAN_FRONTEND=noninteractive bash "$REPLY"
+  as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nodejs
+  hash -r
 fi
-refresh_path
-note "node $(node --version)"
-# ctx7 requires Node >= 22.13; an older global node chosen earlier would fail later and obscurely.
-if ! node -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit(major > 22 || (major === 22 && minor >= 13) ? 0 : 1)'; then
-  echo "error: node $(node --version) is older than 22.13 (needed by ctx7); run: ${MISE} use -g node@lts" >&2
+if ! node_is_current; then
+  echo "error: node is missing or older than 22.13 after the install; check: command -v node" >&2
   exit 1
 fi
+note "node $(node --version)"
 
 # ---------------------------------------------------------------------------------------------
-step "Bun (canary)"
+step "Bun (the plugin's hooks run it)"
 
-# The toolchain needs `bun lint`, `bun fmt` and `bun check`, which exist only in canary builds.
-# mise cannot install bun@canary, so it installs a stable Bun and `bun upgrade --canary` replaces
-# the binary in place. A later `mise upgrade bun` that installs a new stable brings stable back,
-# so the canary check below runs on every invocation, like the repo's `toolchain` task.
-if ! "$MISE" where bun >/dev/null 2>&1; then
-  "$MISE" use -g bun
-fi
-refresh_path
-if bun --revision | grep -q canary; then
-  note "bun is already canary: $(bun --revision)"
+if have bun; then
+  note "bun $(bun --revision) already installed"
 else
-  # A `--smol` in BUN_OPTIONS makes `bun upgrade` fail ("does not take package names").
-  env -u BUN_OPTIONS bun upgrade --canary
+  # Official installer: https://bun.com/docs/installation (installs to $BUN_INSTALL, default ~/.bun).
+  download https://bun.com/install
+  bash "$REPLY"
+  hash -r
 fi
-bun --revision | grep -q canary || { echo "error: bun is not a canary build after upgrade" >&2; exit 1; }
+if ! have bun; then
+  echo "error: bun not found after install; check ${BUN_INSTALL}/bin" >&2
+  exit 1
+fi
 note "bun $(bun --revision)"
+# The Bun installer edits ~/.bashrc itself; this keeps the line present, and unchanged when it is.
+# shellcheck disable=SC2016
+printf -v bun_line 'export BUN_INSTALL=%q; export PATH="$BUN_INSTALL/bin:$PATH"' "$BUN_INSTALL"
+ensure_bashrc_line '^[[:space:]]*(export[[:space:]]+)?BUN_INSTALL=' "$bun_line"
 
 # ---------------------------------------------------------------------------------------------
-step "Claude Code (via Bun)"
+step "GitHub CLI (gh)"
 
-# Anthropic's setup page (https://code.claude.com/docs/en/setup) documents the native installer,
-# Homebrew, WinGet, apt/dnf/apk and `npm install -g @anthropic-ai/claude-code`; it does not mention
-# Bun. Installing the same npm package with Bun works but is not an officially documented method,
-# and its auto-update behavior is undocumented. `claude doctor` reports the install type.
-install_bun_global claude @anthropic-ai/claude-code
-
-# ---------------------------------------------------------------------------------------------
-step "ctx7 (Context7 CLI via Bun) and its Claude Code skill"
-
-# ctx7 needs Node >= 22.13, checked in the Node step.
-install_bun_global ctx7 ctx7
-
-# `ctx7 setup --cli --claude` downloads the find-docs skill and a rule file for Claude Code. The
-# hosted setup needs a login or an API key; without either, --yes starts a browser device flow
-# that blocks a script, so the step is skipped with a hint instead. ctx7 0.8.2 reads
-# CONTEXT7_API_KEY during setup only for --base-url deployments (tested: with the variable set and
-# no login, hosted setup waited for the device flow), so the key has to go on the command line,
-# visible in the process list for the seconds the command runs.
-ctx7_ready() {
-  [[ -f "$CLAUDE_DIR/skills/find-docs/SKILL.md" && -f "$CLAUDE_DIR/rules/context7.md" ]]
-}
-if ctx7_ready; then
-  note "Context7 skill and rule already installed"
-elif [[ -n "${CONTEXT7_API_KEY:-}" ]]; then
-  ctx7 setup --cli --claude --yes --api-key "$CONTEXT7_API_KEY"
-elif [[ -f "$HOME/.config/context7/credentials.json" ]]; then
-  ctx7 setup --cli --claude --yes
+if have gh; then
+  note "gh already installed: $(gh --version | head -n 1)"
 else
-  warn "Context7 skill not installed: no login or API key found."
-  warn "run 'ctx7 login', or export CONTEXT7_API_KEY (for example: read -rs CONTEXT7_API_KEY; export CONTEXT7_API_KEY), then re-run this script"
+  # Official apt repository: https://github.com/cli/cli/blob/trunk/docs/install_linux.md
+  download https://cli.github.com/packages/githubcli-archive-keyring.gpg
+  as_root mkdir -p -m 755 /etc/apt/keyrings
+  as_root install -m 644 "$REPLY" /etc/apt/keyrings/githubcli-archive-keyring.gpg
+  as_root mkdir -p -m 755 /etc/apt/sources.list.d
+  printf 'deb [arch=%s signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main\n' "$(dpkg --print-architecture)" |
+    as_root tee /etc/apt/sources.list.d/github-cli.list >/dev/null
+  as_root env DEBIAN_FRONTEND=noninteractive apt-get update -qq
+  as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq gh
+  hash -r
+  note "gh $(gh --version | head -n 1)"
+fi
+
+# ---------------------------------------------------------------------------------------------
+if [[ $DEV -eq 1 ]]; then
+  step "mise (development: tool versions and the repository's commands)"
+
+  if [[ -x "$MISE" ]]; then
+    note "mise already installed: $("$MISE" --version)"
+  else
+    # Official installer: https://mise.jdx.dev/getting-started.html (installs to ~/.local/bin/mise,
+    # or to MISE_INSTALL_PATH).
+    download https://mise.run
+    sh "$REPLY"
+  fi
+  if [[ ! -x "$MISE" ]]; then
+    echo "error: mise not found at ${MISE} after install" >&2
+    exit 1
+  fi
+  # shellcheck disable=SC2016
+  printf -v mise_line 'eval "$(%q activate bash)"' "$MISE"
+  ensure_bashrc_line '^[[:space:]]*eval .*mise.* activate bash' "$mise_line"
 fi
 
 # ---------------------------------------------------------------------------------------------
@@ -250,15 +248,12 @@ verify() {
   fi
 }
 
-verify mise "$MISE" --version
 verify node node --version
 verify bun bun --revision
-verify claude claude --version
-verify ctx7 ctx7 --version
-
-if have bun && ! bun --revision | grep -q canary; then
-  echo "    bun is not a canary build" >&2
-  failed+=("bun-canary")
+verify git git --version
+verify gh gh --version
+if [[ $DEV -eq 1 ]]; then
+  verify mise "$MISE" --version
 fi
 
 if [[ ${#failed[@]} -gt 0 ]]; then
@@ -266,4 +261,20 @@ if [[ ${#failed[@]} -gt 0 ]]; then
   exit 1
 fi
 
-echo "Done. Open a new shell (or run: source ~/.bashrc) so PATH picks up mise and Bun."
+if ! gh auth status >/dev/null 2>&1; then
+  warn "gh is not authenticated; run: gh auth login (or export GH_TOKEN)"
+fi
+if ! have claude; then
+  warn "Claude Code is not installed; see https://code.claude.com/docs/en/setup"
+fi
+
+cat <<'EOF'
+
+Done. Open a new shell (or run: source ~/.bashrc) so PATH picks up Bun, then install HolyAgent with
+these two commands:
+
+  claude plugin marketplace add davidbasilefilho/holyagent
+  claude plugin install holyagent@holyagent
+
+On the first launch, run /holyagent:setup to install ctx7 and to configure Claude Code.
+EOF

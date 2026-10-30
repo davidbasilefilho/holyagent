@@ -138,6 +138,22 @@ const hooks = (): GeneratedFile => ({
   }),
 })
 
+/**
+ * The `/holyagent:setup` command, a prompt that runs `holyagent setup` and shows its report, like
+ * Billion Context's own setup command. `${CLAUDE_PLUGIN_ROOT}` is substituted in the body
+ * (https://code.claude.com/docs/en/plugins-reference, "Environment variables"); the docs do not say
+ * it is in `allowed-tools`, so that rule matches the bun call by its script names instead.
+ */
+const commands = async (): Promise<ReadonlyArray<GeneratedFile>> => {
+  const source = `${SOURCES}/setup-command.md`
+  return [
+    {
+      path: inPlugin("commands/setup.md"),
+      content: noteInFrontmatter(await readSource(source), source),
+    },
+  ]
+}
+
 const skills = async (): Promise<ReadonlyArray<GeneratedFile>> => {
   const root = `${INSTRUCTIONS_DIRECTORY}/skills`
   return Promise.all(
@@ -210,6 +226,7 @@ export const generate = async (): Promise<ReadonlyArray<GeneratedFile>> =>
     ...manifests(),
     hooks(),
     ...(await agentFiles()),
+    ...(await commands()),
     ...(await skills()),
     ...(await licenses()),
     ...(await scripts()),

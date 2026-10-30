@@ -1,10 +1,41 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
+import * as filesystem from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import path from "node:path"
 
-import { Effect, FileSystem, Option, Path, PlatformError } from "effect"
+import { Effect } from "effect"
 
-import { cleanupLeftovers, findLeftovers } from "../src/claude/leftovers.ts"
-import { userFiles } from "../src/claude/user.ts"
-import { envLayer, fakeShell, parseJson, run, tempDir } from "./support.ts"
+import { cleanupLeftovers, findLeftovers } from "../src/setup/leftovers.ts"
+import { fakeShell } from "./setup-fixture.ts"
+
+/** Runs a test effect. */
+const run = <A, E>(effect: Effect.Effect<A, E>) => Effect.runPromise(effect)
+
+/** Parses a JSON object, failing the test on anything else. */
+const parseJson = (text: string): Record<string, unknown> =>
+  JSON.parse(text) as Record<string, unknown>
+
+const temporaries: Array<string> = []
+afterEach(async () => {
+  await Promise.all(temporaries.splice(0).map((directory) => rm(directory, { recursive: true })))
+})
+
+/** Creates a temporary directory that is removed after the test. */
+const tempDir = Effect.promise(async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "holyagent-leftovers-"))
+  temporaries.push(directory)
+  return directory
+})
+
+/** The file operations the tests use, as effects. */
+const fs = {
+  readFileString: (file: string) => Effect.promise(() => readFile(file, "utf8")),
+  writeFileString: (file: string, text: string) => Effect.promise(() => writeFile(file, text)),
+  exists: (file: string) => Effect.promise(() => Bun.file(file).exists()),
+  makeDirectory: (directory: string, options?: { readonly recursive?: boolean }) =>
+    Effect.promise(() => mkdir(directory, options)),
+}
 
 const PROXY = "http://127.0.0.1:18787/bili/https://api.anthropic.com"
 /** `commands/acp-cache.md` as Billion Context's installer writes it (src/plugin-install.ts). */
@@ -23,8 +54,6 @@ const BILI_SERVER = { type: "stdio", command: "node", args: ["/opt/bili/dist/cla
 
 /** A fake home whose Claude Code files can be written and read as JSON. */
 const home = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem
-  const path = yield* Path.Path
   const root = yield* tempDir
   const files = {
     claudeDir: path.join(root, ".claude"),
@@ -40,6 +69,7 @@ const home = Effect.gen(function* () {
     })
   const read = (file: string) => fs.readFileString(file).pipe(Effect.map(parseJson))
   return {
+    env: { HOME: root },
     files,
     write,
     read,
@@ -88,7 +118,7 @@ describe("Billion Context leftovers", () => {
         })
         yield* h.write(h.markets, { "billion-context": {}, holyagent: {} })
         const shell = fakeShell({ commands: ["claude"] })
-        const lines = yield* cleanupLeftovers(h.files, false).pipe(Effect.provide(shell.layer))
+        const lines = yield* cleanupLeftovers(h.env, false).pipe(Effect.provide(shell.layer))
 
         expect(yield* h.read(h.settings)).toEqual({
           model: "opus",
@@ -100,7 +130,7 @@ describe("Billion Context leftovers", () => {
           numStartups: 3,
           mcpServers: { mine: { command: "x" } },
         })
-        expect(yield* (yield* FileSystem.FileSystem).exists(h.command)).toBe(false)
+        expect(yield* fs.exists(h.command)).toBe(false)
         expect(shell.lines()).toEqual([
           "claude plugin uninstall billion-context@billion-context",
           "claude plugin marketplace remove billion-context",
@@ -120,8 +150,8 @@ describe("Billion Context leftovers", () => {
         const h = yield* home
         yield* h.write(h.settings, leftoverSettings)
         const shell = fakeShell({ commands: ["claude"] })
-        yield* cleanupLeftovers(h.files, false).pipe(Effect.provide(shell.layer))
-        const again = yield* cleanupLeftovers(h.files, false).pipe(Effect.provide(shell.layer))
+        yield* cleanupLeftovers(h.env, false).pipe(Effect.provide(shell.layer))
+        const again = yield* cleanupLeftovers(h.env, false).pipe(Effect.provide(shell.layer))
         expect(again).toEqual(["= billion-context: no leftovers"])
       }),
     ))
@@ -140,11 +170,11 @@ describe("Billion Context leftovers", () => {
           mcpServers: { bili: { command: "node", args: ["x"] } },
         })
         yield* h.write(h.command.replace("acp-cache", "other"), "x")
-        const before = yield* (yield* FileSystem.FileSystem).readFileString(h.settings)
+        const before = yield* fs.readFileString(h.settings)
         const shell = fakeShell({ commands: ["claude"] })
-        const lines = yield* cleanupLeftovers(h.files, false).pipe(Effect.provide(shell.layer))
+        const lines = yield* cleanupLeftovers(h.env, false).pipe(Effect.provide(shell.layer))
         expect(lines).toEqual(["= billion-context: no leftovers"])
-        expect(yield* (yield* FileSystem.FileSystem).readFileString(h.settings)).toBe(before)
+        expect(yield* fs.readFileString(h.settings)).toBe(before)
         expect(shell.lines()).toEqual([])
       }),
     ))
@@ -155,11 +185,11 @@ describe("Billion Context leftovers", () => {
         const h = yield* home
         yield* h.write(h.settings, { env: { DISABLE_AUTO_COMPACT: "1" } })
         const shell = fakeShell({ commands: ["claude"] })
-        expect(yield* cleanupLeftovers(h.files, false).pipe(Effect.provide(shell.layer))).toEqual([
+        expect(yield* cleanupLeftovers(h.env, false).pipe(Effect.provide(shell.layer))).toEqual([
           "= billion-context: no leftovers",
         ])
         yield* h.write(h.command, COMMAND_BODY)
-        yield* cleanupLeftovers(h.files, false).pipe(Effect.provide(shell.layer))
+        yield* cleanupLeftovers(h.env, false).pipe(Effect.provide(shell.layer))
         expect(yield* h.read(h.settings)).toEqual({})
       }),
     ))
@@ -171,10 +201,9 @@ describe("Billion Context leftovers", () => {
         yield* h.write(h.settings, leftoverSettings)
         yield* h.write(h.command, COMMAND_BODY)
         yield* h.write(h.installed, { plugins: { "billion-context@billion-context": [{}] } })
-        const fs = yield* FileSystem.FileSystem
         const before = yield* fs.readFileString(h.settings)
         const shell = fakeShell({ commands: ["claude"] })
-        const lines = yield* cleanupLeftovers(h.files, true).pipe(Effect.provide(shell.layer))
+        const lines = yield* cleanupLeftovers(h.env, true).pipe(Effect.provide(shell.layer))
         expect(lines.length).toBeGreaterThan(0)
         expect(lines.every((line) => line.startsWith("+ billion-context: would remove "))).toBe(
           true,
@@ -191,7 +220,7 @@ describe("Billion Context leftovers", () => {
         const h = yield* home
         yield* h.write(h.markets, { "billion-context": {} })
         const shell = fakeShell({ commands: [] })
-        const lines = yield* cleanupLeftovers(h.files, false).pipe(Effect.provide(shell.layer))
+        const lines = yield* cleanupLeftovers(h.env, false).pipe(Effect.provide(shell.layer))
         expect(lines).toEqual([
           "~ billion-context: marketplace billion-context stays; `claude` not found, run: claude plugin marketplace remove billion-context",
         ])
@@ -207,7 +236,7 @@ describe("Billion Context leftovers", () => {
           commands: ["claude"],
           respond: () => ({ exitCode: 1, stderr: "in use" }),
         })
-        const lines = yield* cleanupLeftovers(h.files, false).pipe(Effect.provide(shell.layer))
+        const lines = yield* cleanupLeftovers(h.env, false).pipe(Effect.provide(shell.layer))
         expect(lines).toEqual([
           "! billion-context: claude plugin uninstall billion-context@billion-context failed (exit 1): in use",
         ])
@@ -221,10 +250,10 @@ describe("Billion Context leftovers", () => {
         yield* h.write(h.settings, "[1]")
         yield* h.write(h.command, COMMAND_BODY)
         const shell = fakeShell({ commands: ["claude"] })
-        const lines = yield* cleanupLeftovers(h.files, false).pipe(Effect.provide(shell.layer))
+        const lines = yield* cleanupLeftovers(h.env, false).pipe(Effect.provide(shell.layer))
         expect(lines[0]).toContain("is not a JSON object")
-        expect(yield* (yield* FileSystem.FileSystem).readFileString(h.settings)).toBe("[1]")
-        expect(yield* (yield* FileSystem.FileSystem).exists(h.command)).toBe(false)
+        expect(yield* fs.readFileString(h.settings)).toBe("[1]")
+        expect(yield* fs.exists(h.command)).toBe(false)
       }),
     ))
 
@@ -241,8 +270,6 @@ describe("Billion Context leftovers", () => {
   test("a plugin installed at project or local scope is uninstalled with that scope, from its project", () =>
     run(
       Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem
-        const path = yield* Path.Path
         const h = yield* home
         const one = path.join(yield* tempDir, "one")
         const two = path.join(yield* tempDir, "two")
@@ -259,9 +286,9 @@ describe("Billion Context leftovers", () => {
           },
         })
         const shell = fakeShell({ commands: ["claude"] })
-        const lines = yield* cleanupLeftovers(h.files, false).pipe(Effect.provide(shell.layer))
+        const lines = yield* cleanupLeftovers(h.env, false).pipe(Effect.provide(shell.layer))
         expect(shell.calls.map((call) => [call.line, call.cwd])).toEqual([
-          ["claude plugin uninstall billion-context@billion-context", undefined],
+          ["claude plugin uninstall billion-context@billion-context", h.env.HOME],
           ["claude plugin uninstall billion-context@billion-context --scope project", one],
           ["claude plugin uninstall billion-context@billion-context --scope local", two],
         ])
@@ -284,7 +311,7 @@ describe("Billion Context leftovers", () => {
         })
         const shell = fakeShell({ commands: ["claude"] })
         for (const dryRun of [true, false]) {
-          const lines = yield* cleanupLeftovers(h.files, dryRun).pipe(Effect.provide(shell.layer))
+          const lines = yield* cleanupLeftovers(h.env, dryRun).pipe(Effect.provide(shell.layer))
           expect(lines).toEqual([
             "~ billion-context: plugin billion-context@billion-context (project scope) stays; its install records no project folder, run in that project: claude plugin uninstall billion-context@billion-context --scope project",
             "~ billion-context: plugin billion-context@billion-context (local scope) stays; its install records no project folder, run in that project: claude plugin uninstall billion-context@billion-context --scope local",
@@ -294,92 +321,73 @@ describe("Billion Context leftovers", () => {
       }),
     ))
 
-  test("claude is not run in a project folder that is missing, relative, a file or owned by someone else", () =>
-    run(
-      Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem
-        const path = yield* Path.Path
-        const h = yield* home
-        const root = yield* tempDir
-        const file = path.join(root, "a-file")
-        const foreign = path.join(root, "foreign")
-        yield* fs.writeFileString(file, "x")
-        yield* fs.makeDirectory(foreign)
-        const projects = [path.join(root, "missing"), "relative/dir", file, foreign]
-        yield* h.write(h.installed, {
-          plugins: {
-            "billion-context@billion-context": projects.map((projectPath) => ({
-              scope: "project",
-              projectPath,
-            })),
-          },
-        })
-        // Everything is owned by the test user, except the folder this file system reports otherwise.
-        const stranger = {
-          ...fs,
-          stat: (target: string) =>
-            fs
-              .stat(target)
-              .pipe(
-                Effect.map((info) =>
-                  target === foreign
-                    ? { ...info, uid: Option.some((process.getuid?.() ?? 0) + 1) }
-                    : info,
-                ),
-              ),
-        } as FileSystem.FileSystem
-        const shell = fakeShell({ commands: ["claude"] })
-        const lines = yield* cleanupLeftovers(h.files, false).pipe(
-          Effect.provide(shell.layer),
-          Effect.provideService(FileSystem.FileSystem, stranger),
-        )
-        expect(shell.lines()).toEqual([])
-        expect(lines.length).toBe(4)
-        for (const [index, line] of lines.entries()) {
-          expect(line).toStartWith("~ billion-context: plugin billion-context@billion-context")
-          expect(line).toContain(`in ${projects[index]}`)
-          expect(line).toEndWith(
-            "run in that project: claude plugin uninstall billion-context@billion-context --scope project",
+  test.skipIf(process.getuid === undefined)(
+    "claude is not run in a project folder that is missing, relative, a file or owned by someone else",
+    () =>
+      run(
+        Effect.gen(function* () {
+          const h = yield* home
+          const root = yield* tempDir
+          const file = path.join(root, "a-file")
+          const foreign = path.join(root, "foreign")
+          yield* fs.writeFileString(file, "x")
+          yield* fs.makeDirectory(foreign)
+          const projects = [path.join(root, "missing"), "relative/dir", file, foreign]
+          yield* h.write(h.installed, {
+            plugins: {
+              "billion-context@billion-context": projects.map((projectPath) => ({
+                scope: "project",
+                projectPath,
+              })),
+            },
+          })
+          // The one folder that exists is owned by the test user; the process claims to be someone else.
+          const getuid = process.getuid
+          ;(process as { getuid?: unknown }).getuid = () => (getuid?.() ?? 0) + 1
+          const shell = fakeShell({ commands: ["claude"] })
+          const lines = yield* cleanupLeftovers(h.env, false).pipe(
+            Effect.provide(shell.layer),
+            Effect.ensuring(
+              Effect.sync(() => {
+                ;(process as { getuid?: unknown }).getuid = getuid
+              }),
+            ),
           )
-        }
-      }),
-    ))
+          expect(shell.lines()).toEqual([])
+          expect(lines.length).toBe(4)
+          for (const [index, line] of lines.entries()) {
+            expect(line).toStartWith("~ billion-context: plugin billion-context@billion-context")
+            expect(line).toContain(`in ${projects[index]}`)
+            expect(line).toEndWith(
+              "run in that project: claude plugin uninstall billion-context@billion-context --scope project",
+            )
+          }
+        }),
+      ),
+  )
 
   test("a project folder that cannot be inspected is reported with the cause and claude is not run there", () =>
     run(
       Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem
         const h = yield* home
         const root = yield* tempDir
+        // A path below a regular file cannot be inspected, and is not merely missing.
+        const file = path.join(root, "a-file")
+        yield* fs.writeFileString(file, "x")
+        const below = path.join(file, "project")
         yield* h.write(h.installed, {
-          plugins: { "billion-context@billion-context": [{ scope: "project", projectPath: root }] },
+          plugins: {
+            "billion-context@billion-context": [{ scope: "project", projectPath: below }],
+          },
         })
-        const unreadable = {
-          ...fs,
-          stat: (target: string) =>
-            target === root
-              ? Effect.fail(
-                  PlatformError.systemError({
-                    _tag: "PermissionDenied",
-                    module: "FileSystem",
-                    method: "stat",
-                    pathOrDescriptor: target,
-                    description: "permission denied",
-                  }),
-                )
-              : fs.stat(target),
-        } as FileSystem.FileSystem
         const shell = fakeShell({ commands: ["claude"] })
-        const lines = yield* cleanupLeftovers(h.files, false).pipe(
-          Effect.provide(shell.layer),
-          Effect.provideService(FileSystem.FileSystem, unreadable),
-        )
+        const lines = yield* cleanupLeftovers(h.env, false).pipe(Effect.provide(shell.layer))
         expect(shell.lines()).toEqual([])
         expect(lines.length).toBe(1)
         expect(lines[0]).toStartWith(
-          `~ billion-context: plugin billion-context@billion-context (project scope in ${root}) stays; cannot check ${root}: `,
+          `~ billion-context: plugin billion-context@billion-context (project scope in ${below}) stays; cannot check ${below}: `,
         )
-        expect(lines[0]).toContain("permission denied")
+        expect(lines[0]).toContain("ENOTDIR")
         expect(lines[0]).not.toContain("not an existing folder of yours")
         expect(lines[0]).toEndWith(
           "run in that project: claude plugin uninstall billion-context@billion-context --scope project",
@@ -401,7 +409,7 @@ describe("Billion Context leftovers", () => {
         try {
           for (const dryRun of [true, false]) {
             const shell = fakeShell({ commands: ["claude"] })
-            const lines = yield* cleanupLeftovers(h.files, dryRun).pipe(Effect.provide(shell.layer))
+            const lines = yield* cleanupLeftovers(h.env, dryRun).pipe(Effect.provide(shell.layer))
             expect(lines.length).toBe(1)
             expect(lines[0]).toStartWith("+ billion-context: ")
             expect(lines[0]).toContain("owner was not checked")
@@ -419,7 +427,7 @@ describe("Billion Context leftovers", () => {
         const h = yield* home
         yield* h.write(h.installed, { plugins: { "billion-context@billion-context": [] } })
         const shell = fakeShell({ commands: ["claude"] })
-        const lines = yield* cleanupLeftovers(h.files, false).pipe(Effect.provide(shell.layer))
+        const lines = yield* cleanupLeftovers(h.env, false).pipe(Effect.provide(shell.layer))
         expect(lines).toEqual(["= billion-context: no leftovers"])
         expect((yield* findLeftovers(h.files)).found).toEqual([])
         expect(shell.lines()).toEqual([])
@@ -430,7 +438,7 @@ describe("Billion Context leftovers", () => {
     run(
       Effect.gen(function* () {
         const evidence: ReadonlyArray<
-          (h: Effect.Success<typeof home>) => Effect.Effect<void, unknown, FileSystem.FileSystem>
+          (h: Effect.Success<typeof home>) => Effect.Effect<void, unknown>
         > = [
           (h) => h.write(h.installed, { plugins: { "billion-context@billion-context": [{}] } }),
           (h) => h.write(h.markets, { "billion-context": {} }),
@@ -450,7 +458,7 @@ describe("Billion Context leftovers", () => {
           if (index < 2) yield* h.write(h.settings, { env: { DISABLE_AUTO_COMPACT: "1" } })
           yield* arrange(h)
           const shell = fakeShell({ commands: ["claude"] })
-          yield* cleanupLeftovers(h.files, false).pipe(Effect.provide(shell.layer))
+          yield* cleanupLeftovers(h.env, false).pipe(Effect.provide(shell.layer))
           expect((yield* h.read(h.settings))["env"]).toBeUndefined()
         }
       }),
@@ -475,7 +483,7 @@ describe("Billion Context leftovers", () => {
           for (const url of kept) {
             const h = yield* home
             yield* h.write(h.settings, { env: { [key]: url } })
-            const lines = yield* cleanupLeftovers(h.files, false).pipe(
+            const lines = yield* cleanupLeftovers(h.env, false).pipe(
               Effect.provide(fakeShell({ commands: ["claude"] }).layer),
             )
             expect(lines).toEqual(["= billion-context: no leftovers"])
@@ -487,7 +495,7 @@ describe("Billion Context leftovers", () => {
           ]) {
             const h = yield* home
             yield* h.write(h.settings, { env: { [key]: url } })
-            yield* cleanupLeftovers(h.files, false).pipe(
+            yield* cleanupLeftovers(h.env, false).pipe(
               Effect.provide(fakeShell({ commands: ["claude"] }).layer),
             )
             expect(yield* h.read(h.settings)).toEqual({})
@@ -522,7 +530,7 @@ describe("Billion Context leftovers", () => {
             "/work/h": { mcpServers: { bili: entry("node", "/b/distclaude-mcp-entry.js") } },
           },
         })
-        const lines = yield* cleanupLeftovers(h.files, false).pipe(
+        const lines = yield* cleanupLeftovers(h.env, false).pipe(
           Effect.provide(fakeShell({ commands: ["claude"] }).layer),
         )
         const foreign = (command: string, script: string) => ({ bili: entry(command, script) })
@@ -551,10 +559,10 @@ describe("Billion Context leftovers", () => {
           h.files.claudeJson,
           `{"projects":{"__proto__":{"allowedTools":["a"]},"/work":{"mcpServers":{"bili":${server}}}}}`,
         )
-        yield* cleanupLeftovers(h.files, false).pipe(
+        yield* cleanupLeftovers(h.env, false).pipe(
           Effect.provide(fakeShell({ commands: ["claude"] }).layer),
         )
-        const text = yield* (yield* FileSystem.FileSystem).readFileString(h.files.claudeJson)
+        const text = yield* fs.readFileString(h.files.claudeJson)
         const projects = parseJson(text)["projects"] as Record<string, unknown>
         expect(Object.keys(projects).sort()).toEqual(["/work", "__proto__"])
         expect(Object.getOwnPropertyDescriptor(projects, "__proto__")?.value).toEqual({
@@ -567,7 +575,6 @@ describe("Billion Context leftovers", () => {
   test("commands/acp-cache.md is removed only when its text equals what Billion Context writes", () =>
     run(
       Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem
         const h = yield* home
         const shell = fakeShell({ commands: ["claude"] })
         const kept = [
@@ -579,7 +586,7 @@ describe("Billion Context leftovers", () => {
         ]
         for (const text of kept) {
           yield* h.write(h.command, text)
-          const lines = yield* cleanupLeftovers(h.files, false).pipe(Effect.provide(shell.layer))
+          const lines = yield* cleanupLeftovers(h.env, false).pipe(Effect.provide(shell.layer))
           expect(yield* fs.readFileString(h.command)).toBe(text)
           expect(lines.length).toBe(1)
           expect(lines[0]).toStartWith(`~ billion-context: ${h.command}`)
@@ -587,10 +594,10 @@ describe("Billion Context leftovers", () => {
         }
         for (const text of [COMMAND_BODY, COMMAND_BODY.trimEnd(), `${COMMAND_BODY}\n\n`]) {
           yield* h.write(h.command, text)
-          const dry = yield* cleanupLeftovers(h.files, true).pipe(Effect.provide(shell.layer))
+          const dry = yield* cleanupLeftovers(h.env, true).pipe(Effect.provide(shell.layer))
           expect(dry).toEqual([`+ billion-context: would remove ${h.command}`])
           expect(yield* fs.exists(h.command)).toBe(true)
-          yield* cleanupLeftovers(h.files, false).pipe(Effect.provide(shell.layer))
+          yield* cleanupLeftovers(h.env, false).pipe(Effect.provide(shell.layer))
           expect(yield* fs.exists(h.command)).toBe(false)
         }
       }),
@@ -623,7 +630,7 @@ describe("Billion Context leftovers", () => {
           },
         }
         yield* h.write(h.settings, settings)
-        const lines = yield* cleanupLeftovers(h.files, false).pipe(
+        const lines = yield* cleanupLeftovers(h.env, false).pipe(
           Effect.provide(fakeShell({ commands: ["claude"] }).layer),
         )
         expect(yield* h.read(h.settings)).toEqual({
@@ -650,7 +657,7 @@ describe("Billion Context leftovers", () => {
             ],
           },
         })
-        yield* cleanupLeftovers(h.files, false).pipe(
+        yield* cleanupLeftovers(h.env, false).pipe(
           Effect.provide(fakeShell({ commands: ["claude"] }).layer),
         )
         expect(yield* h.read(h.settings)).toEqual({
@@ -663,7 +670,7 @@ describe("Billion Context leftovers", () => {
         yield* h.write(h.settings, {
           hooks: { SessionStart: [{ hooks: [{ command: BOOTSTRAP }] }] },
         })
-        yield* cleanupLeftovers(h.files, false).pipe(
+        yield* cleanupLeftovers(h.env, false).pipe(
           Effect.provide(fakeShell({ commands: ["claude"] }).layer),
         )
         expect(yield* h.read(h.settings)).toEqual({})
@@ -706,7 +713,7 @@ describe("Billion Context leftovers", () => {
           const h = yield* home
           yield* h.write(h.settings, withProxy(item.compact))
           if (item.backup !== undefined) yield* h.write(backup(h), item.backup)
-          const lines = yield* cleanupLeftovers(h.files, false).pipe(
+          const lines = yield* cleanupLeftovers(h.env, false).pipe(
             Effect.provide(fakeShell({ commands: ["claude"] }).layer),
           )
           const settings = yield* h.read(h.settings)
@@ -714,7 +721,7 @@ describe("Billion Context leftovers", () => {
           if (item.backup === "not json")
             expect(lines.join("\n")).toContain("settings.json.bili-bak")
           // A second run changes nothing.
-          const again = yield* cleanupLeftovers(h.files, false).pipe(
+          const again = yield* cleanupLeftovers(h.env, false).pipe(
             Effect.provide(fakeShell({ commands: ["claude"] }).layer),
           )
           expect(yield* h.read(h.settings)).toEqual(settings)
@@ -730,7 +737,7 @@ describe("Billion Context leftovers", () => {
         yield* h.write(h.settings, { env: { DISABLE_AUTO_COMPACT: "1" } })
         yield* h.write(`${h.settings}.bili-bak`, { env: { DISABLE_AUTO_COMPACT: "0", FOO: "x" } })
         yield* h.write(h.files.claudeJson, { mcpServers: { bili: BILI_SERVER } })
-        const lines = yield* cleanupLeftovers(h.files, false).pipe(
+        const lines = yield* cleanupLeftovers(h.env, false).pipe(
           Effect.provide(fakeShell({ commands: ["claude"] }).layer),
         )
         expect(yield* h.read(h.settings)).toEqual({ env: { DISABLE_AUTO_COMPACT: "0" } })
@@ -741,8 +748,6 @@ describe("Billion Context leftovers", () => {
   test("settings.json, commands/ and .claude.json come from CLAUDE_CONFIG_DIR when it is set", () =>
     run(
       Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem
-        const path = yield* Path.Path
         const root = yield* tempDir
         const config = path.join(root, "custom")
         const write = (file: string, content: string | object) =>
@@ -763,10 +768,7 @@ describe("Billion Context leftovers", () => {
         yield* write(path.join(config, "settings.json.bili-bak"), {
           env: { DISABLE_AUTO_COMPACT: "0" },
         })
-        const files = yield* userFiles.pipe(
-          Effect.provide(envLayer({ HOME: root, CLAUDE_CONFIG_DIR: config })),
-        )
-        yield* cleanupLeftovers(files, false).pipe(
+        yield* cleanupLeftovers({ HOME: root, CLAUDE_CONFIG_DIR: config }, false).pipe(
           Effect.provide(fakeShell({ commands: ["claude"] }).layer),
         )
         expect(yield* fs.exists(path.join(config, "commands", "acp-cache.md"))).toBe(false)
@@ -804,7 +806,7 @@ describe("Billion Context leftovers", () => {
           mcpServers: { bili: { ...BILI_SERVER, env: { LABEL: "hidden-value-three" } } },
         })
         for (const dryRun of [true, false]) {
-          const lines = yield* cleanupLeftovers(h.files, dryRun).pipe(
+          const lines = yield* cleanupLeftovers(h.env, dryRun).pipe(
             Effect.provide(fakeShell({ commands: ["claude"] }).layer),
           )
           expect(lines.join("\n")).not.toContain("hidden-value")
@@ -824,7 +826,7 @@ describe("Billion Context leftovers", () => {
         yield* h.write(h.markets, "not json")
         const found = yield* findLeftovers(h.files)
         expect(found.unreadable.length).toBe(2)
-        const lines = yield* cleanupLeftovers(h.files, false).pipe(
+        const lines = yield* cleanupLeftovers(h.env, false).pipe(
           Effect.provide(fakeShell({ commands: ["claude"] }).layer),
         )
         expect(lines.length).toBe(2)
@@ -832,31 +834,47 @@ describe("Billion Context leftovers", () => {
       }),
     ))
 
-  /** A file system whose first `chmod` (just before the cleanup's final check) runs `during`. */
-  const interrupted = (fs: FileSystem.FileSystem, during: () => Effect.Effect<void, unknown>) =>
-    ({
-      ...fs,
-      chmod: (path: string, mode: number) =>
-        during().pipe(Effect.ignore, Effect.andThen(fs.chmod(path, mode))),
-    }) as FileSystem.FileSystem
+  /**
+   * Runs `effect` while every temporary file the cleanup writes is followed by `during`, which
+   * stands for another program rewriting the file just before the cleanup replaces it.
+   */
+  const racing = <A, E, R>(
+    during: () => Effect.Effect<void, unknown>,
+    effect: Effect.Effect<A, E, R>,
+  ) =>
+    Effect.acquireUseRelease(
+      Effect.sync(() => {
+        const original = filesystem.writeFile
+        return spyOn(filesystem, "writeFile").mockImplementation((async (
+          ...args: Parameters<typeof filesystem.writeFile>
+        ) => {
+          const written = await original(...args)
+          if (typeof args[0] === "string" && args[0].endsWith(".tmp"))
+            await Effect.runPromise(Effect.ignore(during()))
+          return written
+        }) as typeof filesystem.writeFile)
+      }),
+      () => effect,
+      (spy) => Effect.sync(() => spy.mockRestore()),
+    )
 
   test("a ~/.claude.json that Claude Code rewrites during the cleanup keeps that update", () =>
     run(
       Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem
         const h = yield* home
         const original = { numStartups: 3, mcpServers: { bili: BILI_SERVER } }
         yield* h.write(h.files.claudeJson, original)
         let writes = 0
-        const racing = interrupted(fs, () => {
-          writes += 1
-          return writes === 1
-            ? h.write(h.files.claudeJson, { ...original, numStartups: 4 })
-            : Effect.void
-        })
-        const lines = yield* cleanupLeftovers(h.files, false).pipe(
-          Effect.provide(fakeShell({ commands: ["claude"] }).layer),
-          Effect.provideService(FileSystem.FileSystem, racing),
+        const lines = yield* racing(
+          () => {
+            writes += 1
+            return writes === 1
+              ? h.write(h.files.claudeJson, { ...original, numStartups: 4 })
+              : Effect.void
+          },
+          cleanupLeftovers(h.env, false).pipe(
+            Effect.provide(fakeShell({ commands: ["claude"] }).layer),
+          ),
         )
         expect(yield* h.read(h.files.claudeJson)).toEqual({ numStartups: 4 })
         expect(lines.every((line) => line.startsWith("+ billion-context: removed "))).toBe(true)
@@ -867,13 +885,13 @@ describe("Billion Context leftovers", () => {
   test("a file that turns into invalid JSON during the retry is left as it is, with a note", () =>
     run(
       Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem
         const h = yield* home
         yield* h.write(h.files.claudeJson, { mcpServers: { bili: BILI_SERVER } })
-        const racing = interrupted(fs, () => h.write(h.files.claudeJson, "{ half written"))
-        const lines = yield* cleanupLeftovers(h.files, false).pipe(
-          Effect.provide(fakeShell({ commands: ["claude"] }).layer),
-          Effect.provideService(FileSystem.FileSystem, racing),
+        const lines = yield* racing(
+          () => h.write(h.files.claudeJson, "{ half written"),
+          cleanupLeftovers(h.env, false).pipe(
+            Effect.provide(fakeShell({ commands: ["claude"] }).layer),
+          ),
         )
         expect(lines.length).toBe(1)
         expect(lines[0]).toStartWith(`~ billion-context: ${h.files.claudeJson} changed while`)
@@ -882,23 +900,41 @@ describe("Billion Context leftovers", () => {
       }),
     ))
 
+  test("a file that turns blank during the retry is left as it is, with a note", () =>
+    run(
+      Effect.gen(function* () {
+        const h = yield* home
+        yield* h.write(h.files.claudeJson, { mcpServers: { bili: BILI_SERVER } })
+        const lines = yield* racing(
+          () => h.write(h.files.claudeJson, ""),
+          cleanupLeftovers(h.env, false).pipe(
+            Effect.provide(fakeShell({ commands: ["claude"] }).layer),
+          ),
+        )
+        expect(lines.length).toBe(1)
+        expect(lines[0]).toStartWith(`~ billion-context: ${h.files.claudeJson} changed while`)
+        expect(lines[0]).toContain("cannot be read now")
+        expect(yield* fs.readFileString(h.files.claudeJson)).toBe("")
+      }),
+    ))
+
   test("a file that keeps changing is left as it is, with a note", () =>
     run(
       Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem
         const h = yield* home
         let count = 0
         yield* h.write(h.files.claudeJson, { n: 0, mcpServers: { bili: BILI_SERVER } })
-        const racing = interrupted(fs, () => {
-          count += 1
-          return h.write(h.files.claudeJson, {
-            n: count,
-            mcpServers: { bili: BILI_SERVER },
-          })
-        })
-        const lines = yield* cleanupLeftovers(h.files, false).pipe(
-          Effect.provide(fakeShell({ commands: ["claude"] }).layer),
-          Effect.provideService(FileSystem.FileSystem, racing),
+        const lines = yield* racing(
+          () => {
+            count += 1
+            return h.write(h.files.claudeJson, {
+              n: count,
+              mcpServers: { bili: BILI_SERVER },
+            })
+          },
+          cleanupLeftovers(h.env, false).pipe(
+            Effect.provide(fakeShell({ commands: ["claude"] }).layer),
+          ),
         )
         expect(lines.length).toBe(1)
         expect(lines[0]).toContain("kept changing")

@@ -1344,6 +1344,9 @@ var none2 = () => none;
 var some2 = some;
 var isNone2 = isNone;
 var isSome2 = isSome;
+var getOrElse = /* @__PURE__ */ dual(2, (self, onNone) => isNone2(self) ? onNone() : self.value);
+var fromNullishOr = (a) => a == null ? none2() : some2(a);
+var getOrUndefined = /* @__PURE__ */ getOrElse(constUndefined);
 var filter = /* @__PURE__ */ dual(2, (self, predicate) => isNone2(self) ? none2() : predicate(self.value) ? some2(self.value) : none2());
 
 var ServiceTypeId = "~effect/Context/Service";
@@ -1504,7 +1507,7 @@ var addUnsafe = (self, key, service) => {
     parent: impl.overlay
   }, impl.depth + 1);
 };
-var getOrUndefined = /* @__PURE__ */ dual(2, (self, key) => getOrUndefinedUnsafe(self, key.key));
+var getOrUndefined2 = /* @__PURE__ */ dual(2, (self, key) => getOrUndefinedUnsafe(self, key.key));
 var getOrUndefinedUnsafe = (self, key) => {
   const value = lookup(self, key);
   return value === notFound ? undefined : value;
@@ -2021,8 +2024,118 @@ class EncodingError extends (/* @__PURE__ */ TaggedError2("EncodingError")) {
   [EncodingErrorTypeId] = EncodingErrorTypeId;
 }
 
+var random2 = (length) => {
+  switch (length) {
+    case 16:
+      return random16();
+    case 32:
+      return random32();
+    default: {
+      let result = "";
+      for (let i = length >>> 3;i > 0; i--) {
+        result += random8();
+      }
+      return result;
+    }
+  }
+};
+var hexCharCodes = /* @__PURE__ */ Uint8Array.from("0123456789abcdef", (c) => c.charCodeAt(0));
+var randomWord = () => Math.random() * 4294967296 >>> 0;
+var random8 = () => {
+  const a = randomWord();
+  return String.fromCharCode(hexCharCodes[a >>> 28], hexCharCodes[a >>> 24 & 15], hexCharCodes[a >>> 20 & 15], hexCharCodes[a >>> 16 & 15], hexCharCodes[a >>> 12 & 15], hexCharCodes[a >>> 8 & 15], hexCharCodes[a >>> 4 & 15], hexCharCodes[a & 15]);
+};
+var random16 = () => {
+  const a = randomWord();
+  const b = randomWord();
+  return String.fromCharCode(hexCharCodes[a >>> 28], hexCharCodes[a >>> 24 & 15], hexCharCodes[a >>> 20 & 15], hexCharCodes[a >>> 16 & 15], hexCharCodes[a >>> 12 & 15], hexCharCodes[a >>> 8 & 15], hexCharCodes[a >>> 4 & 15], hexCharCodes[a & 15], hexCharCodes[b >>> 28], hexCharCodes[b >>> 24 & 15], hexCharCodes[b >>> 20 & 15], hexCharCodes[b >>> 16 & 15], hexCharCodes[b >>> 12 & 15], hexCharCodes[b >>> 8 & 15], hexCharCodes[b >>> 4 & 15], hexCharCodes[b & 15]);
+};
+var random32 = () => {
+  const a = randomWord();
+  const b = randomWord();
+  const c = randomWord();
+  const d = randomWord();
+  return String.fromCharCode(hexCharCodes[a >>> 28], hexCharCodes[a >>> 24 & 15], hexCharCodes[a >>> 20 & 15], hexCharCodes[a >>> 16 & 15], hexCharCodes[a >>> 12 & 15], hexCharCodes[a >>> 8 & 15], hexCharCodes[a >>> 4 & 15], hexCharCodes[a & 15], hexCharCodes[b >>> 28], hexCharCodes[b >>> 24 & 15], hexCharCodes[b >>> 20 & 15], hexCharCodes[b >>> 16 & 15], hexCharCodes[b >>> 12 & 15], hexCharCodes[b >>> 8 & 15], hexCharCodes[b >>> 4 & 15], hexCharCodes[b & 15], hexCharCodes[c >>> 28], hexCharCodes[c >>> 24 & 15], hexCharCodes[c >>> 20 & 15], hexCharCodes[c >>> 16 & 15], hexCharCodes[c >>> 12 & 15], hexCharCodes[c >>> 8 & 15], hexCharCodes[c >>> 4 & 15], hexCharCodes[c & 15], hexCharCodes[d >>> 28], hexCharCodes[d >>> 24 & 15], hexCharCodes[d >>> 20 & 15], hexCharCodes[d >>> 16 & 15], hexCharCodes[d >>> 12 & 15], hexCharCodes[d >>> 8 & 15], hexCharCodes[d >>> 4 & 15], hexCharCodes[d & 15]);
+};
+
 var ParentSpanKey = "effect/Tracer/ParentSpan";
+
+class ParentSpan extends (/* @__PURE__ */ Service()(ParentSpanKey, {
+  fiberCached: true
+})) {
+}
+var make4 = (options) => options;
+var DisablePropagation = /* @__PURE__ */ Reference("effect/Tracer/DisablePropagation", {
+  defaultValue: constFalse
+});
+var CurrentTraceLevel = /* @__PURE__ */ Reference("effect/Tracer/CurrentTraceLevel", {
+  defaultValue: () => "Info"
+});
+var MinimumTraceLevel = /* @__PURE__ */ Reference("effect/Tracer/MinimumTraceLevel", {
+  defaultValue: () => "All"
+});
 var TracerKey = "effect/Tracer";
+var nativeTracer = /* @__PURE__ */ make4({
+  span: (options) => new NativeSpan(options)
+});
+
+class NativeSpan {
+  _tag = "Span";
+  sampled;
+  name;
+  parent;
+  annotations;
+  links;
+  startTime;
+  kind;
+  status;
+  _traceId = undefined;
+  _spanId = undefined;
+  _attributes = undefined;
+  _events = undefined;
+  constructor(options) {
+    this.name = options.name;
+    this.parent = options.parent;
+    this.annotations = options.annotations;
+    this.links = options.links;
+    this.startTime = options.startTime;
+    this.kind = options.kind;
+    this.sampled = options.sampled;
+    this.status = {
+      _tag: "Started",
+      startTime: options.startTime
+    };
+  }
+  get traceId() {
+    return this._traceId ??= getOrUndefined(this.parent)?.traceId ?? random2(32);
+  }
+  get spanId() {
+    return this._spanId ??= random2(16);
+  }
+  get attributes() {
+    return this._attributes ??= new Map;
+  }
+  get events() {
+    return this._events ??= [];
+  }
+  end(endTime, exit) {
+    this.status = {
+      _tag: "Ended",
+      endTime,
+      exit,
+      startTime: this.status.startTime
+    };
+  }
+  attribute(key, value) {
+    this.attributes.set(key, value);
+  }
+  event(name, startTime, attributes) {
+    this.events.push([name, startTime, attributes ?? {}]);
+  }
+  addLinks(links) {
+    this.links.push(...links);
+  }
+}
 
 var FiberRuntimeMetricsKey = "effect/Metric/FiberRuntimeMetrics";
 
@@ -2033,6 +2146,15 @@ var CurrentStackFrame = /* @__PURE__ */ Reference("effect/References/CurrentStac
 var TracerEnabled = /* @__PURE__ */ Reference("effect/References/TracerEnabled", {
   fiberCached: true,
   defaultValue: constTrue
+});
+var TracerTimingEnabled = /* @__PURE__ */ Reference("effect/References/TracerTimingEnabled", {
+  defaultValue: constTrue
+});
+var TracerSpanAnnotations = /* @__PURE__ */ Reference("effect/References/TracerSpanAnnotations", {
+  defaultValue: () => ({})
+});
+var TracerSpanLinks = /* @__PURE__ */ Reference("effect/References/TracerSpanLinks", {
+  defaultValue: () => []
 });
 var CurrentLogAnnotations = /* @__PURE__ */ Reference("effect/References/CurrentLogAnnotations", {
   defaultValue: () => ({})
@@ -2048,6 +2170,23 @@ var MinimumLogLevel = /* @__PURE__ */ Reference("effect/References/MinimumLogLev
 var CurrentLogSpans = /* @__PURE__ */ Reference("effect/References/CurrentLogSpans", {
   defaultValue: () => []
 });
+
+var makeStackCleaner = (line) => (stack) => {
+  let cache;
+  return () => {
+    if (cache !== undefined)
+      return cache;
+    const trace = stack();
+    if (!trace)
+      return;
+    const lines = trace.split(`
+`);
+    if (lines[line] !== undefined) {
+      cache = lines[line].trim();
+      return cache;
+    }
+  };
+};
 
 class Interrupt extends ReasonBase {
   constructor(fiberId, annotations = constEmptyAnnotations) {
@@ -2719,6 +2858,56 @@ var defineFunctionLength = (length, fn) => Object.defineProperty(fn, "length", {
   value: length,
   configurable: true
 });
+var fnStackCleaner = /* @__PURE__ */ makeStackCleaner(2);
+var fn = function() {
+  const nameFirst = typeof arguments[0] === "string";
+  const name = nameFirst ? arguments[0] : "Effect.fn";
+  const spanOptions = nameFirst ? arguments[1] : undefined;
+  const prevLimit = getStackTraceLimit();
+  let defError;
+  if (prevLimit !== 0) {
+    setStackTraceLimit(2);
+    defError = new globalThis.Error;
+    setStackTraceLimit(prevLimit);
+  }
+  if (nameFirst) {
+    return (body, ...pipeables) => makeFn(name, body, defError, pipeables, nameFirst, spanOptions);
+  }
+  return makeFn(name, arguments[0], defError, Array.prototype.slice.call(arguments, 1), nameFirst, spanOptions);
+};
+var makeFn = (name, bodyOrOptions, defError, pipeables, addSpan, spanOptions) => {
+  const body = typeof bodyOrOptions === "function" ? bodyOrOptions : pipeables.shift().bind(bodyOrOptions.self);
+  const definitionName = `${name} (definition)`;
+  const definitionStack = defError ? fnStackCleaner(() => defError.stack) : constUndefined;
+  return defineFunctionLength(body.length, function(...args) {
+    let result = suspend(() => {
+      const iter = body.apply(this, arguments);
+      return isEffect(iter) ? iter : fromIteratorUnsafe(iter);
+    });
+    for (let i = 0;i < pipeables.length; i++) {
+      result = pipeables[i](result, ...args);
+    }
+    if (!isEffect(result)) {
+      return result;
+    }
+    const prevLimit = getStackTraceLimit();
+    let callError;
+    if (prevLimit !== 0) {
+      setStackTraceLimit(2);
+      callError = new globalThis.Error;
+      setStackTraceLimit(prevLimit);
+    }
+    return updateService(addSpan ? useSpan(name, spanOptions, (span) => provideParentSpan(result, span)) : result, CurrentStackFrame, (prev) => ({
+      name,
+      stack: callError ? fnStackCleaner(() => callError.stack) : constUndefined,
+      parent: {
+        name: definitionName,
+        stack: definitionStack,
+        parent: prev
+      }
+    }));
+  });
+};
 var fnUntracedEager = (body, ...pipeables) => defineFunctionLength(body.length, pipeables.length === 0 ? function() {
   return fromIteratorEagerUnsafe(() => body.apply(this, arguments));
 } : function() {
@@ -2856,6 +3045,7 @@ var map2 = /* @__PURE__ */ dual(2, (self, f) => new ContImpl(self, mapCont, f));
 var mapEager = /* @__PURE__ */ dual(2, (self, f) => effectIsExit(self) ? exitMap(self, f) : map2(self, f));
 var mapErrorEager = /* @__PURE__ */ dual(2, (self, f) => effectIsExit(self) ? exitMapError(self, f) : mapError(self, f));
 var exitIsSuccess = (self) => self._tag === "Success";
+var exitFilterCause = (self) => self._tag === "Failure" ? succeed2(self.cause) : fail2(self);
 var exitVoid = /* @__PURE__ */ exitSucceed(undefined);
 var exitMap = /* @__PURE__ */ dual(2, (self, f) => self._tag === "Success" ? exitSucceed(f(self.value)) : self);
 var exitMapError = /* @__PURE__ */ dual(2, (self, f) => {
@@ -2883,6 +3073,13 @@ var updateContext = /* @__PURE__ */ dual(2, (self, f) => withFiber((fiber) => {
     return;
   });
   return self;
+}));
+var updateService = /* @__PURE__ */ dual(3, (self, service, f) => updateContext(self, (s) => {
+  const prev = getUnsafe(s, service);
+  const next = f(prev);
+  if (prev === next)
+    return s;
+  return add(s, service, next);
 }));
 var provideContext = /* @__PURE__ */ dual(2, (self, context) => {
   if (effectIsExit(self))
@@ -3184,6 +3381,11 @@ var onExitUnsafe = (fiber, f) => {
 };
 var onExit = /* @__PURE__ */ dual(2, onExitPrimitive);
 var ensuring = /* @__PURE__ */ dual(2, (self, finalizer) => onExit(self, (_) => finalizer));
+var onExitFilter = /* @__PURE__ */ dual(3, (self, filter, f) => onExit(self, (exit) => {
+  const b = filter(exit);
+  return isFailure2(b) ? void_ : f(b.success, exit);
+}));
+var onError = /* @__PURE__ */ dual(2, (self, f) => onExitFilter(self, exitFilterCause, f));
 var acquireUseRelease = (acquire, use, release) => uninterruptibleMask((restore) => flatMap(acquire, (a) => onExitPrimitive(suspend(() => restore(use(a))), (exit) => release(a, exit), true)));
 var uninterruptible = (self) => withFiber((fiber) => {
   if (!fiber.interruptible)
@@ -3515,6 +3717,88 @@ var runSyncExitWith = (context) => {
   };
 };
 var runSyncExit = /* @__PURE__ */ runSyncExitWith(/* @__PURE__ */ empty());
+var bigint02 = /* @__PURE__ */ BigInt(0);
+var NoopSpanProto = {
+  _tag: "Span",
+  spanId: "noop",
+  traceId: "noop",
+  sampled: false,
+  status: {
+    _tag: "Ended",
+    startTime: bigint02,
+    endTime: bigint02,
+    exit: exitVoid
+  },
+  attributes: /* @__PURE__ */ new Map,
+  links: [],
+  kind: "internal",
+  attribute() {},
+  event() {},
+  end() {},
+  addLinks() {}
+};
+var noopSpan = (options) => Object.assign(Object.create(NoopSpanProto), options);
+var filterDisablePropagation = (span) => {
+  if (!span)
+    return none2();
+  return get(span.annotations, DisablePropagation) ? span._tag === "Span" ? filterDisablePropagation(getOrUndefined(span.parent)) : none2() : some2(span);
+};
+var makeSpanUnsafe = (fiber, name, options) => {
+  const disablePropagation = !fiber.cache.tracerEnabled || options?.annotations && get(options.annotations, DisablePropagation);
+  const parent = options?.parent !== undefined ? some2(options.parent) : options?.root ? none2() : filterDisablePropagation(fiber.cache.span);
+  let span;
+  if (disablePropagation) {
+    span = noopSpan({
+      name,
+      parent,
+      annotations: add(options?.annotations ?? empty(), DisablePropagation, true)
+    });
+  } else {
+    const tracer = fiber.cache.tracer ?? nativeTracer;
+    const clock = fiber.getRef(ClockRef);
+    const timingEnabled = fiber.getRef(TracerTimingEnabled);
+    const annotationsFromEnv = fiber.getRef(TracerSpanAnnotations);
+    const linksFromEnv = fiber.getRef(TracerSpanLinks);
+    const level = options?.level ?? fiber.getRef(CurrentTraceLevel);
+    const links = options?.links !== undefined ? [...linksFromEnv, ...options.links] : linksFromEnv.length === 0 ? [] : linksFromEnv.slice();
+    span = tracer.span({
+      name,
+      parent,
+      annotations: options?.annotations ?? empty(),
+      links,
+      startTime: timingEnabled ? clock.currentTimeNanosUnsafe() : bigint02,
+      kind: options?.kind ?? "internal",
+      root: options?.root ?? false,
+      sampled: options?.sampled ?? (isSome2(parent) && parent.value.sampled === false ? false : !isLogLevelGreaterThan(fiber.getRef(MinimumTraceLevel), level))
+    });
+    for (const key in annotationsFromEnv) {
+      span.attribute(key, annotationsFromEnv[key]);
+    }
+    if (options?.attributes !== undefined) {
+      for (const key in options.attributes) {
+        span.attribute(key, options.attributes[key]);
+      }
+    }
+  }
+  return span;
+};
+var endSpan = (span, exit, clock, timingEnabled) => sync(() => {
+  if (span.status._tag === "Ended")
+    return;
+  span.end(timingEnabled ? clock.currentTimeNanosUnsafe() : bigint02, exit);
+});
+var useSpan = (name, ...args) => {
+  const options = args.length === 1 ? undefined : args[0];
+  const evaluate = args[args.length - 1];
+  return withFiber((fiber) => {
+    const span = makeSpanUnsafe(fiber, name, options);
+    const clock = fiber.getRef(ClockRef);
+    const timingEnabled = fiber.getRef(TracerTimingEnabled);
+    onExitUnsafe(fiber, (exit) => endSpan(span, exit, clock, timingEnabled));
+    return evaluate(span);
+  });
+};
+var provideParentSpan = /* @__PURE__ */ provideService(ParentSpan);
 var ClockRef = /* @__PURE__ */ Reference("effect/Clock", {
   defaultValue: () => new ClockImpl
 });
@@ -3918,7 +4202,7 @@ var makeMemoMapUnsafe = () => new MemoMapImpl;
 var forkMemoMapUnsafe = (parent) => new MemoMapImpl(parent);
 class CurrentMemoMap extends (/* @__PURE__ */ Service()("effect/Layer/CurrentMemoMap")) {
   static forkOrCreate(self) {
-    const current = getOrUndefined(self, CurrentMemoMap);
+    const current = getOrUndefined2(self, CurrentMemoMap);
     return current ? forkMemoMapUnsafe(current) : makeMemoMapUnsafe();
   }
 }
@@ -4162,8 +4446,10 @@ var provide3 = provide2;
 var provideService2 = provideService;
 var acquireUseRelease2 = acquireUseRelease;
 var ensuring2 = ensuring;
+var onError2 = onError;
 var runPromise2 = runPromise;
 var runSyncExit2 = runSyncExit;
+var fn2 = fn;
 var mapEager2 = mapEager;
 var mapErrorEager2 = mapErrorEager;
 var flatMapEager2 = flatMapEager;
@@ -6564,7 +6850,7 @@ function makeOption(schema) {
     return none2();
   };
 }
-function make4(schema) {
+function make5(schema) {
   return makeConstructorSync(toType(schema.ast));
 }
 function is(schema) {
@@ -6703,7 +6989,7 @@ var RebuildOptions = /* @__PURE__ */ Symbol();
 var SchemaProto = {
   [TypeId11]: TypeId11,
   get make() {
-    const value = make4(this);
+    const value = make5(this);
     Object.defineProperty(this, "make", {
       value,
       enumerable: true
@@ -6739,10 +7025,10 @@ var SchemaProto = {
     return this.rebuild(appendChecks(this.ast, checks));
   },
   rebuild(ast) {
-    return make5(ast, this[RebuildOptions]);
+    return make6(ast, this[RebuildOptions]);
   }
 };
-function make5(ast, options) {
+function make6(ast, options) {
   function Schema() {}
   const self = Object.setPrototypeOf(Schema, SchemaProto);
   if (options && (Object.hasOwn(options, "name") || Object.hasOwn(options, "length") || Object.hasOwn(options, "__proto__"))) {
@@ -6763,7 +7049,7 @@ var SchemaErrorTypeId = "~effect/Schema/SchemaError";
 
 function declareConstructor() {
   return (typeParameters, run, annotations) => {
-    return make6(new Declaration(typeParameters.map(getAST), (typeParameters) => run(typeParameters.map((ast) => make6(ast))), annotations));
+    return make7(new Declaration(typeParameters.map(getAST), (typeParameters) => run(typeParameters.map((ast) => make7(ast))), annotations));
   };
 }
 function declare(is, annotations) {
@@ -6821,15 +7107,15 @@ function encodeUnknownEffect2(schema, options) {
   };
 }
 var encodeEffect = encodeUnknownEffect2;
-var make6 = make5;
-var optionalKey2 = /* @__PURE__ */ lambda((schema) => make6(optionalKey(schema.ast), {
+var make7 = make6;
+var optionalKey2 = /* @__PURE__ */ lambda((schema) => make7(optionalKey(schema.ast), {
   schema
 }));
-var toEncoded2 = /* @__PURE__ */ lambda((schema) => make6(toEncoded(schema.ast), {
+var toEncoded2 = /* @__PURE__ */ lambda((schema) => make7(toEncoded(schema.ast), {
   schema
 }));
 function Literal2(literal) {
-  const out = make6(new Literal(literal), {
+  const out = make7(new Literal(literal), {
     literal,
     transform(to) {
       return out.pipe(decodeTo2(Literal2(to), {
@@ -6840,13 +7126,13 @@ function Literal2(literal) {
   });
   return out;
 }
-var Unknown2 = /* @__PURE__ */ make6(unknown);
-var Null2 = /* @__PURE__ */ make6(null_);
-var String4 = /* @__PURE__ */ make6(string2);
-var Number5 = /* @__PURE__ */ make6(number2);
-var Boolean3 = /* @__PURE__ */ make6(boolean);
+var Unknown2 = /* @__PURE__ */ make7(unknown);
+var Null2 = /* @__PURE__ */ make7(null_);
+var String4 = /* @__PURE__ */ make7(string2);
+var Number5 = /* @__PURE__ */ make7(number2);
+var Boolean3 = /* @__PURE__ */ make7(boolean);
 function makeStruct(ast, fields) {
-  return make6(ast, {
+  return make7(ast, {
     fields,
     mapFields(f, options) {
       const fields = f(this.fields);
@@ -6858,25 +7144,25 @@ function Struct(fields) {
   return makeStruct(struct(fields, undefined), fields);
 }
 function Record(key, value) {
-  return make6(record(key.ast, value.ast), {
+  return make7(record(key.ast, value.ast), {
     key,
     value
   });
 }
 function StructWithRest(schema, records) {
-  return make6(structWithRest(schema.ast, records.map(getAST)), {
+  return make7(structWithRest(schema.ast, records.map(getAST)), {
     schema,
     records
   });
 }
-var ArraySchema = /* @__PURE__ */ lambda((schema) => make6(new Arrays(false, [], [schema.ast]), {
+var ArraySchema = /* @__PURE__ */ lambda((schema) => make7(new Arrays(false, [], [schema.ast]), {
   value: schema
 }));
-var NonEmptyArray = /* @__PURE__ */ lambda((schema) => make6(new Arrays(false, [schema.ast], [schema.ast]), {
+var NonEmptyArray = /* @__PURE__ */ lambda((schema) => make7(new Arrays(false, [schema.ast], [schema.ast]), {
   value: schema
 }));
 function makeUnion(ast, members) {
-  return make6(ast, {
+  return make7(ast, {
     members,
     mapMembers(f, options) {
       const members = f(this.members);
@@ -6889,7 +7175,7 @@ function Union2(members, options) {
 }
 function Literals(literals) {
   const members = literals.map(Literal2);
-  return make6(union(members, undefined, undefined), {
+  return make7(union(members, undefined, undefined), {
     literals,
     members,
     mapMembers(f) {
@@ -6906,7 +7192,7 @@ function Literals(literals) {
 var NullOr = /* @__PURE__ */ lambda((self) => Union2([self, Null2]));
 function decodeTo2(to, transformation) {
   return (from) => {
-    return make6(decodeTo(from.ast, to.ast, transformation ? makeTransformation(transformation) : passthrough3()), {
+    return make7(decodeTo(from.ast, to.ast, transformation ? makeTransformation(transformation) : passthrough3()), {
       from,
       to
     });
@@ -7381,7 +7667,7 @@ var describeFailure = (error) => {
   };
 };
 
-import { join as join13 } from "path";
+import { join as join18 } from "path";
 
 var NULL_LITERAL = "null";
 var DELIMITERS = {
@@ -11960,7 +12246,7 @@ var ASSIGNMENT_COMMANDS = [
 ];
 
 import { stat as stat2 } from "fs/promises";
-import { join as join9 } from "path";
+import { join as join14 } from "path";
 
 var delegating_default = `## Delegating
 
@@ -11982,17 +12268,583 @@ var ROOT_CORE = [identity_default, delegating_default, dispatch_default, task_li
 
 var state_changes_default = "## Leave state changes to the root\n\nLeave to the root every command that changes git, GitHub or holyagent state (`git commit`, `branch`, `push`, `checkout`, `stash`, `merge`, `reset`, `gh` writes, and `holyagent vcs`, `assignment` and `intent` commands), and anything under `.git/` or `.holyagent/`. The root owns the branch, PR and state records and records your changed paths from the report, and other workers share the tree, so a stray write corrupts their work; nothing blocks one, so it rests on you. When you need such a change, say so in the report. Read-only commands are open: `git status`, `diff`, `log`, `show`, `blame`, `fetch`, and `holyagent status`, `plan`, `assignment show` and `assignment list`. To undo your own edit, edit the file back.\n";
 
-import { lstat as lstat2, mkdir as mkdir3, open as open3 } from "fs/promises";
-import { tmpdir, userInfo } from "os";
+import { homedir as homedir2 } from "os";
+import { join as join8 } from "path";
+
+import { homedir } from "os";
 import { join as join7 } from "path";
+var TTL_VARIABLE = "HOLYAGENT_REUSE_TTL_MINUTES";
+var Minutes = NumberFromString.check(isFinite2(), isGreaterThanOrEqualTo2(0));
+var reuseTtl = (env) => {
+  const raw = env[TTL_VARIABLE];
+  return raw === undefined || raw.trim() === "" ? succeed6(DEFAULT_CONFIG.ttlMinutes) : decodeUnknownEffect2(Minutes)(raw.trim()).pipe(mapError2(() => new Usage({
+    message: `${TTL_VARIABLE} must be a number of minutes, not "${raw}"`,
+    hint: `Unset ${TTL_VARIABLE} for the default of ${DEFAULT_CONFIG.ttlMinutes}.`
+  })));
+};
+var WorkflowSettings = Struct({
+  disableWorkflows: optionalKey2(Boolean3),
+  enableWorkflows: optionalKey2(Boolean3)
+});
+var disablesWorkflows = (path) => readText(path).pipe(flatMap2((text) => text === undefined ? succeed6(false) : decodeUnknownEffect2(fromJsonString2(WorkflowSettings))(text).pipe(map4((settings) => settings.disableWorkflows === true || settings.enableWorkflows === false))), orElseSucceed2(() => false));
+var firstNonEmpty = (...values) => values.find((value) => value !== undefined && value !== "");
+var claudeConfigDirectory = (env, home = homedir) => {
+  const configured = env.CLAUDE_CONFIG_DIR;
+  if (configured !== undefined && configured !== "")
+    return configured;
+  return join7(firstNonEmpty(env.HOME, env.USERPROFILE) ?? home(), ".claude");
+};
+var workflowsAvailable = (env, root) => {
+  if (env.CLAUDE_CODE_DISABLE_WORKFLOWS === "1")
+    return succeed6(false);
+  const files = [
+    join7(claudeConfigDirectory(env), "settings.json"),
+    join7(root, ".claude", "settings.json"),
+    join7(root, ".claude", "settings.local.json")
+  ];
+  return forEach2(files, disablesWorkflows).pipe(map4((disabled) => !disabled.includes(true)));
+};
+var loadConfig = (env, root) => all2({ ttlMinutes: reuseTtl(env), workflowsAvailable: workflowsAvailable(env, root) }).pipe(map4((config) => config));
+
+var firstNonEmpty2 = (...values) => values.find((value) => value !== undefined && value !== "");
+var homeDirectory = (env, fallback = homedir2) => firstNonEmpty2(env.HOME, env.USERPROFILE) ?? fallback();
+var userFiles = (env) => {
+  const home = homeDirectory(env);
+  const claudeDir = claudeConfigDirectory(env, () => home);
+  return {
+    claudeDir,
+    settings: join8(claudeDir, "settings.json"),
+    claudeJson: join8(firstNonEmpty2(env.CLAUDE_CONFIG_DIR) ?? home, ".claude.json"),
+    ctx7Credentials: join8(home, ".config", "context7", "credentials.json")
+  };
+};
+
+import { rm as rm5 } from "fs/promises";
+import { isAbsolute, join as join11 } from "path";
+
+import { chmod, mkdir as mkdir3, realpath as realpath3, rename as rename3, rm as rm4, writeFile } from "fs/promises";
+import { basename as basename2, dirname as dirname3, join as join9 } from "path";
+
+class SetupFailure extends TaggedError2("SetupFailure") {
+}
+
+var JsonObjectText = fromJsonString2(Record(String4, Unknown2), {
+  space: 2
+});
+var strict2 = { onExcessProperty: "error" };
+var empty3 = {};
+var fileOperation = (path, what, run) => tryPromise2({
+  try: run,
+  catch: (cause) => new SetupFailure({
+    message: `cannot ${what} ${path}: ${cause instanceof Error ? cause.message : String(cause)}`
+  })
+});
+var isJsonObject2 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+var fileExists2 = (path) => tryPromise2(() => Bun.file(path).exists()).pipe(orElseSucceed2(() => false));
+var readJsonObject = (path) => readJsonObjectSnapshot(path).pipe(map4((snapshot) => snapshot.value));
+var readJsonObjectSnapshot = (path) => gen2(function* () {
+  if (!(yield* fileOperation(path, "read", () => Bun.file(path).exists()))) {
+    return { value: empty3, text: undefined };
+  }
+  const text = yield* fileOperation(path, "read", () => Bun.file(path).text());
+  if (text.trim() === "")
+    return { value: empty3, text };
+  const value = yield* decodeUnknownEffect2(JsonObjectText)(text, strict2).pipe(mapError2((error) => new SetupFailure({ message: `${path} is not a JSON object: ${error.message}` })));
+  return { value, text };
+});
+var writeJsonObject = (path, value, options) => replaceJsonObject(path, value, options).pipe(asVoid2);
+var writeJsonObjectIfUnchanged = (path, value, unchangedSince, options) => replaceJsonObject(path, value, options, unchangedSince);
+var replaceJsonObject = (path, value, options, unchangedSince) => gen2(function* () {
+  const exists = yield* fileOperation(path, "write", () => Bun.file(path).exists());
+  const target = exists ? yield* fileOperation(path, "write", () => realpath3(path)) : path;
+  const mode = options?.mode ?? (exists ? (yield* fileOperation(target, "write", () => Bun.file(target).stat())).mode & 511 : undefined);
+  const text = (yield* encodeEffect(JsonObjectText)(value, strict2).pipe(mapError2((error) => new SetupFailure({ message: `cannot encode ${path}: ${error.message}` })))) + `
+`;
+  const temporary = join9(dirname3(target), `.${basename2(target)}.${process.pid}.tmp`);
+  yield* fileOperation(dirname3(target), "write", () => mkdir3(dirname3(target), { recursive: true }));
+  yield* tryPromise2({
+    try: () => writeFile(temporary, text, { flag: "wx", ...mode === undefined ? {} : { mode } }),
+    catch: (cause) => cause
+  }).pipe(catch_2((error) => (error.code === "EEXIST" ? void_3 : ignore2(fileOperation(temporary, "remove", () => rm4(temporary, { force: true })))).pipe(andThen2(fail5(new SetupFailure({
+    message: `cannot write ${temporary}: ${error instanceof Error ? error.message : String(error)}`
+  }))))));
+  return yield* gen2(function* () {
+    if (mode !== undefined)
+      yield* fileOperation(temporary, "write", () => chmod(temporary, mode));
+    if (unchangedSince !== undefined && (yield* fileOperation(target, "read", () => Bun.file(target).text())) !== unchangedSince) {
+      yield* fileOperation(temporary, "remove", () => rm4(temporary, { force: true }));
+      return false;
+    }
+    yield* fileOperation(target, "write", () => rename3(temporary, target));
+    return true;
+  }).pipe(onError2(() => ignore2(fileOperation(temporary, "remove", () => rm4(temporary, { force: true })))));
+});
+var place = (node, path, depth, wanted) => {
+  const key = path[depth];
+  const reported = path.slice(0, depth + 1).join(".");
+  const current = node[key];
+  if (depth === path.length - 1) {
+    if (current === undefined) {
+      return [
+        { ...node, [key]: wanted },
+        { path: reported, status: "added", value: wanted, wanted }
+      ];
+    }
+    const status = equals(current, wanted) ? "present" : "kept";
+    return [node, { path: reported, status, value: current, wanted }];
+  }
+  if (current !== undefined && !isJsonObject2(current)) {
+    return [node, { path: reported, status: "kept", value: current, wanted }];
+  }
+  const [child, entry] = place(current ?? {}, path, depth + 1, wanted);
+  return [child === current ? node : { ...node, [key]: child }, entry];
+};
+var applyDefaults = (existing, defaults) => {
+  let merged = existing;
+  const entries = new Map;
+  for (const { path, value } of defaults) {
+    const [next, entry] = place(merged, path, 0, value);
+    merged = next;
+    if (!entries.has(entry.path))
+      entries.set(entry.path, entry);
+  }
+  return { merged, entries: [...entries.values()] };
+};
+
+import { delimiter, join as join10 } from "path";
+var {$: $3 } = globalThis.Bun;
+var pathKey = (env, insensitive = process.platform === "win32") => {
+  if (!insensitive || env.PATH !== undefined)
+    return "PATH";
+  return Object.keys(env).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
+};
+var pathWithBunBin = (env, options) => {
+  const key = pathKey(env, options.insensitive);
+  const root = options.bunInstall ? options.bunInstall : join10(options.home, ".bun");
+  const bunBin = join10(root, "bin");
+  return { key, value: `${env[key] ?? ""}${options.delimiter ?? delimiter}${bunBin}`, bunBin };
+};
+var findCommand = (env, command, options) => {
+  const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory(env), bunInstall: env.BUN_INSTALL });
+  return fromNullishOr(Bun.which(command, {
+    PATH: options?.includeBunBin ? bunBin.value : env[bunBin.key] ?? ""
+  }));
+};
+var EMPTY_BUNFIG = join10(import.meta.dir, "empty-bunfig.toml");
+
+class Shell extends Service()("holyagent/Shell") {
+  static live = (env) => {
+    const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory(env), bunInstall: env.BUN_INSTALL });
+    return succeed5(Shell, Shell.of({
+      which: (command, options) => sync2(() => findCommand(env, command, options)),
+      run: (command, args, options) => tryPromise2({
+        try: () => $3`${command} ${args}`.cwd(options.cwd).env(Object.fromEntries(Object.entries({ ...env, [bunBin.key]: bunBin.value }).filter((entry) => entry[1] !== undefined))).quiet().nothrow().then((result) => ({
+          exitCode: result.exitCode,
+          stdout: result.stdout.toString(),
+          stderr: result.stderr.toString()
+        })),
+        catch: (error) => String(error)
+      }).pipe(catch_2((message) => succeed6({ exitCode: 127, stdout: "", stderr: message })))
+    }));
+  };
+}
+
+var BILI_PLUGIN = "billion-context@billion-context";
+var BILI_MARKETPLACE = "billion-context";
+var ACP_CACHE_COMMAND = [
+  "---",
+  "description: billion-context prompt-cache reconciliation report (same as the acp_cache tool)",
+  "---",
+  'Run the `acp_cache` tool provided by the `bili` MCP server now. If the arguments below contain the word "full", call it with detail:"full"; otherwise call it with no arguments. Then paste the tool\'s complete output verbatim in a fenced code block \u2014 do not summarize, translate, reorder, or omit anything. If the tool is unavailable, reply exactly: bili: acp_cache tool not available (is the bili MCP server registered?)',
+  "",
+  "Arguments: $ARGUMENTS"
+].join(`
+`);
+var HOOK_COMMAND = /claude-native-bootstrap\.(?:js|mjs|ts)["']?$/;
+var HOOK_MARKER = "claude-native-bootstrap";
+var PROXY_URL = /^http:\/\/127\.0\.0\.1:\d{1,5}\/bili\/(?:[a-z][a-z0-9-]*\/)?https?:\/\//;
+var BASE_URL_KEYS = ["ANTHROPIC_BASE_URL", "ANTHROPIC_VERTEX_BASE_URL"];
+var MCP_PROGRAM = /^(?:.*[\\/])?node(?:\.exe|\.cmd)?$/;
+var MCP_SCRIPT = /dist[\\/](?:claude-mcp-entry|mcp)\.(?:js|mjs)$/;
+var SETTINGS_BACKUP = "settings.json.bili-bak";
+var hookMatch = (handler) => isJsonObject2(handler) && typeof handler["command"] === "string" && HOOK_COMMAND.test(handler["command"]) ? HOOK_MARKER : undefined;
+var isBiliServer = (server) => isJsonObject2(server) && typeof server["command"] === "string" && MCP_PROGRAM.test(server["command"]) && Array.isArray(server["args"]) && server["args"].some((arg) => typeof arg === "string" && MCP_SCRIPT.test(arg));
+var without = (object, key) => Object.fromEntries(Object.entries(object).filter(([name]) => name !== key));
+var dropKey = (root, parent, key) => {
+  const node = root[parent];
+  if (!isJsonObject2(node) || !Object.hasOwn(node, key))
+    return { merged: root, removed: [] };
+  const rest = without(node, key);
+  return {
+    merged: Object.keys(rest).length === 0 ? without(root, parent) : { ...root, [parent]: rest },
+    removed: [`${parent}.${key}`]
+  };
+};
+var dropHooks = (root) => {
+  const hooks = root["hooks"];
+  const groups = isJsonObject2(hooks) ? hooks["SessionStart"] : undefined;
+  if (!isJsonObject2(hooks) || !Array.isArray(groups))
+    return { merged: root, removed: [] };
+  const removed = [];
+  const kept = [];
+  for (const group of groups) {
+    if (!isJsonObject2(group) || !Array.isArray(group["hooks"])) {
+      kept.push(group);
+      continue;
+    }
+    const handlers = group["hooks"].filter((handler) => {
+      const matched = hookMatch(handler);
+      if (matched === undefined)
+        return true;
+      removed.push(`hooks.SessionStart command matching ${matched}`);
+      return false;
+    });
+    if (handlers.length === group["hooks"].length)
+      kept.push(group);
+    else if (handlers.length > 0)
+      kept.push({ ...group, hooks: handlers });
+  }
+  if (removed.length === 0)
+    return { merged: root, removed };
+  const rest = kept.length > 0 ? { ...hooks, SessionStart: kept } : without(hooks, "SessionStart");
+  return {
+    merged: Object.keys(rest).length === 0 ? without(root, "hooks") : { ...root, hooks: rest },
+    removed
+  };
+};
+var chain = (start, steps) => {
+  let merged = start;
+  const removed = [];
+  for (const step of steps) {
+    const plan = step(merged);
+    merged = plan.merged;
+    removed.push(...plan.removed);
+  }
+  return { merged, removed };
+};
+var planSettings = (settings, nativeMode, backup) => {
+  const env = settings["env"];
+  const proxied = BASE_URL_KEYS.filter((key) => isJsonObject2(env) && typeof env[key] === "string" && PROXY_URL.test(env[key]));
+  const hooks = dropHooks(settings);
+  const plugins = settings["enabledPlugins"];
+  const markets = settings["extraKnownMarketplaces"];
+  const evidence = nativeMode || proxied.length > 0 || hooks.removed.length > 0 || isJsonObject2(plugins) && Object.hasOwn(plugins, BILI_PLUGIN) || isJsonObject2(markets) && Object.hasOwn(markets, BILI_MARKETPLACE);
+  const compact = isJsonObject2(env) ? env["DISABLE_AUTO_COMPACT"] : undefined;
+  const noChange = (root) => ({ merged: root, removed: [] });
+  return chain(settings, [
+    ...proxied.map((key) => (root) => dropKey(root, "env", key)),
+    (root) => {
+      const current = root["env"];
+      if (!evidence || compact !== "1" || !backup.readable || !isJsonObject2(current)) {
+        return noChange(root);
+      }
+      if (backup.value === undefined)
+        return dropKey(root, "env", "DISABLE_AUTO_COMPACT");
+      if (backup.value === compact)
+        return noChange(root);
+      return {
+        merged: { ...root, env: { ...current, DISABLE_AUTO_COMPACT: backup.value } },
+        removed: [`env.DISABLE_AUTO_COMPACT=1 (put back the value in ${SETTINGS_BACKUP})`]
+      };
+    },
+    dropHooks,
+    (root) => dropKey(root, "enabledPlugins", BILI_PLUGIN),
+    (root) => dropKey(root, "extraKnownMarketplaces", BILI_MARKETPLACE)
+  ]);
+};
+var dropBiliServer = (node, where) => {
+  const servers = node["mcpServers"];
+  const server = isJsonObject2(servers) ? servers["bili"] : undefined;
+  if (!isBiliServer(server))
+    return { merged: node, removed: [] };
+  const plan = dropKey(node, "mcpServers", "bili");
+  return { ...plan, removed: [`${where}mcpServers.bili running the Billion Context entry script`] };
+};
+var planClaudeJson = (config) => {
+  const top = dropBiliServer(config, "");
+  const projects = top.merged["projects"];
+  if (!isJsonObject2(projects))
+    return top;
+  const removed = [...top.removed];
+  const kept = Object.entries(projects).map(([name, project]) => {
+    const plan = isJsonObject2(project) ? dropBiliServer(project, `projects.${name}.`) : { merged: project, removed: [] };
+    removed.push(...plan.removed);
+    return [name, plan.merged];
+  });
+  return removed.length === top.removed.length ? top : { merged: { ...top.merged, projects: Object.fromEntries(kept) }, removed };
+};
+var pluginInstalls = (record) => {
+  const plugins = record["plugins"];
+  if (!isJsonObject2(plugins) || !Object.hasOwn(plugins, BILI_PLUGIN))
+    return [];
+  const entries = Array.isArray(plugins[BILI_PLUGIN]) ? plugins[BILI_PLUGIN] : [plugins[BILI_PLUGIN]];
+  const installs = entries.map((entry) => {
+    const scope = isJsonObject2(entry) ? entry["scope"] : undefined;
+    const projectPath = isJsonObject2(entry) ? entry["projectPath"] : undefined;
+    return {
+      scope: scope === "project" || scope === "local" ? scope : "user",
+      projectPath: typeof projectPath === "string" && projectPath !== "" ? projectPath : undefined
+    };
+  });
+  const distinct = new Map(installs.map((install) => [`${install.scope}\x00${install.projectPath ?? ""}`, install]));
+  return [...distinct.values()];
+};
+var none3 = { value: {}, text: undefined };
+var readOrReport = (file) => readJsonObjectSnapshot(file).pipe(map4((snapshot) => ({ ...snapshot, error: undefined })), catchTag2("SetupFailure", (error) => succeed6({ ...none3, error: error.message })));
+var installLabel = (install) => `plugin ${BILI_PLUGIN}${install.scope === "user" ? "" : ` (${install.scope} scope${install.projectPath === undefined ? "" : ` in ${install.projectPath}`})`}`;
+var findLeftovers = (files) => gen2(function* () {
+  const settingsFile = join11(files.claudeDir, "settings.json");
+  const settings = yield* readOrReport(settingsFile);
+  const config = yield* readOrReport(files.claudeJson);
+  const plugins = yield* readOrReport(join11(files.claudeDir, "plugins", "installed_plugins.json"));
+  const markets = yield* readOrReport(join11(files.claudeDir, "plugins", "known_marketplaces.json"));
+  const backup = yield* readOrReport(join11(files.claudeDir, SETTINGS_BACKUP));
+  const commandFile = join11(files.claudeDir, "commands", "acp-cache.md");
+  const commandText = yield* tryPromise2({
+    try: () => Bun.file(commandFile).text(),
+    catch: (cause) => cause
+  }).pipe(map4((text) => ({ text, error: undefined })), catch_2((error) => succeed6({
+    text: undefined,
+    error: error.code === "ENOENT" ? undefined : `cannot read ${commandFile}: ${error.message}`
+  })));
+  const mine = commandText.text !== undefined && commandText.text.trimEnd() === ACP_CACHE_COMMAND.trimEnd();
+  const command = mine ? commandFile : undefined;
+  const foreignCommand = commandText.text !== undefined && !mine ? commandFile : undefined;
+  const claudeJson = planClaudeJson(config.value);
+  const installs = pluginInstalls(plugins.value);
+  const marketplaceRegistered = Object.hasOwn(markets.value, BILI_MARKETPLACE);
+  const settingsPlan = planSettings(settings.value, command !== undefined || claudeJson.removed.length > 0 || installs.length > 0 || marketplaceRegistered, {
+    readable: backup.error === undefined,
+    value: isJsonObject2(backup.value["env"]) ? backup.value["env"]["DISABLE_AUTO_COMPACT"] : undefined
+  });
+  const found = [
+    ...settingsPlan.removed.map((item) => `${item} in ${settingsFile}`),
+    ...claudeJson.removed.map((item) => `${item} in ${files.claudeJson}`),
+    ...command === undefined ? [] : [command],
+    ...installs.map(installLabel),
+    ...marketplaceRegistered ? [`marketplace ${BILI_MARKETPLACE}`] : []
+  ];
+  return {
+    settingsFile,
+    settings: settingsPlan,
+    settingsText: settings.text,
+    claudeJsonFile: files.claudeJson,
+    claudeJson,
+    claudeJsonText: config.text,
+    command,
+    foreignCommand,
+    pluginInstalls: installs,
+    marketplaceRegistered,
+    unreadable: [settings, config, plugins, markets, backup, commandText].flatMap((read) => read.error === undefined ? [] : [read.error]),
+    found
+  };
+});
+var WRITE_ATTEMPTS = 3;
+var applyPlan = (files, first, pick, dryRun) => gen2(function* () {
+  for (let attempt = 1;attempt <= WRITE_ATTEMPTS; attempt += 1) {
+    const { file, plan, text } = pick(attempt === 1 ? first : yield* findLeftovers(files));
+    if (attempt > 1 && (text === undefined || text.trim() === "")) {
+      return [
+        `~ billion-context: ${file} changed while it was cleaned and cannot be read now, so it was left as it is; run holyagent setup again`
+      ];
+    }
+    if (plan.removed.length === 0 || text === undefined)
+      return [];
+    if (dryRun || (yield* writeJsonObjectIfUnchanged(file, plan.merged, text))) {
+      return plan.removed.map((item) => `+ billion-context: ${dryRun ? "would remove" : "removed"} ${item} from ${file}`);
+    }
+  }
+  return [
+    `~ billion-context: ${pick(first).file} kept changing while it was cleaned and was left as it is; run holyagent setup again`
+  ];
+}).pipe(catchTag2("SetupFailure", (error) => succeed6([`! billion-context: ${error.message}`])));
+var owned = { _tag: "Owned" };
+var unchecked = { _tag: "Unchecked" };
+var refused = { _tag: "Refused" };
+var ownedDirectory = (directory) => gen2(function* () {
+  if (!isAbsolute(directory))
+    return refused;
+  const info = yield* tryPromise2({
+    try: () => Bun.file(directory).stat(),
+    catch: (cause) => cause
+  });
+  if (!info.isDirectory())
+    return refused;
+  const user = process.getuid?.();
+  if (user === undefined)
+    return unchecked;
+  return info.uid === user ? owned : refused;
+}).pipe(catch_2((error) => succeed6(error.code === "ENOENT" ? refused : { _tag: "Failed", message: error.message })));
+var hasRemovableLeftovers = (leftovers) => gen2(function* () {
+  if (leftovers.settings.removed.length > 0 || leftovers.claudeJson.removed.length > 0 || leftovers.command !== undefined || leftovers.marketplaceRegistered)
+    return true;
+  for (const install of leftovers.pluginInstalls) {
+    if (install.scope === "user")
+      return true;
+    if (install.projectPath === undefined)
+      continue;
+    const owner = yield* ownedDirectory(install.projectPath);
+    if (owner._tag === "Owned" || owner._tag === "Unchecked")
+      return true;
+  }
+  return false;
+});
+var cleanupLeftovers = fn2("cleanupLeftovers")(function* (env, dryRun) {
+  const shell = yield* Shell;
+  const files = userFiles(env);
+  const neutral = homeDirectory(env);
+  const leftovers = yield* findLeftovers(files);
+  const verb = dryRun ? "would remove" : "removed";
+  const lines = leftovers.unreadable.map((message) => `! billion-context: ${message}; its entries were not checked`);
+  lines.push(...yield* applyPlan(files, leftovers, (l) => ({ file: l.settingsFile, plan: l.settings, text: l.settingsText }), dryRun));
+  lines.push(...yield* applyPlan(files, leftovers, (l) => ({ file: l.claudeJsonFile, plan: l.claudeJson, text: l.claudeJsonText }), dryRun));
+  if (leftovers.command !== undefined) {
+    const file = leftovers.command;
+    if (dryRun)
+      lines.push(`+ billion-context: ${verb} ${file}`);
+    else {
+      lines.push(yield* fileOperation(file, "remove", () => rm5(file)).pipe(as2(`+ billion-context: ${verb} ${file}`), catchTag2("SetupFailure", (error) => succeed6(`! billion-context: ${error.message}`))));
+    }
+  }
+  if (leftovers.foreignCommand !== undefined) {
+    lines.push(`~ billion-context: ${leftovers.foreignCommand} is not the text Billion Context writes and stays; delete it yourself if it is a leftover`);
+  }
+  const removals = [];
+  for (const install of leftovers.pluginInstalls) {
+    const args = [
+      "plugin",
+      "uninstall",
+      BILI_PLUGIN,
+      ...install.scope === "user" ? [] : ["--scope", install.scope]
+    ];
+    const what = installLabel(install);
+    if (install.scope === "user")
+      removals.push({ what, args, cwd: undefined });
+    else if (install.projectPath === undefined) {
+      lines.push(`~ billion-context: ${what} stays; its install records no project folder, run in that project: claude ${args.join(" ")}`);
+    } else {
+      const owner = yield* ownedDirectory(install.projectPath);
+      if (owner._tag === "Failed") {
+        lines.push(`~ billion-context: ${what} stays; cannot check ${install.projectPath}: ${owner.message}, so claude is not run there; run in that project: claude ${args.join(" ")}`);
+      } else if (owner._tag === "Refused") {
+        lines.push(`~ billion-context: ${what} stays; ${install.projectPath} is not an existing folder of yours, so claude is not run there; run in that project: claude ${args.join(" ")}`);
+      } else {
+        removals.push({
+          what,
+          args,
+          cwd: install.projectPath,
+          ...owner._tag === "Unchecked" ? { note: "; this system has no user ids, so the folder's owner was not checked" } : {}
+        });
+      }
+    }
+  }
+  if (leftovers.marketplaceRegistered) {
+    removals.push({
+      what: `marketplace ${BILI_MARKETPLACE}`,
+      args: ["plugin", "marketplace", "remove", BILI_MARKETPLACE],
+      cwd: undefined
+    });
+  }
+  if (removals.length > 0) {
+    const claude = yield* shell.which("claude", { includeBunBin: true });
+    for (const removal of removals) {
+      const command = `claude ${removal.args.join(" ")}`;
+      const where = removal.cwd === undefined ? "" : ` (in ${removal.cwd})`;
+      if (isNone2(claude)) {
+        lines.push(`~ billion-context: ${removal.what} stays; \`claude\` not found, run${where}: ${command}`);
+      } else if (dryRun) {
+        lines.push(`+ billion-context: ${verb} ${removal.what} with ${command}${where}${removal.note ?? ""}`);
+      } else {
+        const result = yield* shell.run("claude", removal.args, { cwd: removal.cwd ?? neutral });
+        const detail = (result.stderr || result.stdout).trim().split(`
+`)[0] ?? "";
+        lines.push(result.exitCode === 0 ? `+ billion-context: ${verb} ${removal.what}${removal.note ?? ""}` : `! billion-context: ${command} failed (exit ${result.exitCode})${detail === "" ? "" : `: ${detail}`}`);
+      }
+    }
+  }
+  return lines.length === 0 ? ["= billion-context: no leftovers"] : lines;
+});
+
+var added = (text) => `+ ${text}`;
+var present2 = (text) => `= ${text}`;
+var skipped = (text) => `- ${text}`;
+var hint = (text) => `~ ${text}`;
+var failed2 = (what, result) => {
+  const detail = (result.stderr || result.stdout).trim().split(`
+`)[0] ?? "";
+  return `! ${what}: failed (exit ${result.exitCode})${detail === "" ? "" : `: ${detail}`}`;
+};
+var show = (value) => JSON.stringify(value) ?? String(value);
+
+var MARKETPLACE = { name: "holyagent", repo: "davidbasilefilho/holyagent" };
+var PLUGIN_ID = `${MARKETPLACE.name}@${MARKETPLACE.name}`;
+var CACHE_TTLS = ["1h", "5m"];
+var userSettingsDefaults = (subagentCacheTtl) => [
+  { path: ["attribution", "commit"], value: "" },
+  { path: ["attribution", "pr"], value: "" },
+  { path: ["attribution", "sessionUrl"], value: false },
+  { path: ["includeGitInstructions"], value: false },
+  { path: ["subagentPromptCacheTtl"], value: subagentCacheTtl },
+  {
+    path: ["extraKnownMarketplaces", MARKETPLACE.name],
+    value: { source: { source: "github", repo: MARKETPLACE.repo } }
+  },
+  { path: ["enabledPlugins", PLUGIN_ID], value: true },
+  { path: ["permissions", "deny"], value: ["WebSearch", "WebFetch"] }
+];
+var describe2 = ({ path, status, value, wanted }) => {
+  switch (status) {
+    case "added":
+      return `+ ${path}: added ${show(value)}`;
+    case "present":
+      return `= ${path}: already ${show(value)}`;
+    case "kept":
+      return `~ ${path}: kept ${show(value)} (recommended ${show(wanted)})`;
+  }
+};
+var mergeUserSettings = fn2("mergeUserSettings")(function* (env, options) {
+  const file = userFiles(env).settings;
+  const existing = yield* readJsonObject(file);
+  const { merged, entries } = applyDefaults(existing, userSettingsDefaults(options.subagentCacheTtl));
+  const added = entries.filter((entry) => entry.status === "added").length;
+  if (added > 0 && !options.dryRun)
+    yield* writeJsonObject(file, merged);
+  const summary = added === 0 ? "no changes" : options.dryRun ? `dry run: would add ${added}, nothing written` : `added ${added}`;
+  return [file, ...entries.map(describe2), summary];
+});
+var missingSettingKeys = fn2("missingSettingKeys")(function* (env) {
+  const existing = yield* readJsonObject(userFiles(env).settings);
+  return applyDefaults(existing, userSettingsDefaults("1h")).entries.filter((entry) => entry.status === "added").map((entry) => entry.path);
+});
+
+var setupNotice = (env) => {
+  if (inCloudSession(env))
+    return succeed6(undefined);
+  const missing = isNone2(findCommand(env, "ctx7", { includeBunBin: true })) ? ["ctx7"] : [];
+  return all2([
+    missingSettingKeys(env).pipe(orElseSucceed2(() => [])),
+    findLeftovers(userFiles(env)).pipe(flatMap2(hasRemovableLeftovers), orElseSucceed2(() => false))
+  ]).pipe(map4(([keys, leftovers]) => {
+    const lacking = [...missing, ...keys.length === 0 ? [] : ["user settings keys"]];
+    const details = [
+      ...lacking.length === 0 ? [] : [`missing ${lacking.join(", ")}`],
+      ...leftovers ? ["leftovers from an earlier Billion Context setup"] : []
+    ];
+    return details.length === 0 ? undefined : `holyagent: setup is incomplete (${details.join("; ")}). Offer the user to run /holyagent:setup, which installs, configures and cleans up; do not run it unasked.`;
+  }));
+};
+
+import { lstat as lstat2, mkdir as mkdir4, open as open3 } from "fs/promises";
+import { tmpdir, userInfo } from "os";
+import { join as join12 } from "path";
 var SAFE_SESSION = /^[\w.-]{1,80}$/;
 var isSessionId = (id) => id !== undefined && SAFE_SESSION.test(id) && !/^\.+$/.test(id);
-var markers = () => join7(tmpdir(), `holyagent-sessions-${(process.getuid?.() ?? userInfo().username).toString().replace(/[^\w.-]/g, "_")}`);
-var markerOf = (sessionId) => join7(markers(), sessionId);
+var markers = () => join12(tmpdir(), `holyagent-sessions-${(process.getuid?.() ?? userInfo().username).toString().replace(/[^\w.-]/g, "_")}`);
+var markerOf = (sessionId) => join12(markers(), sessionId);
 var ensureMarkers = () => {
   const folder = markers();
   const uid = process.getuid?.();
-  return io(folder, () => mkdir3(folder, { recursive: true, mode: 448 })).pipe(andThen2(io(folder, () => lstat2(folder))), filterOrFail2((found) => found.isDirectory() && (uid === undefined || found.uid === uid && (found.mode & 18) === 0), () => new StateIo({
+  return io(folder, () => mkdir4(folder, { recursive: true, mode: 448 })).pipe(andThen2(io(folder, () => lstat2(folder))), filterOrFail2((found) => found.isDirectory() && (uid === undefined || found.uid === uid && (found.mode & 18) === 0), () => new StateIo({
     path: folder,
     cause: new Error("not a private directory owned by the current user")
   })));
@@ -12001,12 +12853,12 @@ var create = (sessionId) => ensureMarkers().pipe(andThen2(io(markerOf(sessionId)
 var markRulesDelivered = (sessionId) => create(sessionId).pipe(asVoid2);
 var claimRulesDelivery = create;
 
-import { join as join8 } from "path";
+import { join as join13 } from "path";
 var LEGACY_FOLDERS = {
   holyclaude: ".holyclaude",
   holycodex: ".holycodex"
 };
-var strict2 = { onExcessProperty: "error" };
+var strict3 = { onExcessProperty: "error" };
 var collapse = (message) => message.replace(/\s+/g, " ").trim();
 var strings = ArraySchema(String4);
 var optionalStrings = optionalKey2(strings);
@@ -12143,7 +12995,7 @@ var parseText = (format, text) => try_2({
   try: () => format === "json" ? JSON.parse(text) : decode2(text, { strict: true }),
   catch: (cause) => `not valid ${format === "json" ? "JSON" : "TOON"}: ${String(cause)}`
 });
-var readLegacy = (pick, format, path) => readText(path).pipe(flatMap2((text) => parseText(format, text ?? "").pipe(flatMap2((raw) => decodeUnknownEffect2(pick(raw), strict2)(raw).pipe(mapError2((error) => collapse(error.message)))), map4((value) => ({ value })), catch_2((problem) => succeed6({ problem })))));
+var readLegacy = (pick, format, path) => readText(path).pipe(flatMap2((text) => parseText(format, text ?? "").pipe(flatMap2((raw) => decodeUnknownEffect2(pick(raw), strict3)(raw).pipe(mapError2((error) => collapse(error.message)))), map4((value) => ({ value })), catch_2((problem) => succeed6({ problem })))));
 var listFiles = (directory) => io(directory, () => Array.fromAsync(new Bun.Glob("**/*").scan({ cwd: directory, dot: true, onlyFiles: true }))).pipe(map4((paths) => paths.map((path) => toPosix(path)).toSorted()), catchIf2((error) => hasCode(error.cause, "ENOENT") || hasCode(error.cause, "ENOTDIR"), () => succeed6([])));
 var byFolder = (paths) => {
   const folders = new Map;
@@ -12157,7 +13009,7 @@ var byFolder = (paths) => {
   return folders;
 };
 var convertibleFolders = (source, files) => byFolder(source === "holyclaude" ? files.filter((path) => path.startsWith("intents/")).map((path) => path.slice(8)) : files.filter((path) => !path.startsWith(".")));
-var legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join8(root, LEGACY_FOLDERS[source])).pipe(map4((files) => convertibleFolders(source, files).size > 0))).pipe(map4((sources) => sources.map((source) => LEGACY_FOLDERS[source])));
+var legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join13(root, LEGACY_FOLDERS[source])).pipe(map4((files) => convertibleFolders(source, files).size > 0))).pipe(map4((sources) => sources.map((source) => LEGACY_FOLDERS[source])));
 var isoOf = (millis) => {
   const date = new Date(millis);
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
@@ -12278,13 +13130,13 @@ var holyclaudeAssignment = (legacy, roleTask, siblings) => {
 };
 var gatherHolyclaude = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holyclaude;
-  const legacy = join8(root, folderName);
+  const legacy = join13(root, folderName);
   const intents = convertibleFolders("holyclaude", yield* listFiles(legacy));
   if (intents.size === 0)
     return;
   const state = collector("holyclaude");
   for (const [folder, inside] of intents) {
-    const base = join8(legacy, "intents", folder);
+    const base = join13(legacy, "intents", folder);
     const shown = (relative) => `${folderName}/intents/${folder}/${relative}`;
     if (!inside.includes("intent.json")) {
       unconvertible(state, shown("").slice(0, -1), "the folder has no intent.json");
@@ -12292,7 +13144,7 @@ var gatherHolyclaude = (root, directory) => gen2(function* () {
     }
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.json$/.test(path));
     const notes = inside.filter((path) => path !== "intent.json" && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join8(base, "intent.json"));
+    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join13(base, "intent.json"));
     const intent = yield* intentRecord(directory, shown("intent.json"), "problem" in read ? read : holyclaudeIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.json"), intent.problem);
@@ -12303,10 +13155,10 @@ var gatherHolyclaude = (root, directory) => gen2(function* () {
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join8(base, path), to: join8(target, path) });
+      state.notes.push({ from: join13(base, path), to: join13(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join8(base, path));
+      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join13(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (assignment.value.intent_id !== intent.value.intent.id)
@@ -12408,13 +13260,13 @@ var holycodexAssignment = (legacy, roleTask, intent, siblings) => {
 var TRANSACTION_FILE = ".holycodex-transaction.toon";
 var gatherHolycodex = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holycodex;
-  const legacy = join8(root, folderName);
+  const legacy = join13(root, folderName);
   const folders = convertibleFolders("holycodex", yield* listFiles(legacy));
   if (folders.size === 0)
     return;
   const state = collector("holycodex");
   for (const [folder, inside] of folders) {
-    const base = join8(legacy, folder);
+    const base = join13(legacy, folder);
     const shown = (relative) => `${folderName}/${folder}/${relative}`;
     if (!inside.includes("intent.toon")) {
       unconvertible(state, `${folderName}/${folder}`, "the folder has no intent.toon");
@@ -12428,7 +13280,7 @@ var gatherHolycodex = (root, directory) => gen2(function* () {
       });
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.toon$/.test(path));
     const notes = inside.filter((path) => path !== "intent.toon" && path !== TRANSACTION_FILE && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join8(base, "intent.toon"));
+    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join13(base, "intent.toon"));
     const intent = yield* intentRecord(directory, shown("intent.toon"), "problem" in read ? read : holycodexIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.toon"), intent.problem);
@@ -12439,10 +13291,10 @@ var gatherHolycodex = (root, directory) => gen2(function* () {
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join8(base, path), to: join8(target, path) });
+      state.notes.push({ from: join13(base, path), to: join13(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join8(base, path));
+      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join13(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (mapId("intent", assignment.value.intent_id) !== intent.value.intent.id)
@@ -12737,15 +13589,22 @@ var render = (title, status, rows, chars) => {
   return [`${title}:`, encode2(shown), ...more].join(`
 `);
 };
-var legacyContext = (folders, core, cloud) => [
+var legacyContext = (folders, core, cloud, notice) => [
   ...core === undefined ? [] : [core, POINTER],
   ...cloud === undefined ? [] : [cloud],
+  ...notice === undefined ? [] : [notice],
   `This project holds the legacy state folder ${folders.map((name) => `\`${name}/\``).join(" and ")} and no \`.holyagent/\`. Run \`holyagent migrate --dry-run\` to preview the conversion, then \`holyagent migrate\` to convert it; there are no Intents or Assignments to read until then.`,
   SESSION_REMINDER
 ].join(`
 
 `);
-var bareContext = (core, cloud) => [core, POINTER, ...cloud === undefined ? [] : [cloud], SESSION_REMINDER].join(`
+var bareContext = (core, cloud, notice) => [
+  core,
+  POINTER,
+  ...cloud === undefined ? [] : [cloud],
+  ...notice === undefined ? [] : [notice],
+  SESSION_REMINDER
+].join(`
 
 `);
 var renderRequirements = (intent, shown) => [
@@ -12760,10 +13619,11 @@ var renderRequirements = (intent, shown) => [
   ] : []
 ].join(`
 `);
-var sessionContext = (status, core, reconcile, intent, cloud) => {
+var sessionContext = (status, core, reconcile, intent, cloud, notice) => {
   const head = [
     ...core === undefined ? [] : [core, POINTER],
-    ...cloud === undefined ? [] : [cloud]
+    ...cloud === undefined ? [] : [cloud],
+    ...notice === undefined ? [] : [notice]
   ];
   const running = Array.isArray(reconcile?.running) && reconcile.running.length > 0 ? reconcile.running : undefined;
   const wanted = intent !== undefined && intent.requirements.length > 0 ? intent : undefined;
@@ -15597,7 +16457,7 @@ pp$5.parseParenItem = function(item) {
 pp$5.parseParenArrowList = function(startPos, startLoc, exprList, forInit) {
   return this.parseArrowExpression(this.startNodeAt(startPos, startLoc), exprList, false, forInit);
 };
-var empty3 = [];
+var empty4 = [];
 pp$5.parseNew = function() {
   if (this.containsEsc) {
     this.raiseRecoverable(this.start, "Escape sequence in keyword new");
@@ -15630,7 +16490,7 @@ pp$5.parseNew = function() {
   if (this.eat(types$1.parenL)) {
     node.arguments = this.parseExprList(types$1.parenR, this.options.ecmaVersion >= 8, false);
   } else {
-    node.arguments = empty3;
+    node.arguments = empty4;
   }
   return this.finishNode(node, "NewExpression");
 };
@@ -18869,26 +19729,30 @@ var rootCore = (payload, call) => ROOT_AGENTS.has(payload.agent_type) ? undefine
 `).replaceAll("${CLAUDE_PLUGIN_ROOT}", () => call.env.CLAUDE_PLUGIN_ROOT ?? "${CLAUDE_PLUGIN_ROOT}");
 var isMainThread = (payload) => payload.agent_id === undefined && !isSpecialist(payload.agent_type);
 var HOOK_COMMANDS = [
-  hook("session-start", "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread, and in a claude.ai cloud session, `CLAUDE_CODE_REMOTE=true`, the steps that set the commit author to the user), always ending with a short block of the root rules most often missed; for a project with no .holyagent and a .holyclaude or .holycodex folder that holds state to convert, a notice naming the folder and `holyagent migrate`, with the same rules; for a project with none of the three, the core root rules with that line and the reminder when the holyagent agent is not the main thread, otherwise nothing", (payload, call) => {
+  hook("session-start", "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread, and in a claude.ai cloud session, `CLAUDE_CODE_REMOTE=true`, the steps that set the commit author to the user), always ending with a short block of the root rules most often missed; one line that offers /holyagent:setup when ctx7 or a recommended user-settings key is missing, or when an earlier Billion Context setup left entries in the Claude Code files that setup can remove (nothing in a cloud session, nothing installed or written); for a project with no .holyagent and a .holyclaude or .holycodex folder that holds state to convert, a notice naming the folder and `holyagent migrate`, with the same rules; for a project with none of the three, the core root rules with that line and the reminder when the holyagent agent is not the main thread, otherwise nothing", (payload, call) => {
     const core = rootCore(payload, call);
     const cloud = inCloudSession(call.env) ? CLOUD_IDENTITY : undefined;
     return gen2(function* () {
+      const notice = yield* setupNotice(call.env);
       if (!(yield* hasStateFolder(call.directory))) {
         const found = yield* legacyFoldersWithState(call.root);
-        if (found.length === 0)
-          return core === undefined ? NOTHING : output({
+        if (found.length === 0) {
+          if (core === undefined)
+            return notice === undefined ? NOTHING : output({ hookEventName: "SessionStart", additionalContext: notice });
+          return output({
             hookEventName: "SessionStart",
-            additionalContext: bareContext(core, cloud)
+            additionalContext: bareContext(core, cloud, notice)
           });
+        }
         return output({
           hookEventName: "SessionStart",
-          additionalContext: legacyContext(found, core, cloud)
+          additionalContext: legacyContext(found, core, cloud, notice)
         });
       }
       const { status, reconcile } = RESUMED.has(payload.source) ? yield* resumeOf(call.directory) : { status: yield* statusOf(call.directory), reconcile: undefined };
       return output({
         hookEventName: "SessionStart",
-        additionalContext: sessionContext(status, core, reconcile, RESUMED.has(payload.source) ? yield* requirementsOf(call.directory) : undefined, cloud)
+        additionalContext: sessionContext(status, core, reconcile, RESUMED.has(payload.source) ? yield* requirementsOf(call.directory) : undefined, cloud, notice)
       });
     }).pipe(core === undefined ? (effect) => effect : catch_2((error) => succeed6(output({
       hookEventName: "SessionStart",
@@ -18964,7 +19828,7 @@ var HOOK_COMMANDS = [
       const message = cleaned.split(`
 `).filter((line) => !line.startsWith(comment)).join(`
 `);
-      const phrases = forbiddenPhrases(message, (yield* readSettings([join9(call.root, STATE_DIRECTORY)])).allowWords);
+      const phrases = forbiddenPhrases(message, (yield* readSettings([join14(call.root, STATE_DIRECTORY)])).allowWords);
       if (phrases.length > 0)
         return yield* new MessageRefused({ phrases });
       if (cleaned !== above.trim() || cleanedBelow !== below.trim())
@@ -18985,8 +19849,8 @@ ${cleanedBelow}
   }, true)
 ];
 
-import { join as join10, relative as relative3 } from "path";
-var {$: $3 } = globalThis.Bun;
+import { join as join15, relative as relative3 } from "path";
+var {$: $4 } = globalThis.Bun;
 class NothingToMigrate extends TaggedError2("NothingToMigrate") {
   get message() {
     return `${this.root} has no ${LEGACY_FOLDERS.holyclaude}/ or ${LEGACY_FOLDERS.holycodex}/ folder with state in it`;
@@ -19064,7 +19928,7 @@ var mentionsOf = (root, folders) => gen2(function* () {
   const patterns = folders.flatMap((folder) => ["-e", folder]);
   const excluded = [STATE_DIRECTORY, ...folders].map((folder) => `:(exclude)${folder}`);
   const output = yield* tryPromise2({
-    try: () => $3`git grep -I -l -F --untracked ${patterns} -- . ${excluded}`.cwd(root).quiet().nothrow(),
+    try: () => $4`git grep -I -l -F --untracked ${patterns} -- . ${excluded}`.cwd(root).quiet().nothrow(),
     catch: (cause) => new StateIo({ path: root, cause })
   });
   if (output.exitCode === 0 || output.exitCode === 1)
@@ -19073,7 +19937,7 @@ var mentionsOf = (root, folders) => gen2(function* () {
   const names = yield* io(root, () => Array.fromAsync(new Bun.Glob("*").scan({ cwd: root, dot: true, onlyFiles: true })));
   const hits = [];
   for (const name of names.toSorted()) {
-    const text = yield* readText(join10(root, name));
+    const text = yield* readText(join15(root, name));
     if (text !== undefined && folders.some((folder) => text.includes(folder)))
       hits.push(name);
   }
@@ -19147,6 +20011,158 @@ var MIGRATE_COMMANDS = [
   }
 ];
 
+import { join as join16 } from "path";
+var CLOUD_SKIP = "skipped in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true), which has no machine of yours to install it on";
+var neutralDirectory = (env) => homeDirectory(env);
+var ensureGlobal = fn2("ensureGlobal")(function* (env, command, packageName, dryRun) {
+  const shell = yield* Shell;
+  if (isSome2(yield* shell.which(command, { includeBunBin: true }))) {
+    return { usable: true, lines: [present2(`${command}: already installed`)] };
+  }
+  if (dryRun) {
+    return {
+      usable: true,
+      lines: [added(`${command}: would install with bun add -g ${packageName}`)]
+    };
+  }
+  const result = yield* shell.run("bun", ["--no-env-file", `--config=${EMPTY_BUNFIG}`, "add", "-g", packageName], { cwd: neutralDirectory(env) });
+  if (result.exitCode !== 0)
+    return { usable: false, lines: [failed2(`bun add -g ${packageName}`, result)] };
+  const lines = [added(`${command}: installed with bun add -g ${packageName}`)];
+  const onPath = yield* shell.which(command);
+  const anywhere = yield* shell.which(command, { includeBunBin: true });
+  if (isNone2(onPath) && isSome2(anywhere)) {
+    lines.push(hint(`${command}: ${anywhere.value} is not on PATH; add its directory to PATH`));
+  }
+  return { usable: true, lines };
+});
+var installCtx7 = fn2("installCtx7")(function* (env, dryRun) {
+  const shell = yield* Shell;
+  const files = userFiles(env);
+  const global = yield* ensureGlobal(env, "ctx7", "ctx7", dryRun);
+  if (!global.usable)
+    return global.lines;
+  const skillReady = (yield* fileExists2(join16(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join16(files.claudeDir, "rules", "context7.md")));
+  if (skillReady)
+    return [...global.lines, present2("ctx7 skill: already installed")];
+  const apiKey = env.CONTEXT7_API_KEY === "" ? undefined : env.CONTEXT7_API_KEY;
+  const setupArgs = ["setup", "--cli", "--claude", "--yes"];
+  const args = apiKey !== undefined ? [...setupArgs, "--api-key", apiKey] : (yield* fileExists2(files.ctx7Credentials)) ? setupArgs : undefined;
+  if (args === undefined) {
+    return [
+      ...global.lines,
+      skipped("ctx7 skill: no CONTEXT7_API_KEY and no saved login; run `ctx7 login` or export CONTEXT7_API_KEY, then re-run")
+    ];
+  }
+  if (dryRun) {
+    return [...global.lines, added("ctx7 skill: would install with ctx7 setup --cli --claude")];
+  }
+  const result = yield* shell.run("ctx7", args, { cwd: neutralDirectory(env) });
+  return [
+    ...global.lines,
+    result.exitCode === 0 ? added("ctx7 skill: installed with ctx7 setup --cli --claude") : failed2("ctx7 setup", result)
+  ];
+});
+var asStep = (label, step) => step.pipe(catchTag2("SetupFailure", (error) => succeed6([`! ${label}: ${error.message}`])));
+var setup = fn2("setup")(function* (env, options) {
+  const cloud = inCloudSession(env);
+  const lines = [
+    ...yield* asStep("billion-context", cleanupLeftovers(env, options.dryRun)),
+    ...options.skipCtx7 ? [skipped("ctx7: skipped by flag")] : cloud ? [skipped(`ctx7: ${CLOUD_SKIP}`)] : yield* asStep("ctx7", installCtx7(env, options.dryRun)),
+    ...yield* asStep("user settings", mergeUserSettings(env, options))
+  ];
+  return { lines, ok: !lines.some((line) => line.startsWith("! ")) };
+});
+
+var FIX = "run /holyagent:setup, or `holyagent doctor --fix`";
+var pass = (name, detail) => `ok   ${name}: ${detail}`;
+var fail6 = (name, detail) => `FAIL ${name}: ${detail}`;
+var warn = (name, detail) => `warn ${name}: ${detail}`;
+var checkBun = gen2(function* () {
+  const shell = yield* Shell;
+  const found = yield* shell.which("bun");
+  return isSome2(found) ? pass("bun", found.value) : fail6("bun", "not found on PATH; install Bun (https://bun.sh), which runs the plugin hooks");
+});
+var checkCommand = (env, command) => gen2(function* () {
+  if (inCloudSession(env))
+    return pass(command, "not installed in a claude.ai cloud session, by design");
+  const shell = yield* Shell;
+  const onPath = yield* shell.which(command);
+  if (isSome2(onPath))
+    return pass(command, onPath.value);
+  const anywhere = yield* shell.which(command, { includeBunBin: true });
+  return isSome2(anywhere) ? pass(command, `${anywhere.value} (not on PATH; add its directory to PATH)`) : fail6(command, `not found on PATH or in Bun's bin directory; ${FIX}`);
+});
+var checkSettings = (env) => missingSettingKeys(env).pipe(map4((missing) => missing.length === 0 ? pass("settings", userFiles(env).settings) : fail6("settings", `${userFiles(env).settings} lacks ${missing.join(", ")}; ${FIX}`)), catchTag2("SetupFailure", (error) => succeed6(fail6("settings", error.message))));
+var checkLeftovers = (env) => findLeftovers(userFiles(env)).pipe(map4((leftovers) => {
+  const notes = [
+    ...leftovers.found.length === 0 ? [] : [
+      `${leftovers.found.length} leftover(s) from an earlier setup: ${leftovers.found.join("; ")}; run /holyagent:setup`
+    ],
+    ...leftovers.unreadable.length === 0 ? [] : [`not checked, ${leftovers.unreadable.join("; ")}`]
+  ];
+  return notes.length === 0 ? pass("billion-context", "no leftovers from an earlier setup") : warn("billion-context", notes.join(" | "));
+}));
+var checks = (env) => all2([checkBun, checkCommand(env, "ctx7"), checkSettings(env), checkLeftovers(env)]);
+var doctor = fn2("doctor")(function* (env, options) {
+  const before = yield* checks(env);
+  const failing = (name) => before.some((line) => line.startsWith(`FAIL ${name}:`));
+  const fixes = options.fix && !inCloudSession(env) ? [...failing("ctx7") ? yield* asStep("ctx7", installCtx7(env, false)) : []] : [];
+  const settingsFixes = options.fix && failing("settings") ? yield* asStep("user settings", mergeUserSettings(env, { subagentCacheTtl: "1h", dryRun: false })) : [];
+  const ran = [...fixes, ...settingsFixes];
+  const lines = ran.length === 0 ? before : [...ran, ...yield* checks(env)];
+  return { lines, ok: lines.every((line) => !line.startsWith("FAIL ")) };
+});
+
+var CacheTtlFlag = Literals(CACHE_TTLS);
+var printed = (report) => new Verbatim(`${report.lines.join(`
+`)}
+`, "", report.ok ? 0 : 1);
+var SETUP_USAGE = "setup [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7]";
+var SETUP_COMMANDS = [
+  {
+    path: ["setup"],
+    usage: SETUP_USAGE,
+    summary: "Install and configure what HolyAgent needs beside the plugin, skipping every step already done",
+    output: "report lines: `+` added, `=` already in place, `-` skipped, `~` kept or needs you, `!` failed; exit 1 when any step failed",
+    notes: [
+      "installs ctx7 with the Context7 skill (needs CONTEXT7_API_KEY or a saved login)",
+      "removes what an earlier Billion Context setup left in your Claude Code files (the local proxy base URL and DISABLE_AUTO_COMPACT in settings.json, its hook, the bili MCP server, commands/acp-cache.md, and its plugin and marketplace), only entries that match what it wrote, and prints each entry it removes",
+      "merges these keys into the user settings (CLAUDE_CONFIG_DIR, else ~/.claude/settings.json) without changing any value already set: attribution, includeGitInstructions, subagentPromptCacheTtl, extraKnownMarketplaces, enabledPlugins and permissions.deny for WebSearch and WebFetch",
+      "a failed step is reported and the rest still run; in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) ctx7 is skipped and the settings are still merged"
+    ],
+    flags: {
+      "dry-run": "boolean",
+      "subagent-cache-ttl": "string",
+      "skip-ctx7": "boolean"
+    },
+    stateless: true,
+    positionals: 0,
+    run: ({ args, env }) => gen2(function* () {
+      const subagentCacheTtl = yield* choiceFlag(CacheTtlFlag, "subagent-cache-ttl", stringFlag(args, "subagent-cache-ttl") ?? "1h", SETUP_USAGE);
+      const report = yield* setup(env, {
+        subagentCacheTtl,
+        dryRun: booleanFlag(args, "dry-run"),
+        skipCtx7: booleanFlag(args, "skip-ctx7")
+      });
+      return printed(report);
+    }).pipe(provide3(Shell.live(env)))
+  },
+  {
+    path: ["doctor"],
+    usage: "doctor [--fix]",
+    summary: "Check bun, ctx7 and the user settings, and warn about Billion Context leftovers; exit 1 when a check fails",
+    output: "one line per check, `ok   <name>: \u2026` or `FAIL <name>: \u2026`; exit 1 when any check failed",
+    notes: [
+      "--fix runs the setup steps behind a failing check, prints their lines, then checks again; it never installs Bun"
+    ],
+    flags: { fix: "boolean" },
+    stateless: true,
+    positionals: 0,
+    run: ({ args, env }) => doctor(env, { fix: booleanFlag(args, "fix") }).pipe(map4(printed), provide3(Shell.live(env)))
+  }
+];
+
 var STATE_COMMANDS = [
   {
     path: ["state", "mode"],
@@ -19175,14 +20191,14 @@ var STATE_COMMANDS = [
   }
 ];
 
-import { join as join11 } from "path";
-var {$: $4 } = globalThis.Bun;
+import { join as join17 } from "path";
+var {$: $5 } = globalThis.Bun;
 var TARGETS = [
   { id: "darwin-arm64", platform: "darwin", arch: "arm64", suffix: "" },
   { id: "linux-x64", platform: "linux", arch: "x64", suffix: "" },
   { id: "windows-x64", platform: "win32", arch: "x64", suffix: ".exe" }
 ];
-var BUNDLED_TOOLS = join11(import.meta.dir, "vendor");
+var BUNDLED_TOOLS = join17(import.meta.dir, "vendor");
 
 class UnsupportedPlatform extends TaggedError2("UnsupportedPlatform") {
   get message() {
@@ -19199,13 +20215,13 @@ var selectTarget = (platform, arch) => {
   const target = TARGETS.find((candidate) => candidate.platform === platform && candidate.arch === arch);
   return target === undefined ? fail5(new UnsupportedPlatform({ platform, arch })) : succeed6(target);
 };
-var toolPath = (directory, tool, target) => join11(directory, target.id, `${tool}${target.suffix}`);
+var toolPath = (directory, tool, target) => join17(directory, target.id, `${tool}${target.suffix}`);
 var runTool = (options) => gen2(function* () {
   const path = toolPath(options.directory, options.tool, options.target);
   if (!(yield* promise2(() => Bun.file(path).exists())))
     return yield* new ToolMissing({ tool: options.tool, path });
   const env = Object.fromEntries(Object.entries(options.env).filter((entry) => entry[1] !== undefined));
-  const output = yield* promise2(() => $4`${path} ${options.args}`.cwd(options.cwd).env(env).nothrow());
+  const output = yield* promise2(() => $5`${path} ${options.args}`.cwd(options.cwd).env(env).nothrow());
   return output.exitCode;
 });
 var toolCommand = (tool, summary) => ({
@@ -19244,46 +20260,12 @@ var COMMANDS = [
   ...ASSIGNMENT_COMMANDS,
   ...OVERVIEW_COMMANDS,
   ...MIGRATE_COMMANDS,
+  ...SETUP_COMMANDS,
   ...STATE_COMMANDS,
   ...TOOL_COMMANDS,
   ...VCS_COMMANDS,
   ...HOOK_COMMANDS
 ];
-
-import { homedir } from "os";
-import { join as join12 } from "path";
-var TTL_VARIABLE = "HOLYAGENT_REUSE_TTL_MINUTES";
-var Minutes = NumberFromString.check(isFinite2(), isGreaterThanOrEqualTo2(0));
-var reuseTtl = (env) => {
-  const raw = env[TTL_VARIABLE];
-  return raw === undefined || raw.trim() === "" ? succeed6(DEFAULT_CONFIG.ttlMinutes) : decodeUnknownEffect2(Minutes)(raw.trim()).pipe(mapError2(() => new Usage({
-    message: `${TTL_VARIABLE} must be a number of minutes, not "${raw}"`,
-    hint: `Unset ${TTL_VARIABLE} for the default of ${DEFAULT_CONFIG.ttlMinutes}.`
-  })));
-};
-var WorkflowSettings = Struct({
-  disableWorkflows: optionalKey2(Boolean3),
-  enableWorkflows: optionalKey2(Boolean3)
-});
-var disablesWorkflows = (path) => readText(path).pipe(flatMap2((text) => text === undefined ? succeed6(false) : decodeUnknownEffect2(fromJsonString2(WorkflowSettings))(text).pipe(map4((settings) => settings.disableWorkflows === true || settings.enableWorkflows === false))), orElseSucceed2(() => false));
-var firstNonEmpty = (...values) => values.find((value) => value !== undefined && value !== "");
-var claudeConfigDirectory = (env, home = homedir) => {
-  const configured = env.CLAUDE_CONFIG_DIR;
-  if (configured !== undefined && configured !== "")
-    return configured;
-  return join12(firstNonEmpty(env.HOME, env.USERPROFILE) ?? home(), ".claude");
-};
-var workflowsAvailable = (env, root) => {
-  if (env.CLAUDE_CODE_DISABLE_WORKFLOWS === "1")
-    return succeed6(false);
-  const files = [
-    join12(claudeConfigDirectory(env), "settings.json"),
-    join12(root, ".claude", "settings.json"),
-    join12(root, ".claude", "settings.local.json")
-  ];
-  return forEach2(files, disablesWorkflows).pipe(map4((disabled) => !disabled.includes(true)));
-};
-var loadConfig = (env, root) => all2({ ttlMinutes: reuseTtl(env), workflowsAvailable: workflowsAvailable(env, root) }).pipe(map4((config) => config));
 
 var help = (command) => [
   `${command.usage}  ${command.summary}`,
@@ -19302,7 +20284,7 @@ var topHelp = () => [
 ].join(`
 `);
 var callFor = (args, host, emit, command) => gen2(function* () {
-  const { root, directory } = command.stateless === true ? { root: host.cwd, directory: join13(host.cwd, STATE_DIRECTORY) } : yield* resolveState(host.cwd, host.env, typeof command.state === "function" ? command.state(args) : command.state ?? "ifPresent");
+  const { root, directory } = command.stateless === true ? { root: host.cwd, directory: join18(host.cwd, STATE_DIRECTORY) } : yield* resolveState(host.cwd, host.env, typeof command.state === "function" ? command.state(args) : command.state ?? "ifPresent");
   const inline = stringFlag(args, INPUT_FLAG);
   return {
     args,
@@ -19368,13 +20350,13 @@ ${output.text}
 `;
   return { stdout, stderr: "", code: 0 };
 });
-var failed2 = (error) => {
+var failed3 = (error) => {
   const { tag, message, hint, code } = describeFailure(error);
   return { stdout: "", stderr: `error: ${tag}: ${message}
 hint: ${hint}
 `, code };
 };
-var run2 = (argv, host) => execute(argv, host).pipe(catch_2((error) => succeed6(failed2(error))), catchCause2((cause) => succeed6(failed2({ _tag: "Defect", message: pretty(cause) }))));
+var run2 = (argv, host) => execute(argv, host).pipe(catch_2((error) => succeed6(failed3(error))), catchCause2((cause) => succeed6(failed3({ _tag: "Defect", message: pretty(cause) }))));
 
 var stdin = suspend2(() => process.stdin.isTTY ? fail5(new StdinMissing({ reason: "stdin is a terminal" })) : tryPromise2({
   try: () => Bun.stdin.text(),

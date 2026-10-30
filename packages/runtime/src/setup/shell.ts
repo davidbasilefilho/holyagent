@@ -1,8 +1,9 @@
-import { homedir } from "node:os"
 import { delimiter, join } from "node:path"
 
 import { $ } from "bun"
-import { Config, Context, Effect, Layer, Option } from "effect"
+import { Context, Effect, Layer, Option } from "effect"
+
+import { type Env, homeDirectory } from "./environment.ts"
 
 /** The outcome of a finished command; a command that cannot start has exit code 127. */
 export interface ShellResult {
@@ -16,10 +17,7 @@ export interface ShellResult {
  * without regard to case, so `insensitive` finds it however it is spelled (an exact `PATH` wins);
  * elsewhere names are exact. A missing variable is `PATH`.
  */
-export const pathKey = (
-  env: Readonly<Record<string, string | undefined>>,
-  insensitive: boolean = process.platform === "win32",
-): string => {
+export const pathKey = (env: Env, insensitive: boolean = process.platform === "win32"): string => {
   if (!insensitive || env.PATH !== undefined) return "PATH"
   return Object.keys(env).find((name) => name.toUpperCase() === "PATH") ?? "PATH"
 }
@@ -31,7 +29,7 @@ export const pathKey = (
  * separator, and the entries are joined with its list delimiter (`;` on Windows).
  */
 export const pathWithBunBin = (
-  env: Readonly<Record<string, string | undefined>>,
+  env: Env,
   options: {
     readonly home: string
     readonly bunInstall?: string | undefined
@@ -45,16 +43,35 @@ export const pathWithBunBin = (
   return { key, value: `${env[key] ?? ""}${options.delimiter ?? delimiter}${bunBin}`, bunBin }
 }
 
-/** Options for {@link Shell}'s `run`. */
-export interface RunOptions {
-  /** Environment variables to remove for this command only. */
-  readonly unsetEnv?: ReadonlyArray<string>
-  /** The working directory for this command; the current one when unset. */
-  readonly cwd?: string
+/**
+ * Finds a command on the search path of an environment, plus Bun's global bin directory when
+ * `includeBunBin` is set. A lookup only: nothing is spawned.
+ */
+export const findCommand = (
+  env: Env,
+  command: string,
+  options?: { readonly includeBunBin?: boolean },
+): Option.Option<string> => {
+  const bunBin = pathWithBunBin(
+    { ...env },
+    { home: homeDirectory(env), bunInstall: env.BUN_INSTALL },
+  )
+  return Option.fromNullishOr(
+    Bun.which(command, {
+      PATH: options?.includeBunBin ? bunBin.value : (env[bunBin.key] ?? ""),
+    }),
+  )
 }
 
 /**
- * The external commands the CLI drives (`claude`, `bun`, `ctx7`). Commands see Bun's global bin
+ * The empty Bun config the plugin ships beside the CLI script (`scripts/empty-bunfig.toml`), found
+ * the way the bundled tools are: in the folder of the running bundle. `bun add -g` takes it as
+ * `--config`, so no bunfig.toml of a project can change an install.
+ */
+export const EMPTY_BUNFIG: string = join(import.meta.dir, "empty-bunfig.toml")
+
+/**
+ * The external commands setup drives (`bun`, `claude`, `ctx7`). Commands see Bun's global bin
  * directory on PATH, because a `bun add -g` in the same run puts new commands there.
  */
 export class Shell extends Context.Service<
@@ -65,66 +82,56 @@ export class Shell extends Context.Service<
       command: string,
       options?: { readonly includeBunBin?: boolean },
     ) => Effect.Effect<Option.Option<string>>
-    /** Runs a command to completion without a terminal; stdout and stderr are captured. */
+    /**
+     * Runs a command to completion without a terminal; stdout and stderr are captured. The command
+     * runs in `cwd`, which setup sets to a neutral directory because the process directory is the
+     * user's project, whose .npmrc, bunfig.toml and .env must not steer an install.
+     */
     readonly run: (
       command: string,
       args: ReadonlyArray<string>,
-      options?: RunOptions,
+      options: { readonly cwd: string },
     ) => Effect.Effect<ShellResult>
   }
 >()("holyagent/Shell") {
-  /** The real implementation, backed by the Bun Shell. */
-  static readonly layer = Layer.effect(
-    Shell,
-    Effect.gen(function* () {
-      // HOME, else USERPROFILE (Windows), else what the operating system says.
-      const home = yield* Config.option(Config.String("HOME"))
-      const profile = yield* Config.option(Config.String("USERPROFILE"))
-      const bunInstall = yield* Config.option(Config.String("BUN_INSTALL"))
-      // A plain copy, because Windows hands out `process.env` with case-insensitive names that a
-      // spread flattens to the real one (`Path`).
-      const bunBin = pathWithBunBin(
-        { ...process.env },
-        {
-          home: [home, profile].map(Option.getOrUndefined).find(Boolean) ?? homedir(),
-          bunInstall: Option.getOrUndefined(bunInstall),
-        },
-      )
-
-      return Shell.of({
-        which: (command, options) =>
-          Effect.sync(() =>
-            Option.fromNullishOr(
-              Bun.which(command, {
-                PATH: options?.includeBunBin ? bunBin.value : (process.env[bunBin.key] ?? ""),
-              }),
-            ),
-          ),
+  /** The real implementation, backed by the Bun Shell, for the environment of the process. */
+  static readonly live = (env: Env) => {
+    // A plain copy of the names and values, because Windows hands out `process.env` with
+    // case-insensitive names that a spread flattens to the real one (`Path`).
+    const bunBin = pathWithBunBin(
+      { ...env },
+      { home: homeDirectory(env), bunInstall: env.BUN_INSTALL },
+    )
+    return Layer.succeed(
+      Shell,
+      Shell.of({
+        which: (command, options) => Effect.sync(() => findCommand(env, command, options)),
         run: (command, args, options) =>
           Effect.tryPromise({
-            try: () => {
-              const env: Record<string, string | undefined> = {
-                ...process.env,
-                [bunBin.key]: bunBin.value,
-              }
-              for (const name of options?.unsetEnv ?? []) env[name] = undefined
-              const pending = $`${command} ${args}`.env(env)
-              return (options?.cwd === undefined ? pending : pending.cwd(options.cwd))
+            try: () =>
+              $`${command} ${args}`
+                .cwd(options.cwd)
+                .env(
+                  Object.fromEntries(
+                    Object.entries({ ...env, [bunBin.key]: bunBin.value }).filter(
+                      (entry): entry is [string, string] => entry[1] !== undefined,
+                    ),
+                  ),
+                )
                 .quiet()
                 .nothrow()
                 .then((result) => ({
                   exitCode: result.exitCode,
                   stdout: result.stdout.toString(),
                   stderr: result.stderr.toString(),
-                }))
-            },
+                })),
             catch: (error) => String(error),
           }).pipe(
             Effect.catch((message) =>
               Effect.succeed({ exitCode: 127, stdout: "", stderr: message }),
             ),
           ),
-      })
-    }),
-  )
+      }),
+    )
+  }
 }

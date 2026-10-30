@@ -1,12 +1,17 @@
-import { Effect, FileSystem, Option, Path } from "effect"
+import { rm } from "node:fs/promises"
+import { isAbsolute, join } from "node:path"
 
+import { Effect, Option } from "effect"
+
+import { type Env, homeDirectory, userFiles } from "./environment.ts"
 import {
+  fileOperation,
   isJsonObject,
   type JsonObject,
   readJsonObjectSnapshot,
   writeJsonObjectIfUnchanged,
-} from "../json-file.ts"
-import { Shell } from "../shell.ts"
+} from "./json-file.ts"
+import { Shell } from "./shell.ts"
 
 /** Where the current user's Claude Code files live, as far as the leftovers scan needs them. */
 export interface ClaudeFiles {
@@ -276,7 +281,7 @@ const none = { value: {} as JsonObject, text: undefined }
 const readOrReport = (file: string) =>
   readJsonObjectSnapshot(file).pipe(
     Effect.map((snapshot) => ({ ...snapshot, error: undefined as string | undefined })),
-    Effect.catchTag("CliFailure", (error) => Effect.succeed({ ...none, error: error.message })),
+    Effect.catchTag("SetupFailure", (error) => Effect.succeed({ ...none, error: error.message })),
   )
 
 const installLabel = (install: PluginInstall) =>
@@ -292,30 +297,25 @@ const installLabel = (install: PluginInstall) =>
  */
 export const findLeftovers = (files: ClaudeFiles) =>
   Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem
-    const path = yield* Path.Path
-    const settingsFile = path.join(files.claudeDir, "settings.json")
+    const settingsFile = join(files.claudeDir, "settings.json")
     const settings = yield* readOrReport(settingsFile)
     const config = yield* readOrReport(files.claudeJson)
-    const plugins = yield* readOrReport(
-      path.join(files.claudeDir, "plugins", "installed_plugins.json"),
-    )
-    const markets = yield* readOrReport(
-      path.join(files.claudeDir, "plugins", "known_marketplaces.json"),
-    )
-    const backup = yield* readOrReport(path.join(files.claudeDir, SETTINGS_BACKUP))
-    const commandFile = path.join(files.claudeDir, "commands", "acp-cache.md")
+    const plugins = yield* readOrReport(join(files.claudeDir, "plugins", "installed_plugins.json"))
+    const markets = yield* readOrReport(join(files.claudeDir, "plugins", "known_marketplaces.json"))
+    const backup = yield* readOrReport(join(files.claudeDir, SETTINGS_BACKUP))
+    const commandFile = join(files.claudeDir, "commands", "acp-cache.md")
     // The file is Billion Context's only when its text is the one it writes; a missing or
     // unreadable file is not.
-    const commandText = yield* fs.readFileString(commandFile).pipe(
+    const commandText = yield* Effect.tryPromise({
+      try: () => Bun.file(commandFile).text(),
+      catch: (cause) => cause as NodeJS.ErrnoException,
+    }).pipe(
       Effect.map((text) => ({ text, error: undefined as string | undefined })),
       Effect.catch((error) =>
         Effect.succeed({
           text: undefined,
           error:
-            error.reason._tag === "NotFound"
-              ? undefined
-              : `cannot read ${commandFile}: ${error.message}`,
+            error.code === "ENOENT" ? undefined : `cannot read ${commandFile}: ${error.message}`,
         }),
       ),
     )
@@ -387,10 +387,11 @@ const applyPlan = (
   Effect.gen(function* () {
     for (let attempt = 1; attempt <= WRITE_ATTEMPTS; attempt += 1) {
       const { file, plan, text } = pick(attempt === 1 ? first : yield* findLeftovers(files))
-      if (text === undefined && attempt > 1) {
-        // The file read fine at first; now it is gone or is not valid JSON (it may be mid-write).
+      if (attempt > 1 && (text === undefined || text.trim() === "")) {
+        // The file read fine at first; now it is gone, blank or not valid JSON (it may be
+        // mid-write). A blank file reads as an empty object, so its text is checked too.
         return [
-          `~ billion-context: ${file} changed while it was cleaned and cannot be read now, so it was left as it is; run holyagent setup claude again`,
+          `~ billion-context: ${file} changed while it was cleaned and cannot be read now, so it was left as it is; run holyagent setup again`,
         ]
       }
       if (plan.removed.length === 0 || text === undefined) return []
@@ -402,10 +403,10 @@ const applyPlan = (
       }
     }
     return [
-      `~ billion-context: ${pick(first).file} kept changing while it was cleaned and was left as it is; run holyagent setup claude again`,
+      `~ billion-context: ${pick(first).file} kept changing while it was cleaned and was left as it is; run holyagent setup again`,
     ]
   }).pipe(
-    Effect.catchTag("CliFailure", (error) =>
+    Effect.catchTag("SetupFailure", (error) =>
       Effect.succeed([`! billion-context: ${error.message}`]),
     ),
   )
@@ -431,23 +432,48 @@ const refused: DirectoryOwnership = { _tag: "Refused" }
  */
 const ownedDirectory = (directory: string) =>
   Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem
-    const path = yield* Path.Path
-    if (!path.isAbsolute(directory)) return refused
-    const info = yield* fs.stat(directory)
-    if (info.type !== "Directory") return refused
+    if (!isAbsolute(directory)) return refused
+    const info = yield* Effect.tryPromise({
+      try: () => Bun.file(directory).stat(),
+      catch: (cause) => cause as NodeJS.ErrnoException,
+    })
+    if (!info.isDirectory()) return refused
     const user = process.getuid?.()
     if (user === undefined) return unchecked
-    return Option.isSome(info.uid) && info.uid.value === user ? owned : refused
+    return info.uid === user ? owned : refused
   }).pipe(
     Effect.catch((error) =>
       Effect.succeed(
-        error.reason._tag === "NotFound"
+        error.code === "ENOENT"
           ? refused
           : ({ _tag: "Failed", message: error.message } satisfies DirectoryOwnership),
       ),
     ),
   )
+
+/**
+ * Whether `/holyagent:setup` can remove at least one of the leftovers. A project or local install
+ * whose folder is gone, not yours, unreadable or not recorded only gets a "run it there" line from
+ * {@link cleanupLeftovers}, so it does not count: a notice that cannot be cleared would repeat at
+ * every session start.
+ */
+export const hasRemovableLeftovers = (leftovers: Leftovers) =>
+  Effect.gen(function* () {
+    if (
+      leftovers.settings.removed.length > 0 ||
+      leftovers.claudeJson.removed.length > 0 ||
+      leftovers.command !== undefined ||
+      leftovers.marketplaceRegistered
+    )
+      return true
+    for (const install of leftovers.pluginInstalls) {
+      if (install.scope === "user") return true
+      if (install.projectPath === undefined) continue
+      const owner = yield* ownedDirectory(install.projectPath)
+      if (owner._tag === "Owned" || owner._tag === "Unchecked") return true
+    }
+    return false
+  })
 
 /**
  * Removes what an earlier Billion Context setup left in the Claude Code files: the proxy base URLs
@@ -456,11 +482,13 @@ const ownedDirectory = (directory: string) =>
  * keeps every other setting. On a dry run it removes nothing and the lines say what would go.
  */
 export const cleanupLeftovers = Effect.fn("cleanupLeftovers")(function* (
-  files: ClaudeFiles,
+  env: Env,
   dryRun: boolean,
 ) {
-  const fs = yield* FileSystem.FileSystem
   const shell = yield* Shell
+  const files = userFiles(env)
+  // `claude` runs in the home directory, not in the user's project, whose settings it would read.
+  const neutral = homeDirectory(env)
   const leftovers = yield* findLeftovers(files)
   const verb = dryRun ? "would remove" : "removed"
   const lines: Array<string> = leftovers.unreadable.map(
@@ -489,10 +517,10 @@ export const cleanupLeftovers = Effect.fn("cleanupLeftovers")(function* (
     if (dryRun) lines.push(`+ billion-context: ${verb} ${file}`)
     else {
       lines.push(
-        yield* fs.remove(file).pipe(
+        yield* fileOperation(file, "remove", () => rm(file)).pipe(
           Effect.as(`+ billion-context: ${verb} ${file}`),
-          Effect.catch((error) =>
-            Effect.succeed(`! billion-context: cannot remove ${file}: ${error.message}`),
+          Effect.catchTag("SetupFailure", (error) =>
+            Effect.succeed(`! billion-context: ${error.message}`),
           ),
         ),
       )
@@ -567,11 +595,7 @@ export const cleanupLeftovers = Effect.fn("cleanupLeftovers")(function* (
           `+ billion-context: ${verb} ${removal.what} with ${command}${where}${removal.note ?? ""}`,
         )
       } else {
-        const result = yield* shell.run(
-          "claude",
-          removal.args,
-          removal.cwd === undefined ? undefined : { cwd: removal.cwd },
-        )
+        const result = yield* shell.run("claude", removal.args, { cwd: removal.cwd ?? neutral })
         const detail = (result.stderr || result.stdout).trim().split("\n")[0] ?? ""
         lines.push(
           result.exitCode === 0

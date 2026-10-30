@@ -93,7 +93,6 @@ export const bumpVersion = (version: Version, kind: BumpKind): Version => {
  */
 export const VERSION_FILES: ReadonlyArray<string> = [
   "package.json",
-  "packages/cli/package.json",
   "packages/runtime/package.json",
   "packages/integrations/claude/package.json",
 ]
