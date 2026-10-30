@@ -1,0 +1,48 @@
+{
+  "id": "assignment-0mvv1ph08-oh0v",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 4,
+  "roleTask": "Worker.operations",
+  "slug": "install-mise-locally-inside-the",
+  "objective": "Install mise locally inside the repository checkout, as the maintainer asked, so git hooks and mise gates can run, without global installs or tracked-file changes.",
+  "state": "Running",
+  "scope": [
+    "The maintainer asked to install mise in the repository rather than globally. Use the platform package that ships the binary with no install script: first inspect it with `npm view @jdxcode/mise-linux-x64 version bin scripts` (confirm there is no preinstall/postinstall). Then in /home/user/holyagent run `bun add --no-save @jdxcode/mise-linux-x64@2026.10.24` (no --trust, no scripts) so it lands in the ignored node_modules and package.json and bun.lock stay unchanged; confirm with `git status --short` (must be empty).",
+    "Locate the binary (e.g. node_modules/@jdxcode/mise-linux-x64/bin/mise), run `<path> --version`.",
+    "Then, with that directory prepended to PATH (`export PATH=<dir>:$PATH` only for your commands), in /home/user/holyagent run `mise trust`, `mise install` (its postinstall upgrades Bun to canary), `mise exec -- bun --version` (canary), `mise run toolchain`, `mise run verify` with counts. Report the exact directory to put on PATH so git hooks find mise.",
+    "If the permission policy denies any step, stop and report the exact denial; do not try another route."
+  ],
+  "constraints": [
+    "User: install mise in the repository, not globally.",
+    "No tracked file changes (package.json, bun.lock must stay as they are); no git writes; no edits under .git/ or .holyagent/; do not touch the other worktrees.",
+    "Stop and report when done or on a denial."
+  ],
+  "criteria": [
+    {
+      "text": "The mise binary runs from the repository's node_modules with no tracked file changed",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run toolchain passes with a canary Bun and mise run verify ran with counts reported",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "mise-path",
+    "gate-command"
+  ],
+  "ownershipPaths": [
+    "node_modules"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-30T14:06:22.040Z"
+  },
+  "createdAt": "2026-10-30T14:06:22.040Z"
+}
