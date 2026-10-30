@@ -1,0 +1,46 @@
+{
+  "id": "assignment-0mvv10jd6-8ihe",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 4,
+  "roleTask": "Worker.mechanical",
+  "slug": "apply-the-final-documentation-fixes-in",
+  "objective": "Apply the final documentation fixes in /home/user/holyagent-docs.",
+  "state": "Ready",
+  "scope": [
+    "Review: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/fin-docs.txt.",
+    "docs/usage.md line 134: delete ', plus `license` for the vendored one' so the sentence reads 'HolyAgent's skills use `name` and `description`.' In the same paragraph, where it says the maintainer tested it and it does not work, add what was observed in a few words only if the paragraph already implies it; otherwise leave it.",
+    "docs/requirements.md line 10: the mise 'Needed for' cell becomes 'Developing this repository; `--dev` installers or Bun' only if that fits the column; else 'Developing this repository; installers with --dev' (the original) and rely on docs/development.md for the Bun route. Keep the table aligned (run fmt).",
+    "docs/hooks.md line 108: replace 'as in [the README table](README.md)' with 'as in [requirements.md](requirements.md#native-windows)'.",
+    "README.md line 18: change '(T3 Code, the desktop app, claude.ai)' to '(T3 Code, claude.ai)' since the table has no desktop-app row.",
+    "Then run /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/canary/x/bun-linux-x64/bun fmt --no-script on the changed Markdown files and /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/canary/x/bun-linux-x64/bun fmt --no-script --check on them; write the diff of these edits (before/after) to /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/docs-final-polish.diff."
+  ],
+  "constraints": [
+    "Change nothing else. Edit only README.md, docs/usage.md, docs/requirements.md, docs/hooks.md in /home/user/holyagent-docs. No git writes; no edits under .git/ or .holyagent/.",
+    "Stop and report when done."
+  ],
+  "criteria": [
+    {
+      "text": "The four edits are applied and nothing else changes",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "fmt check passes",
+      "blocking": true,
+      "dimension": "style"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "README.md",
+    "docs/usage.md",
+    "docs/requirements.md",
+    "docs/hooks.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-10-30T13:46:58.698Z"
+}
