@@ -7,7 +7,10 @@ commit-msg:
         bun --no-env-file --config=packages/integrations/claude/dist/scripts/empty-bunfig.toml
         packages/integrations/claude/dist/scripts/holyagent.js hook commit-msg {1}
 
-# Hooks run the same mise tasks as CI; arguments after `--` go to the underlying Bun command.
+# Hooks run the same mise tasks as CI, through the repository's own mise (`mise`, a dev dependency
+# that `bunx` finds in node_modules/.bin, so no mise on PATH is needed); `--no-install` makes a
+# missing local binary fail instead of fetching the package from the registry. Arguments after `--`
+# go to the underlying Bun command.
 # `--staged` limits lint and fmt to the staged files, and Bun leaves a partly staged file unwritten
 # rather than committing its unstaged changes. `stage_fixed` re-stages what lint fixed, since the
 # `bun lint` docs do not say `--staged --fix` stages again (`bun fmt --staged` does). `piped` stops at
@@ -16,15 +19,15 @@ pre-commit:
   piped: true
   jobs:
     - name: lint
-      run: mise run lint:fix -- --staged
+      run: bunx --no-install mise run lint:fix -- --staged
       stage_fixed: true
     - name: fmt
-      run: mise run fmt -- --staged
+      run: bunx --no-install mise run fmt -- --staged
       stage_fixed: true
     # Stages exactly the paths build.ts generates (its GENERATED_PATHS), deletions included, so a
     # commit always carries a plugin in step with its sources.
     - name: build
       run: >-
-        mise run build && git add -A --
+        bunx --no-install mise run build && git add -A --
         .claude-plugin/marketplace.json
         packages/integrations/claude/dist
