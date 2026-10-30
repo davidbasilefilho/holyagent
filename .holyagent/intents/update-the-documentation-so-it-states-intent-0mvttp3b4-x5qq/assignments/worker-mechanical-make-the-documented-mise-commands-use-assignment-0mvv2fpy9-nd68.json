@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mvv2fpy9-nd68",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 5,
+  "roleTask": "Worker.mechanical",
+  "slug": "make-the-documented-mise-commands-use",
+  "objective": "Make the documented mise commands use bunx --no-install, in /home/user/holyagent-docs.",
+  "state": "Running",
+  "scope": [
+    "In README.md (~lines 35-37) and docs/development.md (~lines 37-38, and any other plain 'bunx mise' command line), change 'bunx mise' to 'bunx --no-install mise'. In docs/development.md line ~33, make the sentence about --no-install say a missing local mise is never fetched from the registry (Bun uses a mise on PATH if there is one, else the command fails).",
+    "Run 'bunx --no-install mise run fmt:check' in that worktree (or the canary fmt check), and write the before/after diff to /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/nofetch.diff."
+  ],
+  "constraints": [
+    "Change nothing else. Edit only README.md and docs/development.md in /home/user/holyagent-docs. No git writes; no edits under .git/ or .holyagent/. Stop and report when done."
+  ],
+  "criteria": [
+    {
+      "text": "Every documented bunx mise command uses --no-install, the sentence is precise, and the format check passes",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "README.md",
+    "docs/development.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-30T14:26:46.689Z"
+  },
+  "createdAt": "2026-10-30T14:26:46.689Z"
+}
