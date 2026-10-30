@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mvv058da-cxwb",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 4,
+  "roleTask": "Worker.operations",
+  "slug": "install-mise-through-bun-as-the",
+  "objective": "Install mise through Bun, as the maintainer asked, so the repository's git hooks and mise gates run in this container.",
+  "state": "Running",
+  "scope": [
+    "The maintainer asked to install mise via Bun. First confirm the npm package that ships the mise binary (expected `@jdxcode/mise`; check with `bun pm view @jdxcode/mise` or `npm view @jdxcode/mise name version bin` and report its version and bin entry). Then run `bun add -g @jdxcode/mise` (or the confirmed name).",
+    "Confirm `mise --version` works and that `sh -c 'command -v mise'` finds it from /home/user/holyagent (git hooks run through sh). If Bun's global bin directory is not on that PATH, report the directory (`bun pm bin -g`) and do not edit shell profiles.",
+    "In /home/user/holyagent run `mise trust`, `mise install` (its postinstall upgrades Bun to canary), `mise exec -- bun --version` (must be canary), `mise run toolchain`, then `mise run verify` on main (7d8c8bc) as the baseline with counts.",
+    "If the permission policy denies a step, stop and report the exact denial."
+  ],
+  "constraints": [
+    "No tracked repository file edits; no git writes; no edits under .git/ or .holyagent/; do not touch the other worktrees.",
+    "Stop and report when done."
+  ],
+  "criteria": [
+    {
+      "text": "mise is installed through Bun and `sh -c 'command -v mise'` finds it from /home/user/holyagent",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run toolchain passes with a canary Bun and mise run verify ran with counts reported",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "package",
+    "gate-command"
+  ],
+  "ownershipPaths": [
+    "node_modules"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-30T13:22:38.111Z"
+  },
+  "createdAt": "2026-10-30T13:22:38.111Z"
+}
