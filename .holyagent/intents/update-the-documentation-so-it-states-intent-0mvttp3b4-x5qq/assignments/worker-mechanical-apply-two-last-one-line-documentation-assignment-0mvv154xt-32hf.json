@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mvv154xt-32hf",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 4,
+  "roleTask": "Worker.mechanical",
+  "slug": "apply-two-last-one-line-documentation",
+  "objective": "Apply two last one-line documentation fixes in two worktrees.",
+  "state": "Running",
+  "scope": [
+    "In /home/user/holyagent-docs/docs/requirements.md line 10, change the mise 'Needed for' cell text 'Developing this repository; `--dev` installers or Bun' to 'Developing this repository; `--dev` installers' (mise is not needed for Bun; the Bun route to mise is in docs/development.md). Run /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/canary/x/bun-linux-x64/bun fmt --no-script docs/requirements.md then --check in that worktree.",
+    "In /home/user/holyagent-plugin-only-install/docs/hooks.md line 26, make the sentence that bounds the session-start check's work also name the stat of each recorded project or local install folder; edit only that sentence. Run /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/canary/x/bun-linux-x64/bun fmt --no-script --check docs/hooks.md there, then 'git add docs/hooks.md' in that worktree.",
+    "Write both before/after diffs to /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/last.diff."
+  ],
+  "constraints": [
+    "Change nothing else. The only git write allowed is 'git add docs/hooks.md' in /home/user/holyagent-plugin-only-install. No edits under .git/ or .holyagent/. Stop and report when done."
+  ],
+  "criteria": [
+    {
+      "text": "Both edits are applied, fmt checks pass, and nothing else changes",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "docs/requirements.md",
+    "docs/hooks.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-30T13:50:33.282Z"
+  },
+  "createdAt": "2026-10-30T13:50:33.282Z"
+}
