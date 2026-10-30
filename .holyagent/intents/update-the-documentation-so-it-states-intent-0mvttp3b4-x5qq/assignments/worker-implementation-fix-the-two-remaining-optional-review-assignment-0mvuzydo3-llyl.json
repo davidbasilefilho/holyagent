@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "fix-the-two-remaining-optional-review",
   "objective": "Fix the two remaining optional review findings of PR 37's merge resolution in /home/user/holyagent-plugin-only-install.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Review report: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-rev37.txt, findings 4 and 5. The worktree holds the resolved, staged, uncommitted merge.",
     "Finding 4: packages/runtime/src/setup/json-file.ts writes the temp file with Bun.write, which overwrites a stale temp file and applies the mode afterwards with chmod; main's CLI created it exclusively (flag 'wx') with the mode at creation. Restore exclusive creation with the mode at creation (node:fs with flag 'wx' and mode, inside Effect, tagged errors), so an existing temp file is never followed or overwritten and the file is never briefly readable with default permissions. Add a test that fails without the fix. Covers writeJsonObjectIfUnchanged too.",
@@ -49,5 +49,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-30T13:17:27.080Z"
+  },
   "createdAt": "2026-10-30T13:17:18.388Z"
 }
