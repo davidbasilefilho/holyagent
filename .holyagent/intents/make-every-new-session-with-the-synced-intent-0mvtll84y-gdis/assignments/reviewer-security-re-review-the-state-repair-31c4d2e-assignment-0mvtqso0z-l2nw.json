@@ -1,0 +1,57 @@
+{
+  "id": "assignment-0mvtqso0z-l2nw",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.security",
+  "slug": "re-review-the-state-repair-31c4d2e",
+  "objective": "Re-review the state repair 31c4d2e against the previous security review's findings.",
+  "state": "Succeeded",
+  "scope": [
+    "Worktree /home/user/holyagent-state-edges. Repair diff: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/rr-B.diff. Previous review: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-hgmv.txt; writer report: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-o3r1.txt."
+  ],
+  "constraints": [
+    "Read-only: write no files and make no version-control writes.",
+    "Judge only the repair diff against the previous findings."
+  ],
+  "criteria": [
+    {
+      "text": "Each previous security finding is stated closed or open with file:line, and any new finding traces source to sink with a fix, or its absence is stated",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources-read"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvtqdcfu-o3r1"
+  ],
+  "followUpOf": "assignment-0mvtq11a4-hgmv",
+  "specialist": {
+    "agentId": "workflow:wf_0f931165-1c5/assignment-0mvtqso0z-l2nw",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T16:13:09.155Z",
+    "finishedAt": "2026-10-29T16:22:01.548Z"
+  },
+  "result": "result: The repair closes all previous security findings. I found no blocker and no validated vulnerability. I have one low-severity new suspicion and two minor residual gaps, all non-blocking.\n\n**Built-in coverage:** `/security-review` failed to start again. Its `git log origin/HEAD...` step errors with \"unknown revision\" because this clone has no `origin/HEAD`. I reviewed `rr-B.diff` and the live files in `/home/user/holyagent-state-edges`. I have no shell, so I ran no tests or git commands. I did not confirm the live files equal `31c4d2e`, and I did not read the minified `dist/scripts/holyagent.js`.\n\n**Previous findings**\n\n| # | Finding | Status | Where |\n|---|---|---|---|\n| S | Case folding depended on `core.ignorecase` | Closed | `commit.ts:130` and `commit.ts:191` |\n| 1 | `trim()` on exclude lines hid a leading-space pattern | Closed | `tree.ts:130-131` |\n| 2 | Temp file left after a failed write | Closed | `tree.ts:193`, `files.ts:62-67` |\n| 3 | Short exclude-lock wait | Closed | `tree.ts:195` |\n| 4 | Hand-set `local` removed the user's own line | Closed | `tree.ts:228-229` |\n| 5 | NTFS short name `HOLYAG~1` | Closed for the common form, with a low residual | `commit.ts:89`, `commit.ts:123` |\n\n- **S (case folding):** `commit.ts:130` calls `inStateFolder(clean, ignoreCase || mode !== \"work\")`, so `branch` and `local` refuse the state folder in any letter case. `requireNoStagedState` at `commit.ts:191` always folds. The `work` mode still canonicalizes only when `ignoreCase` is set, and state is meant to be staged there.\n- **1 (exclude line match):** Only the end of a line is trimmed. A line with a leading space is now a different pattern, so `withEntry` adds the real entry.\n- **2 (temp file):** `commitFile` chains the write and the rename, with one `tapError` cleanup, so a failure in either removes the temp file. `Bun.write` creates the parent directory, so dropping the explicit `mkdir` loses nothing.\n- **3 (lock wait):** The lock is now taken with `\"long\"`. I saw no lock cycle: `worktree.lock` is still taken before `exclude.lock`.\n- **4 (user's line):** `unexcludeState` removes only the marked pair or a stray mark. The `holyagent.stateExcludeKept` key and the legacy deletion rule are gone, and I found no other references outside `dist/`.\n- **5 (short name):** `isShortStateName` refuses `holyag~N` as the first path segment in every mode, in any case. `pathProblem` already rejects `:`, trailing dot or space, `\\`, `.` and `..` segments, so alternate-stream and trailing-dot spellings were already blocked.\n\n**New suspicion (low, not validated): exclude matching is looser than git's**\n- **Source:** the user's own `.git/info/exclude`. A repository clone cannot supply it.\n- **Sink:** `hasEntry` (`tree.ts:134`) and `withEntry` (`tree.ts:142`), then `git status` and `git add` in `local` mode.\n- **Path:** `trimEnd()` at `tree.ts:130-131` strips tabs and Unicode whitespace as well as spaces. Git strips one trailing CR and trailing ASCII spaces only. A line such as `/.holyagent/<TAB>` counts as the entry, so none is added, yet git treats it as a different pattern that hides nothing.\n- **Impact:** state files show as untracked in `local` mode. `vcs commit` still refuses state paths there, and no scope can be the project root. The exposure is a manual `git add .` by the user, from a file the user wrote.\n- **Fix:** `line.replace(/\\r$/, \"\").replace(/ +$/, \"\")`.\n\n**Residuals (low or informational)**\n- **Hashed short names:** Windows switches to hashed short names such as `HOA3F2~1` after several name collisions. The regex does not match these. The path must come from an agent, there must be many collisions, and the host must be Windows. The previous review already rated this very low.\n- **Leftover entry in `work` mode:** an unmarked line left by the earlier unreleased build now stays after leaving `local`. In `work` mode it hides state from `git status`, so state is silently not staged. It fails closed on confidentiality and is a functional gap only. The writer already flagged this.\n\n**Checked and sound**\n- **Mode restore (`tree.ts:951-972`):**\n  - It runs under `worktree.lock`.\n  - It restores `previous` if the key was set locally, and unsets the key otherwise.\n  - It runs only when removing the entry fails after the mode write.\n  - Entering `local` and failing at the mode write still removes the entry we added, and only when `previous !== \"local\"`, so a user's own line is untouched.\n- **Staged-file checks (`inScope`):** git pathspecs also honour `core.ignorecase`, so folding in `inScope` matches git's behavior. It only widens the check when `core.ignorecase` is true, and the staged files are the user's own.\n- **Message change:** the `requireNoStagedState` wording change has no behavioral effect.\n- **Dependencies and network:** no new dependency, no network or outbound call, no secret handling.\n\n**Not run:** tests and `mise run verify`. The writer's reported figures are 911 pass, 1 skip, 0 fail, and I did not reproduce them.\n\nblockers: none\nquestions: none\n\nnotes:\n- Optional hardening: the CR-and-spaces-only trim above. It would need a test with a tab-suffixed entry.\n- The root decides whether the unmarked-line departure (the earlier build's line now stays) is acceptable.\n\nevidence:\nEach previous security finding is stated closed or open with file:line, and any new finding traces source to sink with a fix, or its absence is stated: All six previous findings are closed. The case-folding suspicion is closed at `commit.ts:130` and `commit.ts:191`. Findings 1 to 5 are closed at `tree.ts:130-131`, `tree.ts:193` with `files.ts:62-67`, `tree.ts:195`, `tree.ts:228-229`, and `commit.ts:89` with `commit.ts:123`. One new low suspicion is traced from the user's exclude file to `hasEntry` and `withEntry` (`tree.ts:130-142`), with a fix. The hashed short-name residual and the work-mode leftover entry are stated above.\nsources-read: `/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/rr-B.diff` (whole), `/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-hgmv.txt` (whole), `/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-o3r1.txt` (whole). Live in `/home/user/holyagent-state-edges/packages/runtime/src`: `state/tree.ts` (lines 110-239 and 915-977), `vcs/commit.ts` (lines 28-243), `state/files.ts` (`commitFile`, lines 62-68), `domain/paths.ts` (whole), plus a grep for `stateExcludeKept` outside `dist/` (no matches). The built-in `/security-review` could not run (no `origin/HEAD`).",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "Previous findings stated closed or open; no new blocker",
+    "criteria": [
+      {
+        "criterion": "Each previous security finding is stated closed or open with file:line, and any new finding traces source to sink with a fix, or its absence is stated",
+        "support": "All six previous findings are closed. The case-folding suspicion is closed at `commit.ts:130` and `commit.ts:191`. Findings 1 to 5 are closed at `tree.ts:130-131`, `tree.ts:193` with `files.ts:62-67`, `tree.ts:195`, `tree.ts:228-229`, and `commit.ts:89` with `commit.ts:123`. One new low suspicion is traced from the user's exclude file to `hasEntry` and `withEntry` (`tree.ts:130-142`), with a fix. The hashed short-name residual and the work-mode leftover entry are stated above."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "sources-read",
+        "support": "`/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/rr-B.diff` (whole), `/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-hgmv.txt` (whole), `/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-o3r1.txt` (whole). Live in `/home/user/holyagent-state-edges/packages/runtime/src`: `state/tree.ts` (lines 110-239 and 915-977), `vcs/commit.ts` (lines 28-243), `state/files.ts` (`commitFile`, lines 62-68), `domain/paths.ts` (whole), plus a grep for `stateExcludeKept` outside `dist/` (no matches). The built-in `/security-review` could not run (no `origin/HEAD`)."
+      }
+    ]
+  },
+  "createdAt": "2026-10-29T16:13:09.155Z"
+}

@@ -1,0 +1,61 @@
+{
+  "id": "assignment-0mvtlrfnt-fomd",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "make-every-main-thread-that-loads-the",
+  "objective": "Make every main thread that loads the holyagent plugin receive the root rules even when the SessionStart hook output arrives late or never, so the holyagent way is the default with no user nudge.",
+  "state": "Succeeded",
+  "scope": [
+    "Worktree /home/user/holyagent-root (branch ccr-046ad103-6qsvgx-mandatory-root, from origin/main 7929f2d).",
+    "Evidence from session_012tBKnb2s5Pj2Z6LXoSmUTW (claude.ai web, default cloud environment, no repository): the main thread ran as the default agent for its first 13 actions; holyagent 0.1.2-3 loaded and its CLI worked; no SessionStart hook output is in the feed; the init event shows hooks_init_ms 47165 and new_plugin_hooks_join_ms 81167, so the synced plugin's hooks joined after the first prompt (13:42:51) and the plugin settings.json agent key did not make the main thread the root. Audit: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-assignment-0mvtll8wn-y0nb.txt.",
+    "Design: deliver the root core rules (the same text session-start injects: ROOT_CORE plus the takeover line and the absolute CLI form) on the first main-thread hook event of a session that has not received them yet: SessionStart, UserPromptSubmit and PreToolUse (any tool, main thread only: skip when the payload carries an agent_id/agent_type of a subagent or when agent_type is holyagent). Record per session_id that the rules were delivered, in a small marker outside the repository (for example under ${CLAUDE_PLUGIN_DATA} or os.tmpdir()/holyagent-sessions/<session_id>), so each session gets them once; also re-deliver after compaction (SessionStart source compact) as today. UserPromptSubmit and PreToolUse return the text as hookSpecificOutput.additionalContext. Add a UserPromptSubmit hook to hooks.json in packages/integrations/claude/src/generate.ts and extend the existing PreToolUse entry (or add a catch-all one) without changing what the existing PreToolUse hooks already do.",
+    "Make failures visible to the model where possible: if session-start fails, emit a short context line saying the holyagent rules could not load and where to read them, instead of exiting with nothing.",
+    "Tests: a session whose first hook is UserPromptSubmit gets the rules once; a later PreToolUse in the same session gets nothing extra; a subagent PreToolUse gets nothing; SessionStart then UserPromptSubmit delivers once; compaction re-delivers. Update docs/hooks.md."
+  ],
+  "constraints": [
+    "Follow /home/user/holyagent/.claude/CLAUDE.md (Effect with tagged errors, no try/catch/new Promise/async in runtime source, Schema at boundaries, Bun APIs, JSDoc).",
+    "Work only in that worktree; run bun install --frozen-lockfile there if node_modules is missing; make no version-control writes and no edits under .git/ or .holyagent/. Finish with mise run build and mise run verify.",
+    "Keep the root-core size budget test passing. Keep working until done; when done and checked, stop and report; no unrequested changes."
+  ],
+  "criteria": [
+    {
+      "text": "A main thread whose SessionStart output never arrives still gets the root rules on its first UserPromptSubmit or PreToolUse, exactly once per session, proven by tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Subagents and a main thread already running as holyagent get no extra text, and existing hook behavior and tests are unchanged",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "mise run build leaves no diff after the change and mise run verify passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli",
+    "packages/runtime/src/state",
+    "packages/runtime/tests",
+    "packages/integrations/claude",
+    "docs"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "workflow:wf_58048ce1-8f7/assignment-0mvtlrfnt-fomd",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T13:52:13.577Z",
+    "finishedAt": "2026-10-29T14:00:01.345Z"
+  },
+  "result": "result: main threads that load the plugin now get the root rules on their first UserPromptSubmit or PreToolUse, once per session, even when the SessionStart output never arrives.\n\nchanged:\n- /home/user/holyagent-root/packages/runtime/src/cli/hook.ts\n- /home/user/holyagent-root/packages/runtime/src/state/delivery.ts (new)\n- /home/user/holyagent-root/packages/integrations/claude/src/generate.ts\n- /home/user/holyagent-root/packages/integrations/claude/dist/hooks/hooks.json (rebuilt)\n- /home/user/holyagent-root/packages/integrations/claude/dist/scripts/holyagent.js (rebuilt)\n- /home/user/holyagent-root/packages/integrations/claude/tests/hooks.test.ts\n- /home/user/holyagent-root/packages/integrations/claude/tests/plugin.test.ts\n- /home/user/holyagent-root/docs/hooks.md\n\nchecks:\n- `mise run build` -> exit 0, 29 files built. A second run left the `dist` diff identical (same md5).\n- `mise run verify` -> exit 0: 860 pass, 1 skip, 0 fail. Type-check found no errors, lint found no problems, the format check passed, and the root-core size-budget test still passes.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- **Design choices.**\n  - The new `root-rules` hook is wired to UserPromptSubmit and to PreToolUse with no matcher. The PreToolUse entry is appended after the existing ones, which are unchanged.\n  - It adds `bareContext(core, cloud)`, the same text session-start gives a project with no state.\n  - It is silent for the root, for a subagent (payload has `agent_id`, or an `agent_type` that is a plugin specialist), for events other than those two, and for a missing or unsafe `session_id`.\n  - Delivery is claimed with an exclusive-create marker at `os.tmpdir()/holyagent-sessions/<session_id>`. Parallel tool calls cannot both win; a test with six racing calls proves it.\n  - SessionStart still always delivers as before, and writes the marker (best effort) when it delivers the core. A compact re-delivers.\n- **SessionStart failure.** For a main thread that is not the root, session-start no longer exits 1 with nothing. It emits the core rules plus one line naming the failure tag and `holyagent status`, with exit 0. The root keeps the existing exit 1 with a stderr line, because the host reads nothing from a failed hook and the root has its rules in the prompt; this keeps the existing tests unchanged. The line says the project state could not be read, not that the rules could not load, because the rules still load in that case.\n- **Marker write failure.** In `root-rules` this is exit 1 with a stderr line and no delivery, so a broken marker folder never causes a delivery on every tool call.\n- **Cost.** The hook starts Bun on every main-thread tool call, even though it prints nothing after the first delivery. The cost is documented in `docs/hooks.md`.\n- **Unrun.** I did not run this against a live claude.ai session.\n\nevidence:\n- A main thread whose SessionStart output never arrives still gets the root rules on its first UserPromptSubmit or PreToolUse, exactly once per session, proven by tests: `bun test packages/integrations/claude/tests/hooks.test.ts -t \"root-rules|cannot be read\"` -> 12 pass, 0 fail, and the full `mise run verify` passed. The tests in `hooks.test.ts` cover:\n  - first prompt delivers once;\n  - first PreToolUse delivers once, and a later prompt gets nothing;\n  - six racing calls deliver once;\n  - sessions are kept apart;\n  - SessionStart then UserPromptSubmit delivers once;\n  - compact re-delivers, then the session stays quiet;\n  - a marker write failure.\n- Subagents and a main thread already running as holyagent get no extra text, and existing hook behavior and tests are unchanged: the `root-rules` test covers `agent_id`, specialist `agent_type`, `holyagent` and `holyagent:holyagent`, an unsafe or missing `session_id`, and other events, and none of them uses up the session's delivery. Existing session-start, vcs-reminder, workflow and agent-launch tests pass unmodified. The only edits to existing tests are the exact hook-map expectation and the carrier filter in `plugin.test.ts`, which now account for the new entries.\n- mise run build leaves no diff after the change and mise run verify passes: build twice gave an identical `dist` diff (md5 884fa12f…), and `mise run verify` exited 0 with 860 pass, 0 fail.\n- changed-paths: the eight files listed under `changed`.\n- checks-run: `mise run build` -> 0; `mise run verify` -> 0 (860 pass, 1 skip, 0 fail); targeted `bun test … -t \"root-rules|cannot be read\"` -> 12 pass.\n- diff-file: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/root-rules.diff",
+  "createdAt": "2026-10-29T13:52:13.577Z"
+}

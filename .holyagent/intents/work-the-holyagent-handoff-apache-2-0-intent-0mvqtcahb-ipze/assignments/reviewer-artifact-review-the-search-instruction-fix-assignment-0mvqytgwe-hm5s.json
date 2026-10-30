@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mvqytgwe-hm5s",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-the-search-instruction-fix",
+  "objective": "Review the search instruction fix (79b4f61..461af9d on ccr-046ad103-6qsvgx-rgfd) for correctness, calm wording and consistency between requirements.md, the root and specialist text.",
+  "state": "Succeeded",
+  "scope": [
+    "Diff: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/search-fix.diff; files in /home/user/holyagent-rgfd. Rules for model-facing text: the 'Writing instructions' section of packages/integrations/claude/dist/agents/holyagent.md. Intent: agents with a shell search with holyagent rg/fd, always pass a path, and fall back to the system rg, fd, grep or find on UnsupportedPlatform; agents without a shell use Grep/Glob."
+  ],
+  "constraints": [
+    "Read-only: write no files."
+  ],
+  "criteria": [
+    {
+      "text": "Findings are ranked blocking or non-blocking with the file, line and fix, or their absence is stated",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources-read"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvqypvzr-8bm0"
+  ],
+  "specialist": {
+    "agentId": "workflow:wf_e2aa2a94-cd6/assignment-0mvqytgwe-hm5s",
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-27T17:34:24.974Z",
+    "finishedAt": "2026-10-27T17:38:25.926Z"
+  },
+  "result": "result: The search fix is consistent across requirements.md, the root search.md, working.md and the dist copies. No blocking findings. Four non-blocking items and three notes below. Review was from file contents only; no shell, so git and checks were not run.\nchanged: none (read-only review)\nchecks: none run. No shell in this role, so `git show --stat 461af9d`, `mise run verify`, and any rg/fd behavior check were not run.\nblockers: none\nquestions: none\nnotes:\n- Non-blocking, `packages/integrations/claude/dist/agents/holyagent.md:56` and `packages/runtime/src/instructions/claude-5.5/root/search.md:3`: \"with an open stdin and no path, rg searches stdin and reports no matches\" gives the wrong mechanism. From ripgrep's stdin heuristic (from source knowledge, not run here), rg reads stdin only when it is a regular file, FIFO or socket. An open pipe blocks until EOF; an empty or closed one reports no matches. Fix: \"With no path and stdin as a pipe or file, rg reads stdin instead of the working directory, so pass the path (for example `.`).\" The rule stands; the reason is imprecise and applies to rg, not fd.\n- Non-blocking, `root/search.md:3` and `specialist/working.md:4`: the sentence \"not with grep, find or the Grep and Glob tools\" is followed by \"use the system rg, fd, grep or find\". The \"When either fails\" clause scopes it, but a fix that opens with \"Only when either fails with UnsupportedPlatform, use the system rg, fd, grep or find\" removes the apparent contradiction.\n- Non-blocking, `packages/integrations/claude/src/agents.ts:119-120`: `workflows.md` and `search.md` swapped order. The Intent and requirements do not mention this. No test pins the pair (plugin.test.ts:614 pins only visual after assignments). Explain it in the commit or revert.\n- Non-blocking verification gap: the diff omits `packages/integrations/claude/dist/agents/*.md` (19 files), although the worktree copies already match the src text exactly (holyagent.md:56, worker-implementation.md:46). CLAUDE.md requires `mise run build` when plugin sources change. Root should confirm 461af9d includes the dist changes with `git show --stat 461af9d`.\n- Notes, not blocking: (a) the fix's path and fallback sentences land in all 19 specialist Working sections, including the 9 roles that disallow Bash (explorer-lookup/map/trace, librarian-lookup/research, reviewer-artifact/audit/security/visual), which cannot run either command; this is a shared-section design choice. (b) ToolMissing (exit 4, vendored binary absent, errors.ts:127) has no stated fallback; the Intent scopes the fallback to UnsupportedPlatform only. (c) No test pins the new \"always pass the path\" sentence; agents.ts:232 and :289 match only the leading phrases.\nevidence:\nFindings are ranked blocking or non-blocking with the file, line and fix, or their absence is stated: met. No blocking findings. Non-blocking items are ranked above with file, line and fix (search.md:3 and holyagent.md:56 mechanism; search.md:3 and working.md:4 wording; agents.ts:119-120 order; dist omission from the diff). Support: `/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/search-fix.diff` hunks 5-12, 15-57, and the worktree files below.\nsources-read: diff `/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/search-fix.diff`; `/home/user/holyagent-rgfd/packages/runtime/src/instructions/claude-5.5/root/search.md`; `.../claude-5.5/specialist/working.md`; `/home/user/holyagent-rgfd/packages/runtime/src/instructions/requirements.md` (lines 16-60, 19 and 50); `/home/user/holyagent-rgfd/packages/integrations/claude/src/agents.ts` (lines 90-130, 200-300); `/home/user/holyagent-rgfd/packages/integrations/claude/dist/agents/holyagent.md` (lines 50-100, 56) and `dist/agents/worker-implementation.md` (lines 40-51) and the disallowedTools line of all 19 dist agents; `/home/user/holyagent-rgfd/packages/runtime/src/instructions/claude-5.5/roles/explorer-lookup/method.md` (line 1); `/home/user/holyagent-rgfd/packages/runtime/src/cli/tools.ts` (lines 30-128, runTool stdio inherited, toolCommand exit 4); `/home/user/holyagent-rgfd/packages/runtime/src/cli/errors.ts` (lines 100-135, UnsupportedPlatform hint and tag); `/home/user/holyagent-rgfd/packages/runtime/tests/tools.test.ts` (60-83); `/home/user/holyagent-rgfd/packages/integrations/claude/tests/plugin.test.ts` (lines 283-285, 331, 366, 444, 614; grep for search terms); `/home/user/holyagent-rgfd/.gitignore` (no dist match); Glob of `search.md`/`working.md` (only the claude-5.5 set exists).",
+  "createdAt": "2026-10-27T17:34:24.974Z"
+}

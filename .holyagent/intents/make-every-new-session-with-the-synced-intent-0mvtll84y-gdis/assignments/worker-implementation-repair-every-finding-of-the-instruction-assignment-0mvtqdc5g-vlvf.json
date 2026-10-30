@@ -1,0 +1,61 @@
+{
+  "id": "assignment-0mvtqdc5g-vlvf",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 5,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-every-finding-of-the-instruction",
+  "objective": "Repair every finding of the instruction review of be35f58 so the resolve-before-finishing rule has no contradiction, a bounded loop and a route for every state-mode case.",
+  "state": "Succeeded",
+  "scope": [
+    "Worktree /home/user/holyagent-instr-finish, branch ccr-046ad103-6qsvgx-pending-autofix at be35f58. Review: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-g7dy.txt; fix both blockers and every note in it.",
+    "Blocker 1: a repository the owner does not control that already tracks .holyagent/ state (local refuses there): add to R-STATE and root/version-control.md that the root asks the user through AskUserQuestion with a recommended default (local after the owner removes nothing is impossible, so offer for example work kept out of the PR by not pushing state, or leaving holyagent state untracked by working in a fork) and records the answer; keep it one sentence.",
+    "Blocker 2: root/assignments.md line 17 and R-FINISH: the final report keeps Unknown results, waived gates and the PR's unresolved threads and non-clean merge state next to what needs the user; PR text keeps 'what remains' as what is left for the account owner.",
+    "Notes: restore the non-blocking ride-along sentence; say the finish round's brief names its added checks and tests as requested work; cap it: a blocking finding from the finish round's re-review gets one repair and re-review, and one still open after that goes to the user as a blocker; drop or define 'edge cases' against the mergeability rubric; remove duplication of the three-round rule and the finish rule so each lives in one place with pointers, keeping the R-WVI and R-FINISH phrase anchors in packages/integrations/claude/src/agents.ts matching. Net instruction size at or below be35f58."
+  ],
+  "constraints": [
+    "User (verbatim): \"não deve ter nada pendente / outra coisa: arrume esse comportamento, o que ficar pendente que o agente pode resolver deve ser resolvido\".",
+    "Follow /home/user/holyagent/.claude/CLAUDE.md and /home/user/holyagent/AGENTS.md. Do not edit .claude/CLAUDE.md or AGENTS.md.",
+    "Make no version-control writes and no edits under .git/ or .holyagent/ of the repository; tests use temp folders.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done and checked, stop and report; add no unrequested features."
+  ],
+  "criteria": [
+    {
+      "text": "Both blockers and every note of the review are fixed or named with a concrete reason",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Net instruction word count is at or below be35f58",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "mise run build leaves no diff after the change and mise run verify passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/integrations/claude/src",
+    "packages/integrations/claude/tests",
+    "packages/integrations/claude/dist/agents"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvtq10oh-g7dy",
+  "specialist": {
+    "agentId": "workflow:wf_18dfc86e-0c1/assignment-0mvtqdc5g-vlvf",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T16:01:13.924Z",
+    "finishedAt": "2026-10-29T16:12:39.884Z"
+  },
+  "result": "result: Both blockers and all notes are fixed. Instruction size is 4651 words against 4654 at be35f58, and `mise run verify` passes.\n\nchanged (all in /home/user/holyagent-instr-finish/):\n- packages/runtime/src/instructions/claude-5.5/root/assignments.md\n- packages/runtime/src/instructions/claude-5.5/root/version-control.md\n- packages/runtime/src/instructions/claude-5.5/roles/worker-visual/purpose.md\n- packages/runtime/src/instructions/requirements.md\n- packages/integrations/claude/dist/agents/holyagent.md (generated)\n- packages/integrations/claude/dist/agents/worker-visual.md (generated)\n- Not edited: `agents.ts` and the tests. The R-FINISH (\"one more repair round\") and R-WVI (\"stop repairing a finding after round three\") anchors still match.\n\nchecks:\n- `mise run verify` -> exit 0 (type-check, lint, format check clean; 893 pass, 1 skip, 0 fail).\n- `mise run build` -> run twice; the second run changed nothing, so the dist is in sync with the sources.\n- Word count of the seven changed instruction sources, by `wc -w`: 4651 now, 4654 at be35f58 (4395 at its parent).\n\nblockers: none\nquestions: none\n\nnotes:\n- **Blocker 1 wording:** I chose \"recommending a fork (where `local` applies)\" as the recommended default. The task text for this option was garbled, so the root may want different wording.\n- **Dropped sentence:** I removed \"Name each Unknown result and waived gate\" from the finish bullet in assignments.md. The final-report sentence now lists them, and the \"counting either as Passed ends the work early\" warning stays.\n- **Round-three wording:** requirements.md R-VISUAL and R-WVI now say \"stop at round three\" and leave the counting to `visual.md` and the Assignment. The worker purpose says only that the Assignment names the repair round.\n- **Not done:** I did not touch `reviewer-visual/purpose.md` or the reviewer-visual dist. I also did not check whether the generated holyagent.md contradicts the repository's own CLAUDE.md or AGENTS.md rules.\n\nevidence:\nBoth blockers and every note of the review are fixed or named with a concrete reason:\n- version-control.md local bullet: when git already tracks state there, `local` refuses, so the root asks via AskUserQuestion recommending a fork and records the answer. R-STATE adds the same (\"or the user's choice when git already tracks state there\").\n- assignments.md finish bullet now lists the following.\n  - The ride-along sentence is restored.\n  - The finish brief names its added checks and tests as requested work.\n  - A blocking finding from the finish re-review gets one repair and re-review, then goes to the user as a blocker.\n  - \"edge cases\" is dropped.\n- The final report keeps Unknown results, waived gates, unresolved PR threads, non-clean merge state and skipped visual preferences. PR text keeps \"what remains\" for the account owner.\n- Duplication: R-FINISH is now a pointer, R-VISUAL points to the interface inspection list instead of repeating it, and the round-three rule lives in `visual.md`.\n\nNet instruction word count is at or below be35f58: 4651 vs 4654 (`wc -w` over assignments.md, version-control.md, visual.md, both visual purposes, interface-inspection.md, requirements.md).\n\nmise run build leaves no diff after the change and mise run verify passes: a second `mise run build` left `git status` identical to the first; `mise run verify` exit 0, 893 pass, 0 fail.\n\nchanged-paths: the six paths under `changed` above.\n\nchecks-run: `mise run verify` -> 0; `mise run build` -> 0, twice; `wc -w` size comparison.\n\ndiff-file: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/finish-fix.diff (no new files).",
+  "createdAt": "2026-10-29T16:01:13.924Z"
+}

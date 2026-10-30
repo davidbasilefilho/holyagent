@@ -1,0 +1,57 @@
+{
+  "id": "assignment-0mvtoqs25-9sjn",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.security",
+  "slug": "re-review-the-state-mode-repair-commit",
+  "objective": "Re-review the state-mode repair commit abbef7a: confirm the config.json blocker and the lock, exclude-file and local-commit findings are closed without new issues.",
+  "state": "Succeeded",
+  "scope": [
+    "Worktree /home/user/holyagent-state-mode, branch ccr-046ad103-6qsvgx-state-mode at abbef7a. Judge only the repair commit d6234b3..abbef7a; diff without the minified bundle: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/state-repair.diff. Repair report: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-58f1.txt.",
+    "Previous findings: code review /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-di6x.txt and security review /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-oi0p.txt. Code findings 5, 8, 9 and security finding 2 (signal order fixed by the requirements) were deliberately skipped."
+  ],
+  "constraints": [
+    "Read-only: write no files and make no version-control writes."
+  ],
+  "criteria": [
+    {
+      "text": "Each previous security finding is stated closed or open with file:line, and any new finding traces source to sink with a fix, or its absence is stated",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources-read"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvtohznl-58f1"
+  ],
+  "followUpOf": "assignment-0mvto7zbl-oi0p",
+  "specialist": {
+    "agentId": "workflow:wf_014e414f-6f6/assignment-0mvtoqs25-9sjn",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T15:15:41.837Z",
+    "finishedAt": "2026-10-29T15:20:44.313Z"
+  },
+  "result": "result: All four previous findings (the config.json blocker, lock, exclude file, local-mode commit) are closed at abbef7a with no new blocker. Security finding 2 (signal order) is skipped by requirement and stays open as a suspicion. There are three non-blocking edge notes below.\n\n**Built-in coverage:** `/security-review` failed to start again. Its `!git diff origin/HEAD...` step errored with \"unknown revision origin/HEAD\", because this clone has no `origin/HEAD`. I reviewed `d6234b3..abbef7a` from `state-repair.diff` and the live files in `/home/user/holyagent-state-mode`. I had no shell, so I ran no tests or git commands and did not confirm the files equal `abbef7a`. The minified `packages/integrations/claude/dist/scripts/holyagent.js` was not read; I checked only that the `holyagent.md` text matches its source.\n\n**Previous findings**\n1. **Blocker, `config.json` counted as tracked state: CLOSED.**\n   - `TRACKED_STATE_PATHSPEC` (`packages/runtime/src/state/layout.ts:17`) is `.holyagent` plus `:(exclude).holyagent/config.json`. It feeds the three places that decide on tracked state.\n   - Root instruction: `git ls-files .holyagent ':!.holyagent/config.json'` at `packages/integrations/claude/dist/agents/holyagent.md:123`, `packages/runtime/src/instructions/claude-5.5/root/version-control.md:15` and `packages/runtime/src/instructions/requirements.md:34`.\n   - `setStateMode` refusal for `local`: `tree.ts:881`. A repo that tracks only the config can now use `local`.\n   - Work-mode staging: `changedState` at `commit.ts:123-141`. It lists changed state files (`status --porcelain -z --no-renames`) without the config file. The paths are then added through `gitPaths`, which uses `--literal-pathspecs` (`git.ts:68`), so none of them is read as a glob or pathspec magic.\n   - The config is staged only when the caller names `.holyagent/config.json` or `.holyagent`. A config change staged beforehand but not named trips `StagedOutsideScope` (`commit.ts:182-184`), so the check fails closed.\n   - The `-z` parsing keeps the leading status code (it does not go through the trimming `git()` helper), and `slice(3)` is correct.\n2. **Suspicion, signal order (tracked state outranks \"repository not the owner's\"): OPEN, skipped by requirement.** No change in the repair. A forked or third-party repo that tracks anything besides the config can still send the root to `work` mode. I treat it as a decision for the root, not a defect.\n3. **Lock race (`setStateMode`): CLOSED.**\n   - The refusal checks and the config write now run under `<common>/holyagent/worktree.lock` with long patience (`tree.ts:858`). That is the same lock `ensureWorktree` holds (`tree.ts:369`).\n   - `ensureWorktree` re-reads the mode after taking the lock and returns `deferred` when it is no longer `branch` (`tree.ts:380`). The caller then falls back to the work-tree folder (`tree.ts:782-783`). A command that waited on the lock can no longer create the branch after a mode change.\n   - No deadlock: none of the git, ref and worktree-listing helpers called inside the lock take it again.\n   - Entering `local` writes the exclude before the config, and leaving writes it after (`tree.ts:886-888`), so records are never exposed to git during the switch. `holdsRecords` now scans every listed worktree (`tree.ts` ~284-300).\n4. **Exclude file: CLOSED.**\n   - The write goes to `<path>.<pid>.<uuid>.tmp` and is renamed over the file (`tree.ts:156-163`), with the temp file removed on error. The name is unpredictable and sits in the clone's own `.git/info`.\n   - Only a marker comment plus the line directly below it are removed (`tree.ts:147-151`). A line the user wrote stays.\n5. **`local` mode and tracked files / letter case: CLOSED.**\n   - `requireUntrackedState` (`commit.ts:147-158`, called at `commit.ts:175`) refuses a `local` commit while the index tracks any state file.\n   - `commitScope` now lowercases the path before the `.holyagent` check (`commit.ts:88-89`), so `.HolyAgent` is refused in `branch` and `local` modes.\n   - The `ls-files` call runs through `git()` without literal pathspecs, so the `:(exclude)` magic applies as intended.\n\n**New findings:** no blocker, no validated vulnerability. The repair adds no dependency and no new write outside `.git/info/exclude` and the local git config. Three notes, none a blocker:\n- **Exclude entry left behind (availability).** The old branch commit wrote an unmarked `/.holyagent/` line. Leaving `local` will not remove it. In `work` mode that line hides the records from `git status`, so `changedState` stages nothing and the records silently stay out of commits. This leaks nothing and fails safe, and the repair report already says so. Source is the old-version exclude line, the sink is `commit.ts:123`, and the fix is a manual line removal or a doctor hint.\n- **Rare race.** Line `tree.ts:757` re-adds the exclude on every `local` resolve, outside the lock. A command that read `local` just before `holyagent state mode work` ran could re-add the line after `setStateMode` removed it. The effect is the same as above, so it is availability only. Re-reading the mode under the lock would close it.\n- **Orphaned marker.** If the user deletes the `/.holyagent/` line but leaves the marker comment, a later `local` appends a second pair. Leaving `local` then removes nothing, because the first marker is not followed by the line (`tree.ts:148`). The effect is again the persistent exclude above.\n- **Symlinked exclude file.** `rename` replaces a symlinked `info/exclude` with a regular file, where `Bun.write` used to follow the link. This only changes the user's own dotfile setup and has no security impact.\n\n**Checked and sound**\n- Mode source is still git config only.\n- `StagedOutsideScope` still blocks anything pre-staged outside the scope.\n- `.holyagent/local/` is still covered by its own `.gitignore`.\n- Nothing pushes.\n\n**Not run:** the tests, `mise run verify` and the git commands. The repair report says verify passed with 893 pass and 0 fail, but I did not reproduce that.\n\nevidence:\nEach previous security finding is stated closed or open with file:line, and any new finding traces source to sink with a fix, or its absence is stated: Finding 1 closed (`layout.ts:17`, `commit.ts:123-141`, `tree.ts:881`, `holyagent.md:123`). Finding 2 open, skipped by requirement. Finding 3 closed (`tree.ts:369`, `tree.ts:380`, `tree.ts:858-888`). Finding 4 closed (`tree.ts:147-163`). Finding 5 closed (`commit.ts:88-89`, `commit.ts:147-175`). New: no blocker or validated vulnerability; three availability-only notes (old unmarked exclude line, `tree.ts:757` race, orphaned marker at `tree.ts:148`) with fixes stated.\nsources-read: `/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/state-repair.diff` (whole), `/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-oi0p.txt`, `/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-58f1.txt`. Live in `/home/user/holyagent-state-mode`: `packages/runtime/src/vcs/commit.ts` (whole), `vcs/git.ts` (whole), `state/lock.ts` (whole), `state/tree.ts` (lines 100-174, 340-420, 760-809, and the `setStateMode` region by grep), plus grep of `packages` for `TRACKED_STATE_PATHSPEC` and the instruction text. The built-in `/security-review` could not run (no `origin/HEAD`).",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Previous security findings closed; no new blocker",
+    "criteria": [
+      {
+        "criterion": "Each previous security finding is stated closed or open with file:line, and any new finding traces source to sink with a fix, or its absence is stated",
+        "support": "Finding 1 closed (`layout.ts:17`, `commit.ts:123-141`, `tree.ts:881`, `holyagent.md:123`). Finding 2 open, skipped by requirement. Finding 3 closed (`tree.ts:369`, `tree.ts:380`, `tree.ts:858-888`). Finding 4 closed (`tree.ts:147-163`). Finding 5 closed (`commit.ts:88-89`, `commit.ts:147-175`). New: no blocker or validated vulnerability; three availability-only notes (old unmarked exclude line, `tree.ts:757` race, orphaned marker at `tree.ts:148`) with fixes stated."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "sources-read",
+        "support": "`/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/state-repair.diff` (whole), `/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-oi0p.txt`, `/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-58f1.txt`. Live in `/home/user/holyagent-state-mode`: `packages/runtime/src/vcs/commit.ts` (whole), `vcs/git.ts` (whole), `state/lock.ts` (whole), `state/tree.ts` (lines 100-174, 340-420, 760-809, and the `setStateMode` region by grep), plus grep of `packages` for `TRACKED_STATE_PATHSPEC` and the instruction text. The built-in `/security-review` could not run (no `origin/HEAD`)."
+      }
+    ]
+  },
+  "createdAt": "2026-10-29T15:15:41.837Z"
+}

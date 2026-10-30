@@ -1,0 +1,59 @@
+{
+  "id": "assignment-0mvto7z1g-di6x",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-per-clone-state-mode-branch",
+  "objective": "Review the per-clone state mode (branch, work, local) and the root's signal-order rule for correctness and regressions.",
+  "state": "Succeeded",
+  "scope": [
+    "Worktree /home/user/holyagent-state-mode, branch ccr-046ad103-6qsvgx-state-mode at d6234b3; review git diff 85a8560..d6234b3 (main to head: commits 6b5883d and the signal-order follow-up, plus a clean merge of main). Full diff without the minified bundle: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/state-all.diff.",
+    "Requirements: the holyagent/state branch stays the default; a per-clone mode (git config holyagent.stateMode = branch|work|local, never a repository file) lets a project without stacked PRs keep state on the work branch (work) or local-only, excluded via .git/info/exclude (local); the root picks the mode once per clone from this order: the account owner's words; a tracked .holyagent/ -> work; conventions asking for independent PRs, or a repository the owner does not control -> local; no signal -> branch. Mode changes move no records and refuse when records would be stranded.",
+    "Known for checking: docs/decisions.md around line 51 and docs/usage.md around line 61 may still describe the earlier 'stack convention' wording rather than the signal order.",
+    "Check resolveState and commitState per mode, vcs commit staging and refusals, .git/info/exclude handling, the state mode CLI and its refusals, tests (do they fail without the change), docs and instruction accuracy. Run mise run verify."
+  ],
+  "constraints": [
+    "Read-only: write no files and make no version-control writes."
+  ],
+  "criteria": [
+    {
+      "text": "Findings are ranked blocking or non-blocking with file, line and fix, or their absence is stated, with mise run verify run on the head",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvtnnrr3-wg92",
+    "assignment-0mvto3a2x-7and"
+  ],
+  "specialist": {
+    "agentId": "workflow:wf_48c37a7b-487/assignment-0mvto7z1g-di6x",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T15:01:04.420Z",
+    "finishedAt": "2026-10-29T15:08:51.093Z"
+  },
+  "result": "result: No blockers. `mise run verify` passes on d6234b3, and the code matches the stated modes and signal order. I found one doc inaccuracy and a few code and test gaps, all non-blocking.\n\nchanged: none (read-only)\n\nchecks:\n- `/code-review 85a8560...d6234b3` (built-in, via Skill tool) -> ran. It returned 7 claims, each read against the code and classified below.\n- `mise run verify` in /home/user/holyagent-state-mode at d6234b3 -> exit 0. Type-check found no errors in 117 files, lint no problems in 118, format check clean on 233, tests 881 pass, 0 fail (882 tests, 32 files). Log: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/verify.log\n- Repro run from the source CLI in a throwaway repo, since removed: work mode with records, then `state mode branch` from a clean linked worktree -> exit 0. The next `intent list` there moved the records onto holyagent/state.\n- Not run: the built bundle (`dist/scripts/holyagent.js`) and Windows paths. The dist files do contain the new mode code and instruction text.\n\nblockers: none\n\nquestions: none\n\nnotes:\n\nNon-blocking, ranked:\n\n1. docs/decisions.md:51 is stale, as you suspected.\n   - The heading \"State follows the project's stack convention\" and the sentence \"`work` ... for independent PRs in a repository that already tracks `.holyagent/` or whose conventions allow it\" contradict the signal order. In the rule (version-control.md, R-STATE) a convention asking for independent PRs gives `local`, and only a tracked `.holyagent/` gives `work`.\n   - The order itself (words, tracked, conventions or not-owner, else branch) appears nowhere in the docs.\n   - Fix: retitle, and replace that sentence with the four-step order, which also names a repository the owner does not control as a `local` trigger.\n   - docs/usage.md:56 is accurate but could point to the order.\n2. `setStateMode` can move records (packages/runtime/src/state/tree.ts:858).\n   - `holdsRecords` checks only the current work tree. In work or local mode, records in another linked worktree do not stop `state mode branch` from a clean worktree.\n   - My repro confirmed it: the next command's `keepsState` and the one-time migration move those records onto the state branch. That breaks \"mode changes move no records\".\n   - Nothing was lost in the repro, so this is an edge case.\n   - Fix: run the same scan over the listed worktrees that `keepsState` runs, and add a test.\n3. packages/runtime/src/vcs/commands.ts:58 (`vcs commit --help`) still says state \"is never part of the commit\" and that `.holyagent/` paths are refused. That is false in work mode. Fix: make it mode-aware.\n4. packages/runtime/src/cli/migrate.ts:159 and :229 still say records are \"committed on the state branch\". In work and local mode nothing is committed, and in local mode the records are excluded from git. The hint may also lead someone to delete the legacy folders too early. Fix: word it by mode.\n5. Work-mode `vcs commit` stages the whole `.holyagent/` (packages/runtime/src/vcs/commit.ts:136-138).\n   - It does so even when the caller named only a subpath such as `.holyagent/intents`.\n   - A state-only change also commits when the named files have no change, instead of refusing with `NothingToCommit`.\n   - This is largely what the docs describe. Optional: widen only when no `.holyagent` path was named, and document the state-only commit.\n6. `setStateMode` (tree.ts:866-867) writes git config before the exclude line, outside any lock. If the exclude write fails, the clone is left in local mode without an exclude entry. The next state-writing command re-adds it, so the gap closes itself. Optional: write the exclude first when entering local, and config first when leaving it.\n7. `setExcluded(…, false)` (tree.ts:133) deletes a hand-added `/.holyagent/` line from `.git/info/exclude` when the mode is not local. This is an edge case. Optional: leave a line it did not add.\n8. `readStateMode` calls `resolveState` just to get the directory, so `state mode` fails whenever state resolution fails. Optional: compute the directory without resolving the state worktree.\n9. Commit.ts and tree.ts each read the config key (`stateMode` and `stateModeOf`). Optional: share one reader.\n\nRejected from code-review:\n- The claim that `--path-format=absolute` needs git 2.31 or later: `locate` already uses it.\n- The claim that read-only commands rewrite the exclude file on every run: `setExcluded` writes only when the line is missing.\n\nTests:\n- New behavior (the command, per-mode resolution, commit staging and refusals, exclude handling, mode-change refusals) is covered in packages/runtime/tests/state-mode.test.ts. The tests assert observable behavior and would fail without the change, since the `state mode` command does not exist on the base.\n- Gaps, in line with finding 2: no test for records held in another linked worktree, and none for a mode change refused because only `origin/holyagent/state` exists.\n\nOther checks:\n- Requirement check: the default stays `branch`. The mode lives only in git config and is never read from a repository file (test: \"a mode written in a repository file is not read\"). The signal order is identical in version-control.md, R-STATE and the `agents.ts` phrase.\n- `commitState` returns early outside `branch` mode, and `resolveState` returns the work-tree folder for work and local.\n\nevidence:\nFindings are ranked blocking or non-blocking with file, line and fix, or their absence is stated, with mise run verify run on the head: no blockers. Non-blocking findings are above (docs/decisions.md:51; tree.ts:858, :133, :866-867; commands.ts:58; migrate.ts:159 and :229; commit.ts:136-138). `mise run verify` -> exit 0, 881 pass, 0 fail, type-check, lint and format clean, log at /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/verify.log\nchecks-run: `/code-review 85a8560...d6234b3` (7 claims, classified); `mise run verify` exit 0 on d6234b3; CLI repro of finding 2 in a temp repo (removed). Not run: the built bundle, Windows paths.",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "No blockers; verify passed on d6234b3",
+    "criteria": [
+      {
+        "criterion": "Findings are ranked blocking or non-blocking with file, line and fix, or their absence is stated, with mise run verify run on the head",
+        "support": "no blockers. Non-blocking findings are above (docs/decisions.md:51; tree.ts:858, :133, :866-867; commands.ts:58; migrate.ts:159 and :229; commit.ts:136-138). `mise run verify` -> exit 0, 881 pass, 0 fail, type-check, lint and format clean, log at /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/verify.log"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`/code-review 85a8560...d6234b3` (7 claims, classified); `mise run verify` exit 0 on d6234b3; CLI repro of finding 2 in a temp repo (removed). Not run: the built bundle, Windows paths."
+      }
+    ]
+  },
+  "createdAt": "2026-10-29T15:01:04.420Z"
+}

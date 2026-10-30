@@ -1,0 +1,112 @@
+{
+  "id": "assignment-0mvr8a9ob-1qbm",
+  "intentId": "intent-0mvr4zvnq-k1q1",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-security-and-consistency",
+  "objective": "Repair the security and consistency findings in holyagent setup and doctor so setup children ignore the current project's Bun and npm config and doctor agrees with setup about where tools are found.",
+  "state": "Succeeded",
+  "scope": [
+    "Worktree C:/Users/david.basile/dev/holyagent-feat-plugin-only-install (branch feat/plugin-only-install, commit 450465c added packages/runtime/src/setup).",
+    "Blocking security finding (Medium): packages/runtime/src/setup/shell.ts:97 runs `bun add -g billion-context`, `bun add -g ctx7`, `bili plugin install claude` and `ctx7 setup` with the process cwd (the user's project, cli/main.ts:36), so a project bunfig.toml, .npmrc or .env can redirect the install registry or preload code. Run every setup child from a neutral directory (the home directory), and start `bun add -g` with `--no-env-file` and `--config=<the plugin's empty-bunfig.toml>` so project config cannot change it; keep ignoring a project .npmrc (a neutral cwd covers it; set npm_config_userconfig only if needed).",
+    "Blocking stale text: packages/runtime/src/instructions/requirements/cache.md:7 says \"the public CLI sets `subagentPromptCacheTtl` to 1h\"; the public CLI is deleted and `holyagent setup` writes that key now. Update it and anything generated from it.",
+    "Non-blocking, fix alongside: doctor.ts:28 checkCommand uses shell.which without includeBunBin while setup and check.ts:21 search Bun's bin directory; make doctor agree (and name the PATH hint when found only in Bun's bin). json-file.ts:52: treat a 0-byte or whitespace-only settings.json as an empty object, as a missing file is."
+  ],
+  "constraints": [
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report; do not add unrequested features, tests, files or refactors (name them in the report).",
+    "No version-control writes, no edits under .git/ or .holyagent/; report changed paths. If `mise run build` removes the vendored tools, run `git restore packages/integrations/claude/dist/scripts/vendor`.",
+    "Follow .claude/CLAUDE.md and AGENTS.md (Effect, Effect Schema, Bun Shell, JSDoc, mise run build after plugin source changes)."
+  ],
+  "criteria": [
+    {
+      "text": "Every setup child process runs from a neutral working directory and `bun add -g` starts with --no-env-file and the empty bunfig, shown by a test on the command and cwd the shell receives",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "cache.md and the generated plugin no longer say the public CLI sets subagentPromptCacheTtl",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "doctor finds bili and ctx7 where setup and the SessionStart check find them, and an empty settings.json is treated as an empty object, each with a test",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Setup tests pass, check, lint and fmt:check exit 0, and the generated plugin matches its sources after mise run build",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Changes stay within packages/runtime/src/setup, packages/runtime/src/cli/setup.ts, packages/runtime/src/instructions/requirements/cache.md, their tests and the rebuilt plugin",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/setup",
+    "packages/runtime/src/cli/setup.ts",
+    "packages/runtime/src/instructions/requirements/cache.md",
+    "packages/runtime/tests",
+    "packages/integrations/claude/dist",
+    "packages/integrations/claude/tests"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvr5ftro-9wfh",
+  "specialist": {
+    "agentId": "workflow:wf_c943451a-36b/assignment-0mvr8a9ob-1qbm",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-28T01:50:06.461Z",
+    "finishedAt": "2026-10-28T02:16:45.138Z"
+  },
+  "result": "result: Done. Every setup child now runs from the home directory, and `bun add -g` starts with `--no-env-file` and the plugin's empty bunfig. `cache.md` and the rebuilt plugin no longer say the public CLI sets the TTL. Doctor finds `bili` and `ctx7` where setup does, and an empty `settings.json` reads as `{}`.\n\nchanged:\n- C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/packages/runtime/src/setup/shell.ts\n- C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/packages/runtime/src/setup/steps.ts\n- C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/packages/runtime/src/setup/doctor.ts\n- C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/packages/runtime/src/setup/json-file.ts\n- C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/packages/runtime/src/instructions/requirements/cache.md\n- C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/packages/runtime/tests/setup.test.ts\n- C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/packages/runtime/tests/setup-fixture.ts\n- C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/packages/runtime/tests/setup-files.test.ts\n- C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/packages/integrations/claude/dist/scripts/holyagent.js (rebuilt)\n\n`git status` also shows `docs/components.md` and `docs/requirements.md` as modified. I did not touch them; they belong to another worker.\n\nchecks:\n- `mise run check` -> exit 0, no type errors in 114 files.\n- `mise run lint` -> exit 0, no problems in 115 files.\n- `mise run fmt:check` -> exit 0, all 230 files formatted. It failed once on `setup.test.ts`; I ran `bun fmt` on that file and it passed.\n- `bun test packages/runtime/tests/setup` -> 55 pass, 0 fail.\n- `bun test packages/runtime/tests/instructions.test.ts` -> 7 pass, 0 fail.\n- `mise run build` -> exit 0. The vendored tools were not removed, and `git status` shows no change under `vendor`.\n- `bun test packages/runtime packages/integrations` -> 102 fail, 711 pass. A diff against the saved baseline list at /tmp/before-fails.txt (108 failures from before this change) shows no new failures. The baseline failures are Windows path and executable-bit issues in the hook, plugin and state tests.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- `bun add -g` sets `--config` to `EMPTY_BUNFIG`, which resolves to `join(import.meta.dir, \"empty-bunfig.toml\")`. In the built plugin that is `scripts/empty-bunfig.toml`, beside `holyagent.js`. Run from source it points at a file that does not exist; the tests only check the argument string, so they do not exercise this.\n- I did not set `npm_config_userconfig`. Running from the home directory is enough to ignore a project `.npmrc`. A user-level `~/.npmrc` still applies, which is intended.\n- Doctor now passes `bili` or `ctx7` found only in Bun's bin directory, with the hint \"(not on PATH; add its directory to PATH)\", and fails only when neither location has it. This matches the SessionStart check. The fail text changed from \"not found on PATH\" to \"not found on PATH or in Bun's bin directory\".\n- `Shell.run` now requires `{ cwd }`. The test fake records `cwd` and can model commands found only in Bun's bin directory.\n- A test that listed an empty file as invalid JSON was updated, because an empty file is now `{}`.\n- The `docs/` pages that describe `doctor` output were not checked for the new wording, since `docs/` is outside my ownership paths.\n\ndiff file: /tmp/tmp.Ez9OVdBehc/setup-repair.diff (505 lines, no new files).\n\nevidence:\nEvery setup child process runs from a neutral working directory and `bun add -g` starts with --no-env-file and the empty bunfig, shown by a test on the command and cwd the shell receives: the test \"every child runs from the home directory, and bun add -g reads no env file and only the empty config\" in packages/runtime/tests/setup.test.ts asserts `cwd === home` for all four children and the first three `bun` arguments, and passes. The code is at packages/runtime/src/setup/steps.ts (`neutralDirectory`, `ensureGlobal`) and packages/runtime/src/setup/shell.ts (`EMPTY_BUNFIG`, `.cwd(options.cwd)`).\ncache.md and the generated plugin no longer say the public CLI sets subagentPromptCacheTtl: `cache.md:7` now reads \"`holyagent setup` sets `subagentPromptCacheTtl`...\". `rg \"public CLI sets\"` finds no match in packages/runtime/src or packages/integrations/claude/dist after `mise run build`.\ndoctor finds bili and ctx7 where setup and the SessionStart check find them, and an empty settings.json is treated as an empty object, each with a test: packages/runtime/tests/setup.test.ts has the doctor tests \"finds bili and ctx7 in Bun's bin directory as setup does, with a PATH hint\" and \"an empty settings.json counts as an empty object...\"; packages/runtime/tests/setup-files.test.ts has \"an empty or whitespace-only file is an empty object, as a missing file is\". All pass in the 55-pass run.\nSetup tests pass, check, lint and fmt:check exit 0, and the generated plugin matches its sources after mise run build: setup tests 55 pass and 0 fail; check, lint and fmt:check each exit 0; `mise run build` exit 0. The full-suite run has 102 failures against a baseline of 108, with none new.\nChanges stay within packages/runtime/src/setup, packages/runtime/src/cli/setup.ts, packages/runtime/src/instructions/requirements/cache.md, their tests and the rebuilt plugin: `git diff --stat -- packages` lists only the nine files under changed. `packages/runtime/src/cli/setup.ts` is unchanged.\nchecks-run: the commands and exit codes listed under checks above. Not run: `mise run verify` as a single gate (check, lint, fmt:check and the tests were run separately).\nchanged-paths: the nine paths listed under changed above.\ndiff-file: /tmp/tmp.Ez9OVdBehc/setup-repair.diff",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Children run from home with tested cwd and bun add -g flags; setup tests 55 pass; gates exit 0; no new suite failures.",
+    "criteria": [
+      {
+        "criterion": "Every setup child process runs from a neutral working directory and `bun add -g` starts with --no-env-file and the empty bunfig, shown by a test on the command and cwd the shell receives",
+        "support": "the test \"every child runs from the home directory, and bun add -g reads no env file and only the empty config\" in packages/runtime/tests/setup.test.ts asserts `cwd === home` for all four children and the first three `bun` arguments, and passes. The code is at packages/runtime/src/setup/steps.ts (`neutralDirectory`, `ensureGlobal`) and packages/runtime/src/setup/shell.ts (`EMPTY_BUNFIG`, `.cwd(options.cwd)`)."
+      },
+      {
+        "criterion": "cache.md and the generated plugin no longer say the public CLI sets subagentPromptCacheTtl",
+        "support": "`cache.md:7` now reads \"`holyagent setup` sets `subagentPromptCacheTtl`...\". `rg \"public CLI sets\"` finds no match in packages/runtime/src or packages/integrations/claude/dist after `mise run build`."
+      },
+      {
+        "criterion": "doctor finds bili and ctx7 where setup and the SessionStart check find them, and an empty settings.json is treated as an empty object, each with a test",
+        "support": "packages/runtime/tests/setup.test.ts has the doctor tests \"finds bili and ctx7 in Bun's bin directory as setup does, with a PATH hint\" and \"an empty settings.json counts as an empty object...\"; packages/runtime/tests/setup-files.test.ts has \"an empty or whitespace-only file is an empty object, as a missing file is\". All pass in the 55-pass run."
+      },
+      {
+        "criterion": "Setup tests pass, check, lint and fmt:check exit 0, and the generated plugin matches its sources after mise run build",
+        "support": "setup tests 55 pass and 0 fail; check, lint and fmt:check each exit 0; `mise run build` exit 0. The full-suite run has 102 failures against a baseline of 108, with none new."
+      },
+      {
+        "criterion": "Changes stay within packages/runtime/src/setup, packages/runtime/src/cli/setup.ts, packages/runtime/src/instructions/requirements/cache.md, their tests and the rebuilt plugin",
+        "support": "`git diff --stat -- packages` lists only the nine files under changed. `packages/runtime/src/cli/setup.ts` is unchanged."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "the commands and exit codes listed under checks above. Not run: `mise run verify` as a single gate (check, lint, fmt:check and the tests were run separately)."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the nine paths listed under changed above."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/tmp.Ez9OVdBehc/setup-repair.diff"
+      }
+    ]
+  },
+  "createdAt": "2026-10-27T21:59:25.308Z"
+}

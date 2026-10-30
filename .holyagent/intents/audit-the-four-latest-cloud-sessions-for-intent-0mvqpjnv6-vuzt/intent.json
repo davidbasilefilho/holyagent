@@ -12,6 +12,7 @@
     "Decision (user): the Intent in use is kept per work tree, so sessions in different worktrees do not switch each other's Intent; all other state stays shared."
   ],
   "revision": 4,
-  "state": "Open",
+  "state": "Closed",
+  "closeReason": "Audit delivered; state branch merged in #28.",
   "createdAt": "2026-10-27T13:14:50.898Z"
 }

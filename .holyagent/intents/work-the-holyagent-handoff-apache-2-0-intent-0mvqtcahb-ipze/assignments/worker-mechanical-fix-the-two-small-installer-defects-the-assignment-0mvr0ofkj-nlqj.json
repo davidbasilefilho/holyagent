@@ -1,0 +1,48 @@
+{
+  "id": "assignment-0mvr0ofkj-nlqj",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Worker.mechanical",
+  "slug": "fix-the-two-small-installer-defects-the",
+  "objective": "Fix the two small installer defects the Windows re-reviews found: the profile-line regex matching indented comments and curly single quotes in profile paths.",
+  "state": "Succeeded",
+  "scope": [
+    "File /home/user/holyagent-windows/install/windows-install.ps1 (head f106ac2).",
+    "(1) Line ~218: anchor the mise activation regex so indented commented lines do not match, using ^\\s*[^#\\s] before the rest of the pattern, and check the BUN_INSTALL regex the same way. Prove it with a bun one-liner over: \"(& mise activate pwsh)\" (match), \"  # (& mise activate pwsh)\" (no match), \"\\t#mise activate pwsh\" (no match), \"# (& mise activate pwsh)\" (no match).",
+    "(2) ConvertTo-SingleQuoted (~line 95): also double the curly single quotes U+2018, U+2019, U+201A and U+201B, which PowerShell treats as quote characters."
+  ],
+  "constraints": [
+    "Work only in that worktree; edit only install/windows-install.ps1; make no version-control writes and no edits under .git/ or .holyagent/.",
+    "When done, run mise run fmt:check and report; stop."
+  ],
+  "criteria": [
+    {
+      "text": "The regex probe gives the four expected results and ConvertTo-SingleQuoted doubles all five single-quote characters",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Only install/windows-install.ps1 changed and mise run fmt:check passes",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "install"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "workflow:wf_ba78efc7-bb6/assignment-0mvr0ofkj-nlqj",
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-27T18:26:29.203Z",
+    "finishedAt": "2026-10-27T18:30:05.673Z"
+  },
+  "result": "result: Both installer defects fixed in install/windows-install.ps1. The mise profile regex no longer matches indented or tab-indented comments, and ConvertTo-SingleQuoted doubles all five single-quote characters. The BUN_INSTALL regex was left unchanged because it already rejects commented lines.\nchanged: install/windows-install.ps1 (only path in `git status`; diff saved at /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/windows-install-fix.diff)\nchecks:\n- `mise run fmt:check` -> exit 0, \"All 229 files are formatted.\"\n- Regex probe, `bun -e` over the file's mise pattern `^\\s*[^#\\s].*mise.*\\bactivate\\b.*pwsh` -> \"(& mise activate pwsh)\" match; \"  # (& mise activate pwsh)\" no match; \"\\t#mise activate pwsh\" no match; \"# (& mise activate pwsh)\" no match. Old pattern `^\\s*(?!#).*...` returned match for the indented-comment case, which confirms the defect.\n- BUN_INSTALL regex `^\\s*\\$env:BUN_INSTALL\\s*=` probe -> matches the live line; all three commented variants do not match. The `[^#\\s]` anchor was not applied there because it would stop the live line from matching.\n- Quote doubling, checked with a JS mirror of the .NET logic (`'` doubled, then U+2018/2019/201A/201B doubled via regex `[...]` with `$0$0`) on input containing all five characters -> output doubles each of the five, wrapper quotes intact, exact expected string matched. Not run in PowerShell: `pwsh` is not installed here.\nblockers: none\nquestions: none\nnotes: The ConvertTo-SingleQuoted change is verified only by the JS mirror; a `pwsh` run of the function would confirm it on the real .NET regex engine.\nevidence:\nThe regex probe gives the four expected results and ConvertTo-SingleQuoted doubles all five single-quote characters (behavior): bun -e probe above (4/4 expected for mise pattern, BUN regex probe clean); quote doubling via JS mirror, exact string match; pwsh not run (not installed).\nOnly install/windows-install.ps1 changed and mise run fmt:check passes (scope): `git status --short` shows only ` M install/windows-install.ps1`; `mise run fmt:check` exit 0.\nchecks-run: `mise run fmt:check` exit 0 (229 files formatted); bun -e regex probes (exit 0); JS quote-doubling mirror (exit 0).\nchanged-paths: install/windows-install.ps1",
+  "createdAt": "2026-10-27T18:26:29.203Z"
+}

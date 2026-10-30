@@ -1,0 +1,80 @@
+{
+  "id": "assignment-0mvrgin79-c897",
+  "intentId": "intent-0mvr58iqt-40ix",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.code",
+  "slug": "review-commit-c7bb78f-cli-finishes",
+  "objective": "Review commit c7bb78f (CLI finishes commands that read stdin before exiting) for correctness and regressions before it is pushed.",
+  "state": "Succeeded",
+  "scope": [
+    "Worktree C:/Users/david.basile/dev/holyagent-fix-cli-stdin, branch fix/cli-stdin, stacked on fix/state-off-main (PR #35, head 935d4b3).",
+    "Bug: on Windows the built CLI exited 0 without doing anything when input came on stdin (assignment close, intent create), because packages/runtime/src/cli/main.ts used Effect.runFork and a pending Bun.stdin.text() does not keep the process alive. Fix: top-level await Effect.runPromise; dispatch InvalidDraft refusal hints {\"id\": \"<id>\"}; regression test packages/runtime/tests/stdin.test.ts; rebuilt packages/integrations/claude/dist/scripts/holyagent.js.",
+    "Known Windows baseline: about 108 tests fail on untouched main on this machine (symlink EPERM, backslash paths, POSIX modes); compare against that.",
+    "Review `git diff 935d4b3 c7bb78f`."
+  ],
+  "constraints": [
+    "Read-only: no edits, no version-control writes, nothing under .git/ or .holyagent/.",
+    "When the review is done, stop and report findings marked blocking or non-blocking with file:line; launch no other reviewers."
+  ],
+  "criteria": [
+    {
+      "text": "Commands reading stdin complete and exit non-zero with the error on stderr on failure, and exit codes for every other command path are unchanged",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The regression test fails without the fix and passes with it, and no test newly fails against the baseline",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The change stays within the CLI entry point, the dispatch hint, its test and the rebuilt plugin, and follows the repository rules (Effect at integration boundaries, JSDoc)",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "workflow:wf_c943451a-36b/assignment-0mvrgin79-c897",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-28T01:50:07.632Z",
+    "finishedAt": "2026-10-28T02:16:44.517Z"
+  },
+  "result": "result: No blockers. c7bb78f fixes the Windows stdin exit, and the regression test fails on the base and passes with the fix. Three non-blocking items are listed below.\n\nchanged: none (read-only review). I wrote and removed a scratch copy of the base main.ts in the worktree, and `git status --short` was clean afterwards.\n\nchecks:\n- `/code-review medium 935d4b3...c7bb78f` -> ran, 4 findings. I classified them below.\n- `bun run lint` (`mise run lint`) -> exit 0, \"No problems in 117 files\". Type-check is on in `bunfig.toml`, so this covers it.\n- `bun test packages/runtime/tests/stdin.test.ts` -> 3 pass, 0 fail.\n- Base against fix: I ran the 935d4b3 `main.ts` with `echo '{\"objective\":\"x\"}' | bun ... intent create`. It exited 0 and printed nothing. The fixed `main.ts` printed the created Intent. This reproduces the bug and shows the test would fail on the base.\n- `mise run build` -> succeeded, and `git status` stayed clean afterwards. The committed `dist/scripts/holyagent.js` therefore matches a fresh build.\n- Full `bun test` -> 822 pass, 3 skip, 34 fail, run twice with the same count.\n  - Every failure is in the known Windows families: symlink, POSIX mode, vendored tools, wrapper, state worktree and path tests.\n  - None involves stdin, dispatch or the entry point.\n  - I did not run the suite on the base, so this is a read of the failure names, not a measured diff. The count is below the stated ~108 baseline.\n- `assignment dispatch` with bad input:\n  - `{\"id\":5}`, `{\"assignmentId\":\"x\"}` and `{\"id\":\"assignment-x\",\"extra\":1}` each exit 2 with the hint appended.\n  - I ran these against the source entry point. I did not run the built bundle or a hook command.\n  - I could only read, not run, the behavior on non-Windows platforms.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- Non-blocking, `packages/runtime/src/cli/assignment.ts:181-189`. The hint is added to every `InvalidDraft` from `inputBy`. That includes a failed `ExistingRef` decode: `{\"id\":5}` is told to \"send {\"id\": \"<id>\"}\", and an excess property next to a valid-looking id gets the same text. The message is also joined with \". \", so a message already ending in \".\" would show \"..\" (not triggered in my runs). Applying the hint only when the `AssignmentInput` branch was chosen would be tighter.\n- Non-blocking, `packages/runtime/src/cli/main.ts:36`. `run` never fails because of `catchCause`, so `runPromise` can only reject if the output `write` dies on a non-EPIPE error. That now ends in a stack trace with exit 1. On the base `runFork` would have lost it silently with exit 0, so this is an improvement and not a regression. Command exit codes are unchanged: they still come from `result.code`.\n- Rejected, bundle top-level await (`holyagent.js:19124`). The bundle is generated and I confirmed it is in step with a fresh build. It runs under Bun, where top-level await is supported.\n- Rejected, \"other entry points still use `runFork`\". `rg` finds no `runFork` or `Bun.stdin` in `packages` outside `main.ts`. Hooks go through the same `main.ts`.\n- Scope and rules: the diff touches only `main.ts`, the dispatch hint in `assignment.ts`, `stdin.test.ts` and the rebuilt bundle. The top-level `await Effect.runPromise` sits at the entry boundary, which the Effect rule allows. The `no-async-await` lint override passed. The test has no exported symbols, so JSDoc does not apply.\n\nevidence:\nCommands reading stdin complete and exit non-zero with the error on stderr on failure, and exit codes for every other command path are unchanged: the base exits 0 silently while the fix prints the created Intent. `stdin.test.ts` asserts exit 2 with `error: InvalidDraft:` and `error: StdinMissing:` on stderr and empty stdout. `run` in `packages/runtime/src/cli/program.ts:149-154` never fails and the exit code still comes from `result.code` at `main.ts:41`.\nThe regression test fails without the fix and passes with it, and no test newly fails against the baseline: `bun test packages/runtime/tests/stdin.test.ts` -> 3 pass. The base `main.ts` reproduces the silent exit 0. The full suite has 34 failures, all Windows-environment families and none touching stdin or dispatch. I did not run the suite on the base.\nThe change stays within the CLI entry point, the dispatch hint, its test and the rebuilt plugin, and follows the repository rules (Effect at integration boundaries, JSDoc): `git diff --stat 935d4b3 c7bb78f` lists only 4 files, `mise run lint` exits 0, and `mise run build` leaves the tree clean.\nfindings: the 4 `/code-review` findings plus my own are classified under notes. There are no blockers and 2 non-blocking items.\nchecks-run: lint, the stdin test, the base-against-fix reproduction, `mise run build` and the full `bun test`, as listed under checks.",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "No blockers; base reproduces silent exit 0, fix passes 3/3; diff limited to 4 files; lint and build clean.",
+    "criteria": [
+      {
+        "criterion": "Commands reading stdin complete and exit non-zero with the error on stderr on failure, and exit codes for every other command path are unchanged",
+        "support": "the base exits 0 silently while the fix prints the created Intent. `stdin.test.ts` asserts exit 2 with `error: InvalidDraft:` and `error: StdinMissing:` on stderr and empty stdout. `run` in `packages/runtime/src/cli/program.ts:149-154` never fails and the exit code still comes from `result.code` at `main.ts:41`."
+      },
+      {
+        "criterion": "The regression test fails without the fix and passes with it, and no test newly fails against the baseline",
+        "support": "`bun test packages/runtime/tests/stdin.test.ts` -> 3 pass. The base `main.ts` reproduces the silent exit 0. The full suite has 34 failures, all Windows-environment families and none touching stdin or dispatch. I did not run the suite on the base."
+      },
+      {
+        "criterion": "The change stays within the CLI entry point, the dispatch hint, its test and the rebuilt plugin, and follows the repository rules (Effect at integration boundaries, JSDoc)",
+        "support": "`git diff --stat 935d4b3 c7bb78f` lists only 4 files, `mise run lint` exits 0, and `mise run build` leaves the tree clean."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "the 4 `/code-review` findings plus my own are classified under notes. There are no blockers and 2 non-blocking items."
+      },
+      {
+        "label": "checks-run",
+        "support": "lint, the stdin test, the base-against-fix reproduction, `mise run build` and the full `bun test`, as listed under checks."
+      }
+    ]
+  },
+  "createdAt": "2026-10-28T01:49:53.013Z"
+}

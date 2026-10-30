@@ -1,0 +1,63 @@
+{
+  "id": "assignment-0mvqztvfv-ffm5",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-two-blocking-review-findings",
+  "objective": "Repair the two blocking review findings in the instruction change and fold in its small notes.",
+  "state": "Succeeded",
+  "scope": [
+    "Worktree /home/user/holyagent-instructions (head 671bdca). Review: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-assignment-0mvqzlmko-it5f.txt.",
+    "Blocker 1: give push authority one owner. In root/identity.md say reviewed branches are pushed and their stacked PRs opened or updated as the stack plan sets, once reviews accept, and that a user instruction to the contrary outranks this; change root/stack-plan.md:8, root/version-control.md:11 and requirements.md R-GIT to 'as the stack plan sets'; keep user approval for pushes to the base, default or protected branch, force-push, merges, publishing and deploys, and state in R-OUTWARD that opening a PR for a reviewed stacked branch is not publishing.",
+    "Blocker 2: add 'after an empty reply' to the neutral-line rule in root/task-list.md and requirements.md R-NUDGE.",
+    "Notes to fold in: state the noise list once (user-messages.md owns it; task-list.md keeps a one-line pointer) and trim R-NUDGE to point at it; say 'keep the checkout clean by committing work with holyagent vcs commit, so state stays on the state branch'; keep the ~/.claude/stop-hook-git-check.sh path (it is real, confirmed in this cloud session); restore 'not git loops' in root/delegating.md if it fits the core budget, else leave it out and say so; clarify asking.md:3 ('including when the user asks what needs their decision; then list only those').",
+    "Mind the root-core budget test (4000 on this branch)."
+  ],
+  "constraints": [
+    "Follow /home/user/holyagent/.claude/CLAUDE.md and the 'Writing instructions' rules in packages/integrations/claude/dist/agents/holyagent.md.",
+    "Work only in your worktree; make no version-control writes and no edits under .git/ or .holyagent/. Finish with mise run build and mise run verify.",
+    "Keep working until done; when done and checked, stop and report; no unrequested changes."
+  ],
+  "criteria": [
+    {
+      "text": "Push authority is stated one way across identity.md, stack-plan.md, version-control.md and requirements.md, with approvals kept for protected pushes, force-push and merges",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The neutral-line rule carries 'after an empty reply' everywhere it appears",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions/requirements.md",
+    "packages/runtime/src/instructions/claude-5.5/root",
+    "packages/runtime/src/instructions/claude-5.5/session-reminder.md",
+    "packages/integrations/claude/dist/agents",
+    "packages/integrations/claude/dist/scripts",
+    "packages/integrations/claude/tests",
+    "packages/runtime/tests"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvqz0j46-rf4y",
+  "specialist": {
+    "agentId": "workflow:wf_134c5f6a-34c/assignment-0mvqztvfv-ffm5",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T18:02:43.435Z",
+    "finishedAt": "2026-10-27T18:06:22.134Z"
+  },
+  "result": "result: Both blockers are repaired and the notes folded in, except the restored \"not grep or git loops\" in delegating.md, which I left out because it would not fit the 4000-character core budget. `mise run build` and `mise run verify` pass.\n\nchanged (all under /home/user/holyagent-instructions):\n- packages/runtime/src/instructions/requirements.md\n- packages/runtime/src/instructions/claude-5.5/root/identity.md\n- packages/runtime/src/instructions/claude-5.5/root/stack-plan.md\n- packages/runtime/src/instructions/claude-5.5/root/version-control.md\n- packages/runtime/src/instructions/claude-5.5/root/task-list.md\n- packages/runtime/src/instructions/claude-5.5/root/user-messages.md\n- packages/runtime/src/instructions/claude-5.5/root/asking.md\n- packages/integrations/claude/dist/agents/holyagent.md (generated)\n- packages/integrations/claude/dist/scripts/holyagent.js (generated)\n\nchecks:\n- `mise run build` -> exit 0, 29 files built.\n- `mise run verify` -> pass: format clean, no type errors, no lint problems, 825 tests pass, 1 skip, 0 fail. I read the exit status from the output, not from a captured exit code.\n- The root-core length is 3994, against a limit of 4000.\n\nblockers: none\nquestions: none\n\nnotes:\n- delegating.md: I tried restoring \"not grep or git loops\", but it pushed the core over 4000 characters. I trimmed the added text elsewhere to fit the budget and left delegating.md identical to HEAD.\n- The neutral-line rule in task-list.md is now \"Say nothing of hook or harness noise (User messages lists it); after an empty reply, a harness demand for visible output gets one neutral line naming no hook.\" The noise list lives only in user-messages.md.\n- I trimmed task-list.md's \"Ask only when…\" clause to \"nothing else settles it; otherwise act and record the default\", since asking.md owns the details of what settles a question.\n- In identity.md I wrote \"open or update their PRs\", dropping \"stacked\" so the core fits the budget. R-GIT keeps \"stacked PRs\".\n- The diff is saved at /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/repair.diff. It covers the instruction sources and `dist/agents`, not `dist/scripts/holyagent.js`.\n\nevidence:\nPush authority is stated one way across identity.md, stack-plan.md, version-control.md and requirements.md, with approvals kept for protected pushes, force-push and merges:\n- identity.md now says reviewed branches are pushed and their PRs opened or updated as the stack plan sets once reviews accept, and that the user's word to the contrary outranks this. The same line keeps \"Never force-push\" and the approval list for the base, default or protected branch, merging, publishing and deploys.\n- stack-plan.md:8, version-control.md:11 and R-GIT all say \"as the stack plan sets\".\n- R-GIT keeps the ban on force-push and on pushes to the base, default or a protected branch without approval.\n- R-OUTWARD now says opening a PR for a reviewed stacked branch is not publishing.\n- Supporting diff: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/repair.diff.\n\nThe neutral-line rule carries 'after an empty reply' everywhere it appears: it appears in task-list.md, user-messages.md:8 (already had it) and R-NUDGE in requirements.md, and the regenerated dist/agents/holyagent.md carries these edits.\n\nmise run verify passes: exit 0 from the output; 825 pass, 0 fail, after `mise run build`.\n\nchanged-paths: the nine paths listed under changed above.\n\nchecks-run: `mise run build` (exit 0) and `mise run verify` (825 pass, 1 skip, 0 fail), plus a measurement of the root-core length (3994 of 4000).",
+  "createdAt": "2026-10-27T18:02:43.435Z"
+}

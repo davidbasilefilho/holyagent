@@ -1,0 +1,65 @@
+{
+  "id": "assignment-0mvqxgyn3-f29m",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-cloud-author-identity-change",
+  "objective": "Review the cloud author identity change (4702068..a5575f1 on ccr-046ad103-6qsvgx-identity) for correctness and regressions.",
+  "state": "Succeeded",
+  "scope": [
+    "Worktree /home/user/holyagent-identity (node_modules installed; mise available). Diff without dist and .holyagent: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/identity.diff.",
+    "Intent: in claude.ai (CLAUDE_CODE_REMOTE=true) commits use the account owner as author (author.name/author.email in local git config, set by the new vcs identity command from the GitHub connector) and keep the cloud committer Claude <noreply@anthropic.com>, so the Anthropic signature verifies; outside claude.ai behavior is unchanged; identity guidance appears in session context only in the cloud; nothing identity-related is written to repository files."
+  ],
+  "constraints": [
+    "Read-only: write no repository files; make no version-control writes and no edits under .git/ or .holyagent/."
+  ],
+  "criteria": [
+    {
+      "text": "Findings are ranked blocking or non-blocking with file:line and a failure scenario, covering the cloud and non-cloud paths, GIT_AUTHOR_* precedence and the identity command's validation",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Tests are judged for whether they fail without the change",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvqw75ho-95eb"
+  ],
+  "specialist": {
+    "agentId": "workflow:wf_96692dce-8d3/assignment-0mvqxgyn3-f29m",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T16:56:41.823Z",
+    "finishedAt": "2026-10-27T17:20:35.788Z"
+  },
+  "result": "result: No blockers. All 8 `/code-review` findings are non-blocking or rejected. `mise run verify` passes (808 pass, 1 skip, 0 fail), but the tree was not mutated, so \"fails without the change\" is judged by reading. Evidence is from a settled tree (`git status` clean).\n\nchanged: none (read-only). `/code-review high 4702068...a5575f1` ran through the Skill tool and loaded the built-in review.\n\nchecks:\n- `mise run verify` in `/home/user/holyagent-identity` -> exit 0. Type-check: no errors in 103 files. Lint: no problems in 104 files. Format: 217 files formatted. Tests: 808 pass, 1 skip, 0 fail, 5437 expects.\n- Manual git probes in temp repos: `git var GIT_AUTHOR_IDENT` honours `GIT_AUTHOR_*` over `author.*` over `user.*`. Git is 2.43.\n- Not run: a real claude.ai commit signature check, and the GitHub connector's `get_me`. Whether Anthropic's signature verifies with a user author and a Claude committer is read from the intent, not run.\n\nblockers: none\n\nnotes (each classified from the `/code-review` claims):\n\nNon-blocking\n1. `packages/runtime/src/vcs/commit.ts:90`, `requireOwnIdentity` checks only `user.*`, not the author git would use. Outside a cloud session a commit can pass the check yet be authored by an agent.\n   - Scenario: `user.*` is a person and `author.*` or `GIT_AUTHOR_*` is Claude.\n   - This is the same as the base, so it is not a regression. The new `vcs identity` command makes `author.*` a documented key, so the gap is more reachable. The non-cloud test 'the author setting is ignored' pins this behavior.\n2. `packages/runtime/src/vcs/errors.ts` (CloudAuthor hint) and `commit.ts:44`: with `GIT_AUTHOR_NAME` or `GIT_AUTHOR_EMAIL` set to an agent in the environment, the environment wins over `author.*`, which I probed.\n   - Scenario: `vcs identity` succeeds, `vcs commit` still refuses with CloudAuthor, and the hint says to run `vcs identity` again, which loops. The hint never mentions the environment variables.\n   - This is the precedence behavior the cloud tests cover with a refusal, so it is correct but not self-healing. The hint could name them.\n3. `packages/runtime/src/vcs/author.ts:30-37`: `--name ','` or `';'` passes validation. I probed git, and `git var` then fails with \"name consists only of disallowed characters\", so `vcs commit` reports \"(none set)\" and the hint loops back to `vcs identity`.\n   - The `/code-review` example `'.'` is rejected: git accepts `. <a@b.c>`.\n   - A GitHub name made only of punctuation is implausible.\n4. `packages/runtime/src/vcs/identity.ts:3`: `/^claude\\b/i` rejects a real user named \"Claude Dupont\" (also `looksLikeAgent`'s original rule on the base). `vcs identity` and CloudAuthor now apply it to `get_me` names. The hint offers only the login when the name is empty, so such a user has no path. This is a limited false positive and the rule already existed for `user.name`.\n5. `packages/runtime/src/cli/hook.ts:210-214`: a cloud session whose main thread is already the holyagent agent, in a project with no `.holyagent` and no legacy folder, gets no author text. The test 'says nothing to a root with neither' asserts this on purpose. The first `vcs commit` then refuses with the CloudAuthor hint, which carries the full steps, so the session recovers. This matches the intent only partly (\"guidance appears in the cloud\").\n6. `packages/runtime/src/vcs/author.ts:38-39`: the two `git config` writes are not atomic. A failure between them leaves `author.name` set with `author.email` at `user.email` (noreply@anthropic.com). The next `vcs commit` refuses, so the state is detected and the command can simply be re-run.\n7. `packages/runtime/src/vcs/commit.ts:44`: when no identity is configured, `git var GIT_AUTHOR_IDENT` can return an auto-detected `user@host`, which passes. In claude.ai `~/.gitconfig` always sets `user.*` to Claude, so this does not occur in the target environment.\n8. `packages/runtime/src/state/tree.ts:201` repeats the ident regex that `parseIdent` provides (`parseIdent` forbids angle brackets in the email). `tree.ts` is untouched by this change, so this is optional dedup.\n9. Rejected: two identity checks selected by `cloud` (`requireOwnAuthor` and `requireOwnIdentity`) is a design preference. The split is justified because the non-cloud path must stay unchanged.\n\nScope and compatibility:\n- Nothing identity-related goes into repository files. `identity` uses `git config --local`, which lives in `.git/config`. A test asserts `git status` and `ls-files` are unchanged.\n- The cloud switch is the strict `CLAUDE_CODE_REMOTE === \"true\"`. `\"false\"` and `\"1\"` are tested as non-cloud.\n- Docs, `dist` and requirements text changes are consistent with the code.\n- The generated `dist` is not covered by a rebuild check here (not examined beyond the plugin tests, which pass).\n\nTest judgment (read, not run against the base):\n- `vcs identity` writes only the two keys, validation refusals write nothing, and the missing or agent-like author is refused with exit 3. All of these fail on the base: the command does not exist, and the base would refuse the cloud commit with AgentIdentity.\n- The cloud test 'the author is the user and the committer stays Claude' asserts the `%an|%cn` pair on a real commit. It fails on the base. The `GIT_AUTHOR_*`, `author.*` and environment-variable cases are covered.\n- The non-cloud test passes on the base too. It is a regression guard, not a change test, which is acceptable.\n- The hook and session-context tests assert the text is present only when `CLAUDE_CODE_REMOTE=true`, its position, and the context budget. The plugin test asserts the static root prompt has no identity guidance. All of these fail without the change.\n- Gap: no test covers the `--name ','` case (note 3) or a `GIT_AUTHOR_*` environment variable overriding a good `author.*` (note 2).\n\nevidence:\nFindings are ranked blocking or non-blocking with file:line and a failure scenario, covering the cloud and non-cloud paths, GIT_AUTHOR_* precedence and the identity command's validation: no blockers. Non-blocking notes 1-9 above carry file:line and scenarios. Cloud path: `commit.ts:42-52`, `commands.ts` (`inCloudSession`), `hook.ts:210`. Non-cloud: `commit.ts:30-37`. `GIT_AUTHOR_*` precedence: probed with `git var` (note 2). Validation: `author.ts:28-37` and the probe in note 3.\nTests are judged for whether they fail without the change: the new cloud, `identity`, hook, session-context and plugin tests fail on the base by reading; the non-cloud test is a guard that also passes on the base (see \"Test judgment\"). Test files: `/home/user/holyagent-identity/packages/runtime/tests/vcs-commit.test.ts`, `/home/user/holyagent-identity/packages/runtime/tests/sessioncontext.test.ts`, `/home/user/holyagent-identity/packages/integrations/claude/tests/hooks.test.ts`.\nchecks-run: `mise run verify` -> exit 0 (808 pass, 1 skip, 0 fail; check, lint and fmt:check clean); `git var` probes in temp repos; `/code-review high 4702068...a5575f1`.",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Validation or review completed on the named head with evidence; no blockers.",
+    "criteria": [
+      {
+        "criterion": "Findings are ranked blocking or non-blocking with file:line and a failure scenario, covering the cloud and non-cloud paths, GIT_AUTHOR_* precedence and the identity command's validation",
+        "support": "no blockers. Non-blocking notes 1-9 above carry file:line and scenarios. Cloud path: `commit.ts:42-52`, `commands.ts` (`inCloudSession`), `hook.ts:210`. Non-cloud: `commit.ts:30-37`. `GIT_AUTHOR_*` precedence: probed with `git var` (note 2). Validation: `author.ts:28-37` and the probe in note 3."
+      },
+      {
+        "criterion": "Tests are judged for whether they fail without the change",
+        "support": "the new cloud, `identity`, hook, session-context and plugin tests fail on the base by reading; the non-cloud test is a guard that also passes on the base (see \"Test judgment\"). Test files: `/home/user/holyagent-identity/packages/runtime/tests/vcs-commit.test.ts`, `/home/user/holyagent-identity/packages/runtime/tests/sessioncontext.test.ts`, `/home/user/holyagent-identity/packages/integrations/claude/tests/hooks.test.ts`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`mise run verify` -> exit 0 (808 pass, 1 skip, 0 fail; check, lint and fmt:check clean); `git var` probes in temp repos; `/code-review high 4702068...a5575f1`."
+      }
+    ]
+  },
+  "createdAt": "2026-10-27T16:56:41.823Z"
+}

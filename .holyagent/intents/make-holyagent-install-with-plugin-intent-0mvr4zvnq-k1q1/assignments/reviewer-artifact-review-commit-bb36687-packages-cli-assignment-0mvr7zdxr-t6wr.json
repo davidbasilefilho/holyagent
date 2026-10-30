@@ -1,0 +1,63 @@
+{
+  "id": "assignment-0mvr7zdxr-t6wr",
+  "intentId": "intent-0mvr4zvnq-k1q1",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-commit-bb36687-packages-cli",
+  "objective": "Review commit bb36687 (packages/cli deleted, installers shrunk, README and docs rewritten for the plugin-only install, pi decision recorded) against the Intent.",
+  "state": "Succeeded",
+  "scope": [
+    "Worktree C:/Users/david.basile/dev/holyagent-feat-plugin-only-install, branch feat/plugin-only-install, stacked on fix/state-off-main (PR #35, head 935d4b3).",
+    "Intent: HolyAgent installs with `claude plugin marketplace add davidbasilefilho/holyagent`, `claude plugin marketplace add ranxianglei/billion-context`, `claude plugin install holyagent@holyagent` and nothing else; prerequisites Bun on PATH, Node LTS, git, authenticated gh. Setup moves into the plugin runtime as `holyagent setup` and `holyagent doctor [--fix]`: install Billion Context (bili, native mode, compress.rules) and ctx7 with its skill; merge attribution, includeGitInstructions, subagentPromptCacheTtl, extraKnownMarketplaces, enabledPlugins and permissions.deny into the USER settings (~/.claude/settings.json) never changing a value already set, keeping the + = ~ ! report lines; doctor checks user settings, not the current directory; steps idempotent, a failed step does not stop the others, --dry-run works. /holyagent:setup slash command runs setup and shows its report like /billion-context:bili-setup. SessionStart check: cheap, bounded, never installs or writes, only detects missing bili, ctx7 or settings keys and adds one line suggesting /holyagent:setup; silent when all is in place; within docs/hooks.md bounds. User decisions: plugin-registration step dropped; Bun canary check dropped (doctor checks bun on PATH); cloud sessions (CLAUDE_CODE_REMOTE=true): SessionStart silent, setup skips bili/ctx7 with a '-' line but still merges settings. packages/cli is deleted; the future pi extension installs with plain `pi install` (recorded in docs/decisions.md). README keeps its six sections in order (AGENTS.md).",
+    "Known Windows baseline: about 107 tests in packages/* fail on untouched main on this machine (symlink EPERM, backslash paths, POSIX modes, bundled hook tests); compare against that rather than treating them as new.",
+    "Read C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/node_modules/.review/docs.diff (the commit without bun.lock and the deleted packages/cli) and the files under C:/Users/david.basile/dev/holyagent-feat-plugin-only-install it touches."
+  ],
+  "constraints": [
+    "Read-only: no edits, no version-control writes, nothing under .git/ or .holyagent/.",
+    "When the review is done, stop and report findings marked blocking or non-blocking with file:line; launch no other reviewers."
+  ],
+  "criteria": [
+    {
+      "text": "README keeps exactly # HolyAgent, How do I install it?, Why HolyAgent?, Development, Special thanks, License in order, and the install section shows the three commands, the prerequisites and one line about /holyagent:setup on first launch",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "install/wsl-install.sh and install/windows-install.ps1 install only Bun, Node LTS, git, gh and, for development, mise, and each ends by printing the three plugin commands",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No doc, script or config still tells users to run packages/cli or setup claude, and the docs describe setup, doctor, /holyagent:setup and the SessionStart check consistently with the Intent",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "docs/decisions.md records that packages/cli is deleted and the pi extension installs with plain pi install, in the file's existing format",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Changes stay in scope: no unrequested content, and docs/attributions.md:25 'and the public CLI' is flagged if still present",
+      "blocking": false,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvr5jcix-kkv9"
+  ],
+  "specialist": {
+    "agentId": "workflow:wf_f1731b3c-653/assignment-0mvr7zdxr-t6wr",
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-27T21:50:58.687Z",
+    "finishedAt": "2026-10-27T21:58:54.971Z"
+  },
+  "result": "result: Not done. Review of bb36687 is complete from the diff and files, with two blocking gaps and one non-blocking scope item. I did not switch to the fix/state-off-main assignment (see questions).\nchanged: none (read-only review)\nchecks: none run. This session has no shell, so no bun, mise or test commands ran. Everything came from reading node_modules/.review/docs.diff and the worktree files, and the install scripts were read, not executed.\nblockers:\n- install/wsl-install.sh:143 and install/windows-install.ps1:~200 install mise on every run, and mise is then the installer for Node, Bun and gh (wsl-install.sh:166-187, windows-install.ps1 Bun/Node steps). The criterion lists mise as a development-only install, and docs/decisions.md:53 and docs/requirements.md say the same. Either mise becomes a documented exception to the plugin-only install or the Node/Bun/gh install path changes. This needs a root decision.\n- packages/runtime/src/instructions/requirements/cache.md:7 (shipped agent instruction text) says \"the public CLI sets `subagentPromptCacheTtl` to 1h\". The public CLI is deleted and `holyagent setup` now writes that key. This is a stale reference, not a run instruction.\nquestions:\n- The compressed history says I am now the worker for assignment-0mvr5ftbl-g78k on fix/state-off-main, citing a task text m00309. I cannot see that message in this session. The only task I have is the bb36687 review, so I finished that and did not switch. The root should confirm which assignment stands.\n- Should mise be a documented exception to the \"plugin-only\" install, or should the installers stop using it for plugin-only users?\nnotes:\n- docs/attributions.md:25 still reads \"and the public CLI\" (criterion 5, flagged as asked).\n- docs/decisions.md:53 records the deletion and the pi decision in the file's format, but names \"the public CLI\" and not packages/cli. Naming the path would make the record exact.\n- The SessionStart line text in packages/runtime/src/setup/check.ts:29 matches docs/hooks.md:25 word for word. I did not read the cloud-session silence logic in check.ts or sessioncontext.ts, so that part of the docs is checked only for wording.\n- README Node floor changed from \"20 or later, 22.13 or later for ctx7\" to \"22.13 or later\". Both statements are consistent with docs/requirements.md, since the README is a summary.\nevidence:\nREADME keeps exactly # HolyAgent, How do I install it?, Why HolyAgent?, Development, Special thanks, License in order, and the install section shows the three commands, the prerequisites and one line about /holyagent:setup on first launch: met. README.md headings at lines 1, 9, 21, 29, 42, 52; prerequisites README.md:11; three commands README.md:13-17; first-launch line README.md:19.\ninstall/wsl-install.sh and install/windows-install.ps1 install only Bun, Node LTS, git, gh and, for development, mise, and each ends by printing the three plugin commands: gap. mise is installed unconditionally (wsl-install.sh:143, windows-install.ps1 mise step) and used to install Node, Bun and gh. The three commands are printed at the end of both scripts (wsl-install.sh:951-962, windows-install.ps1:669-678).\nNo doc, script or config still tells users to run packages/cli or setup claude, and the docs describe setup, doctor, /holyagent:setup and the SessionStart check consistently with the Intent: gap. Repo-wide grep for packages/cli, setup claude, public CLI and bun packages finds no run instruction. The stale mention is packages/runtime/src/instructions/requirements/cache.md:7. Doctor output format (ok/FAIL, doctor.ts:12-13) and setupNotice text (check.ts:29) match docs/usage.md:346 and docs/hooks.md:25.\ndocs/decisions.md records that packages/cli is deleted and the pi extension installs with plain pi install, in the file's existing format: met. docs/decisions.md:53 is a bold-lead paragraph in \"## Changed since the audit\", with pi install named. Deletion is shown by Glob finding no packages/cli files; deletion was not checked in git.\n[non-blocking] Changes stay in scope: no unrequested content, and docs/attributions.md:25 'and the public CLI' is flagged if still present: flagged. docs/attributions.md:25 still says \"and the public CLI\". The bunfig.toml:40 and scripts/bump-version*.ts edits follow from the deletion and are in scope.\nRequired evidence \"findings\": the blocking and non-blocking items above, with file:line.",
+  "createdAt": "2026-10-27T21:50:57.615Z"
+}

@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mvr0ihy6-ezpn",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.security",
+  "slug": "confirm-the-windows-repair-closes-the",
+  "objective": "Confirm the Windows repair closes the installer secret leak and temp-script execution findings without new vulnerabilities.",
+  "state": "Succeeded",
+  "scope": [
+    "Repair diff (daca0f9..8e9399b on ccr-046ad103-6qsvgx-windows, without dist): /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/windows-fix2.diff; files in /home/user/holyagent-windows. Judge only whether the earlier findings close and whether the repair adds a problem.",
+    "Earlier findings: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-assignment-0mvqzz5pk-vnqv.txt (1 API key in error, 2 predictable temp script, 3 profile quoting, plus the rest)."
+  ],
+  "constraints": [
+    "Read-only: write no files."
+  ],
+  "criteria": [
+    {
+      "text": "Each earlier finding is marked closed or open with file:line, and new findings are traced and rated or their absence stated",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources-read"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvr0ck29-hdsz"
+  ],
+  "followUpOf": "assignment-0mvqzz5pk-vnqv",
+  "specialist": {
+    "agentId": "workflow:wf_ab765e82-411/assignment-0mvr0ihy6-ezpn",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T18:21:52.351Z",
+    "finishedAt": "2026-10-27T18:26:28.643Z"
+  },
+  "result": "result: The leak (1) and the temp-script execution (2) are closed. Finding 3 is only partly closed: the repair doubles ASCII `'` but not the curly single quotes PowerShell also treats as quote characters (new Low). Finding 4 is unchanged by design (Low). Finding 5 and the hook-spawn suspicion were not touched. I found no blocker and no other new vulnerability.\n\nThe built-in `/security-review` could not run. Its `git diff origin/HEAD...` step failed with \"unknown revision\" because the worktree has no `origin/HEAD`. This review is a manual read of the repair diff plus the current `/home/user/holyagent-windows/install/windows-install.ps1` and the files named below. I ran nothing, wrote nothing, and saw no sign the tree was changing. The `dist/` files were not read, and the PowerShell behaviors below are from reading the code, not from running it on Windows.\n\n**Earlier findings**\n\n1. **API key in the error message: CLOSED.**\n   - `windows-install.ps1:55-69`: `Invoke-Native` now builds the error text from `$shown`, which replaces the value after `--api-key` (and `--api-key=*`) with `<redacted>`.\n   - The only call that passes the key is line 346 (`--api-key $env:CONTEXT7_API_KEY`), so the redaction covers it. The catch at line 376 prints only that redacted message.\n   - A command-not-found error does not include the arguments. No other path puts the key in a message.\n   - Note, not a finding: the key is still visible in the process list while `ctx7` runs. The comment at lines 339-341 discloses this.\n\n2. **Predictable temp script that gets executed: CLOSED.**\n   - `windows-install.ps1:293-329`: the script is now a here-string piped to `node -` on stdin. No file is written or deleted, so the swap window is gone.\n   - The `BILI_CONFIG` path still comes from the installer's own environment (the same trust as before). The config rename in the Node script is also unchanged.\n\n3. **Profile line quoting: PARTIALLY CLOSED, residual Low (new).**\n   - `windows-install.ps1:95` (`ConvertTo-SingleQuoted`), used at lines 215-218, doubles only the ASCII `'`. It leaves U+2018, U+2019, U+201A and U+201B unescaped. PowerShell reads those four as single quotes too, in single-quoted strings.\n   - Source: `$env:BUN_INSTALL`, `$HOME`, or the `Find-Mise` result. These can contain a curly apostrophe, for example a profile folder `C:\\Users\\O’Brien`.\n   - Sink: the string appended to `$PROFILE.CurrentUserAllHosts`, which PowerShell parses on every shell start.\n   - Precondition: a curly quote in one of those paths. A hostile value would also need control of the installer's own environment, so that case is theoretical.\n   - Impact: the same as before for an accidental curly quote, a profile that fails to parse on every start. A hostile value could add persistent code.\n   - Fix: also double `[char]0x2018`, `0x2019`, `0x201A` and `0x201B` in `ConvertTo-SingleQuoted`.\n   - Rating: Low, not a blocker. The ASCII case, the realistic one, is fixed.\n   - Not a security issue: the new profile regex at line 218, `^\\s*(?!#).*mise.*\\bactivate\\b.*pwsh`, can still match an indented commented line, because `\\s*` can backtrack before the lookahead. The effect is a skipped install of the activation line.\n\n4. **User-writable `BUN_INSTALL\\bin` ahead of system paths: unchanged, Low, accepted design.** The profile line at `windows-install.ps1:217` and `Update-SessionPath` at line 116 still put it first, as the WSL installer does (`wsl-install.sh:67, 164`). The comment at lines 211-213 now matches the code.\n\n5. **Case-sensitive state-directory guard: OPEN, untouched by the repair.** `packages/runtime/src/vcs/commit.ts:78` still compares `clean === STATE_DIRECTORY` exactly. Low, an integrity guard and not an attacker-facing boundary.\n\n6. **Hook `bun` resolved from the project folder on Windows: still unverified, untouched.** The repair only changes `docs/hooks.md`. Its new sentence says a hook that fails to receive its arguments does not fail visibly, because `bun` with no arguments exits 0. The doc now states this accurately.\n\n**New repair-only changes, checked and sound**\n\n- **Hand-run command with flags:** the `bun --no-env-file --config=\"${CLAUDE_PLUGIN_ROOT}/scripts/empty-bunfig.toml\" \"…/holyagent.js\"` form appears in `dispatch.md:1`, `specialist/working.md:4` and `docs/hooks.md`. It keeps a project's `.env` and `bunfig.toml` from changing how the CLI starts. This is a security improvement, and `wrapper.sh:42` already used the same flags.\n- **New instructions test:** it requires those flags on every mention of `holyagent.js` in the instruction files. No new sink.\n- **Invoke-Probe:** it uses splatted arguments with no shell and discards stderr. Its only caller outputs are exit codes and lines.\n- **`$ErrorActionPreference = 'Continue'` around `node -`:** it is restored afterward and is a robustness matter only. The earlier version check at line 226 already guarantees node exists.\n- **Prose changes:** the edits to `asking.md` and `user-messages.md` carry no security effect.\n\nevidence:\nEach earlier finding is marked closed or open with file:line, and new findings are traced and rated or their absence stated: Finding 1 is closed (`windows-install.ps1:55-69` and `:346`). Finding 2 is closed (`windows-install.ps1:293-329`). Finding 3 is partly closed, with a new Low residual for curly single quotes (`windows-install.ps1:95` and `:215-218`). Finding 4 is unchanged and accepted (`windows-install.ps1:116` and `:217`). Finding 5 is open (`commit.ts:78`). The hook-spawn suspicion is untouched. No other new vulnerability was found in the repair.\nsources-read: `/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/windows-fix2.diff` (all 241 lines); `/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-assignment-0mvqzz5pk-vnqv.txt` (all); `/home/user/holyagent-windows/install/windows-install.ps1` (all 379 lines); grep of `holyagent.js` across `/home/user/holyagent-windows/packages` (non-dist: `wrapper.sh:42`, `dispatch.md:1`, `working.md:4`, `generate.ts`, tests); `/home/user/holyagent-windows/packages/runtime/src/vcs/commit.ts:78`; `/home/user/holyagent-windows/install/wsl-install.sh:55,67,164`. The built-in `/security-review` could not run (no `origin/HEAD`).",
+  "createdAt": "2026-10-27T18:21:52.351Z"
+}

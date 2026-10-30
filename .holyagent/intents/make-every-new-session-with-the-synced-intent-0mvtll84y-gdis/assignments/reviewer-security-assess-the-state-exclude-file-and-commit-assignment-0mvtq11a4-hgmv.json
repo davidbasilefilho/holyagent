@@ -1,0 +1,56 @@
+{
+  "id": "assignment-0mvtq11a4-hgmv",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.security",
+  "slug": "assess-the-state-exclude-file-and-commit",
+  "objective": "Assess the state exclude-file and commit-scope fixes for security issues: lock handling, writes under .git, case folding, and anything that could commit state the project does not accept.",
+  "state": "Succeeded",
+  "scope": [
+    "Worktree /home/user/holyagent-state-edges; review commit 32b1d25 (eaed3fd..32b1d25); diff: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/rv-B.diff.",
+    "Earlier security notes: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-9sjn.txt; writer report /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-1i5u.txt."
+  ],
+  "constraints": [
+    "Read-only: write no files and make no version-control writes."
+  ],
+  "criteria": [
+    {
+      "text": "Each finding traces a source to a sink with file:line and a fix, or the absence of findings is stated",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources-read"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvtpddfi-1i5u"
+  ],
+  "specialist": {
+    "agentId": "workflow:wf_52d895ab-075/assignment-0mvtq11a4-hgmv",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T15:51:39.965Z",
+    "finishedAt": "2026-10-29T16:01:12.674Z"
+  },
+  "result": "result: No blocker and no validated vulnerability in `eaed3fd..32b1d25`. I have one low-severity suspicion (case folding now depends on `core.ignorecase`) and four non-blocking notes.\n\n**Built-in coverage:** `/security-review` failed to start. Its `git log origin/HEAD...` step errored with \"unknown revision\", because this clone has no `origin/HEAD`. I reviewed `rv-B.diff` and the live files in `/home/user/holyagent-state-edges`. I have no shell, so I ran no tests or git commands and did not confirm the files equal `32b1d25`. I did not read the minified `dist/scripts/holyagent.js`.\n\n**Trust boundaries**\n- **Sources:** paths named in `vcs commit -- <paths>`, the contents of `.git/info/exclude` (including a symlinked file), git config (`holyagent.stateMode`, `core.ignorecase`, the new `holyagent.stateExcludeKept`), and lock files in `.git/holyagent/`.\n- **Sinks:** `git add -A -- <scope>` (`commit.ts:211`), `git commit`, and writes to `.git/info/exclude`, `.git/config` and `.git/holyagent/exclude.lock`.\n\n**Suspicion (low): case folding depends on `core.ignorecase`**\n- **Source:** a path named in `vcs commit`, for example `.HolyAgent/x`.\n- **Sink:** `git add -A -- .HolyAgent/x` at `commit.ts:211`, reached in `branch` or `local` mode.\n- **Path:** `inStateFolder` (`commit.ts:70-73`) now folds case only when `core.ignorecase` is true. Before this change it always folded. `commitScope` defaults `ignoreCase` to false (`commit.ts:97`).\n- **Precondition:** the file system ignores case but `core.ignorecase` is false or unset. A Linux repository copied or bind-mounted onto macOS or Windows keeps the Linux value.\n- **Impact:** on such a file system `.HolyAgent/x` is the real `.holyagent/x`. The scope check lets it through, and git's case-sensitive exclude pattern `/.holyagent/` does not match it. The state file is then committed in `local` or `branch` mode. The required precondition is a misconfigured clone plus a model-chosen odd spelling, so I could not validate it.\n- **Fix:** refuse the state folder in `branch` and `local` modes with an unconditional case fold. Keep the canonicalization in `work` mode conditional on `ignoreCase`. The cost is that a literal `.HolyAgent` folder on a case-sensitive file system is refused.\n\n**Notes (availability or hygiene only, none a blocker)**\n1. **Exclude-line match (`tree.ts:135-136`):** `isMark` and `isEntry` use `trim()`. Git treats a leading space or tab in an exclude line as part of the pattern. A user line like ` /.holyagent/` would count as present (`hasEntry`, `tree.ts:143`), so nothing is added, and the folder is not actually ignored. The only source is the user's own file, and the old code behaved the same. Fix: trim only trailing whitespace.\n2. **Leftover temp file (`tree.ts:205-212`):** the temp file `info/exclude.<pid>.<uuid>.tmp` is cleaned up only when the rename fails. A failed `Bun.write` can leave it behind. Fix: put the cleanup around the write as well.\n3. **Short lock wait (`tree.ts:198`):** the exclude lock uses the short wait, about 1 second. A crashed holder with an unreadable lock file blocks `local` resolves for up to 30 seconds (`lock.ts:19`) and fails with `StateLocked`. This only happens when the entry is missing, because `done: hasEntry` skips the lock otherwise.\n4. **Hand-set `local` removes the user's line (`tree.ts:263-264`):** if the user sets `local` with `git config` and already had their own unmarked line, leaving `local` removes it (the \"legacy\" rule). The user's line is lost, but the state still stays out of commits.\n5. **NTFS 8.3 short names:** on Windows, `HOLYAG~1/x` passes `pathProblem` (`paths.ts:12`) and `inStateFolder`. It could bypass the state fence. The old code had the same gap, and it needs an agent-supplied path, so I rate it very low.\n\n**Checked and sound**\n- **Root path:** `\"\"`, `.` and `..` are rejected by `pathProblem` (`paths.ts:16-17`), so no commit scope can cover the project root. Relaxing `requireUntrackedState` to `requireNoStagedState` (`commit.ts:169`) therefore opens no path where a modified tracked state file is swept in by a directory scope.\n- **No glob widening:** `gitPaths` passes `--literal-pathspecs`, so scope entries are not read as globs or pathspec magic.\n- **Pre-staged state:** `StagedOutsideScope` still blocks any pre-staged file outside the scope (`commit.ts:208-209`). A case-misfolded staged name fails closed.\n- **Case folding of the folder name:** the letters in `.holyagent` have no Unicode lowercase collisions, so `toLowerCase` cannot be spoofed.\n- **Lock ordering:** `worktree.lock` (long wait) is taken before `exclude.lock`. Nothing inside `exclude.lock` takes `worktree.lock`, so there is no deadlock (`tree.ts:195-215`, `956-1001`).\n- **Mode races:**\n  - A waiter re-reads the mode under the lock (`tree.ts:222-232`), so it cannot bring the entry back after `local` was left.\n  - Entering `local` adds the entry before the mode write, and leaving removes it after (`tree.ts:988-997`). Records are never exposed to git, and the transient state hides records rather than leaking them.\n- **Rollback:** a failed mode write rolls the entry back (`tree.ts:990-996`). A failed note write aborts `excludeState` before the file is rewritten.\n- **Exclude write:** it happens in `.git` only, through temp file plus rename, with an unpredictable name. A repository clone cannot supply `.git/info/exclude`, `.git/config` or the lock files.\n- **Config key:** `holyagent.stateExcludeKept` is set only by holyagent, holds a fixed value and takes no user input.\n- **Work mode:** state is staged in `work` mode only, canonicalized to `.holyagent`. A mode value from the repository's files cannot reach it, because the mode is read from git config only.\n- **Dependencies and network:** no new dependency, no new network or outbound call, and nothing pushes.\n\n**Not run:** tests and `mise run verify`. The writer's reported figures are 905 pass, 1 skip, 0 fail, and I did not reproduce them. The symlinked-exclude claim (\"git resolves it\") rests on the writer's test. I could not confirm it by running `rev-parse --path-format=absolute`.\n\nblockers: none\nquestions: none\n\nevidence:\nEach finding traces a source to a sink with file:line and a fix, or the absence of findings is stated: No blocker or validated vulnerability. One suspicion, case folding conditional on `core.ignorecase`, traced from the named path (`commit.ts:70-73`, `97`, `199`) to `git add` (`commit.ts:211`), with a fix. Five notes with `tree.ts` and `commit.ts` line references and fixes: the leading-whitespace exclude match (`tree.ts:135-143`), the temp file left behind (`tree.ts:205-212`), the short lock wait (`tree.ts:198`, `lock.ts:19`), the legacy removal (`tree.ts:263-264`), and NTFS short names (`paths.ts:12`).\nsources-read: `/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/rv-B.diff` (whole), `/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-9sjn.txt` (whole), `/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-1i5u.txt` (whole). Live in `/home/user/holyagent-state-edges/packages/runtime/src`: `state/tree.ts` (lines 60-320, 915-1003, plus a grep for `common`), `state/lock.ts` (whole), `state/layout.ts` (whole), `vcs/commit.ts` (lines 28-39 and 55-225), `vcs/git.ts` (whole), `domain/paths.ts` (whole). The built-in `/security-review` could not run (no `origin/HEAD`).",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "Findings ranked with file, line and fix",
+    "criteria": [
+      {
+        "criterion": "Each finding traces a source to a sink with file:line and a fix, or the absence of findings is stated",
+        "support": "No blocker or validated vulnerability. One suspicion, case folding conditional on `core.ignorecase`, traced from the named path (`commit.ts:70-73`, `97`, `199`) to `git add` (`commit.ts:211`), with a fix. Five notes with `tree.ts` and `commit.ts` line references and fixes: the leading-whitespace exclude match (`tree.ts:135-143`), the temp file left behind (`tree.ts:205-212`), the short lock wait (`tree.ts:198`, `lock.ts:19`), the legacy removal (`tree.ts:263-264`), and NTFS short names (`paths.ts:12`)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "sources-read",
+        "support": "`/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/rv-B.diff` (whole), `/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-9sjn.txt` (whole), `/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-1i5u.txt` (whole). Live in `/home/user/holyagent-state-edges/packages/runtime/src`: `state/tree.ts` (lines 60-320, 915-1003, plus a grep for `common`), `state/lock.ts` (whole), `state/layout.ts` (whole), `vcs/commit.ts` (lines 28-39 and 55-225), `vcs/git.ts` (whole), `domain/paths.ts` (whole). The built-in `/security-review` could not run (no `origin/HEAD`)."
+      }
+    ]
+  },
+  "createdAt": "2026-10-29T15:51:39.965Z"
+}

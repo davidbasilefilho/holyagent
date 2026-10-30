@@ -1,0 +1,60 @@
+{
+  "id": "assignment-0mvr70a82-jd84",
+  "intentId": "intent-0mvr4zvnq-k1q1",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "stop-scripts-vendor-ts-from-deleting",
+  "objective": "Stop scripts/vendor.ts from deleting every vendored ripgrep and fd file on Windows, so `mise run build` and the pre-commit hook work there.",
+  "state": "Succeeded",
+  "scope": [
+    "Worktree C:/Users/david.basile/dev/holyagent-fix-state-off-main (branch fix/state-off-main).",
+    "Known cause and reproduction: in scripts/vendor.ts the cleanup loop `for await (const file of new Bun.Glob(\"**/*\").scan({ cwd: directory, onlyFiles: true })) if (!expected.has(file)) await rm(join(directory, file))` compares Glob results with expectedFiles(), which use forward slashes. On Windows Bun.Glob yields backslash paths, so no file matches and every vendored file is removed; vendorProblems then reports each file missing. Reproduce with `bun scripts/vendor.ts` on Windows after `git restore packages/integrations/claude/dist/scripts/vendor`: it deletes the files and exits 1. Check other path comparisons in scripts/vendor.ts for the same separator issue."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md and AGENTS.md (Bun APIs, JSDoc on exports, mise tasks).",
+    "You may run `git restore packages/integrations/claude/dist/scripts/vendor` to bring the tracked files back before and after testing; make no other version-control writes, and no edits under .git/ or .holyagent/. Report changed paths.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report; do not add unrequested features, tests, files or refactors (name them in the report)."
+  ],
+  "criteria": [
+    {
+      "text": "`bun scripts/vendor.ts` on Windows with the tracked vendor files present leaves every tracked vendor file in place, prints the vendored count and exits 0, and still removes a stray file placed in the vendor folder",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A test fails on the old comparison and passes on the fix (for example by unit-testing the cleanup with backslash-separated paths, or by running the script against a temporary vendor folder)",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "`git status --short packages/integrations/claude/dist/scripts/vendor` is empty at the end",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Changes stay within scripts/vendor.ts and its test file",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "scripts/vendor.ts",
+    "scripts/vendor.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "workflow:wf_13bfdb8f-845/assignment-0mvr70a82-jd84",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T21:23:40.725Z",
+    "finishedAt": "2026-10-27T21:26:40.086Z"
+  },
+  "result": "result: `scripts/vendor.ts` no longer deletes the vendored files on Windows. The cleanup now converts scanned paths to `/` before comparing them with `expectedFiles()`. I verified the script on Windows and the new tests pass. `bun test` still has 2 failures in the plugin's own vendor tests, which are outside my ownership.\nchanged: `C:/Users/david.basile/dev/holyagent-fix-state-off-main/scripts/vendor.ts`, `C:/Users/david.basile/dev/holyagent-fix-state-off-main/scripts/vendor.test.ts` (new)\nchecks:\n- `bun test scripts/vendor.test.ts` -> exit 0, 3 pass, 0 fail.\n- `bun check --no-script` -> exit 0, no type errors in 115 files.\n- `bun lint --no-script` -> exit 0, no problems in 116 files.\n- `bun fmt --no-script --check` -> exit 0, all 231 files formatted.\n- `bun scripts/vendor.ts` with a stray `stray.txt` placed in the vendor folder -> exit 0, printed `vendored 21 files in packages/integrations/claude/dist/scripts/vendor`. The stray file was removed and all tracked files stayed.\n- `git status --short packages/integrations/claude/dist/scripts/vendor` -> empty.\n- Old comparison, run in `bun -e` with the pinned set `{\"linux-x64/rg\"}` and scanned paths `[\"linux-x64\\rg\",\"stray.txt\"]` -> it selected both for removal, which reproduces the bug.\n- Not run: `mise run verify`; I ran its component commands (`bun check`, `bun lint`, `bun fmt --check`) directly. I did not run the whole test suite.\n\nblockers: none\nquestions: none\nnotes:\n- `bun test packages/integrations/claude/tests/vendor.test.ts` has 2 failures on this Windows machine. They are Windows failures in `packages/integrations/claude/tests/vendor.test.ts` itself. The file is outside my ownership, so I left it.\n  - \"are exactly the pinned files\": it compares `Bun.Glob` results, which come back with backslashes, to the `/`-separated `expectedFiles()`. It needs `toPosix` on the scanned paths.\n  - \"are executable where the platform needs the mode\": it asserts the executable bit, which Windows `stat` does not report.\n  - I did not run these tests on the original code, so I have not confirmed they failed before my change.\n- `scripts/vendor.ts` now also exports `unpinnedFiles` and `removeUnpinned`, so the test can import them. Both have JSDoc.\n- `scripts/vendor.ts` now imports `toPosix` from `packages/runtime/src/domain/paths.ts`.\n- `scripts/vendor.test.ts` is untracked, so the root needs to add it.\n\nevidence:\n`bun scripts/vendor.ts` on Windows with the tracked vendor files present leaves every tracked vendor file in place, prints the vendored count and exits 0, and still removes a stray file placed in the vendor folder: Ran `bun scripts/vendor.ts` with `vendor/stray.txt` present. Exit 0, output `vendored 21 files in ...`. `ls` of the vendor folder showed `darwin-arm64`, `linux-x64`, `windows-x64` and no `stray.txt`.\nA test fails on the old comparison and passes on the fix: `scripts/vendor.test.ts` has 3 passing tests. `unpinnedFiles` is tested with `\\` as the separator. `removeUnpinned` is tested against a temporary folder (pinned files kept, stray removed). The old-comparison `bun -e` check shows backslash paths were all selected for removal.\n`git status --short packages/integrations/claude/dist/scripts/vendor` is empty at the end: The command output was empty (`wc -l` printed 0) after the last run.\nChanges stay within scripts/vendor.ts and its test file: `git status --short scripts` shows only `scripts/vendor.ts` modified and `scripts/vendor.test.ts` untracked. `scripts/repo-paths.test.ts` was already staged, not mine.\nchecks-run: See `checks:` above.\nchanged-paths: `scripts/vendor.ts`, `scripts/vendor.test.ts`\ndiff-file: `/tmp/tmp.KHdbmctn5A/vendor.diff` (git diff of `scripts/vendor.ts` plus the new `scripts/vendor.test.ts`)",
+  "createdAt": "2026-10-27T21:23:39.842Z"
+}

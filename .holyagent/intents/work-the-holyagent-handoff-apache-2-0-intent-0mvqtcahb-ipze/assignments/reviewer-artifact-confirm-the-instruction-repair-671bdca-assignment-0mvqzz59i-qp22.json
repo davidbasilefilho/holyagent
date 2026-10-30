@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mvqzz59i-qp22",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.artifact",
+  "slug": "confirm-the-instruction-repair-671bdca",
+  "objective": "Confirm the instruction repair (671bdca..f0ef15d) closes the two blockers without new contradictions.",
+  "state": "Succeeded",
+  "scope": [
+    "Repair diff: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/instr-repair.diff; earlier findings: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-assignment-0mvqzlmko-it5f.txt; files in /home/user/holyagent-instructions. Judge only the repair."
+  ],
+  "constraints": [
+    "Read-only: write no files."
+  ],
+  "criteria": [
+    {
+      "text": "Each earlier blocker is marked closed or open with file and line, and new problems are listed or their absence stated",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources-read"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvqztvfv-ffm5"
+  ],
+  "followUpOf": "assignment-0mvqzlmko-it5f",
+  "specialist": {
+    "agentId": "workflow:wf_0ea44421-984/assignment-0mvqzz59i-qp22",
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-27T18:06:49.446Z",
+    "finishedAt": "2026-10-27T18:16:28.451Z"
+  },
+  "result": "result: Both earlier blockers are closed and no blocking problem remains. One new non-blocking contradiction and one new scope ambiguity came with the repair.\n\nchanged: none\n\nchecks: none run. This role has no shell, so no mise or bun gate ran. The repair diff matches the on-disk source for every touched file. Dist sync was checked by Read and Grep: `dist/agents/holyagent.md` matches the source at lines 13, 31, 39-40, 117, 128, 148 and 150. `dist/scripts/holyagent.js` matched 2 lines for the combined phrase pattern, which I did not compare line by line, so its sync is unverified. No writer was reported, and I saw no sign of a moving tree.\n\nblockers: none. Earlier blocker status:\n- B1, push authorization stated three ways: closed. The single grant is `root/identity.md:5` (\"Push reviewed branches and open or update their PRs as the stack plan sets, once reviews accept; the user's word to the contrary outranks this\"). `root/stack-plan.md:8`, `root/version-control.md:11`, `root/asking.md:5`, `requirements.md:33` (R-GIT) and `requirements.md:35` (R-ASK) now agree with it. `requirements.md:17` (R-OUTWARD) states that opening a PR for a reviewed stacked branch is not publishing. The \"request or repository workflow\" wording now applies only to thread replies (`identity.md:5`).\n- B2, neutral-line condition dropped: closed. `root/task-list.md:3` and `requirements.md:12` (R-NUDGE) now read \"after an empty reply\". `root/user-messages.md:8` already had the condition and is unchanged.\n\nnotes (new, non-blocking):\n1. `root/asking.md:3`: \"including when the user asks what needs their decision; then list only those\" can be read as a plain-text list, which conflicts with \"never as a plain-text list\" in `root/task-list.md:3`, `requirements.md:14` (R-DECIDE) and dist `holyagent.md:31`. Suggested fix: \"then ask only those through AskUserQuestion\".\n2. `root/user-messages.md:7`: \"keep the checkout clean by committing work with `holyagent vcs commit`\" leaves \"work\" undefined. `root/version-control.md:5` says `vcs commit` stages only the named Assignment paths and keeps unrelated work apart. Read literally, a model could commit unrelated untracked files. Suggested fix: \"commit the Assignment paths you own with `holyagent vcs commit`\".\n3. `root/stack-plan.md:8` and `root/version-control.md:11` repeat \"as the stack plan sets\" inside the stack plan's own text. The grant lives in `identity.md:5`, so the repeated phrase is redundant there.\n4. Carried from the earlier round and not re-judged: the duplicated hook-noise rule across `task-list.md`, `user-messages.md` and `requirements.md`; the unverified stop-hook path in `user-messages.md:7`; the dropped \"not grep or git loops\" in `delegating.md:3`; and the quoting change in `session-cloud-identity.md:1`.\n\nevidence:\nEach earlier blocker is marked closed or open with file and line, and new problems are listed or their absence stated: B1 closed at `packages/runtime/src/instructions/claude-5.5/root/identity.md:5` (grant), `root/stack-plan.md:8`, `root/asking.md:5`, `root/version-control.md:11`, `packages/runtime/src/instructions/requirements.md:17`, `:33` and `:35`, and dist `packages/integrations/claude/dist/agents/holyagent.md:13`, `:117`, `:128` and `:150`. B2 closed at `root/task-list.md:3`, `requirements.md:12`, `root/user-messages.md:8` and dist `holyagent.md:31` and `:40`. New problems are listed in notes 1 to 3; no new blocking problem was found.\nsources-read: `/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/instr-repair.diff` (read in full); `/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-assignment-0mvqzlmko-it5f.txt` (earlier findings, read in full); `/home/user/holyagent-instructions/packages/runtime/src/instructions/claude-5.5/root/{identity,stack-plan,asking,task-list,user-messages,version-control}.md` (full); `/home/user/holyagent-instructions/packages/runtime/src/instructions/requirements.md` (full); `/home/user/holyagent-instructions/packages/integrations/claude/dist/agents/holyagent.md` (full); Grep over `/home/user/holyagent-instructions/packages` for the new phrases, including `dist/scripts/holyagent.js` (count only).",
+  "createdAt": "2026-10-27T18:06:49.446Z"
+}

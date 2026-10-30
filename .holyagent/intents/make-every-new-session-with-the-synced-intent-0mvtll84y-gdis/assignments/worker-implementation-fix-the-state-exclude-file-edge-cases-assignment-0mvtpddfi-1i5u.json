@@ -1,0 +1,91 @@
+{
+  "id": "assignment-0mvtpddfi-1i5u",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 5,
+  "roleTask": "Worker.implementation",
+  "slug": "fix-the-state-exclude-file-edge-cases",
+  "objective": "Fix the state exclude-file edge cases left by the last state-mode reviews and make the runtime check ownership before the tracked-state signal wherever it encodes the order.",
+  "state": "Succeeded",
+  "scope": [
+    "Worktree /home/user/holyagent-state-edges (branch ccr-046ad103-6qsvgx-state-edges from origin/main eaed3fd).",
+    "Findings to fix, from /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-yjjl.txt (code re-review notes 1, 2, 4-8) and /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-9sjn.txt (security re-review notes): setExcluded removes an unmarked /.holyagent/ line written by the earlier unreleased build only when leaving local (packages/runtime/src/state/tree.ts ~150); local-mode vcs commit refusal applies only when the staged set touches tracked state, not to every commit (commit.ts ~175); commitScope's case-insensitive .holyagent match only when core.ignorecase is true (commit.ts ~90); setExcluded read-modify-write under a lock (tree.ts ~154); an orphan marker comment without its line is repaired instead of duplicated (tree.ts ~145); roll back the exclude entry if the config write fails after it (tree.ts ~877); naming .HolyAgent in work mode is recognized as the whole folder where the file system ignores case (commit.ts ~172). Read both reports for exact wording and the security re-review's remaining notes, and fix every one the reports call non-blocking, or name it with a concrete reason it cannot be fixed.",
+    "Tests for each fix that fail without it. Regenerate with mise run build."
+  ],
+  "constraints": [
+    "User (verbatim): \"não deve ter nada pendente / outra coisa: arrume esse comportamento, o que ficar pendente que o agente pode resolver deve ser resolvido\".",
+    "Follow /home/user/holyagent/.claude/CLAUDE.md and /home/user/holyagent/AGENTS.md (Effect with tagged errors, no try/catch/new Promise/async in runtime and CLI source, Schema at boundaries, Bun APIs and Bun Shell, JSDoc). Do not edit .claude/CLAUDE.md or AGENTS.md.",
+    "Make no version-control writes and no edits under .git/ or .holyagent/ of the repository; tests use temp folders.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done and checked, stop and report; add no unrequested features (name ideas in the report)."
+  ],
+  "criteria": [
+    {
+      "text": "Each listed re-review note is fixed with a test that fails without the fix, or named with a concrete reason",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Existing state-mode and vcs commit behavior and tests are unchanged apart from the fixed edges",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "mise run build leaves no diff after the change and mise run verify passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/state",
+    "packages/runtime/src/vcs",
+    "packages/runtime/tests",
+    "packages/integrations/claude/dist/scripts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "workflow:wf_9735205d-478/assignment-0mvtpddfi-1i5u",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T15:33:15.966Z",
+    "finishedAt": "2026-10-29T15:50:54.476Z"
+  },
+  "result": "result: Every listed re-review note is fixed with a test, and the signal order now puts ownership before tracked state. One note (the symlinked exclude file) did not reproduce, so it needs no fix. `mise run verify` passes.\n\nchanged (worktree /home/user/holyagent-state-edges):\n- `packages/runtime/src/state/tree.ts`\n- `packages/runtime/src/vcs/commit.ts`\n- `packages/runtime/tests/state-mode.test.ts`\n- `packages/integrations/claude/dist/scripts/holyagent.js` (generated)\n- `packages/integrations/claude/dist/agents/holyagent.md` (generated)\n- Outside the ownership paths, because the ownership-first order lives there: `packages/runtime/src/instructions/requirements.md`, `packages/runtime/src/instructions/claude-5.5/root/version-control.md`, `docs/decisions.md` and `docs/usage.md`. The `dist/agents/holyagent.md` change comes from the build of the `version-control.md` edit.\n\nchecks:\n- `mise run verify` -> exit 0: 905 pass, 1 skip, 0 fail; type-check, lint and format clean.\n- `mise run build` run after the final formatting; `git status` shows only the files above, so the build adds nothing further.\n- Each new or changed test fails on base HEAD except the three below. I swapped the base `tree.ts` and `commit.ts` in, saw 10 failures, and restored my versions.\n  - The test where a staged tracked state file refuses the commit, which guards behavior kept from base.\n  - The test where a user's own exclude line stays, which guards the existing contract.\n  - The symlink test.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- **Not reproducible, symlinked exclude file:** the base already follows the link, because `git rev-parse --path-format=absolute --git-path` resolves it. I left the base behavior as it is and added a regression test.\n- **Behavior change, exclude-file edits:** they now run under `.git/holyagent/exclude.lock`.\n- **Behavior change, scoped local-mode refusal:** a local-mode `vcs commit` is now refused only when the staged set holds state files other than `config.json`. A commit that stages none goes through even when git tracks state.\n- **Behavior change, the `ignorecase` parameter:** `commitScope` gained a fourth parameter, `ignoreCase`. `commit` reads it from `core.ignorecase`, and it defaults to false.\n- **Behavior change, state-folder case in work mode:** in `work` mode a state path named in another case is canonicalized to `.holyagent`, which fixes the `.HolyAgent` note. The `local` and `branch` refusals now fold case only when `core.ignorecase` is true.\n- **New git config key:** `holyagent.stateExcludeKept` is new and internal. It notes that the user already had the `/.holyagent/` line when the clone entered `local`. It is how leaving `local` removes an unmarked line from the earlier build without deleting one the user wrote.\n- **Other exclude-file fixes:**\n  - An orphan marker comment is repaired instead of duplicated.\n  - A stray marker is removed when the clone leaves `local`.\n  - The entry is rolled back if the mode write fails after it, tested with a held `config.lock`.\n  - A command resolving `local` re-reads the mode under the lock, so it cannot bring the entry back after a mode change.\n- **Signal order, tracked-state note:** the order is now the user's words, then a repository not the owner's (`local`), then tracked state (`work`), then independent-PR conventions (`local`), else `branch`. When tracked state makes `state mode local` refuse, the root instruction says to ask the user, because `work` would put state files in PRs to another owner's repository. This is a decision for the root to confirm.\n- **Idea, not done:** `state mode local` refusals still say \"use the work mode\", which may mislead in the not-owner case.\n\nevidence:\nEach listed re-review note is fixed with a test that fails without the fix, or named with a concrete reason: every note is covered in `packages/runtime/tests/state-mode.test.ts` (\"local mode and files that git tracks under .holyagent\" and \"the exclude file edge cases\"). The symlink note is the exception, named above as not reproducible.\nExisting state-mode and vcs commit behavior and tests are unchanged apart from the fixed edges: only the tracked-state commit test and the `commitScope` case test were reshaped for the two narrowed edges; the rest of the 905 pass, 0 fail, with `windows-paths` untouched.\nmise run build leaves no diff after the change and mise run verify passes: `mise run build` then `mise run verify` -> exit 0, `git status` unchanged by the build.\nchanged-paths: the changed list above.\nchecks-run: `mise run fmt`, `mise run build`, `mise run verify` (exit 0), and `bun test packages/runtime/tests/state-mode.test.ts` against base `tree.ts` and `commit.ts` (10 fail as expected, then restored).\ndiff-file: `/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/state-edges.diff` (all changed files except the generated `dist/scripts/holyagent.js`, which is 80 insertions and 38 deletions).",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "Reviewed through the final code and security re-reviews with no open blocker; verify passes on the stack head e544a87",
+    "criteria": [
+      {
+        "criterion": "Each listed re-review note is fixed with a test that fails without the fix, or named with a concrete reason",
+        "support": "every note is covered in `packages/runtime/tests/state-mode.test.ts` (\"local mode and files that git tracks under .holyagent\" and \"the exclude file edge cases\"). The symlink note is the exception, named above as not reproducible."
+      },
+      {
+        "criterion": "Existing state-mode and vcs commit behavior and tests are unchanged apart from the fixed edges",
+        "support": "only the tracked-state commit test and the `commitScope` case test were reshaped for the two narrowed edges; the rest of the 905 pass, 0 fail, with `windows-paths` untouched."
+      },
+      {
+        "criterion": "mise run build leaves no diff after the change and mise run verify passes",
+        "support": "`mise run build` then `mise run verify` -> exit 0, `git status` unchanged by the build."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "the changed list above."
+      },
+      {
+        "label": "checks-run",
+        "support": "`mise run fmt`, `mise run build`, `mise run verify` (exit 0), and `bun test packages/runtime/tests/state-mode.test.ts` against base `tree.ts` and `commit.ts` (10 fail as expected, then restored)."
+      },
+      {
+        "label": "diff-file",
+        "support": "`/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/state-edges.diff` (all changed files except the generated `dist/scripts/holyagent.js`, which is 80 insertions and 38 deletions)."
+      }
+    ]
+  },
+  "createdAt": "2026-10-29T15:33:15.966Z"
+}

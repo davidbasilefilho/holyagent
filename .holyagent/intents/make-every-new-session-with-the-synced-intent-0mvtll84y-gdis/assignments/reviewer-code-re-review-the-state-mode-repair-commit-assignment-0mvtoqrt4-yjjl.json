@@ -1,0 +1,58 @@
+{
+  "id": "assignment-0mvtoqrt4-yjjl",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-state-mode-repair-commit",
+  "objective": "Re-review the state-mode repair commit abbef7a: confirm the previous findings it targets are closed and it adds no regression.",
+  "state": "Succeeded",
+  "scope": [
+    "Worktree /home/user/holyagent-state-mode, branch ccr-046ad103-6qsvgx-state-mode at abbef7a. Judge only the repair commit d6234b3..abbef7a; diff without the minified bundle: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/state-repair.diff. Repair report: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-58f1.txt.",
+    "Previous findings: code review /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-di6x.txt and security review /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-oi0p.txt. Code findings 5, 8, 9 and security finding 2 (signal order fixed by the requirements) were deliberately skipped.",
+    "Run mise run verify on the head."
+  ],
+  "constraints": [
+    "Read-only: write no files and make no version-control writes."
+  ],
+  "criteria": [
+    {
+      "text": "Each targeted previous finding is stated closed or open with file and line, any new blocking issue is named with a fix or its absence is stated, with mise run verify run on the head",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvtohznl-58f1"
+  ],
+  "followUpOf": "assignment-0mvto7z1g-di6x",
+  "specialist": {
+    "agentId": "workflow:wf_014e414f-6f6/assignment-0mvtoqrt4-yjjl",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T15:15:41.513Z",
+    "finishedAt": "2026-10-29T15:20:43.967Z"
+  },
+  "result": "result: Every targeted previous finding is closed and the repair adds no blocking regression. `mise run verify` on abbef7a passed.\n\nchanged: none (read-only). The only file I wrote is the verify log in the scratchpad.\n\nchecks:\n- `/code-review d6234b3...abbef7a` (built-in, run through the Skill tool, loaded as the built-in) -> it returned 7 claims. I read each against the code and classified them below.\n- `mise run verify` in /home/user/holyagent-state-mode at abbef7a -> exit 0. Format check was clean on 233 files, type-check found no errors in 117, lint no problems in 118, and tests were 893 pass, 1 skip, 0 fail. Log: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/verify-head.log\n- The tree was clean at abbef7a.\n- I read three git behaviors in throwaway repos, which I removed:\n  - The `git ls-files .holyagent ':!.holyagent/config.json'` form from the instruction returns nothing when only config.json is tracked and lists real state files.\n  - The `:(exclude)` pathspec returns the same.\n  - `git status -z` returns repo-root-relative paths. A literal `git add` of such a path from a subdirectory fails, but see claim 3 below.\n- Not run: the built bundle `dist/scripts/holyagent.js`, and Windows paths.\n\nblockers: none\n\nquestions: none\n\nnotes:\n\nPrevious findings targeted by the repair:\n- Security 1 (blocker, a tracked `config.json` read as tracked state): closed.\n  - `packages/runtime/src/state/layout.ts:12-21` adds `CONFIG_FILE` and `TRACKED_STATE_PATHSPEC`.\n  - `tree.ts` `setStateMode` uses it for the `local` refusal, and `commit.ts` `changedState` uses it for staging.\n  - The root instruction in `version-control.md:15` and R-STATE in `requirements.md:34` now exclude config.json.\n  - Work mode no longer stages an untracked or changed config.json unless it is named (tests \"work mode stages the records but not a config change nobody named\" and \"work mode never stages an untracked config.json either, but stages it when named\").\n  - `local` is allowed when only config.json is tracked (test \"is not tracked state, so the local mode is allowed and hides the records\").\n- Code 1 (stale docs): closed. `docs/decisions.md:51` is retitled and has the four-step signal order. `docs/usage.md:56` points to it.\n- Code 2 (records in another linked worktree): closed. `tree.ts` `holdsRecords(top, listed)` scans every listed worktree, and `setStateMode` uses it (test \"records in another linked work tree stop a move onto the state branch\").\n- Code 3 (stale `vcs commit --help`): closed. `commands.ts:58` is worded by mode (test \"describes the commit by state mode\").\n- Code 4 (migrate hints): closed. `migrate.ts:159` and `:229` are worded by mode, and `migrate.test.ts` asserts it.\n- Code 6 and security 3 (config/exclude order, lock): closed.\n  - `setStateMode` runs the checks and the write under `.git/holyagent/worktree.lock`.\n  - It writes the exclude entry before the config when entering `local`, and removes it after when leaving.\n  - `ensureWorktree` (`tree.ts:380`) re-reads the mode after taking the lock and returns `deferred`, which `resolveState` handles at `:782`.\n  - Tests cover both.\n- Code 7 and security 4 (hand-added exclude line, atomic write): closed. `tree.ts` `setExcluded` writes a marked pair through a temporary file and a rename. It removes only the marked pair, so a line the user wrote stays.\n- Security 5 (`local` relying only on the exclude entry): closed. `commit.ts` has `requireUntrackedState` and a case-folded `.holyagent` check in `commitScope`.\n- Skipped as agreed: code 5, 8 and 9, and security 2. The repair also resolves code 5, since only changed state paths are added.\n\nThe built-in review's claims, all non-blocking:\n1. Optional, `tree.ts:150`: `setExcluded(false)` does not remove an unmarked `/.holyagent/` line written by an earlier build of this unreleased branch. The repair report names this. A clone that ran such a build and then leaves `local` keeps the stale ignore, which hides state from `changedState` in `work` mode. Fix if wanted: also remove the bare line when `holyagent.stateMode` was `local`.\n2. Optional, `commit.ts:175`: in `local` mode every `vcs commit` is refused while git tracks any state file besides config.json, even if no state path is named. This is the safe fix security 5 proposed. The state is already unusual in `local`, since `setStateMode` refuses it. A narrower check would apply only when the staged set touches tracked state.\n3. Rejected, `commit.ts:138`: root-relative against cwd-relative paths. In `work` and `local` mode `resolveState` returns `root: top`, and `vcsLive(root)` runs git there (`program.ts:71`). Root-relative and cwd-relative paths are the same. The existing `stagedPaths` check already assumes this.\n4. Optional, `commit.ts:90`: `commitScope` lowercases unconditionally, so a distinct `.HolyAgent/` folder on a case-sensitive file system is refused in `branch` and `local`. This is an unlikely edge. A fix would depend on `core.ignorecase`.\n5. Optional, `tree.ts:154`: `setExcluded` is still read-modify-write without a lock. The write is atomic but lost updates are possible between concurrent processes. This is a small residual of security 4.\n6. Optional, `tree.ts:145`: an orphan marker comment with no line after it gets a new marker and line pair appended on each call. This needs the user to hand-delete the line.\n7. Optional, `tree.ts:877`: if the config write fails after the exclude entry is added, the entry stays. This is the ordering code 6 asked for. The failure is rare, and a rollback would close it.\n8. Optional, `commit.ts:172`: in `work` mode, naming `.HolyAgent` is not recognized as the whole folder, so `changedState` is appended as well. The user did name the whole folder, so the effect is a redundant scope.\n\nevidence:\nEach targeted previous finding is stated closed or open with file and line, any new blocking issue is named with a fix or its absence is stated, with mise run verify run on the head: Security 1, code 1, 2, 3, 4, 6, 7 and security 3, 4, 5 are all closed, with files and lines in the notes above. No new blocking issue. Eight non-blocking claims from the built-in review are classified above, and seven of them (all but claim 3) are optional. `mise run verify` -> exit 0 at abbef7a, 893 pass, 1 skip, 0 fail, type-check, lint and format clean. Log: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/verify-head.log\nchecks-run: `/code-review d6234b3...abbef7a` (built-in, 7 claims classified); `mise run verify` exit 0 on abbef7a; two throwaway-repo git probes (the `ls-files` exclude form, and the `status` and `add` path-relativity check), removed after. Not run: the built bundle, Windows paths.",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Targeted findings closed; verify passed on abbef7a",
+    "criteria": [
+      {
+        "criterion": "Each targeted previous finding is stated closed or open with file and line, any new blocking issue is named with a fix or its absence is stated, with mise run verify run on the head",
+        "support": "Security 1, code 1, 2, 3, 4, 6, 7 and security 3, 4, 5 are all closed, with files and lines in the notes above. No new blocking issue. Eight non-blocking claims from the built-in review are classified above, and seven of them (all but claim 3) are optional. `mise run verify` -> exit 0 at abbef7a, 893 pass, 1 skip, 0 fail, type-check, lint and format clean. Log: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/verify-head.log"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`/code-review d6234b3...abbef7a` (built-in, 7 claims classified); `mise run verify` exit 0 on abbef7a; two throwaway-repo git probes (the `ls-files` exclude form, and the `status` and `add` path-relativity check), removed after. Not run: the built bundle, Windows paths."
+      }
+    ]
+  },
+  "createdAt": "2026-10-29T15:15:41.513Z"
+}

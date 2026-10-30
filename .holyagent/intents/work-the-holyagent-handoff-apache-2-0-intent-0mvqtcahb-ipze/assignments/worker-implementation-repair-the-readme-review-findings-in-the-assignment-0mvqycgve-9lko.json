@@ -1,0 +1,48 @@
+{
+  "id": "assignment-0mvqycgve-9lko",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-readme-review-findings-in-the",
+  "objective": "Repair the README review findings in the readme worktree.",
+  "state": "Succeeded",
+  "scope": [
+    "Worktree /home/user/holyagent-readme (branch ccr-046ad103-6qsvgx-readme). Review report: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-assignment-0mvqxgyye-ylxp.txt. Fix the blocker (README line 11: state the highest documented Claude Code minimum from docs/requirements.md and link that section) and the notes: Node.js prerequisite, `bun packages/cli/src/index.ts doctor` instead of bare holyagent doctor, setup claude configuring the directory and installing the plugin, WSL script run as your own user without sudo or arguments, link docs/requirements.md for desktop/web status, 'one long session', 'builds with or installs', the brief acknowledgment, link rather than repeat usage.md, and `mise install` before `mise run verify`. Keep the six sections and their order."
+  ],
+  "constraints": [
+    "Work only in your worktree; make no version-control writes (no commit, add, checkout, switch, merge, stash, push) and no edits under .git/ or .holyagent/.",
+    "Keep working until everything asked is done; when done and checked, stop and report; no unrequested features or refactors.",
+    "Write only README.md."
+  ],
+  "criteria": [
+    {
+      "text": "The Claude Code minimum matches the highest documented minimum and every note is fixed or answered in the report",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The six sections stay in order and mise run fmt:check passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "README.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvqw75te-qv26",
+  "specialist": {
+    "agentId": "workflow:wf_94a09cae-ded/assignment-0mvqycgve-9lko",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T17:21:11.786Z",
+    "finishedAt": "2026-10-27T17:23:34.825Z"
+  },
+  "result": "result: Blocker and all ten notes fixed in README.md; the six sections are unchanged and in order. The one note I answered rather than took verbatim is the usage.md duplication (see notes).\nchanged: /home/user/holyagent-readme/README.md\nchecks: `mise run fmt:check` -> exit 0 (\"All 216 files are formatted\"). Anchors `#install`, `#claude-code-version` and `#supported-environments` exist as headings in docs/usage.md and docs/requirements.md. I did not run `mise run verify`, and the edit touches only README.md.\nblockers: none\nquestions: none\nnotes:\n- Link-rather-than-repeat note: I removed the slash-command paragraph and linked docs/usage.md#install instead. I kept the one-line statement that `billion-context` and `exa` are required and must be added first, because that ordering prevents a failed install. Nothing else from usage.md is repeated.\n- Diff saved to /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/readme-repair.diff.\nevidence:\nThe Claude Code minimum matches the highest documented minimum and every note is fixed or answered in the report: Line 11 now says 2.1.295 or later, matching docs/requirements.md line 20, with a link to its \"Claude Code version\" section. The notes are fixed as follows:\n- Node.js is added to the prerequisites (20 or later, 22.13 or later for ctx7).\n- `doctor` is now `bun packages/cli/src/index.ts doctor`.\n- The `setup claude` description now says it adds the marketplaces, installs the plugin and configures the current or `--dir` directory.\n- The WSL script is to run as your own user, not through sudo, with no arguments.\n- Desktop and web status links to docs/requirements.md#supported-environments.\n- The audited-sessions wording is now \"one long session\".\n- The software wording is now \"builds with or installs\".\n- The acknowledgment clause is added to the line about when the root speaks to you.\n- `mise install` precedes the verify commands.\n- The usage.md duplication is answered above.\nThe six sections stay in order and mise run fmt:check passes: The headings are at README.md lines 1, 9, 29, 37, 50 and 60 in the same order. `mise run fmt:check` exits 0.\nchanged-paths: /home/user/holyagent-readme/README.md\nchecks-run: `mise run fmt:check` -> exit 0.",
+  "createdAt": "2026-10-27T17:21:11.786Z"
+}

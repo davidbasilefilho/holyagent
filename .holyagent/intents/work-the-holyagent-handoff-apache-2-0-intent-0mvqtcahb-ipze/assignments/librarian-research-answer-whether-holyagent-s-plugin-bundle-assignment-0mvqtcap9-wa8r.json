@@ -1,0 +1,67 @@
+{
+  "id": "assignment-0mvqtcap9-wa8r",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 1,
+  "roleTask": "Librarian.research",
+  "slug": "answer-whether-holyagent-s-plugin-bundle",
+  "objective": "Answer whether holyagent's plugin bundle can ship ripgrep and fd, or fff instead if it has native executables for darwin-arm64, linux-x64 and windows-x64 and covers what rg and fd do, and whether that works with claude.ai plugin sync (size limits, executable bit).",
+  "state": "Succeeded",
+  "scope": [
+    "fff: identify the project (search GitHub/npm/crates), its release assets per platform, and which rg/fd features it covers.",
+    "rg and fd: release asset names and sizes for the three targets and licenses.",
+    "claude.ai / Claude Code plugin sync: size limits, whether the exec bit survives, how other plugins ship binaries; holyagent build in packages/integrations/claude/build.ts and dist/."
+  ],
+  "constraints": [
+    "Read-only: write no files in the repository; scratch notes only under /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad.",
+    "Look up facts that may have changed (versions, release assets, sizes, product behavior) instead of answering from memory, and cite each source URL or file:line.",
+    "Keep working until the question is answered; when done, stop and report. Separate sourced facts from inference."
+  ],
+  "criteria": [
+    {
+      "text": "A recommendation (bundle rg+fd, bundle fff, or download on first use) with per-platform sizes, license notes and the sync constraints it rests on",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Sourced facts are separated from inference, with a source for each fact",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "sources-read"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "workflow:wf_45d2f497-d70/assignment-0mvqtcap9-wa8r",
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-10-27T15:01:05.710Z",
+    "finishedAt": "2026-10-27T15:27:29.173Z"
+  },
+  "result": "result: Recommend download on first use. Do not bundle rg+fd or fff. fff is an MCP server and a library, not a drop-in rg/fd replacement. The claude.ai paths reject or hold bundled executables, and no source says the exec bit survives.\n\n**Sourced facts**\n\nfff (github.com/dmtrKovalenko/fff, MIT; https://github.com/dmtrKovalenko/fff/blob/main/LICENSE)\n- The README calls it \"a file search library, not a CLI\" and has no rg/fd-style CLI. It exposes a Rust crate, a C library, Node/Bun SDKs and an MCP server (https://github.com/dmtrKovalenko/fff/).\n- Its MCP tools are `grep`, `find_files` and `multi_grep` (README, https://github.com/dmtrkovalenko/fff/blob/main/README.md).\n  - Regex and literal modes, `paths`/`globs`, context lines, `hidden`, and `find_files` glob/regex modes exist.\n  - Results are frecency-ranked and fuzzy, and the index is resident in memory.\n- It is not a drop-in rg or fd. There is no `--exec`, no `-l`/`-c`-style CLI flags, and no stdout piping. It would replace the Grep/Glob tool path, not shell calls.\n- Latest stable is v0.11.0, 2026-09-21 (https://github.com/dmtrKovalenko/fff/releases/latest). A nightly 0.11.1 exists as a pre-release.\n- Assets are bare `fff-mcp-*` binaries with no archive, sizes in MB:\n\n| Platform | Asset | Size |\n| --- | --- | --- |\n| darwin-arm64 | `fff-mcp-aarch64-apple-darwin` | 7.0 |\n| linux-x64 | `fff-mcp-x86_64-unknown-linux-gnu` (also `-musl`) | 12.7 |\n| windows-x64 | `fff-mcp-x86_64-pc-windows-msvc.exe` | 13.9 |\n\n- The three total about 33.6 MB.\n- Each asset has a `.sha256`. The official `install-mcp.sh` pins the tag and the SHA256 values and downloads musl on Linux (https://raw.githubusercontent.com/dmtrKovalenko/fff/main/install-mcp.sh).\n\nripgrep 15.2.0, 2026-07-15 (https://github.com/BurntSushi/ripgrep/releases/latest):\n\n| Platform | Asset | Size |\n| --- | --- | --- |\n| darwin-arm64 | `ripgrep-15.2.0-aarch64-apple-darwin.tar.gz` | 1.7 MB |\n| linux-x64 | `ripgrep-15.2.0-x86_64-unknown-linux-musl.tar.gz` (musl only, no gnu x64 asset) | 2.2 MB |\n| windows-x64 | `ripgrep-15.2.0-x86_64-pc-windows-msvc.zip` | 1.7 MB |\n\nfd v10.5.0, 2026-08-26 (https://github.com/sharkdp/fd/releases/, https://aimap.page/en/software/fd/download/). The aimap page mirrors GitHub's published sizes.\n\n| Platform | Asset | Size |\n| --- | --- | --- |\n| darwin-arm64 | `fd-v10.5.0-aarch64-apple-darwin.tar.gz` | 1.27 MB |\n| linux-x64 | `fd-v10.5.0-x86_64-unknown-linux-gnu.tar.gz` (musl 1.5 MB) | 1.44 MB |\n| windows-x64 | `fd-v10.5.0-x86_64-pc-windows-msvc.zip` | 1.46 MB |\n\n- rg and fd together are about 9.5 MB compressed for the three targets, plus a few MB unpacked.\n- Licenses:\n  - fff is MIT (sourced, link above).\n  - fd is listed as Apache-2.0 (winget page https://wingetgui.com/apps/sharkdp-fd).\n  - rg and fd license text was not fetched.\n\nPlugin sync and distribution constraints\n- In Claude Code, `bin/` is on the Bash tool PATH (https://code.claude.com/docs/en/plugins/components).\n- claude.ai and Cowork do not install a plugin with a top-level `bin/` (https://code.claude.com/docs/en/plugins/manifest-reference, https://claude.com/docs/plugins/build).\n- Organization sync and upload also reject a plugin with `bin/`. The docs say to keep executables in `scripts/` and reference them as `${CLAUDE_PLUGIN_ROOT}/scripts/<name>` (https://claude.com/docs/plugins/org-sync).\n- Size limits:\n  - Zip upload: 200 MB, 5,000 files (https://support.claude.com/en/articles/13837433-manage-plugins-for-your-organization, https://platform.claude.com/docs/en/manage-claude/plugins-api).\n  - Cowork: 200 MB uncompressed, 5,000 files, and a 512 MB marketplace repository archive (https://claude.com/docs/cowork/guide/plugins).\n  - Government card: 10 MB per plugin and 50 MB uncompressed, text only, no binaries (https://claude.com/docs/government/config/plugins-and-connectors).\n  - Directory submission: files under 5 MiB, and a compiled executable is held for review (https://claude.com/docs/plugins/pre-submission-checklist).\n- The upload API allows no symlinks and requires DEFLATE or STORE compression.\n- Plugins copy into `~/.claude/plugins/cache/...`, and claude.ai-synced plugins land in `synced/` (https://code.claude.com/docs/en/plugins/loading).\n- Persistent downloads belong in `${CLAUDE_PLUGIN_DATA}`, which survives updates (manifest-reference).\n\nHolyagent build\n- `/home/user/holyagent/packages/integrations/claude/build.ts:16` runs `chmod 0o755` only for files flagged `executable`.\n- `/home/user/holyagent/packages/integrations/claude/src/generate.ts:190-193` flags only `scripts/holyagent` as executable.\n- `dist/` has no `bin/`, so the current plugin is not blocked by the `bin/` rule.\n- The marketplace entry sources `./packages/integrations/claude/dist` (`generate.ts:71`). That is a git-based sync, so the exec bit would depend on git mode 100755.\n\n**Inference**\n- Exec bit: no fetched doc says whether it survives the cache copy, zip upload or org sync. A `.zip` upload carries whatever mode the archive holds, and the sync path is unspecified. The `chmod` at `build.ts:16` plus git mode 100755 is probably enough for Claude Code. It is unverified for claude.ai, and one empirical test would settle it. Note that `scripts/holyagent` already depends on it.\n- Bundling about 34 MB of fff binaries, or about 10 MB of rg+fd, fits the 200 MB cap. It conflicts with the 5 MiB per-file rule and the compiled-executable hold for directory submission. It also fails on the Government path. It would likely force a third-party-binary maintenance and security-review burden on every release.\n- Bundling rg+fd would still need a per-platform selector. The three targets would ship as three archives with different extensions. The wrapper would then have to unpack at runtime anyway.\n- Downloading on first use avoids all of this. Use a version-pinned URL plus a SHA256 into `${CLAUDE_PLUGIN_DATA}`, as fff's own installer does, and fall back to PATH `rg`/`fd` when present. The cost is a network and `unzip`/`tar` dependency on first run, and it is likely unavailable in sandboxed Cowork.\n- If fff is wanted, add it as an optional MCP server (`.mcp.json` `command` pointing at the downloaded binary) rather than as a replacement for rg/fd. It also adds a trust and dependency decision for the root.\n\nquestions: Should the first-use downloader be a new holyagent CLI subcommand? That is a dependency and trust decision for the root. Is empirical testing of exec-bit survival through claude.ai upload and sync wanted?\nblockers: none (the GitHub MCP could not read rg/fd repos, so Exa-fetched pages were used; the sharkdp/fd `releases/latest` fetch failed, so fd sizes come from the releases search result plus aimap).\nchanged: none\n\nevidence:\nA recommendation (bundle rg+fd, bundle fff, or download on first use) with per-platform sizes, license notes and the sync constraints it rests on: download on first use. Per-platform sizes, licenses and sync constraints are in the sourced facts above. Key sources: https://claude.com/docs/plugins/org-sync, https://platform.claude.com/docs/en/manage-claude/plugins-api, https://code.claude.com/docs/en/plugins/manifest-reference, https://claude.com/docs/plugins/pre-submission-checklist\nSourced facts are separated from inference, with a source for each fact: the \"Sourced facts\" and \"Inference\" sections above, with a URL or file:line per fact; the rg and fd license text was not fetched.\nsources-read: https://github.com/dmtrKovalenko/fff/releases/latest, https://github.com/dmtrkovalenko/fff/blob/main/README.md, https://github.com/dmtrKovalenko/fff/blob/main/LICENSE, https://raw.githubusercontent.com/dmtrKovalenko/fff/main/install-mcp.sh, https://crates.io/crates/fff-search, https://github.com/BurntSushi/ripgrep/releases/latest, https://github.com/sharkdp/fd/releases/, https://aimap.page/en/software/fd/download/, https://code.claude.com/docs/en/plugins/loading, https://code.claude.com/docs/en/plugins/manifest-reference, https://code.claude.com/docs/en/plugins/components, https://claude.com/docs/plugins/build, https://claude.com/docs/plugins/org-sync, https://claude.com/docs/plugins/pre-submission-checklist, https://claude.com/docs/cowork/guide/plugins, https://claude.com/docs/government/config/plugins-and-connectors, https://platform.claude.com/docs/en/manage-claude/plugins-api, https://support.claude.com/en/articles/13837433-manage-plugins-for-your-organization, /home/user/holyagent/packages/integrations/claude/build.ts, /home/user/holyagent/packages/integrations/claude/src/generate.ts, /home/user/holyagent/packages/integrations/claude/dist/ (glob listing)",
+  "acceptance": {
+    "revision": 2,
+    "carriedFrom": 1,
+    "rationale": "Research answered with cited sources; the rev 2 change only recorded decisions on items 1, 2 and 4, not on item 3.",
+    "criteria": [
+      {
+        "criterion": "A recommendation (bundle rg+fd, bundle fff, or download on first use) with per-platform sizes, license notes and the sync constraints it rests on",
+        "support": "download on first use. Per-platform sizes, licenses and sync constraints are in the sourced facts above. Key sources: https://claude.com/docs/plugins/org-sync, https://platform.claude.com/docs/en/manage-claude/plugins-api, https://code.claude.com/docs/en/plugins/manifest-reference, https://claude.com/docs/plugins/pre-submission-checklist"
+      },
+      {
+        "criterion": "Sourced facts are separated from inference, with a source for each fact",
+        "support": "the \"Sourced facts\" and \"Inference\" sections above, with a URL or file:line per fact; the rg and fd license text was not fetched."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "sources-read",
+        "support": "https://github.com/dmtrKovalenko/fff/releases/latest, https://github.com/dmtrkovalenko/fff/blob/main/README.md, https://github.com/dmtrKovalenko/fff/blob/main/LICENSE, https://raw.githubusercontent.com/dmtrKovalenko/fff/main/install-mcp.sh, https://crates.io/crates/fff-search, https://github.com/BurntSushi/ripgrep/releases/latest, https://github.com/sharkdp/fd/releases/, https://aimap.page/en/software/fd/download/, https://code.claude.com/docs/en/plugins/loading, https://code.claude.com/docs/en/plugins/manifest-reference, https://code.claude.com/docs/en/plugins/components, https://claude.com/docs/plugins/build, https://claude.com/docs/plugins/org-sync, https://claude.com/docs/plugins/pre-submission-checklist, https://claude.com/docs/cowork/guide/plugins, https://claude.com/docs/government/config/plugins-and-connectors, https://platform.claude.com/docs/en/manage-claude/plugins-api, https://support.claude.com/en/articles/13837433-manage-plugins-for-your-organization, /home/user/holyagent/packages/integrations/claude/build.ts, /home/user/holyagent/packages/integrations/claude/src/generate.ts, /home/user/holyagent/packages/integrations/claude/dist/ (glob listing)"
+      }
+    ]
+  },
+  "createdAt": "2026-10-27T15:01:05.710Z"
+}

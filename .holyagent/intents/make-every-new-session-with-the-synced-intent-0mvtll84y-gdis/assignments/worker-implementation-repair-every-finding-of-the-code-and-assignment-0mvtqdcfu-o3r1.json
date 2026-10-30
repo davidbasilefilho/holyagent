@@ -1,0 +1,92 @@
+{
+  "id": "assignment-0mvtqdcfu-o3r1",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 5,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-every-finding-of-the-code-and",
+  "objective": "Repair every finding of the code and security reviews of the state edge-case commit 32b1d25.",
+  "state": "Succeeded",
+  "scope": [
+    "Worktree /home/user/holyagent-state-edges, branch ccr-046ad103-6qsvgx-state-edges at e185f22 (32b1d25 plus a merge of the instruction branch). Reviews: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-qq7y.txt (code notes 3-7) and /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-hgmv.txt (security suspicion and notes 1-5).",
+    "Fix: code 3 and 5 and security 4 (an unmarked user line is never removed unless holyagent recorded that it wrote it: have ensureExcluded record the keep note whenever it sees an unmarked line; drop the legacy deletion heuristic or limit it to lines holyagent provably wrote); code 4 (a failure after the mode write leaves a consistent state or rolls back); code 6 (precise refusal text); code 7 (inScope compares case-insensitively when core.ignorecase is true); security suspicion (refuse the state folder in branch and local modes with an unconditional case fold, keep work-mode canonicalization conditional); security 1 (trim only trailing whitespace when matching exclude lines); security 2 (remove the temp file when the write fails too); security 3 (use the long lock wait for the exclude lock); security 5 (refuse an NTFS 8.3 short name for the state folder, for example a first segment matching HOLYAG~<digits> case-insensitively). Tests for each that fail without the fix."
+  ],
+  "constraints": [
+    "User (verbatim): \"não deve ter nada pendente / outra coisa: arrume esse comportamento, o que ficar pendente que o agente pode resolver deve ser resolvido\".",
+    "Follow /home/user/holyagent/.claude/CLAUDE.md and /home/user/holyagent/AGENTS.md. Do not edit .claude/CLAUDE.md or AGENTS.md.",
+    "Make no version-control writes and no edits under .git/ or .holyagent/ of the repository; tests use temp folders.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done and checked, stop and report; add no unrequested features."
+  ],
+  "criteria": [
+    {
+      "text": "Every listed finding is fixed with a test that fails without it, or named with a concrete reason",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Existing state-mode and vcs commit behavior and tests are unchanged apart from the fixed edges",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "mise run build leaves no diff after the change and mise run verify passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/state",
+    "packages/runtime/src/vcs",
+    "packages/runtime/src/domain",
+    "packages/runtime/tests",
+    "packages/integrations/claude/dist/scripts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvtq11a4-hgmv",
+  "specialist": {
+    "agentId": "workflow:wf_18dfc86e-0c1/assignment-0mvtqdcfu-o3r1",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T16:01:14.299Z",
+    "finishedAt": "2026-10-29T16:12:40.182Z"
+  },
+  "result": "result: All listed findings are fixed in /home/user/holyagent-state-edges, except that security 2 (temp file left after a failed write) has no test. `mise run verify` passes, and `mise run build` leaves no further diff.\n\nDesign departure from the Assignment, for the root to decide on: I dropped the legacy deletion heuristic and the `holyagent.stateExcludeKept` note, rather than recording the note in `ensureExcluded`. Without the heuristic nothing reads the note, so only the marked pair and stray marker comments are ever removed. The cost: an unmarked line left by the earlier unreleased build now stays when a clone leaves `local`. In `work` mode that line hides the state folder from `git status`. If you want that case handled, the heuristic needs a way to prove holyagent wrote the line, which the clone does not have today.\n\nchanged:\n- /home/user/holyagent-state-edges/packages/runtime/src/state/tree.ts\n- /home/user/holyagent-state-edges/packages/runtime/src/vcs/commit.ts\n- /home/user/holyagent-state-edges/packages/runtime/tests/state-mode.test.ts\n- /home/user/holyagent-state-edges/packages/integrations/claude/dist/scripts/holyagent.js (rebuilt)\n\nchecks:\n- `mise run verify` -> exit 0. Format clean on 233 files, type-check clean on 117, lint clean on 118, tests 911 pass, 1 skip, 0 fail.\n- `mise run build` run twice -> the diff hash is identical, so the build leaves no diff.\n- With `src/` reverted and the new tests kept, `bun test tests/state-mode.test.ts` -> 10 failures, each a new or updated test for a fixed finding. The trailing-whitespace test passes either way, because it guards against the trim being over-corrected.\n\nFindings, by fix:\n- **Code 3/5, security 4:** an unmarked exclude line is never removed. The test covers a line found in `local`, one added after entering `local`, and one present before entering it.\n- **Code 4:** if removing the entry fails after the mode write, the mode is restored. A clone with no configured mode has the key unset again. Tests cover both cases, using an unwritable exclude file.\n- **Code 6:** the refusal now says \"files under .holyagent/ are staged (...)\", which is accurate for force-added untracked files too.\n- **Code 7:** `inScope` folds case when `core.ignorecase` is true. The test stages `.HolyAgent/x` in `work` mode, then turns `core.ignorecase` on.\n- **Security suspicion:** `branch` and `local` modes refuse the state folder in any letter case, whatever `core.ignorecase` says. Canonicalization in `work` mode stays conditional. The old tests that allowed `.HolyAgent/x` with `ignorecase=false` in those modes were rewritten to expect the refusal.\n- **Security 1:** exclude lines are matched with a trailing trim only. The test uses ` /.holyagent/`, which now gets its own marked pair, and checks `git status` ignores `.holyagent/x`.\n- **Security 3:** the exclude edit takes the lock with the long wait. The test holds the lock for 2.5 s, which outlasts the short wait of about 1.1 s.\n- **Security 5:** a first segment matching `HOLYAG~<digits>` (any case) is refused in every mode. A deeper segment such as `src/HOLYAG~1` is still allowed.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- Security 2 is fixed by writing the exclude file through the existing `commitFile` helper, which already removes the temp file when either the write or the rename fails. It has no test: a write that fails after creating the temp file cannot be provoked without injection, since the temp name is unpredictable and root ignores permissions. An over-long temp name fails before any file exists.\n- Docs and instruction text that mention the earlier-build heuristic or the keep note were not searched for outside my paths. A `rg` of the tree found none besides `tree.ts`.\n\nevidence:\nEvery listed finding is fixed with a test that fails without it, or named with a concrete reason: All findings have tests that fail with `src/` reverted, as shown in `bun test tests/state-mode.test.ts`. The one exception is security 2, a temp file left behind when the write fails. It is fixed by using `commitFile`, and the reason it has no test is in the notes.\nExisting state-mode and vcs commit behavior and tests are unchanged apart from the fixed edges: Only the tests that pinned a fixed edge changed. These are the earlier-build deletion, the \"tracks files\" wording, and the lowercase-only folding with `ignorecase` off. All other state-mode, vcs-commit and windows-paths tests pass in the full run (911 pass, 0 fail).\nmise run build leaves no diff after the change and mise run verify passes: `mise run build` run twice gave an identical `git diff` md5. `mise run verify` -> exit 0, with 911 pass, 1 skip, 0 fail.\nchanged-paths: the four paths listed under `changed` above.\nchecks-run: `bun fmt --no-script`; `bun test tests/state-mode.test.ts` (46 pass); the same file with `src/` reverted (10 fail, 36 pass); `mise run build` twice; `mise run verify` (exit 0).\ndiff-file: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/state-edges-repair.diff",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "Reviewed through the final code and security re-reviews with no open blocker; verify passes on the stack head e544a87",
+    "criteria": [
+      {
+        "criterion": "Every listed finding is fixed with a test that fails without it, or named with a concrete reason",
+        "support": "All findings have tests that fail with `src/` reverted, as shown in `bun test tests/state-mode.test.ts`. The one exception is security 2, a temp file left behind when the write fails. It is fixed by using `commitFile`, and the reason it has no test is in the notes."
+      },
+      {
+        "criterion": "Existing state-mode and vcs commit behavior and tests are unchanged apart from the fixed edges",
+        "support": "Only the tests that pinned a fixed edge changed. These are the earlier-build deletion, the \"tracks files\" wording, and the lowercase-only folding with `ignorecase` off. All other state-mode, vcs-commit and windows-paths tests pass in the full run (911 pass, 0 fail)."
+      },
+      {
+        "criterion": "mise run build leaves no diff after the change and mise run verify passes",
+        "support": "`mise run build` run twice gave an identical `git diff` md5. `mise run verify` -> exit 0, with 911 pass, 1 skip, 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "the four paths listed under `changed` above."
+      },
+      {
+        "label": "checks-run",
+        "support": "`bun fmt --no-script`; `bun test tests/state-mode.test.ts` (46 pass); the same file with `src/` reverted (10 fail, 36 pass); `mise run build` twice; `mise run verify` (exit 0)."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/state-edges-repair.diff"
+      }
+    ]
+  },
+  "createdAt": "2026-10-29T16:01:14.299Z"
+}

@@ -1,0 +1,88 @@
+{
+  "id": "assignment-0mvrhpqy7-xsx8",
+  "intentId": "intent-0mvr4zvnq-k1q1",
+  "intentRevision": 4,
+  "roleTask": "Worker.mechanical",
+  "slug": "fix-three-stale-lines-in-docs",
+  "objective": "Fix three stale lines in docs/requirements.md and docs/usage.md so they match the installers and doctor as they now are.",
+  "state": "Succeeded",
+  "scope": [
+    "Worktree C:/Users/david.basile/dev/holyagent-feat-plugin-only-install, branch feat/plugin-only-install. Read install/wsl-install.sh, install/windows-install.ps1 and packages/runtime/src/setup/doctor.ts for the current behavior.",
+    "1) docs/requirements.md:7 (Node.js LTS row, Detail column) says \"mise's `lts` satisfies both\"; the installers now get Node from NodeSource (WSL) and winget (Windows). Name those and keep mise out of the row. 2) docs/usage.md:29 says the WSL installer runs in five steps; add that --dev adds a sixth (mise), as docs/requirements.md:38 says for Windows. 3) docs/usage.md:25 says doctor checks bili and ctx7 on PATH; doctor now also finds them in Bun's global bin directory, passing with a hint to add it to PATH."
+  ],
+  "constraints": [
+    "Edit only docs/requirements.md and docs/usage.md; change only those lines and keep the surrounding wording and size.",
+    "No version-control writes, nothing under .git/ or .holyagent/; report changed paths.",
+    "When done and checked, stop and report; add nothing unrequested."
+  ],
+  "criteria": [
+    {
+      "text": "docs/requirements.md:7 names NodeSource and winget as the Node source and does not mention mise",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "docs/usage.md says --dev adds a mise step to the WSL installer and that doctor also finds bili and ctx7 in Bun's global bin directory",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Only docs/requirements.md and docs/usage.md change and mise run fmt:check exits 0",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "docs/requirements.md",
+    "docs/usage.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvrginn4-wgcr",
+  "specialist": {
+    "agentId": "workflow:wf_ef2d92c8-384/assignment-0mvrhpqy7-xsx8",
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-28T02:23:24.657Z",
+    "finishedAt": "2026-10-28T02:26:12.890Z"
+  },
+  "result": "result: Three stale doc lines fixed in docs/requirements.md and docs/usage.md; `mise run fmt:check` exits 0 and only those two files changed.\nchanged: docs/requirements.md, docs/usage.md\nchecks:\n- `mise run fmt:check` (first run) -> exit 1: docs/requirements.md needed formatting after the Node row edit (table padding).\n- `bun fmt --no-script docs/requirements.md` -> exit 0, formatted 1 file.\n- `mise run fmt:check` (final) -> exit 0, \"All 230 files are formatted.\"\n- `git status --short` -> only ` M docs/requirements.md` and ` M docs/usage.md`.\n- Not run: `mise run verify` and tests. This is a docs-only change and the format gate was the Assignment's check.\nblockers: none\nquestions: none\nnotes: My compressed history mentions other assignments (assignment-0mvr5ftbl-g78k, assignment-0mvrginn4-wgcr, a fix-state-off-main worktree). I did not act on them; this report covers only assignment-0mvrhpqy7-xsx8. The `bun fmt` run changed only the whitespace padding of the Node row, not its wording.\nevidence:\ndocs/requirements.md:7 names NodeSource and winget as the Node source and does not mention mise: line 7 now reads \"the installers take Node LTS from NodeSource (WSL) or winget (Windows)\"; \"mise\" removed from that row (diff file)\ndocs/usage.md says --dev adds a mise step to the WSL installer and that doctor also finds bili and ctx7 in Bun's global bin directory: docs/usage.md:29 \"in five steps with a final verification, or six with `--dev`, which adds a mise step\"; docs/usage.md:25 \"checks `bun` on `PATH`, `bili` and `ctx7` on `PATH` or in Bun's global bin directory (passing with a hint to add that directory to `PATH`)\" (diff file)\nOnly docs/requirements.md and docs/usage.md change and mise run fmt:check exits 0: `git status --short` lists only those two paths; `mise run fmt:check` exit 0, \"All 230 files are formatted\" (checks above)\nchanged-paths: C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/docs/requirements.md, C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/docs/usage.md\nchecks-run: `mise run fmt:check` exit 0 (final, after formatting); `bun fmt --no-script docs/requirements.md` exit 0; `mise run fmt:check` exit 1 before formatting, as recorded above\ndiff-file: C:\\Users\\DAVID~1.BAS\\AppData\\Local\\Temp\\assignment-0mvrhpqy7-xsx8.diff (git diff of both files, 3 insertions and 3 deletions)",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Three lines fixed; fmt:check exit 0; only two docs files changed.",
+    "criteria": [
+      {
+        "criterion": "docs/requirements.md:7 names NodeSource and winget as the Node source and does not mention mise",
+        "support": "line 7 now reads \"the installers take Node LTS from NodeSource (WSL) or winget (Windows)\"; \"mise\" removed from that row (diff file)"
+      },
+      {
+        "criterion": "docs/usage.md says --dev adds a mise step to the WSL installer and that doctor also finds bili and ctx7 in Bun's global bin directory",
+        "support": "docs/usage.md:29 \"in five steps with a final verification, or six with `--dev`, which adds a mise step\"; docs/usage.md:25 \"checks `bun` on `PATH`, `bili` and `ctx7` on `PATH` or in Bun's global bin directory (passing with a hint to add that directory to `PATH`)\" (diff file)"
+      },
+      {
+        "criterion": "Only docs/requirements.md and docs/usage.md change and mise run fmt:check exits 0",
+        "support": "`git status --short` lists only those two paths; `mise run fmt:check` exit 0, \"All 230 files are formatted\" (checks above)"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/docs/requirements.md, C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/docs/usage.md"
+      },
+      {
+        "label": "checks-run",
+        "support": "`mise run fmt:check` exit 0 (final, after formatting); `bun fmt --no-script docs/requirements.md` exit 0; `mise run fmt:check` exit 1 before formatting, as recorded above"
+      },
+      {
+        "label": "diff-file",
+        "support": "C:\\Users\\DAVID~1.BAS\\AppData\\Local\\Temp\\assignment-0mvrhpqy7-xsx8.diff (git diff of both files, 3 insertions and 3 deletions)"
+      }
+    ]
+  },
+  "createdAt": "2026-10-28T02:23:24.080Z"
+}

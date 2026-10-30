@@ -1,0 +1,112 @@
+{
+  "id": "assignment-0mvrg7tfo-hon9",
+  "intentId": "intent-0mvr4zvnq-k1q1",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-installers-install-bun-node-lts",
+  "objective": "Make the installers install Bun, Node LTS, git and gh without mise, and install mise only when development is asked for, then fix the two stale CLI mentions in the docs.",
+  "state": "Succeeded",
+  "scope": [
+    "Worktree C:/Users/david.basile/dev/holyagent-feat-plugin-only-install (branch feat/plugin-only-install, commit bb36687 rewrote install/ and docs).",
+    "Blocking: install/wsl-install.sh:143 and install/windows-install.ps1 (mise step) install mise on every run and use it to install Node, Bun and gh (wsl-install.sh:166-187). The requirement is: installers shrink to the prerequisites only: Bun, Node LTS, git, gh and, for development, mise. Install Bun, Node LTS, git and gh with each platform's usual installer (for example Bun's official install script, the distribution or NodeSource/winget packages, the GitHub CLI apt repository or winget), and install mise only behind an explicit development option (a flag such as --dev / -Dev); keep the scripts idempotent and keep printing the three plugin commands and the /holyagent:setup line at the end. Update README.md, docs/usage.md or docs/development.md only where they describe the installer options.",
+    "Non-blocking, fix alongside: docs/attributions.md:25 says \"in the runtime and the public CLI\" (drop \"and the public CLI\"); docs/decisions.md:53 names \"the public CLI\" without its path, name packages/cli."
+  ],
+  "constraints": [
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report; do not add unrequested features, tests, files or refactors (name them in the report).",
+    "No version-control writes, no edits under .git/ or .holyagent/; report changed paths. If `mise run build` removes the vendored tools, run `git restore packages/integrations/claude/dist/scripts/vendor`.",
+    "Follow .claude/CLAUDE.md and AGENTS.md (Effect, Effect Schema, Bun Shell, JSDoc, mise run build after plugin source changes).",
+    "Look up the current official install commands for Bun, Node LTS, gh and mise rather than relying on memory."
+  ],
+  "criteria": [
+    {
+      "text": "Without the development option, neither installer installs or uses mise, and each installs Bun, Node LTS, git and gh, is idempotent, and ends by printing the three plugin commands",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "With the development option, each installer also installs mise",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "`bash -n install/wsl-install.sh` exits 0 and the PowerShell parser reports 0 errors for install/windows-install.ps1",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "docs/attributions.md no longer mentions the public CLI and docs/decisions.md names packages/cli",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "README keeps its six required sections in order, and changes stay within install/, README.md, docs/usage.md, docs/development.md, docs/attributions.md and docs/decisions.md",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "install",
+    "README.md",
+    "docs/usage.md",
+    "docs/development.md",
+    "docs/attributions.md",
+    "docs/decisions.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvr8aadm-0iax",
+  "specialist": {
+    "agentId": "workflow:wf_8f47ca90-b3d/assignment-0mvrg7tfo-hon9",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-28T01:41:28.492Z",
+    "finishedAt": "2026-10-28T01:48:17.940Z"
+  },
+  "result": "result: Both installers now install Bun, Node LTS, git and gh without mise. They install mise only behind `--dev` (`-Dev` on Windows). The two stale CLI mentions in the docs are fixed. I did not run either installer end to end, since this machine has no Ubuntu or Windows install to run them on.\n\nchanged:\n- C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/install/wsl-install.sh\n- C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/install/windows-install.ps1\n- C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/README.md\n- C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/docs/usage.md\n- C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/docs/development.md\n- C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/docs/attributions.md\n- C:/Users/david.basile/dev/holyagent-feat-plugin-only-install/docs/decisions.md\n\nchecks:\n- `bash -n install/wsl-install.sh` -> exit 0\n- PowerShell `Parser::ParseFile` on `install/windows-install.ps1` -> 0 errors\n- `bash install/wsl-install.sh --bogus` -> prints the usage line, exit 2\n- README headings -> `# HolyAgent`, `## How do I install it?`, `## Why HolyAgent?`, `## Development`, `## Special thanks`, `## License`, in that order\n- `rg \"public CLI\" docs README.md` -> one hit, in docs/decisions.md:53, which is the \"public CLI is gone\" decision record and now names `packages/cli`\n- `git status --short` -> only the seven files above are modified\n- Not run: `mise run verify`, the actual installers, shellcheck (not installed). The change touches only shell, PowerShell and docs.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- docs/components.md (lines 7-10) and docs/requirements.md (lines 10 and 38) are outside my ownership and now say the installers use mise for Node, Bun and gh. They say the Windows installer is \"six steps (…mise, Node LTS, Bun, gh…)\", and it is now five steps, or six with `-Dev`. They need a follow-up edit.\n- The install commands come from current docs: NodeSource `setup_lts.x`, `https://bun.com/install`, GitHub's apt repository for `gh`, `https://mise.run`, and winget `OpenJS.NodeJS.LTS`, `Git.Git`, `GitHub.cli`, `jdx.mise`. The Windows Bun installer is `https://bun.sh/install.ps1`. I fetched the Bun, `gh` and Node docs through ctx7; I did not look up `mise.run` or the Windows `bun.sh/install.ps1` URL, and the NodeSource `setup_lts.x` URL did not appear in the Node.js docs result either.\n- Script behavior to know about:\n  - Without `--dev` the scripts do not touch mise at all.\n  - The WSL script now requires apt-get and dpkg-query and exits with an error where it used to warn and continue.\n  - The WSL script adds only one `~/.bashrc` line without `--dev`, and the Windows script adds the Bun bin directory to the user PATH.\n  - The Windows script is still untested on Windows.\n\nevidence:\nWithout the development option, neither installer installs or uses mise, and each installs Bun, Node LTS, git and gh, is idempotent, and ends by printing the three plugin commands: In `install/wsl-install.sh`, every mise reference is inside the `$DEV -eq 1` mise step or the `$DEV` verification line, apart from the `MISE=` variable definition. `install/windows-install.ps1` has `Find-Mise` and the mise step behind `if ($Dev)`. Node, Bun, git and gh each skip when already present or current (the WSL Node check also needs 22.13 or later). Both end with the three `claude plugin` commands and the `/holyagent:setup` line. I read the code but did not run the installers.\nWith the development option, each installer also installs mise: The `--dev` and `-Dev` branches install mise (`https://mise.run` on WSL, winget `jdx.mise` on Windows), add the activation line to the shell profile, and verify it. The step count becomes 6.\n`bash -n install/wsl-install.sh` exits 0 and the PowerShell parser reports 0 errors for install/windows-install.ps1: `bash -n` exit 0; `Parser::ParseFile` reported \"errors: 0\".\nREADME keeps its six required sections in order, and changes stay within install/, README.md, docs/usage.md, docs/development.md, docs/attributions.md and docs/decisions.md: The README headings are in the required order, and `git status --short` lists only those seven paths.\ndocs/attributions.md no longer mentions the public CLI and docs/decisions.md names packages/cli: attributions.md:25 now reads \"in the runtime\"; decisions.md:53 reads \"a separate public CLI package (`packages/cli`)\".\nchecks-run: The commands under `checks:` above; `mise run verify` was not run.\nchanged-paths: The seven paths under `changed:`.\ndiff-file: C:/Users/DAVID~1.BAS/AppData/Local/Temp/installers-dev-flag.diff (628 lines, `git diff` against HEAD bb36687 for the ownership paths; no new files).",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Installers skip mise without --dev/-Dev; bash -n and PowerShell parse clean; README sections in order.",
+    "criteria": [
+      {
+        "criterion": "Without the development option, neither installer installs or uses mise, and each installs Bun, Node LTS, git and gh, is idempotent, and ends by printing the three plugin commands",
+        "support": "In `install/wsl-install.sh`, every mise reference is inside the `$DEV -eq 1` mise step or the `$DEV` verification line, apart from the `MISE=` variable definition. `install/windows-install.ps1` has `Find-Mise` and the mise step behind `if ($Dev)`. Node, Bun, git and gh each skip when already present or current (the WSL Node check also needs 22.13 or later). Both end with the three `claude plugin` commands and the `/holyagent:setup` line. I read the code but did not run the installers."
+      },
+      {
+        "criterion": "With the development option, each installer also installs mise",
+        "support": "The `--dev` and `-Dev` branches install mise (`https://mise.run` on WSL, winget `jdx.mise` on Windows), add the activation line to the shell profile, and verify it. The step count becomes 6."
+      },
+      {
+        "criterion": "`bash -n install/wsl-install.sh` exits 0 and the PowerShell parser reports 0 errors for install/windows-install.ps1",
+        "support": "`bash -n` exit 0; `Parser::ParseFile` reported \"errors: 0\"."
+      },
+      {
+        "criterion": "docs/attributions.md no longer mentions the public CLI and docs/decisions.md names packages/cli",
+        "support": "attributions.md:25 now reads \"in the runtime\"; decisions.md:53 reads \"a separate public CLI package (`packages/cli`)\"."
+      },
+      {
+        "criterion": "README keeps its six required sections in order, and changes stay within install/, README.md, docs/usage.md, docs/development.md, docs/attributions.md and docs/decisions.md",
+        "support": "The README headings are in the required order, and `git status --short` lists only those seven paths."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "The commands under `checks:` above; `mise run verify` was not run."
+      },
+      {
+        "label": "changed-paths",
+        "support": "The seven paths under `changed:`."
+      },
+      {
+        "label": "diff-file",
+        "support": "C:/Users/DAVID~1.BAS/AppData/Local/Temp/installers-dev-flag.diff (628 lines, `git diff` against HEAD bb36687 for the ownership paths; no new files)."
+      }
+    ]
+  },
+  "createdAt": "2026-10-28T01:41:27.876Z"
+}

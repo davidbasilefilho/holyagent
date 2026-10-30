@@ -1,0 +1,103 @@
+{
+  "id": "assignment-0mvtnnrr3-wg92",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "make-where-holyagent-keeps-intent",
+  "objective": "Make where holyagent keeps Intent, Assignment and state records follow the project: the holyagent/state branch stays the default for stacked-PR projects, while a project without stacked PRs keeps them on the work branch when it already tracks .holyagent/ or its conventions allow it, and local-only (ignored by git, out of every PR) otherwise.",
+  "state": "Succeeded",
+  "scope": [
+    "Worktree /home/user/holyagent-state-mode (branch ccr-046ad103-6qsvgx-state-mode from origin/main 1277474; node_modules installed).",
+    "Current design, traced with file:line in /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-yc5t.txt: resolveState in packages/runtime/src/state/tree.ts:662-731 always uses the state branch in a git repo (name from git config holyagent.stateBranch, tree.ts:130-144); commitState (tree.ts:620-650) commits there; vcs commit refuses .holyagent/ paths (packages/runtime/src/vcs/commit.ts:76-85); migrateWorkTree moves work-tree state into the state worktree; before PR #28 state rode the work commits (docs/decisions.md:9,49).",
+    "Add a per-clone state mode read from git config (for example holyagent.stateMode = branch | work | local), never from a repository file, for the same trust reason holyagent.stateBranch gives (tree.ts:126-129, vcs/settings.ts:14-19). Unset means branch, so existing clones and stacked projects keep today's behavior. work: state lives in the work tree's .holyagent/ and is committed with the work (vcs commit accepts and stages the changed state paths alongside the work paths, as before #28; no state-branch worktree, no migration away). local: state lives in the work tree's .holyagent/, kept out of git through .git/info/exclude (not the repository .gitignore), and nothing commits it. Add a CLI command for the root to read and set the mode with help text (for example holyagent state mode [branch|work|local]); decide what happens to existing records when the mode changes (keep it simple and safe: refuse or move once, documented).",
+    "Instruction text: update the model-agnostic requirements (packages/runtime/src/instructions/requirements.md, R-VCS and related) first, then the claude-5.5 root sections (version-control.md, stack-plan.md and any other mention of holyagent/state) so the root chooses the mode at the start of work in a project: stacked PRs (holyagent's default stack plan, or the project's history/conventions) -> branch; the project's conventions ask for independent PRs from the base -> work when the repository already tracks .holyagent/ or its conventions allow it, else local; it records the choice with the CLI and pushes holyagent/state only in branch mode. Keep instruction size about the same as the text replaced. Update the session-start hook text only if it states the state branch unconditionally.",
+    "Docs: docs/decisions.md (new entry; fix the stale 'below' cross-reference at :65), docs/hooks.md or the state docs that describe the branch. Tests for each mode: resolution, commit behavior (vcs commit with .holyagent paths in work mode, refusal in branch and local mode), exclude entry in local mode, default unchanged when unset, CLI get/set. Regenerate with mise run build."
+  ],
+  "constraints": [
+    "User (verbatim): \"outra coisa: a branch pra intents/assignments/estado deve ser apenas para projetos que usam pr stacks e como o comportamento padrão, mas mergeability é necessário, deve seguir o padrão do projeto\"; decision: follow the project (work branch if it tracks or allows .holyagent/, else local-only).",
+    "Follow /home/user/holyagent/.claude/CLAUDE.md (Effect with tagged errors, no try/catch/new Promise/async in runtime and CLI source, Schema at boundaries with onExcessProperty error, Bun APIs and Bun Shell, JSDoc on exports) and /home/user/holyagent/AGENTS.md. Do not edit .claude/CLAUDE.md or AGENTS.md.",
+    "Work only in that worktree; make no version-control writes and no edits under .git/ or .holyagent/ of the repository (tests use temp repos).",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done and checked, stop and report; no unrequested features (name ideas in the report)."
+  ],
+  "criteria": [
+    {
+      "text": "With the mode unset, behavior and existing tests are unchanged (state branch)",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "work and local modes store, commit or exclude state as specified, each proven by tests that fail without the change",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The root instructions and requirements say how to pick the mode from the project's stack convention and when to push holyagent/state, at about the same size",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build leaves no diff after the change and mise run verify passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime",
+    "packages/integrations/claude",
+    "packages/cli",
+    "docs"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "workflow:wf_898f4f42-cdf/assignment-0mvtnnrr3-wg92",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T14:45:21.855Z",
+    "finishedAt": "2026-10-29T14:57:01.714Z"
+  },
+  "result": "result: Added a per-clone state mode (`branch` | `work` | `local`, git config `holyagent.stateMode`, unset means branch). `holyagent state mode [branch|work|local]` reads and sets it, and the root instructions say how to choose it. `mise run verify` exits 0 and `mise run build` leaves no diff (881 pass, 1 skip, 0 fail).\n\nchanged:\n- /home/user/holyagent-state-mode/packages/runtime/src/state/mode.ts (new)\n- /home/user/holyagent-state-mode/packages/runtime/src/state/tree.ts\n- /home/user/holyagent-state-mode/packages/runtime/src/state/errors.ts\n- /home/user/holyagent-state-mode/packages/runtime/src/vcs/commit.ts\n- /home/user/holyagent-state-mode/packages/runtime/src/cli/state.ts (new)\n- /home/user/holyagent-state-mode/packages/runtime/src/cli/commands.ts\n- /home/user/holyagent-state-mode/packages/runtime/src/cli/errors.ts\n- /home/user/holyagent-state-mode/packages/runtime/src/instructions/requirements.md\n- /home/user/holyagent-state-mode/packages/runtime/src/instructions/requirements/commit-text.md\n- /home/user/holyagent-state-mode/packages/runtime/src/instructions/claude-5.5/root/version-control.md\n- /home/user/holyagent-state-mode/packages/runtime/src/instructions/claude-5.5/root/stack-plan.md\n- /home/user/holyagent-state-mode/packages/runtime/src/instructions/claude-5.5/root/user-messages.md\n- /home/user/holyagent-state-mode/packages/integrations/claude/src/agents.ts\n- /home/user/holyagent-state-mode/packages/integrations/claude/dist/agents/holyagent.md (regenerated)\n- /home/user/holyagent-state-mode/packages/integrations/claude/dist/scripts/holyagent.js (regenerated)\n- /home/user/holyagent-state-mode/packages/runtime/tests/state-mode.test.ts (new)\n- /home/user/holyagent-state-mode/docs/decisions.md\n- /home/user/holyagent-state-mode/docs/usage.md\n- /home/user/holyagent-state-mode/docs/commit-authorship.md\n- /home/user/holyagent-state-mode/docs/development.md\n- /home/user/holyagent-state-mode/docs/hooks.md\n\nchecks:\n- `mise run fmt` -> 0\n- `mise run build` -> 0. Run again, the two generated files kept the same checksums.\n- `mise run verify` -> 0. Type-check 117 files clean, lint 118 files clean, format 233 files clean, tests 881 pass / 1 skip / 0 fail.\n- The first `verify` run failed one existing test: `plugin.test.ts` requires every `R-*` id in `requirements.md` to be mapped. I added `R-STATE` to `REQUIREMENT_SECTIONS` in `agents.ts` and it passed.\n- `bun test tests/state-mode.test.ts` -> 16 pass.\n- Mutation check: with the mode check removed from `commitState`, the test \"a state commit is never made on a branch that happens to be named like the state branch\" failed. Restored afterwards.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- **Behavior by mode:**\n  - `branch` (default): unchanged. `vcs commit` still refuses `.holyagent/` paths with the old message.\n  - `work`: state is read and written in the work tree and `commitState` makes no commit. `vcs commit` adds `.holyagent` to the commit scope when state files changed, so the old `StagedOutsideScope` check does not trip. `.holyagent/local/` stays out because it ignores itself.\n  - `local`: state lives in the work tree, and `.holyagent/` is added to `.git/info/exclude`, not `.gitignore`. `vcs commit` refuses `.holyagent` paths with a local-specific message.\n- **Mode changes:** the command never moves or deletes records. It refuses (`StateModeRefused`, exit 3) to leave `branch` once the `holyagent/state` branch exists locally or on origin. It also refuses to enter `branch` while the work tree's `.holyagent/` holds records, and to set `local` while git tracks `.holyagent/` (it says to use `work`). `work` and `local` switch freely, and leaving `local` removes the exclude line.\n- **Work-mode commit lag:** in `work` mode, `vcs commit` records the branch on the Intent after it commits. That state change rides the next commit and leaves the tree dirty until then. It is documented in `docs/decisions.md`.\n- **`local` mode scope:** state is per work tree, so linked worktrees do not share it (documented).\n- **AGENTS.md:** it still says unconditionally that state lives on `holyagent/state`. I left it alone per the constraint, so the root should adjust it or confirm this repo stays in `branch` mode.\n- **Instruction size:** `version-control.md` went from 420 to 514 words, and `requirements.md` gained one new `R-STATE` line. The `State` bullet is about 135 words against 66 replaced. I could trim further if that is too large.\n- **Docs and hook text:** `docs/decisions.md` has a new entry, and its stale \"below\" cross-reference at line 65 now says \"above\". The session-start hook text did not state the branch unconditionally, so I left it unchanged.\n- **Ideas not built:** a `--move` option for mode changes, and a mode hint in the session-start status.\n\nevidence:\n- With the mode unset, behavior and existing tests are unchanged (state branch): `mise run verify` exit 0, all pre-existing tests in `state-branch.test.ts`, `vcs-commit.test.ts` and `cli.test.ts` pass unmodified. New tests \"a clone with no mode set is in branch mode…\" and \"the branch mode refuses state paths\" cover the default.\n- work and local modes store, commit or exclude state as specified, each proven by tests that fail without the change: `packages/runtime/tests/state-mode.test.ts` (16 tests). The `describe(\"the work mode\")` and `describe(\"the local mode\")` blocks cover where state is stored, which files `vcs commit` stages, the `.git/info/exclude` entry and the refusals. The `holyagent/state`-named-branch test was confirmed to fail when the `commitState` mode check is removed. The other tests need the new `state mode` command or the changed `vcs commit` and resolution paths.\n- The root instructions and requirements say how to pick the mode from the project's stack convention and when to push holyagent/state, at about the same size: `requirements.md` has new `R-STATE` plus an edited `R-VCS` and `R-GIT`. `claude-5.5/root/version-control.md` has the `State` bullet with the branch, work and local rules and the push rule \"in the branch mode\". `stack-plan.md` points to it. Size is as noted above.\n- mise run build leaves no diff after the change and mise run verify passes: `mise run build` -> 0, the second run left the checksums of `dist/agents/holyagent.md` and `dist/scripts/holyagent.js` unchanged (`sha256sum -c` OK). `mise run verify` -> 0.\n- changed-paths: the list under `changed:` above.\n- checks-run: the list under `checks:` above.\n- diff-file: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/state-mode.diff (959 lines). It leaves out the minified `dist/scripts/holyagent.js` and includes the new files via `--no-index`.",
+  "acceptance": {
+    "revision": 4,
+    "carriedFrom": 3,
+    "rationale": "Mode implementation holds at revision 4; the signal order was added by the follow-up and reviewed",
+    "criteria": [
+      {
+        "criterion": "With the mode unset, behavior and existing tests are unchanged (state branch)",
+        "support": "`mise run verify` exit 0, all pre-existing tests in `state-branch.test.ts`, `vcs-commit.test.ts` and `cli.test.ts` pass unmodified. New tests \"a clone with no mode set is in branch mode…\" and \"the branch mode refuses state paths\" cover the default."
+      },
+      {
+        "criterion": "work and local modes store, commit or exclude state as specified, each proven by tests that fail without the change",
+        "support": "`packages/runtime/tests/state-mode.test.ts` (16 tests). The `describe(\"the work mode\")` and `describe(\"the local mode\")` blocks cover where state is stored, which files `vcs commit` stages, the `.git/info/exclude` entry and the refusals. The `holyagent/state`-named-branch test was confirmed to fail when the `commitState` mode check is removed. The other tests need the new `state mode` command or the changed `vcs commit` and resolution paths."
+      },
+      {
+        "criterion": "The root instructions and requirements say how to pick the mode from the project's stack convention and when to push holyagent/state, at about the same size",
+        "support": "`requirements.md` has new `R-STATE` plus an edited `R-VCS` and `R-GIT`. `claude-5.5/root/version-control.md` has the `State` bullet with the branch, work and local rules and the push rule \"in the branch mode\". `stack-plan.md` points to it. Size is as noted above."
+      },
+      {
+        "criterion": "mise run build leaves no diff after the change and mise run verify passes",
+        "support": "`mise run build` -> 0, the second run left the checksums of `dist/agents/holyagent.md` and `dist/scripts/holyagent.js` unchanged (`sha256sum -c` OK). `mise run verify` -> 0."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "the list under `changed:` above."
+      },
+      {
+        "label": "checks-run",
+        "support": "the list under `checks:` above."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/state-mode.diff (959 lines). It leaves out the minified `dist/scripts/holyagent.js` and includes the new files via `--no-index`."
+      }
+    ]
+  },
+  "createdAt": "2026-10-29T14:45:21.855Z"
+}

@@ -1,0 +1,70 @@
+{
+  "id": "assignment-0mvqxh7l8-hxl9",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "bundle-ripgrep-and-fd-in-the-holyagent",
+  "objective": "Bundle ripgrep and fd in the holyagent plugin for darwin-arm64, linux-x64 and windows-x64, expose them through the holyagent CLI, and make every holyagent agent use them for content and file search.",
+  "state": "Succeeded",
+  "scope": [
+    "Worktree: /home/user/holyagent-rgfd on branch ccr-046ad103-6qsvgx-rgfd.",
+    "User decision: drop fff; bundle rg and fd; agents must use them.",
+    "Known (research, verify versions and checksums now): ripgrep 15.2.0 assets ripgrep-15.2.0-aarch64-apple-darwin.tar.gz, -x86_64-unknown-linux-musl.tar.gz, -x86_64-pc-windows-msvc.zip; fd v10.5.0 assets fd-v10.5.0-aarch64-apple-darwin.tar.gz, -x86_64-unknown-linux-musl.tar.gz (or gnu), -x86_64-pc-windows-msvc.zip. claude.ai rejects plugins with a top-level bin/, so ship them under scripts/ (for example dist/scripts/vendor/<target>/rg[.exe]); build.ts chmods files flagged executable and git keeps mode 100755. Keep each license file (rg: MIT/Unlicense, fd: MIT/Apache-2.0) beside the binaries.",
+    "Design: a pinned version and SHA-256 per asset in source; a build step (a Bun script run by mise, e.g. a vendor task) downloads, verifies and extracts them into the plugin output; `holyagent rg ...` and `holyagent fd ...` run the binary for the current platform with inherited stdio and exit code. Agents: specialists and the root that have Bash use `holyagent rg`/`holyagent fd` instead of grep, find or the built-in Grep/Glob; roles without Bash keep the built-in Grep and Glob (state in the report whether those are ripgrep-backed). Put the rule in the instruction source (packages/runtime/src/instructions: requirements.md first, then the claude-5.5 root and specialist sections) and adjust agent tool lists in packages/integrations/claude/src/agents.ts only if needed.",
+    "Report the total size added to dist and per binary."
+  ],
+  "constraints": [
+    "Follow /home/user/holyagent/.claude/CLAUDE.md (Effect with tagged errors, no try/catch/new Promise/async in runtime source, Schema at boundaries, Bun APIs and Bun Shell, JSDoc on exports) and AGENTS.md.",
+    "Work only in your worktree; make no version-control writes (no commit, add, checkout, switch, merge, stash, push) and no edits under .git/ or .holyagent/.",
+    "Run `bun install --frozen-lockfile` in your worktree first if node_modules is missing (mise is installed; run gates through mise). When done, run `mise run build` and `mise run verify` in your worktree and report the results.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When done and checked, stop and report; do not add unrequested features or refactors (name them in the report)."
+  ],
+  "criteria": [
+    {
+      "text": "holyagent rg and holyagent fd run the bundled binary for each of the three targets, with checksums verified at build time and licenses shipped",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Instruction text tells every agent with Bash to search with them, and roles without Bash have a stated rule",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Tests cover target selection, a missing binary error and the CLI pass-through",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The plugin keeps no top-level bin/ and mise run verify passes in the worktree",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file",
+    "bundle-size"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli",
+    "packages/runtime/src/instructions",
+    "packages/runtime/tests",
+    "packages/integrations/claude",
+    "mise.toml",
+    "scripts",
+    "docs"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "workflow:wf_96692dce-8d3/assignment-0mvqxh7l8-hxl9",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T16:56:53.420Z",
+    "finishedAt": "2026-10-27T17:20:36.600Z"
+  },
+  "result": "result: `holyagent rg` and `holyagent fd` now run the bundled ripgrep 15.2.0 and fd 10.5.0 for darwin-arm64, linux-x64 and windows-x64. `mise run build` and `mise run verify` both pass in the worktree: 825 pass, 0 fail, 1 skip that was already in the suite.\nchanged:\n- `/home/user/holyagent-rgfd/packages/runtime/src/cli/tools.ts` (new), `commands.ts`, `errors.ts`, `program.ts`, `types.ts`\n- `/home/user/holyagent-rgfd/packages/runtime/src/instructions/requirements.md`, `claude-5.5/specialist/working.md`, `claude-5.5/root/search.md` (new)\n- `/home/user/holyagent-rgfd/packages/runtime/tests/tools.test.ts` (new)\n- `/home/user/holyagent-rgfd/packages/integrations/claude/build.ts`, `src/agents.ts`, `src/files.ts`, `src/vendor.ts` (new), `tests/plugin.test.ts`, `tests/vendor.test.ts` (new)\n- `/home/user/holyagent-rgfd/packages/integrations/claude/dist/**`: rebuilt agents and `scripts/holyagent.js`, plus the new `scripts/vendor/` (21 files)\n- `/home/user/holyagent-rgfd/scripts/vendor.ts` (new), `/home/user/holyagent-rgfd/mise.toml`\n- `/home/user/holyagent-rgfd/docs/{README,components,decisions,development}.md`\n\nchecks:\n- `mise run build` -> exit 0, 29 files written; the vendor step is a no-op once the files are verified.\n- `mise run verify` -> exit 0: type-check 108 files clean, lint 109 files clean, fmt 223 files formatted, `bun test` 825 pass / 0 fail / 1 skip.\n- `mise run vendor` -> exit 0. The first run fetched all six archives; the second changed nothing.\n- Manual run of the built `dist/scripts/holyagent rg|fd`, linux-x64 only:\n  - Exit codes pass through (0 on a match, 1 on none, 2 on a bad flag).\n  - Stdin pipes through, and `rg --version` prints ripgrep's own text.\n  - Under `| head` the exit status was 32 (broken pipe), not rg's own 141.\n- Not run: `claude plugin validate --strict`, because the Claude binary in `node_modules` is a stub here. Nothing exercised the darwin-arm64 or Windows binaries or the Windows `$` spawn; only their pinned hashes were checked.\n\nblockers: none\n\nquestions:\n- Is fd's trust-on-first-use pinning acceptable? fd 10.5.0 publishes no checksum file. Its archive hashes come from my downloads, while ripgrep's match the hashes its release publishes.\n- Do you want the Grep and Glob tools removed from the agents that have Bash? I left `agents.ts` tool lists alone, so those roles are told in text, not blocked.\n\nnotes:\n- **Design:**\n  - **Vendor folder:** The binaries are committed in `dist/scripts/vendor/<target>/`. `build.ts` now leaves that folder in place while regenerating the rest of `dist/`, and `mise run build` depends on `vendor`. The folder is checked offline against pinned SHA-256s of both archive and program, and a test shows a build keeps it.\n  - **CLI:** `rg` and `fd` are stateless, raw pass-through commands. `--help` and `-h` reach the tool, so `holyagent help rg` shows ripgrep's help. `Host.tools` and `Call.tools` hold the vendor folder, defaulting to `vendor/` beside the bundle.\n  - **Missing or unsupported:** A missing binary gives `ToolMissing` and an unsupported host gives `UnsupportedPlatform`, both exit 4.\n  - **Instruction text:** I put the root rule in a new `root/search.md`, not in `delegating.md`. The new line in `delegating.md` pushed the root-core text to 4167 characters, over the 4000-character cap that `sessioncontext.test.ts` enforces. The specialist bullet in `working.md` uses the `\"${CLAUDE_PLUGIN_ROOT}/scripts/holyagent\"` path, because specialists have no `holyagent` on PATH.\n- **Roles without Bash:** These keep the built-in Grep and Glob: explorer-lookup, explorer-map, explorer-trace, librarian-lookup, librarian-research, reviewer-artifact, reviewer-audit, reviewer-security and reviewer-visual. I could not verify the Grep/Glob backend, since `node_modules/@anthropic-ai/claude-code/bin/claude.exe` is a stub. Claude Code documents Grep as ripgrep-backed and documents no backend for Glob.\n- **Windows license files:** They carry CRLF, and `.gitattributes` (`* text=auto eol=lf`) will normalize them on `git add`. No test depends on those bytes.\n- **Left out:** A `.gitattributes` binary marker and CI changes (`.github` is outside my ownership). CI's stale-plugin check runs `mise run build`, which is a no-op for vendoring because the folder is committed.\n\nevidence:\nholyagent rg and holyagent fd run the bundled binary for each of the three targets, with checksums verified at build time and licenses shipped: Pins and SHA-256 checks are in `packages/integrations/claude/src/vendor.ts`; the `rg` and `fd` commands are in `packages/runtime/src/cli/tools.ts`. `mise run vendor` fetched and verified all six archives, with archive and program hashes checked, including the zip path. `dist/scripts/vendor/{darwin-arm64,linux-x64,windows-x64}` holds each program plus `licenses/ripgrep/{LICENSE-MIT,UNLICENSE,COPYING}` and `licenses/fd/{LICENSE-MIT,LICENSE-APACHE}`. Executed only on linux-x64; the other two targets were checked by hash and the pin table only.\nInstruction text tells every agent with Bash to search with them, and roles without Bash have a stated rule: R-SEARCH and R-S-SEARCH are in `requirements.md`. The root rule is `root/search.md`, and the specialist bullet in `specialist/working.md` reaches all 18 specialists, including the no-Bash roles, who are told to use Grep and Glob. `plugin.test.ts` checks that each requirement is implemented and reaches its agents; it passes.\nTests cover target selection, a missing binary error and the CLI pass-through: `packages/runtime/tests/tools.test.ts` has 8 tests. They cover target mapping and refusal, the `.exe` suffix, `ToolMissing` with exit 4 for `rg` and `fd`, argument and exit-code pass-through with `--help` and `-h` untouched, and the vendored `rg` and `fd` run for real. `packages/integrations/claude/tests/vendor.test.ts` has 7 tests: pins, vendor folder against the pins, zip reader, and pin-mismatch refusal. `bun test` ran with 0 fail.\nThe plugin keeps no top-level bin/ and mise run verify passes in the worktree: `dist/` top level is `.claude-plugin agents hooks licenses scripts settings.json skills`, and `plugin.test.ts` asserts no `bin`. `mise run verify` exited 0 (check, lint, fmt:check, test).\nchanged-paths: listed under `changed:` above.\nchecks-run: listed under `checks:` above.\ndiff-file: `/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/rgfd.diff` (text sources, docs, tests, and one regenerated agent as a sample; it leaves out the binaries, the other 18 regenerated agents and the rebuilt `holyagent.js`).\nbundle-size: 24,468,332 bytes added to dist under `scripts/vendor`.\n- Per binary: rg darwin-arm64 4,014,576; rg linux-x64 5,408,904; rg windows-x64 4,218,880; fd darwin-arm64 2,970,480; fd linux-x64 3,708,016; fd windows-x64 4,104,192.\n- Totals: rg 13,642,360, fd 10,782,688, licenses 43,284.\n- Per target folder: darwin-arm64 6,999,394; linux-x64 9,131,258; windows-x64 8,337,680.\n- `holyagent.js` grew by 75 lines; the agent files grew by 22 lines in total.",
+  "createdAt": "2026-10-27T16:56:53.420Z"
+}

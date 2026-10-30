@@ -1,0 +1,57 @@
+{
+  "id": "assignment-0mvtrktfr-x2ye",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.security",
+  "slug": "re-review-the-setup-finish-round-commit",
+  "objective": "Re-review the setup finish-round commit a0842af for security against the notes it targets.",
+  "state": "Succeeded",
+  "scope": [
+    "Worktree /home/user/holyagent-setup-cleanup. Diff: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/f-C.diff. Targeted notes: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-w639.txt. Billion Context's rules: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-owwv.txt. Writer report: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-9ufd.txt."
+  ],
+  "constraints": [
+    "Read-only: write no files and make no version-control writes.",
+    "Judge only this finish-round diff against the findings it targets; it is the last review round, so rank anything new precisely."
+  ],
+  "criteria": [
+    {
+      "text": "Each targeted security finding is stated closed or open with file:line, and any new finding traces source to sink with a fix, or its absence is stated",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources-read"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvtr44em-9ufd"
+  ],
+  "followUpOf": "assignment-0mvtqsol2-w639",
+  "specialist": {
+    "agentId": "workflow:wf_5449e6df-5ba/assignment-0mvtrktfr-x2ye",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T16:35:02.535Z",
+    "finishedAt": "2026-10-29T16:42:23.133Z"
+  },
+  "result": "result: All four targeted security findings are closed. I found no new blocking or validated vulnerability, only three low or negligible suspicions. The built-in `/security-review` could not run. It failed with `fatal: ambiguous argument 'origin/HEAD...'` because this checkout has no `origin/HEAD`, so it produced no claims to verify. I reviewed from `f-C.diff` (all 1194 lines) and the current `leftovers.ts` and `json-file.ts`, and the current `leftovers.ts` matches the diff. I had no shell, so I ran no tests, git commands or checks.\n\nchanged: none (read-only)\nchecks: `/security-review` via Skill -> failed to start (no `origin/HEAD`). No other commands run.\nblockers: none\nquestions: none\n\nTargeted findings (the four notes in `r-w639.txt`):\n1. **Hook match too loose: closed.**\n   - `leftovers.ts:37` now uses `HOOK_COMMAND = /claude-native-bootstrap\\.(?:js|mjs|ts)[\"']?$/`, applied in `hookMatch` (`:54-59`) and only to the `SessionStart` event (`:96-122`).\n   - A user hook that merely mentions the string, or ends in another suffix such as `.sh` or `.cjs`, is kept.\n   - The regex is anchored and has no nested quantifiers, so there is no ReDoS risk.\n   - What remains is that a user hook whose command ends in `claude-native-bootstrap.js` is still removed. That is Billion Context's own ownership rule (`r-9ufd.txt`, item 2).\n2. **`claude` run in an untrusted project folder: closed, with residuals.**\n   - `ownedDirectory` (`:417-428`) accepts a `projectPath` only if it is absolute, an existing directory (`stat` follows symlinks), and owned by `process.getuid()`.\n   - A missing `projectPath` or a rejected folder prints the manual command (`:499-506`) and `claude` is not run. Any error becomes false.\n   - Arguments are constants and an enum, passed in array form, so there is no injection.\n   - Residuals are in notes 1 and 2 below.\n3. **`__proto__` project key: closed.**\n   - `planClaudeJson` (`:205-215`) now builds the projects object with `Object.fromEntries`, which defines the key as an own property.\n   - The spreads in `dropKey` and `dropHooks` also define own properties.\n4. **Silent `[]` on retry: closed.**\n   - `applyPlan` (`:390-395`) returns a `~ ... cannot be read now, so it was left as it is; run holyagent setup claude again` line when the re-read has no text on attempt 2 or later.\n   - The file is left untouched.\n\nNew code traced, no vulnerability:\n- **`acp-cache.md` exact-text match** (`:27-34`, `:322-325`): the source is the file's text (untrusted), and it is deleted only when it equals the Billion Context template after `trimEnd`. The sink is `fs.remove(file)` (`:470`), which does not recurse, so a symlinked `acp-cache.md` loses only the link and a traversal is not possible.\n- **`PROXY_URL`** (`:41`): it requires the literal `http://127.0.0.1:<port>/bili/` prefix, so a userinfo or look-alike host cannot match. Only `env` keys are dropped.\n- **`isBiliServer`** (`:65-70`): the command must be `node` and an argument must end in `dist/claude-mcp-entry` or `dist/mcp`. The removal acts on the `mcpServers.bili` key only.\n- **`settings.json.bili-bak` restore** (`:166-177`): the source is a file in the user's own Claude directory, the same trust as `settings.json`. The sink is `env.DISABLE_AUTO_COMPACT` in `settings.json`. No command or secret is printed, and an unreadable backup keeps the setting and prints a `!` line.\n- **Write guard in `json-file.ts:96-105`:** it still re-reads the target before the rename.\n\nnotes:\n1. **Low, suspicion (residual of finding 2):** the owner check does not make a folder trusted. A project folder you own, such as an untrusted clone you once ran Claude Code in, still has its project settings read by `claude plugin uninstall`. The risk is limited because that subcommand starts no session. A possible fix is to skip the run and print the manual command for project and local scope when the folder is a git clone you do not recognize. I consider that optional.\n2. **Low (residual of finding 2):** where `process.getuid` is undefined (Windows), the owner check degrades to \"absolute existing directory\", yet `usage.md` says \"owned by you\". Either reword the doc or say the ownership check does not apply on Windows.\n3. **Negligible:** the `bili-bak` value is written back as-is, so a non-string value (an object or number) would put a non-string into `env`. That could make Claude Code reject the settings file. It needs write access to `~/.claude`, so it is not a security issue. A possible fix is to restore only when the value is a string.\n\nevidence:\nEach targeted security finding is stated closed or open with file:line, and any new finding traces source to sink with a fix, or its absence is stated: Findings 1-4 are all closed: hook match `leftovers.ts:37,54-59,96-122`; `cwd` ownership `:417-428,499-507`; `__proto__` `:205-215`; silent retry `:390-395`. New code traced with no validated vulnerability: `:27-34,322-325,470` (`acp-cache.md`), `:41,150-152` (proxy URL), `:65-70` (MCP entry), `:166-177` (backup restore), `json-file.ts:96-105` (write guard). Notes 1-3 above are low or negligible suspicions, not blockers.\nsources-read: `/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/` files `f-C.diff` (all 1194 lines), `r-w639.txt`, `r-owwv.txt` and `r-9ufd.txt`; `/home/user/holyagent-setup-cleanup/packages/cli/src/claude/leftovers.ts` (all 545 lines), `/home/user/holyagent-setup-cleanup/packages/cli/src/json-file.ts` (all), and `user.ts` lines 40-45 for `CLAUDE_CONFIG_DIR`; a grep of `packages/cli/src` for `getuid` and `uid`. Not run: `/security-review` (failed to start), tests, git commands (no shell).",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "Targeted findings closed; no blocker",
+    "criteria": [
+      {
+        "criterion": "Each targeted security finding is stated closed or open with file:line, and any new finding traces source to sink with a fix, or its absence is stated",
+        "support": "Findings 1-4 are all closed: hook match `leftovers.ts:37,54-59,96-122`; `cwd` ownership `:417-428,499-507`; `__proto__` `:205-215`; silent retry `:390-395`. New code traced with no validated vulnerability: `:27-34,322-325,470` (`acp-cache.md`), `:41,150-152` (proxy URL), `:65-70` (MCP entry), `:166-177` (backup restore), `json-file.ts:96-105` (write guard). Notes 1-3 above are low or negligible suspicions, not blockers."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "sources-read",
+        "support": "`/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/` files `f-C.diff` (all 1194 lines), `r-w639.txt`, `r-owwv.txt` and `r-9ufd.txt`; `/home/user/holyagent-setup-cleanup/packages/cli/src/claude/leftovers.ts` (all 545 lines), `/home/user/holyagent-setup-cleanup/packages/cli/src/json-file.ts` (all), and `user.ts` lines 40-45 for `CLAUDE_CONFIG_DIR`; a grep of `packages/cli/src` for `getuid` and `uid`. Not run: `/security-review` (failed to start), tests, git commands (no shell)."
+      }
+    ]
+  },
+  "createdAt": "2026-10-29T16:35:02.535Z"
+}

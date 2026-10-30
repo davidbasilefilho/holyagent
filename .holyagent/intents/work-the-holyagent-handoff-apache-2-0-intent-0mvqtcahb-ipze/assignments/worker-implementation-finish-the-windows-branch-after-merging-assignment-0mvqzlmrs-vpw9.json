@@ -1,0 +1,53 @@
+{
+  "id": "assignment-0mvqzlmrs-vpw9",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "finish-the-windows-branch-after-merging",
+  "objective": "Finish the Windows branch after merging the instruction change: rebuild, keep the safe hand-run invocation, and close the leftovers the Windows writer reported.",
+  "state": "Succeeded",
+  "scope": [
+    "Worktree /home/user/holyagent-windows (head 6c8528b: the Windows commit plus a merge of the instructions branch). Writer report: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-assignment-0mvqz0jb5-96fd.txt.",
+    "(1) Run mise run build and fix any test the merge broke (the root core text budget in sessioncontext.test.ts is the likely one, since both branches edited core sections). (2) Restore the safety flags in the documented hand-run form in packages/runtime/src/instructions/claude-5.5/root/dispatch.md: bun --no-env-file --config=\"${CLAUDE_PLUGIN_ROOT}/scripts/empty-bunfig.toml\" \"${CLAUDE_PLUGIN_ROOT}/scripts/holyagent.js\" <command>, because without them a project .env or bunfig.toml can change a hand-run call. To make room, raise the root-core character cap in the test by the needed amount (state the new cap and the reason in a comment) rather than cutting other rules. (3) In packages/runtime/src/instructions/claude-5.5/specialist/working.md change the rg/fd invocation to the same bun form so it works on Windows. (4) Add the Windows installer (install/windows-install.ps1) next to the WSL one in README.md's install section, keeping the six sections. (5) Rebuild and run mise run verify."
+  ],
+  "constraints": [
+    "Follow /home/user/holyagent/.claude/CLAUDE.md.",
+    "Work only in that worktree; make no version-control writes and no edits under .git/ or .holyagent/.",
+    "Keep working until done; when done and checked, stop and report; no unrequested changes."
+  ],
+  "criteria": [
+    {
+      "text": "The documented invocation keeps --no-env-file and the empty bunfig, specialist rg/fd use the bun form, and README names the Windows installer",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build leaves no diff after the commit and mise run verify passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions/claude-5.5/root/dispatch.md",
+    "packages/runtime/src/instructions/claude-5.5/specialist/working.md",
+    "packages/runtime/tests",
+    "packages/integrations/claude",
+    "README.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvqz0jb5-96fd",
+  "specialist": {
+    "agentId": "workflow:wf_88dc88d5-c1b/assignment-0mvqzlmrs-vpw9",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T17:56:18.952Z",
+    "finishedAt": "2026-10-27T18:02:22.047Z"
+  },
+  "result": "result: Done. The rebuild is idempotent and `mise run verify` passes. Nothing was run on Windows.\nchanged:\n- /home/user/holyagent-windows/packages/runtime/src/instructions/claude-5.5/root/dispatch.md: the hand-run form is `bun --no-env-file --config=\"${CLAUDE_PLUGIN_ROOT}/scripts/empty-bunfig.toml\" \"${CLAUDE_PLUGIN_ROOT}/scripts/holyagent.js\" <command>`.\n- /home/user/holyagent-windows/packages/runtime/src/instructions/claude-5.5/specialist/working.md: the `rg` and `fd` text uses `bun \"${CLAUDE_PLUGIN_ROOT}/scripts/holyagent.js\" rg|fd <pattern> <path…>`.\n- /home/user/holyagent-windows/packages/runtime/tests/sessioncontext.test.ts: the root-core cap is raised from 4000 to 4100, with a comment giving the reason (the safety flags cost about 100 characters). The core is now 4066 characters, and the test name now says \"about 4,100\".\n- /home/user/holyagent-windows/packages/integrations/claude/tests/hooks.test.ts: the expected hand-run string now includes the flags.\n- /home/user/holyagent-windows/README.md: the install section names `install\\windows-install.ps1` next to the WSL installer; the six sections are unchanged.\n- /home/user/holyagent-windows/packages/integrations/claude/dist/: regenerated. The agents `*.md` and `scripts/holyagent.js` changed, because the instructions are embedded in them.\n\nchecks:\n- `mise run build` -> exit 0, 29 files built. A second build changed no files (25 changed paths before and after).\n- `mise run verify` -> exit 0: type-check 113 files with no errors, lint 114 files with no problems, format 229 files formatted, tests 846 pass, 0 fail, 1 skip.\n- The first verify, before my `hooks.test.ts` edit, had 1 failure, the stale hand-run assertion; the merge did not break the core budget test.\n\nblockers: none\nquestions: none\nnotes:\n- `docs/hooks.md` line 23 now says the hand-run form carries no `--no-env-file`/`--config` flags because of the 4,000 cap. That is now false and needs updating. `docs/requirements.md` line 41 (flags added \"in a repository you do not trust\") and `docs/README.md` line 17 show the form without flags and are now incomplete. These are outside my ownership paths, so I left them.\n- `scripts/holyagent.js` is the only path in the `rg`/`fd` text, so the `sh` wrapper is no longer referenced from the specialist text.\n\nevidence:\nThe documented invocation keeps --no-env-file and the empty bunfig, specialist rg/fd use the bun form, and README names the Windows installer: `dispatch.md:1` has the full flag form; `working.md:4` has the bun form for rg and fd; `README.md` install section names `install\\windows-install.ps1`. The hooks.test.ts session-start assertion passes with the flags. Diff: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/finish.diff.\nmise run build leaves no diff after the commit and mise run verify passes: `mise run build` exit 0 and repeat build changed nothing; `mise run verify` exit 0, 846 pass, 0 fail, 1 skip.\nchanged-paths: the changed paths are the ones listed under `changed:` above.\nchecks-run: `mise run build` exit 0 (29 files, run twice); `mise run verify` exit 0 (log /tmp/v.log). The first verify, before the test edit, failed 1 test.",
+  "createdAt": "2026-10-27T17:56:18.952Z"
+}

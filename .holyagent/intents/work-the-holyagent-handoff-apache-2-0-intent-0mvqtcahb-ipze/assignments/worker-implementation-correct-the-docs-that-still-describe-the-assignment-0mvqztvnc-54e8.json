@@ -1,0 +1,49 @@
+{
+  "id": "assignment-0mvqztvnc-54e8",
+  "intentId": "intent-0mvqtcahb-ipze",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "correct-the-docs-that-still-describe-the",
+  "objective": "Correct the docs that still describe the hand-run invocation without its safety flags on the Windows branch.",
+  "state": "Succeeded",
+  "scope": [
+    "Worktree /home/user/holyagent-windows (head a97b5db). docs/hooks.md line 23 says the hand-run form has no --no-env-file/--config flags because of the 4,000 cap: now false (the form keeps them and the cap is 4,100). docs/requirements.md line 41 and docs/README.md line 17 show the form without flags: show bun --no-env-file --config=\"<pluginRoot>/scripts/empty-bunfig.toml\" \"<pluginRoot>/scripts/holyagent.js\" <command>."
+  ],
+  "constraints": [
+    "Follow /home/user/holyagent/.claude/CLAUDE.md and the 'Writing instructions' rules in packages/integrations/claude/dist/agents/holyagent.md.",
+    "Work only in your worktree; make no version-control writes and no edits under .git/ or .holyagent/. Finish with mise run build and mise run verify.",
+    "Keep working until done; when done and checked, stop and report; no unrequested changes.",
+    "Write only under docs/."
+  ],
+  "criteria": [
+    {
+      "text": "Every doc line showing the hand-run form includes the flags and no doc claims they were dropped",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run fmt:check passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "docs"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvqzlmrs-vpw9",
+  "specialist": {
+    "agentId": "workflow:wf_134c5f6a-34c/assignment-0mvqztvnc-54e8",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-27T18:02:43.704Z",
+    "finishedAt": "2026-10-27T18:06:22.445Z"
+  },
+  "result": "result: The hand-run form now keeps `--no-env-file` and `--config` in the three docs you named, and the \"no flags because of the cap\" claim is gone. `mise run build` and `mise run verify` both pass.\nchanged: /home/user/holyagent-windows/docs/hooks.md, /home/user/holyagent-windows/docs/requirements.md, /home/user/holyagent-windows/docs/README.md, /home/user/holyagent-windows/docs/development.md\nchecks:\n- `mise run build` -> exit 0, built 29 files.\n- `mise run verify` -> exit 0 on the final tree. Type-check and lint clean, 846 pass, 1 skip, 0 fail.\n- `mise run fmt:check` -> passes, \"All 229 files are formatted.\"\n- The first `verify` run failed fmt:check on `docs/README.md`: my longer table cell needed its column widths reflowed. I ran `bun fmt docs/README.md` to fix it, which touched only that file.\nblockers: none\nquestions: none\nnotes:\n- I wrote the placeholder as `<plugin>`, not `<pluginRoot>`. The docs define and use `<plugin>` everywhere, and the README row names `<plugin>` as the plugin folder. Say if you want `<pluginRoot>` instead.\n- `docs/development.md` line 79 also said the root core is capped at 4,000 characters. `packages/runtime/tests/sessioncontext.test.ts` caps it at 4,100, so I corrected it. This is the same stale fact, but you did not list the file.\n- `docs/hooks.md` line 23 now says the form keeps the flags, as the hooks do. It states the cap is 4,100 characters to make room for them.\n- The `docs/README.md` change is a single table cell. The Prettier-style reflow (8 changed lines) comes from widening it.\n- Diff: /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/docs.diff\nevidence:\nEvery doc line showing the hand-run form includes the flags and no doc claims they were dropped: `docs/hooks.md:23`, `docs/requirements.md:41` and `docs/README.md:17` now show `bun --no-env-file --config=\"<plugin>/scripts/empty-bunfig.toml\" \"<plugin>/scripts/holyagent.js\" <command>`, or in `hooks.md` say the form keeps the flags. A grep of `docs/` for `holyagent.js`, `no-env-file` and the cap figures found no other stale hand-run form. `docs/commit-authorship.md` and `docs/hooks.md:79` already show the flags.\nmise run fmt:check passes: exit 0, \"All 229 files are formatted.\"\nchanged-paths: `docs/hooks.md`, `docs/requirements.md`, `docs/README.md`, `docs/development.md`\nchecks-run: `mise run build` exit 0; `mise run verify` exit 0 (846 pass, 1 skip, 0 fail); `mise run fmt:check` exit 0.",
+  "createdAt": "2026-10-27T18:02:43.704Z"
+}

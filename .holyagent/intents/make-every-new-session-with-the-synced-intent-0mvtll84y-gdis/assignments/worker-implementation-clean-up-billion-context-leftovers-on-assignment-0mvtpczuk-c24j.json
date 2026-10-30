@@ -1,0 +1,102 @@
+{
+  "id": "assignment-0mvtpczuk-c24j",
+  "intentId": "intent-0mvtll84y-gdis",
+  "intentRevision": 5,
+  "roleTask": "Worker.implementation",
+  "slug": "clean-up-billion-context-leftovers-on",
+  "objective": "Clean up Billion Context leftovers on machines that ran an earlier holyagent setup, add a CI parse check of both installers, and fix the two doc nits from the removal review.",
+  "state": "Succeeded",
+  "scope": [
+    "Worktree /home/user/holyagent-setup-cleanup (branch ccr-046ad103-6qsvgx-bili-cleanup from origin/main eaed3fd).",
+    "Leftovers an earlier setup or installer left (see the git history of PR #40, commit 383531b's removed installBillionContext, and the review note in /tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/r-kayy.txt): in ~/.claude/settings.json an env ANTHROPIC_BASE_URL pointing at the local proxy http://127.0.0.1:18787 and DISABLE_AUTO_COMPACT=1, the claude-native-bootstrap hook and the bili MCP server entries written by bili plugin install claude, ~/.claude/commands/acp-cache.md, and the billion-context marketplace and plugin entries. Make holyagent setup claude remove exactly those entries when they match what Billion Context wrote (leave anything else, keep the user's other settings, print what it removed, --dry-run shows it), and make holyagent doctor warn when any remain. Read how bili plugin install claude writes them from the removed code and docs in git history (git show 383531b^:packages/cli/src/claude/user.ts, docs/components.md at that commit); where the exact shape is unknown, match only the unambiguous keys (the 127.0.0.1:18787 base URL, acp-cache.md, a server or hook whose command is bili). Tests with temp homes.",
+    "CI: add a job or step to .github/workflows/ci.yml that runs bash -n install/wsl-install.sh and parses install/windows-install.ps1 with pwsh ([System.Management.Automation.Language.Parser]::ParseFile, failing on errors) on ubuntu-latest, which ships pwsh; keep existing jobs and pinned action versions unchanged.",
+    "Docs: README.md the link labeled docs/usage.md that points to docs/components.md#exa (fix label or target); docs/components.md the comma splice in the Windows installer sentence ('..., and puts Bun's global bin folder on your user PATH.'). Document the cleanup in docs/usage.md."
+  ],
+  "constraints": [
+    "User (verbatim): \"não deve ter nada pendente / outra coisa: arrume esse comportamento, o que ficar pendente que o agente pode resolver deve ser resolvido\".",
+    "Follow /home/user/holyagent/.claude/CLAUDE.md and /home/user/holyagent/AGENTS.md (Effect with tagged errors, no try/catch/new Promise/async in runtime and CLI source, Schema at boundaries, Bun APIs and Bun Shell, JSDoc). Do not edit .claude/CLAUDE.md or AGENTS.md.",
+    "Make no version-control writes and no edits under .git/ or .holyagent/ of the repository; tests use temp folders.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done and checked, stop and report; add no unrequested features (name ideas in the report)."
+  ],
+  "criteria": [
+    {
+      "text": "setup claude removes only the Billion Context leftovers and doctor warns on them, proven by tests that fail without the change",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "CI parses both installers and existing CI jobs are unchanged",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The two doc nits are fixed and the cleanup is documented",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build leaves no diff after the change and mise run verify passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/cli",
+    "install",
+    "docs",
+    "README.md",
+    ".github"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "workflow:wf_9735205d-478/assignment-0mvtpczuk-c24j",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-29T15:32:58.364Z",
+    "finishedAt": "2026-10-29T15:50:54.811Z"
+  },
+  "result": "result: Done. `holyagent setup claude` now removes Billion Context leftovers and prints each entry it removes. `--dry-run` lists them without removing, and `holyagent doctor` warns while any remain. CI parses both installers, and the two doc nits are fixed. I could not run `pwsh` locally, so the CI step that parses `windows-install.ps1` is untested.\n\nchanged:\n- `/home/user/holyagent-setup-cleanup/packages/cli/src/claude/leftovers.ts` (new)\n- `/home/user/holyagent-setup-cleanup/packages/cli/src/claude/user.ts`\n- `/home/user/holyagent-setup-cleanup/packages/cli/src/cmd/doctor.ts`\n- `/home/user/holyagent-setup-cleanup/packages/cli/src/cmd/setup-claude.ts`\n- `/home/user/holyagent-setup-cleanup/packages/cli/tests/leftovers.test.ts` (new)\n- `/home/user/holyagent-setup-cleanup/packages/cli/tests/claude-user.test.ts`\n- `/home/user/holyagent-setup-cleanup/packages/cli/tests/doctor.test.ts`\n- `/home/user/holyagent-setup-cleanup/packages/cli/tests/setup-claude.test.ts`\n- `/home/user/holyagent-setup-cleanup/.github/workflows/ci.yml`\n- `/home/user/holyagent-setup-cleanup/README.md`\n- `/home/user/holyagent-setup-cleanup/docs/components.md`\n- `/home/user/holyagent-setup-cleanup/docs/usage.md`\n\nchecks:\n- `mise run verify` -> exit 0: type-check clean, lint \"No problems in 120 files\", format \"All 235 files are formatted\", tests 904 pass, 1 skip, 0 fail.\n- `mise run build` -> exit 0, and `git status --short` still lists exactly the 12 files above, so the build changed no tracked file.\n- `bash -n install/wsl-install.sh` -> exit 0.\n- `pwsh` and `shellcheck` are not installed in this environment, so I did not run the PowerShell parse. The step is written from the `[System.Management.Automation.Language.Parser]::ParseFile` API.\n- Manual run in a temp HOME: `setup claude --dry-run` listed the removals, and the real run removed `env.ANTHROPIC_BASE_URL` and `env.DISABLE_AUTO_COMPACT` while keeping the other keys.\n- The new and extended tests call `cleanupLeftovers` or assert the new \"billion-context\" lines, which do not exist on the base. They cover removal, a second run that finds nothing, entries that are left alone, dry run, missing `claude`, a failed uninstall, a non-object settings file, and the doctor warning.\n- Existing tests: I added a temp HOME to the doctor tests, so they no longer read the real home. I added the \"= billion-context: no leftovers\" line to one expected list.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- **Doctor warning:** it does not change the exit code, because you asked for a warning. If a leftover proxy URL should fail `doctor`, that is a one-line change.\n- **`DISABLE_AUTO_COMPACT=1`:** it is removed only when another Billion Context artifact shows it set it (the proxy URL, a hook, `acp-cache.md` or the `bili` server), because a person can set it for their own reasons. That choice goes beyond what you specified, so check it.\n- **Plugin and marketplace:** they are detected from `plugins/installed_plugins.json` and `plugins/known_marketplaces.json`. They are removed with `claude plugin uninstall billion-context@billion-context` and `claude plugin marketplace remove billion-context`; those two commands are not in the `docs/components.md` history, so confirm the removal works against a real earlier install. If `claude` is not on `PATH`, the output prints the command to run instead.\n- **`bili` package:** it and `~/.config/billion-context` are left alone. `docs/usage.md` gives `bun remove -g billion-context` for removing the package.\n- **Guessed shapes:** the hook and server matches go beyond the keys you named as unambiguous. A hook counts if its command contains `claude-native-bootstrap` or starts with `bili`. The server counts if its command is `bili`. Both shapes are my guess from the old docs, because the exact output of `bili plugin install claude` was not in the git history.\n- **CI job:** `.github/workflows/ci.yml` gets a new `installers` job with the same pinned checkout. The existing `check` job is untouched.\n- **Docs:** the README label now reads `docs/components.md`, and the Windows-installer comma splice is fixed. The cleanup is documented in `docs/usage.md` and in the `doctor` checklist in `docs/components.md`.\n\nevidence:\nsetup claude removes only the Billion Context leftovers and doctor warns on them, proven by tests that fail without the change: `packages/cli/tests/leftovers.test.ts`, the new case in `setup-claude.test.ts` and the new warn case in `doctor.test.ts`. `mise run verify` -> exit 0, 904 pass, 0 fail.\nCI parses both installers and existing CI jobs are unchanged: `.github/workflows/ci.yml` only adds the `installers` job (`bash -n` plus the `pwsh` ParseFile step). `bash -n install/wsl-install.sh` -> exit 0. The `pwsh` step was not run locally.\nThe two doc nits are fixed and the cleanup is documented: `README.md` label, `docs/components.md` sentence, and the \"If you ran an earlier setup\" paragraph in `docs/usage.md`.\nmise run build leaves no diff after the change and mise run verify passes: `mise run build` -> exit 0 with no tracked-file changes; `mise run verify` -> exit 0.\nchanged-paths: the 12 paths listed under `changed:`.\nchecks-run: `mise run verify` -> 0; `mise run build` -> 0; `bash -n install/wsl-install.sh` -> 0; `bun test packages/cli` -> 58 pass, 0 fail. Not run: `pwsh` parse, `shellcheck`.\ndiff-file: `/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/cleanup.diff`",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "Reviewed through the final code and security re-reviews with no open blocker; verify passes on the stack head e544a87",
+    "criteria": [
+      {
+        "criterion": "setup claude removes only the Billion Context leftovers and doctor warns on them, proven by tests that fail without the change",
+        "support": "`packages/cli/tests/leftovers.test.ts`, the new case in `setup-claude.test.ts` and the new warn case in `doctor.test.ts`. `mise run verify` -> exit 0, 904 pass, 0 fail."
+      },
+      {
+        "criterion": "CI parses both installers and existing CI jobs are unchanged",
+        "support": "`.github/workflows/ci.yml` only adds the `installers` job (`bash -n` plus the `pwsh` ParseFile step). `bash -n install/wsl-install.sh` -> exit 0. The `pwsh` step was not run locally."
+      },
+      {
+        "criterion": "The two doc nits are fixed and the cleanup is documented",
+        "support": "`README.md` label, `docs/components.md` sentence, and the \"If you ran an earlier setup\" paragraph in `docs/usage.md`."
+      },
+      {
+        "criterion": "mise run build leaves no diff after the change and mise run verify passes",
+        "support": "`mise run build` -> exit 0 with no tracked-file changes; `mise run verify` -> exit 0."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "the 12 paths listed under `changed:`."
+      },
+      {
+        "label": "checks-run",
+        "support": "`mise run verify` -> 0; `mise run build` -> 0; `bash -n install/wsl-install.sh` -> 0; `bun test packages/cli` -> 58 pass, 0 fail. Not run: `pwsh` parse, `shellcheck`."
+      },
+      {
+        "label": "diff-file",
+        "support": "`/tmp/claude-0/-home-user-holyagent/e4ac10e5-b710-572b-aa70-34045c8c8d11/scratchpad/cleanup.diff`"
+      }
+    ]
+  },
+  "createdAt": "2026-10-29T15:32:58.364Z"
+}
