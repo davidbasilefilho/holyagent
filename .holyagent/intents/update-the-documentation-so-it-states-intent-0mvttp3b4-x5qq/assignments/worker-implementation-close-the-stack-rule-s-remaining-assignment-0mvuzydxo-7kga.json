@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mvuzydxo-7kga",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "close-the-stack-rule-s-remaining",
+  "objective": "Close the stack rule's remaining optional review notes in /home/user/holyagent-stack-rule.",
+  "state": "Ready",
+  "scope": [
+    "Notes: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-rerev3.txt (non-blocking) and the earlier /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-rerev2.txt notes not yet closed. Current full diff: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule-v4.diff.",
+    "(1) stack-plan.md bullets 4-5: name the referent instead of 'its start point'/'that point'. (2) Drift: keep the full rule only in stack-plan.md; requirements.md R-STACK keeps one short clause; docs/decisions.md keeps the decision and a short summary pointing to the root's Stack plan instead of restating every base case. (3) Bring stack-plan.md's net addition against the original (336 words) to 60 words or fewer.",
+    "Rebuild dist and gate with the canary Bun /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/canary/x/bun-linux-x64/bun: scripts/vendor.ts, packages/integrations/claude/build.ts, check --no-script, lint --no-script, fmt --no-script --check, test. Write the full diff to /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule-v5.diff and this pass alone to /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule-repair5.diff."
+  ],
+  "constraints": [
+    "Model-facing text in US English, imperative, calm. Do not change the rule's behavior.",
+    "Edit only in /home/user/holyagent-stack-rule: packages/runtime/src/instructions, packages/integrations/claude/dist/agents, docs/decisions.md.",
+    "No git writes; no edits under .git/ or .holyagent/; no other worktree.",
+    "Keep working until done; stop and report when done and checked."
+  ],
+  "criteria": [
+    {
+      "text": "Bullets 4-5 name their referent, the rule's full text lives only in stack-plan.md with short pointers elsewhere, and the net addition is 60 words or fewer, with the rule's behavior unchanged",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "dist rebuilt; check, lint, fmt --check and test pass with the canary Bun",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/integrations/claude/dist/agents",
+    "docs/decisions.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-10-30T13:17:18.733Z"
+}
