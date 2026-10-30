@@ -1,0 +1,63 @@
+{
+  "id": "assignment-0mvv2a4y1-o5n0",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 5,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-security-findings-on-the-mise",
+  "objective": "Repair the security findings on the mise dev dependency in /home/user/holyagent-docs (branch claude/intelligent-dijkstra-x7njap, commit 1c253b4 on top of b1e6713).",
+  "state": "Running",
+  "scope": [
+    "Security review: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-secmise.txt. Fix: (1) blocking: trustedDependencies in package.json replaces Bun's default list, so it must also list @anthropic-ai/claude-code and lefthook (both have install scripts in bun.lock); verify with a clean `rm -rf node_modules && bun install --frozen-lockfile` and `bun run claude --version`. (2) Use the npm package mise's own docs recommend: the review found the mise docs say to install `mise`, not the older `@jdxcode/mise`; look this up on mise's installation docs (mise.jdx.dev) and the npm registry, and if confirmed switch the devDependency to `mise` with the same trust handling; whichever package, pin it exactly (no ^), as the repo pins @anthropic-ai/claude-code. (3) lefthook.yml: use `bunx --no-install mise run ...` (flag before the package name) so a missing local binary fails instead of fetching from the registry; keep comments accurate. (4) docs/development.md: name the package actually used, mention that its install script needs node and npm on PATH at install time (verify that claim against the package's install script), and the --no-install behavior in one clause.",
+    "Gates: `bunx --no-install mise run verify` and `bunx --no-install mise run build` (no diff). Write the diff of your changes against HEAD to /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/misefix.diff."
+  ],
+  "constraints": [
+    "User: install mise via Bun as a project dependency.",
+    "Edit only package.json, bun.lock, lefthook.yml, docs/development.md (and README.md / docs/requirements.md only if they name the package) in /home/user/holyagent-docs. Git writes: none (the root commits). No edits under .git/ or .holyagent/.",
+    "If the permission policy denies an install, stop and report it.",
+    "Keep working until done; stop and report when done and checked."
+  ],
+  "criteria": [
+    {
+      "text": "trustedDependencies keeps @anthropic-ai/claude-code and lefthook trusted, and bun run claude --version works after a clean frozen install",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The mise package is the one mise's docs recommend, pinned exactly, and its binary runs after bun install",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "lefthook uses bunx --no-install and docs/development.md matches",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify passes and build leaves no diff",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "package.json",
+    "bun.lock",
+    "lefthook.yml",
+    "docs/development.md",
+    "README.md",
+    "docs/requirements.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvv1uj47-gk56",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-30T14:22:26.185Z"
+  },
+  "createdAt": "2026-10-30T14:22:26.185Z"
+}
