@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mvv2ha3t-7jel",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 5,
+  "roleTask": "Worker.validation",
+  "slug": "validate-the-final-heads-of-the-docs",
+  "objective": "Validate the final heads of the docs branch (0a6a0ab) and the stack-rule branch (cb50c75) before push.",
+  "state": "Running",
+  "scope": [
+    "Worktrees: /home/user/holyagent-docs (claude/intelligent-dijkstra-x7njap, expect HEAD 0a6a0ab) and /home/user/holyagent-stack-rule (claude/intelligent-dijkstra-x7njap-stack-rule, expect HEAD cb50c75, a clean merge of the docs branch into the rule commit).",
+    "In each: confirm HEAD; `rm -rf node_modules && bun install --frozen-lockfile`; `bunx --no-install mise run verify`; `bunx --no-install mise run build` then `git status --short` (must be empty)."
+  ],
+  "constraints": [
+    "No tracked file edits; no git writes; no edits under .git/ or .holyagent/. Stop and report counts and exit codes."
+  ],
+  "criteria": [
+    {
+      "text": "verify passes on both heads with counts",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "build leaves no diff on both heads",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-30T14:27:59.466Z"
+  },
+  "createdAt": "2026-10-30T14:27:59.466Z"
+}
