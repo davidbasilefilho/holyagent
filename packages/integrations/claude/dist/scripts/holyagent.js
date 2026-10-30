@@ -2096,6 +2096,20 @@ var causeMap = /* @__PURE__ */ dual(2, (self, f) => {
   });
   return hasFail ? causeFromReasons(failures) : self;
 });
+var causeSquash = (self) => {
+  let die;
+  for (const reason of self.reasons) {
+    if (reason._tag === "Fail")
+      return reason.error;
+    if (reason._tag === "Die")
+      die ??= reason;
+  }
+  if (die !== undefined)
+    return die.defect;
+  if (self.reasons.length > 0)
+    return new globalThis.Error("All fibers interrupted without error");
+  return new globalThis.Error("Empty cause");
+};
 var causePrettyErrors = (self, options) => {
   const errors = [];
   const interrupts = [];
@@ -3468,7 +3482,25 @@ var runForkWith = (context) => (effect, options) => {
   }
   return fiber;
 };
-var runFork = /* @__PURE__ */ runForkWith(/* @__PURE__ */ empty());
+var runPromiseExitWith = (context) => {
+  const runFork = runForkWith(context);
+  return (effect, options) => {
+    const fiber = runFork(effect, options);
+    return new Promise((resolve) => {
+      fiber.addObserver((exit) => resolve(exit));
+    });
+  };
+};
+var runPromiseWith = (context) => {
+  const runPromiseExit = runPromiseExitWith(context);
+  return (effect, options) => runPromiseExit(effect, options).then((exit) => {
+    if (exit._tag === "Failure") {
+      throw causeSquash(exit.cause);
+    }
+    return exit.value;
+  });
+};
+var runPromise = /* @__PURE__ */ runPromiseWith(/* @__PURE__ */ empty());
 var runSyncExitWith = (context) => {
   const runFork = runForkWith(context);
   return (effect) => {
@@ -4130,7 +4162,7 @@ var provide3 = provide2;
 var provideService2 = provideService;
 var acquireUseRelease2 = acquireUseRelease;
 var ensuring2 = ensuring;
-var runFork2 = runFork;
+var runPromise2 = runPromise;
 var runSyncExit2 = runSyncExit;
 var mapEager2 = mapEager;
 var mapErrorEager2 = mapErrorEager;
@@ -11781,7 +11813,9 @@ var ASSIGNMENT_COMMANDS = [
     flags: { input: "string" },
     positionals: 0,
     run: ({ update, config, inputBy }) => gen2(function* () {
-      const request = yield* inputBy((raw) => typeof raw === "object" && raw !== null && ("id" in raw) ? ExistingRef : AssignmentInput);
+      const request = yield* inputBy((raw) => typeof raw === "object" && raw !== null && ("id" in raw) ? ExistingRef : AssignmentInput).pipe(mapError2((error) => error instanceof InvalidDraft ? new InvalidDraft({
+        message: `${error.message}. To dispatch an existing Assignment send {"id": "<id>"}`
+      }) : error));
       const settings = yield* config;
       const newAssignmentId = yield* newId("assignment");
       const now = yield* nowIso;
@@ -19354,7 +19388,7 @@ for (const stream of [process.stdout, process.stderr])
     throw error;
   });
 var write = (stream, text) => try_2({ try: () => void stream.write(text), catch: (cause) => cause }).pipe(catch_2((cause) => brokenPipe(cause) ? sync2(() => process.exit(0)) : die3(cause)));
-runFork2(run2(Bun.argv.slice(2), {
+await runPromise2(run2(Bun.argv.slice(2), {
   cwd: process.cwd(),
   env: process.env,
   stdin,
