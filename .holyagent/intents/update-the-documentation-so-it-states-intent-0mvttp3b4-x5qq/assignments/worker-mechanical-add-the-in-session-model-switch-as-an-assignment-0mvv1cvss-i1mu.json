@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mvv1cvss-i1mu",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 4,
+  "roleTask": "Worker.mechanical",
+  "slug": "add-the-in-session-model-switch-as-an",
+  "objective": "Add the in-session model switch as an alternative in the 'Run the root on Sonnet' section of /home/user/holyagent-docs/docs/usage.md.",
+  "state": "Running",
+  "scope": [
+    "Maintainer statement: users can also just switch the model in the session (with `/model`, e.g. `/model sonnet`), although setting ANTHROPIC_DEFAULT_OPUS_MODEL is more reliable. Add one or two sentences to the 'Run the root on Sonnet' section saying exactly that: the alternative is `/model sonnet` in the running session; the environment variable is the more reliable route (it applies from the start of every session). Do not add other claims.",
+    "Run /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/canary/x/bun-linux-x64/bun fmt --no-script docs/usage.md, then --check, in /home/user/holyagent-docs. Write the before/after diff to /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/modeldoc.diff."
+  ],
+  "constraints": [
+    "User: the user can also just switch the model in the session, even though the other way is more reliable.",
+    "Edit only docs/usage.md in /home/user/holyagent-docs, only that section. No git writes; no edits under .git/ or .holyagent/. Stop and report when done."
+  ],
+  "criteria": [
+    {
+      "text": "The section names /model in the session as an alternative and the variable as the more reliable route, with nothing else changed",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "fmt check passes",
+      "blocking": true,
+      "dimension": "style"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "docs/usage.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-30T13:56:34.684Z"
+  },
+  "createdAt": "2026-10-30T13:56:34.684Z"
+}
