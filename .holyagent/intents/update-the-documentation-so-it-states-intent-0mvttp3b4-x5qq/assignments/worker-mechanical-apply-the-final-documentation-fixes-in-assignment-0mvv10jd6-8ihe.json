@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "apply-the-final-documentation-fixes-in",
   "objective": "Apply the final documentation fixes in /home/user/holyagent-docs.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Review: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/fin-docs.txt.",
     "docs/usage.md line 134: delete ', plus `license` for the vendored one' so the sentence reads 'HolyAgent's skills use `name` and `description`.' In the same paragraph, where it says the maintainer tested it and it does not work, add what was observed in a few words only if the paragraph already implies it; otherwise leave it.",
@@ -42,5 +42,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-30T13:47:10.122Z"
+  },
   "createdAt": "2026-10-30T13:46:58.698Z"
 }
