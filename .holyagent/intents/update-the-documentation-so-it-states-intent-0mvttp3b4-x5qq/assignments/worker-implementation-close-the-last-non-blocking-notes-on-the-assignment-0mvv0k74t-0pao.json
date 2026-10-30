@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "close-the-last-non-blocking-notes-on-the",
   "objective": "Close the last non-blocking notes on the stack rule in /home/user/holyagent-stack-rule.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Review: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-revrule5.txt notes. Full diff so far: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule-v5.diff.",
     "stack-plan.md bullet 3 (start point): restore the short reason for the boundary, e.g. '(never forks or others' PRs, whose branches the root cannot push to)'. Bullet 7: say the base merges into the lowest stack branch first and forward up the stack, and replace 'the delivery's top branch, or its first PR's start branch' with a clear referent, e.g. 'Writers start from the branch the PR targets: the start point for a delivery's first PR, else its predecessor's branch.' Then reduce version-control.md's merge line to a pointer if it now duplicates.",
@@ -45,5 +45,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mvuzydxo-7kga",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-30T13:34:17.014Z"
+  },
   "createdAt": "2026-10-30T13:34:16.350Z"
 }
