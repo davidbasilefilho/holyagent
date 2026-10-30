@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "close-the-stack-rule-s-remaining",
   "objective": "Close the stack rule's remaining optional review notes in /home/user/holyagent-stack-rule.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Notes: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-rerev3.txt (non-blocking) and the earlier /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-rerev2.txt notes not yet closed. Current full diff: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule-v4.diff.",
     "(1) stack-plan.md bullets 4-5: name the referent instead of 'its start point'/'that point'. (2) Drift: keep the full rule only in stack-plan.md; requirements.md R-STACK keeps one short clause; docs/decisions.md keeps the decision and a short summary pointing to the root's Stack plan instead of restating every base case. (3) Bring stack-plan.md's net addition against the original (336 words) to 60 words or fewer.",
@@ -41,5 +41,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-30T13:17:27.415Z"
+  },
   "createdAt": "2026-10-30T13:17:18.733Z"
 }
