@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "add-the-in-session-model-switch-as-an",
   "objective": "Add the in-session model switch as an alternative in the 'Run the root on Sonnet' section of /home/user/holyagent-docs/docs/usage.md.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Maintainer statement: users can also just switch the model in the session (with `/model`, e.g. `/model sonnet`), although setting ANTHROPIC_DEFAULT_OPUS_MODEL is more reliable. Add one or two sentences to the 'Run the root on Sonnet' section saying exactly that: the alternative is `/model sonnet` in the running session; the environment variable is the more reliable route (it applies from the start of every session). Do not add other claims.",
     "Run /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/canary/x/bun-linux-x64/bun fmt --no-script docs/usage.md, then --check, in /home/user/holyagent-docs. Write the before/after diff to /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/modeldoc.diff."
@@ -39,7 +39,9 @@
     "agentId": "workflow:wf_bab14ed7-c94/assignment-0mvv1cvss-i1mu",
     "model": "haiku",
     "effort": "high",
-    "startedAt": "2026-10-30T13:56:34.684Z"
+    "startedAt": "2026-10-30T13:56:34.684Z",
+    "finishedAt": "2026-10-30T13:57:20.155Z"
   },
+  "result": "result: Added a paragraph to \"Run the root on Sonnet\" in docs/usage.md naming `/model sonnet` as the in-session alternative and the environment variable as the more reliable route. Nothing else in the file changed.\nchanged: docs/usage.md\nchecks:\n- `bun fmt --no-script docs/usage.md` -> exit 0, \"Formatted 0 files, 1 unchanged\" (no reformatting needed)\n- `bun fmt --no-script --check docs/usage.md` -> exit 0, \"1 file is formatted.\" (run before the edit too: exit 0)\n- `git diff --no-index` of the pre-edit copy against the file -> exit 1 (expected), one hunk at line 127, +2 lines\nblockers: none\nquestions: none\nnotes: `git status` in /home/user/holyagent-docs also shows modified README.md, docs/development.md, docs/hooks.md, docs/requirements.md and install/windows-install.ps1. I did not touch them; they belong to other workers. The diff file's `diff --git` header names the scratchpad copy as the \"before\" path, but the hunk content is correct.\nevidence:\nchecks-run: `bun fmt --no-script --check docs/usage.md` exit 0 (\"1 file is formatted.\"), run after the edit; baseline check before the edit also exit 0\ndiff-file: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/modeldoc.diff\nThe section names /model in the session as an alternative and the variable as the more reliable route, with nothing else changed: /home/user/holyagent-docs/docs/usage.md lines 130-131, and the diff file shows a single +2-line hunk at line 127\nfmt check passes: `bun fmt --no-script --check docs/usage.md` -> exit 0, \"1 file is formatted.\"",
   "createdAt": "2026-10-30T13:56:34.684Z"
 }
