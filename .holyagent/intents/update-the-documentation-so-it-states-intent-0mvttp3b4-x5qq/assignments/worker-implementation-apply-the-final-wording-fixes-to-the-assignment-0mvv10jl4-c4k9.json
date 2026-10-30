@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mvv10jl4-c4k9",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "apply-the-final-wording-fixes-to-the",
+  "objective": "Apply the final wording fixes to the stack rule in /home/user/holyagent-stack-rule.",
+  "state": "Ready",
+  "scope": [
+    "Review: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/fin-rule.txt notes.",
+    "stack-plan.md line 7: replace 'the start point for a delivery's first PR' with 'for a delivery's first PR, the open stack's top or the base, as the first bullet sets'. docs/usage.md:96 and docs/decisions.md:53: make the 'waits for the independent review' sentences name the new PR as the subject (the new PR stacks once the PRs under it pass holyagent's independent review, not human review). docs/decisions.md:66: make 'see New PRs stack on the open stack' say 'see the decision \"New PRs stack on the open stack\" above'. Keep stack-plan.md's net addition at 60 words or fewer against the original 336.",
+    "Rebuild and gate with the canary Bun /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/canary/x/bun-linux-x64/bun: scripts/vendor.ts, packages/integrations/claude/build.ts, check --no-script, lint --no-script, fmt --no-script --check, test (name any failing test and rerun it alone). Write this pass's diff to /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule-repair7.diff."
+  ],
+  "constraints": [
+    "Model-facing text in US English, imperative, calm; behavior unchanged.",
+    "Edit only in /home/user/holyagent-stack-rule: packages/runtime/src/instructions, packages/integrations/claude/dist/agents, docs/usage.md, docs/decisions.md. No git writes; no edits under .git/ or .holyagent/.",
+    "Stop and report when done and checked."
+  ],
+  "criteria": [
+    {
+      "text": "The three wording fixes are applied with behavior unchanged and net addition at 60 words or fewer",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "dist rebuilt; check, lint, fmt --check and test pass with the canary Bun",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/integrations/claude/dist/agents",
+    "docs/decisions.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-10-30T13:46:58.985Z"
+}
