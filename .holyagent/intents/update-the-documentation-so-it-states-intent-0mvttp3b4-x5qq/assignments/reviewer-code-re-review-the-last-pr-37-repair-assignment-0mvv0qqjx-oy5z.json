@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mvv0qqjx-oy5z",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-last-pr-37-repair",
+  "objective": "Re-review the last PR 37 repair (removable-leftovers notice, temp-file cleanup, descriptions).",
+  "state": "Ready",
+  "scope": [
+    "Previous findings: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-rev37b.txt items 1-4. Repair diff (no dist bundle): /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/fix37c.diff; pre-change copies /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/orig37c/; report /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-fix37c.txt. Worktree /home/user/holyagent-plugin-only-install (staged, uncommitted merge).",
+    "Judge each item closed or open, and check the new hasRemovableLeftovers mirrors cleanupLeftovers' branches, the EEXIST-only exception in the cleanup, and the tests. Run the full test suite once with the canary Bun /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/canary/x/bun-linux-x64/bun in that worktree (bun test) and report counts."
+  ],
+  "constraints": [
+    "Read-only; no edits or git writes. Findings blocking or non-blocking with file:line; stop and report when done."
+  ],
+  "criteria": [
+    {
+      "text": "Each previous item is judged closed or open with evidence",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No new regression is left unflagged",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvv0k6w6-hwhf"
+  ],
+  "followUpOf": "assignment-0mvv0ecyp-fsqt",
+  "createdAt": "2026-10-30T13:39:21.453Z"
+}
