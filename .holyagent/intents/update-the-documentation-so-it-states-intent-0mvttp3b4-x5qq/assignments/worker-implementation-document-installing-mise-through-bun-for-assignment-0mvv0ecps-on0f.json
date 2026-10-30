@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mvv0ecps-on0f",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "document-installing-mise-through-bun-for",
+  "objective": "Document installing mise through Bun for developing this repository, in /home/user/holyagent-docs.",
+  "state": "Ready",
+  "scope": [
+    "The maintainer asked to document that mise can be installed through Bun. Facts established in this container: the npm package @jdxcode/mise (2026.10.24) ships the mise binary (bin 'mise'); 'bun add -g @jdxcode/mise' installs the package, but Bun blocks its preinstall script (node installArchSpecificPackage.js, which installs the platform package such as @jdxcode/mise-linux-x64 and links bin/mise) unless the package is trusted, so the command is 'bun add -g --trust @jdxcode/mise' (or 'bun pm -g trust @jdxcode/mise' after a plain install). Bun's global bin folder (~/.bun/bin) must be on PATH, as it already is after the Bun installer. After mise is installed, 'mise install' in the checkout installs the pinned Bun and its postinstall upgrades it to canary, and 'mise run verify' runs the gates.",
+    "First copy docs/development.md from /home/user/holyagent-plugin-only-install into /home/user/holyagent-docs (docs/requirements.md there already starts from the merged text). Add the Bun route where development.md says how to get mise (one short paragraph or a line next to the existing install route), and mention it in docs/requirements.md's mise row in a few words if that row says how mise is installed. State that trusting runs the package's install script from npm. Do not claim it was verified end to end here; describe the commands.",
+    "Format check with the canary Bun /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/canary/x/bun-linux-x64/bun: fmt --no-script --check docs/development.md docs/requirements.md. Append the diff of docs/development.md against /home/user/holyagent-plugin-only-install/docs/development.md to /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/docs-mise.diff."
+  ],
+  "constraints": [
+    "User: document that mise can be installed via Bun.",
+    "Edit only docs/development.md and docs/requirements.md in /home/user/holyagent-docs.",
+    "No git writes; no edits under .git/ or .holyagent/; no other worktree except reading /home/user/holyagent-plugin-only-install.",
+    "Keep working until done; stop and report when done and checked."
+  ],
+  "criteria": [
+    {
+      "text": "docs/development.md documents bun add -g --trust @jdxcode/mise with why --trust is needed, followed by mise install and mise run verify",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "fmt check passes",
+      "blocking": true,
+      "dimension": "style"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "docs/development.md",
+    "docs/requirements.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-10-30T13:29:43.648Z"
+}
