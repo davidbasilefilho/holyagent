@@ -13,9 +13,11 @@
     "User decision: merge main forward into the lagging stack (35, 36, 37) with merge commits, resolve 37's conflicts, review and validate before pushing.",
     "Default (user busy, revisit): the open stack counts only the account owner's own non-draft PRs from branches of this repository (no forks, bots or other authors); new work stacks on its top even while those PRs wait for human review, since holyagent's own review of each PR is what must accept before the next stacks; a change that adds CI still goes first, from the base; with several open chains, the one the work depends on, else the most recent.",
     "User: the claude.ai unified chat/Cowork session was tested by the maintainer and holyagent does not work there because of how hooks are activated in those sessions; the docs say so instead of not tested.",
-    "User: fix the rest and the optional findings: install mise so the repository hooks and gates run (the maintainer asked to fix the rest after the installer denial), fix the optional review findings in PR 37, the docs and the stack rule, then commit, push and open the PRs."
+    "User: fix the rest and the optional findings: install mise so the repository hooks and gates run (the maintainer asked to fix the rest after the installer denial), fix the optional review findings in PR 37, the docs and the stack rule, then commit, push and open the PRs.",
+    "User: install mise via Bun as a project dependency (a devDependency in package.json), not as a global or loose install.",
+    "User: the root can also be switched with /model in the session, though the environment variable is more reliable; document both."
   ],
-  "revision": 4,
+  "revision": 5,
   "state": "Open",
   "createdAt": "2026-10-29T17:34:21.186Z"
 }
