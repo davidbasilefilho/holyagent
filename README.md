@@ -15,10 +15,11 @@ claude plugin marketplace add davidbasilefilho/holyagent
 claude plugin install holyagent@holyagent
 ```
 
-Restart Claude Code afterwards. Web search needs the Exa connector, which you connect once at [claude.ai/customize/connectors](https://claude.ai/customize/connectors) (see [docs/components.md](docs/components.md#exa)); HolyAgent supports only claude.ai account login. On the first launch, run `/holyagent:setup` once to install ctx7 and to configure Claude Code. The same steps as slash commands, the details and `holyagent doctor` are in [docs/usage.md](docs/usage.md#install), and the status of the other environments (T3 Code, the desktop app, claude.ai) is in [docs/requirements.md](docs/requirements.md#supported-environments).
+Restart Claude Code afterwards. The root runs on Opus; [docs/usage.md](docs/usage.md#run-the-root-on-sonnet) shows how to run it on Sonnet instead. Web search needs the Exa connector, which you connect once at [claude.ai/customize/connectors](https://claude.ai/customize/connectors) (see [docs/components.md](docs/components.md#exa)); HolyAgent supports only claude.ai account login. On the first launch, run `/holyagent:setup` once to install ctx7 and to configure Claude Code. The same steps as slash commands, the details and `holyagent doctor` are in [docs/usage.md](docs/usage.md#install), and the status of the other environments (T3 Code, claude.ai) is in [docs/requirements.md](docs/requirements.md#supported-environments).
 
 ## Why HolyAgent?
 
+- **It fits the work you have.** From a one-line fix to a stacked multi-PR delivery, through bug hunts, codebase questions, reviews, refactors, UI work and solo or coursework repositories ([docs/usage.md](docs/usage.md#what-it-fits)).
 - **One agent that plans, many that do.** The root owns the relationship with you, the plan and the verdict. Specialists do the work in bounded Assignments, each with acceptance criteria and evidence, so a long request stays reviewable instead of drifting inside one huge context.
 - **A warm cache, by design.** Prompts put stable material first, specialists are reused while their cache is alive, and the CLI embeds the timing so the model carries none of that reasoning. See [docs/cache-and-workflows.md](docs/cache-and-workflows.md).
 - **State outside the conversation.** Intents and Assignments live in `.holyagent/`, so a resumed or compacted session picks up exactly where the work stands, through a small, bounded session-start hook ([docs/hooks.md](docs/hooks.md)).
@@ -30,10 +31,10 @@ Restart Claude Code afterwards. Web search needs the Exa connector, which you co
 The contributing rules are in [.claude/CLAUDE.md](.claude/CLAUDE.md) and the pitfalls of this repository in [AGENTS.md](AGENTS.md). The layout, the tooling, the generated plugin and versioning are in [docs/development.md](docs/development.md).
 
 ```sh
-mise install
-bun install --frozen-lockfile
-mise run build    # regenerate the Claude plugin after changing its sources
-mise run verify   # type-check, lint, format check and tests
+bun install --frozen-lockfile   # also installs mise, a dev dependency
+bunx mise install
+bunx mise run build    # regenerate the Claude plugin after changing its sources
+bunx mise run verify   # type-check, lint, format check and tests
 ```
 
 `mise.toml` is the source of commands, and the repository toolchain needs a canary Bun, which the `toolchain` task checks for you. Commits follow Conventional Commits.

@@ -20,7 +20,7 @@
 #   build; developing this repository needs a canary build, which `mise install` in the checkout
 #   upgrades to.
 #
-# Not covered, because it is not tested on a real Windows machine: see docs/requirements.md.
+# Tested by the maintainer on a Windows machine; see docs/requirements.md.
 param([switch]$Dev)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
