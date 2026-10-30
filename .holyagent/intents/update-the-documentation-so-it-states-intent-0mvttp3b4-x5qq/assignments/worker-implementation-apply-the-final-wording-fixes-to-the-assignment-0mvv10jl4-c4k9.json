@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "apply-the-final-wording-fixes-to-the",
   "objective": "Apply the final wording fixes to the stack rule in /home/user/holyagent-stack-rule.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Review: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/fin-rule.txt notes.",
     "stack-plan.md line 7: replace 'the start point for a delivery's first PR' with 'for a delivery's first PR, the open stack's top or the base, as the first bullet sets'. docs/usage.md:96 and docs/decisions.md:53: make the 'waits for the independent review' sentences name the new PR as the subject (the new PR stacks once the PRs under it pass holyagent's independent review, not human review). docs/decisions.md:66: make 'see New PRs stack on the open stack' say 'see the decision \"New PRs stack on the open stack\" above'. Keep stack-plan.md's net addition at 60 words or fewer against the original 336.",
@@ -43,7 +43,9 @@
     "agentId": "workflow:wf_0ca2984f-23d/assignment-0mvv10jl4-c4k9",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-10-30T13:47:10.384Z"
+    "startedAt": "2026-10-30T13:47:10.384Z",
+    "finishedAt": "2026-10-30T13:50:33.018Z"
   },
+  "result": "result: The three wording fixes are applied and stack-plan.md is at 395 words, +59 over the original 336. dist is rebuilt and every gate passes with the canary Bun.\nchanged:\n- /home/user/holyagent-stack-rule/packages/runtime/src/instructions/claude-5.5/root/stack-plan.md\n- /home/user/holyagent-stack-rule/docs/usage.md\n- /home/user/holyagent-stack-rule/docs/decisions.md\n- /home/user/holyagent-stack-rule/packages/integrations/claude/dist/agents/holyagent.md (rebuilt)\nchecks:\n- `bun scripts/vendor.ts` -> exit 0, vendored 21 files\n- `bun packages/integrations/claude/build.ts` -> exit 0, built 29 files\n- `bun check --no-script` -> exit 0, no type errors in 121 files\n- `bun lint --no-script` -> exit 0, no problems in 122 files\n- `bun fmt --no-script --check` -> exit 0, 237 files formatted\n- `bun test` -> exit 0, 957 pass, 1 skip, 0 fail, so there was no failing test to rerun alone\nblockers: none\nquestions: none\nnotes:\n- The stack-plan.md edit needed offsetting trims to stay under the 60-word cap. The line 7 replacement alone added 9 words, so I made four small cuts elsewhere in the file:\n  - \"reviewed\" in \"so each change is reviewed\" became \"so each is reviewed\".\n  - \"the owner's own non-draft\" became \"the owner's non-draft\".\n  - \"the conventions ask\" became \"conventions ask\".\n  - \"on top of the one before it\" became \"atop the one before it\".\n- I also reworded the base-merge sentence to \"Before stacking on a lagging open stack, merge the base into its lowest branch, then forward up the stack.\" The behavior is unchanged.\n- The diff file is cumulative against HEAD, because the earlier passes are uncommitted in the worktree. It is not only this pass.\nevidence:\n- The three wording fixes are applied with behavior unchanged and net addition at 60 words or fewer: stack-plan.md line 7 uses the requested replacement. usage.md:96 and decisions.md:53 now say \"the new PR stacks once the PRs under it pass holyagent's independent review, not human review\". decisions.md:66 says `see the decision \"New PRs stack on the open stack\" above`. `wc -w` gives 395, +59 over 336.\n- dist rebuilt; check, lint, fmt --check and test pass with the canary Bun: build.ts exit 0, then check, lint, fmt --check and test all exit 0, with 957 pass and 0 fail.\n- checks-run: the six commands listed under checks, all run on the current tree.\n- diff-file: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule-repair7.diff",
   "createdAt": "2026-10-30T13:46:58.985Z"
 }
