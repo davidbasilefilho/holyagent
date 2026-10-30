@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mvv06t8y-we5m",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 4,
+  "roleTask": "Worker.operations",
+  "slug": "finish-installing-mise-through-bun-as",
+  "objective": "Finish installing mise through Bun, as the maintainer asked, and run the repository's toolchain and baseline gates.",
+  "state": "Running",
+  "scope": [
+    "The maintainer asked to install mise via Bun; trusting the package's install script is part of that route. @jdxcode/mise 2026.10.24 is installed globally but Bun blocked its preinstall (`node installArchSpecificPackage.js`, which installs @jdxcode/mise-linux-x64 and links bin/mise). Run `bun pm -g trust @jdxcode/mise` (or reinstall with `bun add -g --trust @jdxcode/mise`), then confirm `mise --version` and `sh -c 'command -v mise'` from /home/user/holyagent.",
+    "Then in /home/user/holyagent: `mise trust`, `mise install` (its postinstall runs `bun scripts/toolchain.ts upgrade`, which upgrades Bun to canary; that upgrade is the repository's documented toolchain), `mise exec -- bun --version` (canary), `mise run toolchain`, then `mise run verify` on main (7d8c8bc) with counts. Report the exact commands that worked, for the docs.",
+    "If the permission policy denies a step, stop and report the exact denial; do not fetch binaries by hand."
+  ],
+  "constraints": [
+    "No tracked repository file edits; no git writes; no edits under .git/ or .holyagent/; do not touch the other worktrees.",
+    "Stop and report when done."
+  ],
+  "criteria": [
+    {
+      "text": "mise is installed through Bun and `sh -c 'command -v mise'` finds it from /home/user/holyagent",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run toolchain passes with a canary Bun and mise run verify ran with counts reported",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "commands",
+    "gate-command"
+  ],
+  "ownershipPaths": [
+    "node_modules"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvv058da-cxwb",
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-30T13:23:51.827Z"
+  },
+  "createdAt": "2026-10-30T13:23:51.827Z"
+}
