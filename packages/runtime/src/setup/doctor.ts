@@ -2,15 +2,17 @@ import { Effect, Option } from "effect"
 
 import { inCloudSession } from "../vcs/identity.ts"
 import { type Env, userFiles } from "./environment.ts"
+import { findLeftovers } from "./leftovers.ts"
 import { type Report } from "./report.ts"
 import { mergeUserSettings, missingSettingKeys } from "./settings.ts"
 import { Shell } from "./shell.ts"
-import { asStep, installBillionContext, installCtx7 } from "./steps.ts"
+import { asStep, installCtx7 } from "./steps.ts"
 
 const FIX = "run /holyagent:setup, or `holyagent doctor --fix`"
 
 const pass = (name: string, detail: string) => `ok   ${name}: ${detail}`
 const fail = (name: string, detail: string) => `FAIL ${name}: ${detail}`
+const warn = (name: string, detail: string) => `warn ${name}: ${detail}`
 
 const checkBun = Effect.gen(function* () {
   const shell = yield* Shell
@@ -48,27 +50,46 @@ const checkSettings = (env: Env) =>
     Effect.catchTag("SetupFailure", (error) => Effect.succeed(fail("settings", error.message))),
   )
 
+/**
+ * Warns when an earlier Billion Context setup left entries in the Claude Code files, and when a
+ * file could not be read, because then its entries were not checked.
+ */
+const checkLeftovers = (env: Env) =>
+  findLeftovers(userFiles(env)).pipe(
+    Effect.map((leftovers) => {
+      const notes = [
+        ...(leftovers.found.length === 0
+          ? []
+          : [
+              `${leftovers.found.length} leftover(s) from an earlier setup: ${leftovers.found.join("; ")}; run /holyagent:setup`,
+            ]),
+        ...(leftovers.unreadable.length === 0
+          ? []
+          : [`not checked, ${leftovers.unreadable.join("; ")}`]),
+      ]
+      return notes.length === 0
+        ? pass("billion-context", "no leftovers from an earlier setup")
+        : warn("billion-context", notes.join(" | "))
+    }),
+  )
+
 const checks = (env: Env) =>
-  Effect.all([checkBun, checkCommand(env, "bili"), checkCommand(env, "ctx7"), checkSettings(env)])
+  Effect.all([checkBun, checkCommand(env, "ctx7"), checkSettings(env), checkLeftovers(env)])
 
 /**
- * Checks the environment HolyAgent needs, one line per check: `bun`, `bili` and `ctx7` on PATH and
- * the recommended keys of the user settings (not those of a project). In a claude.ai cloud session
- * `bili` and `ctx7` pass, since setup leaves them out there. With `fix`, the setup steps behind a
- * failing check run first, their lines come before the checks, and the checks then run again; Bun
- * is never installed. The report is ok only when every check passes.
+ * Checks the environment HolyAgent needs, one line per check: `bun` and `ctx7` on PATH, the
+ * recommended keys of the user settings (not those of a project), and leftovers of an earlier
+ * Billion Context setup (a warning, not a failure). In a claude.ai cloud session `ctx7` passes,
+ * since setup leaves it out there. With `fix`, the setup steps behind a failing check run first,
+ * their lines come before the checks, and the checks then run again; Bun is never installed, and
+ * leftovers are removed by `holyagent setup`, not here. The report is ok when no check fails.
  */
 export const doctor = Effect.fn("doctor")(function* (env: Env, options: { readonly fix: boolean }) {
   const before = yield* checks(env)
   const failing = (name: string) => before.some((line) => line.startsWith(`FAIL ${name}:`))
   const fixes =
     options.fix && !inCloudSession(env)
-      ? [
-          ...(failing("bili")
-            ? yield* asStep("billion-context", installBillionContext(env, false))
-            : []),
-          ...(failing("ctx7") ? yield* asStep("ctx7", installCtx7(env, false)) : []),
-        ]
+      ? [...(failing("ctx7") ? yield* asStep("ctx7", installCtx7(env, false)) : [])]
       : []
   const settingsFixes =
     options.fix && failing("settings")

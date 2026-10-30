@@ -9,7 +9,7 @@ It has two layers:
 
 Release 0.1.0 ships the Claude Code integration only. A Pi integration comes later; its research is in [pi/README.md](pi/README.md).
 
-HolyAgent installs as a plugin with three `claude plugin` commands and nothing else ([usage.md](usage.md#install)). Its one command-line program, `holyagent`, is the runtime CLI inside the plugin: `bun --no-env-file --config="<plugin>/scripts/empty-bunfig.toml" "<plugin>/scripts/holyagent.js" <command>`, with `<plugin>` the plugin folder (`${CLAUDE_PLUGIN_ROOT}` inside a session); it runs in bash, PowerShell and cmd, is not on your `PATH`, and `holyagent vcs`, `holyagent plan` and the like in these pages mean it. The root agent and the plugin's hooks run `intent`, `assignment`, `plan`, `status`, `reconcile`, `vcs`, `hook`, `rg` and `fd`; you run `setup` and `doctor`, usually through `/holyagent:setup`.
+HolyAgent installs as a plugin with two `claude plugin` commands and nothing else ([usage.md](usage.md#install)). Its one command-line program, `holyagent`, is the runtime CLI inside the plugin: `bun --no-env-file --config="<plugin>/scripts/empty-bunfig.toml" "<plugin>/scripts/holyagent.js" <command>`, with `<plugin>` the plugin folder (`${CLAUDE_PLUGIN_ROOT}` inside a session); it runs in bash, PowerShell and cmd, is not on your `PATH`, and `holyagent vcs`, `holyagent plan` and the like in these pages mean it. The root agent and the plugin's hooks run `intent`, `assignment`, `plan`, `status`, `reconcile`, `vcs`, `hook`, `rg` and `fd`; you run `setup` and `doctor`, usually through `/holyagent:setup`.
 
 ## Pages
 

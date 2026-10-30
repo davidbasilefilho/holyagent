@@ -6,6 +6,7 @@ import { Effect, Schema } from "effect"
 import { ROOT_CORE } from "../instructions/claude-5.5/root-core.ts"
 import stateChanges from "../instructions/claude-5.5/specialist/state-changes.md" with { type: "text" }
 import { setupNotice } from "../setup/check.ts"
+import { claimRulesDelivery, isSessionId, markRulesDelivered } from "../state/delivery.ts"
 import { hasCode, io } from "../state/files.ts"
 import { STATE_DIRECTORY } from "../state/layout.ts"
 import { legacyFoldersWithState } from "../state/legacy.ts"
@@ -41,6 +42,9 @@ const Payload = Schema.Struct({
   tool_name: Schema.optionalKey(Schema.String),
   tool_input: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
   agent_type: Schema.optionalKey(Schema.String),
+  agent_id: Schema.optionalKey(Schema.String),
+  session_id: Schema.optionalKey(Schema.String),
+  hook_event_name: Schema.optionalKey(Schema.String),
   source: Schema.optionalKey(Schema.String),
   tool_response: Schema.optionalKey(Schema.Unknown),
 })
@@ -190,6 +194,28 @@ const commentPrefix = Effect.gen(function* () {
 /** The Workflow inputs an inline run may carry; a script path, name or resume would run other code. */
 const INLINE_INPUTS: ReadonlySet<string> = new Set(["script", "args"])
 
+/**
+ * The core of the root rules and the line that makes the main thread the root, with the CLI form of
+ * the plugin filled in, for a main thread that is not the root; nothing for the root. The host
+ * fills in `${CLAUDE_PLUGIN_ROOT}` in agent text only, and this text is context.
+ */
+const rootCore = (payload: typeof Payload.Type, call: Call): string | undefined =>
+  ROOT_AGENTS.has(payload.agent_type)
+    ? undefined
+    : [ROOT_CORE, ROOT_TAKEOVER]
+        .join("\n\n")
+        .replaceAll(
+          "${CLAUDE_PLUGIN_ROOT}",
+          () => call.env.CLAUDE_PLUGIN_ROOT ?? "${CLAUDE_PLUGIN_ROOT}",
+        )
+
+/**
+ * True for the main thread: the payload of a subagent carries an `agent_id`, and its `agent_type`
+ * is a specialist of the plugin.
+ */
+const isMainThread = (payload: typeof Payload.Type): boolean =>
+  payload.agent_id === undefined && !isSpecialist(payload.agent_type)
+
 // Both version-control hooks only add context, so neither can deny, allow or block: they carry no
 // permission decision, and the plugin wires them without `onFailure: block`.
 
@@ -197,19 +223,12 @@ const INLINE_INPUTS: ReadonlySet<string> = new Set(["script", "args"])
 export const HOOK_COMMANDS: ReadonlyArray<Command> = [
   hook(
     "session-start",
-    "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread, and in a claude.ai cloud session, `CLAUDE_CODE_REMOTE=true`, the steps that set the commit author to the user), always ending with a short block of the root rules most often missed; one line that offers /holyagent:setup when bili, ctx7 or a recommended user-settings key is missing (nothing in a cloud session, nothing installed or written); for a project with no .holyagent and a .holyclaude or .holycodex folder that holds state to convert, a notice naming the folder and `holyagent migrate`, with the same rules; for a project with none of the three, the core root rules with that line and the reminder when the holyagent agent is not the main thread, otherwise nothing",
-    (payload, call) =>
-      Effect.gen(function* () {
-        const pluginRoot = call.env.CLAUDE_PLUGIN_ROOT
-        // The host fills in ${CLAUDE_PLUGIN_ROOT} in agent text only, and this text is context.
-        // A main thread that is not the root gets the core and the line that makes it the root.
-        const core = ROOT_AGENTS.has(payload.agent_type)
-          ? undefined
-          : [ROOT_CORE, ROOT_TAKEOVER]
-              .join("\n\n")
-              .replaceAll("${CLAUDE_PLUGIN_ROOT}", pluginRoot ?? "${CLAUDE_PLUGIN_ROOT}")
-        // How the commit author is set matters only where git's committer is the platform's.
-        const cloud = inCloudSession(call.env) ? CLOUD_IDENTITY : undefined
+    "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread, and in a claude.ai cloud session, `CLAUDE_CODE_REMOTE=true`, the steps that set the commit author to the user), always ending with a short block of the root rules most often missed; one line that offers /holyagent:setup when ctx7 or a recommended user-settings key is missing, or when an earlier Billion Context setup left entries in the Claude Code files that setup can remove (nothing in a cloud session, nothing installed or written); for a project with no .holyagent and a .holyclaude or .holycodex folder that holds state to convert, a notice naming the folder and `holyagent migrate`, with the same rules; for a project with none of the three, the core root rules with that line and the reminder when the holyagent agent is not the main thread, otherwise nothing",
+    (payload, call) => {
+      const core = rootCore(payload, call)
+      // How the commit author is set matters only where git's committer is the platform's.
+      const cloud = inCloudSession(call.env) ? CLOUD_IDENTITY : undefined
+      return Effect.gen(function* () {
         // Reads files and looks commands up; it installs and writes nothing (`holyagent setup` does).
         const notice = yield* setupNotice(call.env)
         if (!(yield* hasStateFolder(call.directory))) {
@@ -245,7 +264,59 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
             notice,
           ),
         })
-      }),
+      }).pipe(
+        // A main thread that is not the root still gets the rules and is told what failed, since
+        // exit 1 would leave it with nothing; the root has the rules in its prompt, so it keeps the
+        // visible failure.
+        core === undefined
+          ? (effect) => effect
+          : Effect.catch((error) =>
+              Effect.succeed(
+                output({
+                  hookEventName: "SessionStart",
+                  additionalContext: [
+                    bareContext(core, cloud),
+                    `holyagent: the project state could not be read (${describeFailure(error).tag}), so no status is shown. Run \`holyagent status\` to see the error.`,
+                  ].join("\n\n"),
+                }),
+              ),
+            ),
+        // Later events of the session skip the rules once this event has carried them; a marker
+        // that cannot be written costs one more delivery, never the hook.
+        Effect.tap(() =>
+          core !== undefined && isSessionId(payload.session_id)
+            ? markRulesDelivered(payload.session_id).pipe(Effect.ignore)
+            : Effect.void,
+        ),
+      )
+    },
+  ),
+  hook(
+    "root-rules",
+    "UserPromptSubmit and PreToolUse: on the first event of a main thread that is not the root and has not been given the rules (its SessionStart output never came, or came late), add the core root rules with the takeover line as context, once per session; nothing for later events, the root, a subagent or a payload with no usable session id",
+    (payload, call) => {
+      const core = rootCore(payload, call)
+      const event = payload.hook_event_name
+      if (
+        core === undefined ||
+        (event !== "UserPromptSubmit" && event !== "PreToolUse") ||
+        !isMainThread(payload) ||
+        !isSessionId(payload.session_id)
+      )
+        return Effect.succeed(NOTHING)
+      const cloud = inCloudSession(call.env) ? CLOUD_IDENTITY : undefined
+      return claimRulesDelivery(payload.session_id).pipe(
+        Effect.map((first) =>
+          first
+            ? output({ hookEventName: event, additionalContext: bareContext(core, cloud) })
+            : NOTHING,
+        ),
+        // This runs on every tool call, so a marker folder that cannot be used (another account's,
+        // a link, read-only or full) must not fail each call: the late delivery is skipped quietly.
+        Effect.catch(() => Effect.succeed(NOTHING)),
+      )
+    },
+    true,
   ),
   hook(
     "agent-launch",

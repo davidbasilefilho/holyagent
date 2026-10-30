@@ -31,19 +31,6 @@ const SOURCES = `${PLUGIN_DIRECTORY}/src`
 const DESCRIPTION =
   "A root agent that plans work as Intents and Assignments and eighteen specialists it dispatches, with a CLI that keeps their state."
 
-/**
- * The plugins this one depends on, and their marketplaces, which are allowed for cross-marketplace
- * dependencies. Claude Code installs a dependency only from a marketplace that is already added;
- * the official one is added by default. Billion Context compresses the conversation, and Exa
- * provides the web tools of the Search roles.
- */
-const BILLION_CONTEXT_MARKETPLACE = "billion-context"
-const OFFICIAL_MARKETPLACE = "claude-plugins-official"
-const DEPENDENCIES = [
-  `billion-context@${BILLION_CONTEXT_MARKETPLACE}`,
-  `exa@${OFFICIAL_MARKETPLACE}`,
-]
-
 const inPlugin = (path: string) => `${DIST_DIRECTORY}/${path}`
 
 const manifests = (): ReadonlyArray<GeneratedFile> => [
@@ -55,7 +42,6 @@ const manifests = (): ReadonlyArray<GeneratedFile> => [
       description: DESCRIPTION,
       author: { name: "davidbasilefilho" },
       license: "Apache-2.0",
-      dependencies: DEPENDENCIES,
     }),
   },
   { path: inPlugin("settings.json"), content: jsonText({ agent: PLUGIN_NAME }) },
@@ -65,7 +51,6 @@ const manifests = (): ReadonlyArray<GeneratedFile> => [
       name: PLUGIN_NAME,
       owner: { name: "davidbasilefilho" },
       description: DESCRIPTION,
-      allowCrossMarketplaceDependenciesOn: [BILLION_CONTEXT_MARKETPLACE, OFFICIAL_MARKETPLACE],
       plugins: [
         {
           name: PLUGIN_NAME,
@@ -114,11 +99,13 @@ const GIT_COMMIT = "Bash(*git*commit*)"
 const GIT_PUSH = "Bash(*git*push*)"
 
 /**
- * The five hooks. The session hook adds the state of the project (and, after a resume or
- * compaction, the reconcile result). The SubagentStart hook adds the version-control rules to each
- * specialist (it has no matcher, and the hook itself picks the plugin's specialists), and the
- * PreToolUse reminder adds them in one line to a Bash command that mentions git commit or push;
- * both only add context and never block. The workflow hook runs `onFailure: block`, because a
+ * The six hooks. The session hook adds the state of the project (and, after a resume or compaction,
+ * the reconcile result). The rules hook, on the first prompt or tool call of a main thread that did
+ * not get the rules at its start (the session hook's output can arrive late or never), adds them
+ * once; it has no matcher, so it sees every tool. The SubagentStart hook adds the version-control
+ * rules to each specialist (it has no matcher, and the hook itself picks the plugin's specialists),
+ * and the PreToolUse reminder adds them in one line to a Bash command that mentions git commit or
+ * push; both only add context and never block. The workflow hook runs `onFailure: block`, because a
  * failure there would let an unvetted workflow through unexamined. The PostToolUse hook records the
  * agent of a dispatched launch, runs only for the Agent tool, and reports its own failures to the
  * root as context, since it authorizes nothing.
@@ -133,6 +120,7 @@ const hooks = (): GeneratedFile => ({
           hooks: [hookCommand("session-start")],
         },
       ],
+      UserPromptSubmit: [{ hooks: [hookCommand("root-rules")] }],
       SubagentStart: [{ hooks: [hookCommand("subagent-start")] }],
       PreToolUse: [
         {
@@ -143,6 +131,7 @@ const hooks = (): GeneratedFile => ({
           ],
         },
         { matcher: "Workflow", hooks: [hookCommand("workflow", { onFailure: "block" })] },
+        { hooks: [hookCommand("root-rules")] },
       ],
       PostToolUse: [{ matcher: "Agent", hooks: [hookCommand("agent-launch")] }],
     },

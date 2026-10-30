@@ -31,10 +31,10 @@ const env = (extra: Record<string, string> = {}) => ({ HOME: home, PATH: project
 const files = (directory: string) => readdir(directory, { recursive: true })
 
 describe("the setup check of the SessionStart hook", () => {
-  test("names /holyagent:setup in one line when bili, ctx7 and the settings keys are missing", async () => {
+  test("names /holyagent:setup in one line when ctx7 and the settings keys are missing", async () => {
     const notice = await Effect.runPromise(setupNotice(env()))
     expect(notice).toContain("/holyagent:setup")
-    expect(notice).toContain("bili, ctx7, user settings keys")
+    expect(notice).toContain("ctx7, user settings keys")
     expect(notice).not.toContain("\n")
   })
 
@@ -55,6 +55,59 @@ describe("the setup check of the SessionStart hook", () => {
   test("says nothing when everything is in place", async () => {
     await completeSetup(home)
     expect(await Effect.runPromise(setupNotice(env()))).toBeUndefined()
+  })
+
+  test("names leftovers of an earlier Billion Context setup, and only when there are some", async () => {
+    await completeSetup(home)
+    const plugins = join(home, ".claude", "plugins")
+    await mkdir(plugins, { recursive: true })
+    await writeFile(join(plugins, "installed_plugins.json"), '{"plugins":{"other@market":[{}]}}')
+    expect(await Effect.runPromise(setupNotice(env()))).toBeUndefined()
+    await writeFile(
+      join(plugins, "installed_plugins.json"),
+      '{"plugins":{"billion-context@billion-context":[{}]}}',
+    )
+    const notice = await Effect.runPromise(setupNotice(env()))
+    expect(notice).toContain("leftovers from an earlier Billion Context setup")
+    expect(notice).toContain("/holyagent:setup")
+    expect(notice).not.toContain("missing")
+    expect(notice).not.toContain("\n")
+  })
+
+  test("counts only leftovers that setup can remove, so the line can clear", async () => {
+    await completeSetup(home)
+    const plugins = join(home, ".claude", "plugins")
+    await mkdir(plugins, { recursive: true })
+    const record = (installs: ReadonlyArray<Record<string, unknown>>) =>
+      writeFile(
+        join(plugins, "installed_plugins.json"),
+        JSON.stringify({ plugins: { "billion-context@billion-context": installs } }),
+      )
+    // Setup only prints the command to run for these: no folder recorded, or a folder that is gone.
+    await record([
+      { scope: "project" },
+      { scope: "local", projectPath: join(project, "gone") },
+      { scope: "project", projectPath: "relative/folder" },
+    ])
+    expect(await Effect.runPromise(setupNotice(env()))).toBeUndefined()
+    // A folder setup runs claude in (it exists and is the user's) is removable.
+    await record([{ scope: "project", projectPath: project }])
+    expect(await Effect.runPromise(setupNotice(env()))).toContain("leftovers from an earlier")
+    // One removable leftover next to unremovable ones keeps the line.
+    await record([{ scope: "local", projectPath: join(project, "gone") }, { scope: "user" }])
+    expect(await Effect.runPromise(setupNotice(env()))).toContain("leftovers from an earlier")
+  })
+
+  test("names missing pieces and leftovers together in one line", async () => {
+    await mkdir(join(home, ".claude", "plugins"), { recursive: true })
+    await writeFile(
+      join(home, ".claude", "plugins", "known_marketplaces.json"),
+      '{"billion-context":{}}',
+    )
+    const notice = await Effect.runPromise(setupNotice(env()))
+    expect(notice).toContain(
+      "missing ctx7, user settings keys; leftovers from an earlier Billion Context setup",
+    )
   })
 
   test("says nothing in a claude.ai cloud session, whatever is missing", async () => {
@@ -99,6 +152,18 @@ describe("hook session-start with the setup check", () => {
     const text = context(result.stdout)
     expect(text.split("\n")).toHaveLength(1)
     expect(text).toContain("/holyagent:setup")
+  })
+
+  test("adds the line when only Billion Context leftovers remain", async () => {
+    await completeSetup(home)
+    await mkdir(join(home, ".claude", "plugins"), { recursive: true })
+    await writeFile(
+      join(home, ".claude", "plugins", "known_marketplaces.json"),
+      '{"billion-context":{}}',
+    )
+    const result = await sessionStart({})
+    expect(result.code).toBe(0)
+    expect(context(result.stdout)).toContain("leftovers from an earlier Billion Context setup")
   })
 
   test("prints nothing when everything is in place", async () => {

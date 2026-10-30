@@ -5,9 +5,5 @@
   "author": {
     "name": "davidbasilefilho"
   },
-  "license": "Apache-2.0",
-  "dependencies": [
-    "billion-context@billion-context",
-    "exa@claude-plugins-official"
-  ]
+  "license": "Apache-2.0"
 }

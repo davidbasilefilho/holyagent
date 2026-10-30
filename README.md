@@ -12,11 +12,10 @@ You need Claude Code 2.1.295 or later (the highest minimum the plugin documents,
 
 ```sh
 claude plugin marketplace add davidbasilefilho/holyagent
-claude plugin marketplace add ranxianglei/billion-context
 claude plugin install holyagent@holyagent
 ```
 
-The plugin requires `billion-context` and `exa`, so add the Billion Context marketplace first, as above, and restart Claude Code afterwards. On the first launch, run `/holyagent:setup` once to install Billion Context and ctx7 and to configure Claude Code. The same steps as slash commands, the details and `holyagent doctor` are in [docs/usage.md](docs/usage.md#install), and the status of the other environments (T3 Code, the desktop app, claude.ai) is in [docs/requirements.md](docs/requirements.md#supported-environments).
+Restart Claude Code afterwards. Web search needs the Exa connector, which you connect once at [claude.ai/customize/connectors](https://claude.ai/customize/connectors) (see [docs/components.md](docs/components.md#exa)); HolyAgent supports only claude.ai account login. On the first launch, run `/holyagent:setup` once to install ctx7 and to configure Claude Code. The same steps as slash commands, the details and `holyagent doctor` are in [docs/usage.md](docs/usage.md#install), and the status of the other environments (T3 Code, the desktop app, claude.ai) is in [docs/requirements.md](docs/requirements.md#supported-environments).
 
 ## Why HolyAgent?
 
@@ -42,7 +41,6 @@ mise run verify   # type-check, lint, format check and tests
 ## Special thanks
 
 - [HolyClaude](docs/decisions.md), the predecessor plugin whose one long session was audited to shape HolyAgent's decisions.
-- [Billion Context](https://github.com/ranxianglei/billion-context) and its [acp-kernel](https://github.com/ranxianglei/acp-kernel), which HolyAgent installs to compress the conversation ([docs/attributions.md](docs/attributions.md)).
 - [t3dotgg/tstack](https://github.com/t3dotgg/tstack), for the inspiration.
 - Anthropic's [frontend-design](docs/attributions.md#vendored-skill) skill, embedded in the visual specialists.
 - [Context7](https://context7.com), [Effect](https://effect.website), [Bun](https://bun.sh), [mise](https://mise.jdx.dev), [lefthook](https://lefthook.dev), [TOON](https://toonformat.dev) and [acorn](https://github.com/acornjs/acorn), the software HolyAgent builds with or installs.

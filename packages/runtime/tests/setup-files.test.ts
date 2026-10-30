@@ -1,10 +1,16 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { readdir, readFile, stat, writeFile } from "node:fs/promises"
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
+import * as filesystem from "node:fs/promises"
+import { readdir, readFile, stat, symlink, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
 import { Effect, Option } from "effect"
 
-import { applyDefaults, readJsonObject, writeJsonObject } from "../src/setup/json-file.ts"
+import {
+  applyDefaults,
+  readJsonObject,
+  writeJsonObject,
+  writeJsonObjectIfUnchanged,
+} from "../src/setup/json-file.ts"
 import { findCommand, pathKey, pathWithBunBin } from "../src/setup/shell.ts"
 import { installPrograms, programName, scratch } from "./setup-fixture.ts"
 
@@ -79,6 +85,71 @@ describe("the JSON files setup edits", () => {
     expect(await readdir(dirname(file))).toEqual(["settings.json"])
     if (process.platform !== "win32") expect((await stat(file)).mode & 0o777).toBe(0o600)
   })
+
+  test("a stale temporary file is never overwritten and the target is left as it was", async () => {
+    const file = join(directory, "settings.json")
+    const temporary = join(directory, `.settings.json.${process.pid}.tmp`)
+    await writeFile(file, '{"old":true}\n')
+    await writeFile(temporary, "stale")
+    const failure = await Effect.runPromise(Effect.flip(writeJsonObject(file, { a: 1 })))
+    expect(failure._tag).toBe("SetupFailure")
+    expect(failure.message).toContain(temporary)
+    expect(await readFile(temporary, "utf8")).toBe("stale")
+    expect(await readFile(file, "utf8")).toBe('{"old":true}\n')
+    const guarded = await Effect.runPromise(
+      Effect.flip(writeJsonObjectIfUnchanged(file, { a: 1 }, '{"old":true}\n')),
+    )
+    expect(guarded._tag).toBe("SetupFailure")
+    expect(await readFile(temporary, "utf8")).toBe("stale")
+  })
+
+  test("a write that fails after creating the temporary file removes it, so a rerun is not blocked", async () => {
+    const file = join(directory, "settings.json")
+    await writeFile(file, '{"old":true}\n')
+    const original = filesystem.writeFile
+    const spy = spyOn(filesystem, "writeFile").mockImplementation((async (
+      ...args: Parameters<typeof filesystem.writeFile>
+    ) => {
+      // The file exists with part of the text when the disk fills up.
+      await original(args[0], "{", { flag: "wx" })
+      throw Object.assign(new Error("ENOSPC: no space left on device"), { code: "ENOSPC" })
+    }) as typeof filesystem.writeFile)
+    try {
+      const failure = await Effect.runPromise(Effect.flip(writeJsonObject(file, { a: 1 })))
+      expect(failure._tag).toBe("SetupFailure")
+      expect(failure.message).toContain("ENOSPC")
+    } finally {
+      spy.mockRestore()
+    }
+    expect(await readdir(directory)).toEqual(["settings.json"])
+    expect(await readFile(file, "utf8")).toBe('{"old":true}\n')
+    await Effect.runPromise(writeJsonObject(file, { a: 1 }))
+    expect(await readFile(file, "utf8")).toBe('{\n  "a": 1\n}\n')
+  })
+
+  test("a folder that cannot be made is reported by its own path", async () => {
+    const blocker = join(directory, "blocker")
+    await writeFile(blocker, "a file")
+    const failure = await Effect.runPromise(
+      Effect.flip(writeJsonObject(join(blocker, "sub", "settings.json"), { a: 1 })),
+    )
+    expect(failure.message).toContain(`cannot write ${join(blocker, "sub")}`)
+    expect(failure.message).not.toContain(".tmp")
+  })
+
+  test.skipIf(process.platform === "win32")(
+    "a symlink in the place of the temporary file is not followed",
+    async () => {
+      const file = join(directory, "settings.json")
+      const victim = join(directory, "victim.txt")
+      await writeFile(victim, "keep")
+      await symlink(victim, join(directory, `.settings.json.${process.pid}.tmp`))
+      const failure = await Effect.runPromise(Effect.flip(writeJsonObject(file, { a: 1 })))
+      expect(failure._tag).toBe("SetupFailure")
+      expect(await readFile(victim, "utf8")).toBe("keep")
+      expect(await Bun.file(file).exists()).toBe(false)
+    },
+  )
 })
 
 describe("finding commands", () => {
@@ -117,9 +188,9 @@ describe("finding commands", () => {
     const onPath = join(directory, "onpath")
     await installPrograms(directory)
     const env = { HOME: directory, PATH: onPath }
-    expect(Option.isNone(findCommand(env, "bili"))).toBe(true)
-    const found = findCommand(env, "bili", { includeBunBin: true })
-    expect(Option.getOrUndefined(found)).toBe(join(directory, ".bun", "bin", programName("bili")))
+    expect(Option.isNone(findCommand(env, "ctx7"))).toBe(true)
+    const found = findCommand(env, "ctx7", { includeBunBin: true })
+    expect(Option.getOrUndefined(found)).toBe(join(directory, ".bun", "bin", programName("ctx7")))
     expect(Option.isNone(findCommand(env, "missing-program", { includeBunBin: true }))).toBe(true)
   })
 })

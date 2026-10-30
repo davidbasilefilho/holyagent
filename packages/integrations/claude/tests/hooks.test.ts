@@ -1,5 +1,16 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
+import {
+  chmod,
+  chown,
+  lstat,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
@@ -82,6 +93,9 @@ const addedContext = (stdout: string) =>
     : (JSON.parse(stdout) as { hookSpecificOutput: Record<string, unknown> }).hookSpecificOutput
 
 const nothing = { stdout: "", stderr: "", code: 0 }
+
+/** The `additionalContext` text of a hook's stdout. */
+const additionalOf = (stdout: string) => String(addedContext(stdout)?.additionalContext)
 
 describe("hook subagent-start", () => {
   const specialist = (agent_type: string) => ({
@@ -1700,6 +1714,291 @@ describe("hook session-start, size", () => {
       )
     } finally {
       await rm(big, { recursive: true, force: true })
+    }
+  })
+})
+
+describe("hook root-rules, a main thread whose SessionStart output never arrived", () => {
+  const PLUGIN = { CLAUDE_PLUGIN_ROOT: "/opt/plugin" }
+  const rules =
+    `${core}\n\n${ROOT_TAKEOVER}\n\nThe full root rules are in the holyagent agent prompt.\n\n${SESSION_REMINDER}`.replaceAll(
+      "${CLAUDE_PLUGIN_ROOT}",
+      "/opt/plugin",
+    )
+  const prompt = (session_id: string, extra: Record<string, unknown> = {}) => ({
+    hook_event_name: "UserPromptSubmit",
+    session_id,
+    ...extra,
+  })
+  const tool = (session_id: string, extra: Record<string, unknown> = {}) => ({
+    hook_event_name: "PreToolUse",
+    session_id,
+    tool_name: "Read",
+    tool_input: {},
+    ...extra,
+  })
+  const start = (session_id: string, source = "startup") => ({
+    hook_event_name: "SessionStart",
+    session_id,
+    source,
+  })
+  const delivery = (hookEventName: string) => ({
+    stdout: `${JSON.stringify({ hookSpecificOutput: { hookEventName, additionalContext: rules } })}\n`,
+    stderr: "",
+    code: 0,
+  })
+  /** Runs the hook with its own temporary folder, so markers of other tests cannot interfere. */
+  const withMarkers = async (run: (env: Record<string, string>) => Promise<void>) => {
+    const markers = await mkdtemp(join(tmpdir(), "holyagent-hook-markers-"))
+    try {
+      await run({ ...PLUGIN, TMPDIR: markers })
+    } finally {
+      await rm(markers, { recursive: true, force: true })
+    }
+  }
+  const root = (name: string, payload: unknown, env: Record<string, string>) =>
+    hook(name, payload, project, env)
+
+  test("gives the rules on the first prompt, once, and nothing on a later prompt or tool call", async () => {
+    await withMarkers(async (env) => {
+      expect(await root("root-rules", prompt("s1"), env)).toEqual(delivery("UserPromptSubmit"))
+      expect(await root("root-rules", prompt("s1"), env)).toEqual(nothing)
+      expect(await root("root-rules", tool("s1"), env)).toEqual(nothing)
+    })
+  })
+
+  test("gives the rules on the first tool call when no prompt came first, once", async () => {
+    await withMarkers(async (env) => {
+      expect(await root("root-rules", tool("s2"), env)).toEqual(delivery("PreToolUse"))
+      expect(await root("root-rules", tool("s2"), env)).toEqual(nothing)
+      expect(await root("root-rules", prompt("s2"), env)).toEqual(nothing)
+    })
+  })
+
+  test("delivers once when parallel tool calls race for the first delivery", async () => {
+    await withMarkers(async (env) => {
+      const results = await Promise.all(
+        Array.from({ length: 6 }, () => root("root-rules", tool("s3"), env)),
+      )
+      expect(results.filter((result) => result.stdout !== "")).toHaveLength(1)
+      for (const result of results)
+        expect({ code: result.code, stderr: result.stderr }).toEqual({ code: 0, stderr: "" })
+    })
+  })
+
+  test("keeps sessions apart", async () => {
+    await withMarkers(async (env) => {
+      expect(await root("root-rules", prompt("a"), env)).toEqual(delivery("UserPromptSubmit"))
+      expect(await root("root-rules", prompt("b"), env)).toEqual(delivery("UserPromptSubmit"))
+    })
+  })
+
+  test("says nothing for a subagent, a specialist type, the root and a payload with no usable session", async () => {
+    await withMarkers(async (env) => {
+      for (const payload of [
+        tool("s4", { agent_id: "agent-1", agent_type: "general-purpose" }),
+        tool("s4", { agent_id: "agent-1" }),
+        tool("s4", { agent_type: "holyagent:worker-debugging" }),
+        prompt("s4", { agent_type: "holyagent" }),
+        tool("s4", { agent_type: "holyagent:holyagent" }),
+        tool("../escape"),
+        tool(""),
+        { hook_event_name: "PreToolUse", tool_name: "Read" },
+        { hook_event_name: "Stop", session_id: "s4" },
+        { tool_name: "Bash", tool_input: {} },
+      ])
+        expect(await root("root-rules", payload, env)).toEqual(nothing)
+      // None of them used up the session's delivery.
+      expect(await root("root-rules", tool("s4"), env)).toEqual(delivery("PreToolUse"))
+    })
+  })
+
+  test("gives a main thread of another agent type the rules too", async () => {
+    await withMarkers(async (env) => {
+      expect(await root("root-rules", prompt("s5", { agent_type: "other" }), env)).toEqual(
+        delivery("UserPromptSubmit"),
+      )
+    })
+  })
+
+  test("a SessionStart that did deliver is not followed by a second delivery", async () => {
+    await withMarkers(async (env) => {
+      const started = await hook("session-start", start("s6"), project, env)
+      expect(additionalOf(started.stdout)).toContain("You are the root.")
+      expect(await root("root-rules", prompt("s6"), env)).toEqual(nothing)
+      expect(await root("root-rules", tool("s6"), env)).toEqual(nothing)
+    })
+  })
+
+  test("a SessionStart for the root leaves the marker alone, and a later main-thread event still gets the rules", async () => {
+    await withMarkers(async (env) => {
+      expect(
+        await hook("session-start", { ...start("s7"), agent_type: "holyagent" }, project, env),
+      ).toEqual(nothing)
+      expect(await root("root-rules", prompt("s7"), env)).toEqual(delivery("UserPromptSubmit"))
+    })
+  })
+
+  test("compaction delivers the rules again, and the session stays quiet after it", async () => {
+    await withMarkers(async (env) => {
+      expect(await root("root-rules", prompt("s8"), env)).toEqual(delivery("UserPromptSubmit"))
+      const compacted = await hook("session-start", start("s8", "compact"), project, env)
+      expect(additionalOf(compacted.stdout)).toContain("You are the root.")
+      expect(await root("root-rules", tool("s8"), env)).toEqual(nothing)
+    })
+  })
+
+  /** The marker folder of this user inside a temporary folder. */
+  const folderIn = (temporary: string) =>
+    join(temporary, `holyagent-sessions-${process.getuid?.()}`)
+  /** Runs the hook with a temporary folder in which `prepare` may set up a bad marker folder. */
+  const withBlocked = async (
+    prepare: (temporary: string) => Promise<void>,
+    run: (env: Record<string, string>, temporary: string) => Promise<void>,
+  ) => {
+    const blocked = await mkdtemp(join(tmpdir(), "holyagent-hook-blocked-"))
+    try {
+      await prepare(blocked)
+      await run({ ...PLUGIN, TMPDIR: blocked }, blocked)
+    } finally {
+      await rm(blocked, { recursive: true, force: true })
+    }
+  }
+
+  test("keeps the markers in a folder of this user that only this user can use", async () => {
+    await withMarkers(async (env) => {
+      expect(await root("root-rules", prompt("m1"), env)).toEqual(delivery("UserPromptSubmit"))
+      const folder = folderIn(env.TMPDIR!)
+      const found = await lstat(folder)
+      expect(found.isDirectory()).toBe(true)
+      expect(found.mode & 0o777).toBe(0o700)
+      expect(found.uid).toBe(process.getuid?.() ?? found.uid)
+      expect(await readdir(env.TMPDIR!)).toEqual([`holyagent-sessions-${process.getuid?.()}`])
+    })
+  })
+
+  test("a marker folder that cannot be used is quiet on every call, not a repeated delivery", async () => {
+    const folderIsAFile = (temporary: string) =>
+      writeFile(folderIn(temporary), "a file where the folder should be")
+    await withBlocked(folderIsAFile, async (env) => {
+      for (const payload of [tool("s9"), tool("s9"), prompt("s9")])
+        expect(await root("root-rules", payload, env)).toEqual(nothing)
+    })
+  })
+
+  test("a marker folder that is a link is not used and nothing is written through it", async () => {
+    let target = ""
+    await withBlocked(
+      async (temporary) => {
+        target = join(temporary, "elsewhere")
+        await mkdir(target, { mode: 0o700 })
+        await symlink(target, folderIn(temporary))
+      },
+      async (env) => {
+        expect(await root("root-rules", tool("s11"), env)).toEqual(nothing)
+        const started = await hook("session-start", start("s11"), project, env)
+        expect({ code: started.code, stderr: started.stderr }).toEqual({ code: 0, stderr: "" })
+        expect(await readdir(target)).toEqual([])
+      },
+    )
+  })
+
+  test("a marker folder open to other users is not used", async () => {
+    await withBlocked(
+      async (temporary) => {
+        await mkdir(folderIn(temporary))
+        await chmod(folderIn(temporary), 0o777)
+      },
+      async (env, temporary) => {
+        expect(await root("root-rules", tool("s12"), env)).toEqual(nothing)
+        expect(await readdir(folderIn(temporary))).toEqual([])
+      },
+    )
+  })
+
+  test.skipIf(process.getuid?.() !== 0)(
+    "a marker folder owned by another user is not used",
+    async () => {
+      await withBlocked(
+        async (temporary) => {
+          await mkdir(folderIn(temporary), { mode: 0o700 })
+          await chown(folderIn(temporary), 12345, 12345)
+        },
+        async (env, temporary) => {
+          expect(await root("root-rules", tool("s13"), env)).toEqual(nothing)
+          expect(await readdir(folderIn(temporary))).toEqual([])
+        },
+      )
+    },
+  )
+
+  test("a marker replaced by a link is not followed when session-start records the delivery", async () => {
+    let victim = ""
+    await withBlocked(
+      async (temporary) => {
+        victim = join(temporary, "victim.txt")
+        await writeFile(victim, "keep me")
+        // The shared folder of earlier versions gets the same link, so the test also fails on them.
+        for (const folder of [folderIn(temporary), join(temporary, "holyagent-sessions")]) {
+          await mkdir(folder, { mode: 0o700 })
+          await symlink(victim, join(folder, "s14"))
+        }
+      },
+      async (env) => {
+        const started = await hook("session-start", start("s14"), project, env)
+        expect({ code: started.code, stderr: started.stderr }).toEqual({ code: 0, stderr: "" })
+        expect(additionalOf(started.stdout)).toContain("You are the root.")
+        expect(await readFile(victim, "utf8")).toBe("keep me")
+        expect(await root("root-rules", prompt("s14"), env)).toEqual(nothing)
+      },
+    )
+  })
+
+  test("session-start still answers when its marker cannot be written", async () => {
+    const blocked = await mkdtemp(join(tmpdir(), "holyagent-hook-blocked-"))
+    try {
+      await writeFile(
+        join(blocked, `holyagent-sessions-${process.getuid?.()}`),
+        "a file where the folder should be",
+      )
+      const result = await hook("session-start", start("s10"), project, {
+        ...PLUGIN,
+        TMPDIR: blocked,
+      })
+      expect({ code: result.code, stderr: result.stderr }).toEqual({ code: 0, stderr: "" })
+      expect(additionalOf(result.stdout)).toContain("You are the root.")
+    } finally {
+      await rm(blocked, { recursive: true, force: true })
+    }
+  })
+})
+
+describe("hook session-start, when the project state cannot be read", () => {
+  const broken = async () => {
+    const directory = await mkdtemp(join(tmpdir(), "holyagent-hook-broken-start-"))
+    const file = join(directory, ".holyagent", "intents", "x-intent-1", "intent.json")
+    await mkdir(dirname(file), { recursive: true })
+    await writeFile(file, "{ not json")
+    return directory
+  }
+
+  test("a main thread that is not the root still gets the rules and a line about the failure", async () => {
+    const directory = await broken()
+    try {
+      const result = await hook(
+        "session-start",
+        { hook_event_name: "SessionStart", source: "startup" },
+        directory,
+        { CLAUDE_PLUGIN_ROOT: "/opt/plugin" },
+      )
+      expect({ code: result.code, stderr: result.stderr }).toEqual({ code: 0, stderr: "" })
+      const text = additionalOf(result.stdout)
+      expect(text).toContain("You are the root.")
+      expect(text).toContain("read `/opt/plugin/agents/holyagent.md` before acting")
+      expect(text).toContain("the project state could not be read (CorruptRecord)")
+      expect(text).toContain("Run `holyagent status`")
+    } finally {
+      await rm(directory, { recursive: true, force: true })
     }
   })
 })

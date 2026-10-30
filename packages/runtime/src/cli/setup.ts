@@ -14,8 +14,7 @@ const CacheTtlFlag = Schema.Literals(CACHE_TTLS)
 const printed = (report: Report) =>
   new Verbatim(`${report.lines.join("\n")}\n`, "", report.ok ? 0 : 1)
 
-const SETUP_USAGE =
-  "setup [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-billion-context] [--skip-ctx7]"
+const SETUP_USAGE = "setup [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7]"
 
 /**
  * The `setup` and `doctor` commands, which install and check what HolyAgent needs beside the
@@ -30,14 +29,14 @@ export const SETUP_COMMANDS: ReadonlyArray<Command> = [
     output:
       "report lines: `+` added, `=` already in place, `-` skipped, `~` kept or needs you, `!` failed; exit 1 when any step failed",
     notes: [
-      "installs Billion Context with Bun (`bili`, its Claude Code native mode, compress.rules set only when absent) and ctx7 with the Context7 skill (needs CONTEXT7_API_KEY or a saved login); restart Claude Code after native mode changed",
+      "installs ctx7 with the Context7 skill (needs CONTEXT7_API_KEY or a saved login)",
+      "removes what an earlier Billion Context setup left in your Claude Code files (the local proxy base URL and DISABLE_AUTO_COMPACT in settings.json, its hook, the bili MCP server, commands/acp-cache.md, and its plugin and marketplace), only entries that match what it wrote, and prints each entry it removes",
       "merges these keys into the user settings (CLAUDE_CONFIG_DIR, else ~/.claude/settings.json) without changing any value already set: attribution, includeGitInstructions, subagentPromptCacheTtl, extraKnownMarketplaces, enabledPlugins and permissions.deny for WebSearch and WebFetch",
-      "a failed step is reported and the rest still run; in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) Billion Context and ctx7 are skipped and the settings are still merged",
+      "a failed step is reported and the rest still run; in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) ctx7 is skipped and the settings are still merged",
     ],
     flags: {
       "dry-run": "boolean",
       "subagent-cache-ttl": "string",
-      "skip-billion-context": "boolean",
       "skip-ctx7": "boolean",
     },
     stateless: true,
@@ -53,7 +52,6 @@ export const SETUP_COMMANDS: ReadonlyArray<Command> = [
         const report = yield* setup(env, {
           subagentCacheTtl,
           dryRun: booleanFlag(args, "dry-run"),
-          skipBillionContext: booleanFlag(args, "skip-billion-context"),
           skipCtx7: booleanFlag(args, "skip-ctx7"),
         })
         return printed(report)
@@ -62,7 +60,8 @@ export const SETUP_COMMANDS: ReadonlyArray<Command> = [
   {
     path: ["doctor"],
     usage: "doctor [--fix]",
-    summary: "Check bun, bili, ctx7 and the user settings; exit 1 when a check fails",
+    summary:
+      "Check bun, ctx7 and the user settings, and warn about Billion Context leftovers; exit 1 when a check fails",
     output:
       "one line per check, `ok   <name>: …` or `FAIL <name>: …`; exit 1 when any check failed",
     notes: [

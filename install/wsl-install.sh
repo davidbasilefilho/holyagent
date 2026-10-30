@@ -15,7 +15,7 @@
 #   (https://github.com/cli/cli/blob/trunk/docs/install_linux.md). The last two add a repository to apt.
 # - Bun comes from its official install script (https://bun.com/install) into ~/.bun.
 # - ~/.bashrc gains a line that puts Bun's global bin directory on PATH, where `holyagent setup` puts
-#   Billion Context and ctx7 (a one-time copy is kept as ~/.bashrc.pre-holyagent).
+#   ctx7 (a one-time copy is kept as ~/.bashrc.pre-holyagent).
 # - --dev adds mise (https://mise.run) and a line in ~/.bashrc that activates it. Bun stays a stable
 #   build; developing this repository needs a canary build, which `mise install` in the checkout
 #   upgrades to.
@@ -152,7 +152,7 @@ fi
 note "$(git --version)"
 
 # ---------------------------------------------------------------------------------------------
-step "Node.js LTS (Billion Context and ctx7 run on Node)"
+step "Node.js LTS (ctx7 runs on Node)"
 
 if node_is_current; then
   note "node $(node --version) already installed"
@@ -271,12 +271,10 @@ fi
 cat <<'EOF'
 
 Done. Open a new shell (or run: source ~/.bashrc) so PATH picks up Bun, then install HolyAgent with
-these three commands:
+these two commands:
 
   claude plugin marketplace add davidbasilefilho/holyagent
-  claude plugin marketplace add ranxianglei/billion-context
   claude plugin install holyagent@holyagent
 
-On the first launch, run /holyagent:setup to install Billion Context and ctx7 and to configure
-Claude Code.
+On the first launch, run /holyagent:setup to install ctx7 and to configure Claude Code.
 EOF

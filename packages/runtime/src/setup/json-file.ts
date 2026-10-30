@@ -1,4 +1,4 @@
-import { chmod, realpath, rename, rm } from "node:fs/promises"
+import { chmod, mkdir, realpath, rename, rm, writeFile } from "node:fs/promises"
 import { basename, dirname, join } from "node:path"
 
 import { Effect, Equal, Schema } from "effect"
@@ -51,27 +51,63 @@ export const fileContains = (path: string, needle: string) =>
  * hand-edited file is never overwritten.
  */
 export const readJsonObject = (path: string) =>
+  readJsonObjectSnapshot(path).pipe(Effect.map((snapshot) => snapshot.value))
+
+/** A JSON object file as read: the object, and the text it came from (`undefined` when missing). */
+export interface JsonSnapshot {
+  readonly value: JsonObject
+  readonly text: string | undefined
+}
+
+/**
+ * Reads a JSON object file like {@link readJsonObject} and also returns its text, so a later write
+ * can check that the file did not change in between (see {@link writeJsonObjectIfUnchanged}).
+ */
+export const readJsonObjectSnapshot = (path: string) =>
   Effect.gen(function* () {
-    if (!(yield* fileOperation(path, "read", () => Bun.file(path).exists()))) return empty
+    if (!(yield* fileOperation(path, "read", () => Bun.file(path).exists()))) {
+      return { value: empty, text: undefined } satisfies JsonSnapshot
+    }
     const text = yield* fileOperation(path, "read", () => Bun.file(path).text())
-    if (text.trim() === "") return empty
-    return yield* Schema.decodeUnknownEffect(JsonObjectText)(text, strict).pipe(
+    if (text.trim() === "") return { value: empty, text } satisfies JsonSnapshot
+    const value = yield* Schema.decodeUnknownEffect(JsonObjectText)(text, strict).pipe(
       Effect.mapError(
         (error) => new SetupFailure({ message: `${path} is not a JSON object: ${error.message}` }),
       ),
     )
+    return { value, text } satisfies JsonSnapshot
   })
 
 /**
  * Writes a JSON object with two-space indentation and a final newline. The text goes to a temporary
- * file next to the target and is renamed over it, so readers never see a partial file. A symlink is
- * written through to its real file, and an existing file keeps its permissions unless `mode` is
- * set.
+ * file next to the target, created exclusively with the final mode, and is renamed over it, so
+ * readers never see a partial file. A symlink is written through to its real file, and an existing
+ * file keeps its permissions unless `mode` is set. A temporary file left over from an earlier run
+ * makes the write fail rather than be overwritten.
  */
 export const writeJsonObject = (
   path: string,
   value: JsonObject,
   options?: { readonly mode?: number },
+) => replaceJsonObject(path, value, options).pipe(Effect.asVoid)
+
+/**
+ * Like {@link writeJsonObject}, but writes only when the file still has the text `unchangedSince`
+ * (from {@link readJsonObjectSnapshot}); the check runs just before the rename, so the window in
+ * which another program's update could be lost is the rename itself. Returns whether it wrote.
+ */
+export const writeJsonObjectIfUnchanged = (
+  path: string,
+  value: JsonObject,
+  unchangedSince: string,
+  options?: { readonly mode?: number },
+) => replaceJsonObject(path, value, options, unchangedSince)
+
+const replaceJsonObject = (
+  path: string,
+  value: JsonObject,
+  options?: { readonly mode?: number },
+  unchangedSince?: string,
 ) =>
   Effect.gen(function* () {
     const exists = yield* fileOperation(path, "write", () => Bun.file(path).exists())
@@ -88,11 +124,47 @@ export const writeJsonObject = (
         ),
       )) + "\n"
     const temporary = join(dirname(target), `.${basename(target)}.${process.pid}.tmp`)
-    yield* fileOperation(temporary, "write", () => Bun.write(temporary, text, { createPath: true }))
-    yield* Effect.gen(function* () {
-      // Bun.write applies the umask; chmod sets the exact mode.
+    yield* fileOperation(dirname(target), "write", () =>
+      mkdir(dirname(target), { recursive: true }),
+    )
+    // Exclusive creation (`wx`) fails on any existing entry, a stale file or a symlink included, so
+    // one is never followed or overwritten. With a known mode it is set at creation, so the file is
+    // not readable with default permissions, not even briefly.
+    yield* Effect.tryPromise({
+      try: () =>
+        writeFile(temporary, text, { flag: "wx", ...(mode === undefined ? {} : { mode }) }),
+      catch: (cause) => cause as NodeJS.ErrnoException,
+    }).pipe(
+      Effect.catch((error) =>
+        // `EEXIST` means the entry was there before and is not ours to remove; any other failure
+        // (a full disk, an I/O error) may have left our own partial file, which would block the
+        // next run with the same process id.
+        (error.code === "EEXIST"
+          ? Effect.void
+          : Effect.ignore(fileOperation(temporary, "remove", () => rm(temporary, { force: true })))
+        ).pipe(
+          Effect.andThen(
+            Effect.fail(
+              new SetupFailure({
+                message: `cannot write ${temporary}: ${error instanceof Error ? error.message : String(error)}`,
+              }),
+            ),
+          ),
+        ),
+      ),
+    )
+    return yield* Effect.gen(function* () {
+      // Creation applies the umask; chmod sets the exact mode.
       if (mode !== undefined) yield* fileOperation(temporary, "write", () => chmod(temporary, mode))
+      if (
+        unchangedSince !== undefined &&
+        (yield* fileOperation(target, "read", () => Bun.file(target).text())) !== unchangedSince
+      ) {
+        yield* fileOperation(temporary, "remove", () => rm(temporary, { force: true }))
+        return false
+      }
       yield* fileOperation(target, "write", () => rename(temporary, target))
+      return true
     }).pipe(
       Effect.onError(() =>
         Effect.ignore(fileOperation(temporary, "remove", () => rm(temporary, { force: true }))),

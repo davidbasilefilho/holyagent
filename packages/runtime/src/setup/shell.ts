@@ -71,7 +71,7 @@ export const findCommand = (
 export const EMPTY_BUNFIG: string = join(import.meta.dir, "empty-bunfig.toml")
 
 /**
- * The external commands setup drives (`bun`, `bili`, `ctx7`). Commands see Bun's global bin
+ * The external commands setup drives (`bun`, `claude`, `ctx7`). Commands see Bun's global bin
  * directory on PATH, because a `bun add -g` in the same run puts new commands there.
  */
 export class Shell extends Context.Service<

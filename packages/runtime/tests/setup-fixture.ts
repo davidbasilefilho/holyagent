@@ -12,12 +12,11 @@ import { Shell, type ShellResult } from "../src/setup/shell.ts"
 export const programName = (name: string): string =>
   process.platform === "win32" ? `${name}.exe` : name
 
-/** Puts empty, executable `bili` and `ctx7` files in Bun's global bin directory of a home. */
+/** Puts an empty, executable `ctx7` file in Bun's global bin directory of a home. */
 export const installPrograms = async (home: string): Promise<string> => {
   const bin = join(home, ".bun", "bin")
   await mkdir(bin, { recursive: true })
-  for (const name of ["bili", "ctx7"])
-    await writeFile(join(bin, programName(name)), "", { mode: 0o755 })
+  await writeFile(join(bin, programName("ctx7")), "", { mode: 0o755 })
   return bin
 }
 
@@ -30,8 +29,8 @@ export const writeCompleteSettings = async (claudeDirectory: string): Promise<st
 }
 
 /**
- * Makes a home directory look set up: `bili` and `ctx7` in Bun's global bin directory and the
- * recommended keys in the user settings. The SessionStart hook then adds no setup line.
+ * Makes a home directory look set up: `ctx7` in Bun's global bin directory and the recommended keys
+ * in the user settings. The SessionStart hook then adds no setup line.
  */
 export const completeSetup = async (home: string): Promise<void> => {
   await installPrograms(home)
@@ -53,10 +52,7 @@ export interface Ran {
   readonly cwd: string
 }
 
-const packageCommands: Readonly<Record<string, string>> = {
-  "billion-context": "bili",
-  ctx7: "ctx7",
-}
+const packageCommands: Readonly<Record<string, string>> = { ctx7: "ctx7" }
 
 /**
  * A fake {@link Shell} that records every `run` and knows which commands are on PATH. A `bun add -g

@@ -36,26 +36,25 @@ const settings = () => join(home, "claude", "settings.json")
 
 describe("holyagent setup and doctor as commands", () => {
   test("setup --dry-run prints the report, exits 0 and writes nothing", async () => {
-    const result = await cli(["setup", "--dry-run", "--skip-billion-context", "--skip-ctx7"])
+    const result = await cli(["setup", "--dry-run", "--skip-ctx7"])
     expect(result.code).toBe(0)
     expect(result.stderr).toBe("")
-    expect(result.stdout).toContain("- billion-context: skipped by flag\n")
+    expect(result.stdout).toContain("= billion-context: no leftovers\n")
     expect(result.stdout).toContain("+ includeGitInstructions: added false\n")
-    expect(result.stdout).toEndWith("dry run: would add 9, nothing written\n")
+    expect(result.stdout).toEndWith("dry run: would add 8, nothing written\n")
     expect(await Bun.file(settings()).exists()).toBe(false)
   })
 
   test("setup merges the user settings of CLAUDE_CONFIG_DIR, and a second run prints no + line", async () => {
-    const flags = ["setup", "--skip-billion-context", "--skip-ctx7", "--subagent-cache-ttl", "5m"]
+    const flags = ["setup", "--skip-ctx7", "--subagent-cache-ttl", "5m"]
     const first = await cli(flags)
     expect(first.code).toBe(0)
-    expect(first.stdout).toEndWith("added 9\n")
+    expect(first.stdout).toEndWith("added 8\n")
     const written = (await Bun.file(settings()).json()) as { subagentPromptCacheTtl?: string }
     expect(written.subagentPromptCacheTtl).toBe("5m")
     const second = await cli(flags)
     expect(second.code).toBe(0)
     expect(second.stdout.split("\n").filter((line) => /^[+!~-] /.test(line))).toEqual([
-      "- billion-context: skipped by flag",
       "- ctx7: skipped by flag",
     ])
     expect(second.stdout).toEndWith("no changes\n")
@@ -63,16 +62,16 @@ describe("holyagent setup and doctor as commands", () => {
 
   test("setup exits 1 when a step failed, here a settings file that is not an object", async () => {
     await Bun.write(settings(), "[1]")
-    const result = await cli(["setup", "--skip-billion-context", "--skip-ctx7"])
+    const result = await cli(["setup", "--skip-ctx7"])
     expect(result.code).toBe(1)
     expect(result.stdout).toContain("! user settings: ")
     expect(await Bun.file(settings()).text()).toBe("[1]")
   })
 
-  test("setup in a cloud session skips bili and ctx7 and still merges the settings", async () => {
+  test("setup in a cloud session skips ctx7 and still merges the settings", async () => {
     const result = await cli(["setup"], { CLAUDE_CODE_REMOTE: "true" })
     expect(result.code).toBe(0)
-    expect(result.stdout.split("\n").filter((line) => line.startsWith("- "))).toHaveLength(2)
+    expect(result.stdout.split("\n").filter((line) => line.startsWith("- "))).toHaveLength(1)
     expect(await Bun.file(settings()).exists()).toBe(true)
   })
 
@@ -80,6 +79,12 @@ describe("holyagent setup and doctor as commands", () => {
     const result = await cli(["setup", "--subagent-cache-ttl", "2h"])
     expect(result.code).not.toBe(0)
     expect(result.stderr).toContain("subagent-cache-ttl")
+    expect(await Bun.file(settings()).exists()).toBe(false)
+  })
+
+  test("setup has no --skip-billion-context: Billion Context is no longer installed", async () => {
+    const result = await cli(["setup", "--skip-billion-context"])
+    expect(result.code).not.toBe(0)
     expect(await Bun.file(settings()).exists()).toBe(false)
   })
 
@@ -92,7 +97,7 @@ describe("holyagent setup and doctor as commands", () => {
     const failing = await cli(["doctor"], { CLAUDE_CODE_REMOTE: "true" })
     expect(failing.code).toBe(1)
     expect(failing.stdout).toContain("FAIL settings: ")
-    expect(failing.stdout).toContain("ok   bili: not installed in a claude.ai cloud session")
+    expect(failing.stdout).toContain("ok   ctx7: not installed in a claude.ai cloud session")
 
     const fixed = await cli(["doctor", "--fix"], { CLAUDE_CODE_REMOTE: "true" })
     expect(fixed.code).toBe(0)

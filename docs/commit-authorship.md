@@ -15,7 +15,7 @@ holyagent vcs commit -m <headline> [-m <body>] -- <paths…>
 ```
 
 - Refuses an identity that looks like an agent's (`noreply@anthropic.com`, or a name starting with `Claude`) with `AgentIdentity`: set the user's own with `git config user.name <name>` and `git config user.email <email>` in the repository. In a claude.ai cloud session it checks the author instead (below).
-- Stages exactly the named paths and refuses any path under `.holyagent/`: Intent state is committed on the state branch by the holyagent commands, never on a work branch. If something else is already staged the command refuses (`StagedOutsideScope`), and with nothing changed it refuses (`NothingToCommit`).
+- Stages exactly the named paths and, in the `branch` and `local` state modes, refuses any path under `.holyagent/`: Intent state is committed on the state branch by the holyagent commands, or by nothing, never on a work branch. In the `work` mode it stages the changed state files (`.holyagent/local/` excepted, which git ignores) with the named paths. If something else is already staged the command refuses (`StagedOutsideScope`), and with nothing changed it refuses (`NothingToCommit`).
 - Cleans and checks the message (below), then runs `git commit`, so the repository's own hooks run, a `commit-msg` hook included.
 
 `holyagent vcs pr --base <b> --title <t> [--body-file <f>] [--update <n>]` opens a ready-for-review PR from the current branch, or updates one with `--update <n>`, through the REST API of `gh`; the body comes from a file inside the project that git does not ignore (at most 256 KiB, never under `.git`).

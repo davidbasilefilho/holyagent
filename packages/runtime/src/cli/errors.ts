@@ -87,6 +87,7 @@ const REFUSED_ERRORS = new Set([
   "SpecialistNotRecorded",
   "MigrationRefused",
   "NothingToMigrate",
+  "StateModeRefused",
   ...VCS_REFUSED_ERRORS,
 ])
 
@@ -126,6 +127,8 @@ const HINTS: Readonly<Record<string, string>> = {
     "Search with the programs of your system instead, or run holyagent on darwin-arm64, linux-x64 or windows-x64.",
   ToolMissing:
     "The plugin was built without its vendored tools: run `mise run vendor`, then `mise run build`, and reinstall the plugin.",
+  StateModeRefused:
+    "Leave the mode as it is and work with it. To change it deliberately, move the records by hand first: the command never moves or deletes them.",
   StateLocked: "Another process holds the state lock; retry in a moment.",
   StateIo:
     "Check what the message names: the permissions of the .holyagent folder of the state worktree (under the git directory, or in the project outside git), that git runs there, and that no branch already uses a name the state branch needs (holyagent/state needs no branch called holyagent; git config holyagent.stateBranch picks another name).",

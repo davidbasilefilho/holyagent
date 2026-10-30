@@ -14,7 +14,7 @@
 # - git (Git.Git), Node LTS (OpenJS.NodeJS.LTS) and gh (GitHub.cli) are installed with winget, which
 #   asks for elevation itself when a package needs it.
 # - Bun comes from its official install script (https://bun.sh/install.ps1) into ~\.bun, and your user
-#   PATH gains Bun's global bin directory, where `holyagent setup` puts Billion Context and ctx7.
+#   PATH gains Bun's global bin directory, where `holyagent setup` puts ctx7.
 # - -Dev adds mise (winget package jdx.mise) and a line in your PowerShell profile that activates it (a
 #   one-time copy of the profile is kept next to it as <profile>.pre-holyagent). Bun stays a stable
 #   build; developing this repository needs a canary build, which `mise install` in the checkout
@@ -175,7 +175,7 @@ try {
   Install-WithWinget git 'Git.Git'
 
   # ---------------------------------------------------------------------------------------------
-  Step 'Node.js LTS (Billion Context and ctx7 run on Node)'
+  Step 'Node.js LTS (ctx7 runs on Node)'
 
   Install-WithWinget node 'OpenJS.NodeJS.LTS'
   $nodeVersion = Get-FirstLine node --version
@@ -256,14 +256,12 @@ try {
 
   Write-Host ''
   Write-Host 'Done. Open a new PowerShell window so PATH picks up Bun, then install HolyAgent with these'
-  Write-Host 'three commands:'
+  Write-Host 'two commands:'
   Write-Host ''
   Write-Host '  claude plugin marketplace add davidbasilefilho/holyagent'
-  Write-Host '  claude plugin marketplace add ranxianglei/billion-context'
   Write-Host '  claude plugin install holyagent@holyagent'
   Write-Host ''
-  Write-Host 'On the first launch, run /holyagent:setup to install Billion Context and ctx7 and to configure'
-  Write-Host 'Claude Code.'
+  Write-Host 'On the first launch, run /holyagent:setup to install ctx7 and to configure Claude Code.'
 } catch {
   [Console]::Error.WriteLine("error: step failed: $($script:CurrentStep) ($($_.Exception.Message)). Fix the cause and re-run; finished steps are skipped.")
   exit 1

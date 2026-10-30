@@ -17,22 +17,19 @@ export const homeDirectory = (env: Env, fallback: () => string = homedir): strin
   firstNonEmpty(env.HOME, env.USERPROFILE) ?? fallback()
 
 /**
- * Where the current user's Claude Code, Billion Context and Context7 files live. The Claude Code
- * folder is `CLAUDE_CONFIG_DIR` when set, else `.claude` in the home directory
+ * Where the current user's Claude Code and Context7 files live. The Claude Code folder is
+ * `CLAUDE_CONFIG_DIR` when set, else `.claude` in the home directory
  * (https://code.claude.com/docs/en/env-vars).
  */
 export const userFiles = (env: Env) => {
   const home = homeDirectory(env)
   const claudeDir = claudeConfigDirectory(env, () => home)
-  const xdg = firstNonEmpty(env.XDG_CONFIG_HOME) ?? join(home, ".config")
   return {
     claudeDir,
     /** The user settings, which Claude Code applies to every project. */
     settings: join(claudeDir, "settings.json"),
     // Claude Code keeps .claude.json inside CLAUDE_CONFIG_DIR when that is set, else in $HOME.
     claudeJson: join(firstNonEmpty(env.CLAUDE_CONFIG_DIR) ?? home, ".claude.json"),
-    biliConfig:
-      firstNonEmpty(env.BILI_CONFIG_FILE) ?? join(xdg, "billion-context", "billion-context.json"),
     ctx7Credentials: join(home, ".config", "context7", "credentials.json"),
   }
 }

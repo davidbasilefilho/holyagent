@@ -14,15 +14,6 @@ import { show } from "./report.ts"
 export const MARKETPLACE = { name: "holyagent", repo: "davidbasilefilho/holyagent" } as const
 /** The plugin id Claude Code uses, `plugin@marketplace`. */
 export const PLUGIN_ID = `${MARKETPLACE.name}@${MARKETPLACE.name}`
-/**
- * The marketplace of Billion Context's Claude Code plugin, which the HolyAgent plugin declares as a
- * dependency. Claude Code installs a dependency only from a marketplace that is already
- * registered.
- */
-export const BILLION_CONTEXT_MARKETPLACE = {
-  name: "billion-context",
-  repo: "ranxianglei/billion-context",
-} as const
 
 /** Prompt cache lifetimes Claude Code accepts for `subagentPromptCacheTtl`. */
 export const CACHE_TTLS = ["1h", "5m"] as const
@@ -40,10 +31,6 @@ export const userSettingsDefaults = (subagentCacheTtl: CacheTtl): ReadonlyArray<
   {
     path: ["extraKnownMarketplaces", MARKETPLACE.name],
     value: { source: { source: "github", repo: MARKETPLACE.repo } },
-  },
-  {
-    path: ["extraKnownMarketplaces", BILLION_CONTEXT_MARKETPLACE.name],
-    value: { source: { source: "github", repo: BILLION_CONTEXT_MARKETPLACE.repo } },
   },
   { path: ["enabledPlugins", PLUGIN_ID], value: true },
   { path: ["permissions", "deny"], value: ["WebSearch", "WebFetch"] },
