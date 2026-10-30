@@ -1,0 +1,42 @@
+{
+  "id": "assignment-0mvv1uuue-yx6p",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 5,
+  "roleTask": "Worker.validation",
+  "slug": "validate-the-merged-heads-of-the-open",
+  "objective": "Validate the merged heads of the open stack before push: fix/state-off-main (f837317), fix/cli-stdin (cea189f) and feat/plugin-only-install (b1e6713).",
+  "state": "Running",
+  "scope": [
+    "Worktrees: /home/user/holyagent-state-off-main (f837317, merge of main 7d8c8bc into PR 35, clean), /home/user/holyagent-cli-stdin (cea189f, merge of PR 35's head into PR 36, clean), /home/user/holyagent-plugin-only-install (b1e6713, merge into PR 37 with resolved conflicts, already reviewed).",
+    "In each: confirm HEAD with git rev-parse, run `bun install --frozen-lockfile` if node_modules is missing, then `mise run verify` and `mise run build` followed by `git status --short` (build must leave no diff). mise is at /home/user/holyagent/node_modules/@jdxcode/mise-linux-x64/bin: run with PATH=/home/user/holyagent/node_modules/@jdxcode/mise-linux-x64/bin:$PATH.",
+    "For the two clean merges, also confirm each merge brought only main's commits (git log --oneline HEAD^1..HEAD^2 lists PRs 38-45 for 35; for 36 the PR 35 merge) and that git diff HEAD^2 HEAD for 35 is empty except PR 35's own changes (summarize)."
+  ],
+  "constraints": [
+    "Read-only on tracked files: if a build changes files, report it and do not commit. No git writes; no edits under .git/ or .holyagent/.",
+    "Stop and report exact counts and exit codes."
+  ],
+  "criteria": [
+    {
+      "text": "mise run verify passes on each of the three heads with counts reported",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "mise run build leaves no diff on each head",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-30T14:10:33.254Z"
+  },
+  "createdAt": "2026-10-30T14:10:33.254Z"
+}
