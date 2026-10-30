@@ -1,0 +1,49 @@
+{
+  "id": "assignment-0mvuzydef-czx1",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "record-that-holyagent-does-not-work-in",
+  "objective": "Record that holyagent does not work in claude.ai unified chat/Cowork sessions and close the open optional documentation findings, in /home/user/holyagent-docs.",
+  "state": "Ready",
+  "scope": [
+    "Maintainer statement: holyagent was tested in a claude.ai unified chat/Cowork session and does not work there, because of the way hooks are activated in those sessions. Replace the 'not tested in a Cowork session' claims: docs/requirements.md line 32 (Supported environments row for claude.ai chat and Cowork) and docs/usage.md line 134 (the claude.ai section's 'HolyAgent has not been tested in a Cowork session of the unified Claude'). Say it was tested and does not work there because of how hooks are activated in those sessions; keep the rest of the section's sourced facts, and keep 'For the full workflow use Claude Code.' Do not invent further detail about the hook mechanism.",
+    "Optional findings from /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-revdocs2.txt to close: (1) docs/usage.md Sonnet section ~line 126: word the scope exactly: the documented effect is that ANTHROPIC_DEFAULT_OPUS_MODEL sets what the opus alias resolves to; the root's frontmatter is model: opus, so the root resolves to the model you set; say to confirm with /status after restarting; phrase the global effect as 'anything else that selects the opus alias'. (2) 'Sonnet is a cheaper model' needs a source: cite Anthropic's pricing page https://platform.claude.com/docs/en/about-claude/pricing if you can confirm it there, else drop the sentence. (3) Keep the model id claude-sonnet-5-5; it is the current Sonnet 5.5 id.",
+    "Format check with the canary Bun /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/canary/x/bun-linux-x64/bun: fmt --no-script --check README.md docs/usage.md docs/requirements.md docs/hooks.md in /home/user/holyagent-docs. Write the diff of README.md, docs/usage.md, docs/requirements.md, docs/hooks.md and install/windows-install.ps1 against /home/user/holyagent-plugin-only-install to /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/docs-v5.diff."
+  ],
+  "constraints": [
+    "User: holyagent was tested in a unified chat/Cowork session and does not work there because of how hooks are activated; document exactly that.",
+    "Edit only docs/usage.md and docs/requirements.md in /home/user/holyagent-docs.",
+    "No git writes; no edits under .git/ or .holyagent/; no other worktree except reading /home/user/holyagent-plugin-only-install.",
+    "Keep working until done; stop and report when done and checked."
+  ],
+  "criteria": [
+    {
+      "text": "No doc says holyagent is untested in Cowork; requirements.md and usage.md say it was tested and does not work there because of how hooks are activated",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The Sonnet section states only the documented alias effect, and the cheaper-model sentence is sourced or removed",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "fmt check passes",
+      "blocking": true,
+      "dimension": "style"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "docs/usage.md",
+    "docs/requirements.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-10-30T13:17:18.039Z"
+}
