@@ -30,6 +30,7 @@
   ],
   "followUpOf": "assignment-0mvv24ptm-zq33",
   "specialist": {
+    "agentId": "workflow:wf_0e1d2b8a-360/assignment-0mvv2egou-2eum",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-10-30T14:25:48.030Z"
