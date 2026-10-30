@@ -31,7 +31,9 @@ const write = (stream: NodeJS.WriteStream, text: string) =>
     ),
   )
 
-Effect.runFork(
+// Awaited at the top level: on Windows a pending `Bun.stdin.text()` does not keep the process alive,
+// so a forked fiber that waits on stdin ended with exit 0 before the command ran.
+await Effect.runPromise(
   run(Bun.argv.slice(2), {
     cwd: process.cwd(),
     env: process.env,
