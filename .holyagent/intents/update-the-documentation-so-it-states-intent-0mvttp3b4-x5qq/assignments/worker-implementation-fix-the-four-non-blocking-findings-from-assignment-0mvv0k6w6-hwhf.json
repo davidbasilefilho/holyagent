@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "fix-the-four-non-blocking-findings-from",
   "objective": "Fix the four non-blocking findings from the review of PR 37's repair, in /home/user/holyagent-plugin-only-install.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Review: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-rev37b.txt, non-blocking findings 1-4.",
     "1: the session-start notice must count only leftovers that /holyagent:setup can remove, so it does not repeat forever for ones setup only reports (for example a project-scope install whose project folder is gone or not yours); keep the notice for removable ones. Add a test.",
@@ -58,5 +58,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mvuzydo3-llyl",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-10-30T13:34:17.346Z"
+  },
   "createdAt": "2026-10-30T13:34:16.039Z"
 }
