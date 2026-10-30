@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "final-review-of-the-documentation-pr",
   "objective": "Final review of the documentation PR: Windows tested, root on Sonnet, use cases, Cowork, mise through Bun.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Files in /home/user/holyagent-docs: README.md, docs/usage.md, docs/requirements.md, docs/hooks.md, docs/development.md, install/windows-install.ps1. Compare each with /home/user/holyagent-plugin-only-install (the base, PR 37 with main merged; its docs/hooks.md and docs/components.md changed after these copies were made, so judge only the requested edits in hooks.md, not text 37 changed since). Previous findings: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-revdocs.txt and /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-revdocs2.txt.",
     "Requirements: native Windows reads as tested by the maintainer, no untested claim left; Run the root on Sonnet section (ANTHROPIC_DEFAULT_OPUS_MODEL sets what the opus alias resolves to, the root's frontmatter uses it, /status to confirm, model-config and pricing sources); What it fits section grounded in documented behavior, including the solo-repository state-mode sentence consistent with the signal order; claude.ai unified chat/Cowork: tested by the maintainer and does not work there because of how hooks are activated; docs/development.md 'Getting mise' with bun add -g --trust @jdxcode/mise, why --trust, then mise install and mise run verify; README keeps its six sections in order and links the new sections; requirements.md table intact."
@@ -35,5 +35,10 @@
     "assignment-0mvv0ecps-on0f",
     "assignment-0mvtw4jd5-yrya"
   ],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-10-30T13:39:22.476Z"
+  },
   "createdAt": "2026-10-30T13:39:21.999Z"
 }
