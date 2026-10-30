@@ -1,0 +1,34 @@
+{
+  "id": "assignment-0mvv0qqrr-2xtx",
+  "intentId": "intent-0mvttp3b4-x5qq",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.artifact",
+  "slug": "re-review-the-last-stack-rule-pass-for",
+  "objective": "Re-review the last stack-rule pass for unchanged behavior and clarity.",
+  "state": "Ready",
+  "scope": [
+    "Previous notes: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-revrule5.txt. This pass: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule-repair6.diff; full diff /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/stack-rule-v6.diff; report /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/rep-rule6.txt (worktree /home/user/holyagent-stack-rule).",
+    "Recorded behavior: every new PR, a delivery's first included, starts from the open stack's top (owner's own non-draft PRs from this repository's branches, never forks or others'; the one the work depends on, else the most recently updated); a CI change, no open stack, or independent-PR conventions start from the base; the next PR stacks once holyagent's independent review accepts, not human review; a lagging stack gets the base merged into its lowest branch first and forward up, reviewed before push.",
+    "Judge the notes closed, the behavior unchanged, and no contradiction across stack-plan.md, version-control.md, requirements.md, docs/usage.md, docs/decisions.md and dist/agents/holyagent.md."
+  ],
+  "constraints": [
+    "Read-only. Findings blocking or non-blocking with file:line; stop and report when done."
+  ],
+  "criteria": [
+    {
+      "text": "Behavior unchanged and no contradiction",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvv0k74t-0pao"
+  ],
+  "followUpOf": "assignment-0mvv0ed6b-37c4",
+  "createdAt": "2026-10-30T13:39:21.736Z"
+}
