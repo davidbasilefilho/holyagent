@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "make-the-documented-mise-commands-use",
   "objective": "Make the documented mise commands use bunx --no-install, in /home/user/holyagent-docs.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "In README.md (~lines 35-37) and docs/development.md (~lines 37-38, and any other plain 'bunx mise' command line), change 'bunx mise' to 'bunx --no-install mise'. In docs/development.md line ~33, make the sentence about --no-install say a missing local mise is never fetched from the registry (Bun uses a mise on PATH if there is one, else the command fails).",
     "Run 'bunx --no-install mise run fmt:check' in that worktree (or the canary fmt check), and write the before/after diff to /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/nofetch.diff."
@@ -34,7 +34,29 @@
     "agentId": "workflow:wf_91cbf67b-3c7/assignment-0mvv2fpy9-nd68",
     "model": "haiku",
     "effort": "high",
-    "startedAt": "2026-10-30T14:26:46.689Z"
+    "startedAt": "2026-10-30T14:26:46.689Z",
+    "finishedAt": "2026-10-30T14:27:44.060Z"
+  },
+  "result": "result: Changed all three plain `bunx mise` command lines in README.md and docs/development.md to `bunx --no-install mise`, and rewrote the docs/development.md sentence so it says a missing local mise is never fetched from the registry. The format check passes before and after.\nchanged: /home/user/holyagent-docs/README.md, /home/user/holyagent-docs/docs/development.md\nchecks:\n- `bunx --no-install mise run fmt:check` (baseline, before edits) -> exit 0, \"All 236 files are formatted.\"\n- `bunx --no-install mise run fmt:check` (after edits) -> exit 0, \"All 236 files are formatted.\" Logs: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/fmt-before.log and fmt-after.log\n- Search `rg \"bunx mise\"` over the worktree (excluding node_modules) -> no matches (rg exit 1)\n- PATH probe in a scratch directory (throwaway, outside the repo): with no local mise and none on PATH, `bunx --no-install mise --version` -> exit 1, \"Could not find an existing 'mise' binary to run. Stopping because --no-install was passed.\" With a stub mise on PATH -> it ran the stub, exit 0. This confirms the new sentence's PATH claim.\n- Not run: `mise run verify` (the change is documentation only; the format check is the relevant gate).\nblockers: none\nquestions: none\nnotes: Lines 45 and 74-78 of docs/development.md already used `bunx --no-install` and were left unchanged. The README build/verify comments stay aligned after the edit.\nevidence:\nEvery documented bunx mise command uses --no-install, the sentence is precise, and the format check passes: README.md lines 35-37 and docs/development.md lines 27, 37-38 use `bunx --no-install mise`; `rg \"bunx mise\"` finds nothing; `bunx --no-install mise run fmt:check` exit 0 after the edit; the PATH probe above confirms the sentence.\nchecks-run: `bunx --no-install mise run fmt:check` before and after, both exit 0; the PATH probe; the `rg` sweep.\ndiff-file: /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/nofetch.diff (git diff of the two owned files, 6 lines changed in each, no other paths touched)",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "All documented bunx mise commands use --no-install; probe confirms the sentence; fmt green.",
+    "criteria": [
+      {
+        "criterion": "Every documented bunx mise command uses --no-install, the sentence is precise, and the format check passes",
+        "support": "README.md lines 35-37 and docs/development.md lines 27, 37-38 use `bunx --no-install mise`; `rg \"bunx mise\"` finds nothing; `bunx --no-install mise run fmt:check` exit 0 after the edit; the PATH probe above confirms the sentence."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bunx --no-install mise run fmt:check` before and after, both exit 0; the PATH probe; the `rg` sweep."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/nofetch.diff (git diff of the two owned files, 6 lines changed in each, no other paths touched)"
+      }
+    ]
   },
   "createdAt": "2026-10-30T14:26:46.689Z"
 }
