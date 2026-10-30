@@ -28,9 +28,21 @@ mise.toml  bunfig.toml  lefthook.yml
 
 A new harness gets its own folder under `packages/integrations/`. It reuses the runtime's domain, state, CLI and instructions and generates its own plugin files.
 
+## Getting mise
+
+mise is a dev dependency (`@jdxcode/mise` in `package.json`, listed in `trustedDependencies`), so `bun install` installs it into `node_modules/.bin`. Bun runs a package's install script only when the package is trusted, and the trust entry lets this one fetch the `mise` binary for your platform and link it; that script comes from npm and runs on your machine when you install. Run the commands through Bun, which finds the local binary:
+
+```sh
+bun install --frozen-lockfile
+bunx mise install
+bunx mise run verify
+```
+
+`mise install` installs the pinned Bun and upgrades it to canary, and `mise run verify` runs the gates. The `package.json` scripts (`bun run verify`, `bun run build`) do the same, since Bun puts `node_modules/.bin` on their `PATH`. A mise already on `PATH` works too: the installers' `--dev` option (`-Dev` on Windows) installs one, and `bun add -g --trust @jdxcode/mise` installs it globally (after a plain `bun add -g`, run `bun pm -g trust @jdxcode/mise`). The rest of this page writes `mise run ...` for either. CI installs its own mise with `jdx/mise-action`. These commands are described here, not verified on Windows.
+
 ## Commands
 
-`mise.toml` is the single source of commands. `package.json` scripts and the git hooks only delegate to it, and `--no-script` makes Bun run its own tool rather than a same-named script. Run gates through mise so the `toolchain` task can first confirm a canary Bun.
+`mise.toml` is the single source of commands. `package.json` scripts and the git hooks only delegate to it, and `--no-script` makes Bun run its own tool rather than a same-named script. Run gates through mise (`bunx mise run <task>` with the local one) so the `toolchain` task can first confirm a canary Bun.
 
 | Task        | Does                                                     |
 | ----------- | -------------------------------------------------------- |
@@ -59,11 +71,11 @@ Everything is configured in `bunfig.toml`. Bun's own `check`, `lint` and `fmt` a
 
 ## Git hooks
 
-`lefthook.yml` runs on `pre-commit`, piped (the first failing job stops the rest):
+`lefthook.yml` runs on `pre-commit`, piped (the first failing job stops the rest). Its commands go through `bunx`, which resolves the dev dependency in `node_modules/.bin` on POSIX and Windows alike, so a hook needs no mise on `PATH`:
 
-1. `lint`: `mise run lint:fix -- --staged`, then `stage_fixed` re-stages what lint changed (the `bun lint` docs do not say that `--staged --fix` stages again).
-2. `fmt`: `mise run fmt -- --staged`, re-staged (Bun leaves a partly staged file unwritten rather than committing its unstaged changes).
-3. `build`: `mise run build`, then `git add -A --` on exactly the generated paths, deletions included, so a commit always carries a plugin in step with its sources.
+1. `lint`: `bunx mise run lint:fix -- --staged`, then `stage_fixed` re-stages what lint changed (the `bun lint` docs do not say that `--staged --fix` stages again).
+2. `fmt`: `bunx mise run fmt -- --staged`, re-staged (Bun leaves a partly staged file unwritten rather than committing its unstaged changes).
+3. `build`: `bunx mise run build`, then `git add -A --` on exactly the generated paths, deletions included, so a commit always carries a plugin in step with its sources.
 
 ## The generated plugin
 
