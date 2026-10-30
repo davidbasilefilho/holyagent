@@ -5,7 +5,7 @@
   "roleTask": "Worker.validation",
   "slug": "validate-the-merged-heads-of-the-open",
   "objective": "Validate the merged heads of the open stack before push: fix/state-off-main (f837317), fix/cli-stdin (cea189f) and feat/plugin-only-install (b1e6713).",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktrees: /home/user/holyagent-state-off-main (f837317, merge of main 7d8c8bc into PR 35, clean), /home/user/holyagent-cli-stdin (cea189f, merge of PR 35's head into PR 36, clean), /home/user/holyagent-plugin-only-install (b1e6713, merge into PR 37 with resolved conflicts, already reviewed).",
     "In each: confirm HEAD with git rev-parse, run `bun install --frozen-lockfile` if node_modules is missing, then `mise run verify` and `mise run build` followed by `git status --short` (build must leave no diff). mise is at /home/user/holyagent/node_modules/@jdxcode/mise-linux-x64/bin: run with PATH=/home/user/holyagent/node_modules/@jdxcode/mise-linux-x64/bin:$PATH.",
@@ -37,7 +37,29 @@
     "agentId": "workflow:wf_04e934f0-c66/assignment-0mvv1uuue-yx6p",
     "model": "haiku",
     "effort": "high",
-    "startedAt": "2026-10-30T14:10:33.254Z"
+    "startedAt": "2026-10-30T14:10:33.254Z",
+    "finishedAt": "2026-10-30T14:17:11.569Z"
+  },
+  "result": "result: All three heads pass `mise run verify` (exit 0 each) and `mise run build` leaves no tracked diff. Nothing was committed or edited.\nchanged: none tracked. Ignored `node_modules` installed in holyagent-state-off-main and holyagent-cli-stdin (`bun install --frozen-lockfile --ignore-scripts`). Build output in the three worktrees was regenerated with no `git status` change.\nchecks:\n- `git rev-parse HEAD` -> state-off-main f8373173f7022c153a3d2d379b8b647e00e3bb55, cli-stdin cea189fc5b0f6936e7cd6a464dea5508e39f9fda, plugin-only-install b1e67138ab9c7fd51e864ee6cdad124ed53d6e5a (all match the Assignment)\n- `bun install --frozen-lockfile --ignore-scripts` (state-off-main, cli-stdin) -> exit 0, \"Checked 133 installs across 149 packages (no changes)\"\n- `mise run verify` (state-off-main f837317) -> exit 0; 958 ran, 957 pass, 1 skip, 0 fail, 35 files, 6368 expect(); type-check \"No type errors in 121 files\"; lint \"No problems in 122 files\"; fmt \"All 237 files are formatted\"\n- `mise run build` (state-off-main) -> exit 0; \"vendored 21 files\", \"built 29 files\"; `git status --short` empty after build\n- `mise run verify` (cli-stdin cea189f) -> exit 0; 961 ran, 960 pass, 1 skip, 0 fail, 36 files, 6384 expect(); \"No type errors in 122 files\"; \"No problems in 123 files\"; \"All 238 files are formatted\"\n- `mise run build` (cli-stdin) -> exit 0; \"built 29 files\"; `git status --short` empty after build\n- `mise run verify` (plugin-only-install b1e6713) -> exit 0; 978 ran, 977 pass, 1 skip, 0 fail, 33 files, 6451 expect(); \"No type errors in 120 files\"; \"No problems in 121 files\"; \"All 236 files are formatted\"\n- `mise run build` (plugin-only-install) -> exit 0; \"built 30 files\"; `git status --short` empty before and after\n- Merge checks (read-only `git log`/`git diff --stat`):\n  - state-off-main f837317: `git log HEAD^1..HEAD^2` lists 7 main commits (#38, #39, #40, #41, #42, #43, #45). #44 is absent from main's listing. `git diff --stat HEAD^2 HEAD` = 139 files, +167/-9301. PR 35's own commits are be17c6d, 023a6fa, 935d4b3. The diff is mostly deletions of tracked `.holyagent/` state records (the intended \"state off main\"), plus `.gitignore` +1, `docs/development.md`, `scripts/vendor.ts` +31, `scripts/vendor.test.ts` +37, `scripts/repo-paths.test.ts` +100. I did not inspect each deleted record.\n  - cli-stdin cea189f: `git log HEAD^1..HEAD^2` lists f837317 and the 7 main commits it carries, because HEAD^1 already contains PR 35's pre-merge head. PR 36's own commit is c7bb78f. `git diff --stat HEAD^2 HEAD` = 4 files, +150/-5: `packages/integrations/claude/dist/scripts/holyagent.js`, `packages/runtime/src/cli/assignment.ts` +10, `packages/runtime/src/cli/main.ts` 4 lines changed, `packages/runtime/tests/stdin.test.ts` +99.\n- Ancestry of plugin-only-install b1e6713 (`git merge-base --is-ancestor`): parents are fd6c9f6 (PR 37) and f837317. f837317 is an ancestor. cea189f is not, which fits the stack order.\n- Baseline on the base commit: not run, not required by the criteria. The checks pass on the heads themselves.\nblockers: none\nquestions: none\nnotes:\n- I used `--ignore-scripts` for the installs. The root `prepare` script runs `bunx lefthook install`, which writes git hooks under `.git/`, and the constraints forbid that. No dependency lifecycle scripts are trusted, so the gates are unaffected. Two earlier install attempts failed with exit 127 because `mise` was not on PATH; they changed nothing in the tree.\n- The state-off-main listing shows 7 main commits, not PRs 38-45, because #44 is absent from main's first-parent range. Confirm #44 is intentionally not in main before pushing.\n- Test-file counts differ by head (35, 36, 33 files). They match each head's own tree, so I did not treat this as a failure.\n- Logs: `/tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/` contains `verify-*.log`, `build-*.log` and `install-*.log` for each worktree.\nevidence:\nmise run verify passes on each of the three heads with counts reported: state-off-main f837317 exit 0, 957 pass / 1 skip / 0 fail (958 ran, 35 files); cli-stdin cea189f exit 0, 960 pass / 1 skip / 0 fail (961 ran, 36 files); plugin-only-install b1e6713 exit 0, 977 pass / 1 skip / 0 fail (978 ran, 33 files). Logs under /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/verify-*.log\nmise run build leaves no diff on each head: state-off-main exit 0, `git status --short` empty; cli-stdin exit 0, `git status --short` empty; plugin-only-install exit 0, `git status --short` empty before and after\nchecks-run: bun install --frozen-lockfile --ignore-scripts (state-off-main, cli-stdin) exit 0; mise run verify x3 exit 0; mise run build x3 exit 0 with empty status; git rev-parse HEAD x3; git log HEAD^1..HEAD^2 and git diff --stat HEAD^2 HEAD for 35 and 36; merge-base ancestry for b1e6713",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "verify passes on f837317 (957/0), cea189f (960/0), b1e6713 (977/0); build leaves no diff on each.",
+    "criteria": [
+      {
+        "criterion": "mise run verify passes on each of the three heads with counts reported",
+        "support": "state-off-main f837317 exit 0, 957 pass / 1 skip / 0 fail (958 ran, 35 files); cli-stdin cea189f exit 0, 960 pass / 1 skip / 0 fail (961 ran, 36 files); plugin-only-install b1e6713 exit 0, 977 pass / 1 skip / 0 fail (978 ran, 33 files). Logs under /tmp/claude-0/-home-user-holyagent/1d4ee015-2de1-5dc0-aa17-15643c104828/scratchpad/verify-*.log"
+      },
+      {
+        "criterion": "mise run build leaves no diff on each head",
+        "support": "state-off-main exit 0, `git status --short` empty; cli-stdin exit 0, `git status --short` empty; plugin-only-install exit 0, `git status --short` empty before and after"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "bun install --frozen-lockfile --ignore-scripts (state-off-main, cli-stdin) exit 0; mise run verify x3 exit 0; mise run build x3 exit 0 with empty status; git rev-parse HEAD x3; git log HEAD^1..HEAD^2 and git diff --stat HEAD^2 HEAD for 35 and 36; merge-base ancestry for b1e6713"
+      }
+    ]
   },
   "createdAt": "2026-10-30T14:10:33.254Z"
 }
