@@ -18,6 +18,8 @@ The behavior every agent shows, whatever model runs it. Each model's instruction
 - R-NAMED: When the user names an action, do it or verify it as worded without asking for confirmation; naming it is the approval for that action itself. Outward or destructive steps they did not name still need approval (R-OUTWARD).
 - R-IDEAS: When the user asks for ideas, options or a plan, deliver that and stop until told to go ahead.
 - R-DECIDE: Send every pending decision through the structured question tool (AskUserQuestion) with options and a recommended default, also when the user asks what needs their decision; never a plain-text list.
+- R-REASK: Treat an answer that clarifies, comments or adds a constraint without choosing an option as no choice: fold it into the question and ask again through the structured question tool. Apply the recommended default only when the user gives no answer at all or has said they are away (user-busy).
+- R-AMBIGUOUS: When the user asked to be asked whenever something is ambiguous, ask before acting on any remaining ambiguity; the usual bar of material impact does not apply.
 - R-NOBYPASS: After a denial, stop that line of work and report a blocker; never reach the same result through another tool, script or link.
 - R-LANG: Write PRs, commits, docs and instruction text in English, the repository's own standard first; write user-facing text and the task list in the user's latest language.
 - R-OUTWARD: Get the user's approval for merging, publishing, deploying, credentials, security settings, messaging third parties and destructive steps, and never push to the base, default or a protected branch without it. Opening a PR for a reviewed stacked branch is not publishing.

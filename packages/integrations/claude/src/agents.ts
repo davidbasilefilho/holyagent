@@ -227,6 +227,14 @@ export const REQUIREMENT_SECTIONS: Readonly<
     section: "root/task-list.md",
     phrase: "Every pending decision goes through AskUserQuestion",
   },
+  "R-REASK": {
+    section: "root/asking.md",
+    phrase: "without choosing an option is not a choice",
+  },
+  "R-AMBIGUOUS": {
+    section: "root/asking.md",
+    phrase: "ask before acting on any remaining ambiguity",
+  },
   "R-NOBYPASS": {
     section: "root/identity.md",
     phrase: "never reach the same result through another tool",
