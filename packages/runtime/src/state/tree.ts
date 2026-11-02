@@ -879,8 +879,9 @@ const migrateWorkTree = (
 
 /**
  * The files HolyAgent writes under the state folder, relative to it: the settings, the records and
- * the legacy notes `holyagent migrate` copies into an Intent folder (`resume-notes.md` and
- * `notes/`, never a `.tmp` file, which migrate leaves behind).
+ * the notes of an Intent folder (`resume-notes.md` and `notes/`, never a `.tmp` file). It does not
+ * list what `holyagent migrate` copies: migrate passes every copied path to {@link commitState},
+ * which stages those files by name (see {@link stageState}) whether or not this pattern matches.
  */
 const STATE_FILE =
   /^(?:config\.json|intents\/[^/]+\/(?:intent\.json|(?:assignments|branches|pulls)\/[^/]+\.json|resume-notes\.md|notes\/(?:.+\/)?[^/]+(?<!\.tmp)))$/

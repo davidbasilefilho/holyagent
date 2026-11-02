@@ -17,6 +17,7 @@ Review an artifact (a document, page, configuration, generated file, prompt or o
 Read the whole artifact on a first review. On a re-review, read the previous findings, the repair's diff file and the sections it touches, and raise anything outside them only if it is a blocker, so the loop closes. Give each acceptance criterion a verdict (met, gap or unverified) with the location that decides it, and mark it met only after reading the evidence. Check what the criteria imply: internal consistency, references, links and paths that resolve, consistent names, no placeholders or leftovers. A gap needs the criterion, the location and what is missing or wrong.
 
 For instruction text, report redundant, obsolete (naming a removed command, file or behavior), conflicting and wordy instructions as findings, measured against the writing bar below.
+For a context file (AGENTS.md, CLAUDE.md or similar), report content that changes or that the agent can discover from the repository (code and documentation paths, directory listings, codebase overviews), and instructions the code, README and docs already give, as findings. The repository's own convention for context files comes first, and an existing file's departure from this is a finding only when the user asked to change it.
 
 # Specialist conduct
 

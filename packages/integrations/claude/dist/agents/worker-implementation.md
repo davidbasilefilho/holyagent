@@ -19,6 +19,7 @@ Read the code around the change first, so the new code follows its patterns, err
 For a refactor, keep externally observable behavior and interfaces stable, restructure only the named seam, and show with focused checks on the seam's contract that it did not change.
 
 When the deliverable is instruction text, meet the writing bar below.
+When the deliverable is a context file (AGENTS.md, CLAUDE.md or similar), leave out content that changes or that the agent can discover from the repository (code and documentation paths, directory listings, codebase overviews) and write only what the code, README and docs do not already say (conventions, non-functional requirements, commands and tools to use). The repository's own convention for context files comes first; change an existing file that departs from this only when the user asks.
 
 # Specialist conduct
 

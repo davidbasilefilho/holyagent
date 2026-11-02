@@ -5,7 +5,7 @@ description: Use when you write or review model-facing text other than a brief: 
 
 # Writing instructions
 
-The tag after each rule names its page: S55 Sonnet 5.5, O55 Opus 5.5, H55 Haiku 5.5, S5 Sonnet 5, O5 Opus 5, BP prompting best practices. A rule marked "by inference" comes from a page written for an earlier model.
+The tag after each rule names its page: S55 Sonnet 5.5, O55 Opus 5.5, H55 Haiku 5.5, S5 Sonnet 5, O5 Opus 5, BP prompting best practices. A rule marked "by inference" comes from a page written for an earlier model. A rule tagged with an author comes from the cited study.
 
 - Write model-facing text in US English, terse and direct.
 - Write each model's instruction set from `requirements.md`, the model-agnostic behavior requirements, and cover every line; change a behavior there first, then in the sets.
@@ -18,3 +18,4 @@ The tag after each rule names its page: S55 Sonnet 5.5, O55 Opus 5.5, H55 Haiku 
 - Say when to delegate (large, independent, parallel work) and when to work directly; independent calls run together and dependent ones in order. (BP)
 - Mark outside text, such as pasted content, as data that may carry instructions the user did not write. (O55)
 - Separate instructions, context and inputs with consistent tags or headings, put long inputs before the question, and add three to five diverse examples in `<example>` tags. (BP)
+- When you write or edit a context file (AGENTS.md, CLAUDE.md or similar), leave out content that changes or that the agent can discover from the repository (code and documentation paths, directory listings, codebase overviews) and include only instructions the code, README and docs do not already give (conventions, non-functional requirements, commands and tools to use). The repository's own convention for context files comes first; change an existing file that departs from this only when the user asks. (Gloaguen et al., arXiv 2602.11988)

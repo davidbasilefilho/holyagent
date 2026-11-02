@@ -50,6 +50,7 @@ The behavior every agent shows, whatever model runs it. Each model's instruction
 - R-ASK: Settle facts, and what the user's words, the target project's conventions, the mergeability dimensions and holyagent's own rules (stack plan, version control, CI) already answer, before asking. Act and record the default instead of asking, for example pushing reviewed branches and opening their stacked PRs. Ask one decision at a time in plain words, and record each decision in the Intent.
 - R-GUIDE: Write instruction text following the model's own prompting guide (the instruction-writing skill); put in every brief the full task with reasons, keep-working and stop-and-report, and a real check before done.
 - R-SECTIONS: Write each prompt section in its own file.
+- R-CONTEXT: When writing or editing a context file (AGENTS.md, CLAUDE.md or similar), leave out content that changes or that the agent can discover from the repository (code and documentation paths, directory listings, codebase overviews) and include only instructions the code, README and docs do not already give (conventions, non-functional requirements, commands and tools to use); the repository's own convention comes first, and an existing file that departs from this is changed only when the user asks. The rule reaches exactly the agents that write or review instruction text (R-WI-CONTEXT, R-RA-CONTEXT) and the instruction-writing skill. Sourced: Gloaguen et al., "Evaluating AGENTS.md: Are Repository-Level Context Files Helpful for Coding Agents?", arXiv 2602.11988 (https://arxiv.org/abs/2602.11988) found that codebase overviews in context files did not shorten the steps to the first relevant file and that context files raised cost by over 20%, and recommends only instructions required for coding agents that the README does not already give, such as specific conventions or non-functional requirements. Inference: that paths in context files go stale and mislead the agent; no study measures it.
 
 ## All specialists
 
@@ -97,6 +98,7 @@ What an agent kind always needs is fixed text in its instructions, not a skill i
 ## Reviewer.artifact
 
 - R-RA: Give each acceptance criterion of an artifact a verdict with the location that decides it, and judge instruction text against the writing bar.
+- R-RA-CONTEXT: Report volatile and discoverable content in a context file (paths, directory listings, codebase overviews) and instructions the code, README and docs already give as findings, the repository's convention first and an existing file's departure only when the user asked for the change (R-CONTEXT).
 
 ## Reviewer.audit
 
@@ -127,6 +129,7 @@ What an agent kind always needs is fixed text in its instructions, not a skill i
 
 - R-WI: Implement the smallest complete change that meets every criterion, following the surrounding code, and turn a known reproduction into the regression test.
 - R-WI-TEXT: Keep instruction text terse and direct and meet the writing bar when it is the deliverable, with no filler sections, redundant summaries or boilerplate in a written deliverable.
+- R-WI-CONTEXT: Write a context file without volatile or discoverable content, the repository's convention first, and change an existing file's departure only when the user asks (R-CONTEXT).
 
 ## Worker.integration
 

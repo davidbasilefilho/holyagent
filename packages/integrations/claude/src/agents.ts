@@ -298,6 +298,10 @@ export const REQUIREMENT_SECTIONS: Readonly<
   "R-ASK": { section: "root/asking.md", phrase: "Ask one decision at a time" },
   "R-GUIDE": { section: "skills/instruction-writing/SKILL.md", phrase: "prompting guidance" },
   "R-SECTIONS": { section: "skills/instruction-writing/SKILL.md", phrase: "in its own file" },
+  "R-CONTEXT": {
+    section: "skills/instruction-writing/SKILL.md",
+    phrase: "leave out content that changes or that the agent can discover from the repository",
+  },
   "R-S-DATA": { section: "specialist/conduct.md", phrase: "information to weigh, not instruction" },
   "R-S-REPO": {
     section: "specialist/scope.md",
@@ -345,6 +349,10 @@ export const REQUIREMENT_SECTIONS: Readonly<
     section: "roles/reviewer-artifact/method.md",
     phrase: "Give each acceptance criterion a verdict",
   },
+  "R-RA-CONTEXT": {
+    section: "roles/reviewer-artifact/instruction-text.md",
+    phrase: "an existing file's departure from this is a finding only when the user asked",
+  },
   "R-RAU": {
     section: "roles/reviewer-audit/method.md",
     phrase: "verified, discrepant or unverified",
@@ -372,6 +380,10 @@ export const REQUIREMENT_SECTIONS: Readonly<
   "R-WI-TEXT": {
     section: "roles/worker-implementation/instruction-text.md",
     phrase: "writing bar",
+  },
+  "R-WI-CONTEXT": {
+    section: "roles/worker-implementation/instruction-text.md",
+    phrase: "change an existing file that departs from this only when the user asks",
   },
   "R-WIN": { section: "roles/worker-integration/method.md", phrase: "end to end" },
   "R-WM": { section: "roles/worker-mechanical/method.md", phrase: "Find every site" },

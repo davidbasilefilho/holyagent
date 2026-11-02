@@ -881,6 +881,34 @@ describe("agents", () => {
         expect(read(`${CLAUDE}/roles/${role}`, name)).not.toContain("State each rule once")
   })
 
+  test("the context-file rule is in the implementation writer, the artifact reviewer and the instruction-writing skill only, convention first", () => {
+    const rule = "codebase overviews"
+    for (const route of ROUTES) {
+      const wanted = ["worker-implementation", "reviewer-artifact"].includes(route.agent)
+      const text = agent(route.agent)?.content ?? ""
+      expect({ agent: route.agent, rule: text.includes(rule) }).toEqual({
+        agent: route.agent,
+        rule: wanted,
+      })
+      if (wanted) {
+        expect(text).toContain("The repository's own convention for context files comes first")
+        expect(text).toContain("only when the user ask")
+      }
+    }
+    expect(agent("holyagent")?.content.includes(rule)).toBe(false)
+    const skill = generated.find((file) =>
+      file.path.endsWith("skills/instruction-writing/SKILL.md"),
+    )
+    expect(skill?.content).toContain(rule)
+    expect(skill?.content).toContain(
+      "The repository's own convention for context files comes first",
+    )
+    expect(skill?.content).toContain("only when the user asks")
+    const requirements = read("packages/runtime/src/instructions", "requirements.md")
+    expect(requirements).toContain("arXiv 2602.11988")
+    expect(requirements).toContain("Inference: that paths in context files go stale")
+  })
+
   test("agent files sit where the plugin expects them", () => {
     expect(AGENTS).toBe("packages/integrations/claude/dist/agents")
   })
