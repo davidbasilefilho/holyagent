@@ -3149,6 +3149,10 @@ var ignore = /* @__PURE__ */ dual((args) => isEffect(args[0]), (self, options) =
     onSuccess: (_) => void_
   });
 });
+var option = (self) => match3(self, {
+  onFailure: none2,
+  onSuccess: some2
+});
 var result = (self) => matchEager(self, {
   onFailure: fail2,
   onSuccess: succeed2
@@ -4425,6 +4429,7 @@ var fromResult2 = fromResult;
 var flatMap2 = flatMap;
 var andThen2 = andThen;
 var tap2 = tap;
+var option2 = option;
 var exit2 = exit;
 var map4 = map2;
 var as2 = as;
@@ -10282,13 +10287,46 @@ var requireFree = (listed, path, branch) => gen2(function* () {
     });
   }
 });
-var fetchRemoteBranch = (top, env, branch) => git(top, { ...env, GIT_TERMINAL_PROMPT: "0" }, [
+var FETCH_TIMEOUT_MS = 8000;
+var NON_INTERACTIVE_SSH = "ssh -o BatchMode=yes -o ConnectTimeout=5";
+var ASKPASS_VARIABLES = new Set(["SSH_ASKPASS", "SSH_ASKPASS_REQUIRE"]);
+var fetchEnvironment = (env) => {
+  const base = Object.fromEntries(Object.entries(gitEnvironment(env)).filter(([name]) => !ASKPASS_VARIABLES.has(name)));
+  const ssh = base["GIT_SSH_COMMAND"] !== undefined || base["GIT_SSH"] !== undefined;
+  return {
+    ...base,
+    GIT_TERMINAL_PROMPT: "0",
+    GIT_ASKPASS: "",
+    GCM_INTERACTIVE: "never",
+    ...ssh ? {} : { GIT_SSH_COMMAND: NON_INTERACTIVE_SSH }
+  };
+};
+var gitBounded = (cwd, env, args, timeout) => try_2({
+  try: () => Bun.spawn(["git", ...args], {
+    cwd,
+    env,
+    stdin: "ignore",
+    stdout: "ignore",
+    stderr: "ignore",
+    timeout,
+    killSignal: "SIGKILL"
+  }),
+  catch: (cause) => new StateIo({ path: cwd, cause })
+}).pipe(flatMap2((child) => tryPromise2({
+  try: () => child.exited,
+  catch: (cause) => new StateIo({ path: cwd, cause })
+})));
+var fetchRemoteBranch = (top, env, branch, timeout = FETCH_TIMEOUT_MS) => gitBounded(top, fetchEnvironment(env), [
+  "-c",
+  "credential.helper=",
+  "-c",
+  "core.askPass=",
   "fetch",
   "-q",
   "--no-tags",
   "origin",
   `+refs/heads/${branch}:refs/remotes/origin/${branch}`
-]).pipe(flatMap2((ran) => ran.code === 0 ? refExists(top, env, `refs/remotes/origin/${branch}`) : succeed6(false)));
+], timeout).pipe(flatMap2((code) => code === 0 ? refExists(top, env, `refs/remotes/origin/${branch}`) : succeed6(false)));
 var readyMarker = (path) => `${path}.ready`;
 var ensureWorktree = (top, common, env, branch, path, options) => withFileLock(join2(common, "holyagent", "worktree.lock"), gen2(function* () {
   const ready = readyMarker(path);
@@ -10306,7 +10344,9 @@ var ensureWorktree = (top, common, env, branch, path, options) => withFileLock(j
   yield* requireFree(yield* listWorktrees(top, env), path, branch);
   const add = [...BOOKKEEPING, "worktree", "add", "-q"];
   const local = yield* refExists(top, env, `refs/heads/${branch}`);
-  const remote = (yield* refExists(top, env, `refs/remotes/origin/${branch}`)) || !local && (yield* fetchRemoteBranch(top, env, branch));
+  const remote = (yield* refExists(top, env, `refs/remotes/origin/${branch}`)) || !local && options.online && (yield* fetchRemoteBranch(top, env, branch));
+  if (!local && !remote && !options.online)
+    return { kind: "absent" };
   const start = local || remote ? undefined : yield* baseStart(top, env);
   const target = local ? [path, branch] : remote ? ["--track", "-b", branch, path, `origin/${branch}`] : start === undefined ? undefined : ["--no-track", "-b", branch, path, start];
   if (target === undefined)
@@ -10507,7 +10547,7 @@ var locate = (cwd, env) => gen2(function* () {
 `).map((path) => fromGitPath(path));
   return { top, common };
 });
-var resolveState = (cwd, env, ensure) => gen2(function* () {
+var resolveState = (cwd, env, ensure, online = true) => gen2(function* () {
   const repository = yield* locate(cwd, env);
   if (repository === undefined)
     return { root: cwd, directory: join2(cwd, STATE_DIRECTORY) };
@@ -10526,7 +10566,8 @@ var resolveState = (cwd, env, ensure) => gen2(function* () {
   const make = ensure === "create" || ensure === "ifPresent" && (yield* keepsState(top, env, branch, listed));
   const ensured = found !== undefined && settled ? { kind: "ready", path: found, created: false } : found === undefined && !make ? { kind: "absent" } : yield* ensureWorktree(top, common, env, branch, standard, {
     make,
-    peek: ensure === "peek"
+    peek: ensure === "peek",
+    online
   });
   if (ensured.kind === "deferred")
     return { root: top, directory: join2(top, STATE_DIRECTORY) };
@@ -11605,6 +11646,8 @@ var VCS_COMMANDS = [
   }
 ];
 
+import { resolve as resolve4 } from "path";
+
 var AcceptanceInput = Struct({
   rationale: Text,
   criteria: ArraySchema(Struct({ criterion: Text, support: Text })),
@@ -11891,10 +11934,16 @@ var closeAssignment = (project, registry, assignmentId, input, now) => gen2(func
 });
 
 import { isAbsolute, join as join7, resolve as resolve3 } from "path";
-var briefFolder = (call) => gitMaybe(["rev-parse", "--path-format=absolute", "--git-common-dir"]).pipe(provide3(call.vcs), map4((common) => common !== undefined && isAbsolute(common) ? join7(resolve3(common), "holyagent", "briefs") : localFile(call.directory, "briefs")));
+var folderFor = (call, name) => gitMaybe(["rev-parse", "--path-format=absolute", "--git-common-dir"]).pipe(provide3(call.vcs), map4((common) => common !== undefined && isAbsolute(common) ? join7(resolve3(common), "holyagent", name) : localFile(call.directory, name)));
 var writeBrief = (call, assignmentId, brief) => gen2(function* () {
-  const path = join7(yield* briefFolder(call), `${assignmentId}.md`);
+  const path = join7(yield* folderFor(call, "briefs"), `${assignmentId}.md`);
   yield* io(path, () => Bun.write(path, `${brief}
+`));
+  return path;
+});
+var writeReport = (call, assignmentId, report) => gen2(function* () {
+  const path = join7(yield* folderFor(call, "reports"), `${assignmentId}.md`);
+  yield* io(path, () => Bun.write(path, `${report}
 `));
   return path;
 });
@@ -11935,7 +11984,7 @@ var evidenceEntries = (report) => {
   const base = block[0] === undefined ? 0 : indentOf(block[0]);
   const entries = [];
   for (const line of block) {
-    const text = line.trim().replace(/^[-*]\s+/, "");
+    const text = line.trim().replace(/^(?:[-*+\u2022]\s+|\d+[.)]\s+|\[[ xX]\]\s+)+/, "");
     const last = entries.length - 1;
     if (indentOf(line) > base && last >= 0)
       entries[last] = `${entries[last] ?? ""}${entries[last]?.endsWith(":") ? " " : "; "}${text}`;
@@ -11947,14 +11996,14 @@ var evidenceEntries = (report) => {
 var MARKER = /^\[(?:non-)?blocking\]\s*/i;
 var DIMENSION = /\s*\((?:behavior|regressions|tests|scope|style|repo-standards)\)$/i;
 var TRAILING = /[\s.,;:!?*_`]+$/;
-var LEADING = /^[\s*_`]+/;
-var normalized = (text) => text.replace(LEADING, "").replace(MARKER, "").replace(/\s+/g, " ").replace(TRAILING, "").replace(DIMENSION, "").replace(TRAILING, "").toLowerCase();
+var LEADING = /^(?:[\s*_`>\u2022+-]+|\d+[.)]\s+|\[[ xX]\](?=\s))+/;
+var normalized = (text) => text.replace(LEADING, "").replace(MARKER, "").replace(/\s+/g, " ").replace(TRAILING, "").replace(DIMENSION, "").replace(TRAILING, "").replace(/[-_\s]+/g, " ").toLowerCase();
 var ownerOf = (entry, known) => {
   for (let at = entry.lastIndexOf(":");at > 0; at = entry.lastIndexOf(":", at - 1)) {
-    const key = known.get(normalized(entry.slice(0, at)));
+    const keys = known.get(normalized(entry.slice(0, at)));
     const support = entry.slice(at + 1).trim();
-    if (key !== undefined && /[\p{L}\p{N}]/u.test(support))
-      return { key, support };
+    if (keys !== undefined && /[\p{L}\p{N}]/u.test(support))
+      return { keys, support };
   }
   return;
 };
@@ -11967,23 +12016,27 @@ var acceptanceFrom = (assignment, report, rationale, carryForward) => {
     ...new Set([...assignment.criteria.map(({ text }) => text), ...assignment.evidence])
   ];
   const known = new Map;
+  const name = (text, key) => known.set(text, (known.get(text) ?? new Set).add(key));
   for (const key of keys)
-    if (!known.has(normalized(key)))
-      known.set(normalized(key), key);
+    name(normalized(key), key);
   const labels = new Map;
   for (const { text } of assignment.criteria) {
     const label = normalized(labelOf(text));
-    if (label !== "" && !known.has(label))
-      labels.set(label, labels.has(label) && labels.get(label) !== text ? undefined : text);
+    if (label !== "")
+      labels.set(label, (labels.get(label) ?? new Set).add(text));
   }
-  for (const [label, key] of labels)
-    if (key !== undefined)
-      known.set(label, key);
+  for (const [label, texts] of labels)
+    if (texts.size === 1)
+      for (const text of texts)
+        name(label, text);
   const supports = new Map;
   for (const entry of evidenceEntries(report)) {
     const owner = ownerOf(entry, known);
-    if (owner !== undefined && !supports.has(owner.key))
-      supports.set(owner.key, owner.support);
+    if (owner !== undefined) {
+      for (const key of owner.keys)
+        if (!supports.has(key))
+          supports.set(key, owner.support);
+    }
   }
   const supportFor = (key) => supports.get(key);
   const criteria = assignment.criteria.map((criterion) => ({
@@ -12024,9 +12077,48 @@ var renderPrompt = (assignment, agent) => [
 `);
 var dispatchPrompt = (assignment, agent, briefPath) => [
   `Role: ${assignment.roleTask} (${agent}). Assignment: ${assignment.id}.`,
-  `Your full task is the brief in ${briefPath}: read it with the Read tool and follow it as your full task.`
+  `Read the brief at ${briefPath} with the Read tool and follow it as your full task.`
 ].join(`
 `);
+var Started = Struct({
+  type: Literal2("started"),
+  key: String4,
+  agentId: String4,
+  label: String4
+});
+var Resulted = Struct({
+  type: Literal2("result"),
+  key: String4,
+  agentId: String4,
+  result: Unknown2
+});
+var Other = Struct({
+  type: String4.check(isPattern2(/^(?!(?:started|result)$)/))
+});
+var JournalLine = fromJsonString2(Union2([Started, Resulted, Other]));
+var journalResults = (journal, source) => gen2(function* () {
+  const labels = new Map;
+  const results = [];
+  const lines = journal.split(/\r?\n/);
+  for (const [index, line] of lines.entries()) {
+    if (line.trim() === "")
+      continue;
+    const entry = yield* decodeUnknownEffect2(JournalLine)(line, {
+      onExcessProperty: "ignore"
+    }).pipe(mapError2((error) => new Usage({
+      message: `Line ${index + 1} of the journal ${source} is not a started or result entry: ${error.message}`,
+      hint: "Pass the journal.jsonl of the Workflow run, unedited."
+    })));
+    if ("label" in entry)
+      labels.set(entry.key, entry.label);
+    else if ("result" in entry) {
+      const json = yield* decodeUnknownEffect2(JsonReport)(entry.result).pipe(option2);
+      const report = typeof entry.result === "string" ? entry.result : json._tag === "Some" ? renderJsonReport(json.value) : JSON.stringify(entry.result, null, 2) ?? "";
+      results.push({ label: labels.get(entry.key), agentId: entry.agentId, report });
+    }
+  }
+  return results;
+});
 
 class WithTrailer {
   fields;
@@ -12098,6 +12190,8 @@ var OUTCOMES = {
 var RECORD_USAGE = "assignment record <id> (--agent <agentId> | --failed)";
 var CLOSE_USAGE = "assignment close <id> --outcome success|failure|errored|interrupted|stopped [--accept <rationale>] [--report-json]";
 var LIST_USAGE = "assignment list [--state <state>] [--all] [--full]";
+var REPORTS_USAGE = "assignment reports <journal.jsonl>";
+var wordCount = (text) => text.split(/\s+/).filter((word) => word !== "").length;
 var withoutNamespace = (type) => type?.startsWith(`${PLUGIN_NAMESPACE}:`) === true ? type.slice(PLUGIN_NAMESPACE.length + 1) : type;
 var recordLaunch = (update, id, agentId, launchedAs) => update((snapshot) => gen2(function* () {
   const route = routeFor((yield* findAssignment(snapshot.project, id)).roleTask);
@@ -12261,6 +12355,35 @@ var ASSIGNMENT_COMMANDS = [
         revision: assignment.acceptance?.revision,
         carriedFrom: assignment.acceptance?.carriedFrom
       });
+    })
+  },
+  {
+    path: ["assignment", "reports"],
+    usage: REPORTS_USAGE,
+    summary: "Write the results of a Workflow run's journal to report files named by Assignment id, and list them",
+    output: "TOON: `reports` rows of id, path and words, one per Assignment id, and `notAssignmentIds` rows of label and agentId for results whose label is not an Assignment id (not written)",
+    notes: [
+      "the journal is the run's journal.jsonl: `started` entries (key, agentId, label) and `result` entries (key, agentId, result) joined by key; label each agent() with its Assignment id so its report lands in <id>.md",
+      "reports go to holyagent/reports in the git common directory (local/reports of the state folder outside git), beside the briefs; a repeated label keeps its last result. Read a report there, or close from it: `assignment close <id> --outcome success --accept <rationale> < <path>`",
+      "a journal line that is not JSON, or a started or result entry without its fields, refuses the whole journal and writes nothing"
+    ],
+    flags: {},
+    positionals: 1,
+    state: "peek",
+    run: (call) => gen2(function* () {
+      const source = resolve4(call.cwd, idArgument(call.args.positionals));
+      const journal = yield* io(source, () => Bun.file(source).text());
+      const results = yield* journalResults(journal, source);
+      const byId = new Map;
+      const strays = [];
+      for (const { label, agentId, report } of results) {
+        if (label !== undefined && is2(AssignmentId)(label))
+          byId.set(label, { report });
+        else
+          strays.push({ label: label ?? "", agentId });
+      }
+      const reports = yield* forEach2([...byId], ([id, { report }]) => writeReport(call, id, report).pipe(map4((path) => ({ id, path, words: wordCount(report) }))));
+      return { reports, notAssignmentIds: strays };
     })
   },
   {
@@ -19820,7 +19943,7 @@ var HOOK_COMMANDS = [
     return gen2(function* () {
       if (agentId === undefined)
         return yield* new AgentIdMissing;
-      const { directory } = yield* resolveState(call.cwd, call.env, "ifPresent");
+      const { directory } = yield* resolveState(call.cwd, call.env, "ifPresent", false);
       if (!(yield* hasStateFolder(directory)))
         return yield* new StateFolderMissing;
       const type = payload.tool_input?.subagent_type;
@@ -20323,7 +20446,7 @@ var topHelp = () => [
 ].join(`
 `);
 var callFor = (args, host, emit, command) => gen2(function* () {
-  const { root, directory } = command.stateless === true ? { root: host.cwd, directory: join19(host.cwd, STATE_DIRECTORY) } : yield* resolveState(host.cwd, host.env, typeof command.state === "function" ? command.state(args) : command.state ?? "ifPresent");
+  const { root, directory } = command.stateless === true ? { root: host.cwd, directory: join19(host.cwd, STATE_DIRECTORY) } : yield* resolveState(host.cwd, host.env, typeof command.state === "function" ? command.state(args) : command.state ?? "ifPresent", command.path[0] !== "hook");
   const inline = stringFlag(args, INPUT_FLAG);
   return {
     args,

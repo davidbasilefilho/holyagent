@@ -5,7 +5,19 @@ import { join } from "node:path"
 import { Effect } from "effect"
 
 import { loadProject } from "../src/state/store.ts"
-import { cleanup, fakeGitHub, initRepo, put, scratch, seed, sh, toon, vcs } from "./vcs-fixtures.ts"
+import { fetchRemoteBranch } from "../src/state/tree.ts"
+import {
+  cleanup,
+  fakeGitHub,
+  GIT_ENV,
+  initRepo,
+  put,
+  scratch,
+  seed,
+  sh,
+  toon,
+  vcs,
+} from "./vcs-fixtures.ts"
 
 afterEach(cleanup)
 
@@ -292,6 +304,97 @@ describe("the state branch", () => {
     await createIntent(dir, "Ship the parser")
 
     expect((await sh(dir, ["git", "merge-base", STATE, "main"])).trim()).toBe(base)
+  })
+})
+
+describe("the fetch of the remote state branch", () => {
+  /**
+   * A clone whose origin is an ssh URL and whose `ssh` is a script that logs how it was called (its
+   * arguments and the askpass variables) and then runs `behavior`, so nothing leaves the machine.
+   */
+  const overSsh = async (behavior: string) => {
+    const dir = await initRepo(OWNER)
+    await seed(dir, { "a.txt": "a\n" })
+    await sh(dir, ["git", "remote", "add", "origin", "ssh://git@example.invalid/octo/project.git"])
+    const bin = await scratch("holyagent-bin-")
+    const log = join(bin, "ssh.log")
+    const script = join(bin, "ssh")
+    await writeFile(
+      script,
+      `#!/bin/sh\necho "args: $*" >> "${log}"\necho "askpass: [${"$"}{SSH_ASKPASS-unset}] [${"$"}{GIT_ASKPASS-unset}]" >> "${log}"\n${behavior}\n`,
+      { mode: 0o755 },
+    )
+    const env = { PATH: `${bin}:${process.env["PATH"] ?? ""}` }
+    const logged = async () => ((await Bun.file(log).exists()) ? await Bun.file(log).text() : "")
+    return { dir, bin, script, env, logged }
+  }
+
+  test("ssh runs in batch mode with a connect timeout and no askpass program", async () => {
+    const { dir, env, logged } = await overSsh("exit 255")
+
+    toon(
+      await vcs(
+        dir,
+        ["intent", "create"],
+        fakeGitHub().layer,
+        { objective: "Ship the parser" },
+        { ...env, SSH_ASKPASS: "/bin/false", GIT_ASKPASS: "/bin/false" },
+      ),
+    )
+
+    const log = await logged()
+    expect(log).toContain("BatchMode=yes")
+    expect(log).toContain("ConnectTimeout=")
+    expect(log).toContain("askpass: [unset] []")
+    // An unreachable remote still leaves a working state branch.
+    expect((await sh(dir, ["git", "rev-parse", "--verify", STATE])).trim()).not.toBe("")
+  })
+
+  test("an ssh command the user chose is kept", async () => {
+    const { dir, script, logged } = await overSsh("exit 255")
+
+    toon(
+      await vcs(
+        dir,
+        ["intent", "create"],
+        fakeGitHub().layer,
+        { objective: "Ship the parser" },
+        { GIT_SSH_COMMAND: `${script} -o Chosen=yes` },
+      ),
+    )
+
+    const log = await logged()
+    expect(log).toContain("Chosen=yes")
+    expect(log).not.toContain("BatchMode")
+  })
+
+  test("a fetch that hangs is killed at its timeout and counts as no remote branch", async () => {
+    const { dir, script } = await overSsh("sleep 5")
+    const started = Date.now()
+
+    const found = await Effect.runPromise(
+      fetchRemoteBranch(dir, { ...GIT_ENV, GIT_SSH_COMMAND: script }, STATE, 300),
+    )
+
+    expect(found).toBe(false)
+    expect(Date.now() - started).toBeLessThan(4000)
+  })
+
+  test("a hook makes no network call, and the next command fetches", async () => {
+    const { dir, env, logged } = await overSsh("exit 255")
+    // A work tree that already holds state is a project that keeps state, which makes the state worktree.
+    await put(dir, { ".holyagent/local/note.json": "{}\n" })
+    const payload = { hook_event_name: "SessionStart", source: "startup" }
+
+    const hooked = await vcs(dir, ["hook", "session-start"], fakeGitHub().layer, payload, env)
+
+    expect(hooked.stderr).toBe("")
+    expect(await logged()).toBe("")
+    expect(await sh(dir, ["git", "branch", "--list", STATE])).toBe("")
+
+    toon(await vcs(dir, ["intent", "list"], fakeGitHub().layer, undefined, env))
+
+    expect(await logged()).toContain("BatchMode=yes")
   })
 })
 

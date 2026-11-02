@@ -8,17 +8,17 @@ import { gitMaybe } from "../vcs/git.ts"
 import type { Call } from "./types.ts"
 
 /**
- * The folder the brief files of Assignments live in: `holyagent/briefs` in the git common
- * directory, which no work tree tracks and the state branch never carries, and which every work
- * tree of the clone shares. Outside a repository it is `local/briefs` of the state folder.
+ * A folder for files of Assignments that stay out of the state: `holyagent/<name>` in the git
+ * common directory, which no work tree tracks and the state branch never carries, and which every
+ * work tree of the clone shares. Outside a repository it is `local/<name>` of the state folder.
  */
-const briefFolder = (call: Call) =>
+const folderFor = (call: Call, name: string) =>
   gitMaybe(["rev-parse", "--path-format=absolute", "--git-common-dir"]).pipe(
     Effect.provide(call.vcs),
     Effect.map((common) =>
       common !== undefined && isAbsolute(common)
-        ? join(resolve(common), "holyagent", "briefs")
-        : localFile(call.directory, "briefs"),
+        ? join(resolve(common), "holyagent", name)
+        : localFile(call.directory, name),
     ),
   )
 
@@ -28,7 +28,18 @@ const briefFolder = (call: Call) =>
  */
 export const writeBrief = (call: Call, assignmentId: string, brief: string) =>
   Effect.gen(function* () {
-    const path = join(yield* briefFolder(call), `${assignmentId}.md`)
+    const path = join(yield* folderFor(call, "briefs"), `${assignmentId}.md`)
     yield* io(path, () => Bun.write(path, `${brief}\n`))
+    return path
+  })
+
+/**
+ * Writes the report of an Assignment, as a workflow's journal holds it, to `<id>.md` in the
+ * `reports` folder next to the briefs, and returns the absolute path.
+ */
+export const writeReport = (call: Call, assignmentId: string, report: string) =>
+  Effect.gen(function* () {
+    const path = join(yield* folderFor(call, "reports"), `${assignmentId}.md`)
+    yield* io(path, () => Bun.write(path, `${report}\n`))
     return path
   })

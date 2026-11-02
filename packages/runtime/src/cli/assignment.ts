@@ -1,3 +1,5 @@
+import { resolve } from "node:path"
+
 import { Effect, Schema } from "effect"
 
 import { accept } from "../domain/acceptance.ts"
@@ -14,14 +16,15 @@ import { closeAssignment, dispatch, record } from "../domain/lifecycle.ts"
 import { Revision } from "../domain/primitives.ts"
 import { findAssignment, findIntent, type Project } from "../domain/project.ts"
 import { RoleTask, routeFor } from "../domain/route.ts"
+import { io } from "../state/files.ts"
 import { readState, type Snapshot } from "../state/store.ts"
 import { booleanFlag, choiceFlag, requiredFlag, stringFlag } from "./args.ts"
-import { writeBrief } from "./brief.ts"
+import { writeBrief, writeReport } from "./brief.ts"
 import { nowIso } from "./context.ts"
 import { AgentMismatch, Usage } from "./errors.ts"
 import { resolveIntent } from "./intent.ts"
 import { JsonReport, renderJsonReport } from "./jsonreport.ts"
-import { acceptanceFrom, dispatchPrompt, renderPrompt } from "./report.ts"
+import { acceptanceFrom, dispatchPrompt, journalResults, renderPrompt } from "./report.ts"
 import { type Call, type Command, WithTrailer } from "./types.ts"
 import { assignmentRow, assignmentView, byId, present } from "./views.ts"
 
@@ -99,6 +102,10 @@ const RECORD_USAGE = "assignment record <id> (--agent <agentId> | --failed)"
 const CLOSE_USAGE =
   "assignment close <id> --outcome success|failure|errored|interrupted|stopped [--accept <rationale>] [--report-json]"
 const LIST_USAGE = "assignment list [--state <state>] [--all] [--full]"
+
+const REPORTS_USAGE = "assignment reports <journal.jsonl>"
+
+const wordCount = (text: string): number => text.split(/\s+/).filter((word) => word !== "").length
 
 const withoutNamespace = (type: string | undefined): string | undefined =>
   type?.startsWith(`${PLUGIN_NAMESPACE}:`) === true ? type.slice(PLUGIN_NAMESPACE.length + 1) : type
@@ -377,6 +384,40 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
           revision: assignment.acceptance?.revision,
           carriedFrom: assignment.acceptance?.carriedFrom,
         })
+      }),
+  },
+  {
+    path: ["assignment", "reports"],
+    usage: REPORTS_USAGE,
+    summary:
+      "Write the results of a Workflow run's journal to report files named by Assignment id, and list them",
+    output:
+      "TOON: `reports` rows of id, path and words, one per Assignment id, and `notAssignmentIds` rows of label and agentId for results whose label is not an Assignment id (not written)",
+    notes: [
+      "the journal is the run's journal.jsonl: `started` entries (key, agentId, label) and `result` entries (key, agentId, result) joined by key; label each agent() with its Assignment id so its report lands in <id>.md",
+      "reports go to holyagent/reports in the git common directory (local/reports of the state folder outside git), beside the briefs; a repeated label keeps its last result. Read a report there, or close from it: `assignment close <id> --outcome success --accept <rationale> < <path>`",
+      "a journal line that is not JSON, or a started or result entry without its fields, refuses the whole journal and writes nothing",
+    ],
+    flags: {},
+    positionals: 1,
+    state: "peek",
+    run: (call) =>
+      Effect.gen(function* () {
+        const source = resolve(call.cwd, idArgument(call.args.positionals))
+        const journal = yield* io(source, () => Bun.file(source).text())
+        const results = yield* journalResults(journal, source)
+        const byId = new Map<string, { readonly report: string }>()
+        const strays: Array<{ label: string; agentId: string }> = []
+        for (const { label, agentId, report } of results) {
+          if (label !== undefined && Schema.is(AssignmentId)(label)) byId.set(label, { report })
+          else strays.push({ label: label ?? "", agentId })
+        }
+        const reports = yield* Effect.forEach([...byId], ([id, { report }]) =>
+          writeReport(call, id, report).pipe(
+            Effect.map((path) => ({ id, path, words: wordCount(report) })),
+          ),
+        )
+        return { reports, notAssignmentIds: strays }
       }),
   },
   {

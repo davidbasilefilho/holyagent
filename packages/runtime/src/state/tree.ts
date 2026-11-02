@@ -407,21 +407,97 @@ const requireFree = (listed: ReadonlyArray<Listed>, path: string, branch: string
     }
   })
 
+/** The longest the state fetch may run before it is killed, in milliseconds. */
+export const FETCH_TIMEOUT_MS = 8_000
+
+/** The ssh a state fetch uses unless the user chose one: it never prompts and gives up connecting. */
+const NON_INTERACTIVE_SSH = "ssh -o BatchMode=yes -o ConnectTimeout=5"
+
+/** Variables through which a program would ask a person for a secret, which a fetch cannot answer. */
+const ASKPASS_VARIABLES: ReadonlySet<string> = new Set(["SSH_ASKPASS", "SSH_ASKPASS_REQUIRE"])
+
+/**
+ * The environment of the state fetch: no terminal, askpass program or interactive credential
+ * manager prompt, and ssh in batch mode with a connect timeout unless the user set
+ * `GIT_SSH_COMMAND` (or `GIT_SSH`), whose choice is kept.
+ */
+const fetchEnvironment = (env: Environment): Record<string, string> => {
+  const base = Object.fromEntries(
+    Object.entries(gitEnvironment(env)).filter(([name]) => !ASKPASS_VARIABLES.has(name)),
+  )
+  const ssh = base["GIT_SSH_COMMAND"] !== undefined || base["GIT_SSH"] !== undefined
+  return {
+    ...base,
+    GIT_TERMINAL_PROMPT: "0",
+    // An empty askpass program is skipped by git, where an unset one falls back to SSH_ASKPASS.
+    GIT_ASKPASS: "",
+    GCM_INTERACTIVE: "never",
+    ...(ssh ? {} : { GIT_SSH_COMMAND: NON_INTERACTIVE_SSH }),
+  }
+}
+
+/**
+ * Runs git for its exit code only and kills it after `timeout` milliseconds. The Bun Shell cannot
+ * kill a process, so this one command uses `Bun.spawn`; the output is discarded because a killed
+ * git can leave an ssh child holding its pipes open, which would stall a reader.
+ */
+const gitBounded = (
+  cwd: string,
+  env: Record<string, string>,
+  args: ReadonlyArray<string>,
+  timeout: number,
+) =>
+  Effect.try({
+    try: () =>
+      Bun.spawn(["git", ...args], {
+        cwd,
+        env,
+        stdin: "ignore",
+        stdout: "ignore",
+        stderr: "ignore",
+        timeout,
+        killSignal: "SIGKILL",
+      }),
+    catch: (cause) => new StateIo({ path: cwd, cause }),
+  }).pipe(
+    Effect.flatMap((child) =>
+      Effect.tryPromise({
+        try: () => child.exited,
+        catch: (cause) => new StateIo({ path: cwd, cause }),
+      }),
+    ),
+  )
+
 /**
  * Fetches the state branch from `origin` into its remote-tracking ref, for a clone that has never
- * fetched it, and returns whether the ref exists afterwards. The fetch is quiet and never asks for
- * credentials; an offline, missing or empty remote only means the branch starts from the base.
+ * fetched it, and returns whether the ref exists afterwards. The fetch is quiet, never prompts (see
+ * {@link fetchEnvironment}), uses no credential helper and is killed after `timeout` milliseconds;
+ * an offline, slow, missing or empty remote only means the branch starts from the base.
  */
-const fetchRemoteBranch = (top: string, env: Environment, branch: string) =>
-  git(top, { ...env, GIT_TERMINAL_PROMPT: "0" }, [
-    "fetch",
-    "-q",
-    "--no-tags",
-    "origin",
-    `+refs/heads/${branch}:refs/remotes/origin/${branch}`,
-  ]).pipe(
-    Effect.flatMap((ran) =>
-      ran.code === 0 ? refExists(top, env, `refs/remotes/origin/${branch}`) : Effect.succeed(false),
+export const fetchRemoteBranch = (
+  top: string,
+  env: Environment,
+  branch: string,
+  timeout: number = FETCH_TIMEOUT_MS,
+) =>
+  gitBounded(
+    top,
+    fetchEnvironment(env),
+    [
+      "-c",
+      "credential.helper=",
+      "-c",
+      "core.askPass=",
+      "fetch",
+      "-q",
+      "--no-tags",
+      "origin",
+      `+refs/heads/${branch}:refs/remotes/origin/${branch}`,
+    ],
+    timeout,
+  ).pipe(
+    Effect.flatMap((code) =>
+      code === 0 ? refExists(top, env, `refs/remotes/origin/${branch}`) : Effect.succeed(false),
     ),
   )
 
@@ -449,7 +525,7 @@ const ensureWorktree = (
   env: Environment,
   branch: string,
   path: string,
-  options: { readonly make: boolean; readonly peek: boolean },
+  options: { readonly make: boolean; readonly peek: boolean; readonly online: boolean },
 ) =>
   withFileLock(
     join(common, "holyagent", "worktree.lock"),
@@ -470,7 +546,10 @@ const ensureWorktree = (
       const local = yield* refExists(top, env, `refs/heads/${branch}`)
       const remote =
         (yield* refExists(top, env, `refs/remotes/origin/${branch}`)) ||
-        (!local && (yield* fetchRemoteBranch(top, env, branch)))
+        (!local && options.online && (yield* fetchRemoteBranch(top, env, branch)))
+      // Without the network the remote copy is unknown, so the branch is left for a command that
+      // may fetch it; starting it from the base here would shadow the remote one for good.
+      if (!local && !remote && !options.online) return { kind: "absent" } satisfies Ensured
       const start = local || remote ? undefined : yield* baseStart(top, env)
       const target = local
         ? [path, branch]
@@ -841,9 +920,17 @@ const locate = (cwd: string, env: Environment) =>
  * base branch has no commit to start from, the state is the `.holyagent` folder of the work tree,
  * and in `branch` mode moves into the state worktree as soon as that can be made. A worktree at the
  * state folder that is on another branch is reported, never used. Any other git failure is
- * reported, so state is not silently written somewhere else.
+ * reported, so state is not silently written somewhere else. With `online` false (a hook's case)
+ * nothing touches the network: a state branch that exists nowhere locally is not made, since only a
+ * fetch can tell whether the remote has it, and the state counts as absent until a command that may
+ * fetch makes it.
  */
-export const resolveState = (cwd: string, env: Environment, ensure: Ensure) =>
+export const resolveState = (
+  cwd: string,
+  env: Environment,
+  ensure: Ensure,
+  online: boolean = true,
+) =>
   Effect.gen(function* () {
     const repository = yield* locate(cwd, env)
     if (repository === undefined)
@@ -875,6 +962,7 @@ export const resolveState = (cwd: string, env: Environment, ensure: Ensure) =>
           : yield* ensureWorktree(top, common, env, branch, standard, {
               make,
               peek: ensure === "peek",
+              online,
             })
     if (ensured.kind === "deferred")
       return { root: top, directory: join(top, STATE_DIRECTORY) } satisfies StateTree

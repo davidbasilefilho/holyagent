@@ -56,6 +56,8 @@ const callFor = (args: Call["args"], host: Host, emit: Call["emit"], command: Co
             typeof command.state === "function"
               ? command.state(args)
               : (command.state ?? "ifPresent"),
+            // A hook runs at session start and on every launch, where a network wait is not worth it.
+            command.path[0] !== "hook",
           )
     const inline = stringFlag(args, INPUT_FLAG)
     return {

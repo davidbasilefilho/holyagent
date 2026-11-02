@@ -55,7 +55,7 @@ const data = (result: Result): Record<string, unknown> => {
 }
 
 /** The path of the brief file a dispatch prompt names. */
-const briefPathOf = (prompt: string): string => /in (\S+\.md):/.exec(prompt)?.[1] ?? ""
+const briefPathOf = (prompt: string): string => /at (\S+\.md) with/.exec(prompt)?.[1] ?? ""
 
 const writer = (over: Record<string, unknown> = {}) => ({
   roleTask: "Worker.implementation",
@@ -566,7 +566,9 @@ describe("report and prompt", () => {
     expect(trailer).not.toContain("\\n")
     expect(prompt.split("\n")).toHaveLength(2)
     expect(prompt).toContain("Read tool")
-    expect(prompt).toContain("full task")
+    // The path and the brief's role are each named once.
+    expect(prompt.split("full task")).toHaveLength(2)
+    expect(prompt.split("briefs")).toHaveLength(2)
     // The brief text is not printed.
     for (const text of ["Objective:", "Build the parser", "Acceptance criteria", "no deps"])
       expect(raw.stdout).not.toContain(text)
@@ -616,6 +618,26 @@ describe("report and prompt", () => {
     const again = await cli(["assignment", "dispatch"], { id: created })
     expect(again.code).toBe(3)
     expect(await readdir(folder)).toEqual(before)
+  })
+
+  test("a brief that cannot be written leaves the Assignment Ready, and a later dispatch works", async () => {
+    await createIntent()
+    const created = String(data(await cli(["assignment", "create"], writer())).id)
+    // A file where the brief folder belongs makes the write fail after the dispatch was decided.
+    const folder = join(project, ".holyagent", "local", "briefs")
+    await mkdir(join(project, ".holyagent", "local"), { recursive: true })
+    await Bun.write(folder, "not a folder")
+
+    const refused = await cli(["assignment", "dispatch"], { id: created })
+    expect(refused.code).toBe(4)
+    expect(refused.stderr).toContain("error:")
+    const shown = data(await cli(["assignment", "show", created]))
+    expect(shown).toMatchObject({ assignments: [{ id: created, state: "Ready" }] })
+
+    await rm(folder)
+    const dispatched = data(await cli(["assignment", "dispatch"], { id: created }))
+    expect(dispatched).toMatchObject({ id: created, state: "Running" })
+    expect(await Bun.file(briefPathOf(String(dispatched.prompt))).exists()).toBe(true)
   })
 
   test("in a repository the brief lives in the git common directory, outside every work tree", async () => {
@@ -750,40 +772,81 @@ describe("close without a report, and report matching", () => {
     })
   })
 
-  test("a label that two criteria share, or that another key spells in full, names none of them", async () => {
+  test("a label that two criteria share names none of them", async () => {
     await createIntent()
     const draft = writer({
       criteria: [
         { text: "Parser: handles nesting", blocking: true, dimension: "behavior" },
         { text: "Parser: rejects junk", blocking: true, dimension: "behavior" },
-        { text: "Tests: all pass", blocking: true, dimension: "tests" },
       ],
-      evidence: ["tests"],
+      evidence: [],
     })
     const id = String(data(await cli(["assignment", "dispatch"], draft)).id)
     data(await cli(["assignment", "record", id, "--agent", "agent-1"]))
     const close = ["assignment", "close", id, "--outcome", "success", "--accept", "ok"]
 
-    // `Parser` is ambiguous; `Tests` is also the evidence label, which keeps its own line.
-    const refused = await cli(
-      close,
-      report("Parser: nested ok", "Tests: bun test passed", "Parser: handles nesting: yes"),
-    )
+    // `Parser` is ambiguous, so only the full text of the second criterion is a key.
+    const refused = await cli(close, report("Parser: nested ok", "Parser: handles nesting: yes"))
     expect(refused.code).toBe(3)
     expect(refused.stderr).toContain('criterion "Parser: rejects junk"')
-    expect(refused.stderr).toContain('criterion "Tests: all pass"')
     expect(refused.stderr).not.toContain('criterion "Parser: handles nesting"')
 
     const closed = await cli(
       close,
-      report(
-        "Parser: handles nesting: yes",
-        "Parser: rejects junk: yes",
-        "Tests: all pass: 12 pass",
-        "tests: bun test passed",
-      ),
+      report("Parser: handles nesting: yes", "Parser: rejects junk: yes"),
     )
     expect(data(closed)).toMatchObject({ accepted: true })
+  })
+
+  test("a criterion label that equals an evidence label is supported by the one line that names both", async () => {
+    await createIntent()
+    const draft = writer({
+      criteria: [
+        { text: "Autocompact: the root text still fits", blocking: true, dimension: "behavior" },
+        { text: "Scope", blocking: true, dimension: "scope" },
+      ],
+      evidence: ["autocompact", "scope"],
+    })
+    const id = String(data(await cli(["assignment", "dispatch"], draft)).id)
+    data(await cli(["assignment", "record", id, "--agent", "agent-1"]))
+    const close = ["assignment", "close", id, "--outcome", "success", "--accept", "ok"]
+
+    expect(
+      data(await cli(close, report("Autocompact: held at 60%", "scope: only the owned paths"))),
+    ).toMatchObject({
+      accepted: true,
+    })
+    expect(data(await cli(["assignment", "show", id, "--full"]))).toMatchObject({
+      acceptance: {
+        criteria: [
+          { criterion: "Autocompact: the root text still fits", support: "held at 60%" },
+          { criterion: "Scope", support: "only the owned paths" },
+        ],
+        evidence: [
+          { label: "autocompact", support: "held at 60%" },
+          { label: "scope", support: "only the owned paths" },
+        ],
+      },
+    })
+  })
+
+  test("hyphens and underscores read as spaces, and list markers and bold around a key are ignored", async () => {
+    await createIntent()
+    const draft = writer({
+      criteria: [{ text: "Agent effort", blocking: true, dimension: "behavior" }],
+      evidence: ["Token totals", "Root context", "Repo standards", "diff file"],
+    })
+    const id = String(data(await cli(["assignment", "dispatch"], draft)).id)
+    data(await cli(["assignment", "record", id, "--agent", "agent-1"]))
+    const close = ["assignment", "close", id, "--outcome", "success", "--accept", "ok"]
+    const lines = [
+      "agent-effort: high on the root, medium on the workers",
+      "- Token totals: 41k in, 6k out",
+      "**Root context**: 38k of 200k",
+      "1. repo_standards: no rule broken",
+      "* [x] **diff-file**: /tmp/holyagent-review/x.diff",
+    ]
+    expect(data(await cli(close, report(...lines)))).toMatchObject({ accepted: true })
   })
 
   test("a criterion is matched by its label as well, in a stored report accepted later", async () => {
