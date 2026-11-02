@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-three-blockers-the-re-reviews",
   "objective": "Repair the three blockers the re-reviews of 7ac8084 found, and the small items beside them.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Blocker A (code review): packages/runtime/src/state/tree.ts:428 fetchEnvironment injects GIT_SSH_COMMAND unless the env sets GIT_SSH_COMMAND or GIT_SSH, which overrides a user's git config core.sshCommand (git's env var outranks it). Keep the user's core.sshCommand: when it is set, pass BatchMode and ConnectTimeout without replacing it (for example append the options to that command) or skip the injection; test with core.sshCommand set.",
     "Blocker B (artifact review): packages/runtime/src/cli/report.ts:123-141 a key line with empty support now takes every following unindented line to the end of the report as support, so 'parses:' followed by 'Looks fine.' accepts. Take as support only the contiguous list items (-, *, numbered) or indented lines directly below the key line, stopping at a blank line, the next key line or any unindented non-list line; test the 'Looks fine.' case is refused and the 'Fetch safety:' list case still accepted.",
@@ -69,7 +69,45 @@
     "agentId": "workflow:wf_434bb160-dc5/assignment-0mvzrqoo2-qb6m",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-02T21:26:13.346Z"
+    "startedAt": "2026-11-02T21:26:13.346Z",
+    "finishedAt": "2026-11-02T21:33:15.570Z"
+  },
+  "result": "result: All three blockers and both small items are fixed. bun test, bun check, bun lint and bun fmt --check pass. dist matches a fresh build, and the root prompt is 31160 bytes (limit 31161).\n\nchanged:\n- /home/user/holyagent/packages/runtime/src/state/tree.ts\n- /home/user/holyagent/packages/runtime/src/cli/report.ts\n- /home/user/holyagent/packages/runtime/src/cli/overview.ts\n- /home/user/holyagent/packages/runtime/src/instructions/claude-5.5/root/workflows.md\n- /home/user/holyagent/packages/runtime/src/instructions/requirements.md\n- /home/user/holyagent/packages/runtime/tests/state-branch.test.ts\n- /home/user/holyagent/packages/runtime/tests/cli.test.ts\n- /home/user/holyagent/packages/runtime/tests/reports.test.ts\n- /home/user/holyagent/packages/integrations/claude/tests/plugin.test.ts\n- /home/user/holyagent/packages/integrations/claude/dist/agents/holyagent.md\n- /home/user/holyagent/packages/integrations/claude/dist/scripts/holyagent.js\n- /home/user/holyagent/docs/cache-and-workflows.md\n\nchecks:\n- `bun test` -> exit 0, 1021 pass, 1 skip, 0 fail\n- `bun check` -> exit 0, no type errors in 123 files\n- `bun lint` -> exit 0, no problems in 124 files\n- `bun fmt --check` -> exit 0, 241 files formatted\n- `bun packages/integrations/claude/build.ts` -> exit 0, 30 files built\n\nblockers: none\nquestions: none\n\nnotes:\n- The `assignment reports` help text at `packages/runtime/src/cli/assignment.ts:398` still writes `< <path>`. That file is outside my ownership, so the placeholder is not fully unified until the root changes it to `<report-file>`.\n- The new tests were not run against the base. I reasoned that each would fail there but did not run it.\n- A key line with an empty support now takes only bullets or numbered items, or indented lines, directly below it. A bullet directly below a bulleted key line (`- parses:` then `- ran it`) counts as its support.\n- The root text drops the old \"confirmed gone\" wording. `requirements.md` R-WORKFLOW no longer restates the closing rule, and the plan notes refer to the workflow text instead. `docs/cache-and-workflows.md` still states it once, updated to the new rule.\n- Trimming the root text to fit the byte limit removed the \"since these agents cannot be messaged\" clause from `workflows.md`. `dispatch.md` still says a workflow agent's gap is a new draft with `followUpOf`.\n\nevidence:\nSSH command: `state-branch.test.ts` test \"a configured core.sshCommand is still used, in batch mode with a connect timeout\" passes. The fetch reads `core.sshCommand` and appends `-o BatchMode=yes -o ConnectTimeout=5` to it (`tree.ts` `fetchEnvironment` and `fetchRemoteBranch`). `GIT_SSH_COMMAND` and `GIT_SSH` in the environment are still left alone.\nEvidence continuation: `cli.test.ts` refuses `parses:` followed by `Looks fine.` (four shapes, including a blank line before the list and `Looks fine.` before the list). It accepts the unindented list case ending in `tests:` then `- 12 pass, 0 fail`, and the indented case. The code is in `report.ts` `evidenceEntries` and `acceptanceFrom`.\nJournal path: `workflows.md` line 10 names the completion notice's diagnostics and `<transcript dir>/journal.jsonl`, and states once that an unlisted Assignment is closed `--outcome errored` after the run completes, without further confirmation. `plugin.test.ts` asserts this, and `overview.ts` plan notes only refer to it.\nNull results: `reports.test.ts` test \"a null result is no result: it is not listed and writes no file\" passes. `<report-file>` is now the placeholder in the root text and plan notes.\nGates: all five commands above exit 0, and the root prompt is 31160 bytes.\ndiff-file: /tmp/holyagent-review/assignment-0mvzrqoo2-qb6m.diff (`git diff` of all 12 changed files, 534 lines; there are no new files)\ntests-run: `bun test` -> 1021 pass, 0 fail, 1 skip, 35 files, exit 0. The new tests are in `state-branch.test.ts`, `cli.test.ts` and `reports.test.ts`.\n",
+  "acceptance": {
+    "revision": 2,
+    "rationale": "Each blocker has a named passing test, gates exit 0, and the diff covers all changed files; review follows.",
+    "criteria": [
+      {
+        "criterion": "SSH command: a configured core.sshCommand is still used by the state fetch, non-interactively; tested",
+        "support": "`state-branch.test.ts` test \"a configured core.sshCommand is still used, in batch mode with a connect timeout\" passes. The fetch reads `core.sshCommand` and appends `-o BatchMode=yes -o ConnectTimeout=5` to it (`tree.ts` `fetchEnvironment` and `fetchRemoteBranch`). `GIT_SSH_COMMAND` and `GIT_SSH` in the environment are still left alone."
+      },
+      {
+        "criterion": "Evidence continuation: only contiguous list or indented lines below an empty key line support it; the 'Looks fine.' case is refused and the list case accepted; tested",
+        "support": "`cli.test.ts` refuses `parses:` followed by `Looks fine.` (four shapes, including a blank line before the list and `Looks fine.` before the list). It accepts the unindented list case ending in `tests:` then `- 12 pass, 0 fail`, and the indented case. The code is in `report.ts` `evidenceEntries` and `acceptanceFrom`."
+      },
+      {
+        "criterion": "Journal path: workflows.md names where the journal path comes from and the closing rule for an unlisted Assignment, stated once",
+        "support": "`workflows.md` line 10 names the completion notice's diagnostics and `<transcript dir>/journal.jsonl`, and states once that an unlisted Assignment is closed `--outcome errored` after the run completes, without further confirmation. `plugin.test.ts` asserts this, and `overview.ts` plan notes only refer to it."
+      },
+      {
+        "criterion": "Null results: a null result is listed as no result and writes no file; tested",
+        "support": "`reports.test.ts` test \"a null result is no result: it is not listed and writes no file\" passes. `<report-file>` is now the placeholder in the root text and plan notes."
+      },
+      {
+        "criterion": "Gates: bun test, bun check, bun lint and bun fmt --check pass and dist matches a fresh build",
+        "support": "all five commands above exit 0, and the root prompt is 31160 bytes."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff-file",
+        "support": "/tmp/holyagent-review/assignment-0mvzrqoo2-qb6m.diff (`git diff` of all 12 changed files, 534 lines; there are no new files)"
+      },
+      {
+        "label": "tests-run",
+        "support": "`bun test` -> 1021 pass, 0 fail, 1 skip, 35 files, exit 0. The new tests are in `state-branch.test.ts`, `cli.test.ts` and `reports.test.ts`."
+      }
+    ]
   },
   "createdAt": "2026-11-02T21:26:13.346Z"
 }
