@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-the-repair-commits-081a273-and",
   "objective": "Re-review the repair commits 081a273 and 7ac8084 (git diff cf522df..7ac8084, code only) for correctness and regressions.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Previous code findings (all non-blocking) on ecea23f/41754dd: fetch without timeout, untested brief write failure, brief left after persist failure, brief Read under .git, add -f scope. Repairs: non-interactive fetch with an 8 s kill and no fetch from hooks (tree.ts, program.ts, hook.ts), credential helpers kept, assignment reports command (assignment.ts, report.ts journalResults, brief.ts writeReport), evidence matching (normalized, multi-line support, label equal to evidence label), dispatch prompt wording, plan notes (overview.ts), and their tests."
   ],
@@ -44,5 +44,10 @@
     "assignment-0mvzlcjd8-cyp6",
     "assignment-0mvzlp1ml-io0u"
   ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-02T18:49:06.517Z"
+  },
   "createdAt": "2026-11-02T18:49:02.214Z"
 }
