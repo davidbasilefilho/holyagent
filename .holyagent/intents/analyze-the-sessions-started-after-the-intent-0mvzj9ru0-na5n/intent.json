@@ -33,9 +33,13 @@
     "User (verbatim, pt-BR): se puder re-escrever/encurtar todas as instruções e skills depois de pesquisar as instruções e com as instruções de curto, direto e objetivo",
     "Decision: after the guide research, rewrite and shorten every agent instruction section and every skill to be short, direct and objective, following the official guides; keep every requirements.md behavior covered.",
     "User (verbatim, pt-BR): limpeza de sobras do billion context não entra em nada",
-    "Decision: the Billion Context leftover cleanup is in no skill or instruction: leave it out of any apply-defaults design and remove it from the existing setup skill and its docs during the rewrite."
+    "Decision: the Billion Context leftover cleanup is in no skill or instruction: leave it out of any apply-defaults design and remove it from the existing setup skill and its docs during the rewrite.",
+    "User (verbatim, pt-BR): ah encurtar não quer dizer tirar detalhes ou deixar ambiguo",
+    "Decision: shortening instruction text keeps every detail and adds no ambiguity: cut only restatement, filler and hedging; every condition, threshold, exception, name and example that carries information stays.",
+    "User (via screenshots of another session): the root asked a direction question, the user answered with a clarification instead of picking an option, and the root went ahead on its recommended default; the user replied \"YOU DIDNT ASK ME AGAIN???????? you were supposed to\".",
+    "Decision: an AskUserQuestion answer that clarifies, comments or adds a constraint without choosing an option is not a choice: fold it into the question and ask again; proceed on the recommended default only when the user gives no answer at all or has said they are away (user-busy). When the user has asked to be asked whenever something is ambiguous, ask before acting on any remaining ambiguity."
   ],
-  "revision": 6,
+  "revision": 7,
   "state": "Open",
   "createdAt": "2026-11-02T17:29:07.369Z"
 }
