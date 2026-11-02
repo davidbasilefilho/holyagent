@@ -1,0 +1,60 @@
+{
+  "id": "assignment-0mvzjrnq1-q6xv",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 2,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-state-branch-start-from-the",
+  "objective": "Make the state branch start from the remote's holyagent/state even when the clone has not fetched it, make state commits survive a .gitignore that ignores .holyagent/, and lower the effort of four specialist routes.",
+  "state": "Ready",
+  "scope": [
+    "packages/runtime/src/state/tree.ts ensureWorktree (about lines 427-472) and the state commit path that runs git add -A -- .holyagent.",
+    "packages/runtime/src/domain/route.ts SPECS."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md and AGENTS.md of the repository (Effect, Schema, JSDoc on exports, Bun APIs).",
+    "Other writers edit other paths of the same tree at the same time: touch only your ownership paths, and run the type-check, lint and the tests of your changed files (bun test <files>, mise run check, mise run lint) rather than judging others work in progress.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done and checked, stop and report with the changed paths and a diff-file evidence path (git diff -- <your paths>, new files included with git diff --no-index or git add -N avoided: list new files separately, saved under /tmp/holyagent-review/); do not add unrequested features or refactors (name them in the report)."
+  ],
+  "criteria": [
+    {
+      "text": "Remote fetch: when neither the local branch nor refs/remotes/origin/<state branch> exists, the CLI fetches the state branch from origin (quietly, tolerating an offline or missing remote) and, when it arrives, starts the local branch from it with tracking; only otherwise it starts from the base",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Ignored state: committing state in the state worktree succeeds when the branch's .gitignore ignores /.holyagent/ (as a branch started from main does), without changing the work branch's ignore rules",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Routes: Worker.operations, Worker.validation and Worker.mechanical are haiku with medium effort and Worker.integration is sonnet with medium effort; every other route is unchanged",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Tests: a test for each of the three changes fails without it, including a clone whose origin has holyagent/state but that has no remote-tracking ref for it",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Scope: only the ownership paths change",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "diff-file",
+    "tests-run"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/state",
+    "packages/runtime/src/domain/route.ts",
+    "packages/runtime/tests/state-branch.test.ts",
+    "packages/runtime/tests/state-mode.test.ts",
+    "packages/runtime/tests/route.test.ts",
+    "packages/runtime/tests/fixtures.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-02T17:43:01.849Z"
+}
