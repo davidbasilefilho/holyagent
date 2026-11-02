@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "close-the-instruction-review-findings-on",
   "objective": "Close the instruction-review findings on cf522df and the remaining open items, so the root text, the CLI it describes and the docs agree.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Artifact review of cf522df (report at /home/user/holyagent/.git/holyagent/reports/assignment-0mvzlcjpy-6ufq.md, read it): blocker 2, packages/runtime/src/cli/overview.ts:91-92 plan notes still tell the root to return reports keyed by id, treat a null report as errored and pipe report text, which contradicts workflows.md ({ done: [ids] } and report files); blocker 3, workflows.md has no rule for an Assignment that `assignment reports` does not list (its agent died: close it errored, once confirmed); blocker 4, rules stated twice (delegating.md:3 and context.md:3/:5; dispatch.md:3 and context.md:7; stack-plan.md:7, assignments.md:12 and version-control.md:11; dispatch.md:9 and ci.md:3; identity.md:5 and version-control.md:11; user-messages.md:6/:10 and task-list.md:3): keep each rule in one section, the core (identity, delegating, dispatch, task-list) stays within its 4,100-character cap.",
     "Its non-blocking notes: routing.md does not classify Reviewer.audit and Reviewer.artifact (haiku in route.ts); R-STATE's 'a mode moves no records' is missing from version-control.md; docs/usage.md omits the local/briefs fallback outside git; context.md and ci.md rules lack the reason beside them and context.md:9 lacks a concrete threshold; the window and effort text repeats across docs (keep one full statement, link the others).",
@@ -81,5 +81,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mvzkezwm-9ib4",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-02T18:37:03.221Z"
+  },
   "createdAt": "2026-11-02T18:36:59.134Z"
 }
