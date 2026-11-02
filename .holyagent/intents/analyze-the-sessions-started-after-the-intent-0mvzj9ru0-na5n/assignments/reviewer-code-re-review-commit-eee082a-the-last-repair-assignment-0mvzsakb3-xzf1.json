@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-commit-eee082a-the-last-repair",
   "objective": "Re-review commit eee082a, the last repair round, and say whether its fixes hold without new defects.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Only the diff of commit eee082a (git show eee082a, also at /tmp/holyagent-review/final-head.diff): packages/runtime/src/cli/report.ts, packages/runtime/src/state/tree.ts, packages/runtime/src/cli/assignment.ts and their tests.",
     "Items it was to fix: (1) an unindented [x]/[ ] checkbox item under an empty-support key line counts as support exactly when '- [x]' does; (2) an empty or whitespace workflow result is not listed and writes no report file; (3) with GIT_SSH and a configured core.sshCommand both set, the fetch uses core.sshCommand plus -o BatchMode=yes -o ConnectTimeout=5, while an env GIT_SSH_COMMAND, or GIT_SSH alone, is left alone."
@@ -44,7 +44,33 @@
     "agentId": "workflow:wf_4b555747-481/assignment-0mvzsakb3-xzf1",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-02T21:41:40.815Z"
+    "startedAt": "2026-11-02T21:41:40.815Z",
+    "finishedAt": "2026-11-02T21:47:39.514Z"
+  },
+  "result": "result: Re-review of eee082a: all three fixes hold and I found no blocking defects. The three changed test files pass: 111 pass, 0 fail, run with `bun test` in `packages/runtime` on the current tree. I only read the tree and ran tests.\n\nI did not run `mise run verify`. I did not run the new tests against the base, so the \"fails without the fix\" judgments below come from reading the diff.\n\nThe built-in `/code-review` ran on `eee082a^...eee082a` and returned six findings. I classify them as follows.\n- **`[ ]` counts as support (report.ts:22):** rejected. Item (1) requires the unindented `[x]`/`[ ]` form to match the dash form, which already stripped `[ ]`. The new test asserts that on purpose.\n- **Empty result is dropped silently (report.ts:312):** optional. The assignment requires this, and it matches how a null result is already treated.\n- **Closing rule folded into one long R-WORKFLOW line, with docs that point to it vaguely:** optional.\n- **`GIT_SSH` alone gets no BatchMode or ConnectTimeout (tree.ts:433):** rejected. Item (3) requires leaving it alone.\n- **`LIST_MARKER` duplicates the marker grammar in `LEADING`:** optional.\n- **`<report-file>` placeholder in the `assignment.ts` note:** optional, cosmetic.\n\nverdict: fixes hold, with no blocking regressions and no blocking test gaps.\n\nnotes (all optional):\n- The items above marked optional.\n- The generated `dist/scripts/holyagent.js` is rebuilt in the same commit and matches the sources.\n\nevidence:\nFixes: (1) `LIST_MARKER` at packages/runtime/src/cli/report.ts:19-22 now accepts `[ ]`/`[xX]`, applied at report.ts:43 and report.ts:52. (2) The `report.trim() !== \"\"` guard at report.ts:315-316 skips empty and whitespace results, so nothing is listed or written. (3) The `chosen` condition at packages/runtime/src/state/tree.ts:433-435 injects `core.sshCommand` plus the batch options when it is configured, even beside `GIT_SSH`. An env `GIT_SSH_COMMAND` is left alone, and `GIT_SSH` alone is left alone.\nNew defects: none. `list` only affects empty-key support, `chosen` is unchanged when `configured` is undefined, and a non-empty JSON or string result is unaffected.\nTests: packages/runtime/tests/cli.test.ts:572 covers `[x]` and `[ ]` unindented against `- [x]` (the old `LIST_ITEM` did not match `[x]`). packages/runtime/tests/reports.test.ts:164 covers empty and whitespace results (the old code listed them). packages/runtime/tests/state-branch.test.ts:383 sets `core.sshCommand` with `GIT_SSH` and asserts BatchMode and ConnectTimeout in the log (the old code skipped the options).\nverdict: pass\n",
+  "acceptance": {
+    "revision": 2,
+    "rationale": "Evidence cites file:line or command, exit code and counts on head eee082a.",
+    "criteria": [
+      {
+        "criterion": "Fixes: each of the three items holds, with file:line support",
+        "support": "(1) `LIST_MARKER` at packages/runtime/src/cli/report.ts:19-22 now accepts `[ ]`/`[xX]`, applied at report.ts:43 and report.ts:52. (2) The `report.trim() !== \"\"` guard at report.ts:315-316 skips empty and whitespace results, so nothing is listed or written. (3) The `chosen` condition at packages/runtime/src/state/tree.ts:433-435 injects `core.sshCommand` plus the batch options when it is configured, even beside `GIT_SSH`. An env `GIT_SSH_COMMAND` is left alone, and `GIT_SSH` alone is left alone."
+      },
+      {
+        "criterion": "New defects: any blocking regression introduced, or none",
+        "support": "none. `list` only affects empty-key support, `chosen` is unchanged when `configured` is undefined, and a non-empty JSON or string result is unaffected."
+      },
+      {
+        "criterion": "Tests: each fix has a test that would fail without it",
+        "support": "packages/runtime/tests/cli.test.ts:572 covers `[x]` and `[ ]` unindented against `- [x]` (the old `LIST_ITEM` did not match `[x]`). packages/runtime/tests/reports.test.ts:164 covers empty and whitespace results (the old code listed them). packages/runtime/tests/state-branch.test.ts:383 sets `core.sshCommand` with `GIT_SSH` and asserts BatchMode and ConnectTimeout in the log (the old code skipped the options)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "verdict",
+        "support": "pass"
+      }
+    ]
   },
   "createdAt": "2026-11-02T21:41:40.815Z"
 }
