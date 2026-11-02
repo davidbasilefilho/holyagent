@@ -2,7 +2,7 @@ import { lstat, mkdir, readdir, realpath, rename, rm, rmdir, stat } from "node:f
 import { basename, dirname, join, sep } from "node:path"
 
 import { $ } from "bun"
-import { Effect } from "effect"
+import { Effect, type Exit } from "effect"
 
 import { fromGitPath, toPosix } from "../domain/paths.ts"
 import { looksLikeAgent } from "../vcs/identity.ts"
@@ -448,10 +448,21 @@ const fetchEnvironment = (
  * children, and a kill of git alone would leave them running. A group that is already gone is not
  * an error. Windows has no process groups, so the child alone is killed there.
  */
-const killGroup = (child: Bun.Subprocess) =>
-  Effect.try(() =>
-    process.platform === "win32" ? child.kill("SIGKILL") : process.kill(-child.pid, "SIGKILL"),
-  ).pipe(Effect.ignore)
+export const killGroup = (child: Pick<Bun.Subprocess, "pid" | "kill">) =>
+  Effect.try(() => {
+    if (process.platform === "win32") return child.kill("SIGKILL")
+    // A negative pid of -1 reaches every process the user may signal, and 0 or 1 is no child's group.
+    if (Number.isInteger(child.pid) && child.pid > 1) process.kill(-child.pid, "SIGKILL")
+  }).pipe(Effect.ignore)
+
+/**
+ * Releases a bounded child: when its use failed or was interrupted, kills its group unless the
+ * child has already exited, because a reaped child's pid may belong to an unrelated group by now.
+ */
+export const releaseGroup = (
+  child: Pick<Bun.Subprocess, "pid" | "kill" | "exitCode">,
+  exit: Exit.Exit<unknown, unknown>,
+) => (exit._tag === "Failure" && child.exitCode === null ? killGroup(child) : Effect.void)
 
 /**
  * Runs git for its exit code only and, after `timeout` milliseconds, kills it and every helper it
@@ -489,7 +500,7 @@ const gitBounded = (
         Effect.tap((code) => (code === -1 ? killGroup(child) : Effect.void)),
       ),
     // An interrupted fetch must not leave the group running either.
-    (child, exit) => (exit._tag === "Failure" ? killGroup(child) : Effect.void),
+    releaseGroup,
   )
 
 /**
@@ -866,9 +877,13 @@ const migrateWorkTree = (
   )
 }
 
-/** The files HolyAgent writes under the state folder, relative to it: the settings and the records. */
+/**
+ * The files HolyAgent writes under the state folder, relative to it: the settings, the records and
+ * the legacy notes `holyagent migrate` copies into an Intent folder (`resume-notes.md` and
+ * `notes/`, never a `.tmp` file, which migrate leaves behind).
+ */
 const STATE_FILE =
-  /^(?:config\.json|intents\/[^/]+\/(?:intent\.json|(?:assignments|branches|pulls)\/[^/]+\.json))$/
+  /^(?:config\.json|intents\/[^/]+\/(?:intent\.json|(?:assignments|branches|pulls)\/[^/]+\.json|resume-notes\.md|notes\/(?:.+\/)?[^/]+(?<!\.tmp)))$/
 
 /**
  * Stages the changes under `.holyagent/` of the state worktree: the changes and removals of what

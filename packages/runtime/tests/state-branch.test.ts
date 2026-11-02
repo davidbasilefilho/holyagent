@@ -1,12 +1,12 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import { mkdir, readdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import { $ } from "bun"
-import { Effect } from "effect"
+import { Effect, Exit } from "effect"
 
 import { loadProject } from "../src/state/store.ts"
-import { fetchRemoteBranch } from "../src/state/tree.ts"
+import { fetchRemoteBranch, killGroup, releaseGroup } from "../src/state/tree.ts"
 import {
   cleanup,
   fakeGitHub,
@@ -445,6 +445,51 @@ describe("the fetch of the remote state branch", () => {
     expect(Date.now() - started).toBeLessThan(4000)
   })
 
+  describe("the group kill", () => {
+    /** Runs `body` with `process.kill` recorded instead of sent. */
+    const recording = async (body: () => Promise<void>) => {
+      const calls: Array<[number, string | number | undefined]> = []
+      const spy = spyOn(process, "kill").mockImplementation((pid, signal) => {
+        calls.push([pid, signal])
+        return true
+      })
+      try {
+        await body()
+      } finally {
+        spy.mockRestore()
+      }
+      return calls
+    }
+    const kill = () => {}
+    const failed = Exit.fail("interrupted")
+
+    test("never signals a pid of 1 or less, which would reach every process or none", async () => {
+      const calls = await recording(async () => {
+        for (const pid of [1, 0, -1, -7, 1.5, Number.NaN, undefined as unknown as number])
+          await Effect.runPromise(killGroup({ pid, kill }))
+      })
+
+      expect(calls).toEqual([])
+    })
+
+    test("signals the group of a child with a real pid", async () => {
+      const calls = await recording(() => Effect.runPromise(killGroup({ pid: 4242, kill })))
+
+      expect(calls).toEqual([[-4242, "SIGKILL"]])
+    })
+
+    test("a failed use kills the group of a running child but not of one that already exited", async () => {
+      const calls = await recording(async () => {
+        await Effect.runPromise(releaseGroup({ pid: 4242, kill, exitCode: null }, failed))
+        await Effect.runPromise(releaseGroup({ pid: 4343, kill, exitCode: 0 }, failed))
+        await Effect.runPromise(releaseGroup({ pid: 4444, kill, exitCode: 128 }, failed))
+        await Effect.runPromise(releaseGroup({ pid: 4545, kill, exitCode: null }, Exit.succeed(0)))
+      })
+
+      expect(calls).toEqual([[-4242, "SIGKILL"]])
+    })
+  })
+
   test("a fetch killed at its timeout leaves no helper process running", async () => {
     const pidFile = join(await scratch("holyagent-pid-"), "helper.pid")
     // The helper stands for an ssh or credential helper that git started and then hangs on.
@@ -523,6 +568,48 @@ describe("a base branch that ignores the state folder", () => {
         stray,
         committed: false,
       })
+  })
+})
+
+describe("migrating the legacy state", () => {
+  test("the notes copied into an Intent folder are committed, a stray file beside them is not", async () => {
+    const dir = await initRepo(OWNER)
+    const folder = ".holyclaude/intents/take-over-legacy-state-intent-0mvp7hcqf-t7pm"
+    await seed(dir, {
+      "a.txt": "a\n",
+      ".gitignore": "/.holyagent/\n",
+      [`${folder}/intent.json`]: JSON.stringify({
+        id: "intent-0mvp7hcqf-t7pm",
+        objective: "Take over legacy state",
+        requirements: "Convert it.",
+        revision: 1,
+      }),
+      [`${folder}/resume-notes.md`]: "# Resume\n",
+      [`${folder}/notes/design.md`]: "design\n",
+      [`${folder}/notes/deep/more.md`]: "more\n",
+      [`${folder}/notes/scratch.tmp`]: "temporary\n",
+    })
+
+    const done = toon(await holy(dir, ["migrate"])) as { migrated: boolean }
+    expect(done.migrated).toBe(true)
+    // A file that is neither a record, the settings nor a copied note stays out of the commit.
+    const state = join(await stateTree(dir), ".holyagent")
+    const migrated = (await readdir(join(state, "intents")))[0] ?? ""
+    await writeFile(join(state, "intents", migrated, "stray.md"), "stray\n")
+    await createIntent(dir, "Ship the lexer")
+
+    const tracked = lines(await sh(dir, ["git", "ls-tree", "-r", "--name-only", STATE]))
+    const prefix = `.holyagent/intents/${migrated}/`
+    const inside = tracked
+      .filter((path) => path.startsWith(prefix))
+      .map((path) => path.slice(prefix.length))
+    expect(inside.toSorted()).toEqual([
+      "intent.json",
+      "notes/deep/more.md",
+      "notes/design.md",
+      "resume-notes.md",
+    ])
+    expect(await sh(dir, ["git", "status", "--porcelain"])).toBe("")
   })
 })
 

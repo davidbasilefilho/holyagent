@@ -50,7 +50,14 @@ describe("instruction sources", () => {
 
   test("give each skill a folder named after it and only the frontmatter keys claude.ai accepts", () => {
     const skills = readdirSync(join(CLAUDE, "skills"))
-    expect(skills.toSorted()).toEqual(["dev-server", "user-busy"])
+    expect(skills.toSorted()).toEqual([
+      "ci-watch",
+      "dev-server",
+      "instruction-writing",
+      "state-mode",
+      "user-busy",
+      "visual-judging",
+    ])
     for (const skill of skills) {
       const text = read(join(CLAUDE, "skills", skill, "SKILL.md"))
       const keys = frontmatterKeys(text)

@@ -30,6 +30,15 @@ import { fresh, PLUGIN, ROOT } from "./built.ts"
 const read = (...path: Array<string>) => readFileSync(join(ROOT, ...path), "utf8")
 const CLAUDE = "packages/runtime/src/instructions/claude-5.5"
 const AGENTS = join("packages", "integrations", "claude", "dist", "agents")
+/** The skills of the plugin, which only the root loads. */
+const SKILLS = [
+  "ci-watch",
+  "dev-server",
+  "instruction-writing",
+  "state-mode",
+  "user-busy",
+  "visual-judging",
+]
 
 /** The paths of every file below a path of the repository, relative to the repository. */
 const filesBelow = async (path: string): Promise<ReadonlyArray<string>> => {
@@ -318,7 +327,7 @@ describe("agents", () => {
       .filter((file) => !file.path.includes("/scripts/"))
       .flatMap((file) => file.content.match(/holyagent:[A-Za-z0-9._-]+/g) ?? [])
       .map((reference) => reference.slice("holyagent:".length))
-    const known = new Set([...agents, "dev-server", "user-busy"])
+    const known = new Set([...agents, ...SKILLS])
     for (const name of [...references, ...ROUTES.map((route) => route.agent)]) {
       expect(name).toMatch(/^[a-z]+(?:-[a-z]+)*$/)
       expect(known.has(name)).toBe(true)
@@ -355,7 +364,7 @@ describe("agents", () => {
       "no scheduled check-ins or wait loops",
       "Never force-push",
       "Hook and harness noise gets no mention or reply",
-      "the push once the reviews accept",
+      "push once the reviews accept",
       "Read only what a decision needs",
     ])
       expect({ rule, count: content.split(rule).length - 1 }).toEqual({ rule, count: 1 })
@@ -401,6 +410,7 @@ describe("agents", () => {
     expect(ids.toSorted()).toEqual(Object.keys(REQUIREMENT_SECTIONS).toSorted())
 
     const assembled = [
+      ...SKILLS.map((name) => `skills/${name}/SKILL.md`),
       ...ROOT_SECTIONS.map((name) => `root/${name}`),
       ...SPECIALIST_SECTIONS.map((name) => `specialist/${name}`),
       ...CONDITIONAL_SECTIONS.map(({ file }) => `specialist/${file}`),
@@ -412,6 +422,11 @@ describe("agents", () => {
       expect({ id, assembled: assembled.includes(section) }).toEqual({ id, assembled: true })
       expect({ id, holds: read(CLAUDE, section).includes(phrase) }).toEqual({ id, holds: true })
       const conditional = CONDITIONAL_SECTIONS.find(({ file }) => section === `specialist/${file}`)
+      if (section.startsWith("skills/")) {
+        const skill = generated.find((file) => file.path.endsWith(section))
+        expect({ id, skill: skill?.content.includes(phrase) }).toEqual({ id, skill: true })
+        continue
+      }
       const reached = section.startsWith("root/")
         ? ["holyagent"]
         : section.startsWith("roles/")
@@ -529,6 +544,7 @@ describe("agents", () => {
         "TaskUpdate",
         "TaskList",
         "TaskGet",
+        "TaskStop",
         "Read",
         "Bash",
       ],
@@ -591,10 +607,8 @@ describe("agents", () => {
       "never open or re-emit the brief",
       "`assignment close <id> --outcome <o> < <report-file>`",
       "a cap on the report",
-      "Read an image in the main thread only to show it to the user (a path is not delivery) or to settle a concrete doubt",
       "no scheduled check-ins or wait loops",
       "a wake that changes nothing gets one short line",
-      "It is the only CI wait",
       "The route table, not the brief, sets model and effort",
       "data, list or count corrections",
       "resolving conflicts in tests or generated files",
@@ -627,7 +641,7 @@ describe("agents", () => {
       .filter((file) => file.path.endsWith("SKILL.md"))
       .map((file) => file.path.split("/").at(-2) ?? "")
       .toSorted()
-    expect(names).toEqual(["dev-server", "user-busy"])
+    expect(names).toEqual(SKILLS)
     expect(agent("reviewer-code")?.content).toContain(
       "Start every review, re-reviews included, with the built-in `/code-review`",
     )
@@ -727,11 +741,119 @@ describe("agents", () => {
     expect(read("packages/integrations/claude/dist/skills/dev-server/SKILL.md")).toBe(skill ?? "")
   })
 
-  test("the root judges visual work from a section of its own, ahead of the guidelines", () => {
-    expect(ROOT_SECTIONS.indexOf("visual.md")).toBeGreaterThan(
-      ROOT_SECTIONS.indexOf("assignments.md"),
+  test("the four moment-specific sections are root skills that open with the situation, and their text is out of the root prompt", () => {
+    const root = agent("holyagent")?.content ?? ""
+    const extracted: Record<string, ReadonlyArray<string>> = {
+      "visual-judging": [
+        "A discrepancy is material, and starts a repair whatever its size",
+        "Read an image in the main thread only to show it to the user (a path is not delivery) or to settle a concrete doubt",
+        "after three, report the finding as a blocker",
+        "`html_render`",
+      ],
+      "ci-watch": [
+        "Watch with Monitor running `gh pr checks <n> --watch`",
+        "the only CI wait",
+        "Failed, Unknown, Pending, Passed",
+        "claims to verify",
+      ],
+      "instruction-writing": [
+        "US English",
+        "`requirements.md`",
+        "prompting guidance",
+        "in its own file",
+        "`<example>` tags",
+      ],
+      "state-mode": [
+        "set the mode with `holyagent state mode <mode>`",
+        "`git ls-files .holyagent ':!.holyagent/config.json'`",
+        "in one shared worktree",
+      ],
+    }
+    expect(ROOT_SECTIONS).not.toContain("visual.md")
+    expect(ROOT_SECTIONS).not.toContain("ci.md")
+    const pointers = read(`${CLAUDE}/root`, "skills.md")
+    for (const [name, parts] of Object.entries(extracted)) {
+      const skill = generated.find((file) => file.path.endsWith(`skills/${name}/SKILL.md`))?.content
+      expect({ name, generated: skill !== undefined }).toEqual({ name, generated: true })
+      expect(field(skill ?? "", "name")).toBe(name)
+      expect(field(skill ?? "", "description")).toStartWith("Use ")
+      expect(pointers).toContain(`\`${name}\``)
+      expect(root).toContain(`\`${name}\``)
+      for (const part of parts) {
+        expect({ name, part, inSkill: skill?.includes(part) }).toEqual({
+          name,
+          part,
+          inSkill: true,
+        })
+        expect({ name, part, inRoot: root.includes(part) }).toEqual({ name, part, inRoot: false })
+      }
+    }
+    // The brief essentials stay in the root: full task with reasons, keep-working, a real check.
+    const briefs = read(`${CLAUDE}/root`, "instruction-guidelines.md")
+    for (const part of ["Keep working until everything asked is done", "A real check before"])
+      expect(briefs).toContain(part)
+    expect(read("packages/integrations/claude/dist/skills/visual-judging/SKILL.md")).toBe(
+      generated.find((file) => file.path.endsWith("skills/visual-judging/SKILL.md"))?.content ?? "",
     )
-    expect(agent("holyagent")?.content).toContain(read(`${CLAUDE}/root`, "visual.md").trim())
+  })
+
+  test("every agent prompt, the root's and each specialist's, says 'Respond tersely.'", () => {
+    const agents = generated.filter((file) => file.path.includes("/agents/"))
+    expect(agents).toHaveLength(ROUTES.length + 1)
+    for (const file of agents)
+      expect({ path: file.path, found: file.content.includes("Respond tersely.") }).toEqual({
+        path: file.path,
+        found: true,
+      })
+    for (const file of agents) expect(read(file.path)).toContain("Respond tersely.")
+  })
+
+  test("the root can stop a running agent or workflow, and only the root", () => {
+    expect(deniedTools("agents/holyagent.md")).not.toContain("TaskStop")
+    for (const route of ROUTES)
+      expect(deniedTools(`agents/${route.agent}.md`)).toContain("TaskStop")
+    const dispatch = read(`${CLAUDE}/root`, "dispatch.md")
+    expect(dispatch).toContain(
+      "only when a new requirement or new information conflicts with that running work",
+    )
+    expect(dispatch).toContain(
+      "When finishing and then repairing costs less than stopping and relaunching",
+    )
+    expect(dispatch).toContain("Close a stopped Assignment with `--outcome stopped`")
+    expect(dispatch).not.toMatch(/no polling, steering or stopping/)
+    expect(read("packages/runtime/src/instructions", "requirements.md")).not.toContain(
+      "steering or stopping",
+    )
+  })
+
+  test("the guide gaps are each stated once, in the file that owns them", () => {
+    const once = (text: string, phrase: string) => text.split(phrase).length - 1
+    const root = agent("holyagent")?.content ?? ""
+    const gaps: ReadonlyArray<readonly [string, string, string]> = [
+      ["G1", `${CLAUDE}/root/task-list.md`, "End your turn only when the work is done"],
+      ["G2", `${CLAUDE}/root/user-messages.md`, "asks for ideas, options or a plan"],
+      [
+        "G3",
+        `${CLAUDE}/specialist/writing-bar.md`,
+        "filler sections, redundant summaries or boilerplate",
+      ],
+      ["G4", `${CLAUDE}/specialist/scope.md`, "seems mistaken or a better approach exists"],
+    ]
+    for (const [gap, path, phrase] of gaps) {
+      expect({ gap, count: once(read(path), phrase) }).toEqual({ gap, count: 1 })
+      // No other instruction file states it.
+      const holders = generated
+        .filter((file) => file.path.includes("/agents/") || file.path.includes("/skills/"))
+        .filter((file) => file.content.includes(phrase))
+        .map((file) => file.path.split("/").at(-1))
+      expect({ gap, holders: holders.length > 0 }).toEqual({ gap, holders: true })
+    }
+    expect(once(root, "asks for ideas, options or a plan")).toBe(1)
+    for (const route of ROUTES) {
+      const text = agent(route.agent)?.content ?? ""
+      expect(once(text, "seems mistaken or a better approach exists")).toBe(1)
+      expect(once(text, "End your turn only when the work is done")).toBe(0)
+    }
   })
 
   test("the writing bar is in the implementation writer and the artifact reviewer once, and nowhere else", () => {

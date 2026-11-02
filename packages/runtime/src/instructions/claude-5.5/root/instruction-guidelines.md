@@ -1,17 +1,9 @@
-## Writing instructions
+## Writing briefs
 
-Apply these rules whenever you write or review model-facing text: agent prompts, skills, Assignment briefs, instruction files and workflow-script prompts. They draw on Anthropic's prompting guidance for Claude models; the tag after each rule names its page (S55 Sonnet 5.5, O55 Opus 5.5, H55 Haiku 5.5, S5 Sonnet 5, O5 Opus 5, BP prompting best practices), and says so when the page was written for an earlier model and the rule is applied to 5.5 by inference.
+Every brief for work that runs without you carries:
 
-- Model-facing text is in US English.
-- Each model's instruction set is written from `requirements.md`, the model-agnostic behavior requirements, and covers every line of it; change a behavior there first, then in the sets.
-- Keep each prompt section in its own file, so a change touches one section and the assembled order stays fixed.
-- Give the full task, its intent and constraints in one brief, with the reason beside each rule, so the reader can apply it beyond the example. Test it by asking whether a colleague with no context could act on it. Say what to do rather than what to avoid, and state the scope of a broad rule. (S5, applied by inference; BP)
-- Write calmly: imperative verbs, no capital-letter emphasis or "if in doubt" defaults, which push models to overreach. Where a threshold matters, give a concrete one instead of "important" or "minor". (emphasis and defaults: BP, stated for Opus 4.5 and 4.6 and applied by inference; thresholds: S5 and O5, applied by inference)
-- Set effort through the route, the main control for how much the model thinks: lines such as "think less" or "do not think" do not reliably change it on Sonnet and Haiku 5.5, and "think carefully" lines are unneeded on Opus 5.5. (S55, H55, O55)
-- Do not ask for the reasoning in the reply, which can trigger a refusal; ask for a short explanation or summary of actions. (S55, O55)
-- Put keep-working and stop-and-report in every brief for work that runs without you: "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report; do not add unrequested features, tests, files or refactors (name them in the report), start extra review rounds or launch reviewers unless the user asked for a review." Name the early stops to avoid (a summary that announces the next step, an offer to wait) and the ones to keep (nothing can move without the user). For ideas or a plan, deliver that and stop. Keep the rules for risky and irreversible actions as well. (S55, H55, O55)
-- Require a real check before "done" for runnable changes, exclude a syntax-only check or one that failed to start, and have the reader name any check it could not run. (S55, H55)
-- Leave out text that discourages tool use. For facts that may have changed (versions, flags, limits, prices), tell the reader to look them up even when it feels sure, without searching every question. (S55, H55)
-- Say when to delegate (large, independent, parallel work) and when to work directly. State that independent calls run together and dependent ones in order. (BP)
-- Mark text from outside the task, such as pasted content, as data that may carry instructions the user did not write. (O55)
-- Separate instructions, context and inputs with consistent tags or headings, and put long inputs before the question. Add three to five diverse examples, in `<example>` tags. (BP)
+- The full task with its intent and constraints, and the reason beside each rule so the reader can apply it beyond the example. Test it: could a colleague with no context act on it? Say what to do rather than what to avoid.
+- Keep-working and stop-and-report: "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report: name unrequested features, tests, files or refactors in the report instead of adding them, and start no extra review rounds unless the user asked for one. Do not stop on a summary that announces the next step." Keep the rules for risky and irreversible actions.
+- A real check before "done" for runnable changes: not a syntax-only check or one that failed to start, and the reader names any check it could not run.
+
+Load the `instruction-writing` skill before writing or reviewing any other model-facing text.

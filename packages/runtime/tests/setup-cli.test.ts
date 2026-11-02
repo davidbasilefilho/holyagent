@@ -39,7 +39,6 @@ describe("holyagent setup and doctor as commands", () => {
     const result = await cli(["setup", "--dry-run", "--skip-ctx7"])
     expect(result.code).toBe(0)
     expect(result.stderr).toBe("")
-    expect(result.stdout).toContain("= billion-context: no leftovers\n")
     expect(result.stdout).toContain("+ includeGitInstructions: added false\n")
     expect(result.stdout).toEndWith("dry run: would add 10, nothing written\n")
     expect(await Bun.file(settings()).exists()).toBe(false)
@@ -79,12 +78,6 @@ describe("holyagent setup and doctor as commands", () => {
     const result = await cli(["setup", "--subagent-cache-ttl", "2h"])
     expect(result.code).not.toBe(0)
     expect(result.stderr).toContain("subagent-cache-ttl")
-    expect(await Bun.file(settings()).exists()).toBe(false)
-  })
-
-  test("setup has no --skip-billion-context: Billion Context is no longer installed", async () => {
-    const result = await cli(["setup", "--skip-billion-context"])
-    expect(result.code).not.toBe(0)
     expect(await Bun.file(settings()).exists()).toBe(false)
   })
 

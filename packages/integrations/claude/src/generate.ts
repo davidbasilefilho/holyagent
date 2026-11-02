@@ -139,8 +139,8 @@ const hooks = (): GeneratedFile => ({
 })
 
 /**
- * The `/holyagent:setup` command, a prompt that runs `holyagent setup` and shows its report, like
- * Billion Context's own setup command. `${CLAUDE_PLUGIN_ROOT}` is substituted in the body
+ * The `/holyagent:setup` command, a prompt that runs `holyagent setup` and shows its report.
+ * `${CLAUDE_PLUGIN_ROOT}` is substituted in the body
  * (https://code.claude.com/docs/en/plugins-reference, "Environment variables"); the docs do not say
  * it is in `allowed-tools`, so that rule matches the bun call by its script names instead.
  */

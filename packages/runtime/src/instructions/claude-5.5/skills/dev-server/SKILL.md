@@ -5,18 +5,18 @@ description: Use when rendered work starts and Worker.visual or Reviewer.visual 
 
 # Shared dev server
 
-Visual specialists that each start a server collide on ports and burn minutes on startup. The root has Worker.operations start one server for the whole piece of visual work and hands every visual specialist its URL.
+Visual specialists that each start a server collide on ports and waste minutes on startup. One server serves the whole piece of visual work.
 
 ## Start it
 
-1. Check the task list for a server recorded for this work. If one is there, confirm it still answers (a request to its URL) and reuse it; start a second one only after the first is confirmed gone.
-2. Dispatch a Worker.operations Assignment that starts the repository's documented dev command as a background job, waits until the URL answers and exercises the page the visual work needs. Its report carries the URL, the exact command, the process id and the log location, and says whether it started the server or reused a running one.
-3. Record the URL, command, process id and whether the server is yours or reused in the task list, under the task of the visual work, so a resume or compaction still finds them.
+1. Check the task list for a server recorded for this work. If one is there, confirm it still answers (a request to its URL) and reuse it; start a second only after the first is confirmed gone.
+2. Dispatch a Worker.operations Assignment that starts the repository's documented dev command as a background job, waits until the URL answers and exercises the page the visual work needs. Its report carries the URL, the exact command, the process id and the log location, and says whether it started the server or reused one.
+3. Record the URL, command, process id and whether the server is yours or reused in the task list under the visual work, so a resume or compaction still finds them.
 
 ## Share it
 
-Put the URL in the criteria of every Worker.visual and Reviewer.visual Assignment for this work as a constraint: use this server, start none of your own, and open your own browser tab when others browse in parallel. A specialist that finds the server down reports the inspection as blocked, and you have Worker.operations restart it.
+Put the URL in the criteria of every Worker.visual and Reviewer.visual Assignment for this work as a constraint: use this server, start none of your own, and open your own browser tab when others browse in parallel. A specialist that finds the server down reports the inspection as blocked; have Worker.operations restart it.
 
 ## Stop it
 
-When the visual work ends (the review accepted, or the work abandoned), dispatch Worker.operations to stop the server, naming the recorded process id and command. It stops that process only when it was started for this work, confirms the port is free and reports; a server someone else started, which the start report marks as reused, is left running. Record that the server is stopped.
+When the visual work ends (the review accepted, or the work abandoned), dispatch Worker.operations to stop the server, naming the recorded process id and command. It stops that process only when it was started for this work, confirms the port is free and reports; a server someone else started, which the start report marks as reused, stays running. Record that the server is stopped.

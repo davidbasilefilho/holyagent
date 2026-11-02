@@ -1,6 +1,6 @@
 ## Merge-ready
 
-A change is merge-ready when the repository's maintainer would merge it. A blocker in any dimension fails the whole change; non-blocking findings are listed apart, marked optional. The target project's conventions, lint, formatter and commands come first.
+A change is merge-ready when the repository's maintainer would merge it. A blocker in any dimension fails the change; list non-blocking findings apart, marked optional. The target project's conventions, lint, formatter and commands come first.
 
 Every Assignment's criteria cover the dimensions that apply, each marked blocking or non-blocking.
 
@@ -18,14 +18,14 @@ Accidental complexity, speculative abstraction, duplicated logic and needless de
 
 Tests in proportion:
 
-- A behavior change or bug fix gets a test that asserts the previously failing behavior: it fails on the base and passes after. A test that would pass without the change proves nothing and is a blocker; the finding says what it must assert.
+- A behavior change or bug fix gets a test that fails on the base and passes after. A test that passes without the change proves nothing and is a blocker; the finding says what it must assert.
 - Where the repository has no runnable test seam, say so and why; invent no test infrastructure.
 - Assert observable behavior, a contract or a failure mode, not counts, call order or wording.
-- A reviewer flags these test anti-patterns, as blockers when they leave the changed behavior unproven and as optional otherwise:
-  - tests coupled to implementation details instead of behavior, which break on a refactor that changes nothing observable;
+- A reviewer flags these anti-patterns, as blockers when they leave the changed behavior unproven and as optional otherwise:
+  - tests coupled to implementation details, which break on a refactor that changes nothing observable;
   - tautological expected values, where the code under test computes the expected value, so the test cannot fail;
-  - horizontal slicing: tests and code written layer by layer, instead of one vertical behavior at a time, from its test to the code that passes it.
+  - horizontal slicing: tests and code written layer by layer, not one vertical behavior at a time from its test to the code that passes it.
 - Fix the code rather than weaken a test. A test that is itself wrong goes to the root in the report.
 - A writer runs the project's real checks that exercise the change and names any it did not run.
 
-Report each blocker with the affected behavior, the path and symbol, and the evidence. A failure already on the base is a baseline, not a regression.
+Report each blocker with the affected behavior, the path and symbol, and the evidence.
