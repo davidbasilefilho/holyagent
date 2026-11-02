@@ -1,0 +1,52 @@
+{
+  "id": "assignment-0mvzvfmfz-5yi5",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 8,
+  "roleTask": "Worker.implementation",
+  "slug": "close-the-four-remaining-artifact-review",
+  "objective": "Close the four remaining artifact-review findings and its wording note in the instruction text.",
+  "state": "Running",
+  "scope": [
+    "Findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mvzv9go6-psy0.md (blockers 1-4 and the ci-watch note). Files under packages/runtime/src/instructions/claude-5.5/ and requirements.md.",
+    "1: restore 'or launch reviewers' in root/instruction-guidelines.md:6 (and requirements if mirrored).",
+    "2: restore in skills/instruction-writing/SKILL.md the two rules the repair removed (full task, intent and constraints with the reason beside each rule, say what to do rather than what to avoid; require a real check before 'done' for runnable changes, excluding a syntax-only check or one that failed to start, and name any check not run (S55, H55)); old wording is in git show f13dfd0:packages/runtime/src/instructions/claude-5.5/skills/instruction-writing/SKILL.md. Keep the brief copies in root/instruction-guidelines.md.",
+    "3: root/version-control.md:11 'The push rules above apply': name them (the force-push and protected-branch rules in identity.md).",
+    "4: the root's mistaken-request rule (root/user-messages.md:7, requirements.md R-FLAG) gets its channel: the one sentence goes in the acknowledgment of that user message, which is already a permitted message; it is not a pending decision unless different readings lead to materially different work, which goes through AskUserQuestion. Make user-messages.md:12 and R-TASKLIST consistent with it.",
+    "Note: ci-watch/SKILL.md:13 'since no data is not Passed' -> 'since no data is Unknown, not Passed'.",
+    "Rebuild dist with bun packages/integrations/claude/build.ts at the end."
+  ],
+  "constraints": [
+    "Keep every existing detail; add or clarify, do not shorten.",
+    "No version-control writes and no edits under .git/ or .holyagent/; report changed paths.",
+    "Keep working until done; when done and checked, stop and report. Respond tersely."
+  ],
+  "criteria": [
+    {
+      "text": "Findings closed: blockers 1-4 and the ci-watch note each fixed, listed with file:line",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Gates: bun check, bun lint, bun fmt --check and bun test exit 0 after rebuilding dist",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/integrations/claude"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvzv9go6-psy0",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-02T23:09:35.711Z"
+  },
+  "createdAt": "2026-11-02T23:09:35.711Z"
+}
