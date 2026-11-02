@@ -42,5 +42,26 @@
     "finishedAt": "2026-11-02T23:04:29.213Z"
   },
   "result": "result: Repair accepted. No blockers in the repair; tests pass with the fix, and the new assertion fails on the base `tree.ts` and `migrate.ts`.\n\nchanged: none (read-only). I extracted the commit with `git archive` into scratch because the shared tree is at f13dfd0 with uncommitted edits.\n\nchecks:\n- `bun test tests/state-branch.test.ts` on ce4bf20 -> exit 0, 46 pass, 0 fail\n- same test with 4724ca7's `tree.ts` and `migrate.ts` -> exit 1, 45 pass, 1 fail; the migrate test fails because `plan.old-001.toon` and `plan.toon` are missing from the committed list\n- `mise run check` (type-check) on ce4bf20 -> exit 0, no errors in 121 files\n- `bun lint` -> exit 0, no problems in 122 files\n- `bun fmt --check` -> exit 0, 241 files formatted\n- Not run: the full `mise run verify` and the other packages' tests; the repair touches only the runtime state module.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- The `/code-review` run on `4724ca7...ce4bf20` also covered the unrelated docs commit 35b4cd4, which was already reviewed. I rejected its findings on `worker-visual`, `merge-ready.md`, `user-messages.md`, `version-control.md`, `instruction-guidelines.md` and `pr-text.md` as out of scope. They concern deliberate instruction-text dedup, not this repair.\n- Optional, from `/code-review`: if `commitState` fails after `writeAll`, a migrate re-run refuses because the targets exist. The copied files then stay untracked, since later calls pass `copied = []`. This exists on the base too, so it is not a regression.\n- Optional, from `/code-review`: a cross-drive `relative()` on Windows could yield an absolute path. I rejected it as a blocker because `note.to` is built under the same `directory` that `folder` derives from, and I could not run it on Windows.\n- Optional: the `STATE_FILE` doc comment still says it lists the notes migrate copies, which is no longer the whole story. `copied` now covers `plan.toon` and the rest.\n\nevidence:\nRepair: Every copied note is committed through the new `copied` argument. `stageState` in `tree.ts` drops any path that is outside `.holyagent/` (`../` prefix) or under `local/` before `add -f`, and the new test asserts `plan.toon` and `plan.old-001.toon` are tracked. `stray.md` and `scratch.tmp` stay untracked, and `git status --porcelain` is empty.\nRegressions: ce4bf20 passes 46/46, including the stray-file assertions. The base source fails only the new test, on the missing `plan` files.\nchecks-run: the five commands above, with the exit codes and counts listed.\n",
+  "acceptance": {
+    "revision": 8,
+    "carriedFrom": 7,
+    "rationale": "Revision 8 adds a context-file writing rule unrelated to state; re-review ran ce4bf20 from an archive, new assertion fails on base and passes on the fix, previous blocker closed.",
+    "criteria": [
+      {
+        "criterion": "Repair: every file migrate copies is committed to the state branch, and a copied path outside .holyagent/ or under local/ is never force-added",
+        "support": "Every copied note is committed through the new `copied` argument. `stageState` in `tree.ts` drops any path that is outside `.holyagent/` (`../` prefix) or under `local/` before `add -f`, and the new test asserts `plan.toon` and `plan.old-001.toon` are tracked. `stray.md` and `scratch.tmp` stay untracked, and `git status --porcelain` is empty."
+      },
+      {
+        "criterion": "Regressions: stray-file tests still pass and the new test fails without the fix",
+        "support": "ce4bf20 passes 46/46, including the stray-file assertions. The base source fails only the new test, on the missing `plan` files."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "the five commands above, with the exit codes and counts listed."
+      }
+    ]
+  },
   "createdAt": "2026-11-02T22:58:36.270Z"
 }
