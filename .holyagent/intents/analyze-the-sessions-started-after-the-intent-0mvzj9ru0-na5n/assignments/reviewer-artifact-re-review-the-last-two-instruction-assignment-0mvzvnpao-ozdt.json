@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "re-review-the-last-two-instruction",
   "objective": "Re-review the last two instruction commits (ab2ca8b..02df5d8): the final repair against the previous findings, and the new context-file rule.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Previous findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mvzv9go6-psy0.md (blockers 1-4, ci-watch note). Diff: /tmp/holyagent-review/final-text.diff. Read current files for context.",
     "The context-file rule (commit d155593) in roles/worker-implementation/instruction-text.md, roles/reviewer-artifact/instruction-text.md, skills/instruction-writing/SKILL.md and requirements.md R-CONTEXT: when writing or editing AGENTS.md, CLAUDE.md and similar, leave out content that changes or that the agent can discover (code and documentation paths, directory listings, codebase overviews), include only what the repository does not already say; the repository convention comes first and an existing file that departs from it changes only when the user asks; source arXiv 2602.11988, staleness harm as inference."
@@ -42,7 +42,28 @@
     "agentId": "workflow:wf_19258962-716/assignment-0mvzvnpao-ozdt",
     "model": "haiku",
     "effort": "high",
-    "startedAt": "2026-11-02T23:15:52.656Z"
+    "startedAt": "2026-11-02T23:15:52.656Z",
+    "finishedAt": "2026-11-02T23:17:56.539Z"
+  },
+  "result": "result: Re-review passes. All four previous blockers and the ci-watch note are closed, the context-file rule is present and correctly sourced in its three places, and the repair removes no detail and adds no new ambiguity.\nchanged: none (read-only review)\nchecks: no shell in this session, so no git or project gate was run. Evidence is Read and Grep on the current sources under packages/runtime/src/instructions/claude-5.5/ and packages/runtime/src/instructions/requirements.md, the diff file /tmp/holyagent-review/final-text.diff, the prior report, and the generated dist (packages/integrations/claude/dist), which carries the changed lines. Source check: Exa fetch of arxiv.org/abs/2602.11988 and arxiv.org/html/2602.11988, plus one search excerpt. Whether the dist matches the sources exactly was checked only by grep on the changed lines.\nblockers: none\nquestions: none\nnotes:\n- Skill instruction-writing/SKILL.md:22 lists \"commands and tools to use\" as content to keep. Neither the paper nor requirements.md:53 names it; the paper recommends only instructions the README lacks, such as conventions or non-functional requirements. The bullet also carries the author tag for the whole rule. Non-blocking, because a command already in the README is excluded by the rule itself.\n- requirements.md:53, 101 and 132 add R-CONTEXT, R-RA-CONTEXT and R-WI-CONTEXT. These are the model-agnostic source lines for the three places, and R-CONTEXT states its own reach, so this is consistent with the brief.\n- The brief's \"no new loss\" check was done from the diff file, since git could not run. Every \"-\" line in the diff is replaced by an equal or longer line.\n- The ci-watch wording at ci-watch/SKILL.md:14 now reads cleanly.\nevidence:\nClosed: root/instruction-guidelines.md:6 restores \"or launch reviewers\" (previous blocker 1; dist agents/holyagent.md:119 matches). skills/instruction-writing/SKILL.md:13 restores \"Give the full task, intent and constraints ... Say what to do rather than what to avoid\" and :17 restores the real-check rule (previous blocker 2). root/version-control.md:11 now names \"the force-push and protected-branch rules in identity.md\", and identity.md:9 contains them (previous blocker 3). root/user-messages.md:7 and :12, root/task-list.md:3, requirements.md:14, :16, :17 and :20 name the acknowledgment as the permitted channel for the one-sentence note (previous blocker 4). skills/ci-watch/SKILL.md:14 reads \"since no data is Unknown, not Passed\" (ci-watch note).\nContext rule: met. Present at roles/worker-implementation/instruction-text.md:2, roles/reviewer-artifact/instruction-text.md:2 and skills/instruction-writing/SKILL.md:22. The convention-first and change-only-when-asked clauses appear in all three. Source: arxiv.org/abs/2602.11988 supports \"repository overviews ... are not helpful\", \"increasing inference cost by over 20%\" and \"should only include instructions ... not already present in the README (e.g., specific conventions or non-functional requirements)\". The search excerpt supports \"did not meaningfully reduce\" the steps to the first PR-modified file. The staleness claim is labelled inference at requirements.md:53, and none of the three places states it as a finding.\nNo new loss: met. Diff \"-\" lines at root/instruction-guidelines.md:6, skills/instruction-writing/SKILL.md:13, root/user-messages.md:7 and :12, root/task-list.md:3, root/version-control.md:11, skills/ci-watch/SKILL.md:14 and requirements.md:14, :17, :20 each keep the original content or replace it with a superset, and the referent \"identity.md\" resolves to root/identity.md:9.\n",
+  "acceptance": {
+    "revision": 8,
+    "rationale": "Every previous finding closed with file:line; context rule present in exactly three places with both clauses and source checked against the paper; no detail lost in the diff.",
+    "criteria": [
+      {
+        "criterion": "Closed: each previous finding is closed, with file:line",
+        "support": "root/instruction-guidelines.md:6 restores \"or launch reviewers\" (previous blocker 1; dist agents/holyagent.md:119 matches). skills/instruction-writing/SKILL.md:13 restores \"Give the full task, intent and constraints ... Say what to do rather than what to avoid\" and :17 restores the real-check rule (previous blocker 2). root/version-control.md:11 now names \"the force-push and protected-branch rules in identity.md\", and identity.md:9 contains them (previous blocker 3). root/user-messages.md:7 and :12, root/task-list.md:3, requirements.md:14, :16, :17 and :20 name the acknowledgment as the permitted channel for the one-sentence note (previous blocker 4). skills/ci-watch/SKILL.md:14 reads \"since no data is Unknown, not Passed\" (ci-watch note)."
+      },
+      {
+        "criterion": "Context rule: the rule is present, unambiguous, reaches only those three places and states the convention-first and change-only-when-asked clauses and the source correctly",
+        "support": "met. Present at roles/worker-implementation/instruction-text.md:2, roles/reviewer-artifact/instruction-text.md:2 and skills/instruction-writing/SKILL.md:22. The convention-first and change-only-when-asked clauses appear in all three. Source: arxiv.org/abs/2602.11988 supports \"repository overviews ... are not helpful\", \"increasing inference cost by over 20%\" and \"should only include instructions ... not already present in the README (e.g., specific conventions or non-functional requirements)\". The search excerpt supports \"did not meaningfully reduce\" the steps to the first PR-modified file. The staleness claim is labelled inference at requirements.md:53, and none of the three places states it as a finding."
+      },
+      {
+        "criterion": "No new loss: the diff removes no detail and adds no ambiguity",
+        "support": "met. Diff \"-\" lines at root/instruction-guidelines.md:6, skills/instruction-writing/SKILL.md:13, root/user-messages.md:7 and :12, root/task-list.md:3, root/version-control.md:11, skills/ci-watch/SKILL.md:14 and requirements.md:14, :17, :20 each keep the original content or replace it with a superset, and the referent \"identity.md\" resolves to root/identity.md:9."
+      }
+    ],
+    "evidence": []
   },
   "createdAt": "2026-11-02T23:15:52.656Z"
 }
