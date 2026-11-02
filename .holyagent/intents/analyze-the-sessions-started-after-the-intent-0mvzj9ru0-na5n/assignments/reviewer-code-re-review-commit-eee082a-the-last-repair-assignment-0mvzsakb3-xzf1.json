@@ -1,0 +1,49 @@
+{
+  "id": "assignment-0mvzsakb3-xzf1",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 2,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-commit-eee082a-the-last-repair",
+  "objective": "Re-review commit eee082a, the last repair round, and say whether its fixes hold without new defects.",
+  "state": "Running",
+  "scope": [
+    "Only the diff of commit eee082a (git show eee082a, also at /tmp/holyagent-review/final-head.diff): packages/runtime/src/cli/report.ts, packages/runtime/src/state/tree.ts, packages/runtime/src/cli/assignment.ts and their tests.",
+    "Items it was to fix: (1) an unindented [x]/[ ] checkbox item under an empty-support key line counts as support exactly when '- [x]' does; (2) an empty or whitespace workflow result is not listed and writes no report file; (3) with GIT_SSH and a configured core.sshCommand both set, the fetch uses core.sshCommand plus -o BatchMode=yes -o ConnectTimeout=5, while an env GIT_SSH_COMMAND, or GIT_SSH alone, is left alone."
+  ],
+  "constraints": [
+    "Read-only: make no edits and no version-control writes. Run the changed tests if useful.",
+    "Follow .claude/CLAUDE.md and AGENTS.md.",
+    "Keep working until the review is done, then stop and report under 300 words; do not start further review rounds. Each evidence entry on one line as '<criterion label>: <support>'."
+  ],
+  "criteria": [
+    {
+      "text": "Fixes: each of the three items holds, with file:line support",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "New defects: any blocking regression introduced, or none",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Tests: each fix has a test that would fail without it",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "verdict"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvzs4678-d8o6"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-02T21:41:40.815Z"
+  },
+  "createdAt": "2026-11-02T21:41:40.815Z"
+}
