@@ -5,7 +5,7 @@
   "roleTask": "Librarian.research",
   "slug": "establish-from-claude-code-s-current",
   "objective": "Establish from Claude Code's current official documentation how to set the reasoning effort of the main thread and how to lower the autocompact threshold, so HolyAgent can ship a high-effort root with a small context.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Official sources: code.claude.com docs (settings, subagents, model configuration, environment variables, plugins), the Claude Code changelog. Look the facts up even if they seem known; they change often."
   ],
@@ -43,5 +43,10 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-02T17:43:10.063Z"
+  },
   "createdAt": "2026-11-02T17:42:40.171Z"
 }
