@@ -1,0 +1,58 @@
+{
+  "id": "assignment-0mvzu0i0s-b9mu",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 6,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-state-commit-stage-the-legacy",
+  "objective": "Make the state commit stage the legacy notes that holyagent migrate copies into an Intent folder, and harden the state fetch's process-group kill.",
+  "state": "Running",
+  "scope": [
+    "packages/runtime/src/state/tree.ts stageState and STATE_FILE: since commit 386cb22 only config.json and intents/*/{intent.json, assignments|branches|pulls/*.json} are force-added, so notes that migrate copies (resume-notes.md, notes/** — see packages/runtime/src/state/legacy.ts around lines 533-551 and migrate.ts writeAll, which then calls commitState) stay uncommitted in the state worktree; the old add -f -A committed them. Stage those note paths too, still never a stray file outside the record, config and migrated-note set.",
+    "Hardening from security review: in killGroup (tree.ts ~451) kill only when child.pid is an integer greater than 1, and skip the group kill when the child has already exited (exitCode !== null) on the failure-exit release path."
+  ],
+  "constraints": [
+    "Another writer owns packages/runtime/src/instructions, packages/integrations/claude (including dist) and setup files and is editing them now: do not edit or rebuild them. Ownership is only the paths listed.",
+    "No version-control writes and no edits under .git/ or .holyagent/; report changed paths.",
+    "Keep working until done; when done and checked, stop and report. Respond tersely."
+  ],
+  "criteria": [
+    {
+      "text": "Migrated notes: after holyagent migrate in branch state mode, the copied notes are in git ls-tree of the state branch, asserted by a test that fails on 386cb22",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Stray files: the existing test that a stray ignored file under .holyagent/ is never committed still passes",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Kill guard: killGroup never calls process.kill with a pid of 1 or less, and the failure-exit path does not kill the group of an exited child; covered by tests where feasible",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Gates: bun test on packages/runtime/tests/state-branch.test.ts and migrate.test.ts, bun check, bun lint and bun fmt --check on the changed files exit 0 (failures in files owned by the other writer are not yours; name them)",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/state",
+    "packages/runtime/tests/state-branch.test.ts",
+    "packages/runtime/tests/migrate.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvztlkjb-g38q",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-02T22:29:50.525Z"
+  },
+  "createdAt": "2026-11-02T22:29:50.525Z"
+}
