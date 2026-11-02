@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-review-findings-on-commits",
   "objective": "Repair the review findings on commits ecea23f and 41754dd and add the assignment reports command the new root text relies on.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Security finding (blocking): packages/runtime/src/state/tree.ts fetchRemoteBranch (about :415-424, called :471) can prompt or hang: GIT_TERMINAL_PROMPT=0 does not stop ssh host-key or passphrase prompts, SSH_ASKPASS/GIT_ASKPASS or credential helpers, it has no timeout and runs under worktree.lock, and SessionStart can reach it through ifPresent plus keepsState.",
     "Evidence matching (packages/runtime/src/cli/report.ts acceptanceFrom): real reports failed to match because a criterion label equal to an evidence label (Autocompact / autocompact, Scope / scope) is discarded as ambiguous, hyphens differ from spaces (agent-effort vs Agent effort), and keys carry list markers or bold ('- Token totals:', '**Root context**:').",
@@ -74,5 +74,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mvzjrnq1-q6xv",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-02T18:27:22.750Z"
+  },
   "createdAt": "2026-11-02T18:27:15.596Z"
 }
