@@ -1,0 +1,52 @@
+{
+  "id": "assignment-0mvztlkjb-g38q",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 6,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-code-changes-of-commit",
+  "objective": "Review the code changes of commit 386cb22 (range eee082a..386cb22) for correctness and regressions.",
+  "state": "Running",
+  "scope": [
+    "packages/runtime/src/state/tree.ts (gitBounded detached spawn and killGroup, stageState), packages/runtime/src/setup/settings.ts and cli/setup.ts (450000, effort auto handling), cli/sessioncontext.ts, and their tests. Instruction-text and docs changes in the same commit are out of scope; they get rewritten next."
+  ],
+  "constraints": [
+    "Read-only; no version-control writes.",
+    "Respond tersely."
+  ],
+  "criteria": [
+    {
+      "text": "Process groups: a timed-out or interrupted state fetch kills its whole process group without killing the CLI itself or leaking zombies, on Linux and macOS",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Staging: stageState stages tracked changes and force-adds only record and config paths, never a stray ignored file, and still commits new records in every state mode",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Effort auto: doctor and setup no longer flag an Opus 5.5 modelSettings entry whose effortLevel /effort auto removed, and still recommend effort when no entry exists",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Regressions: no existing behavior breaks; each fix has a test that fails without it",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvzt8d7b-mze9"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-02T22:18:13.944Z"
+  },
+  "createdAt": "2026-11-02T22:18:13.944Z"
+}
