@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "close-the-four-remaining-artifact-review",
   "objective": "Close the four remaining artifact-review findings and its wording note in the instruction text.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mvzv9go6-psy0.md (blockers 1-4 and the ci-watch note). Files under packages/runtime/src/instructions/claude-5.5/ and requirements.md.",
     "1: restore 'or launch reviewers' in root/instruction-guidelines.md:6 (and requirements if mirrored).",
@@ -47,7 +47,33 @@
     "agentId": "workflow:wf_7a55fe44-de9/assignment-0mvzvfmfz-5yi5",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-02T23:09:35.711Z"
+    "startedAt": "2026-11-02T23:09:35.711Z",
+    "finishedAt": "2026-11-02T23:15:39.539Z"
+  },
+  "result": "result: All four blockers and the ci-watch note are fixed, dist is rebuilt, and the four gates exit 0.\nchanged:\n- /home/user/holyagent/packages/runtime/src/instructions/claude-5.5/root/instruction-guidelines.md\n- /home/user/holyagent/packages/runtime/src/instructions/claude-5.5/skills/instruction-writing/SKILL.md\n- /home/user/holyagent/packages/runtime/src/instructions/claude-5.5/root/version-control.md\n- /home/user/holyagent/packages/runtime/src/instructions/claude-5.5/root/user-messages.md\n- /home/user/holyagent/packages/runtime/src/instructions/claude-5.5/root/task-list.md\n- /home/user/holyagent/packages/runtime/src/instructions/claude-5.5/skills/ci-watch/SKILL.md\n- /home/user/holyagent/packages/runtime/src/instructions/requirements.md\n- /home/user/holyagent/packages/integrations/claude/src/agents.ts\n- /home/user/holyagent/packages/integrations/claude/tests/plugin.test.ts\n- dist, regenerated: `/home/user/holyagent/packages/integrations/claude/dist/agents/holyagent.md`, `dist/scripts/holyagent.js`, `dist/skills/ci-watch/SKILL.md`, `dist/skills/instruction-writing/SKILL.md`\n\nchecks:\n- `bun packages/integrations/claude/build.ts` -> built 34 files.\n- `bun check` -> 0, no type errors in 121 files.\n- `bun lint` -> 0, no problems in 122 files.\n- `bun fmt --check` -> 0, 241 files formatted.\n- `bun test` -> 0, 996 pass, 0 fail (997 tests, 34 files).\n- The first `bun test` run failed 2 tests. Both pinned the old R-FLAG phrase \"say so in one sentence and continue as asked\". I changed that phrase to \"in your acknowledgment of that message and continue as asked\" in `agents.ts` and `plugin.test.ts`; both tests then passed. Those two files were outside the brief's named scope but inside the ownership path `packages/integrations/claude`.\n\nblockers: none\nquestions: none\nnotes:\n- I also added \"the acknowledgment (with the R-FLAG sentence)\" to the R-NUDGE channel list in `requirements.md`, and the acknowledgment to the `user-messages.md:12` list, so the two lists match.\n- The diff is at `/tmp/claude-0/-home-user-holyagent/4ed813b5-dc1d-5f26-9e40-d77f95591930/scratchpad/fix.diff`. It excludes `dist/scripts/holyagent.js`.\n\nevidence:\nFindings closed: blockers 1-4 and the ci-watch note are each fixed.\n- Blocker 1: `root/instruction-guidelines.md:6` now reads \"start no extra review rounds or launch reviewers unless the user asked for one\". `requirements.md` did not mirror it.\n- Blocker 2: `skills/instruction-writing/SKILL.md:12` restores the full-task, intent and constraints rule with the reason beside each rule, and \"say what to do rather than what to avoid\". Line 16 requires a real check before \"done\", excludes a syntax-only check or one that failed to start, and names any check not run, tagged (S55, H55). The brief copies in `instruction-guidelines.md` stay.\n- Blocker 3: `root/version-control.md:11` now names \"the force-push and protected-branch rules in identity.md\" and spells them out.\n- Blocker 4: `root/user-messages.md:7` puts the one sentence in the acknowledgment of that message and says it is not a pending decision unless the readings lead to materially different work, which goes through AskUserQuestion. `user-messages.md:12`, `root/task-list.md:3`, and `requirements.md` R-FLAG (line 20), R-TASKLIST (line 14) and R-NUDGE are consistent with it.\n- ci-watch note: `skills/ci-watch/SKILL.md:13` now reads \"since no data is Unknown, not Passed\".\nGates: `bun check`, `bun lint` and `bun fmt --check` exit 0 and `bun test` exits 0 (996 pass, 0 fail), all after rebuilding dist.\nchanged-paths: listed under `changed:` above.\nchecks-run: listed under `checks:` above.\n",
+  "acceptance": {
+    "revision": 8,
+    "rationale": "Four findings and the ci-watch note fixed with file:line; channel lists made consistent; gates exit 0 (996 pass) after rebuild.",
+    "criteria": [
+      {
+        "criterion": "Findings closed: blockers 1-4 and the ci-watch note each fixed, listed with file:line",
+        "support": "blockers 1-4 and the ci-watch note are each fixed."
+      },
+      {
+        "criterion": "Gates: bun check, bun lint, bun fmt --check and bun test exit 0 after rebuilding dist",
+        "support": "`bun check`, `bun lint` and `bun fmt --check` exit 0 and `bun test` exits 0 (996 pass, 0 fail), all after rebuilding dist."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "listed under `changed:` above."
+      },
+      {
+        "label": "checks-run",
+        "support": "listed under `checks:` above."
+      }
+    ]
   },
   "createdAt": "2026-11-02T23:09:35.711Z"
 }
