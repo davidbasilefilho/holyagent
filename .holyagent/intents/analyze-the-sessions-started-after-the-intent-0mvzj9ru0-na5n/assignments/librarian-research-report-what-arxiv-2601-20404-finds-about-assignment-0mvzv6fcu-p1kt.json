@@ -5,7 +5,7 @@
   "roleTask": "Librarian.research",
   "slug": "report-what-arxiv-2601-20404-finds-about",
   "objective": "Report what arXiv 2601.20404 finds about context files such as AGENTS.md, especially the effect of volatile content like code and documentation paths on agent performance.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Fetch https://arxiv.org/pdf/2601.20404 (or its abs page). Look it up now; do not answer from memory."
   ],
@@ -40,7 +40,33 @@
     "agentId": "workflow:wf_14f8f664-41b/assignment-0mvzv6fcu-p1kt",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-02T23:02:26.622Z"
+    "startedAt": "2026-11-02T23:02:26.622Z",
+    "finishedAt": "2026-11-02T23:03:15.353Z"
+  },
+  "result": "result: arXiv 2601.20404 does NOT study volatile content (code paths, doc paths, directory overviews) and gives no writing recommendations. It only measures presence vs absence of a root AGENTS.md. The user's premise (volatile content hurts performance) is not supported by this paper. Another paper may be meant, e.g. one on context files that lowers success rates.\nchanged: none\nchecks: web_fetch_exa on https://arxiv.org/pdf/2601.20404 -> full text read, no error\nblockers: none\nquestions: Which paper was meant if the user expected a volatile-content finding? This one has none.\nnotes: Sources are the paper alone (v1, single source). The user's request text was garbled (\"o agente relevante*\"), so the brief's objective was followed.\nevidence:\nPaper: Title \"On the Impact of AGENTS.md Files on the Efficiency of AI Coding Agents\". Authors: Jai Lal Lulla, Seyedmoein Mohsenimofidi, Matthias Galster, Jie M. Zhang, Sebastian Baltes, Christoph Treude. arXiv:2601.20404v1 [cs.SE], 28 Jan 2026; ICSE JAWs 2026 (5 pages).\n  Sourced findings:\n  - Abstract: \"the presence of AGENTS.md is associated with a lower median runtime (Δ28.64%) and reduced output token consumption (Δ16.58%), while maintaining a comparable task completion behavior.\"\n  - Design (§3.1): 10 repositories, 124 PRs, one agent (OpenAI Codex, gpt-5.2-codex), paired with/without AGENTS.md. Repos were filtered to files containing conventions, architecture/project structure or project description. PRs were small (≤100 LoC, ≤5 files).\n  - Table 1: median wall-clock 98.57s without vs 70.34s with. Median output tokens 2,925 vs 2,440. Wall-clock time and output tokens are significant (Wilcoxon, p<0.05). Median input tokens went up slightly (116,609 to 120,587) and cached input tokens did too (103,424 to 104,448).\n  - §4: \"AGENTS.md primarily reduces token usage in a small number of very high-cost runs.\"\n  - Limits: §3.1.8 says correctness was checked only by a manual sanity check of 50 random tasks. The paper itself calls this \"not a full correctness evaluation\".\nVolatile content: The paper has no measurement and no statement on code paths, documentation paths, directory overviews or changing information. Its only related text is speculation in §5: \"we speculate that some of the efficiency gains reported in this paper arise because AGENTS.md files describe repository structure and conventions upfront, reducing the need for agents to infer project organization through exploratory navigation.\" This is untested and points the opposite way from a \"volatile content hurts\" claim. The paper also lists, as future work, examining how \"specificity, organization, and the inclusion of workflow guidance\" relate to outcomes. Inference (mine): staleness of structure descriptions is not examined. AGENTS.md versions were taken from the pre-merge commit (§3.1.4), but the paper does not analyze staleness.\nRecommendations: The paper makes no explicit writing recommendations. Its conclusion (§5) says only that the findings \"position AGENTS.md as a practical repository-level mechanism for shaping agent behavior and motivate further investigation.\" Everything else is future work (replication, correctness evaluation, file-property analysis). Any recommendation drawn from this paper would be inference.\nsources: https://arxiv.org/pdf/2601.20404 (v1, 28 Jan 2026), read in full. It cites related work that may hold the volatile-content or content-category findings the user wants: arXiv:2511.12884 (Chatlatanagulchai et al., \"Agent READMEs\"), arXiv:2512.18925 (Jiang and Nam), and Mohsenimofidi et al. (MSR 2026). I did not read those.\n",
+  "acceptance": {
+    "revision": 8,
+    "rationale": "Paper fetched and read in full; title, authors and findings quoted with sections; states clearly it has no volatile-content measurement or writing recommendations.",
+    "criteria": [
+      {
+        "criterion": "Paper: title, authors, date and the main findings about context files, quoted with section or page",
+        "support": "Title \"On the Impact of AGENTS.md Files on the Efficiency of AI Coding Agents\". Authors: Jai Lal Lulla, Seyedmoein Mohsenimofidi, Matthias Galster, Jie M. Zhang, Sebastian Baltes, Christoph Treude. arXiv:2601.20404v1 [cs.SE], 28 Jan 2026; ICSE JAWs 2026 (5 pages).; Sourced findings: Abstract: \"the presence of AGENTS.md is associated with a lower median runtime (Δ28.64%) and reduced output token consumption (Δ16.58%), while maintaining a comparable task completion behavior.\"; Design (§3.1): 10 repositories, 124 PRs, one agent (OpenAI Codex, gpt-5.2-codex), paired with/without AGENTS.md. Repos were filtered to files containing conventions, architecture/project structure or project description. PRs were small (≤100 LoC, ≤5 files).; Table 1: median wall-clock 98.57s without vs 70.34s with. Median output tokens 2,925 vs 2,440. Wall-clock time and output tokens are significant (Wilcoxon, p<0.05). Median input tokens went up slightly (116,609 to 120,587) and cached input tokens did too (103,424 to 104,448).; §4: \"AGENTS.md primarily reduces token usage in a small number of very high-cost runs.\"; Limits: §3.1.8 says correctness was checked only by a manual sanity check of 50 random tasks. The paper itself calls this \"not a full correctness evaluation\"."
+      },
+      {
+        "criterion": "Volatile content: what the paper says about including code paths, documentation paths, directory overviews or other information that changes, and the measured effect, quoted",
+        "support": "The paper has no measurement and no statement on code paths, documentation paths, directory overviews or changing information. Its only related text is speculation in §5: \"we speculate that some of the efficiency gains reported in this paper arise because AGENTS.md files describe repository structure and conventions upfront, reducing the need for agents to infer project organization through exploratory navigation.\" This is untested and points the opposite way from a \"volatile content hurts\" claim. The paper also lists, as future work, examining how \"specificity, organization, and the inclusion of workflow guidance\" relate to outcomes. Inference (mine): staleness of structure descriptions is not examined. AGENTS.md versions were taken from the pre-merge commit (§3.1.4), but the paper does not analyze staleness."
+      },
+      {
+        "criterion": "Recommendations: the paper's own recommendations for writing context files, quoted, with sourced facts kept apart from inference",
+        "support": "The paper makes no explicit writing recommendations. Its conclusion (§5) says only that the findings \"position AGENTS.md as a practical repository-level mechanism for shaping agent behavior and motivate further investigation.\" Everything else is future work (replication, correctness evaluation, file-property analysis). Any recommendation drawn from this paper would be inference."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "sources",
+        "support": "https://arxiv.org/pdf/2601.20404 (v1, 28 Jan 2026), read in full. It cites related work that may hold the volatile-content or content-category findings the user wants: arXiv:2511.12884 (Chatlatanagulchai et al., \"Agent READMEs\"), arXiv:2512.18925 (Jiang and Nam), and Mohsenimofidi et al. (MSR 2026). I did not read those."
+      }
+    ]
   },
   "createdAt": "2026-11-02T23:02:26.622Z"
 }
