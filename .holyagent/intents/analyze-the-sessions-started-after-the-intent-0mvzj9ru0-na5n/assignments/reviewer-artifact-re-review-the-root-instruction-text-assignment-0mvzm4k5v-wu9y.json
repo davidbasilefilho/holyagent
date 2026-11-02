@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "re-review-the-root-instruction-text",
   "objective": "Re-review the root instruction text after commit 7ac8084 against the previous instruction-review findings.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Previous findings are in /home/user/holyagent/.git/holyagent/reports/assignment-0mvzlcjpy-6ufq.md (blockers: reports command missing, plan text contradicting workflows.md, no rule for an Assignment missing from the reports, rules stated twice; plus non-blocking notes). The repair diff is /tmp/holyagent-review/assignment-0mvzlp1ml-io0u.diff; assignment reports now exists (packages/runtime/src/cli/assignment.ts). Judge the repair diff and the assembled prompt packages/integrations/claude/dist/agents/holyagent.md only for these findings and anything the repair broke.",
     "Decision already taken: the force-push and protected-branch rule lives in version-control.md and the PreToolUse reminder, not in the 4,100-character core; this is not a finding."
@@ -39,5 +39,10 @@
   "independentFrom": [
     "assignment-0mvzlp1ml-io0u"
   ],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-11-02T18:49:07.273Z"
+  },
   "createdAt": "2026-11-02T18:49:02.995Z"
 }
