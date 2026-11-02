@@ -1,0 +1,96 @@
+{
+  "id": "assignment-0mvzu0hpz-adhv",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 6,
+  "roleTask": "Worker.implementation",
+  "slug": "finish-the-interrupted-instruction",
+  "objective": "Finish the interrupted instruction rewrite: continue from the partial edits already in the working tree (do not restart or revert them), then complete every criterion.",
+  "state": "Running",
+  "scope": [
+    "A previous run of this same Assignment was cut off by a container restart. Its uncommitted edits are in the tree (git status: rewritten role and specialist sections, requirements.md, agents.ts, generate.ts, setup-command.md, hook.ts, setup/*, leftovers.ts and its test deleted, four new skill folders under claude-5.5/skills and dist/skills). Inspect them with git diff, keep what meets the criteria, and finish the rest. Root sections under claude-5.5/root may still be untouched.",
+    "Instruction sources: packages/runtime/src/instructions (requirements.md first, then claude-5.5/ root, specialist and role sections), the assembly and tool grants in packages/integrations/claude/src/agents.ts, existing skills (setup-command.md, dev-server, user-busy) and the generated plugin (rebuild dist with bun packages/integrations/claude/build.ts).",
+    "Guide research, already done (official pages fetched 2026-11-02): Opus 5.5 https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5, Sonnet 5.5 .../prompting-claude-sonnet-5-5, Haiku 5.5 .../prompting-claude-haiku-5-5, Opus 5 .../prompting-claude-opus-5. Read them yourself if you need detail. Gaps to close: G1 (Opus 5.5 unattended runs) the root does not end its own turn on a summary that announces the next step or an offer to wait, only when work is done or nothing can move without the user -> root/user-messages.md or task-list.md; G2 (Sonnet 5.5 open-ended requests) when asked for ideas, options or a plan, the root delivers that and stops until told to go ahead -> root/user-messages.md; G3 (Opus 5 written deliverable length) no filler sections, redundant summaries or boilerplate in written deliverables -> specialist/writing-bar.md; G4 (Opus 5 task scope) if a request seems mistaken or a better approach exists, say so in one sentence and continue as asked -> specialist/scope.md. Do not add progress narration (conflicts with the terse rule) or elapsed-time signals.",
+    "Skill extraction (conservative, these four only): visual-judging from root/visual.md; ci-watch from root/ci.md; instruction-writing from root/instruction-guidelines.md, keeping in the root prompt only the bullets needed for every brief (full task with reasons, keep-working and stop-and-report, real check before done); state-mode from the State bullet of root/version-control.md. Each is a root skill in the generated plugin, its description starting with the situation; root/skills.md gets one pointer line per skill. Leave every other section in place (stack-plan, asking, frontend-design stay)."
+  ],
+  "constraints": [
+    "Repository rules in .claude/CLAUDE.md and AGENTS.md apply; do not edit those two files.",
+    "Introduce no size limit, character cap or length check on instruction text anywhere; keep the text terse instead.",
+    "No version-control writes and no edits under .git/ or .holyagent/; report changed paths.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done and checked, stop and report; name unrequested ideas instead of building them.",
+    "Respond tersely.",
+    "A separate writer is repairing packages/runtime/src/state and its tests at the same time; do not edit them. Rebuild dist at the end as usual."
+  ],
+  "criteria": [
+    {
+      "text": "Respond tersely: every generated agent prompt (dist/agents/*.md, root and all specialists) contains the sentence \"Respond tersely.\", asserted by a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "TaskStop: the root agent's tools include TaskStop, and requirements.md plus the root text replace the no-stopping rule with: stop a running agent or workflow only when a new requirement or new information conflicts with that running work, let it finish when finishing and then repairing costs less than stopping and relaunching, and close a stopped Assignment as stopped; a test asserts the grant",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Guide gaps: G1-G4 each stated once in the named file",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Skills: the four skills exist in the generated plugin with situation-first descriptions, their text is gone from the always-loaded root prompt, root/skills.md points to each, and the requirement-to-section mapping test passes",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Rewrite: every root, specialist and role section and every skill is rewritten short, direct and objective, every requirements.md behavior is still covered, and the report gives word counts before and after for the root prompt and for all agents combined",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Billion Context: no mention or cleanup of Billion Context remains in skills, instruction text, docs or code (setup command, hook, leftovers code and its tests), except a decision record in docs/decisions.md if one already exists",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Gates: bun check, bun lint, bun fmt --check and bun test exit 0 after rebuilding dist",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Scope: no behavior beyond these items and no edit outside the ownership paths",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/integrations/claude",
+    "docs",
+    "packages/runtime/src/cli/hook.ts",
+    "packages/runtime/src/cli/setup.ts",
+    "packages/runtime/src/setup",
+    "packages/runtime/tests/instructions.test.ts",
+    "packages/runtime/tests/setup.test.ts",
+    "packages/runtime/tests/setup-check.test.ts",
+    "packages/runtime/tests/setup-cli.test.ts",
+    "packages/runtime/tests/setup-leftovers.test.ts",
+    "packages/runtime/tests/sessioncontext.test.ts"
+  ],
+  "dependencies": [
+    "assignment-0mvztbdwe-lkw0",
+    "assignment-0mvzt8dji-0clt"
+  ],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvztm82c-xk2h",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-02T22:29:50.135Z"
+  },
+  "createdAt": "2026-11-02T22:29:50.135Z"
+}
