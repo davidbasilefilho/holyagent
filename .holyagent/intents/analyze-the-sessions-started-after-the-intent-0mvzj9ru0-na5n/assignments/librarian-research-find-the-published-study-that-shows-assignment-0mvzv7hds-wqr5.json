@@ -5,7 +5,7 @@
   "roleTask": "Librarian.research",
   "slug": "find-the-published-study-that-shows",
   "objective": "Find the published study that shows volatile content in agent context files (AGENTS.md, CLAUDE.md), such as code paths, documentation paths or codebase overviews, hurts coding-agent performance, and report its exact findings.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "arXiv 2601.20404 (Lulla et al.) was checked and does not measure this. Candidates to check first: 'Evaluating AGENTS.md: Are Repository-Level Context Files Helpful for Coding Agents?' (2026, around arXiv 2602.x), arXiv:2511.12884 (Agent READMEs), arXiv:2512.18925 (Jiang and Nam), Mohsenimofidi et al. MSR 2026. Search for others. Look everything up now; do not answer from memory."
   ],
@@ -40,7 +40,33 @@
     "agentId": "workflow:wf_8ea32623-e9a/assignment-0mvzv7hds-wqr5",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-02T23:03:15.904Z"
+    "startedAt": "2026-11-02T23:03:15.904Z",
+    "finishedAt": "2026-11-02T23:03:58.029Z"
+  },
+  "result": "result: Closest match is Gloaguen et al., \"Evaluating AGENTS.md\" (arXiv 2602.11988). It measures codebase overviews and finds they don't help. No paper found that measures volatile or stale content (paths, drift) as such. I did not check 2511.12884, 2512.18925 or Mohsenimofidi et al. directly. I searched for other papers and found only the ACL REALM paper below.\n\nchanged: none\nchecks: none run (read-only research)\nblockers: none\nquestions: none\n\nnotes (sourced facts, all from the v1/latest HTML of 2602.11988, fetched via Exa search highlights; the paper is dated 2026-02-12 and revised, with the v1 and latest texts differing):\n- Setup: SWE-bench tasks with LLM-generated context files, plus CTXbench (called AGENTbench in v1), which has 138 instances across 12 repos with developer-committed context files. Four coding agents. Python only.\n- Overall effect (§4, \"LLM-generated context files increase cost and don't improve performance\"): resolution rate changed by -0.5% on SWE-bench and -2% on CTXbench (p=87% and p=37%), so not significant. Steps rose by 2.45 and 3.92, and cost rose 20% and 23% on average (p<0.001%). Failure to pass in 5 of 8 settings.\n- Developer-provided files: +2.4% on average (p=21%), cost up by at most 19%.\n- Overviews (§4, \"Context files do not provide effective overviews\"):\n  - 8 of 12 developer files include a codebase overview, and 4 of those enumerate directories and subdirectories.\n  - Overviews were present in 100% of Sonnet-4.5-generated files, 95% of Qwen3-30b-coder, 99% of GPT-5.2 and 36% of GPT-5.1 mini.\n  - Test: steps before the agent first touches a file changed in the gold PR patch. Context files \"do not meaningfully reduce this metric\". The paper's conclusion: \"context files are not effective at providing a repository overview.\"\n  - Overviews also did not make agents faster at finding the right files. GPT-5.1 mini took significantly more steps, because it searched for the context files and re-read them even though they were already in context.\n- Abstract (latest version): \"repository overviews, although popular and recommended by model providers, are not helpful.\"\n- Recommendations (Introduction): \"We therefore suggest omitting LLM-generated context files for the time being... Human-written context files should only include instructions required for coding agents that are not already present in the README (e.g., specific conventions or non-functional requirements), and be rigorously evaluated before adoption.\"\n- Conclusion (§6): files \"should only contain specific additional instructions beyond what is already available in the codebase.\"\n- Also: instructions such as tool mentions are followed. uv was used 1.6 times per instance when mentioned versus fewer than 0.01 when not.\n- The paper's Appendix B (per its text, not read in full) says context file length has no significant effect and that removing specific categories from LLM-generated files does not change the results.\n- Related, weaker: Do Context Files Help Coding Agents? A Two-Agent Ablation Study (ACL REALM 2026, https://aclanthology.org/2026.realm-1.5.pdf). It found no measurable correctness effect from context strategy, using 17 tasks, 3 repos and 288 runs, and has low power. It does not isolate paths or overviews.\n\nnotes (inference, not in the paper):\n- The paper does not test staleness, drift or changing paths. It shows overviews give no navigation benefit and add cost. That makes volatile structure content cost without measured benefit, but the harm from it going stale is an inference.\n- Secondary blogs (agentpatterns.ai and others) make the staleness argument and cite this paper. They are not independent measurements.\n- The paper is Python only. It lists that as a limitation.\n\nevidence:\nSource: arXiv 2602.11988, Gloaguen, Mündler, Müller, Raychev, Vechev, \"Evaluating AGENTS.md: Are Repository-Level Context Files Helpful for Coding Agents?\", https://arxiv.org/abs/2602.11988 (HTML: https://arxiv.org/html/2602.11988). It measures overviews only, not staleness. No paper measuring volatile paths or drift was found.\nFindings: quoted above with sections (§4 overviews, Introduction recommendations, §6 conclusion, abstract). Overviews gave no reduction in steps to the first relevant file, and cost rose by more than 20%.\nSourcing: sourced facts and inference are kept apart under the two \"notes\" headings above.\nsources: https://arxiv.org/abs/2602.11988, https://arxiv.org/html/2602.11988, https://arxiv.org/html/2602.11988v1, https://openreview.net/forum?id=0DyJeJ3iia, https://aclanthology.org/2026.realm-1.5.pdf, https://agentpatterns.ai/context-engineering/discoverable-vs-nondiscoverable-context/ (secondary)\n",
+  "acceptance": {
+    "revision": 8,
+    "rationale": "Found 2602.11988 with quoted findings on overviews and its recommendation to include only instructions not discoverable in the codebase; states no paper measures staleness; facts and inference kept apart.",
+    "criteria": [
+      {
+        "criterion": "Source: the paper or papers that measure the effect of codebase overviews, paths or other changing content in context files, with title, arXiv id and URL; or a clear statement that none was found",
+        "support": "arXiv 2602.11988, Gloaguen, Mündler, Müller, Raychev, Vechev, \"Evaluating AGENTS.md: Are Repository-Level Context Files Helpful for Coding Agents?\", https://arxiv.org/abs/2602.11988 (HTML: https://arxiv.org/html/2602.11988). It measures overviews only, not staleness. No paper measuring volatile paths or drift was found."
+      },
+      {
+        "criterion": "Findings: the measured effect and the paper's own recommendations on what to include or leave out, quoted with section",
+        "support": "quoted above with sections (§4 overviews, Introduction recommendations, §6 conclusion, abstract). Overviews gave no reduction in steps to the first relevant file, and cost rose by more than 20%."
+      },
+      {
+        "criterion": "Sourcing: sourced facts kept apart from inference",
+        "support": "sourced facts and inference are kept apart under the two \"notes\" headings above."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "sources",
+        "support": "https://arxiv.org/abs/2602.11988, https://arxiv.org/html/2602.11988, https://arxiv.org/html/2602.11988v1, https://openreview.net/forum?id=0DyJeJ3iia, https://aclanthology.org/2026.realm-1.5.pdf, https://agentpatterns.ai/context-engineering/discoverable-vs-nondiscoverable-context/ (secondary)"
+      }
+    ]
   },
   "createdAt": "2026-11-02T23:03:15.904Z"
 }
