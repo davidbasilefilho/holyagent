@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mvzv1hm5-22ku",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 7,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-state-repair-in-commit",
+  "objective": "Re-review the state repair in commit ce4bf20 (range 4724ca7..ce4bf20) against the previous blocker.",
+  "state": "Running",
+  "scope": [
+    "Previous blocker: migrate copies plan.toon, plan.old-NNN.toon and every other legacy file into an Intent folder, but stageState only force-added records, config, resume-notes.md and notes/**, so those files stayed untracked. The repair passes migrate's copied paths to commitState. Diff: /tmp/holyagent-review/state-repair.diff; files packages/runtime/src/state/tree.ts, packages/runtime/src/cli/migrate.ts, packages/runtime/tests/state-branch.test.ts.",
+    "Review only this repair; the rest was reviewed already. Use git show/diff on commits, not the working tree, which another writer is editing."
+  ],
+  "constraints": [
+    "Read-only; no version-control writes (no checkout, switch, stash, add).",
+    "Respond tersely."
+  ],
+  "criteria": [
+    {
+      "text": "Repair: every file migrate copies is committed to the state branch, and a copied path outside .holyagent/ or under local/ is never force-added",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Regressions: stray-file tests still pass and the new test fails without the fix",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvzut91g-3pmi"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-02T22:58:36.270Z"
+  },
+  "createdAt": "2026-11-02T22:58:36.270Z"
+}
