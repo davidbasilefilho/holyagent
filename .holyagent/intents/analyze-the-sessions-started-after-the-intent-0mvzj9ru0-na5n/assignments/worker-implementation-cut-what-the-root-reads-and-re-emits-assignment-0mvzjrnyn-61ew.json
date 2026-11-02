@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "cut-what-the-root-reads-and-re-emits",
   "objective": "Cut what the root reads and re-emits: briefs stored as files behind a short dispatch prompt, evidence matched by criterion label, status trimmed to the Intent in use, and SessionStart context that states each rule and the takeover line once.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "packages/runtime/src/cli (assignment.ts dispatch and close, overview.ts status and plan, hook.ts, sessioncontext.ts), the domain modules that render dispatch prompts and match report evidence (not route.ts), the session-reminder.md instruction file used by SessionStart, and their tests."
   ],
@@ -72,5 +72,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-02T17:43:10.635Z"
+  },
   "createdAt": "2026-11-02T17:43:02.159Z"
 }
