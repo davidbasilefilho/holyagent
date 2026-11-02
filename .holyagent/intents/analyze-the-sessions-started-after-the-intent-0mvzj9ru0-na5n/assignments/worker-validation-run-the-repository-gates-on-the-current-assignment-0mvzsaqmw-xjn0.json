@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mvzsaqmw-xjn0",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 2,
+  "roleTask": "Worker.validation",
+  "slug": "run-the-repository-gates-on-the-current",
+  "objective": "Run the repository gates on the current head eee082a of claude/nifty-faraday-jinmae and report their exact outcomes.",
+  "state": "Running",
+  "scope": [
+    "Run from /home/user/holyagent: bun test, bun check, bun lint, bun fmt --check. Then run bun packages/integrations/claude/build.ts and git status --short to confirm dist matches a fresh build (no changes)."
+  ],
+  "constraints": [
+    "mise is not installed here, so run the gates with bun directly. Make no edits and no version-control writes; if the build changes files, report them and do not keep or revert them yourself beyond running git status.",
+    "Keep working until every check has run, then stop and report under 200 words with command, exit code and counts. Each evidence entry on one line as '<criterion label>: <support>'. Name any check you could not run."
+  ],
+  "criteria": [
+    {
+      "text": "Tests: bun test exits 0, with pass, fail and skip counts",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Static gates: bun check, bun lint and bun fmt --check each exit 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Dist: a fresh build leaves git status clean",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-02T21:41:49.016Z"
+  },
+  "createdAt": "2026-11-02T21:41:49.016Z"
+}
