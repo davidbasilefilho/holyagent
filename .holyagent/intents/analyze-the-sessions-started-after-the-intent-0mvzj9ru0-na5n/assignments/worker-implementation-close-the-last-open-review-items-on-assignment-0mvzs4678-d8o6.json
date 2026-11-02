@@ -1,0 +1,77 @@
+{
+  "id": "assignment-0mvzs4678-d8o6",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 2,
+  "roleTask": "Worker.implementation",
+  "slug": "close-the-last-open-review-items-on",
+  "objective": "Close the last open review items on commit 0cbedf0: state the workflow closing rule once, and fix the small report and fetch edges the reviews named.",
+  "state": "Running",
+  "scope": [
+    "Blocking (artifact review): packages/runtime/src/instructions/requirements.md R-WORKFLOW (about line 328) dropped the closing rule; state it there (after a Workflow run completes, an Assignment its reports do not list has no running agent and is closed errored without further confirmation). docs/cache-and-workflows.md:50 repeats the rule in full; make it refer to the root's workflow text instead. Keep packages/runtime/src/instructions/claude-5.5/root/workflows.md:10 as the single statement in the root text.",
+    "Placeholder: packages/runtime/src/cli/assignment.ts about line 398, the `assignment reports` help, says `< <path>`; use `< <report-file>` as the root text and plan notes do.",
+    "report.ts:21 LIST_ITEM omits the `[ ]`/`[x]` checkbox prefix the strip regex below it accepts, so an unindented `[x] ran it` under an empty key is not support while `- [x] ran it` is. Make the two agree (derive the list test from the same pattern) and test it.",
+    "An empty or whitespace-only workflow result still writes a report file; treat it like a null result (not listed, no file) and test it.",
+    "tree.ts fetchEnvironment: when GIT_SSH is set together with a configured core.sshCommand, no BatchMode is added, but git uses core.sshCommand over GIT_SSH. Add the options to the configured command in that case too; leave an env GIT_SSH_COMMAND alone. Test it."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md and AGENTS.md. Keep the root prompt (packages/integrations/claude/dist/agents/holyagent.md) no larger than its current size.",
+    "Make no version-control writes and no edits under .git/ or .holyagent/; report changed paths.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. Do not add unrequested features or refactors; name them in the report. Run bun test, bun check, bun lint, bun fmt --check, then bun packages/integrations/claude/build.ts. When done, stop and report under 400 words, each evidence entry on one line as '<criterion label>: <support>', with changed paths and a diff file /tmp/holyagent-review/final-repair.diff covering every changed file."
+  ],
+  "criteria": [
+    {
+      "text": "Closing rule: requirements.md R-WORKFLOW states it, workflows.md:10 stays the one root statement, docs refer instead of repeating",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Placeholder: the assignment reports help uses <report-file>",
+      "blocking": false,
+      "dimension": "style"
+    },
+    {
+      "text": "Checkbox items: an unindented checkbox item under an empty key is support exactly when a dash checkbox item is; tested",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Empty results: an empty or whitespace result is not listed and writes no file; tested",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "GIT_SSH edge: with GIT_SSH and core.sshCommand both set, the fetch uses core.sshCommand with BatchMode and ConnectTimeout; tested",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Gates: bun test, bun check, bun lint and bun fmt --check pass and dist matches a fresh build",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "diff-file",
+    "tests-run"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions/requirements.md",
+    "docs/cache-and-workflows.md",
+    "packages/runtime/src/cli/assignment.ts",
+    "packages/runtime/src/cli/report.ts",
+    "packages/runtime/src/state/tree.ts",
+    "packages/runtime/tests/state-branch.test.ts",
+    "packages/runtime/tests/cli.test.ts",
+    "packages/runtime/tests/reports.test.ts",
+    "packages/integrations/claude/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvzrqoo2-qb6m",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-02T21:36:42.596Z"
+  },
+  "createdAt": "2026-11-02T21:36:42.596Z"
+}
