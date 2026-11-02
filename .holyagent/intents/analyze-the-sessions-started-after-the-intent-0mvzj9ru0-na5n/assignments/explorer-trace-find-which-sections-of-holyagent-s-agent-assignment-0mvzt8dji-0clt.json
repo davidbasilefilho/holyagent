@@ -1,0 +1,42 @@
+{
+  "id": "assignment-0mvzt8dji-0clt",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 3,
+  "roleTask": "Explorer.trace",
+  "slug": "find-which-sections-of-holyagent-s-agent",
+  "objective": "Find which sections of HolyAgent's agent prompts are needed only at a specific moment and could move into skills that trigger then, without overdoing it.",
+  "state": "Running",
+  "scope": [
+    "The instruction sources in packages/runtime/src/instructions/claude-5.5/ (the root sections under root/, every specialist prompt, shared sections, session-reminder.md) and how the generated plugin assembles them (packages/integrations/claude/src/agents.ts and the dist/agents/*.md output). Existing skills: packages/runtime/src/instructions or packages/integrations/claude skills folders (dev-server, user-busy, setup).",
+    "For each candidate: the section and file, its size in words, the moment it is needed (the trigger a skill description would name), how often that moment comes up, and whether the agent's main job depends on it every turn (then it stays in the prompt)."
+  ],
+  "constraints": [
+    "Read-only: make no edits.",
+    "Be conservative: propose a skill only for text that is needed at a specific moment rather than on most turns and is not the core reason the agent exists. Say for each rejected large section why it stays.",
+    "Keep working until the analysis is done, then stop and report under 600 words, with a ranked list of at most 8 candidates and the word count each would remove from the always-loaded prompt. Each evidence entry on one line as '<criterion label>: <support>'."
+  ],
+  "criteria": [
+    {
+      "text": "Candidates: each proposed skill names its source section, word count, trigger moment and which agents lose the text",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Kept sections: the large sections that stay are named with the reason",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "candidates"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-02T22:07:58.350Z"
+  },
+  "createdAt": "2026-11-02T22:07:58.350Z"
+}
