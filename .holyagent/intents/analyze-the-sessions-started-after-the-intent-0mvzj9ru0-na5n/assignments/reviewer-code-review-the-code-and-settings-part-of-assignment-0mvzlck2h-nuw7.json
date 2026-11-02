@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-the-code-and-settings-part-of",
   "objective": "Review the code and settings part of commit cf522df (root effort frontmatter, recommended modelSettings in setup and doctor, .claude/settings.json and their tests) for correctness and regressions.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "git show cf522df -- packages/integrations/claude/src/agents.ts packages/runtime/src/setup packages/runtime/src/cli/setup.ts .claude/settings.json packages/runtime/tests packages/integrations/claude/tests"
   ],
@@ -44,5 +44,10 @@
   "independentFrom": [
     "assignment-0mvzkezwm-9ib4"
   ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-02T18:27:23.613Z"
+  },
   "createdAt": "2026-11-02T18:27:16.505Z"
 }
