@@ -33,6 +33,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "workflow:wf_19258962-716/assignment-0mvzvnpn2-4fvp",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-02T23:15:53.102Z"
