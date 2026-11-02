@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mvztlkuq-4pir",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 6,
+  "roleTask": "Reviewer.security",
+  "slug": "assess-the-state-fetch-and-staging",
+  "objective": "Assess the state fetch and staging changes of commit 386cb22 for security vulnerabilities.",
+  "state": "Running",
+  "scope": [
+    "The diff file /tmp/holyagent-review/386cb22-code.diff, mainly packages/runtime/src/state/tree.ts: detached spawn with process-group kill, core.sshCommand handling, stageState force-adding paths under .holyagent/."
+  ],
+  "constraints": [
+    "Read-only.",
+    "Respond tersely."
+  ],
+  "criteria": [
+    {
+      "text": "Process kill: the group kill cannot target an unrelated process or group (pid reuse, negative or zero pid)",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Staging: no path outside the record and config set, and no file an attacker can plant under .holyagent/, gets force-added and pushed",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Findings: each finding traced from source to sink with file and line, or none stated",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvzt8d7b-mze9"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-02T22:18:14.355Z"
+  },
+  "createdAt": "2026-11-02T22:18:14.355Z"
+}
