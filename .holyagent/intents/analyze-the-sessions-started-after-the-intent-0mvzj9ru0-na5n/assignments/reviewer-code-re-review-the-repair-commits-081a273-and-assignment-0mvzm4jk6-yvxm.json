@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-the-repair-commits-081a273-and",
   "objective": "Re-review the repair commits 081a273 and 7ac8084 (git diff cf522df..7ac8084, code only) for correctness and regressions.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Previous code findings (all non-blocking) on ecea23f/41754dd: fetch without timeout, untested brief write failure, brief left after persist failure, brief Read under .git, add -f scope. Repairs: non-interactive fetch with an 8 s kill and no fetch from hooks (tree.ts, program.ts, hook.ts), credential helpers kept, assignment reports command (assignment.ts, report.ts journalResults, brief.ts writeReport), evidence matching (normalized, multi-line support, label equal to evidence label), dispatch prompt wording, plan notes (overview.ts), and their tests."
   ],
@@ -48,7 +48,41 @@
     "agentId": "workflow:wf_c2fff0a8-5e6/assignment-0mvzm4jk6-yvxm",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-02T18:49:06.517Z"
+    "startedAt": "2026-11-02T18:49:06.517Z",
+    "finishedAt": "2026-11-02T18:55:03.297Z"
+  },
+  "result": "result: One blocker. The state fetch overrides a user's `core.sshCommand`. The other repairs work on their error paths, and every gate passes on 7ac8084 (bun test, check, lint, fmt).\n\nI ran `/code-review cf522df..7ac8084` through the Skill tool and it ran as the built-in. It returned 8 findings, which I classified below. \"Ran\" means I executed it. \"Read\" means I only read the code.\n\n**Findings**\n\n1. **BLOCKER** `packages/runtime/src/state/tree.ts:428` (`fetchEnvironment`). The fetch injects `GIT_SSH_COMMAND=ssh -o BatchMode=yes -o ConnectTimeout=5` unless `GIT_SSH_COMMAND` or `GIT_SSH` is set in the environment. Git's environment variable takes precedence over `core.sshCommand`, so the user's configured command is dropped. The doc comment says the user's choice is kept, but only the env vars are checked.\n   - I confirmed in a throwaway repo (ran) that `core.sshCommand` is honoured when the env var is unset, and the `GIT_SSH_COMMAND` I set then ran in its place (I did not run the production code).\n   - Failure scenario: a user has `core.sshCommand 'ssh -i ~/.ssh/work_key -o IdentitiesOnly=yes'`. Before this repair the fetch used that key. Now authentication fails and `fetchRemoteBranch` returns false. The state branch then starts from the base and shadows the remote state branch.\n   - The test \"an ssh command the user chose is kept\" covers only the env var.\n   - Fix: skip the injection when `git config core.sshCommand` is set, or pass the options through `-c`.\n\n2. Optional, `packages/runtime/src/cli/report.ts:281`. A `result` of `null` is written as the report \"null\" and listed with 1 word. `PLAN_NOTES` and the docs now say an Assignment that is not listed returned no result, which hides the dead-agent case. Acceptance would still refuse a close from it, because the file has no evidence block. A repeated label also lets a later null overwrite an earlier good report in the `byId` map. Read only; I could not load the code in a scratch test.\n\n3. Optional, `report.ts:236`. The `Started` entry requires `label`, and one `started` entry without it refuses the whole journal. The workflow instructions label every `agent()`, so this is consistent. I could not verify that the host always writes `label` into `started` entries.\n\n4. Optional, `report.ts:112` and `report.ts:59`. One line now supports every key its normalized text names. Criteria \"Tests\" and \"Tests: pass on CI\" can therefore share one support line. Hyphen/underscore folding also merges criterion texts that differ only by those characters. The test change that removed \"a label equal to another key in full names none\" is deliberate and matches the new rule.\n\n5. Optional, `report.ts:135`. A bare `Key:` line takes the following non-key lines as its support until the next key line or the end of the block. Trailing prose after the last key line can therefore support a blocking criterion. A bare key line at the very end of a report with nothing after it stays unsupported (tested).\n\n6. Optional, `tree.ts:446`. The timeout kill uses SIGKILL, so git cannot remove ref lock files. The kill signal itself works: the hang test returns in under 4 s. A transport child process (ssh or git-remote-https) can also outlive the killed git until its own timeout.\n\n7. Optional, `hook.ts:332`. The extra `false` repeats the `path[0] !== \"hook\"` rule in `program.ts`. This is duplicated policy, but harmless.\n\n8. Optional, `assignment.ts:59`. The reports folder is not cleared, and a repeated label keeps only the last result. The `notes` text documents the second part.\n\n**Verified**\n- **Fetch timeout and kill:** the hang test with a 300 ms limit passes.\n- **Hook paths:** the hook test shows no ssh call and no state branch, and the next command then fetches.\n- **Credential helpers:** the test passes and shows the helper is still called.\n- **Malformed journal:** three bad-journal shapes give exit 2 and write nothing.\n- **Non-id labels:** they are listed under `notAssignmentIds`, never become paths, and `../../escape` leaves no file.\n- **Empty trailing key line:** covered by the test above.\n- **Dispatch and brief write failure:** a brief that cannot be written leaves the Assignment Ready, and a later dispatch succeeds.\n- **Regressions:** state creation from origin, launch recording and existing report shapes all pass in the full suite, 1017 pass with 1 skip.\n- **Test coverage of the repairs:** the new tests use the new `fetchRemoteBranch` signature, `assignment reports`, and the changed prompt wording, so they fail on cf522df. The only removed assertions are the \"label equals another key in full\" cases, which the repair replaced on purpose.\n\n**Repo standards:** `Bun.spawn` in `gitBounded` is justified. The Bun Shell cannot kill or time out a process, and the JSDoc says so and says why output is discarded. It uses Effect for the result and error type, and lint passes. One limitation: interrupting the Effect does not kill the child.\n\nevidence:\n- findings: item 1 is a blocker; items 2 to 8 are optional, with paths and failure scenarios above.\n- verified: the error-path, regression and test-coverage checks above; `core.sshCommand` precedence confirmed in a throwaway repo; items 2, 3, 6 and 8 read only.\n- Behavior: the error paths hold except finding 1; `bun test` -> exit 0, 1017 pass, 1 skip, 0 fail, and the new tests above.\n- Regressions: finding 1 is a regression for users with `core.sshCommand`; everything else listed under verified holds.\n- Tests: `bun test` -> exit 0 (1017 pass, 0 fail); `bun check` -> \"No type errors in 123 files\"; `bun lint` -> \"No problems in 124 files\"; `bun fmt --check` -> \"All 241 files are formatted\" (exit codes were not captured for check, lint and fmt).\n- Repo standards: `tree.ts` `gitBounded` comment explains the Bun Shell limit, so `Bun.spawn` is justified; no other CLAUDE.md rule broken that I found.\n",
+  "acceptance": {
+    "revision": 2,
+    "rationale": "Ran gates on 7ac8084 and confirmed core.sshCommand precedence in a scratch repo; one blocker goes to repair.",
+    "criteria": [
+      {
+        "criterion": "Behavior: each repair works on its error paths (fetch timeout and kill, hook paths with no fetch, malformed journal, non-id labels, empty key lines at the end of a report)",
+        "support": "the error paths hold except finding 1; `bun test` -> exit 0, 1017 pass, 1 skip, 0 fail, and the new tests above."
+      },
+      {
+        "criterion": "Regressions: earlier accepted behavior still holds (state creation from origin, launch recording, acceptance of existing report shapes, status)",
+        "support": "finding 1 is a regression for users with `core.sshCommand`; everything else listed under verified holds."
+      },
+      {
+        "criterion": "Tests: new tests fail without their change and none was weakened; bun test, bun check, bun lint and bun fmt --check pass on 7ac8084",
+        "support": "`bun test` -> exit 0 (1017 pass, 0 fail); `bun check` -> \"No type errors in 123 files\"; `bun lint` -> \"No problems in 124 files\"; `bun fmt --check` -> \"All 241 files are formatted\" (exit codes were not captured for check, lint and fmt)."
+      },
+      {
+        "criterion": "Repo standards: .claude/CLAUDE.md rules, notably the Bun.spawn use in tree.ts against the Bun Shell rule (judge whether the timeout justifies it and whether the code says why)",
+        "support": "`tree.ts` `gitBounded` comment explains the Bun Shell limit, so `Bun.spawn` is justified; no other CLAUDE.md rule broken that I found."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "item 1 is a blocker; items 2 to 8 are optional, with paths and failure scenarios above."
+      },
+      {
+        "label": "verified",
+        "support": "the error-path, regression and test-coverage checks above; `core.sshCommand` precedence confirmed in a throwaway repo; items 2, 3, 6 and 8 read only."
+      }
+    ]
   },
   "createdAt": "2026-11-02T18:49:02.214Z"
 }
