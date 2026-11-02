@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "close-the-instruction-review-findings-on",
   "objective": "Close the instruction-review findings on cf522df and the remaining open items, so the root text, the CLI it describes and the docs agree.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Artifact review of cf522df (report at /home/user/holyagent/.git/holyagent/reports/assignment-0mvzlcjpy-6ufq.md, read it): blocker 2, packages/runtime/src/cli/overview.ts:91-92 plan notes still tell the root to return reports keyed by id, treat a null report as errored and pipe report text, which contradicts workflows.md ({ done: [ids] } and report files); blocker 3, workflows.md has no rule for an Assignment that `assignment reports` does not list (its agent died: close it errored, once confirmed); blocker 4, rules stated twice (delegating.md:3 and context.md:3/:5; dispatch.md:3 and context.md:7; stack-plan.md:7, assignments.md:12 and version-control.md:11; dispatch.md:9 and ci.md:3; identity.md:5 and version-control.md:11; user-messages.md:6/:10 and task-list.md:3): keep each rule in one section, the core (identity, delegating, dispatch, task-list) stays within its 4,100-character cap.",
     "Its non-blocking notes: routing.md does not classify Reviewer.audit and Reviewer.artifact (haiku in route.ts); R-STATE's 'a mode moves no records' is missing from version-control.md; docs/usage.md omits the local/briefs fallback outside git; context.md and ci.md rules lack the reason beside them and context.md:9 lacks a concrete threshold; the window and effort text repeats across docs (keep one full statement, link the others).",
@@ -85,7 +85,61 @@
     "agentId": "workflow:wf_9a6fb1a7-7a1/assignment-0mvzlp1ml-io0u",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-02T18:37:03.221Z"
+    "startedAt": "2026-11-02T18:37:03.221Z",
+    "finishedAt": "2026-11-02T18:48:36.740Z"
+  },
+  "result": "result: All asked items are done and every gate passes; the root prompt went from 31188 to 31161 bytes. One decision for the root: R-GIT in `agents.ts` is still mapped to `version-control.md` (see question).\n\nchanged (ownership paths only):\n- `packages/runtime/src/instructions/requirements.md` and `requirements/context.md`\n- `packages/runtime/src/instructions/claude-5.5/root/`: `ci`, `context`, `delegating`, `identity`, `routing`, `stack-plan`, `user-messages`, `version-control`, `workflows`\n- `packages/runtime/src/cli/overview.ts` and `cli/report.ts`\n- `packages/runtime/src/state/tree.ts`\n- `packages/runtime/src/setup/settings.ts` (comment only)\n- `packages/runtime/tests/cli.test.ts` and `tests/state-branch.test.ts`\n- `packages/integrations/claude/tests/plugin.test.ts`\n- `packages/integrations/claude/dist/agents/holyagent.md` and `dist/scripts/holyagent.js`\n- `docs/usage.md`, `docs/decisions.md` and `docs/cache-and-workflows.md`\n\nchecks:\n- `bun test` -> exit 0, 1017 pass, 1 skip, 0 fail\n- `bun check` -> exit 0, no type errors in 123 files\n- `bun lint` -> exit 0, no problems in 124 files\n- `bun fmt --check` -> exit 0, all 241 files formatted\n- `bun packages/integrations/claude/build.ts` -> built 30 files. The dist-equals-fresh-build test in `plugin.test.ts` passes.\n\nBoth new code tests fail on the base:\n- Reverting `tree.ts` fails \"the credential helpers the user configured still answer an https remote\".\n- Reverting `report.ts` fails \"a key line with nothing after its colon takes the lines below it\".\n\nblockers: none\n\nquestions:\n- Please decide whether to keep the force-push and protected-branch rule where it is now, in `version-control.md` only. It was in both `identity.md` and `version-control.md`. `REQUIREMENT_SECTIONS[\"R-GIT\"]` in `packages/integrations/claude/src/agents.ts` (outside my paths) maps its phrase to `version-control.md`, so I kept it there and dropped the copy from `identity.md`. The core lost that rule, but the PreToolUse hook reminder still states it at every `git push`. If you want it in the core, move the R-GIT mapping to `identity.md` and put the sentence back.\n- The brief's path `packages/runtime/src/instructions/root-core.ts` does not exist. The real file is `claude-5.5/root-core.ts`, and I did not need to edit it. The core files total 4005 characters against the 4,100 cap.\n\nnotes:\n- The duplicates were removed as follows. Edits are rule text moved or shortened, not behavior removed.\n  - Context rules: \"no gates or probes\" is owned by `context.md`, \"read only what a decision needs\" by `delegating.md`, and \"never open or re-emit the brief\" by `dispatch.md`.\n  - Wait rules: `ci.md` now says only that the watch ends on its own, and `dispatch.md` owns the no-polling rules.\n  - Push order: `assignments.md` owns it, and `stack-plan.md` keeps only the PR-opening step.\n  - Messages to the user: `user-messages.md` refers to the task-list rule and adds only what that rule does not name.\n- I also shortened `version-control.md`'s first paragraph, which repeated `identity.md` on `vcs commit` and plain Git. That was not on your list.\n- Reasons were added to `context.md` and `ci.md`, and the report cap in `context.md` is now 150 words for mechanical and validation work.\n- Reviewer.audit and Reviewer.artifact are now classified as haiku in `routing.md`, and R-ROUTE, R-WORKFLOW and R-GIT were updated in `requirements.md`.\n- The window and effort text is now stated in full once, in `docs/usage.md`. `requirements/context.md` links to it, and `decisions.md` and the T3 line in `usage.md` no longer repeat the precedence claim.\n- `docs/usage.md` also has the `local/briefs` fallback and a note that the `claude-opus-5-5` key follows the model the `opus` alias resolves to.\n- The `assignment close` plan text names `assignment reports <journal.jsonl>` as the source of the report files. The journal path itself is still not stated anywhere. I do not know where the Workflow tool puts it, so I did not invent it.\n- I did not verify that a per-model `modelSettings` entry takes precedence over the top-level key. That claim was already in `usage.md` and I left it.\n\nevidence:\ndiff-file: /tmp/holyagent-review/assignment-0mvzlp1ml-io0u.diff (609 lines, excludes the generated `dist/scripts/holyagent.js`)\ntests-run: `bun test` exit 0 with 1017 pass, 1 skip, 0 fail; `bun check`, `bun lint` and `bun fmt --check` exit 0; fresh build run\nprompt-size: `dist/agents/holyagent.md` was 31188 bytes before and is 31161 bytes after (-27)\nPlan text: `overview.ts` PLAN_NOTES now say return only `{ done: [ids] }`, use `assignment reports`, and close an unlisted Assignment errored once its agent is confirmed gone; `cli.test.ts` \"the help carries what a model needs\" asserts those phrases and rejects \"keyed by Assignment id\" and \"null report\"\nAbsent rule: `workflows.md` line 10 gives the rule, and the new `plugin.test.ts` test \"the root text says what to do with an Assignment that assignment reports does not list\" asserts it\nNo duplicates: each listed rule is now in one section (see notes); `plugin.test.ts` \"states the rules that two sections once shared in one section only\" counts one occurrence each; the requirements-coverage test still passes\nCredentials: `tree.ts` no longer passes `-c credential.helper=` and keeps `core.askPass=` plus the existing env; the test uses a local 401 server and a logging helper, and the full suite passes\nMulti-line evidence: `report.ts` `ownerOf` and `acceptanceFrom` take the lines below an empty key line as its support; the `cli.test.ts` test uses the 'Fetch safety:' shape, and a key line with nothing below it is still refused\nNon-blocking notes: `routing.md` classifies audit and artifact; the R-STATE \"moves no records\" line is in `version-control.md`; `usage.md` has the fallback and model-key notes; reasons and the 150-word threshold are in `context.md` and `ci.md`; the window text is in `usage.md` only\nGates: `bun test`, `bun check`, `bun lint` and `bun fmt --check` pass, and dist equals a fresh build (the `plugin.test.ts` byte-for-byte test passes)\nSize: 31161 bytes, no larger than the 31188 before\n",
+  "acceptance": {
+    "revision": 2,
+    "rationale": "1017 tests pass, gates clean, dist rebuilt; both new code tests fail on revert; prompt shrank 27 bytes; each criterion has named tests.",
+    "criteria": [
+      {
+        "criterion": "Plan text: plan's notes match workflows.md (scripts return { done: [ids] }, reports come from assignment reports, an Assignment it does not list is closed errored once its agent is confirmed gone)",
+        "support": "`overview.ts` PLAN_NOTES now say return only `{ done: [ids] }`, use `assignment reports`, and close an unlisted Assignment errored once its agent is confirmed gone; `cli.test.ts` \"the help carries what a model needs\" asserts those phrases and rejects \"keyed by Assignment id\" and \"null report\""
+      },
+      {
+        "criterion": "Absent rule: workflows.md states what to do with an Assignment assignment reports does not list",
+        "support": "`workflows.md` line 10 gives the rule, and the new `plugin.test.ts` test \"the root text says what to do with an Assignment that assignment reports does not list\" asserts it"
+      },
+      {
+        "criterion": "No duplicates: each listed rule appears in one root section only, with no behavior lost and requirements.md still covered by the set",
+        "support": "each listed rule is now in one section (see notes); `plugin.test.ts` \"states the rules that two sections once shared in one section only\" counts one occurrence each; the requirements-coverage test still passes"
+      },
+      {
+        "criterion": "Credentials: the state fetch keeps the configured credential helpers and stays non-interactive; the tests still pass",
+        "support": "`tree.ts` no longer passes `-c credential.helper=` and keeps `core.askPass=` plus the existing env; the test uses a local 401 server and a logging helper, and the full suite passes"
+      },
+      {
+        "criterion": "Multi-line evidence: a key line with empty support followed by list lines counts as support, with a test using the 'Fetch safety:' shape",
+        "support": "`report.ts` `ownerOf` and `acceptanceFrom` take the lines below an empty key line as its support; the `cli.test.ts` test uses the 'Fetch safety:' shape, and a key line with nothing below it is still refused"
+      },
+      {
+        "criterion": "Non-blocking notes: routing classifies audit and artifact, R-STATE line covered, usage.md fallback and model-key notes, reasons and threshold in context.md and ci.md, docs window text stated once",
+        "support": "`routing.md` classifies audit and artifact; the R-STATE \"moves no records\" line is in `version-control.md`; `usage.md` has the fallback and model-key notes; reasons and the 150-word threshold are in `context.md` and `ci.md`; the window text is in `usage.md` only"
+      },
+      {
+        "criterion": "Gates: bun test, bun check, bun lint and bun fmt --check pass and dist matches a fresh build",
+        "support": "`bun test`, `bun check`, `bun lint` and `bun fmt --check` pass, and dist equals a fresh build (the `plugin.test.ts` byte-for-byte test passes)"
+      },
+      {
+        "criterion": "Size: the root prompt is no larger than before, with byte counts",
+        "support": "31161 bytes, no larger than the 31188 before"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff-file",
+        "support": "/tmp/holyagent-review/assignment-0mvzlp1ml-io0u.diff (609 lines, excludes the generated `dist/scripts/holyagent.js`)"
+      },
+      {
+        "label": "tests-run",
+        "support": "`bun test` exit 0 with 1017 pass, 1 skip, 0 fail; `bun check`, `bun lint` and `bun fmt --check` exit 0; fresh build run"
+      },
+      {
+        "label": "prompt-size",
+        "support": "`dist/agents/holyagent.md` was 31188 bytes before and is 31161 bytes after (-27)"
+      }
+    ]
   },
   "createdAt": "2026-11-02T18:36:59.134Z"
 }
