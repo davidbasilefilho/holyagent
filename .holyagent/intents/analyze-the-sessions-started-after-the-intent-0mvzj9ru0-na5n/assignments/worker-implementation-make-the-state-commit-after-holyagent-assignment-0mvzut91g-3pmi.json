@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "make-the-state-commit-after-holyagent",
   "objective": "Make the state commit after holyagent migrate include exactly the files migrate copied, including plan.toon and every other legacy file.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "packages/runtime/src/state/tree.ts STATE_FILE (~line 886) now admits only records, config, resume-notes.md and notes/**; packages/runtime/src/state/legacy.ts (~533-535, 702-707) copies every file of a legacy Intent folder except intent.json/intent.toon, assignment files, the transaction file and *.tmp, and migrate's help (packages/runtime/src/cli/migrate.ts:167) promises plan.toon, plan.old-NNN.toon and every other file are copied. Today plan.toon stays untracked in the state worktree.",
     "Fix: have migrate pass the exact paths it copied to commitState so they are staged, keeping STATE_FILE strict so an unrelated stray file under .holyagent/ is still never committed."
@@ -49,7 +49,37 @@
     "agentId": "workflow:wf_775d33d4-9a8/assignment-0mvzut91g-3pmi",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-02T22:52:11.908Z"
+    "startedAt": "2026-11-02T22:52:11.908Z",
+    "finishedAt": "2026-11-02T22:58:01.433Z"
+  },
+  "result": "result: migrate now passes the paths it copied to `commitState`, so plan.toon and every other copied file are committed. `STATE_FILE` is unchanged. The new test fails without the fix and passes with it.\nchanged:\n- /home/user/holyagent/packages/runtime/src/state/tree.ts\n- /home/user/holyagent/packages/runtime/src/cli/migrate.ts\n- /home/user/holyagent/packages/runtime/tests/state-branch.test.ts\n\nchecks:\n- `bun test packages/runtime/tests/state-branch.test.ts packages/runtime/tests/migrate.test.ts` -> exit 0, 68 pass, 0 fail\n- `bun check --no-script` -> exit 0, no type errors in 121 files\n- `bun lint --no-script` -> exit 0, no problems in 122 files\n- `bun fmt --check --no-script` -> exit 0, all 241 files formatted\n- Without the fix (temporarily dropped `copied` from the `commitState` call, since restored), the updated test fails: plan.toon and plan.old-001.toon are missing from the `ls-tree` result.\n- I ran the `bun` commands directly because `mise` is not installed here, so `mise run verify` was not run.\n\nblockers: none\nquestions: none\nnotes:\n- `commitState` takes an optional 4th argument `copied` (absolute paths). `stageState` force-adds each one that is inside `.holyagent/` and not under `local/`, in addition to the `STATE_FILE` matches. `writeAll` now returns `{ records, copied }`.\n- I extended the existing migrate test in `state-branch.test.ts` instead of adding a new one. Its holyclaude fixture now includes plan.toon and plan.old-001.toon, and it expects them in `ls-tree`. The `stray.md` written afterwards is still not committed, and the other stray-file test is unchanged and passes.\n- `migrate.test.ts` is unchanged.\n- The diff of my three files is saved at /tmp/claude-0/-home-user-holyagent/4ed813b5-dc1d-5f26-9e40-d77f95591930/scratchpad/migrate.diff.\n\nevidence:\nchanged-paths: /home/user/holyagent/packages/runtime/src/state/tree.ts, /home/user/holyagent/packages/runtime/src/cli/migrate.ts, /home/user/holyagent/packages/runtime/tests/state-branch.test.ts\nchecks-run: bun test on the two files (68 pass), `bun check`, `bun lint` and `bun fmt --check`, all exit 0; `mise run verify` not run (mise missing)\nCopied files: the test in `state-branch.test.ts` (\"every file migrate copied into an Intent folder is committed…\") asserts `ls-tree` lists intent.json, notes/deep/more.md, notes/design.md, plan.old-001.toon, plan.toon and resume-notes.md. It fails when migrate does not pass `copied`.\nStray files: `stray.md` under the Intent folder is absent from `ls-tree` in the same test, and the existing test \"a stray file that its own ignore rule covers…\" passes.\nGates: bun test on both files exit 0 (68 pass), `bun check` exit 0, `bun lint` exit 0, `bun fmt --check` exit 0\n",
+  "acceptance": {
+    "revision": 7,
+    "rationale": "migrate passes copied paths to commitState; test lists plan.toon and plan.old-001.toon and fails without the fix; stray files stay out; gates exit 0.",
+    "criteria": [
+      {
+        "criterion": "Copied files: after migrate in branch state mode, git ls-tree of holyagent/state lists plan.toon, plan.old-001.toon, resume-notes.md and notes/** from the fixture, asserted by a test that fails on 35b4cd4",
+        "support": "the test in `state-branch.test.ts` (\"every file migrate copied into an Intent folder is committed…\") asserts `ls-tree` lists intent.json, notes/deep/more.md, notes/design.md, plan.old-001.toon, plan.toon and resume-notes.md. It fails when migrate does not pass `copied`."
+      },
+      {
+        "criterion": "Stray files: a stray file under .holyagent/ that migrate did not copy is never committed; the existing stray-file tests pass",
+        "support": "`stray.md` under the Intent folder is absent from `ls-tree` in the same test, and the existing test \"a stray file that its own ignore rule covers…\" passes."
+      },
+      {
+        "criterion": "Gates: bun test on state-branch.test.ts and migrate.test.ts, bun check, bun lint and bun fmt --check exit 0",
+        "support": "bun test on both files exit 0 (68 pass), `bun check` exit 0, `bun lint` exit 0, `bun fmt --check` exit 0"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "/home/user/holyagent/packages/runtime/src/state/tree.ts, /home/user/holyagent/packages/runtime/src/cli/migrate.ts, /home/user/holyagent/packages/runtime/tests/state-branch.test.ts"
+      },
+      {
+        "label": "checks-run",
+        "support": "bun test on the two files (68 pass), `bun check`, `bun lint` and `bun fmt --check`, all exit 0; `mise run verify` not run (mise missing)"
+      }
+    ]
   },
   "createdAt": "2026-11-02T22:52:11.908Z"
 }
