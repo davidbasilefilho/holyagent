@@ -1,0 +1,59 @@
+{
+  "id": "assignment-0mvzut9c7-cqn9",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 7,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-root-ask-again-when-an-answer",
+  "objective": "Make the root ask again when an answer to its question clarifies without choosing, and fix the setup command's restart rule on dry runs.",
+  "state": "Running",
+  "scope": [
+    "Incident in another session: the root asked a direction question through AskUserQuestion; the user's answer was a clarification (what they meant by randomly placed stars) and picked no option; the root treated it as no answer and went ahead on its recommended default; the user replied \"YOU DIDNT ASK ME AGAIN???????? you were supposed to\". Cause: the rule 'when the user does not answer, proceed on the recommended default' in root/asking.md.",
+    "New rule, in requirements.md first, then root/asking.md (and the user-busy skill if it restates defaults), then rebuild dist with bun packages/integrations/claude/build.ts: an answer that clarifies, comments or adds a constraint without choosing an option is not a choice; fold it into the question and ask again. The recommended default applies only when the user gives no answer at all or has said they are away (user-busy). When the user asked to be asked whenever something is ambiguous, ask before acting on any remaining ambiguity.",
+    "Also: packages/integrations/claude/src/setup-command.md tells the user to restart whenever the report has a '+' line, which also appears on --dry-run; restrict the restart to a real (non-dry) run that changed settings."
+  ],
+  "constraints": [
+    "Shorten nothing else; keep every existing detail.",
+    "Add a test mapping for the new requirement like the others.",
+    "Another writer is changing packages/runtime/src/state, cli/migrate.ts and their tests; do not edit them. Rebuild dist after they finish is handled by your run: rebuild at the end.",
+    "No version-control writes and no edits under .git/ or .holyagent/; report changed paths.",
+    "Keep working until done; when done and checked, stop and report. Respond tersely."
+  ],
+  "criteria": [
+    {
+      "text": "Re-ask: requirements.md and root/asking.md state that a clarifying or commenting answer that picks no option is folded into the question and asked again, and the default applies only with no answer or when the user is away; the requirement is mapped in the plugin test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Ambiguity: when the user asked to be asked about ambiguities, the root asks before acting on a remaining one",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Setup restart: setup-command.md asks for a restart only after a non-dry run that changed settings",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Gates: bun check, bun lint, bun fmt --check and bun test exit 0 after rebuilding dist",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/integrations/claude"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-02T22:52:12.295Z"
+  },
+  "createdAt": "2026-11-02T22:52:12.295Z"
+}
