@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "make-the-state-branch-start-from-the",
   "objective": "Make the state branch start from the remote's holyagent/state even when the clone has not fetched it, make state commits survive a .gitignore that ignores .holyagent/, and lower the effort of four specialist routes.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "packages/runtime/src/state/tree.ts ensureWorktree (about lines 427-472) and the state commit path that runs git add -A -- .holyagent.",
     "packages/runtime/src/domain/route.ts SPECS."
@@ -60,7 +60,45 @@
     "agentId": "workflow:wf_df74bfa8-601/assignment-0mvzjrnq1-q6xv",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-02T17:43:10.360Z"
+    "startedAt": "2026-11-02T17:43:10.360Z",
+    "finishedAt": "2026-11-02T17:59:33.564Z"
+  },
+  "result": "result: all three changes are made and tested. The full runtime suite passes (516/0), and so do `bun check`, lint and the format check.\n\nchanged:\n- `/home/user/holyagent/packages/runtime/src/state/tree.ts`\n- `/home/user/holyagent/packages/runtime/src/domain/route.ts`\n- `/home/user/holyagent/packages/runtime/tests/state-branch.test.ts`\n- `/home/user/holyagent/packages/runtime/tests/route.test.ts`\n\nBoth `state-mode.test.ts` and `fixtures.ts` are unchanged. There are no new files.\n\nchecks:\n- `bun test tests/state-branch.test.ts tests/route.test.ts tests/state-mode.test.ts` (in `packages/runtime`) -> exit 0, 88 pass, 0 fail.\n- `bun test` (full runtime suite) -> 516 pass, 0 fail.\n- `bun check --no-script` -> exit 0, no type errors in 121 files.\n- `bun lint --no-script` -> no problems in 122 files.\n- `bun fmt --no-script --check` -> all 237 files formatted.\n- I ran the checks through bun directly because `mise` is not on PATH, so `mise run verify` itself was not run.\n- Without the three changes (temporarily reverted, then restored), exactly three tests fail:\n  - the fetch test;\n  - the ignored-state test;\n  - the route-effort test.\n- I ran `bun install --frozen-lockfile` because `node_modules` was missing.\n\nblockers: none\nquestions: none\n\nnotes:\n- Read-only commands such as `intent list` and the session-start hook still do not fetch. The fetch happens only in `ensureWorktree` (creating commands), so they keep returning empty on a clone that never fetched the state branch, and the new fetch test uses `intent create` first. Letting `keepsState` fetch would put network calls on every session start, so I left it out.\n- The fetch is one `git fetch -q --no-tags origin +refs/heads/<branch>:refs/remotes/origin/<branch>` with `GIT_TERMINAL_PROMPT=0`. It has no timeout, so a hanging network could hold the worktree lock for a while.\n- The state commit now runs `git add -f -A -- .holyagent ':(exclude).holyagent/local'`. The `-f` is what gets past an ignoring `.gitignore`, and the exclude keeps `local/` out, as its own ignore file did before. The work branch's `.gitignore` is not touched.\n- The generated plugin under `packages/integrations/claude/dist` may embed route efforts. Run `mise run build` and commit its output if so; it is outside my ownership.\n\nevidence:\nRemote fetch: `ensureWorktree` now calls the new `fetchRemoteBranch` in `tree.ts` when there is no local branch and no remote-tracking ref. The test \"the state branch is fetched from origin when the clone has no remote-tracking ref for it\" deletes `refs/remotes/origin/holyagent/state` in a clone first. A second test, \"a remote that cannot be reached leaves the state branch starting from the base\", covers an unreachable origin.\nIgnored state: the `git add` in `commitState` now uses `-f` with the `local/` exclude. The test \"a base branch that ignores the state folder\" seeds a `.gitignore` with `/.holyagent/`. It asserts the intent is committed on the state branch, no `local/` files are tracked, `main:.gitignore` is unchanged and the status is clean.\nRoutes: in `route.ts` `SPECS`, `Worker.operations`, `Worker.validation` and `Worker.mechanical` are haiku/medium and `Worker.integration` is sonnet/medium. The test \"the cheap worker routes and integration run at medium effort\" checks those four and also that implementation, debugging and visual stay sonnet/high. The other routes are unchanged.\nTests: with the changes reverted, the fetch test, the ignored-state test and the route test each fail (3 failures); all pass with the changes restored.\nScope: `git status --short` shows only the four paths above, all inside the ownership paths.\ndiff-file: `/tmp/holyagent-review/assignment-0mvzjrnq1-q6xv.diff`\ntests-run: `bun test` in `packages/runtime` -> 516 pass, 0 fail. The three directly affected files (`state-branch`, `route`, `state-mode`) -> 88 pass, 0 fail.",
+  "acceptance": {
+    "revision": 2,
+    "rationale": "Three new tests fail without the change and pass with it; full runtime suite 516/0, check, lint and fmt clean; only owned paths changed.",
+    "criteria": [
+      {
+        "criterion": "Remote fetch: when neither the local branch nor refs/remotes/origin/<state branch> exists, the CLI fetches the state branch from origin (quietly, tolerating an offline or missing remote) and, when it arrives, starts the local branch from it with tracking; only otherwise it starts from the base",
+        "support": "`ensureWorktree` now calls the new `fetchRemoteBranch` in `tree.ts` when there is no local branch and no remote-tracking ref. The test \"the state branch is fetched from origin when the clone has no remote-tracking ref for it\" deletes `refs/remotes/origin/holyagent/state` in a clone first. A second test, \"a remote that cannot be reached leaves the state branch starting from the base\", covers an unreachable origin."
+      },
+      {
+        "criterion": "Ignored state: committing state in the state worktree succeeds when the branch's .gitignore ignores /.holyagent/ (as a branch started from main does), without changing the work branch's ignore rules",
+        "support": "the `git add` in `commitState` now uses `-f` with the `local/` exclude. The test \"a base branch that ignores the state folder\" seeds a `.gitignore` with `/.holyagent/`. It asserts the intent is committed on the state branch, no `local/` files are tracked, `main:.gitignore` is unchanged and the status is clean."
+      },
+      {
+        "criterion": "Routes: Worker.operations, Worker.validation and Worker.mechanical are haiku with medium effort and Worker.integration is sonnet with medium effort; every other route is unchanged",
+        "support": "in `route.ts` `SPECS`, `Worker.operations`, `Worker.validation` and `Worker.mechanical` are haiku/medium and `Worker.integration` is sonnet/medium. The test \"the cheap worker routes and integration run at medium effort\" checks those four and also that implementation, debugging and visual stay sonnet/high. The other routes are unchanged."
+      },
+      {
+        "criterion": "Tests: a test for each of the three changes fails without it, including a clone whose origin has holyagent/state but that has no remote-tracking ref for it",
+        "support": "with the changes reverted, the fetch test, the ignored-state test and the route test each fail (3 failures); all pass with the changes restored."
+      },
+      {
+        "criterion": "Scope: only the ownership paths change",
+        "support": "`git status --short` shows only the four paths above, all inside the ownership paths."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff-file",
+        "support": "`/tmp/holyagent-review/assignment-0mvzjrnq1-q6xv.diff`"
+      },
+      {
+        "label": "tests-run",
+        "support": "`bun test` in `packages/runtime` -> 516 pass, 0 fail. The three directly affected files (`state-branch`, `route`, `state-mode`) -> 88 pass, 0 fail."
+      }
+    ]
   },
   "createdAt": "2026-11-02T17:43:01.849Z"
 }
