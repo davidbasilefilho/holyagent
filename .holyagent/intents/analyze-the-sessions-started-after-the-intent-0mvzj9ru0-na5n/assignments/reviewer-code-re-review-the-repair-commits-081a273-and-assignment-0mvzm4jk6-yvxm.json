@@ -1,0 +1,48 @@
+{
+  "id": "assignment-0mvzm4jk6-yvxm",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 2,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-repair-commits-081a273-and",
+  "objective": "Re-review the repair commits 081a273 and 7ac8084 (git diff cf522df..7ac8084, code only) for correctness and regressions.",
+  "state": "Ready",
+  "scope": [
+    "Previous code findings (all non-blocking) on ecea23f/41754dd: fetch without timeout, untested brief write failure, brief left after persist failure, brief Read under .git, add -f scope. Repairs: non-interactive fetch with an 8 s kill and no fetch from hooks (tree.ts, program.ts, hook.ts), credential helpers kept, assignment reports command (assignment.ts, report.ts journalResults, brief.ts writeReport), evidence matching (normalized, multi-line support, label equal to evidence label), dispatch prompt wording, plan notes (overview.ts), and their tests."
+  ],
+  "constraints": [
+    "Read-only: no file edits, no git writes. Keep working until everything asked is done, then stop and report; report under 500 words, each evidence entry on one line as <criterion label>: <support>, findings each with path:line, severity and a concrete failure scenario; do not launch other reviewers."
+  ],
+  "criteria": [
+    {
+      "text": "Behavior: each repair works on its error paths (fetch timeout and kill, hook paths with no fetch, malformed journal, non-id labels, empty key lines at the end of a report)",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Regressions: earlier accepted behavior still holds (state creation from origin, launch recording, acceptance of existing report shapes, status)",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Tests: new tests fail without their change and none was weakened; bun test, bun check, bun lint and bun fmt --check pass on 7ac8084",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Repo standards: .claude/CLAUDE.md rules, notably the Bun.spawn use in tree.ts against the Bun Shell rule (judge whether the timeout justifies it and whether the code says why)",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "verified"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvzlcjd8-cyp6",
+    "assignment-0mvzlp1ml-io0u"
+  ],
+  "createdAt": "2026-11-02T18:49:02.214Z"
+}
