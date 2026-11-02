@@ -59,24 +59,30 @@ const normalized = (text: string): string =>
 /** The declared keys by their normalized text; one text may name several keys. */
 type Known = ReadonlyMap<string, ReadonlySet<string>>
 
+/** Whether a support says something: emphasis marks, backticks and punctuation alone do not. */
+const HAS_TEXT = /[\p{L}\p{N}]/u
+
 /**
  * The declared keys an entry belongs to and its support: the entry is `<key>: <support>`, where the
  * key matches declared criteria or labels after normalizing. A key may itself hold colons, so every
- * colon is tried and the longest matching head wins ("Handles errors: network: ok" is the support
- * of "Handles errors: network", not of "Handles errors"). An entry that is only a key, or whose
- * support is only emphasis marks and punctuation, has no support and claims nothing.
+ * colon is tried and the longest head with a support wins ("Handles errors: network: ok" is the
+ * support of "Handles errors: network", not of "Handles errors"). A key line whose support is empty
+ * or only emphasis marks and punctuation (`**Key:**`) is returned with an empty support: it is a
+ * key line all the same, and the lines that follow it may supply the support.
  */
 const ownerOf = (
   entry: string,
   known: Known,
 ): { readonly keys: ReadonlySet<string>; readonly support: string } | undefined => {
+  let bare: ReadonlySet<string> | undefined
   for (let at = entry.lastIndexOf(":"); at > 0; at = entry.lastIndexOf(":", at - 1)) {
     const keys = known.get(normalized(entry.slice(0, at)))
+    if (keys === undefined) continue
     const support = entry.slice(at + 1).trim()
-    // Emphasis marks, backticks and punctuation alone (`**Key:**`) are no support.
-    if (keys !== undefined && /[\p{L}\p{N}]/u.test(support)) return { keys, support }
+    if (HAS_TEXT.test(support)) return { keys, support }
+    bare ??= keys
   }
-  return undefined
+  return bare === undefined ? undefined : { keys: bare, support: "" }
 }
 
 /** The label of a criterion: its text before the first colon, or all of it when it has none. */
@@ -92,8 +98,9 @@ const labelOf = (text: string): string => {
  * is matched by its full text or by its label (the text before its first colon), where a label that
  * two criteria share names none of them. A line supports every key its text names, so a criterion
  * label equal to an evidence label (or to another criterion's full text) is supported by one line.
- * A line for any other text belongs to nothing. Every blocking criterion and every evidence label
- * needs a line with support; the failure lists the ones that have none.
+ * A line for any other text belongs to nothing. A key line with nothing after its colon takes the
+ * lines below it as its support, up to the next key line. Every blocking criterion and every
+ * evidence label needs support; the failure lists the ones that have none.
  */
 export const acceptanceFrom = (
   assignment: Assignment,
@@ -116,11 +123,22 @@ export const acceptanceFrom = (
   for (const [label, texts] of labels)
     if (texts.size === 1) for (const text of texts) name(label, text)
   const supports = new Map<string, string>()
+  const addSupport = (keys: ReadonlySet<string>, text: string) => {
+    if (HAS_TEXT.test(text)) for (const key of keys) if (!supports.has(key)) supports.set(key, text)
+  }
+  // A key line with no support of its own takes the lines after it, up to the next key line.
+  let open: { readonly keys: ReadonlySet<string>; readonly lines: Array<string> } | undefined
   for (const entry of evidenceEntries(report)) {
     const owner = ownerOf(entry, known)
-    if (owner !== undefined)
-      for (const key of owner.keys) if (!supports.has(key)) supports.set(key, owner.support)
+    if (owner === undefined) {
+      open?.lines.push(entry)
+      continue
+    }
+    if (open !== undefined) addSupport(open.keys, open.lines.join("; "))
+    open = owner.support === "" ? { keys: owner.keys, lines: [] } : undefined
+    addSupport(owner.keys, owner.support)
   }
+  if (open !== undefined) addSupport(open.keys, open.lines.join("; "))
   const supportFor = (key: string): string | undefined => supports.get(key)
   const criteria = assignment.criteria.map((criterion) => ({
     criterion,

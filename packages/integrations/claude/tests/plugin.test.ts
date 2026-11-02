@@ -347,6 +347,27 @@ describe("agents", () => {
       expect({ rule, count: content.split(rule).length - 1 }).toEqual({ rule, count: 1 })
   })
 
+  test("the root text states the rules that two sections once shared in one section only", () => {
+    const content = agent("holyagent")?.content ?? ""
+    for (const rule of [
+      "Run no gates, probes or data checks yourself",
+      "never open or re-emit the brief",
+      "no scheduled check-ins or wait loops",
+      "Never force-push",
+      "Hook and harness noise gets no mention or reply",
+      "the push once the reviews accept",
+      "Read only what a decision needs",
+    ])
+      expect({ rule, count: content.split(rule).length - 1 }).toEqual({ rule, count: 1 })
+    expect(content).not.toContain("Push only after the reviews accept")
+  })
+
+  test("the root text says what to do with an Assignment that assignment reports does not list", () => {
+    const text = read(`${CLAUDE}/root`, "workflows.md")
+    expect(text).toContain("does not list returned no result")
+    expect(text).toContain("confirmed gone, close it with `--outcome errored`")
+  })
+
   test("the static root text holds no cloud identity guidance: the session-start hook adds it in a cloud session", () => {
     const content = agent("holyagent")?.content ?? ""
     for (const part of ["get_me", "vcs identity", "users.noreply.github.com"])
@@ -564,7 +585,7 @@ describe("agents", () => {
     for (const part of [
       "Run no gates, probes or data checks yourself",
       "never open or re-emit the brief",
-      "Close each Assignment from its report file",
+      "`assignment close <id> --outcome <o> < <report-file>`",
       "a cap on the report",
       "Read an image in the main thread only to show it to the user (a path is not delivery) or to settle a concrete doubt",
       "no scheduled check-ins or wait loops",

@@ -471,7 +471,8 @@ const gitBounded = (
 /**
  * Fetches the state branch from `origin` into its remote-tracking ref, for a clone that has never
  * fetched it, and returns whether the ref exists afterwards. The fetch is quiet, never prompts (see
- * {@link fetchEnvironment}), uses no credential helper and is killed after `timeout` milliseconds;
+ * {@link fetchEnvironment}), keeps the credential helpers the user configured (a stored one answers
+ * without a prompt, which a private https remote needs) and is killed after `timeout` milliseconds;
  * an offline, slow, missing or empty remote only means the branch starts from the base.
  */
 export const fetchRemoteBranch = (
@@ -484,8 +485,6 @@ export const fetchRemoteBranch = (
     top,
     fetchEnvironment(env),
     [
-      "-c",
-      "credential.helper=",
       "-c",
       "core.askPass=",
       "fetch",

@@ -368,6 +368,38 @@ describe("the fetch of the remote state branch", () => {
     expect(log).not.toContain("BatchMode")
   })
 
+  test("the credential helpers the user configured still answer an https remote", async () => {
+    const dir = await initRepo(OWNER)
+    await seed(dir, { "a.txt": "a\n" })
+    const bin = await scratch("holyagent-bin-")
+    const log = join(bin, "helper.log")
+    const helper = join(bin, "helper.sh")
+    await writeFile(helper, `#!/bin/sh\necho "$1" >> "${log}"\n`, { mode: 0o755 })
+    // A server that demands credentials, so git asks its helper for them.
+    const server = Bun.serve({
+      port: 0,
+      fetch: () =>
+        new Response("denied", { status: 401, headers: { "WWW-Authenticate": 'Basic realm="x"' } }),
+    })
+    try {
+      await sh(dir, [
+        "git",
+        "remote",
+        "add",
+        "origin",
+        `http://localhost:${server.port}/octo/p.git`,
+      ])
+      await sh(dir, ["git", "config", "credential.helper", helper])
+
+      const found = await Effect.runPromise(fetchRemoteBranch(dir, GIT_ENV, STATE))
+
+      expect(found).toBe(false)
+      expect(await Bun.file(log).text()).toContain("get")
+    } finally {
+      await server.stop(true)
+    }
+  })
+
   test("a fetch that hangs is killed at its timeout and counts as no remote branch", async () => {
     const { dir, script } = await overSsh("sleep 5")
     const started = Date.now()

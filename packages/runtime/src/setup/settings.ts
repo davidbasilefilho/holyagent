@@ -22,8 +22,9 @@ export const CACHE_TTLS = ["1h", "5m"] as const
 export type CacheTtl = (typeof CACHE_TTLS)[number]
 
 /**
- * The canonical name Claude Code keys the Opus 5.5 entry of `modelSettings` by, the model the root
- * runs on. The entry matches the model's alias and dated IDs too.
+ * The canonical name Claude Code keys the Opus 5.5 entry of `modelSettings` by, the model the
+ * root's `opus` alias resolves to today. The key follows the model, so it changes when the alias
+ * moves (docs/usage.md, "The root's effort and window").
  */
 export const ROOT_MODEL = "claude-opus-5-5"
 

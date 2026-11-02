@@ -536,6 +536,51 @@ describe("report and prompt", () => {
     })
   })
 
+  test("a key line with nothing after its colon takes the lines below it, up to the next key line", async () => {
+    await createIntent()
+    const id = await dispatchWriter()
+    data(await cli(["assignment", "record", id, "--agent", "agent-1"]))
+    const accept = ["assignment", "close", id, "--outcome", "success", "--accept", "ok"]
+    // The shape of a repair report: the key alone, then unindented list items, then the next key.
+    const listed = [
+      "Built it.",
+      "",
+      "evidence:",
+      "parses:",
+      "- `parse` runs the parser on nested input.",
+      "- Tests in parser.test.ts:",
+      "  - nested input.",
+      "- `bun test` -> exit 0.",
+      "tests:",
+      "12 pass, 0 fail",
+    ].join("\n")
+    expect(data(await cli(accept, listed))).toMatchObject({ accepted: true })
+    expect(data(await cli(["assignment", "show", id, "--full"]))).toMatchObject({
+      acceptance: {
+        criteria: [
+          {
+            criterion: "parses",
+            support:
+              "`parse` runs the parser on nested input.; Tests in parser.test.ts: nested input.; `bun test` -> exit 0.",
+          },
+        ],
+        evidence: [{ label: "tests", support: "12 pass, 0 fail" }],
+      },
+    })
+  })
+
+  test("a key line with nothing below it before the next key line is still no support", async () => {
+    await createIntent()
+    const id = await dispatchWriter()
+    data(await cli(["assignment", "record", id, "--agent", "agent-1"]))
+    const refused = await cli(
+      ["assignment", "close", id, "--outcome", "success", "--accept", "ok"],
+      report("parses:", "tests: passed"),
+    )
+    expect(refused.code).toBe(3)
+    expect(refused.stderr).toContain('criterion "parses"')
+  })
+
   test("the prompt's first line names its Assignment, and nothing else is taken for a dispatch", async () => {
     await createIntent()
     const dispatched = data(await cli(["assignment", "dispatch"], writer()))
@@ -950,9 +995,19 @@ describe("command line", () => {
       "Workflow tool is disabled or unavailable",
       "workflow:<run-id>/<id>",
       "verbatim",
+      "{ done: [ids] }",
+      "`assignment reports <journal.jsonl>`",
+      "does not list returned no result",
+      "confirmed gone, close it errored",
     ])
       expect(plan).toContain(part)
-    for (const gone of ["holyagent:run-assignments", "holyagent:review-diff", "prebuilt"])
+    for (const gone of [
+      "holyagent:run-assignments",
+      "holyagent:review-diff",
+      "prebuilt",
+      "keyed by Assignment id",
+      "null report",
+    ])
       expect(plan).not.toContain(gone)
     expect(await help()).toContain("hint:")
   })
