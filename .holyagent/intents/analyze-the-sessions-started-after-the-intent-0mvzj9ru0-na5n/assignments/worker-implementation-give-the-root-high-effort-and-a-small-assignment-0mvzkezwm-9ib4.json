@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "give-the-root-high-effort-and-a-small",
   "objective": "Give the root high effort and a small context, and rewrite its instruction text so it reads only what orchestration needs, plus the platform-assigned branch rule.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "requirements.md and requirements/ first, then packages/runtime/src/instructions/claude-5.5/root/ sections (and root-core.ts if the core rules change), then agents.ts, setup settings and docs. Facts from research (code.claude.com docs, 2026-11-02): agent frontmatter effort is ignored when the agent is the main thread (anthropics/claude-code#81677, #97829) but applies to subagents and is harmless; a plugin settings.json honors only agent and subagentStatusLine; effortLevel in user settings does not apply to Opus 5.5 while modelSettings.<model>.effortLevel does (v2.1.251+); autoCompactWindow and modelSettings.<model>.autoCompactWindow take 100000 to 1000000 tokens (v2.1.288+); CLAUDE_CODE_EFFORT_LEVEL overrides subagent frontmatter, so never set it. Verify the exact modelSettings key form for the Opus model on code.claude.com/docs/en/settings-reference before writing it.",
     "Findings to act on (three sessions after 2026-10-30): root per-call context grew to 365k-747k tokens and its cache reads dominated its cost; the root read screenshots, ran gates and data checks itself, re-emitted dispatch briefs, polled ReadNotifications, ran sleep loops and scheduled re-checks while work ran, answered status-only wakes at length, and used the platform-reserved branch silently; haiku routes were underused while mechanical repairs and merge-conflict fixes went to Sonnet routes.",
@@ -81,5 +81,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-02T18:01:17.199Z"
+  },
   "createdAt": "2026-11-02T18:01:10.726Z"
 }
