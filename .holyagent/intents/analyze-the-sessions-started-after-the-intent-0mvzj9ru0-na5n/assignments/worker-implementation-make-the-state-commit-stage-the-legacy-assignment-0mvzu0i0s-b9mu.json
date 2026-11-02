@@ -57,5 +57,37 @@
     "finishedAt": "2026-11-02T22:39:01.106Z"
   },
   "result": "result: State commit now stages the migrated notes; `killGroup` only signals a pid above 1, and the failure-exit release skips an exited child. All four gates pass.\n\nchanged:\n- /home/user/holyagent/packages/runtime/src/state/tree.ts\n- /home/user/holyagent/packages/runtime/tests/state-branch.test.ts\n\n`migrate.test.ts` is unchanged. The diff is at /tmp/claude-0/-home-user-holyagent/4ed813b5-dc1d-5f26-9e40-d77f95591930/scratchpad/state-notes.diff.\n\nchecks:\n- `bun test packages/runtime/tests/state-branch.test.ts packages/runtime/tests/migrate.test.ts` -> exit 0, 68 pass, 0 fail.\n- `bun check --no-script` -> exit 0, no type errors in 121 files.\n- `bun lint --no-script` -> exit 0 with no warnings (the first run flagged my test and I fixed it).\n- `bun fmt --no-script --check` on tree.ts, state-branch.test.ts and migrate.test.ts -> exit 0.\n- I ran the new migrate test against the base `STATE_FILE` and it failed. The base tree held only `intent.json`, with the notes missing.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- `migrate.ts` is outside my paths, so I did not pass the copied note paths through to `commitState`. Instead `STATE_FILE` now also accepts `intents/<folder>/resume-notes.md` and `intents/<folder>/notes/**`, excluding `*.tmp`.\n- This means any other legacy note placed directly in an Intent folder is still not staged. If you want the exact copied set staged, `writeAll` would have to pass the paths to `commitState`, which needs an edit in `migrate.ts`.\n- `killGroup` is now exported, and I added an exported `releaseGroup` (the release step of `gitBounded`) so tests can reach both. Both have JSDoc.\n- `packages/integrations/claude/dist/scripts/holyagent.js` bundles this runtime source. Its owner needs to rebuild it with `mise run build` to pick up the change.\n\nevidence:\n- Migrated notes: the test \"the notes copied into an Intent folder are committed, a stray file beside them is not\" in `tests/state-branch.test.ts`. It runs `migrate` in a git repo in branch state mode and asserts `git ls-tree` of `holyagent/state` lists `intent.json`, `resume-notes.md`, `notes/design.md` and `notes/deep/more.md`, but not `notes/scratch.tmp` or a later `stray.md`. It fails with the `STATE_FILE` pattern reverted and passes now.\n- Stray files: the existing test \"a stray file that its own ignore rule covers is never committed, a record always is\" still passes (state-branch.test.ts, 46 pass at that point; 68 pass together with migrate.test.ts).\n- Kill guard: tests in the new \"the group kill\" block in `tests/state-branch.test.ts`. `process.kill` is spied on, and `killGroup` makes no call for pids 1, 0, -1, -7, 1.5, NaN or undefined. It signals `-4242` with SIGKILL for a real pid. `releaseGroup` kills only a running child on failure, not an exited one (exitCode 0 or 128) and not on success. The code is in `tree.ts` at `killGroup` and `releaseGroup`.\n- Gates: the check commands above all exit 0. The first lint run (exit 1) failed on my own new test and is fixed. No failures came from files the other writer owns.\n- changed-paths: `packages/runtime/src/state/tree.ts` and `packages/runtime/tests/state-branch.test.ts`.\n- checks-run: the five commands listed under `checks`, plus the run of the new migrate test against the base `STATE_FILE`.\n",
+  "acceptance": {
+    "revision": 6,
+    "rationale": "Migrated notes now staged with a test failing on the old pattern; kill guard and exited-child skip tested; state-branch and migrate tests 68 pass, check/lint/fmt exit 0.",
+    "criteria": [
+      {
+        "criterion": "Migrated notes: after holyagent migrate in branch state mode, the copied notes are in git ls-tree of the state branch, asserted by a test that fails on 386cb22",
+        "support": "the test \"the notes copied into an Intent folder are committed, a stray file beside them is not\" in `tests/state-branch.test.ts`. It runs `migrate` in a git repo in branch state mode and asserts `git ls-tree` of `holyagent/state` lists `intent.json`, `resume-notes.md`, `notes/design.md` and `notes/deep/more.md`, but not `notes/scratch.tmp` or a later `stray.md`. It fails with the `STATE_FILE` pattern reverted and passes now."
+      },
+      {
+        "criterion": "Stray files: the existing test that a stray ignored file under .holyagent/ is never committed still passes",
+        "support": "the existing test \"a stray file that its own ignore rule covers is never committed, a record always is\" still passes (state-branch.test.ts, 46 pass at that point; 68 pass together with migrate.test.ts)."
+      },
+      {
+        "criterion": "Kill guard: killGroup never calls process.kill with a pid of 1 or less, and the failure-exit path does not kill the group of an exited child; covered by tests where feasible",
+        "support": "tests in the new \"the group kill\" block in `tests/state-branch.test.ts`. `process.kill` is spied on, and `killGroup` makes no call for pids 1, 0, -1, -7, 1.5, NaN or undefined. It signals `-4242` with SIGKILL for a real pid. `releaseGroup` kills only a running child on failure, not an exited one (exitCode 0 or 128) and not on success. The code is in `tree.ts` at `killGroup` and `releaseGroup`."
+      },
+      {
+        "criterion": "Gates: bun test on packages/runtime/tests/state-branch.test.ts and migrate.test.ts, bun check, bun lint and bun fmt --check on the changed files exit 0 (failures in files owned by the other writer are not yours; name them)",
+        "support": "the check commands above all exit 0. The first lint run (exit 1) failed on my own new test and is fixed. No failures came from files the other writer owns."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "`packages/runtime/src/state/tree.ts` and `packages/runtime/tests/state-branch.test.ts`."
+      },
+      {
+        "label": "checks-run",
+        "support": "the five commands listed under `checks`, plus the run of the new migrate test against the base `STATE_FILE`."
+      }
+    ]
+  },
   "createdAt": "2026-11-02T22:29:50.525Z"
 }
