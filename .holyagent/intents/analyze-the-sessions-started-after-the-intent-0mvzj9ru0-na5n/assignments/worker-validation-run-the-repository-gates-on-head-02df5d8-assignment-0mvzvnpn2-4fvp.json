@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mvzvnpn2-4fvp",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 8,
+  "roleTask": "Worker.validation",
+  "slug": "run-the-repository-gates-on-head-02df5d8",
+  "objective": "Run the repository gates on head 02df5d8 and confirm the generated plugin is in step with its sources.",
+  "state": "Running",
+  "scope": [
+    "Repository /home/user/holyagent on branch claude/nifty-faraday-jinmae at 02df5d8. mise is not installed: run bun check, bun lint, bun fmt --check and bun test directly, then bun packages/integrations/claude/build.ts and confirm git status shows no change under packages/integrations/claude/dist afterwards."
+  ],
+  "constraints": [
+    "Read-only apart from the build output; if the build changes dist, report the changed paths and do not edit anything else.",
+    "No version-control writes.",
+    "Respond tersely."
+  ],
+  "criteria": [
+    {
+      "text": "Gates: bun check, bun lint, bun fmt --check and bun test exit 0, with counts",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Dist in step: rebuilding the plugin leaves git status clean under packages/integrations/claude/dist",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-02T23:15:53.102Z"
+  },
+  "createdAt": "2026-11-02T23:15:53.102Z"
+}
