@@ -29,9 +29,11 @@
     "User (verbatim, pt-BR): veja os guias oficiais de instruções para o claude opus 5.5, claude sonnet 5.5 e claude haiku 5.5 se não estiver englobado em claude 5.5 / inclua \"Respond tersely\" (como é dito nos guias) nos prompts dos agentes",
     "User (verbatim, pt-BR): o holyagent desabilita a função de parar agentes ou workflows? tire isso, mas o root deve apenas parar quando um requisito ou informação nova faz parte de um trabalho em andamento que seria conflitante, mas dependendo vale mais a pena esperar o agente/workflow acabar dependendo da situação",
     "Decision: check the official Anthropic prompting guides for Opus 5.5, Sonnet 5.5 and Haiku 5.5, and apply any per-model guidance the claude-5.5 instruction set does not cover yet; add the guides wording \"Respond tersely\" to every agent prompt (root and specialists).",
-    "Decision: give the root agent the TaskStop tool back and replace the no-stopping rule: the root stops a running agent or workflow only when a new requirement or new information conflicts with that running work, and lets it finish when finishing and then repairing costs less than stopping and relaunching."
+    "Decision: give the root agent the TaskStop tool back and replace the no-stopping rule: the root stops a running agent or workflow only when a new requirement or new information conflicts with that running work, and lets it finish when finishing and then repairing costs less than stopping and relaunching.",
+    "User (verbatim, pt-BR): se puder re-escrever/encurtar todas as instruções e skills depois de pesquisar as instruções e com as instruções de curto, direto e objetivo",
+    "Decision: after the guide research, rewrite and shorten every agent instruction section and every skill to be short, direct and objective, following the official guides; keep every requirements.md behavior covered."
   ],
-  "revision": 4,
+  "revision": 5,
   "state": "Open",
   "createdAt": "2026-11-02T17:29:07.369Z"
 }
