@@ -1,0 +1,56 @@
+{
+  "id": "assignment-0mvzs09lb-r6w4",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 2,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-commit-0cbedf0-the-repair-of",
+  "objective": "Re-review commit 0cbedf0, the repair of two code blockers found in the review of 7ac8084, and say whether each is closed without new defects.",
+  "state": "Running",
+  "scope": [
+    "Only the diff of commit 0cbedf0 (git show 0cbedf0, also at /tmp/holyagent-review/0cbedf0.diff) in packages/runtime/src/state/tree.ts, packages/runtime/src/cli/report.ts, packages/runtime/src/cli/overview.ts and their tests.",
+    "Previous finding A: tree.ts fetchEnvironment injected GIT_SSH_COMMAND unless GIT_SSH_COMMAND or GIT_SSH was set, overriding a configured core.sshCommand. Expected fix: keep the configured command and add BatchMode and ConnectTimeout non-interactively.",
+    "Previous finding B: report.ts took every following unindented line after an empty-support key line as support, so 'parses:' then 'Looks fine.' accepted. Expected fix: only contiguous list items or indented lines directly below count.",
+    "Previous small item: a null workflow result was written as the report 'null'; it should write no file."
+  ],
+  "constraints": [
+    "Read-only: make no edits and no version-control writes. Run tests if useful.",
+    "Follow .claude/CLAUDE.md and AGENTS.md as the repository rules.",
+    "Keep working until the review is done, then stop and report under 400 words; do not start further review rounds. Each evidence entry on one line as '<criterion label>: <support>'."
+  ],
+  "criteria": [
+    {
+      "text": "Finding A: closed or still open, with file:line support, including quoting of a core.sshCommand that contains spaces or quotes",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Finding B: closed or still open, with the shapes checked",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "New defects: any blocking regression the repair introduced, or none, with support",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Tests: each fix has a test that would fail without it",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "verdict"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvzrqoo2-qb6m"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-02T21:33:40.367Z"
+  },
+  "createdAt": "2026-11-02T21:33:40.367Z"
+}
