@@ -76,5 +76,45 @@
     "finishedAt": "2026-11-02T21:41:19.152Z"
   },
   "result": "result: All five review items are fixed and the gates pass. The full `bun test` run failed once only on the dist-in-step check; after the rebuild, the affected test files pass. I did not re-run the whole suite after the rebuild.\n\nchanged:\n- /home/user/holyagent/packages/runtime/src/instructions/requirements.md\n- /home/user/holyagent/docs/cache-and-workflows.md\n- /home/user/holyagent/packages/runtime/src/cli/assignment.ts\n- /home/user/holyagent/packages/runtime/src/cli/report.ts\n- /home/user/holyagent/packages/runtime/src/state/tree.ts\n- /home/user/holyagent/packages/runtime/tests/cli.test.ts\n- /home/user/holyagent/packages/runtime/tests/reports.test.ts\n- /home/user/holyagent/packages/runtime/tests/state-branch.test.ts\n- /home/user/holyagent/packages/integrations/claude/dist/scripts/holyagent.js (rebuilt)\n\nchecks:\n- `bun test`, full run before the rebuild -> 1023 pass, 1 skip, 1 fail. The failure was the generated-plugin check \"every committed generated file equals a fresh build\", caused by dist being stale.\n- `bun packages/integrations/claude/build.ts` -> built 30 files, only `dist/scripts/holyagent.js` changed.\n- `bun test packages/integrations` plus `cli`, `reports` and `state-branch` tests, run after the rebuild -> 535 pass, 1 skip, 0 fail.\n- `bun check` -> no type errors in 123 files.\n- `bun lint` -> no problems in 124 files.\n- `bun fmt --check` -> all 241 files formatted.\n- Root prompt `dist/agents/holyagent.md` -> 31160 bytes before and after.\n\nblockers: none\nquestions: none\n\nnotes:\n- For the GIT_SSH edge, a configured `core.sshCommand` now gets the BatchMode and ConnectTimeout options even when `GIT_SSH` is set, since git ranks `core.sshCommand` above `GIT_SSH`. `GIT_SSH` alone and an env `GIT_SSH_COMMAND` are left alone.\n- A report is now skipped when its trimmed text is empty. This also covers a JSON result that renders to nothing, which cannot happen today.\n- I did not run the new tests against the old code. The checkbox test covers `[x] ran it`, `- [x] ran it` and `[ ] ran it`, and the old code would not have counted `[x] ran it` as support.\n- Nothing unrequested was added.\n\nevidence:\nClosing rule: `requirements.md` R-WORKFLOW (line 24) now states it; `docs/cache-and-workflows.md:50` points to the root's workflow text; `workflows.md:10` is unchanged and remains the single statement in the root text.\nPlaceholder: `assignment.ts` reports help now reads `< <report-file>`.\nCheckbox items: `report.ts` derives both the strip and the list test from `LIST_MARKER`; tested in `cli.test.ts` (\"an unindented checkbox item below a key line is support exactly when a dash checkbox item is\"), passing.\nEmpty results: `journalResults` skips a report whose trimmed text is empty; tested in `reports.test.ts` (\"an empty or whitespace result is no result...\"), passing.\nGIT_SSH edge: `fetchEnvironment` in `tree.ts`; tested in `state-branch.test.ts` (\"a configured core.sshCommand wins over GIT_SSH...\"), passing.\nGates: `bun check`, `bun lint` and `bun fmt --check` exit 0; the affected test files pass after the dist rebuild; I did not re-run the full suite, and the only full-suite failure, the dist check, came from stale dist and was fixed by the rebuild.\ndiff-file: /tmp/holyagent-review/final-repair.diff\ntests-run: `bun test` full run (1023 pass, 1 skip, 1 fail on stale dist); after the rebuild, `bun test packages/integrations` plus `cli`, `reports` and `state-branch` (535 pass, 0 fail).\n",
+  "acceptance": {
+    "revision": 2,
+    "rationale": "Validation on eee082a: bun test 1024 pass 0 fail, check/lint/fmt exit 0, dist clean; code and artifact re-reviews pass.",
+    "criteria": [
+      {
+        "criterion": "Closing rule: requirements.md R-WORKFLOW states it, workflows.md:10 stays the one root statement, docs refer instead of repeating",
+        "support": "`requirements.md` R-WORKFLOW (line 24) now states it; `docs/cache-and-workflows.md:50` points to the root's workflow text; `workflows.md:10` is unchanged and remains the single statement in the root text."
+      },
+      {
+        "criterion": "Placeholder: the assignment reports help uses <report-file>",
+        "support": "`assignment.ts` reports help now reads `< <report-file>`."
+      },
+      {
+        "criterion": "Checkbox items: an unindented checkbox item under an empty key is support exactly when a dash checkbox item is; tested",
+        "support": "`report.ts` derives both the strip and the list test from `LIST_MARKER`; tested in `cli.test.ts` (\"an unindented checkbox item below a key line is support exactly when a dash checkbox item is\"), passing."
+      },
+      {
+        "criterion": "Empty results: an empty or whitespace result is not listed and writes no file; tested",
+        "support": "`journalResults` skips a report whose trimmed text is empty; tested in `reports.test.ts` (\"an empty or whitespace result is no result...\"), passing."
+      },
+      {
+        "criterion": "GIT_SSH edge: with GIT_SSH and core.sshCommand both set, the fetch uses core.sshCommand with BatchMode and ConnectTimeout; tested",
+        "support": "`fetchEnvironment` in `tree.ts`; tested in `state-branch.test.ts` (\"a configured core.sshCommand wins over GIT_SSH...\"), passing."
+      },
+      {
+        "criterion": "Gates: bun test, bun check, bun lint and bun fmt --check pass and dist matches a fresh build",
+        "support": "`bun check`, `bun lint` and `bun fmt --check` exit 0; the affected test files pass after the dist rebuild; I did not re-run the full suite, and the only full-suite failure, the dist check, came from stale dist and was fixed by the rebuild."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff-file",
+        "support": "/tmp/holyagent-review/final-repair.diff"
+      },
+      {
+        "label": "tests-run",
+        "support": "`bun test` full run (1023 pass, 1 skip, 1 fail on stale dist); after the rebuild, `bun test packages/integrations` plus `cli`, `reports` and `state-branch` (535 pass, 0 fail)."
+      }
+    ]
+  },
   "createdAt": "2026-11-02T21:36:42.596Z"
 }
