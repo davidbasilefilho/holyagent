@@ -10288,17 +10288,17 @@ var requireFree = (listed, path, branch) => gen2(function* () {
   }
 });
 var FETCH_TIMEOUT_MS = 8000;
-var NON_INTERACTIVE_SSH = "ssh -o BatchMode=yes -o ConnectTimeout=5";
+var NON_INTERACTIVE_SSH_OPTIONS = "-o BatchMode=yes -o ConnectTimeout=5";
 var ASKPASS_VARIABLES = new Set(["SSH_ASKPASS", "SSH_ASKPASS_REQUIRE"]);
-var fetchEnvironment = (env) => {
+var fetchEnvironment = (env, configured) => {
   const base = Object.fromEntries(Object.entries(gitEnvironment(env)).filter(([name]) => !ASKPASS_VARIABLES.has(name)));
-  const ssh = base["GIT_SSH_COMMAND"] !== undefined || base["GIT_SSH"] !== undefined;
+  const chosen = base["GIT_SSH_COMMAND"] !== undefined || base["GIT_SSH"] !== undefined;
   return {
     ...base,
     GIT_TERMINAL_PROMPT: "0",
     GIT_ASKPASS: "",
     GCM_INTERACTIVE: "never",
-    ...ssh ? {} : { GIT_SSH_COMMAND: NON_INTERACTIVE_SSH }
+    ...chosen ? {} : { GIT_SSH_COMMAND: `${configured ?? "ssh"} ${NON_INTERACTIVE_SSH_OPTIONS}` }
   };
 };
 var gitBounded = (cwd, env, args, timeout) => try_2({
@@ -10316,7 +10316,7 @@ var gitBounded = (cwd, env, args, timeout) => try_2({
   try: () => child.exited,
   catch: (cause) => new StateIo({ path: cwd, cause })
 })));
-var fetchRemoteBranch = (top, env, branch, timeout = FETCH_TIMEOUT_MS) => gitBounded(top, fetchEnvironment(env), [
+var fetchRemoteBranch = (top, env, branch, timeout = FETCH_TIMEOUT_MS) => git(top, env, ["config", "--get", "core.sshCommand"]).pipe(map4((ran) => ran.code === 0 ? ran.stdout.trim() : ""), flatMap2((configured) => gitBounded(top, fetchEnvironment(env, configured === "" ? undefined : configured), [
   "-c",
   "core.askPass=",
   "fetch",
@@ -10324,7 +10324,7 @@ var fetchRemoteBranch = (top, env, branch, timeout = FETCH_TIMEOUT_MS) => gitBou
   "--no-tags",
   "origin",
   `+refs/heads/${branch}:refs/remotes/origin/${branch}`
-], timeout).pipe(flatMap2((code) => code === 0 ? refExists(top, env, `refs/remotes/origin/${branch}`) : succeed6(false)));
+], timeout)), flatMap2((code) => code === 0 ? refExists(top, env, `refs/remotes/origin/${branch}`) : succeed6(false)));
 var readyMarker = (path) => `${path}.ready`;
 var ensureWorktree = (top, common, env, branch, path, options) => withFileLock(join2(common, "holyagent", "worktree.lock"), gen2(function* () {
   const ready = readyMarker(path);
@@ -11973,21 +11973,31 @@ var renderJsonReport = (report) => [
 
 var EVIDENCE_HEADING = /^\s*evidence:\s*$/i;
 var indentOf = (line) => line.length - line.trimStart().length;
+var LIST_ITEM = /^(?:[-*+\u2022]|\d+[.)])\s+/;
 var evidenceEntries = (report) => {
   const lines = report.split(/\r?\n/);
   const heading = lines.findLastIndex((line) => EVIDENCE_HEADING.test(line));
   if (heading === -1)
     return [];
-  const block = lines.slice(heading + 1).filter((line) => line.trim() !== "");
-  const base = block[0] === undefined ? 0 : indentOf(block[0]);
+  const base = indentOf(lines.slice(heading + 1).find((line) => line.trim() !== "") ?? "");
   const entries = [];
-  for (const line of block) {
+  let gap = false;
+  for (const line of lines.slice(heading + 1)) {
+    if (line.trim() === "") {
+      gap = true;
+      continue;
+    }
     const text = line.trim().replace(/^(?:[-*+\u2022]\s+|\d+[.)]\s+|\[[ xX]\]\s+)+/, "");
     const last = entries.length - 1;
-    if (indentOf(line) > base && last >= 0)
-      entries[last] = `${entries[last] ?? ""}${entries[last]?.endsWith(":") ? " " : "; "}${text}`;
+    const above = entries[last];
+    if (indentOf(line) > base && above !== undefined && !gap)
+      entries[last] = {
+        ...above,
+        text: `${above.text}${above.text.endsWith(":") ? " " : "; "}${text}`
+      };
     else
-      entries.push(text);
+      entries.push({ text, list: LIST_ITEM.test(line.trim()), gap });
+    gap = false;
   }
   return entries;
 };
@@ -12041,19 +12051,25 @@ var acceptanceFrom = (assignment, report, rationale, carryForward) => {
     }
   };
   let open;
-  for (const entry of evidenceEntries(report)) {
-    const owner = ownerOf(entry, known);
-    if (owner === undefined) {
-      open?.lines.push(entry);
-      continue;
-    }
+  const close = () => {
     if (open !== undefined)
       addSupport(open.keys, open.lines.join("; "));
+    open = undefined;
+  };
+  for (const entry of evidenceEntries(report)) {
+    const owner = ownerOf(entry.text, known);
+    if (owner === undefined) {
+      if (open !== undefined && entry.list && !entry.gap)
+        open.lines.push(entry.text);
+      else
+        close();
+      continue;
+    }
+    close();
     open = owner.support === "" ? { keys: owner.keys, lines: [] } : undefined;
     addSupport(owner.keys, owner.support);
   }
-  if (open !== undefined)
-    addSupport(open.keys, open.lines.join("; "));
+  close();
   const supportFor = (key) => supports.get(key);
   const criteria = assignment.criteria.map((criterion) => ({
     criterion,
@@ -12127,7 +12143,7 @@ var journalResults = (journal, source) => gen2(function* () {
     })));
     if ("label" in entry)
       labels.set(entry.key, entry.label);
-    else if ("result" in entry) {
+    else if ("result" in entry && entry.result !== null) {
       const json = yield* decodeUnknownEffect2(JsonReport)(entry.result).pipe(option2);
       const report = typeof entry.result === "string" ? entry.result : json._tag === "Some" ? renderJsonReport(json.value) : JSON.stringify(entry.result, null, 2) ?? "";
       results.push({ label: labels.get(entry.key), agentId: entry.agentId, report });
@@ -13667,7 +13683,7 @@ var resumeOf = (directory) => readOpenState(directory).pipe(map4((snapshot) => (
 var PLAN_NOTES = [
   "workflow first: `assignment dispatch` each id for its agent, model, effort and prompt, then write the inline script yourself and run it with the Workflow tool; an entry is {id, agent, model, effort, prompt}, where the prompt is the short one `assignment dispatch` printed: it names the brief file the specialist reads, so pass it as it is and never open or retype the brief. A single Assignment is a one-entry workflow, and `continues` lists work that continues a warm specialist by SendMessage beside it. `fallback` is for a session where the Workflow tool is disabled or unavailable: its writers launch together, and `afterwards` launch once the writers they depend on are terminal",
   "the script opens with a literal `export const meta = {name, description}` and has one agent() per entry, every one with agentType holyagent:<agent> and the entry's model and effort. Run the entries through pipeline() and put a review stage after its writers; return only `{ done: [ids] }`, the Assignments whose agent returned a report, since the reports stay out of the Workflow result. An inline script whose every agent() names a holyagent specialist runs without a permission prompt; any other agent type, a scriptPath or a resume goes through the normal flow",
-  "the run ends with a notice carrying the returned value, and the tool result has the run id. Per entry: `assignment record <id> --agent workflow:<run-id>/<id>`. Then `assignment reports <journal.jsonl>` writes each agent's report (the script passes no `schema`, so agent() returns the specialist's own report) to a file named by its Assignment id and lists id, path and words, and `assignment close <id> --outcome <o> [--accept <rationale>] < <path>` closes from the file, verbatim and never retyped or summarized. An Assignment that `assignment reports` does not list returned no result: once the run has ended and its agent is confirmed gone, close it errored. A workflow's agents cannot be messaged, so a gap in a report, like any repair, is a new draft with followUpOf"
+  "the run ends with a notice carrying the returned value, and the tool result has the run id. Per entry: `assignment record <id> --agent workflow:<run-id>/<id>`. Then `assignment reports <journal.jsonl>` writes each agent's report (the script passes no `schema`, so agent() returns the specialist's own report) to a file named by its Assignment id and lists id, path and words, and `assignment close <id> --outcome <o> [--accept <rationale>] < <report-file>` closes from the file, verbatim and never retyped or summarized. An Assignment that `assignment reports` does not list follows the closing rule in the root workflow text. A workflow's agents cannot be messaged, so a gap in a report, like any repair, is a new draft with followUpOf"
 ];
 var OVERVIEW_COMMANDS = [
   {

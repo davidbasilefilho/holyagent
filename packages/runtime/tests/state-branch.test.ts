@@ -368,6 +368,18 @@ describe("the fetch of the remote state branch", () => {
     expect(log).not.toContain("BatchMode")
   })
 
+  test("a configured core.sshCommand is still used, in batch mode with a connect timeout", async () => {
+    const { dir, script, logged } = await overSsh("exit 255")
+    await sh(dir, ["git", "config", "core.sshCommand", `${script} -o Configured=yes`])
+
+    toon(await vcs(dir, ["intent", "create"], fakeGitHub().layer, { objective: "Ship the parser" }))
+
+    const log = await logged()
+    expect(log).toContain("Configured=yes")
+    expect(log).toContain("BatchMode=yes")
+    expect(log).toContain("ConnectTimeout=")
+  })
+
   test("the credential helpers the user configured still answer an https remote", async () => {
     const dir = await initRepo(OWNER)
     await seed(dir, { "a.txt": "a\n" })

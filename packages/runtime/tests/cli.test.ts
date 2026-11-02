@@ -536,7 +536,7 @@ describe("report and prompt", () => {
     })
   })
 
-  test("a key line with nothing after its colon takes the lines below it, up to the next key line", async () => {
+  test("a key line with nothing after its colon takes the list items directly below it, up to the next key line", async () => {
     await createIntent()
     const id = await dispatchWriter()
     data(await cli(["assignment", "record", id, "--agent", "agent-1"]))
@@ -552,7 +552,7 @@ describe("report and prompt", () => {
       "  - nested input.",
       "- `bun test` -> exit 0.",
       "tests:",
-      "12 pass, 0 fail",
+      "- 12 pass, 0 fail",
     ].join("\n")
     expect(data(await cli(accept, listed))).toMatchObject({ accepted: true })
     expect(data(await cli(["assignment", "show", id, "--full"]))).toMatchObject({
@@ -567,6 +567,34 @@ describe("report and prompt", () => {
         evidence: [{ label: "tests", support: "12 pass, 0 fail" }],
       },
     })
+  })
+
+  test("a key line followed by unindented text, or by a list after a blank line, is still no support", async () => {
+    await createIntent()
+    const id = await dispatchWriter()
+    data(await cli(["assignment", "record", id, "--agent", "agent-1"]))
+    const accept = ["assignment", "close", id, "--outcome", "success", "--accept", "ok"]
+    for (const text of [
+      ["parses:", "Looks fine.", "tests: passed"],
+      ["parses:", "tests: passed", "", "Looks fine."],
+      ["parses:", "", "- ran it", "tests: passed"],
+      ["parses:", "Looks fine.", "- ran it", "tests: passed"],
+    ]) {
+      const refused = await cli(accept, ["Built it.", "", "evidence:", ...text].join("\n"))
+      expect(refused.code).toBe(3)
+      expect(refused.stderr).toContain('criterion "parses"')
+    }
+  })
+
+  test("indented lines directly below a key line with nothing after its colon are its support", async () => {
+    await createIntent()
+    const id = await dispatchWriter()
+    data(await cli(["assignment", "record", id, "--agent", "agent-1"]))
+    const accept = ["assignment", "close", id, "--outcome", "success", "--accept", "ok"]
+    const indented = ["Built it.", "", "evidence:", "parses:", "  ran it", "tests: passed"].join(
+      "\n",
+    )
+    expect(data(await cli(accept, indented))).toMatchObject({ accepted: true })
   })
 
   test("a key line with nothing below it before the next key line is still no support", async () => {
@@ -997,8 +1025,7 @@ describe("command line", () => {
       "verbatim",
       "{ done: [ids] }",
       "`assignment reports <journal.jsonl>`",
-      "does not list returned no result",
-      "confirmed gone, close it errored",
+      "does not list follows the closing rule in the root workflow text",
     ])
       expect(plan).toContain(part)
     for (const gone of [

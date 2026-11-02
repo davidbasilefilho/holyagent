@@ -410,29 +410,34 @@ const requireFree = (listed: ReadonlyArray<Listed>, path: string, branch: string
 /** The longest the state fetch may run before it is killed, in milliseconds. */
 export const FETCH_TIMEOUT_MS = 8_000
 
-/** The ssh a state fetch uses unless the user chose one: it never prompts and gives up connecting. */
-const NON_INTERACTIVE_SSH = "ssh -o BatchMode=yes -o ConnectTimeout=5"
+/** The ssh options of a state fetch: it never prompts and gives up connecting. */
+const NON_INTERACTIVE_SSH_OPTIONS = "-o BatchMode=yes -o ConnectTimeout=5"
 
 /** Variables through which a program would ask a person for a secret, which a fetch cannot answer. */
 const ASKPASS_VARIABLES: ReadonlySet<string> = new Set(["SSH_ASKPASS", "SSH_ASKPASS_REQUIRE"])
 
 /**
  * The environment of the state fetch: no terminal, askpass program or interactive credential
- * manager prompt, and ssh in batch mode with a connect timeout unless the user set
- * `GIT_SSH_COMMAND` (or `GIT_SSH`), whose choice is kept.
+ * manager prompt, and ssh in batch mode with a connect timeout. The user's own choice of ssh is
+ * kept: `GIT_SSH_COMMAND` or `GIT_SSH` in the environment is left alone, and a configured
+ * `core.sshCommand` (`configured`), which an injected `GIT_SSH_COMMAND` would override, runs with
+ * the options appended.
  */
-const fetchEnvironment = (env: Environment): Record<string, string> => {
+const fetchEnvironment = (
+  env: Environment,
+  configured: string | undefined,
+): Record<string, string> => {
   const base = Object.fromEntries(
     Object.entries(gitEnvironment(env)).filter(([name]) => !ASKPASS_VARIABLES.has(name)),
   )
-  const ssh = base["GIT_SSH_COMMAND"] !== undefined || base["GIT_SSH"] !== undefined
+  const chosen = base["GIT_SSH_COMMAND"] !== undefined || base["GIT_SSH"] !== undefined
   return {
     ...base,
     GIT_TERMINAL_PROMPT: "0",
     // An empty askpass program is skipped by git, where an unset one falls back to SSH_ASKPASS.
     GIT_ASKPASS: "",
     GCM_INTERACTIVE: "never",
-    ...(ssh ? {} : { GIT_SSH_COMMAND: NON_INTERACTIVE_SSH }),
+    ...(chosen ? {} : { GIT_SSH_COMMAND: `${configured ?? "ssh"} ${NON_INTERACTIVE_SSH_OPTIONS}` }),
   }
 }
 
@@ -471,9 +476,10 @@ const gitBounded = (
 /**
  * Fetches the state branch from `origin` into its remote-tracking ref, for a clone that has never
  * fetched it, and returns whether the ref exists afterwards. The fetch is quiet, never prompts (see
- * {@link fetchEnvironment}), keeps the credential helpers the user configured (a stored one answers
- * without a prompt, which a private https remote needs) and is killed after `timeout` milliseconds;
- * an offline, slow, missing or empty remote only means the branch starts from the base.
+ * {@link fetchEnvironment}), keeps the ssh command and credential helpers the user configured (a
+ * stored helper answers without a prompt, which a private https remote needs) and is killed after
+ * `timeout` milliseconds; an offline, slow, missing or empty remote only means the branch starts
+ * from the base.
  */
 export const fetchRemoteBranch = (
   top: string,
@@ -481,20 +487,24 @@ export const fetchRemoteBranch = (
   branch: string,
   timeout: number = FETCH_TIMEOUT_MS,
 ) =>
-  gitBounded(
-    top,
-    fetchEnvironment(env),
-    [
-      "-c",
-      "core.askPass=",
-      "fetch",
-      "-q",
-      "--no-tags",
-      "origin",
-      `+refs/heads/${branch}:refs/remotes/origin/${branch}`,
-    ],
-    timeout,
-  ).pipe(
+  git(top, env, ["config", "--get", "core.sshCommand"]).pipe(
+    Effect.map((ran) => (ran.code === 0 ? ran.stdout.trim() : "")),
+    Effect.flatMap((configured) =>
+      gitBounded(
+        top,
+        fetchEnvironment(env, configured === "" ? undefined : configured),
+        [
+          "-c",
+          "core.askPass=",
+          "fetch",
+          "-q",
+          "--no-tags",
+          "origin",
+          `+refs/heads/${branch}:refs/remotes/origin/${branch}`,
+        ],
+        timeout,
+      ),
+    ),
     Effect.flatMap((code) =>
       code === 0 ? refExists(top, env, `refs/remotes/origin/${branch}`) : Effect.succeed(false),
     ),

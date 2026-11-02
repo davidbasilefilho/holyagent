@@ -365,7 +365,11 @@ describe("agents", () => {
   test("the root text says what to do with an Assignment that assignment reports does not list", () => {
     const text = read(`${CLAUDE}/root`, "workflows.md")
     expect(text).toContain("does not list returned no result")
-    expect(text).toContain("confirmed gone, close it with `--outcome errored`")
+    expect(text).toContain(
+      "close it with `--outcome errored` once the run has completed, without further confirmation",
+    )
+    expect(text).toContain("names the journal in its diagnostics")
+    expect(text).toContain("`<transcript dir>/journal.jsonl`")
   })
 
   test("the static root text holds no cloud identity guidance: the session-start hook adds it in a cloud session", () => {

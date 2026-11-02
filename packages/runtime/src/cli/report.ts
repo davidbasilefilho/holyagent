@@ -11,24 +11,44 @@ const EVIDENCE_HEADING = /^\s*evidence:\s*$/i
 
 const indentOf = (line: string) => line.length - line.trimStart().length
 
+/** One line of the evidence block with its list marker stripped. */
+interface EvidenceEntry {
+  readonly text: string
+  /** Whether the line is a list item (bullet or number). */
+  readonly list: boolean
+  /** Whether a blank line comes before it. */
+  readonly gap: boolean
+}
+
+const LIST_ITEM = /^(?:[-*+•]|\d+[.)])\s+/
+
 /**
  * The entries of the report's last `evidence:` block, bullets stripped; none without the block. A
  * line indented deeper than the first entry continues the entry above it (the sub-bullets of a
- * support), so a support given on following lines still counts.
+ * support) unless a blank line comes between, so a support given on following lines still counts.
  */
-const evidenceEntries = (report: string): ReadonlyArray<string> => {
+const evidenceEntries = (report: string): ReadonlyArray<EvidenceEntry> => {
   const lines = report.split(/\r?\n/)
   const heading = lines.findLastIndex((line) => EVIDENCE_HEADING.test(line))
   if (heading === -1) return []
-  const block = lines.slice(heading + 1).filter((line) => line.trim() !== "")
-  const base = block[0] === undefined ? 0 : indentOf(block[0])
-  const entries: Array<string> = []
-  for (const line of block) {
+  const base = indentOf(lines.slice(heading + 1).find((line) => line.trim() !== "") ?? "")
+  const entries: Array<EvidenceEntry> = []
+  let gap = false
+  for (const line of lines.slice(heading + 1)) {
+    if (line.trim() === "") {
+      gap = true
+      continue
+    }
     const text = line.trim().replace(/^(?:[-*+•]\s+|\d+[.)]\s+|\[[ xX]\]\s+)+/, "")
     const last = entries.length - 1
-    if (indentOf(line) > base && last >= 0)
-      entries[last] = `${entries[last] ?? ""}${entries[last]?.endsWith(":") ? " " : "; "}${text}`
-    else entries.push(text)
+    const above = entries[last]
+    if (indentOf(line) > base && above !== undefined && !gap)
+      entries[last] = {
+        ...above,
+        text: `${above.text}${above.text.endsWith(":") ? " " : "; "}${text}`,
+      }
+    else entries.push({ text, list: LIST_ITEM.test(line.trim()), gap })
+    gap = false
   }
   return entries
 }
@@ -99,7 +119,8 @@ const labelOf = (text: string): string => {
  * two criteria share names none of them. A line supports every key its text names, so a criterion
  * label equal to an evidence label (or to another criterion's full text) is supported by one line.
  * A line for any other text belongs to nothing. A key line with nothing after its colon takes the
- * lines below it as its support, up to the next key line. Every blocking criterion and every
+ * list items (bullets or numbers) and indented lines directly below it as its support, up to a
+ * blank line, the next key line or any other unindented line. Every blocking criterion and every
  * evidence label needs support; the failure lists the ones that have none.
  */
 export const acceptanceFrom = (
@@ -126,19 +147,24 @@ export const acceptanceFrom = (
   const addSupport = (keys: ReadonlySet<string>, text: string) => {
     if (HAS_TEXT.test(text)) for (const key of keys) if (!supports.has(key)) supports.set(key, text)
   }
-  // A key line with no support of its own takes the lines after it, up to the next key line.
+  // A key line with no support of its own takes the list items directly below it.
   let open: { readonly keys: ReadonlySet<string>; readonly lines: Array<string> } | undefined
+  const close = () => {
+    if (open !== undefined) addSupport(open.keys, open.lines.join("; "))
+    open = undefined
+  }
   for (const entry of evidenceEntries(report)) {
-    const owner = ownerOf(entry, known)
+    const owner = ownerOf(entry.text, known)
     if (owner === undefined) {
-      open?.lines.push(entry)
+      if (open !== undefined && entry.list && !entry.gap) open.lines.push(entry.text)
+      else close()
       continue
     }
-    if (open !== undefined) addSupport(open.keys, open.lines.join("; "))
+    close()
     open = owner.support === "" ? { keys: owner.keys, lines: [] } : undefined
     addSupport(owner.keys, owner.support)
   }
-  if (open !== undefined) addSupport(open.keys, open.lines.join("; "))
+  close()
   const supportFor = (key: string): string | undefined => supports.get(key)
   const criteria = assignment.criteria.map((criterion) => ({
     criterion,
@@ -275,7 +301,8 @@ export const journalResults = (journal: string, source: string) =>
         ),
       )
       if ("label" in entry) labels.set(entry.key, entry.label)
-      else if ("result" in entry) {
+      // A null result is no result: the agent returned nothing to write.
+      else if ("result" in entry && entry.result !== null) {
         const json = yield* Schema.decodeUnknownEffect(JsonReport)(entry.result).pipe(Effect.option)
         const report =
           typeof entry.result === "string"
