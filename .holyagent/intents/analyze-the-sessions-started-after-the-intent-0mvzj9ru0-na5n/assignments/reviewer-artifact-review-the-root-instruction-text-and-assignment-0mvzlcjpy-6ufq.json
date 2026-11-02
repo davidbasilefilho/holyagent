@@ -1,0 +1,49 @@
+{
+  "id": "assignment-0mvzlcjpy-6ufq",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 2,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-the-root-instruction-text-and",
+  "objective": "Review the root instruction text and docs of commit cf522df for correctness, completeness and fidelity to the Intent's requirements.",
+  "state": "Ready",
+  "scope": [
+    "Diff: /tmp/holyagent-review/assignment-0mvzkezwm-9ib4.diff; full files under /home/user/holyagent/packages/runtime/src/instructions and /home/user/holyagent/docs; the assembled prompt /home/user/holyagent/packages/integrations/claude/dist/agents/holyagent.md.",
+    "Requirements: root at high effort with a small context; the root reads only what a decision needs, accepts rendered work on Reviewer.visual evidence and reads images only to show the user or settle a doubt, runs no checks itself, never re-reads or re-emits briefs, closes from report files written by 'holyagent assignment reports <journal>', caps report length; no polling, scheduled check-ins or wait loops; Haiku cases named in routing; platform-assigned branch used as work branch, user told and asked through AskUserQuestion, exp/ for no published version and release/<version>/ with tags or releases, final report names the branch and why."
+  ],
+  "constraints": [
+    "Read-only: no file edits, no git writes. Keep working until everything asked is done, then stop and report; report under 600 words, findings each with path:line, severity (blocking or non-blocking) and a concrete failure scenario; do not launch other reviewers.",
+    "Judge the text against the root rules in the 'Writing instructions' section of the assembled prompt (calm imperative voice, reason beside each rule, no duplicated rules)."
+  ],
+  "criteria": [
+    {
+      "text": "Coverage: every requirement above is stated once, in the right section, and requirements.md carries each behavior",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Consistency: no section contradicts another or the CLI it describes (dispatch short prompt, reports command, status), and no rule is stated twice",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Docs: docs describe the settings, their limits (plugin cannot ship them, main-thread frontmatter effort ignored) and the new behavior accurately",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Style: the text follows the Writing instructions rules",
+      "blocking": false,
+      "dimension": "style"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "verified"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvzkezwm-9ib4"
+  ],
+  "createdAt": "2026-11-02T18:27:16.054Z"
+}
