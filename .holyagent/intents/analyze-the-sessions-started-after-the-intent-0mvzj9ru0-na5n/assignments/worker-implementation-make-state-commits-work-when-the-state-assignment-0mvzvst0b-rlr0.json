@@ -1,0 +1,58 @@
+{
+  "id": "assignment-0mvzvst0b-rlr0",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 8,
+  "roleTask": "Worker.implementation",
+  "slug": "make-state-commits-work-when-the-state",
+  "objective": "Make state commits work when the state branch tracks no file under .holyagent yet, which fails 45 tests in CI.",
+  "state": "Running",
+  "scope": [
+    "CI run https://github.com/davidbasilefilho/holyagent/actions/runs/41544344413 on 02df5d8 fails 45 tests (state-branch, vcs-commit, migrate, process and CLI tests). Error: StateIo ... git add -u -- .holyagent :(exclude).holyagent/local exited 128: error: pathspec '.holyagent' did not match any file(s) known to git; error: pathspec ':(exclude).holyagent/local' did not match any file(s) known to git. Source: stageState in packages/runtime/src/state/tree.ts (added in 386cb22). Locally all tests pass, so the local git likely tolerates the unmatched pathspec where the CI runner's git does not; compare git versions (local `git --version`, CI ubuntu runner) and reproduce, for example by running the failing tests with the CI's git behavior or by a test on a state branch with no tracked .holyagent file.",
+    "Fix: only run the tracked-change staging when git tracks a path under .holyagent (for example check git ls-files first, or stage tracked paths by name), so a first state commit works on every supported git version. Keep the staging scope: records, config and migrate's copied paths only, never a stray file."
+  ],
+  "constraints": [
+    "Do not touch instruction text or docs.",
+    "No version-control writes (no git add on the project, checkout, switch, stash, commit) and no edits under .git/ or .holyagent/ of the project; test repos in temp dirs are fine. Report changed paths.",
+    "Rebuild dist with bun packages/integrations/claude/build.ts at the end, since the bundled CLI includes tree.ts.",
+    "Keep working until done; when done and checked, stop and report. Respond tersely."
+  ],
+  "criteria": [
+    {
+      "text": "Root cause: the report states why CI's git fails and local git does not, with versions",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Fix: a state commit on a state branch with no tracked .holyagent file succeeds without depending on git tolerating an unmatched pathspec, with a regression test that fails without the fix on a git that rejects the pathspec, or if no such git is available locally, a test that asserts git is never called with a pathspec that matches nothing",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Regressions: stray-file and migrate staging tests still pass",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Gates: bun check, bun lint, bun fmt --check and bun test exit 0 after rebuilding dist",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/state",
+    "packages/runtime/tests",
+    "packages/integrations/claude/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-02T23:19:50.747Z"
+  },
+  "createdAt": "2026-11-02T23:19:50.747Z"
+}
