@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-commits-ecea23f-and-41754dd-git",
   "objective": "Review commits ecea23f and 41754dd (git diff 45e7f8d..41754dd) on claude/nifty-faraday-jinmae for correctness and regressions against the merge-ready bar.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "ecea23f: state branch fetch from origin in packages/runtime/src/state/tree.ts, force-add of state, route efforts in route.ts.",
     "41754dd: brief files (packages/runtime/src/cli/brief.ts, assignment.ts), evidence label matching (report.ts acceptanceFrom), status trimming (overview.ts), session context dedup (sessioncontext.ts, hook.ts, session-reminder.md), and their tests."
@@ -50,7 +50,41 @@
     "agentId": "workflow:wf_a0236b39-9b3/assignment-0mvzkei0l-e8gb",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-02T18:01:16.274Z"
+    "startedAt": "2026-11-02T18:01:16.274Z",
+    "finishedAt": "2026-11-02T18:26:27.636Z"
+  },
+  "result": "result: Both commits are sound for the criteria. I found no blockers. All 943 tests pass, and type-check, lint and format are clean on 41754dd.\n\n**Code-review skill:** it ran on `45e7f8d...41754dd` as the built-in. It returned 8 findings, and I classified each below. I cannot say whether the skill text was shadowed by a project command or another plugin, because it ran as a forked skill and I did not see its text.\n\nchanged: none (read-only)\n\nchecks:\n- `bun test packages/runtime packages/integrations/claude/tests` -> exit 0, 943 pass, 1 skip, 0 fail\n- `bun check --no-script` -> exit 0, no type errors in 122 files\n- `bun lint --no-script` -> exit 0, no problems in 123 files\n- `bun fmt --no-script --check` -> exit 0, 238 files formatted\n- `mise run verify` could not run (mise is not installed here), so I ran the Bun gates directly.\n\nblockers: none\n\nfindings:\n1. Non-blocking, `packages/runtime/src/state/tree.ts:471` (`fetchRemoteBranch`). The fetch has no timeout and runs under the worktree lock. An unreachable host that stalls rather than refusing could hold the lock until TCP gives up. Offline, missing or empty remotes fail fast and fall back to the base, and the fetch only runs while the local state branch is absent, so it happens once per clone. Not run: a stalling remote.\n2. Non-blocking, `packages/runtime/src/cli/assignment.ts:201`. No test covers `writeBrief` failing, for example an unwritable folder. The code is correct: `updateState` runs the transition once under the lock and persists only after it succeeds, so a write error leaves the Assignment Ready. The refused-dispatch test does cover that no brief is written. A failure test would make the stated error path provable.\n3. Non-blocking, `packages/runtime/src/cli/assignment.ts:205`. A brief can be left behind if `persist` fails after the write. Re-dispatch overwrites it, and the filename is the Assignment id, so this is harmless.\n4. Non-blocking, `packages/runtime/src/cli/brief.ts:20`. The brief lives in `<git-common-dir>/holyagent/briefs`, outside the tree. If a sandboxed or restricted specialist denies Read there, it gets only the role line. The tests prove the path and its content, not that a specialist's Read tool can open it. Not run: a real specialist launch.\n5. Non-blocking, `packages/runtime/src/state/tree.ts:786`. `add -f` also commits any other ignored file under `.holyagent/`. The state worktree holds only state, and `local/` is excluded by pathspec. Locks sit in `local/` or in the git common directory, so nothing spurious is added today.\n6. Non-blocking, `packages/runtime/src/domain/route.ts`. The `Worker.operations`, `Worker.validation`, `Worker.mechanical` and `Worker.integration` efforts are lowered to medium. The `ecea23f` message states this and `route.test.ts` asserts it, so I treat it as intended. It is a quality trade-off for the root to own.\n\nRejected from the skill:\n- **Label order dependence (`report.ts:101`):** wrong. `known` holds only the full keys while the label loop runs, so the result is deterministic. An ambiguous label is documented and tested to name nothing.\n- **Dropped reminder rules (`session-reminder.md`):** wrong. AskUserQuestion, the denial rule and `holyagent vcs commit` are in ROOT_CORE and `identity.md`. When `core` is undefined the main thread is the holyagent agent, whose prompt carries them.\n- **`status` hides unaccepted rows (`overview.ts:17`):** by design and tested. With one open Intent, `intentInUse` resolves it automatically. With several open and none in use, counts are shown and `intent use` or `intent list` gives the ids.\n\nverified:\n- **Agent-launch recording:** the dispatch prompt's first line is still `Role: <task> (<agent>). Assignment: <id>.`, so `dispatchedAssignment` still reads it. The new tests assert this.\n- **Workflow hook:** `workflow-check.ts` does not inspect prompt contents.\n- **Reconcile:** `reconcileFrom` is unchanged.\n- **Plan:** `plan` only gets text changes.\n- **Offline, missing or unreachable remote:** `git()` in `tree.ts` returns the exit code instead of failing, so the fetch falls back to the base. The unreachable-remote test covers this, and the other state-branch tests have no `origin`.\n- **Test strength:**\n  - The fetch test deletes the remote-tracking ref and expects the remote Intent to appear, so it fails without the fetch.\n  - The ignoring-`.gitignore` test fails without `-f`.\n  - The brief, label, status and takeover-once tests assert behavior that did not exist before.\n  - The \"cut at first colon\" test was inverted, from refused to accepted, to match the intended new behavior. I do not count that as weakening.\n  - The bumped `CONTEXT_BUDGET` fixture (7800 to 8500) only keeps the existing overflow case overflowing after the core text shrank.\n- **Repo standards:** new exports (`writeBrief`, `dispatchPrompt`) have JSDoc and use Effect and the `io` helper. There is no try/catch, `new Promise` or raw spawn, and no new data boundary.\n- **Not run:** the generated dist is stale by design and I did not rebuild it.\n\nevidence:\nBehavior: error paths read in `tree.ts:408-427,468-475` and `assignment.ts:198-211`, `store.ts:270-290`. Tests: fetch from origin and unreachable remote in `state-branch.test.ts`, refused dispatch in `cli.test.ts`, no-Intent-in-use status in `cli.test.ts`. Gap: brief-write failure is untested (finding 2). `bun test` exit 0.\nRegressions: `hook.ts:326` and `report.ts` `dispatchedAssignment` still read the first line. `reconcileFrom` is unchanged. The full runtime and integration suite passes (943 pass, 0 fail).\nTests: the new tests assert behavior absent on the base, as described above. No test was deleted or weakened. `bun test` exit 0.\nRepo standards: `bun check`, `bun lint` and `bun fmt --check` all exit 0. `brief.ts` and `report.ts` follow the Effect, JSDoc and no-spawn rules.\nfindings: the 6 non-blocking items above, plus the 3 rejected skill claims.\nverified: the commands above on a clean tree at head 41754dd (`git status` empty).",
+  "acceptance": {
+    "revision": 2,
+    "rationale": "Gates rerun on 41754dd (943 pass, check/lint/fmt clean); no blockers; six non-blocking findings recorded for the repair round.",
+    "criteria": [
+      {
+        "criterion": "Behavior: each change does what its commit message says on its error paths too (offline fetch, missing remote, brief write failure, ambiguous labels, no Intent in use)",
+        "support": "error paths read in `tree.ts:408-427,468-475` and `assignment.ts:198-211`, `store.ts:270-290`. Tests: fetch from origin and unreachable remote in `state-branch.test.ts`, refused dispatch in `cli.test.ts`, no-Intent-in-use status in `cli.test.ts`. Gap: brief-write failure is untested (finding 2). `bun test` exit 0."
+      },
+      {
+        "criterion": "Regressions: existing commands, hooks and outputs other tools rely on keep working (agent-launch recording, workflow hook, reconcile, plan)",
+        "support": "`hook.ts:326` and `report.ts` `dispatchedAssignment` still read the first line. `reconcileFrom` is unchanged. The full runtime and integration suite passes (943 pass, 0 fail)."
+      },
+      {
+        "criterion": "Tests: the new tests fail without their change and no test was weakened",
+        "support": "the new tests assert behavior absent on the base, as described above. No test was deleted or weakened. `bun test` exit 0."
+      },
+      {
+        "criterion": "Repo standards: .claude/CLAUDE.md rules (Effect, Schema at boundaries, JSDoc on exports, Bun Shell)",
+        "support": "`bun check`, `bun lint` and `bun fmt --check` all exit 0. `brief.ts` and `report.ts` follow the Effect, JSDoc and no-spawn rules."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "the 6 non-blocking items above, plus the 3 rejected skill claims."
+      },
+      {
+        "label": "verified",
+        "support": "the commands above on a clean tree at head 41754dd (`git status` empty)."
+      }
+    ]
   },
   "createdAt": "2026-11-02T18:00:47.541Z"
 }
