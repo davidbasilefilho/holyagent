@@ -1,0 +1,18 @@
+{
+  "id": "intent-0mvzj9ru0-na5n",
+  "slug": "analyze-the-sessions-started-after-the",
+  "objective": "Analyze the sessions started after the last HolyAgent update (2026-10-30T15:53Z) for problems and token-distribution inefficiencies, and fix what they reveal in the plugin, including a high-effort root that receives only what it needs to understand and orchestrate, and the platform-reserved branch rule.",
+  "requirements": [
+    "User (verbatim, pt-BR): analise todas as sessões que você tem acesso que começaram após o último update do holyagent e identifique problemas, ineficiências de distribuição de tokens (tokens indo demais para o root, agentes que poderiam ser o haiku e não o sonnet, reasoning efforts que podiam melhorar, etc, cache não reutilizado, sessões não reutilizadas, cache rate muito baixa, etc), lugares para melhoras em geral.",
+    "User (verbatim): mude o reasoning effort do root para high em vez de medium",
+    "User (verbatim): use o holyagent way e já pratique o que for achando e o que falei",
+    "User (verbatim): quanto menos tokens indo para o root melhor, ele deve ter apenas ter o necessário para entender os problemas e arquitetura e orquestrar. faça decisões sobre isso, ajuste tudo que falei se precisar",
+    "Apply the pasted report's Stack plan corrections: when the platform assigns a branch, use it as the work branch, tell the user its name breaks the convention, and ask through AskUserQuestion whether to open the PR from a branch that follows it; replace 'when the version workflow fits' with a concrete rule (exp/... for work with no published version, release/<version>/... when the repository has tags or releases); the final report names the branch used and why whenever the name departs from the convention.",
+    "Fix the state bug seen in this session: in a fresh clone without the local holyagent/state branch, the CLI created holyagent/state from main instead of from origin/holyagent/state, and then failed with 'git add -A -- .holyagent ... ignored'. It must start the local state branch from the remote one when it exists.",
+    "Sessions in scope: session_012tBKnYgr19wDpKKafc7dbY (Lula's three mandates, created 2026-11-02), session_012tBKnXbdCrWewsy8opSr21 (Trumpism visual dossier, created 2026-11-02), and the post-update activity of session_01PbzbdhKs6KnbtmC3te3dhy (created 2026-10-26, active 2026-11-02). This session is excluded.",
+    "Behavior changes go to requirements.md first, then the instruction sets, then the generated plugin (mise run build); done means mise run verify passes."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-02T17:29:07.369Z"
+}
