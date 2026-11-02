@@ -1,0 +1,42 @@
+{
+  "id": "assignment-0mvzvwmbk-are7",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 8,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-ci-fix-in-the-latest-commit",
+  "objective": "Review the CI fix in the latest commit on claude/nifty-faraday-jinmae (range 02df5d8..HEAD).",
+  "state": "Running",
+  "scope": [
+    "CI on 02df5d8 failed 45 tests: git add -u -- .holyagent ':(exclude).holyagent/local' exited 128 'pathspec did not match any file(s) known to git' on a first state commit. The fix in packages/runtime/src/state/tree.ts stageState runs git ls-files first and skips add -u when nothing is tracked; test in packages/runtime/tests/state-branch.test.ts uses a git wrapper on PATH."
+  ],
+  "constraints": [
+    "Read-only; no version-control writes.",
+    "Respond tersely."
+  ],
+  "criteria": [
+    {
+      "text": "Fix: no git call in stageState can receive a pathspec that matches nothing, on first and later state commits, including when only .holyagent/local is tracked",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Regressions: staging scope unchanged and the test fails without the fix",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvzvst0b-rlr0"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-02T23:22:48.704Z"
+  },
+  "createdAt": "2026-11-02T23:22:48.704Z"
+}
