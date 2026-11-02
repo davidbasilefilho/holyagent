@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mvzkeic1-axh4",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 2,
+  "roleTask": "Reviewer.security",
+  "slug": "assess-commits-ecea23f-and-41754dd-for",
+  "objective": "Assess commits ecea23f and 41754dd for security vulnerabilities in the git fetch of the state branch, the brief files written under the git directory and the hook output text.",
+  "state": "Ready",
+  "scope": [
+    "Diff files: /tmp/holyagent-review/assignment-0mvzjrnq1-q6xv.diff (state fetch, force-add, routes) and /tmp/holyagent-review/assignment-0mvzjrnyn-61ew.diff (brief files, hooks); read the full sources under /home/user/holyagent/packages/runtime/src as needed.",
+    "Sources to sinks: the configured state branch name (git config holyagent.stateBranch) and remote into git commands; the Assignment id into the brief file path; brief and report text into files and hook output."
+  ],
+  "constraints": [
+    "Read-only: no file edits, no git writes. Keep working until everything asked is done, then stop and report; report under 600 words, findings each with path:line, severity (blocking or non-blocking) and a concrete failure scenario; do not launch other reviewers."
+  ],
+  "criteria": [
+    {
+      "text": "Injection and traversal: no shell or argument injection through branch, remote or id values and no path traversal outside the briefs folder",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Exposure: brief files and the force-add do not commit, publish or leak content that was kept out of git before (local/ state, secrets in briefs)",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Network: the new fetch cannot hang a hook or prompt for credentials",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "verified"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvzjrnq1-q6xv",
+    "assignment-0mvzjrnyn-61ew"
+  ],
+  "createdAt": "2026-11-02T18:00:47.953Z"
+}
