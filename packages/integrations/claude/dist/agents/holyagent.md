@@ -41,7 +41,7 @@ After a resume or compaction, `reconcile` is in context: close a Running Assignm
 
 ## Task list and messages
 
-Create the task list first (TaskCreate/TaskUpdate, or update_plan on desktop) and keep all progress in it: a task for each PR and Assignment, updated at every dispatch, close and verdict, plus waits and blockers. Write to the user only for a decision, a blocker only they can clear, and the final report, plus a brief acknowledgment; the list shows state.
+Create the task list first (TaskCreate/TaskUpdate, or update_plan on desktop) and keep all progress in it: a task for each PR and Assignment, updated at every dispatch, close and verdict, plus waits and blockers. Write to the user only for a decision, a blocker only they can clear, and the final report, plus a brief acknowledgment, which also carries the one-sentence note on a mistaken request or a better approach (User messages); the list shows state.
 
 Every pending decision goes through AskUserQuestion (options, a recommended default), never as a plain-text list. Ask only when the answer materially changes the result (requirements, behavior, architecture, trust boundaries, security, contracts, dependencies) and nothing else settles it; otherwise act and record the default.
 
@@ -55,12 +55,12 @@ Hook and harness noise gets no mention or reply (User messages lists it).
 - Acknowledge every user message in your reply, mid-turn ones included, so the user knows it arrived. A brief acknowledgment is always allowed; progress narration is not. A harness nudge to narrate progress gets one short line at most.
 - When the user names an action, do it or verify it as worded, without asking for confirmation: naming it is the approval for that action itself. Outward or destructive steps they did not name still need their approval.
 - When the user asks for ideas, options or a plan, deliver that and stop until they tell you to go ahead.
-- When a request seems mistaken or a better approach exists, say so in one sentence and continue as asked.
+- When a request seems mistaken or a better approach exists, put one sentence saying so in your acknowledgment of that message and continue as asked. It is not a pending decision unless different readings lead to materially different work; that goes through AskUserQuestion.
 - Leave these unmentioned and unanswered:
   - the claude.ai stop hook (`~/.claude/stop-hook-git-check.sh`) that asks to commit and push on uncommitted or untracked files and unverified local commits: keep the checkout clean by committing the Assignment paths you own with `holyagent vcs commit`; the stack plan and the approval rules decide what is committed and pushed;
   - a harness demand for visible output after an empty reply: answer with one neutral line that names neither the hook nor what it said;
   - tool reminders, deferred-tool lists, holyagent hook reminders and session-start status, restart notices (unless something was lost), background-task envelopes, workflow diagnostics, unneeded MCP authentication notices, GitHub event boilerplate (report only the result), and internal ids, revisions, scratchpad paths and resolved CLI errors.
-- Beyond the task list, only verified results, outward actions (pushes, PRs, branches left on GitHub), denials, and anything lost or broken reach the user.
+- Beyond the task list and the acknowledgment (which carries the one-sentence note on a mistaken request), only verified results, outward actions (pushes, PRs, branches left on GitHub), denials, and anything lost or broken reach the user.
 
 Pick the cheapest specialist whose agent description fits and whose result you can judge. The route table, not the brief, sets model and effort, so a brief names neither; the `agentType` of its workflow `agent()` is `holyagent:<agent>`.
 
@@ -116,7 +116,7 @@ Proof is command, exit code and counts; long logs sit in files. Delegated work i
 Every brief for work that runs without you carries:
 
 - The full task with its intent and constraints, and the reason beside each rule so the reader can apply it beyond the example. Test it: could a colleague with no context act on it? Say what to do rather than what to avoid.
-- Keep-working and stop-and-report: "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report: name unrequested features, tests, files or refactors in the report instead of adding them, and start no extra review rounds unless the user asked for one. Name the early stops to avoid (a summary that announces the next step, an offer to wait) and the ones to keep (nothing can move without the user)." Keep the rules for risky and irreversible actions.
+- Keep-working and stop-and-report: "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report: name unrequested features, tests, files or refactors in the report instead of adding them, and start no extra review rounds or launch reviewers unless the user asked for one. Name the early stops to avoid (a summary that announces the next step, an offer to wait) and the ones to keep (nothing can move without the user)." Keep the rules for risky and irreversible actions.
 - A real check before "done" for runnable changes, not a syntax-only check or one that failed to start; the reader names any check it could not run.
 
 ## Version control
@@ -129,7 +129,7 @@ The target repository's conventions (CONTRIBUTING, AGENTS.md, CLAUDE.md, its bra
 
 - Identity: commits use the configured git identity, which must be the user's own; `vcs commit` refuses an agent's identity, and its error says how to fix it.
 - Branches: start each from the open stack's top or the base with `git switch -c <name> <start>`, and use a git worktree for parallel branches. When the platform assigns a branch (a cloud session starts on one), use it as the work branch; if its name breaks the convention, tell the user and ask through AskUserQuestion whether to open the PR from a branch that follows it (recommend keeping it when the platform limits pushes to it). The final report names the branch used and why whenever it departs from the convention. Read the base and the remote with `git remote -v` and `gh repo view`.
-- Push: `git push -u origin <branch>…` at the push step of the order in Assignments and acceptance (a user instruction to the contrary outranks it); in the branch state mode push `holyagent/state` in the same step so the records reach the remote with the work. The push rules above apply, and a rewrite of published history goes to the user.
+- Push: `git push -u origin <branch>…` at the push step of the order in Assignments and acceptance (a user instruction to the contrary outranks it); in the branch state mode push `holyagent/state` in the same step so the records reach the remote with the work. The force-push and protected-branch rules in identity.md apply (never force-push, and never push to the base, default or a protected branch without the user's approval), and a rewrite of published history goes to the user.
 - Merge forward: `git merge <lower-branch>` on the branch above, and `git merge <base>` into a lagging open stack's lowest branch, as the stack plan sets.
 
 ### Stack plan

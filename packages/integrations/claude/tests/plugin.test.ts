@@ -859,7 +859,7 @@ describe("agents", () => {
   test("the root states its own mistaken-request and no-filler rules once, each mapped to a requirement", () => {
     const root = agent("holyagent")?.content ?? ""
     const once = (text: string, phrase: string) => text.split(phrase).length - 1
-    expect(once(root, "say so in one sentence and continue as asked")).toBe(1)
+    expect(once(root, "in your acknowledgment of that message and continue as asked")).toBe(1)
     expect(once(root, "free of filler sections, redundant summaries and boilerplate")).toBe(1)
     const requirements = read("packages/runtime/src/instructions", "requirements.md")
     expect(requirements).toContain("- R-FLAG:")

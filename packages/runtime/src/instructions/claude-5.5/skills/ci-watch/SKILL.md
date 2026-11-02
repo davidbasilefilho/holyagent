@@ -10,6 +10,6 @@ Watch with Monitor running `gh pr checks <n> --watch`: it prints checks as they 
 - Aggregate in this order: Failed, Unknown, Pending, Passed. Missing or unreadable data is Unknown, in-progress checks are Pending, and skipped or neutral results satisfy branch protection but are not validation and never make Passed alone.
 - A snapshot belongs to one head SHA. After a push or merge-forward, watch the new SHA; an old approval or merge-state read is history.
 - Diagnose a failure from the current attempt's logs (`gh run view <id> --log-failed`). After the same gate fails twice, reproduce it with the repository's own script before pushing again. Call a failure environmental only after reproducing it on the base; one the base lacks is the change's.
-- A repository with no CI workflow has the gate Unknown (none configured); finish on local gates and independent review. A watch that ends without a result leaves the gate Unknown, since no data is not Passed.
+- A repository with no CI workflow has the gate Unknown (none configured); finish on local gates and independent review. A watch that ends without a result leaves the gate Unknown, since no data is Unknown, not Passed.
 - A PR is merge-ready when independent review of that head left no open blockers and its CI is Passed; merging still needs the user's approval. Record an unresolved review thread or a merge state other than clean in the PR's task and the final report.
 - Treat review-bot findings as claims to verify: fix the real ones with review, and answer the rest on the thread when replying is authorized.

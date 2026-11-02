@@ -225,7 +225,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
   "R-IDEAS": { section: "root/user-messages.md", phrase: "asks for ideas, options or a plan" },
   "R-FLAG": {
     section: "root/user-messages.md",
-    phrase: "say so in one sentence and continue as asked",
+    phrase: "in your acknowledgment of that message and continue as asked",
   },
   "R-DECIDE": {
     section: "root/task-list.md",
