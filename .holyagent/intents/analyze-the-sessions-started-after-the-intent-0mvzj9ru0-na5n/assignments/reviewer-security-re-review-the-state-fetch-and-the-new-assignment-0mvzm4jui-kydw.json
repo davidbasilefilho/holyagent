@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mvzm4jui-kydw",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 2,
+  "roleTask": "Reviewer.security",
+  "slug": "re-review-the-state-fetch-and-the-new",
+  "objective": "Re-review the state fetch and the new report files in commits 081a273 and 7ac8084 against the previous security findings.",
+  "state": "Ready",
+  "scope": [
+    "Previous findings: (1, blocking) the fetch could prompt for credentials or hang under the worktree lock and from SessionStart; (2) add -f overrides an ignore of .holyagent/; (3) the brief is a mutable file. Diffs: /tmp/holyagent-review/assignment-0mvzlcjd8-cyp6.diff and /tmp/holyagent-review/assignment-0mvzlp1ml-io0u.diff; sources under /home/user/holyagent/packages/runtime/src (state/tree.ts fetchRemoteBranch, cli/program.ts, cli/hook.ts, cli/report.ts journalResults, cli/brief.ts writeReport).",
+    "New sinks: journal label and result text into report file paths and contents."
+  ],
+  "constraints": [
+    "Read-only: no file edits, no git writes. Keep working until everything asked is done, then stop and report; report under 500 words, each evidence entry on one line as <criterion label>: <support>, findings each with path:line, severity and a concrete failure scenario; do not launch other reviewers."
+  ],
+  "criteria": [
+    {
+      "text": "Network: finding 1 is closed: no prompt, a hard time limit, no fetch from any hook",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Reports: journal labels cannot write outside the reports folder and report text reaches no shell or hook output",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No new issue: the repairs add no injection, traversal or exposure",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "verified"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvzlcjd8-cyp6",
+    "assignment-0mvzlp1ml-io0u"
+  ],
+  "createdAt": "2026-11-02T18:49:02.586Z"
+}
