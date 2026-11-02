@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "re-review-the-state-fetch-and-the-new",
   "objective": "Re-review the state fetch and the new report files in commits 081a273 and 7ac8084 against the previous security findings.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Previous findings: (1, blocking) the fetch could prompt for credentials or hang under the worktree lock and from SessionStart; (2) add -f overrides an ignore of .holyagent/; (3) the brief is a mutable file. Diffs: /tmp/holyagent-review/assignment-0mvzlcjd8-cyp6.diff and /tmp/holyagent-review/assignment-0mvzlp1ml-io0u.diff; sources under /home/user/holyagent/packages/runtime/src (state/tree.ts fetchRemoteBranch, cli/program.ts, cli/hook.ts, cli/report.ts journalResults, cli/brief.ts writeReport).",
     "New sinks: journal label and result text into report file paths and contents."
@@ -44,7 +44,37 @@
     "agentId": "workflow:wf_c2fff0a8-5e6/assignment-0mvzm4jui-kydw",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-02T18:49:06.888Z"
+    "startedAt": "2026-11-02T18:49:06.888Z",
+    "finishedAt": "2026-11-02T18:55:03.741Z"
+  },
+  "result": "result: Closed. Network fetch bounded and hook-free; journal labels are traversal-safe. No blocking findings, three low non-blocking notes. The built-in `/security-review` could not run: it failed on `git diff origin/HEAD...` because there is no `origin/HEAD`. This session had no shell, so I read the code and ran no tests, and the tree is not known to be unchanged since the commits.\nchanged: none\nchecks: read-only review of `state/tree.ts`, `cli/program.ts`, `cli/hook.ts`, `cli/report.ts`, `cli/brief.ts`, `cli/assignment.ts`, `domain/ids.ts` and `dist/hooks/hooks.json`. The two diffs were only partly readable (1342 and 610 lines, I saw about half of each), so I confirmed the rest against the current sources. The built `holyagent.js` matches the source (`core.askPass=`, `GCM_INTERACTIVE`, `command.path[0] !== \"hook\"` all present).\nblockers: none\nquestions: none\n\nfindings (all non-blocking):\n1. `packages/runtime/src/state/tree.ts:459`, low. The 8 s kill (`Bun.spawn` `timeout`, `SIGKILL`) hits only the git process, not its children. Since `7ac8084` the user's credential helpers run again (the `credential.helper=` override was dropped).\n   - Failure scenario: a helper that opens a GUI dialog (keychain or secret-service unlock) can leave that dialog or process alive after git is killed.\n   - Terminal and askpass prompts stay blocked and the lock is released on time, so the command does not hang.\n2. `packages/runtime/src/state/tree.ts:428`, low. A user-set `GIT_SSH_COMMAND` or `GIT_SSH` is kept as is.\n   - Failure scenario: if it lacks `BatchMode` and a tty exists, ssh can show a passphrase or host-key prompt on `/dev/tty` for up to 8 s.\n   - The user chose that command, and an unset one gets `BatchMode`.\n3. `packages/runtime/src/cli/assignment.ts:406`, low. `assignment reports` reads any path it is given and puts `error.message` into a `Usage` error (`report.ts:272`).\n   - Failure scenario: a malformed line can echo journal text, which may be report text, into CLI output and the root's context.\n   - It is not a hook or shell sink and the caller can already read any file, so it is not an escalation.\n\nPrevious findings:\n- Finding 1 (blocking) is closed.\n- Finding 2: `tree.ts:868` still uses `git add -f -A -- .holyagent ':(exclude).holyagent/local'` inside `commitState`. `-f` is deliberate, because the state branch inherits the base's `.gitignore` (comment at `tree.ts:864`). `local/` is excluded by pathspec, and `-f` runs only in branch mode, in a worktree on the state branch. Residual: any ignored file a person drops in `.holyagent/` outside `local/` is committed to the state branch.\n- Finding 3: briefs and reports are still plain files under `.git/holyagent/` and nothing checks their integrity. Edits there need same-user write access and instruction text forbids them. A pre-planted symlink at `<id>.md` would be written through. Not worsened by this change.\n\nverified:\n- Fetch environment (`tree.ts:424-437`): `GIT_TERMINAL_PROMPT=0`, empty `GIT_ASKPASS`, `-c core.askPass=`, `GCM_INTERACTIVE=never`, `SSH_ASKPASS*` removed, ssh `BatchMode` with `ConnectTimeout=5`, stdin and stdout ignored.\n- The refspec comes from `stateBranch`, which rejects a leading `-` and runs `check-ref-format`.\n- The fetch runs only when `!local && online`.\n- Every hook in `hooks.json` is `holyagent hook <name>`, and `callFor` passes `online = command.path[0] !== \"hook\"`. `hook.ts:332` also passes `false`.\n- `assignment reports` uses `state: \"peek\"`, which makes no worktree and fetches nothing. No other `git fetch` or `ls-remote` exists in `packages/runtime/src`.\n- Report path: `Schema.is(AssignmentId)` requires `^assignment-[a-z0-9]+(?:-[a-z0-9]+)*$`. That allows no `/`, `.`, `..` or newline, and the JS `$` has no trailing-newline quirk. The file is `join(commonDir, \"holyagent\", \"reports\", id + \".md\")`. Labels that fail the pattern are never written and are only listed.\n- Report text goes only to `Bun.write` content. The CLI prints `id`, `path` and `words`. Strays print `label` and `agentId`, which the script and host set, not the report. No shell, `Bun.$` or hook sink touches the report, and no code reads the reports folder.\n- Journal decode uses a schema, `fromJsonString` and a tagged `Usage` error, with no `eval` or dynamic import.\n\nevidence:\nNetwork: finding 1 is closed: no prompt, a hard time limit, no fetch from any hook: `tree.ts:411-501`, `tree.ts:548`, `program.ts:53-60` and `hook.ts:332` give no prompt, an 8 s SIGKILL, and no fetch from any `hook` command; residual notes 1 and 2 are low.\nReports: journal labels cannot write outside the reports folder and report text reaches no shell or hook output: `ids.ts:4`, `assignment.ts:412`, `brief.ts:42`; the label must match the strict id regex and report text reaches only file contents.\nNo new issue: the repairs add no injection, traversal or exposure: no injection, traversal or secret exposure found in the changed paths; only the three low notes above.\nfindings: three low non-blocking notes (`tree.ts:459`, `tree.ts:428`, `assignment.ts:406`) and the status of previous findings 2 and 3, as above.\nverified: read the current source and `dist` for `tree.ts`, `program.ts`, `hook.ts`, `hooks.json`, `report.ts`, `brief.ts`, `assignment.ts` and `ids.ts`; ran no tests and no `/security-review` (no shell, no `origin/HEAD`).\n",
+  "acceptance": {
+    "revision": 2,
+    "rationale": "Previous blocking finding closed with line references; new sinks traced; only low notes remain.",
+    "criteria": [
+      {
+        "criterion": "Network: finding 1 is closed: no prompt, a hard time limit, no fetch from any hook",
+        "support": "`tree.ts:411-501`, `tree.ts:548`, `program.ts:53-60` and `hook.ts:332` give no prompt, an 8 s SIGKILL, and no fetch from any `hook` command; residual notes 1 and 2 are low."
+      },
+      {
+        "criterion": "Reports: journal labels cannot write outside the reports folder and report text reaches no shell or hook output",
+        "support": "`ids.ts:4`, `assignment.ts:412`, `brief.ts:42`; the label must match the strict id regex and report text reaches only file contents."
+      },
+      {
+        "criterion": "No new issue: the repairs add no injection, traversal or exposure",
+        "support": "no injection, traversal or secret exposure found in the changed paths; only the three low notes above."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "three low non-blocking notes (`tree.ts:459`, `tree.ts:428`, `assignment.ts:406`) and the status of previous findings 2 and 3, as above."
+      },
+      {
+        "label": "verified",
+        "support": "read the current source and `dist` for `tree.ts`, `program.ts`, `hook.ts`, `hooks.json`, `report.ts`, `brief.ts`, `assignment.ts` and `ids.ts`; ran no tests and no `/security-review` (no shell, no `origin/HEAD`)."
+      }
+    ]
   },
   "createdAt": "2026-11-02T18:49:02.586Z"
 }
