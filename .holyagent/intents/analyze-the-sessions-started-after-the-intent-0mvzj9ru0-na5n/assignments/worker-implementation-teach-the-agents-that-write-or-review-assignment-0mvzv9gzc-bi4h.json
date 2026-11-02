@@ -1,0 +1,55 @@
+{
+  "id": "assignment-0mvzv9gzc-bi4h",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 8,
+  "roleTask": "Worker.implementation",
+  "slug": "teach-the-agents-that-write-or-review",
+  "objective": "Teach the agents that write or review context files (AGENTS.md, CLAUDE.md and similar) to leave out volatile and discoverable content, with the repository's convention first.",
+  "state": "Running",
+  "scope": [
+    "Where: packages/runtime/src/instructions/claude-5.5/roles/worker-implementation/instruction-text.md, roles/reviewer-artifact/instruction-text.md and skills/instruction-writing/SKILL.md (the agents that write or review instruction text); requirements.md first, with a REQUIREMENT_SECTIONS mapping in packages/integrations/claude/src/agents.ts. Not in other agents.",
+    "Rule, user's words (pt-BR): \"incluir informações que mudam como caminhos de código, documentação, etc machucam performance. mas o padrão do repositório vem antes, se o repositório sai disso, isso só deve ser mudado se o usuário pergunta.\" State it in English: when writing or editing a context file, leave out content that changes or that the agent can discover from the repository (code and documentation paths, directory listings, codebase overviews) and include only instructions the code, README and docs do not already give (conventions, non-functional requirements, commands and tools to use); the repository's own convention comes first, and an existing file that departs from this is changed only when the user asks.",
+    "Source to cite in requirements.md (sourced vs inference): Gloaguen et al., 'Evaluating AGENTS.md: Are Repository-Level Context Files Helpful for Coding Agents?', arXiv 2602.11988 (https://arxiv.org/abs/2602.11988): codebase overviews in context files did not shorten the steps to the first relevant file and context files raised cost by over 20%; its recommendation: include only instructions required for coding agents that are not already present in the README, such as specific conventions or non-functional requirements. The harm from paths going stale is inference; no study measures it. arXiv 2601.20404 does not support the rule and is not cited.",
+    "Also: update the STATE_FILE doc comment in packages/runtime/src/state/tree.ts, which still says it lists the notes migrate copies; migrate now passes every copied path to commitState. Comment only.",
+    "Rebuild dist with bun packages/integrations/claude/build.ts at the end."
+  ],
+  "constraints": [
+    "Keep every existing detail; add, do not shorten.",
+    "No version-control writes and no edits under .git/ or .holyagent/; report changed paths.",
+    "Keep working until done; when done and checked, stop and report. Respond tersely."
+  ],
+  "criteria": [
+    {
+      "text": "Context files: the rule reaches exactly worker-implementation, reviewer-artifact and the instruction-writing skill, with the repository-convention-first and change-only-when-asked clauses, and requirements.md cites arXiv 2602.11988 with the staleness harm marked as inference; mapped and tested",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Doc comment: the STATE_FILE comment describes the current staging",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "Gates: bun check, bun lint, bun fmt --check and bun test exit 0 after rebuilding dist",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/integrations/claude",
+    "packages/runtime/src/state/tree.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-02T23:04:48.697Z"
+  },
+  "createdAt": "2026-11-02T23:04:48.697Z"
+}
