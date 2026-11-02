@@ -31,9 +31,11 @@
     "Decision: check the official Anthropic prompting guides for Opus 5.5, Sonnet 5.5 and Haiku 5.5, and apply any per-model guidance the claude-5.5 instruction set does not cover yet; add the guides wording \"Respond tersely\" to every agent prompt (root and specialists).",
     "Decision: give the root agent the TaskStop tool back and replace the no-stopping rule: the root stops a running agent or workflow only when a new requirement or new information conflicts with that running work, and lets it finish when finishing and then repairing costs less than stopping and relaunching.",
     "User (verbatim, pt-BR): se puder re-escrever/encurtar todas as instruções e skills depois de pesquisar as instruções e com as instruções de curto, direto e objetivo",
-    "Decision: after the guide research, rewrite and shorten every agent instruction section and every skill to be short, direct and objective, following the official guides; keep every requirements.md behavior covered."
+    "Decision: after the guide research, rewrite and shorten every agent instruction section and every skill to be short, direct and objective, following the official guides; keep every requirements.md behavior covered.",
+    "User (verbatim, pt-BR): limpeza de sobras do billion context não entra em nada",
+    "Decision: the Billion Context leftover cleanup is in no skill or instruction: leave it out of any apply-defaults design and remove it from the existing setup skill and its docs during the rewrite."
   ],
-  "revision": 5,
+  "revision": 6,
   "state": "Open",
   "createdAt": "2026-11-02T17:29:07.369Z"
 }
