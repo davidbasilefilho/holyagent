@@ -746,7 +746,7 @@ describe("agents", () => {
     }
     for (const role of ["worker-implementation", "reviewer-artifact"])
       for (const name of ROLE_SECTIONS[role] ?? [])
-        expect(read(`${CLAUDE}/roles/${role}`, name)).not.toContain("compact and proportional")
+        expect(read(`${CLAUDE}/roles/${role}`, name)).not.toContain("State each rule once")
   })
 
   test("agent files sit where the plugin expects them", () => {

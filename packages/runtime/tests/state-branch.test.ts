@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { mkdir, readdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
+import { $ } from "bun"
 import { Effect } from "effect"
 
 import { loadProject } from "../src/state/store.ts"
@@ -444,6 +445,30 @@ describe("the fetch of the remote state branch", () => {
     expect(Date.now() - started).toBeLessThan(4000)
   })
 
+  test("a fetch killed at its timeout leaves no helper process running", async () => {
+    const pidFile = join(await scratch("holyagent-pid-"), "helper.pid")
+    // The helper stands for an ssh or credential helper that git started and then hangs on.
+    const { dir, script } = await overSsh(`sleep 30 &\necho $! > "${pidFile}"\nwait`)
+
+    const found = await Effect.runPromise(
+      fetchRemoteBranch(dir, { ...GIT_ENV, GIT_SSH_COMMAND: script }, STATE, 1500),
+    )
+
+    expect(found).toBe(false)
+    const pid = Number((await Bun.file(pidFile).text()).trim())
+    expect(pid).toBeGreaterThan(1)
+    // A killed process nobody reaps stays a zombie (state Z) until its parent does; it runs no code.
+    const alive = async () => {
+      for (let attempt = 0; attempt < 20; attempt++) {
+        const state = (await $`ps -o stat= -p ${pid}`.quiet().nothrow().text()).trim()
+        if (state === "" || state.startsWith("Z")) return false
+        await Bun.sleep(50)
+      }
+      return true
+    }
+    expect(await alive()).toBe(false)
+  })
+
   test("a hook makes no network call, and the next command fetches", async () => {
     const { dir, env, logged } = await overSsh("exit 255")
     // A work tree that already holds state is a project that keeps state, which makes the state worktree.
@@ -474,6 +499,30 @@ describe("a base branch that ignores the state folder", () => {
     expect(tracked.some((path) => path.startsWith(".holyagent/local/"))).toBe(false)
     expect(await sh(dir, ["git", "show", "main:.gitignore"])).toBe("/.holyagent/\n")
     expect(await sh(dir, ["git", "status", "--porcelain"])).toBe("")
+  })
+
+  test("a stray file that its own ignore rule covers is never committed, a record always is", async () => {
+    const dir = await initRepo(OWNER)
+    await seed(dir, { "a.txt": "a\n", ".gitignore": "/.holyagent/\n" })
+    const first = await createIntent(dir, "Ship the parser")
+    const tree = await stateTree(dir)
+    const state = join(tree, ".holyagent")
+    const folder = (await readdir(join(state, "intents")))[0] ?? ""
+    await writeFile(join(state, ".gitignore"), "scratch.txt\nintents/*/notes.json\n")
+    await writeFile(join(state, "scratch.txt"), "stray\n")
+    await writeFile(join(state, "intents", folder, "notes.json"), "{}\n")
+    await writeFile(join(state, "intents", folder, "draft.tmp"), "stray\n")
+
+    const second = await createIntent(dir, "Ship the lexer")
+
+    const tracked = lines(await sh(dir, ["git", "ls-tree", "-r", "--name-only", STATE]))
+    expect(tracked.some((path) => path.includes(`${first}/intent.json`))).toBe(true)
+    expect(tracked.some((path) => path.includes(`${second}/intent.json`))).toBe(true)
+    for (const stray of ["scratch.txt", "notes.json", "draft.tmp", ".holyagent/.gitignore"])
+      expect({ stray, committed: tracked.some((path) => path.endsWith(stray)) }).toEqual({
+        stray,
+        committed: false,
+      })
   })
 })
 

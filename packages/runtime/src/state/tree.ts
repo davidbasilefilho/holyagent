@@ -444,9 +444,21 @@ const fetchEnvironment = (
 }
 
 /**
- * Runs git for its exit code only and kills it after `timeout` milliseconds. The Bun Shell cannot
- * kill a process, so this one command uses `Bun.spawn`; the output is discarded because a killed
- * git can leave an ssh child holding its pipes open, which would stall a reader.
+ * Kills the process group of a detached child: git's helpers (ssh, credential helpers) are its
+ * children, and a kill of git alone would leave them running. A group that is already gone is not
+ * an error. Windows has no process groups, so the child alone is killed there.
+ */
+const killGroup = (child: Bun.Subprocess) =>
+  Effect.try(() =>
+    process.platform === "win32" ? child.kill("SIGKILL") : process.kill(-child.pid, "SIGKILL"),
+  ).pipe(Effect.ignore)
+
+/**
+ * Runs git for its exit code only and, after `timeout` milliseconds, kills it and every helper it
+ * started, then yields -1. The child leads a process group of its own (`detached`) so the whole
+ * group can be killed; the Bun Shell cannot kill a process, so this one command uses `Bun.spawn`.
+ * The output is discarded because a killed git can leave an ssh child holding its pipes open, which
+ * would stall a reader.
  */
 const gitBounded = (
   cwd: string,
@@ -454,25 +466,30 @@ const gitBounded = (
   args: ReadonlyArray<string>,
   timeout: number,
 ) =>
-  Effect.try({
-    try: () =>
-      Bun.spawn(["git", ...args], {
-        cwd,
-        env,
-        stdin: "ignore",
-        stdout: "ignore",
-        stderr: "ignore",
-        timeout,
-        killSignal: "SIGKILL",
-      }),
-    catch: (cause) => new StateIo({ path: cwd, cause }),
-  }).pipe(
-    Effect.flatMap((child) =>
+  Effect.acquireUseRelease(
+    Effect.try({
+      try: () =>
+        Bun.spawn(["git", ...args], {
+          cwd,
+          env,
+          stdin: "ignore",
+          stdout: "ignore",
+          stderr: "ignore",
+          detached: true,
+        }),
+      catch: (cause) => new StateIo({ path: cwd, cause }),
+    }),
+    (child) =>
       Effect.tryPromise({
         try: () => child.exited,
         catch: (cause) => new StateIo({ path: cwd, cause }),
-      }),
-    ),
+      }).pipe(
+        Effect.timeoutOption(timeout),
+        Effect.map((code) => (code._tag === "Some" ? code.value : -1)),
+        Effect.tap((code) => (code === -1 ? killGroup(child) : Effect.void)),
+      ),
+    // An interrupted fetch must not leave the group running either.
+    (child, exit) => (exit._tag === "Failure" ? killGroup(child) : Effect.void),
   )
 
 /**
@@ -849,6 +866,37 @@ const migrateWorkTree = (
   )
 }
 
+/** The files HolyAgent writes under the state folder, relative to it: the settings and the records. */
+const STATE_FILE =
+  /^(?:config\.json|intents\/[^/]+\/(?:intent\.json|(?:assignments|branches|pulls)\/[^/]+\.json))$/
+
+/**
+ * Stages the changes under `.holyagent/` of the state worktree: the changes and removals of what
+ * git already tracks there, then each file HolyAgent writes ({@link STATE_FILE}) with `-f`, because
+ * a branch started from the base inherits its `.gitignore`, which may ignore the state folder as a
+ * whole. Any other file stays unstaged whatever the ignore rules say, as does `local/`.
+ */
+const stageState = (worktree: string, env: Environment) =>
+  Effect.gen(function* () {
+    yield* gitText(worktree, env, [
+      "add",
+      "-u",
+      "--",
+      STATE_DIRECTORY,
+      `:(exclude)${STATE_DIRECTORY}/local`,
+    ])
+    const folder = join(worktree, STATE_DIRECTORY)
+    const files = yield* io(folder, () =>
+      Array.fromAsync(new Bun.Glob("**/*").scan({ cwd: folder, dot: true, onlyFiles: true })),
+    )
+    const wanted = files
+      .map((path) => toPosix(path))
+      .filter((path) => STATE_FILE.test(path))
+      .map((path) => `${STATE_DIRECTORY}/${path}`)
+    if (wanted.length > 0)
+      yield* gitText(worktree, env, ["--literal-pathspecs", "add", "-f", "--", ...wanted])
+  })
+
 /**
  * Commits what changed under `.holyagent/` of the state worktree on the state branch, with the
  * identity git has for the repository, and returns whether a commit was made. Nothing happens in
@@ -873,16 +921,7 @@ export const commitState = (directory: string, env: Environment, message: string
     const current = yield* git(worktree, env, ["symbolic-ref", "--short", "-q", "HEAD"])
     if (current.code !== 0 || current.stdout.trim() !== (yield* stateBranch(worktree, env)))
       return false
-    // `-f` because a branch started from the base inherits its `.gitignore`, which may ignore the
-    // state folder; `local/` stays out, as its own ignore file would have kept it.
-    yield* gitText(worktree, env, [
-      "add",
-      "-f",
-      "-A",
-      "--",
-      STATE_DIRECTORY,
-      `:(exclude)${STATE_DIRECTORY}/local`,
-    ])
+    yield* stageState(worktree, env)
     if (yield* gitSucceeds(worktree, env, ["diff", "--cached", "--quiet", "--", STATE_DIRECTORY]))
       return false
     yield* gitText(worktree, yield* committing(worktree, env), [

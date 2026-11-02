@@ -5,6 +5,8 @@ import {
   applyDefaults,
   type Default,
   type Entry,
+  isJsonObject,
+  type JsonObject,
   readJsonObject,
   writeJsonObject,
 } from "./json-file.ts"
@@ -40,7 +42,7 @@ export const userSettingsDefaults = (subagentCacheTtl: CacheTtl): ReadonlyArray<
   { path: ["includeGitInstructions"], value: false },
   { path: ["subagentPromptCacheTtl"], value: subagentCacheTtl },
   { path: ["modelSettings", ROOT_MODEL, "effortLevel"], value: "high" },
-  { path: ["modelSettings", ROOT_MODEL, "autoCompactWindow"], value: 200000 },
+  { path: ["modelSettings", ROOT_MODEL, "autoCompactWindow"], value: 450000 },
   {
     path: ["extraKnownMarketplaces", MARKETPLACE.name],
     value: { source: { source: "github", repo: MARKETPLACE.repo } },
@@ -48,6 +50,20 @@ export const userSettingsDefaults = (subagentCacheTtl: CacheTtl): ReadonlyArray<
   { path: ["enabledPlugins", PLUGIN_ID], value: true },
   { path: ["permissions", "deny"], value: ["WebSearch", "WebFetch"] },
 ]
+
+/**
+ * The defaults to merge into `existing`. `/effort auto` clears the saved level by removing
+ * `effortLevel` from the model's entry and leaves the entry, so an Opus 5.5 entry that exists
+ * without `effortLevel` is the user's choice of the model default, and the level is not re-added.
+ */
+const defaultsFor = (existing: JsonObject, subagentCacheTtl: CacheTtl): ReadonlyArray<Default> => {
+  const models = existing["modelSettings"]
+  const entry = isJsonObject(models) ? models[ROOT_MODEL] : undefined
+  const cleared = isJsonObject(entry) && !("effortLevel" in entry)
+  return userSettingsDefaults(subagentCacheTtl).filter(
+    ({ path }) => !(cleared && path[2] === "effortLevel"),
+  )
+}
 
 const describe = ({ path, status, value, wanted }: Entry): string => {
   switch (status) {
@@ -74,7 +90,7 @@ export const mergeUserSettings = Effect.fn("mergeUserSettings")(function* (
   const existing = yield* readJsonObject(file)
   const { merged, entries } = applyDefaults(
     existing,
-    userSettingsDefaults(options.subagentCacheTtl),
+    defaultsFor(existing, options.subagentCacheTtl),
   )
   const added = entries.filter((entry) => entry.status === "added").length
   if (added > 0 && !options.dryRun) yield* writeJsonObject(file, merged)
@@ -93,7 +109,7 @@ export const mergeUserSettings = Effect.fn("mergeUserSettings")(function* (
  */
 export const missingSettingKeys = Effect.fn("missingSettingKeys")(function* (env: Env) {
   const existing = yield* readJsonObject(userFiles(env).settings)
-  return applyDefaults(existing, userSettingsDefaults("1h"))
+  return applyDefaults(existing, defaultsFor(existing, "1h"))
     .entries.filter((entry) => entry.status === "added")
     .map((entry) => entry.path)
 })

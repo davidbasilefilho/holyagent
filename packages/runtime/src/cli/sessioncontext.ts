@@ -10,9 +10,9 @@ import reminder from "../instructions/claude-5.5/session-reminder.md" with { typ
 export const CONTEXT_BUDGET = 9300
 
 /**
- * The short block of the rules the root rules leave out, which ends the context on every session
- * start so that it is the last thing read. It repeats nothing the core rules state, so an output
- * that carries them is not told twice.
+ * The block of the rules the root rules leave out, which ends the context on every session start so
+ * that it is the last thing read. It repeats nothing the core rules state, so an output that
+ * carries them is not told twice.
  */
 export const SESSION_REMINDER: string = reminder.trim()
 

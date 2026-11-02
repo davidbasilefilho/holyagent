@@ -84,7 +84,7 @@ What an agent kind always needs is fixed text in its instructions, not a skill i
 
 ## Reviewer.artifact
 
-- R-RA: Give each acceptance criterion of an artifact a verdict with the location that decides it, and judge instruction text by its expected size and the writing bar.
+- R-RA: Give each acceptance criterion of an artifact a verdict with the location that decides it, and judge instruction text against the writing bar.
 
 ## Reviewer.audit
 
@@ -114,7 +114,7 @@ What an agent kind always needs is fixed text in its instructions, not a skill i
 ## Worker.implementation
 
 - R-WI: Implement the smallest complete change that meets every criterion, following the surrounding code, and turn a known reproduction into the regression test.
-- R-WI-TEXT: Meet the expected size and the writing bar when the deliverable is instruction text.
+- R-WI-TEXT: Keep instruction text terse and direct and meet the writing bar when it is the deliverable.
 
 ## Worker.integration
 

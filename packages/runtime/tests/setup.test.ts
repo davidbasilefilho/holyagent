@@ -87,11 +87,11 @@ describe("holyagent setup", () => {
     expect(settings.enabledPlugins).toEqual({ "holyagent@holyagent": true })
     expect(settings.permissions).toEqual({ deny: ["WebSearch", "WebFetch"] })
     expect(settings.modelSettings).toEqual({
-      "claude-opus-5-5": { effortLevel: "high", autoCompactWindow: 200000 },
+      "claude-opus-5-5": { effortLevel: "high", autoCompactWindow: 450000 },
     })
   })
 
-  test("recommends high effort and a 200000-token window for Opus 5.5 but keeps a level the user saved", async () => {
+  test("recommends high effort and a 450000-token window for Opus 5.5 but keeps a level the user saved", async () => {
     await write(
       ".claude/settings.json",
       JSON.stringify({
@@ -107,10 +107,10 @@ describe("holyagent setup", () => {
       '~ modelSettings.claude-opus-5-5.effortLevel: kept "xhigh" (recommended "high")',
     )
     expect(report.lines).toContain(
-      "+ modelSettings.claude-opus-5-5.autoCompactWindow: added 200000",
+      "+ modelSettings.claude-opus-5-5.autoCompactWindow: added 450000",
     )
     expect((await readJson(settingsFile())).modelSettings).toEqual({
-      "claude-opus-5-5": { effortLevel: "xhigh", autoCompactWindow: 200000 },
+      "claude-opus-5-5": { effortLevel: "xhigh", autoCompactWindow: 450000 },
       "claude-sonnet-5-5": {},
     })
   })
@@ -441,7 +441,28 @@ describe("holyagent doctor", () => {
     )
     expect(fixed.ok).toBe(true)
     expect((await readJson(settingsFile())).modelSettings).toEqual({
-      "claude-opus-5-5": { effortLevel: "high", autoCompactWindow: 200000 },
+      "claude-opus-5-5": { effortLevel: "high", autoCompactWindow: 450000 },
+    })
+  })
+
+  test("an Opus 5.5 entry that /effort auto left without effortLevel passes the check and stays as it is", async () => {
+    await writeCompleteSettings(claudeDirectory())
+    const complete = await readJson(settingsFile())
+    await writeFile(
+      settingsFile(),
+      JSON.stringify({
+        ...complete,
+        modelSettings: { "claude-opus-5-5": { autoCompactWindow: 450000 } },
+      }),
+    )
+    const shell = fakeShell({ commands: ["bun", "ctx7"] })
+    const report = await Effect.runPromise(
+      doctor(env(), { fix: true }).pipe(Effect.provide(shell.layer)),
+    )
+    expect(report.ok).toBe(true)
+    expect(report.lines.find((line) => line.startsWith("ok   settings"))).toBeDefined()
+    expect((await readJson(settingsFile())).modelSettings).toEqual({
+      "claude-opus-5-5": { autoCompactWindow: 450000 },
     })
   })
 

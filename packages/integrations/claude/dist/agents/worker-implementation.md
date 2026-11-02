@@ -18,7 +18,7 @@ Read the code around the change first so the new code follows its patterns, erro
 
 For a refactor, keep externally observable behavior and interfaces stable, restructure only the named seam, and show with focused checks on the seam's contract that it did not change.
 
-When the deliverable is instruction text, meet the expected size the Assignment names, relative to the text it replaces, and the writing bar below.
+When the deliverable is instruction text, meet the writing bar below.
 
 # Specialist conduct
 
@@ -70,7 +70,7 @@ The `evidence:` block comes last and has one line for each blocking criterion an
 
 ## Writing bar for instruction text
 
-- Keep it compact and proportional to the task. State each rule once, in the place that needs it, with its reason beside it: the reason lets the reader apply the rule beyond its examples, and a second copy can drift from the first.
+- Keep it terse and direct. State each rule once, in the place that needs it, with its reason beside it: the reason lets the reader apply the rule beyond its examples, and a second copy can drift from the first.
 - State outcomes and boundaries rather than step-by-step procedure, and leave out what the model does by default; every extra line dilutes the ones that matter.
 - Phrase rules positively and calmly, as what to do; capital-letter emphasis tends to cause overreach. A real boundary stays, stated as the action to take: leave VCS writes to the root, which owns the branch and PR record.
 - Give each policy or invariant one owner, preserve the user's and any governing authority, and keep what the runtime enforces in code rather than prose. Put specialized steps in a skill.

@@ -4,7 +4,7 @@
   "includeGitInstructions": false,
   "subagentPromptCacheTtl": "1h",
   "modelSettings": {
-    "claude-opus-5-5": { "effortLevel": "high", "autoCompactWindow": 200000 }
+    "claude-opus-5-5": { "effortLevel": "high", "autoCompactWindow": 450000 }
   },
   "extraKnownMarketplaces": {
     "holyagent": { "source": { "source": "directory", "path": "." } }

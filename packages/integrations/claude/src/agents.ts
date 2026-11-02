@@ -259,7 +259,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
     phrase: "Version control and state records are yours alone",
   },
   "R-GIT": {
-    section: "root/version-control.md",
+    section: "root/identity.md",
     phrase: "Never force-push, and never push to the base, default or a protected branch",
   },
   "R-BRANCH": { section: "root/version-control.md", phrase: "When the platform assigns a branch" },
@@ -343,7 +343,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
   "R-WI": { section: "roles/worker-implementation/method.md", phrase: "smallest complete change" },
   "R-WI-TEXT": {
     section: "roles/worker-implementation/instruction-text.md",
-    phrase: "expected size",
+    phrase: "writing bar",
   },
   "R-WIN": { section: "roles/worker-integration/method.md", phrase: "end to end" },
   "R-WM": { section: "roles/worker-mechanical/method.md", phrase: "Find every site" },

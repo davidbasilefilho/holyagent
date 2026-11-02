@@ -36,12 +36,9 @@ const bigStatus = (intents: number, assignments: number) => ({
 })
 
 describe("the core of the root rules", () => {
-  test("is made of its own files of root/ and about 4,100 characters at most", () => {
+  test("is made of its own files of root/", () => {
     const core = ROOT_CORE
     expect(core.length).toBeGreaterThan(1000)
-    // The cap is 4,100: the hand-run form of the CLI keeps `--no-env-file` and the empty bunfig so a
-    // project `.env` or `bunfig.toml` cannot change a call, and those flags cost about 100 characters.
-    expect(core.length).toBeLessThanOrEqual(4100)
     expect(core).toContain("You are the root.")
     expect(core).toContain("assignment dispatch")
     expect(core).not.toContain("core:start")
@@ -188,7 +185,7 @@ describe("the session context", () => {
 describe("the rules block that ends the session context", () => {
   const status = { intents: [{ id: "intent-a", revision: 1, objective: "Ship it" }] }
 
-  test("is a short block of rules the core rules leave out, kept in its own instruction file", () => {
+  test("is a block of rules the core rules leave out, kept in its own instruction file", () => {
     const file = readFileSync(
       join(import.meta.dir, "../src/instructions/claude-5.5/session-reminder.md"),
       "utf8",
@@ -196,7 +193,6 @@ describe("the rules block that ends the session context", () => {
     expect(SESSION_REMINDER).toBe(file.trim())
     const rules = SESSION_REMINDER.split("\n").filter((line) => line.startsWith("- "))
     expect(rules.length).toBeGreaterThanOrEqual(1)
-    expect(rules.length).toBeLessThanOrEqual(4)
     for (const part of [
       "task-list tool if it is deferred (Claude Code's TaskCreate/TaskUpdate, the desktop app's update_plan",
       "mid-turn",
