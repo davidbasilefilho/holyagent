@@ -1,0 +1,78 @@
+{
+  "id": "assignment-0mvzlcjd8-cyp6",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 2,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-review-findings-on-commits",
+  "objective": "Repair the review findings on commits ecea23f and 41754dd and add the assignment reports command the new root text relies on.",
+  "state": "Ready",
+  "scope": [
+    "Security finding (blocking): packages/runtime/src/state/tree.ts fetchRemoteBranch (about :415-424, called :471) can prompt or hang: GIT_TERMINAL_PROMPT=0 does not stop ssh host-key or passphrase prompts, SSH_ASKPASS/GIT_ASKPASS or credential helpers, it has no timeout and runs under worktree.lock, and SessionStart can reach it through ifPresent plus keepsState.",
+    "Evidence matching (packages/runtime/src/cli/report.ts acceptanceFrom): real reports failed to match because a criterion label equal to an evidence label (Autocompact / autocompact, Scope / scope) is discarded as ambiguous, hyphens differ from spaces (agent-effort vs Agent effort), and keys carry list markers or bold ('- Token totals:', '**Root context**:').",
+    "New command `holyagent assignment reports <journal.jsonl>`: a Workflow run's journal has lines {type:'started', key, agentId, label} and {type:'result', key, agentId, result}; the root labels each agent() with its Assignment id.",
+    "Code-review non-blocking items: no test covers writeBrief failing (assignment.ts:201); the dispatch prompt says 'your full task' twice."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md and AGENTS.md (Effect, Schema at the journal boundary with onExcessProperty handled for the extra fields the journal may carry, JSDoc, Bun Shell or Bun APIs).",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. Run bun test, bun check, bun lint and bun fmt --check (mise may be missing), then rebuild the generated plugin (bun scripts/build.ts or the build task mise.toml names) so the sync test passes. When done, stop and report under 600 words with the changed paths and a diff file under /tmp/holyagent-review/; name unrequested ideas instead of building them."
+  ],
+  "criteria": [
+    {
+      "text": "Fetch safety: the state fetch runs with ssh BatchMode and a connect timeout (unless the user set GIT_SSH_COMMAND), without askpass programs or interactive credential helpers, under a hard timeout of at most 10 seconds, and never from a hook, so SessionStart makes no network call; a test covers the timeout or the non-interactive environment",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Matching: a criterion label equal to an evidence label supports both; hyphens and underscores match spaces; a leading list marker or bold markers around the key are ignored; tests cover each with lines taken from real reports",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Reports command: assignment reports <journal> writes each result to a file named by its label under the briefs' sibling folder (for example <git common dir>/holyagent/reports/<id>.md), prints one row per result with id, path and word count, lists labels that are not Assignment ids, refuses a malformed journal with a tagged error, and appears in holyagent help; tests cover it",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Brief: the dispatch prompt names the brief path once without repeating itself, the agent-launch hook still records it, and a test covers a brief write failure leaving the Assignment Ready",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Docs: docs/pi/claude-parity.md no longer describes the root reading screenshots to accept visual work",
+      "blocking": false,
+      "dimension": "style"
+    },
+    {
+      "text": "Gates: bun test, bun check, bun lint and bun fmt --check pass and the generated plugin matches a fresh build",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Scope: only the ownership paths change",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "diff-file",
+    "tests-run"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/state/tree.ts",
+    "packages/runtime/src/cli/report.ts",
+    "packages/runtime/src/cli/assignment.ts",
+    "packages/runtime/src/cli/brief.ts",
+    "packages/runtime/src/cli/commands.ts",
+    "packages/runtime/src/cli/program.ts",
+    "packages/runtime/src/cli/hook.ts",
+    "packages/runtime/tests/state-branch.test.ts",
+    "packages/runtime/tests/cli.test.ts",
+    "packages/runtime/tests/reports.test.ts",
+    "packages/integrations/claude/dist",
+    "docs/pi/claude-parity.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvzjrnq1-q6xv",
+  "createdAt": "2026-11-02T18:27:15.596Z"
+}
