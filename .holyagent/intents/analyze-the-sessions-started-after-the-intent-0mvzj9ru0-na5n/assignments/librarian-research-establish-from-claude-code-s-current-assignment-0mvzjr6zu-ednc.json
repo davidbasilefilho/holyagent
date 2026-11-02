@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mvzjr6zu-ednc",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 2,
+  "roleTask": "Librarian.research",
+  "slug": "establish-from-claude-code-s-current",
+  "objective": "Establish from Claude Code's current official documentation how to set the reasoning effort of the main thread and how to lower the autocompact threshold, so HolyAgent can ship a high-effort root with a small context.",
+  "state": "Ready",
+  "scope": [
+    "Official sources: code.claude.com docs (settings, subagents, model configuration, environment variables, plugins), the Claude Code changelog. Look the facts up even if they seem known; they change often."
+  ],
+  "constraints": [
+    "Read-only. Report under 700 words, every fact with its URL; separate sourced facts from inference. Keep working until everything asked is done, then stop and report."
+  ],
+  "criteria": [
+    {
+      "text": "Agent effort: whether an agent file's frontmatter effort field applies when that agent runs as the main thread (the agent setting or --agent), and its allowed values",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Session effort: the settings.json key and the environment variable, if any, that set the default effort of a session, with allowed values, and their precedence",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Autocompact: every supported way to lower the autocompact threshold (setting or environment variable such as CLAUDE_AUTOCOMPACT_PCT_OVERRIDE), its unit, whether it works with 1M-token windows, and its limits",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Scope: which of these a plugin can ship (plugin settings.json, agent frontmatter) versus user or project settings only",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "agent-effort",
+    "session-effort",
+    "autocompact",
+    "scope"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-02T17:42:40.171Z"
+}
