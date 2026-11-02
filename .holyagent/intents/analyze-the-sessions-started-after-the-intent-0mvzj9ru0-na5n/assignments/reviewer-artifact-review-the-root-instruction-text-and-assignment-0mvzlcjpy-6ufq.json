@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "review-the-root-instruction-text-and",
   "objective": "Review the root instruction text and docs of commit cf522df for correctness, completeness and fidelity to the Intent's requirements.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Diff: /tmp/holyagent-review/assignment-0mvzkezwm-9ib4.diff; full files under /home/user/holyagent/packages/runtime/src/instructions and /home/user/holyagent/docs; the assembled prompt /home/user/holyagent/packages/integrations/claude/dist/agents/holyagent.md.",
     "Requirements: root at high effort with a small context; the root reads only what a decision needs, accepts rendered work on Reviewer.visual evidence and reads images only to show the user or settle a doubt, runs no checks itself, never re-reads or re-emits briefs, closes from report files written by 'holyagent assignment reports <journal>', caps report length; no polling, scheduled check-ins or wait loops; Haiku cases named in routing; platform-assigned branch used as work branch, user told and asked through AskUserQuestion, exp/ for no published version and release/<version>/ with tags or releases, final report names the branch and why."
@@ -49,7 +49,41 @@
     "agentId": "workflow:wf_c37a49df-ed2/assignment-0mvzlcjpy-6ufq",
     "model": "haiku",
     "effort": "high",
-    "startedAt": "2026-11-02T18:27:23.224Z"
+    "startedAt": "2026-11-02T18:27:23.224Z",
+    "finishedAt": "2026-11-02T18:36:31.945Z"
+  },
+  "result": "result: Not ready. Three blocking gaps: the `assignment reports` command the root is told to run does not exist, the CLI's `plan` text contradicts the new workflow rules, and the root has no rule for an Assignment whose agent died. Several rules are also stated twice.\nchanged: none (read-only review)\nchecks: none run (no shell in this role). Read the diff file, the instruction sources, the docs, the assembled prompt and the CLI source with Grep and Glob. Paths below are under /home/user/holyagent/.\n\nblockers:\n1. packages/runtime/src/instructions/claude-5.5/root/workflows.md:10 (also requirements.md:24, docs/cache-and-workflows.md:46, docs/usage.md:112): `holyagent assignment reports <journal.jsonl>` is not implemented. The command paths in packages/runtime/src/cli/assignment.ts are create, dispatch, record, close, accept, show and list. plugin.test.ts:578 only checks the text. Failure: after a run the root gets \"unknown command\", cannot close from report files, and either retypes reports (breaking R-REPORT) or leaves Assignments Running. The source of the journal path is also never stated.\n2. packages/runtime/src/cli/overview.ts:91-92 (shipped in packages/integrations/claude/dist/scripts/holyagent.js:13530): `plan` says to \"return an object of reports keyed by Assignment id\", that a null report means the agent died (close it `errored`), and to pipe report text on stdin. This contradicts workflows.md:6 and :10 (`{ done: [ids] }`, report files). Failure: the root expects reports in the Workflow result, pulls them into its context (R-LEAN) and never uses `done`.\n3. Missing rule: workflows.md has no instruction for an Assignment absent from `{ done: [ids] }`. docs/cache-and-workflows.md:50 says close it `errored`; overview.ts:92 says a null report means `errored`. Failure: a dead workflow agent leaves its Assignment Running, and the root has nothing to act on.\n4. Rules stated twice (the criterion is blocking). Edits to one copy already drift: stack-plan.md:7 and assignments.md:12 word the push rule differently.\n   - No gates or probes: delegating.md:3, context.md:5.\n   - Read only what a decision needs: delegating.md:3, context.md:3.\n   - Never open or re-emit the brief: dispatch.md:3, context.md:7.\n   - Local commit, review, repairs as new commits, push after reviews accept: stack-plan.md:7, assignments.md:12, version-control.md:11.\n   - No scheduled check-ins or wait loops: dispatch.md:9, ci.md:3.\n   - Force-push and protected-branch approval: identity.md:5, version-control.md:11.\n   - Hook noise: user-messages.md:6, task-list.md:3. What reaches the user: user-messages.md:10, task-list.md:3.\n\nnotes (non-blocking):\n- Intent says the final report \"names the branch and why\". version-control.md (Branches bullet) and requirements.md:36 narrow this to \"whenever it departs from the convention\". Blocking if the Intent means always.\n- route.ts:203 and :212-219 make Reviewer.audit and Reviewer.artifact haiku. routing.md:1 names neither, and its Sonnet list leaves them unclassified.\n- requirements.md:37 (R-STATE: \"A mode moves no records\") is missing from version-control.md's State bullet, though instruction-guidelines.md:403 requires sets to cover every line. Pre-existing, outside this diff.\n- docs/usage.md:111 says briefs go \"under the git common directory\". brief.ts:11-13 falls back to the state folder's `local/briefs` outside a repository.\n- Style: context.md:5, :7, :9 and ci.md:3 give rules without a reason beside them. context.md:9 \"needs fewer words\" has no threshold. context.md:7 is a prohibition, not a do-instruction.\n- The window and effort text repeats in usage.md:145-149, decisions.md:76, components.md:63, requirements/context.md:5, settings.ts (ROOT_MODEL comment) and usage.md:185. Drift risk.\n\nquestions: none\n\nevidence:\nCoverage: gap. Blocking: `assignment reports` absent (workflows.md:10; assignment.ts command paths); no absent-Assignment rule (workflows.md after :10). Non-blocking: R-BRANCH narrowed (version-control.md Branches bullet).\nConsistency: gap. overview.ts:91-92 against workflows.md:6,10; duplicates at delegating.md:3/context.md:5, delegating.md:3/context.md:3, dispatch.md:3/context.md:7, stack-plan.md:7/assignments.md:12, dispatch.md:9/ci.md:3, identity.md:5/version-control.md:11, user-messages.md:6/task-list.md:3.\nDocs: gap. usage.md:112 and cache-and-workflows.md:46,50 describe the reports command and the errored rule as shipped. Verified: settings limits at usage.md:145 and requirements/context.md:5 match agents.ts:230-232; anchors #user-settings (usage.md:71) and #run-the-root-on-sonnet (usage.md:125) resolve. Unverified (no network): issues #81677/#97829, the 2.1.251 and 2.1.288 minimums, \"/effort and /autocompact write these keys\", CLAUDE_CODE_AUTO_COMPACT_WINDOW, and \"per-model entry takes precedence\" (decisions.md:76).\nStyle: gap (non-blocking). context.md:5, :7, :9; ci.md:3; repeated window text (see notes).\nfindings: items 1-4 above with the cited lines, plus the notes.\nverified: dispatch prompt is two lines (cli/report.ts:189-193), matching dispatch.md:3 and usage.md:111; `holyagent status` exists (cli/overview.ts:154) and hooks.md:27 uses it correctly; route table (domain/route.ts:110-219) matches routing.md:1 except audit and artifact; settings.ts:596-597 with setup-cli.test.ts counts 8 to 10 and the setup.test.ts doctor fix test.\n",
+  "acceptance": {
+    "revision": 2,
+    "rationale": "Findings cite path:line; blockers 2-4 are real and go to repair, blocker 1 is closed by the reports command now committed.",
+    "criteria": [
+      {
+        "criterion": "Coverage: every requirement above is stated once, in the right section, and requirements.md carries each behavior",
+        "support": "gap. Blocking: `assignment reports` absent (workflows.md:10; assignment.ts command paths); no absent-Assignment rule (workflows.md after :10). Non-blocking: R-BRANCH narrowed (version-control.md Branches bullet)."
+      },
+      {
+        "criterion": "Consistency: no section contradicts another or the CLI it describes (dispatch short prompt, reports command, status), and no rule is stated twice",
+        "support": "gap. overview.ts:91-92 against workflows.md:6,10; duplicates at delegating.md:3/context.md:5, delegating.md:3/context.md:3, dispatch.md:3/context.md:7, stack-plan.md:7/assignments.md:12, dispatch.md:9/ci.md:3, identity.md:5/version-control.md:11, user-messages.md:6/task-list.md:3."
+      },
+      {
+        "criterion": "Docs: docs describe the settings, their limits (plugin cannot ship them, main-thread frontmatter effort ignored) and the new behavior accurately",
+        "support": "gap. usage.md:112 and cache-and-workflows.md:46,50 describe the reports command and the errored rule as shipped. Verified: settings limits at usage.md:145 and requirements/context.md:5 match agents.ts:230-232; anchors #user-settings (usage.md:71) and #run-the-root-on-sonnet (usage.md:125) resolve. Unverified (no network): issues #81677/#97829, the 2.1.251 and 2.1.288 minimums, \"/effort and /autocompact write these keys\", CLAUDE_CODE_AUTO_COMPACT_WINDOW, and \"per-model entry takes precedence\" (decisions.md:76)."
+      },
+      {
+        "criterion": "Style: the text follows the Writing instructions rules",
+        "support": "gap (non-blocking). context.md:5, :7, :9; ci.md:3; repeated window text (see notes)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "items 1-4 above with the cited lines, plus the notes."
+      },
+      {
+        "label": "verified",
+        "support": "dispatch prompt is two lines (cli/report.ts:189-193), matching dispatch.md:3 and usage.md:111; `holyagent status` exists (cli/overview.ts:154) and hooks.md:27 uses it correctly; route table (domain/route.ts:110-219) matches routing.md:1 except audit and artifact; settings.ts:596-597 with setup-cli.test.ts counts 8 to 10 and the setup.test.ts doctor fix test."
+      }
+    ]
   },
   "createdAt": "2026-11-02T18:27:16.054Z"
 }
