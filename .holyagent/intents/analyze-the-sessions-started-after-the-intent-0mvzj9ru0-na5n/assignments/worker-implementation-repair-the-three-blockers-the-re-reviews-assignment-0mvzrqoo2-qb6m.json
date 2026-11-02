@@ -1,0 +1,74 @@
+{
+  "id": "assignment-0mvzrqoo2-qb6m",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 2,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-three-blockers-the-re-reviews",
+  "objective": "Repair the three blockers the re-reviews of 7ac8084 found, and the small items beside them.",
+  "state": "Running",
+  "scope": [
+    "Blocker A (code review): packages/runtime/src/state/tree.ts:428 fetchEnvironment injects GIT_SSH_COMMAND unless the env sets GIT_SSH_COMMAND or GIT_SSH, which overrides a user's git config core.sshCommand (git's env var outranks it). Keep the user's core.sshCommand: when it is set, pass BatchMode and ConnectTimeout without replacing it (for example append the options to that command) or skip the injection; test with core.sshCommand set.",
+    "Blocker B (artifact review): packages/runtime/src/cli/report.ts:123-141 a key line with empty support now takes every following unindented line to the end of the report as support, so 'parses:' followed by 'Looks fine.' accepts. Take as support only the contiguous list items (-, *, numbered) or indented lines directly below the key line, stopping at a blank line, the next key line or any unindented non-list line; test the 'Looks fine.' case is refused and the 'Fetch safety:' list case still accepted.",
+    "Blocker C (artifact review): packages/runtime/src/instructions/claude-5.5/root/workflows.md:10 says only 'the run's journal'. State where it is: the Workflow tool's completion notice names it in its diagnostics as the per-agent results file, <transcript dir>/journal.jsonl. Also say that once the run has completed, an Assignment the reports do not list has no running agent (workflow agents cannot be messaged), so it is closed errored without further confirmation; keep that rule in workflows.md and refer to it from overview.ts plan notes without restating it elsewhere.",
+    "Small: report.ts:281 writes a null result as the report 'null': list it as no result instead and write nothing; unify the placeholder <report-file> vs <path> across the root text and plan notes."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md and AGENTS.md. Keep the root prompt no larger than 31161 bytes.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. Run bun test, bun check, bun lint, bun fmt --check, then bun packages/integrations/claude/build.ts. When done, stop and report under 400 words, each evidence entry on one line as '<criterion label>: <support>', with changed paths and a diff file under /tmp/holyagent-review/ that includes every changed source file.",
+    "A previous attempt stopped on a usage limit after 6 tool calls and left no edits; start from the current head."
+  ],
+  "criteria": [
+    {
+      "text": "SSH command: a configured core.sshCommand is still used by the state fetch, non-interactively; tested",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Evidence continuation: only contiguous list or indented lines below an empty key line support it; the 'Looks fine.' case is refused and the list case accepted; tested",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Journal path: workflows.md names where the journal path comes from and the closing rule for an unlisted Assignment, stated once",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Null results: a null result is listed as no result and writes no file; tested",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Gates: bun test, bun check, bun lint and bun fmt --check pass and dist matches a fresh build",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "diff-file",
+    "tests-run"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/state/tree.ts",
+    "packages/runtime/src/cli/report.ts",
+    "packages/runtime/src/cli/overview.ts",
+    "packages/runtime/src/instructions/claude-5.5/root",
+    "packages/runtime/src/instructions/requirements.md",
+    "packages/runtime/tests/state-branch.test.ts",
+    "packages/runtime/tests/cli.test.ts",
+    "packages/runtime/tests/reports.test.ts",
+    "packages/integrations/claude/tests/plugin.test.ts",
+    "packages/integrations/claude/dist",
+    "docs/cache-and-workflows.md",
+    "docs/usage.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvzmcb7u-3l39",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-02T21:26:13.346Z"
+  },
+  "createdAt": "2026-11-02T21:26:13.346Z"
+}
