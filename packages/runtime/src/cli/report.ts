@@ -71,13 +71,21 @@ const ownerOf = (
   return undefined
 }
 
+/** The label of a criterion: its text before the first colon, or all of it when it has none. */
+const labelOf = (text: string): string => {
+  const colon = text.indexOf(":")
+  return colon > 0 ? text.slice(0, colon) : text
+}
+
 /**
  * Builds the acceptance of an Assignment from a report that ends with an `evidence:` block of
  * `<criterion or evidence label>: <support>` lines. A line belongs to a declared criterion or label
  * when its text before a colon matches it after normalizing case, spacing and trailing punctuation
- * (a leading `[blocking]` and a trailing `(dimension)` are ignored too); a line for any other text
- * belongs to nothing. Every blocking criterion and every evidence label needs a line with support;
- * the failure lists the ones that have none.
+ * (a leading `[blocking]` and a trailing `(dimension)` are ignored too); a criterion is matched by
+ * its full text or by its label (the text before its first colon), where a label that two criteria
+ * share, or that is another key in full, names none of them. A line for any other text belongs to
+ * nothing. Every blocking criterion and every evidence label needs a line with support; the failure
+ * lists the ones that have none.
  */
 export const acceptanceFrom = (
   assignment: Assignment,
@@ -90,6 +98,13 @@ export const acceptanceFrom = (
   ]
   const known = new Map<string, string>()
   for (const key of keys) if (!known.has(normalized(key))) known.set(normalized(key), key)
+  const labels = new Map<string, string | undefined>()
+  for (const { text } of assignment.criteria) {
+    const label = normalized(labelOf(text))
+    if (label !== "" && !known.has(label))
+      labels.set(label, labels.has(label) && labels.get(label) !== text ? undefined : text)
+  }
+  for (const [label, key] of labels) if (key !== undefined) known.set(label, key)
   const supports = new Map<string, string>()
   for (const entry of evidenceEntries(report)) {
     const owner = ownerOf(entry, known)
@@ -142,10 +157,11 @@ export const dispatchedAssignment = (prompt: string): string | undefined =>
   PROMPT_LINE.exec(prompt.split("\n", 1)[0] ?? "")?.[1]
 
 /**
- * The Assignment as the specialist reads it, in a fixed order, so the root sends it as it is: the
- * role line (the marker {@link dispatchedAssignment} reads back), objective, scope, constraints,
- * ownership paths, acceptance criteria, required evidence and the closing line that asks for the
- * `evidence:` block {@link acceptanceFrom} reads.
+ * The Assignment as the specialist reads it, in a fixed order: the role line (the marker
+ * {@link dispatchedAssignment} reads back), objective, scope, constraints, ownership paths,
+ * acceptance criteria, required evidence and the closing line that asks for the `evidence:` block
+ * {@link acceptanceFrom} reads. It is the text of the brief file, which the root never reads or
+ * re-emits: it sends {@link dispatchPrompt}.
  */
 export const renderPrompt = (assignment: Assignment, agent: string): string =>
   [
@@ -162,5 +178,16 @@ export const renderPrompt = (assignment: Assignment, agent: string): string =>
       ),
     ),
     ...section("Required evidence", assignment.evidence),
-    "End your report with an `evidence:` line followed by one `<criterion or evidence label>: <support>` line for each blocking criterion and each required evidence label above.",
+    "End your report with an `evidence:` line followed by one `<criterion or evidence label>: <support>` line for each blocking criterion and each required evidence label above. A criterion may be named by its text before the first colon.",
+  ].join("\n")
+
+/**
+ * The prompt the root sends in place of the brief: the role line of {@link renderPrompt}, so the
+ * launch hook still reads the Assignment from it, and the path of the brief file, which the
+ * specialist reads with its Read tool and follows as its whole task.
+ */
+export const dispatchPrompt = (assignment: Assignment, agent: string, briefPath: string): string =>
+  [
+    `Role: ${assignment.roleTask} (${agent}). Assignment: ${assignment.id}.`,
+    `Your full task is the brief in ${briefPath}: read it with the Read tool and follow it as your full task.`,
   ].join("\n")

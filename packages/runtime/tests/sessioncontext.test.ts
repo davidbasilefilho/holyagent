@@ -138,7 +138,7 @@ describe("the session context", () => {
     for (const text of sizes) expect(text.length).toBeLessThanOrEqual(CONTEXT_BUDGET)
     expect(rows(sizes[0] ?? "")).toBeGreaterThanOrEqual(rows(sizes[2] ?? ""))
     // With little room left, the counts alone remain.
-    const counts = sessionContext(bigStatus(500, 500), "x".repeat(7800))
+    const counts = sessionContext(bigStatus(500, 500), "x".repeat(8500))
     expect(counts.length).toBeLessThanOrEqual(CONTEXT_BUDGET)
     expect(rows(counts)).toBe(0)
     expect(counts).toContain("+500 more intents")
@@ -188,38 +188,66 @@ describe("the session context", () => {
 describe("the rules block that ends the session context", () => {
   const status = { intents: [{ id: "intent-a", revision: 1, objective: "Ship it" }] }
 
-  test("is a short block of five to seven rules, kept in its own instruction file", () => {
+  test("is a short block of rules the core rules leave out, kept in its own instruction file", () => {
     const file = readFileSync(
       join(import.meta.dir, "../src/instructions/claude-5.5/session-reminder.md"),
       "utf8",
     )
     expect(SESSION_REMINDER).toBe(file.trim())
-    expect(SESSION_REMINDER.split("\n").filter((line) => line.startsWith("- "))).toHaveLength(5)
+    const rules = SESSION_REMINDER.split("\n").filter((line) => line.startsWith("- "))
+    expect(rules.length).toBeGreaterThanOrEqual(1)
+    expect(rules.length).toBeLessThanOrEqual(4)
     for (const part of [
       "task-list tool if it is deferred (Claude Code's TaskCreate/TaskUpdate, the desktop app's update_plan",
-      "Acknowledge every user message",
-      "AskUserQuestion",
+      "mid-turn",
       "without asking again",
-      "After a denial, stop and report",
-      "Commit only with `holyagent vcs commit`",
-      "never force-push or push to a protected branch",
-      "otherwise write only for decisions, blockers and the final report",
     ])
       expect(SESSION_REMINDER).toContain(part)
   })
 
-  test("states that the default session agent is the root and that all work goes through Intents and Assignments", () => {
+  test("repeats no rule that the core rules and the takeover line in the same output state", () => {
+    // What the core says in its own words stays out of the reminder.
     for (const part of [
-      "default, user-facing agent of every session is the holyagent root",
-      "whatever agent the session started as",
-      "without being reminded",
-      "Run all work through an Intent and Assignments dispatched to the specialists",
+      "AskUserQuestion",
+      "After a denial",
+      "holyagent vcs commit",
+      "force-push",
+      "protected branch",
+      "decisions, blockers and the final report",
       "the main thread does not edit files",
+      "default, user-facing agent",
+      "whatever agent",
+      "Run all work through an Intent",
+      "without being reminded",
     ])
-      expect(SESSION_REMINDER).toContain(part)
-    expect(SESSION_REMINDER.indexOf("default, user-facing agent")).toBeLessThan(
-      SESSION_REMINDER.indexOf("Rules most often missed"),
-    )
+      expect({ part, found: SESSION_REMINDER.includes(part) }).toEqual({ part, found: false })
+    for (const line of SESSION_REMINDER.split("\n").filter((row) => row.startsWith("- ")))
+      expect(`${ROOT_CORE}\n${ROOT_TAKEOVER}`).not.toContain(line.slice(2))
+  })
+
+  test("every output that carries the core carries the takeover line once and no pointer line", () => {
+    const status = { intents: [{ id: "intent-a", revision: 1, objective: "Ship it" }] }
+    const core = `${ROOT_CORE}\n\n${ROOT_TAKEOVER}`
+    const count = (text: string, part: string) => text.split(part).length - 1
+    for (const text of [
+      bareContext(core),
+      bareContext(core, CLOUD_IDENTITY, "a setup notice"),
+      legacyContext([".holyclaude"], core),
+      sessionContext(status, core),
+      sessionContext(
+        status,
+        core,
+        { running: [{ id: "assignment-a" }] },
+        undefined,
+        CLOUD_IDENTITY,
+      ),
+    ]) {
+      expect(count(text, ROOT_TAKEOVER)).toBe(1)
+      expect(count(text, "agent of this session is the holyagent root")).toBe(1)
+      expect(text).not.toContain("The full root rules are in the holyagent agent prompt.")
+    }
+    // The root itself has no core: the reminder is all it gets besides the state.
+    expect(count(sessionContext(status), "agent of this session is the holyagent root")).toBe(0)
   })
 
   test("ends the context with or without the root core, a reconcile result or requirements", () => {
@@ -306,8 +334,7 @@ describe("the takeover line and the legacy context", () => {
     for (const part of [
       "default, user-facing agent of this session is the holyagent root",
       "whatever agent it started as",
-      "${CLAUDE_PLUGIN_ROOT}/agents/holyagent.md",
-      "before acting",
+      "${CLAUDE_PLUGIN_ROOT}/agents/holyagent.md` with the Read tool before acting",
       "without being reminded",
       "all work through an Intent and Assignments dispatched to the holyagent specialists",
       "never implementing in the main thread",

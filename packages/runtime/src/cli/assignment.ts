@@ -16,11 +16,12 @@ import { findAssignment, findIntent, type Project } from "../domain/project.ts"
 import { RoleTask, routeFor } from "../domain/route.ts"
 import { readState, type Snapshot } from "../state/store.ts"
 import { booleanFlag, choiceFlag, requiredFlag, stringFlag } from "./args.ts"
+import { writeBrief } from "./brief.ts"
 import { nowIso } from "./context.ts"
 import { AgentMismatch, Usage } from "./errors.ts"
 import { resolveIntent } from "./intent.ts"
 import { JsonReport, renderJsonReport } from "./jsonreport.ts"
-import { acceptanceFrom, renderPrompt } from "./report.ts"
+import { acceptanceFrom, dispatchPrompt, renderPrompt } from "./report.ts"
 import { type Call, type Command, WithTrailer } from "./types.ts"
 import { assignmentRow, assignmentView, byId, present } from "./views.ts"
 
@@ -170,12 +171,13 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
       "Start an Assignment and say how to run it: spawn an agent or continue a warm one. A new draft is created and started in one step",
     input: `{id} for a Ready Assignment, or a new draft ${DRAFT_SHAPE}`,
     output:
-      "TOON fields (id, state, agent/model/effort or continue, reason), then a line `prompt:` alone, then the specialist prompt verbatim to the end; pass that text as it is: as the prompt of its agent() in your inline workflow script first, to the Agent tool only when the Workflow tool is disabled or unavailable, and by SendMessage only for a warm continuation",
+      "TOON fields (id, state, agent/model/effort or continue, reason), then a line `prompt:` alone, then a two-line specialist prompt that names the brief file the full Assignment was written to; pass that text as it is: as the prompt of its agent() in your inline workflow script first, to the Agent tool only when the Workflow tool is disabled or unavailable, and by SendMessage only for a warm continuation. The brief itself is never printed: the specialist reads it with the Read tool",
     notes: [...DRAFT_NOTES, 'dispatching a Ready Assignment takes {"id": "<id>"}'],
     flags: { input: "string" },
     positionals: 0,
-    run: ({ update, config, inputBy }) =>
+    run: (call) =>
       Effect.gen(function* () {
+        const { update, config, inputBy } = call
         const request = yield* inputBy((raw) =>
           typeof raw === "object" && raw !== null && "id" in raw ? ExistingRef : AssignmentInput,
         ).pipe(
@@ -196,7 +198,16 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
             const id = "id" in request ? request.id : newAssignmentId
             const project =
               "id" in request ? snapshot.project : yield* withPlanned(snapshot, request, id, now)
-            return yield* dispatch(project, snapshot.specialists, id, now, settings)
+            const dispatched = yield* dispatch(project, snapshot.specialists, id, now, settings)
+            // Written before the transition commits, so a brief that cannot be stored leaves the
+            // Assignment Ready instead of Running with no prompt to send.
+            const agent = `${PLUGIN_NAMESPACE}:${routeFor(dispatched.assignment.roleTask).agent}`
+            const path = yield* writeBrief(
+              call,
+              dispatched.assignment.id,
+              renderPrompt(dispatched.assignment, agent),
+            )
+            return { ...dispatched, prompt: dispatchPrompt(dispatched.assignment, agent, path) }
           }),
         )
         return new WithTrailer(
@@ -206,10 +217,7 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
             ...directiveView(started.directive),
           },
           "prompt",
-          renderPrompt(
-            started.assignment,
-            `${PLUGIN_NAMESPACE}:${routeFor(started.assignment.roleTask).agent}`,
-          ),
+          started.prompt,
         )
       }),
   },
@@ -253,7 +261,7 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
       "the specialist's report as raw text. Required for success; optional for the other outcomes, which store the outcome name when it is empty. With --accept it ends with `evidence:` and one `<criterion or evidence label>: <support>` line per blocking criterion and required label. With --report-json it is a JSON report object returned by an agent() that was given a schema ({status: done|partial|blocked, changed_paths, checks: [{command, exit}], blockers, notes, evidence: [{key, support}]}), which is stored as the text of such a report (fields beyond these are kept in it)",
     notes: [
       "pass the report through a quoted heredoc so it stays intact",
-      "--accept applies to success only and reads the last `evidence:` block: one `<criterion text or evidence label>: <support>` line per blocking criterion and per required label. The text before the colon matches the criterion ignoring case, spacing, trailing punctuation, a leading `[blocking]` and a trailing `(dimension)`; a support may continue on indented lines below its entry. Evidence for a different criterion matches nothing. Accept only support you judge true",
+      "--accept applies to success only and reads the last `evidence:` block: one `<criterion text or evidence label>: <support>` line per blocking criterion and per required label. The text before the colon matches the criterion, or its label (the criterion's text before its first colon, unless two criteria share it), ignoring case, spacing, trailing punctuation, a leading `[blocking]` and a trailing `(dimension)`; a support may continue on indented lines below its entry. Evidence for a different criterion matches nothing. Accept only support you judge true",
       "an evidence gap (InsufficientAcceptance) records nothing: SendMessage the missing support to the same subagent, then close again with the corrected report, or when the Assignment is already Succeeded and not accepted, close it as success again or run `assignment accept <id> --rationale <text> --report` with the corrected report on stdin; a workflow agent cannot be messaged, so draft a follow-up with followUpOf",
       "outcomes: success; failure (the work failed); errored (the agent died or returned no report); interrupted (its agent is gone after a resume or compaction); stopped (you stopped it). A report from an inline workflow script is the specialist's own text: pass it verbatim on stdin, with --report-json only for a JSON report object",
     ],

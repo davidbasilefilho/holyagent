@@ -11,35 +11,44 @@ const statusFrom = (snapshot: Snapshot) => {
   const open = byId(snapshot.project.intents.filter((intent) => intent.state === "Open"))
   const openIds = new Set(open.map((intent) => intent.id))
   const live = byId(snapshot.project.assignments.filter((row) => openIds.has(row.intentId)))
-  const running = live.filter((row) => row.state === "Running").map(assignmentRow)
-  const unaccepted = live
-    .filter((row) => row.state === "Succeeded" && row.acceptance === undefined)
-    .map(assignmentRow)
+  const waiting = (id: string) => live.filter((row) => row.intentId === id)
+  const isRunning = (row: (typeof live)[number]) => row.state === "Running"
+  const isUnaccepted = (row: (typeof live)[number]) =>
+    row.state === "Succeeded" && row.acceptance === undefined
+  const inUse = intentInUse(snapshot)
+  // The Assignments are listed for the Intent in use only; each other open Intent gets counts, so
+  // the root sees that work waits there without reading it.
+  const mine = live.filter((row) => row.intentId === inUse)
   return {
     intents: open.map(({ id, revision, objective }) => ({
       id,
       revision,
       objective: oneLine(objective),
+      ...(id === inUse
+        ? {}
+        : {
+            running: waiting(id).filter(isRunning).length,
+            unaccepted: waiting(id).filter(isUnaccepted).length,
+          }),
     })),
     ...present({
-      inUse: intentInUse(snapshot),
-      running: running.map(({ id, role, agent, objective }) => ({
-        id,
-        role,
-        agent,
-        objective,
-      })),
-      unaccepted: unaccepted.map(({ id, role, rev, objective }) => ({
-        id,
-        role,
-        rev,
-        objective,
-      })),
+      inUse,
+      running: mine
+        .filter(isRunning)
+        .map(assignmentRow)
+        .map(({ id, role, agent, objective }) => ({ id, role, agent, objective })),
+      unaccepted: mine
+        .filter(isUnaccepted)
+        .map(assignmentRow)
+        .map(({ id, role, rev, objective }) => ({ id, role, rev, objective })),
     }),
   }
 }
 
-/** The open Intents and the work waiting on the root, as `status` prints them. */
+/**
+ * The open Intents and the work waiting on the root, as `status` prints them: the Running and
+ * unaccepted Assignments of the Intent in use, and a count of each for every other open Intent.
+ */
 export const statusOf = (directory: string) => readOpenState(directory).pipe(Effect.map(statusFrom))
 
 const reconcileFrom = ({ project }: Snapshot) => {
@@ -78,7 +87,7 @@ export const resumeOf = (directory: string) =>
 
 /** What the root does with a workflow recommendation, for the `plan` help. */
 const PLAN_NOTES: ReadonlyArray<string> = [
-  "workflow first: `assignment dispatch` each id for its agent, model, effort and prompt, then write the inline script yourself and run it with the Workflow tool; an entry is {id, agent, model, effort, prompt}. A single Assignment is a one-entry workflow, and `continues` lists work that continues a warm specialist by SendMessage beside it. `fallback` is for a session where the Workflow tool is disabled or unavailable: its writers launch together, and `afterwards` launch once the writers they depend on are terminal",
+  "workflow first: `assignment dispatch` each id for its agent, model, effort and prompt, then write the inline script yourself and run it with the Workflow tool; an entry is {id, agent, model, effort, prompt}, where the prompt is the short one `assignment dispatch` printed: it names the brief file the specialist reads, so pass it as it is and never open or retype the brief. A single Assignment is a one-entry workflow, and `continues` lists work that continues a warm specialist by SendMessage beside it. `fallback` is for a session where the Workflow tool is disabled or unavailable: its writers launch together, and `afterwards` launch once the writers they depend on are terminal",
   "the script opens with a literal `export const meta = {name, description}` and has one agent() per entry, every one with agentType holyagent:<agent> and the entry's model and effort. Run the entries through pipeline() and put a review stage after its writers; return an object of reports keyed by Assignment id. An inline script whose every agent() names a holyagent specialist runs without a permission prompt; any other agent type, a scriptPath or a resume goes through the normal flow",
   "the run ends with a notice carrying the returned value, and the tool result has the run id. Per entry: `assignment record <id> --agent workflow:<run-id>/<id>`, then `assignment close <id> --outcome <o> [--accept <rationale>]` with the entry's report text on stdin, verbatim and never retyped or summarized (the script passes no `schema`, so agent() returns the specialist's own report). A null report means the agent died: close it errored. A workflow's agents cannot be messaged, so a gap in a report, like any repair, is a new draft with followUpOf",
 ]
@@ -144,7 +153,8 @@ export const OVERVIEW_COMMANDS: ReadonlyArray<Command> = [
   {
     path: ["status"],
     usage: "status",
-    summary: "Summarize the open Intents and the work waiting on the root",
+    summary:
+      "Summarize the open Intents and the work waiting on the root: the Running and unaccepted Assignments of the Intent in use, and counts for the other open Intents",
     flags: {},
     positionals: 0,
     run: ({ directory }) => statusOf(directory),

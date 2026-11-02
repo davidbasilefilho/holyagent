@@ -354,17 +354,17 @@ describe("agents", () => {
     expect(content).toContain("commits use the configured git identity")
   })
 
-  test("the session reminder states each of the user's behavior rules once", () => {
+  test("the session reminder states each rule once and none that the core root rules hold", () => {
     const reminder = read(CLAUDE, "session-reminder.md")
-    for (const rule of [
-      "Acknowledge every user message",
-      "names an action",
-      "AskUserQuestion",
-      "After a denial, stop and report",
-      "otherwise write only for decisions, blockers and the final report",
-      "update_plan",
-    ])
+    for (const rule of ["task-list tool if it is deferred", "mid-turn", "names an action"])
       expect({ rule, count: reminder.split(rule).length - 1 }).toEqual({ rule, count: 1 })
+    for (const rule of [
+      "AskUserQuestion",
+      "After a denial, stop",
+      "holyagent vcs commit",
+      "otherwise write only for decisions, blockers and the final report",
+    ])
+      expect({ rule, found: reminder.includes(rule) }).toEqual({ rule, found: false })
   })
 
   test("every requirement of requirements.md is implemented by a section that reaches its agents", () => {

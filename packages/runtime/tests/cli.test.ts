@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, rm, stat } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir, rm, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -53,6 +53,9 @@ const data = (result: Result): Record<string, unknown> => {
     prompt: result.stdout.slice(at + TRAILER.length).replace(/\n$/, ""),
   }
 }
+
+/** The path of the brief file a dispatch prompt names. */
+const briefPathOf = (prompt: string): string => /in (\S+\.md):/.exec(prompt)?.[1] ?? ""
 
 const writer = (over: Record<string, unknown> = {}) => ({
   roleTask: "Worker.implementation",
@@ -549,18 +552,28 @@ describe("report and prompt", () => {
       expect(dispatchedAssignment(other)).toBeUndefined()
   })
 
-  test("dispatch prints the Assignment as a prompt to send, for a spawn and for a continue", async () => {
+  test("dispatch writes the Assignment to a brief file and prints a short prompt that names it", async () => {
     await createIntent()
     const draft = writer({ scope: ["the parser"], constraints: ["no deps"] })
     const raw = await cli(["assignment", "dispatch"], draft)
     const spawn = data(raw)
     const prompt = String(spawn.prompt)
-    // The fields come first, then `prompt:` alone on its line, then the text verbatim.
+    // The fields come first, then `prompt:` alone on its line, then the short prompt verbatim.
     const [fields = "", trailer = ""] = raw.stdout.split(TRAILER)
     expect(fields).not.toContain("Role:")
     expect(trailer).toBe(`${prompt}\n`)
-    expect(trailer).toStartWith("Role: Worker.implementation")
+    expect(trailer).toStartWith("Role: Worker.implementation (holyagent:worker-implementation)")
     expect(trailer).not.toContain("\\n")
+    expect(prompt.split("\n")).toHaveLength(2)
+    expect(prompt).toContain("Read tool")
+    expect(prompt).toContain("full task")
+    // The brief text is not printed.
+    for (const text of ["Objective:", "Build the parser", "Acceptance criteria", "no deps"])
+      expect(raw.stdout).not.toContain(text)
+
+    const path = briefPathOf(prompt)
+    expect(path).toBe(join(project, ".holyagent", "local", "briefs", `${String(spawn.id)}.md`))
+    const brief = await Bun.file(path).text()
     const order = [
       "Role: Worker.implementation",
       "Objective: Build the parser",
@@ -570,7 +583,7 @@ describe("report and prompt", () => {
       "Acceptance criteria:\n- [blocking] parses (behavior)",
       "Required evidence:\n- tests",
       "End your report with an `evidence:` line",
-    ].map((part) => prompt.indexOf(part))
+    ].map((part) => brief.indexOf(part))
     expect(order.every((at) => at >= 0)).toBe(true)
     expect(order).toEqual(order.toSorted((a, b) => a - b))
 
@@ -582,8 +595,45 @@ describe("report and prompt", () => {
     expect(nextRaw.stdout.indexOf("continue:")).toBeLessThan(nextRaw.stdout.indexOf(TRAILER))
     const next = data(nextRaw)
     expect(next).toMatchObject({ continue: "agent-1" })
-    expect(String(next.prompt)).toContain("Objective: Fix the parser")
-    expect(String(next.prompt)).toContain("End your report with an `evidence:` line")
+    expect(nextRaw.stdout).not.toContain("Fix the parser")
+    expect(String(next.prompt)).toContain("Read tool")
+    const nextBrief = await Bun.file(briefPathOf(String(next.prompt))).text()
+    expect(nextBrief).toContain("Objective: Fix the parser")
+    expect(nextBrief).toContain("End your report with an `evidence:` line")
+  })
+
+  test("a dispatch by id writes the brief too, and a dispatch that is refused writes none", async () => {
+    await createIntent()
+    const planned = writer()
+    const created = String(data(await cli(["assignment", "create"], planned)).id)
+    const dispatched = data(await cli(["assignment", "dispatch"], { id: created }))
+    expect(await Bun.file(briefPathOf(String(dispatched.prompt))).text()).toContain(
+      `Assignment: ${created}.`,
+    )
+
+    const folder = join(project, ".holyagent", "local", "briefs")
+    const before = await readdir(folder)
+    const again = await cli(["assignment", "dispatch"], { id: created })
+    expect(again.code).toBe(3)
+    expect(await readdir(folder)).toEqual(before)
+  })
+
+  test("in a repository the brief lives in the git common directory, outside every work tree", async () => {
+    await $`git init -q -b main`.cwd(project).quiet()
+    await $`git -c user.name=Octo -c user.email=octo@example.com commit -q --allow-empty -m seed`
+      .cwd(project)
+      .quiet()
+    await createIntent()
+    const dispatched = data(await cli(["assignment", "dispatch"], writer()))
+    const path = briefPathOf(String(dispatched.prompt))
+    expect(path).toBe(join(project, ".git", "holyagent", "briefs", `${String(dispatched.id)}.md`))
+    expect(await Bun.file(path).text()).toContain("Objective: Build the parser")
+    // Neither the work tree nor the state worktree holds it, so no commit can carry it.
+    expect((await $`git status --porcelain`.cwd(project).quiet().text()).trim()).toBe("")
+    expect(await $`git ls-files`.cwd(project).quiet().text()).not.toContain("briefs")
+    expect(
+      await $`git ls-tree -r --name-only holyagent/state`.cwd(project).quiet().text(),
+    ).not.toContain("briefs")
   })
 
   test("show and list print a line per Assignment unless --full is given", async () => {
@@ -671,13 +721,90 @@ describe("close without a report, and report matching", () => {
     data(await cli(["assignment", "record", id, "--agent", "agent-1"]))
     const close = ["assignment", "close", id, "--outcome", "success", "--accept", "ok"]
 
-    // The key cut at its first colon is not the criterion, so it is no support for it.
-    const cut = await cli(close, report("mise run verify: `mise run verify` -> exit 0"))
-    expect(cut.code).toBe(3)
-    expect(cut.stderr).toContain(`criterion "${text}"`)
+    // The key cut at the first colon is the criterion's label, so it names the criterion too.
+    const cut = await cli(close, report("mise run verify: `mise run verify` -> exit 0: 12 pass"))
+    expect(data(cut)).toMatchObject({ accepted: true })
+    expect(data(await cli(["assignment", "show", id, "--full"]))).toMatchObject({
+      acceptance: {
+        criteria: [{ criterion: text, support: "`mise run verify` -> exit 0: 12 pass" }],
+      },
+    })
+  })
 
+  test("a criterion text that holds a colon still takes the line keyed by all of it", async () => {
+    await createIntent()
+    const text = "mise run verify: command, exit code and pass/fail counts on the current head"
+    const draft = writer({
+      criteria: [{ text, blocking: true, dimension: "regressions" }],
+      evidence: [],
+    })
+    const id = String(data(await cli(["assignment", "dispatch"], draft)).id)
+    data(await cli(["assignment", "record", id, "--agent", "agent-1"]))
+    const close = ["assignment", "close", id, "--outcome", "success", "--accept", "ok"]
     const whole = report(`${text}: \`mise run verify\` -> exit 0: 12 pass / 0 fail`)
     expect(data(await cli(close, whole))).toMatchObject({ accepted: true })
+    expect(data(await cli(["assignment", "show", id, "--full"]))).toMatchObject({
+      acceptance: {
+        criteria: [{ criterion: text, support: "`mise run verify` -> exit 0: 12 pass / 0 fail" }],
+      },
+    })
+  })
+
+  test("a label that two criteria share, or that another key spells in full, names none of them", async () => {
+    await createIntent()
+    const draft = writer({
+      criteria: [
+        { text: "Parser: handles nesting", blocking: true, dimension: "behavior" },
+        { text: "Parser: rejects junk", blocking: true, dimension: "behavior" },
+        { text: "Tests: all pass", blocking: true, dimension: "tests" },
+      ],
+      evidence: ["tests"],
+    })
+    const id = String(data(await cli(["assignment", "dispatch"], draft)).id)
+    data(await cli(["assignment", "record", id, "--agent", "agent-1"]))
+    const close = ["assignment", "close", id, "--outcome", "success", "--accept", "ok"]
+
+    // `Parser` is ambiguous; `Tests` is also the evidence label, which keeps its own line.
+    const refused = await cli(
+      close,
+      report("Parser: nested ok", "Tests: bun test passed", "Parser: handles nesting: yes"),
+    )
+    expect(refused.code).toBe(3)
+    expect(refused.stderr).toContain('criterion "Parser: rejects junk"')
+    expect(refused.stderr).toContain('criterion "Tests: all pass"')
+    expect(refused.stderr).not.toContain('criterion "Parser: handles nesting"')
+
+    const closed = await cli(
+      close,
+      report(
+        "Parser: handles nesting: yes",
+        "Parser: rejects junk: yes",
+        "Tests: all pass: 12 pass",
+        "tests: bun test passed",
+      ),
+    )
+    expect(data(closed)).toMatchObject({ accepted: true })
+  })
+
+  test("a criterion is matched by its label as well, in a stored report accepted later", async () => {
+    await createIntent()
+    const draft = writer({
+      criteria: [
+        { text: "Brief files: written outside the tree", blocking: true, dimension: "behavior" },
+      ],
+    })
+    const id = String(data(await cli(["assignment", "dispatch"], draft)).id)
+    data(await cli(["assignment", "record", id, "--agent", "agent-1"]))
+    const labelled = report("[blocking] Brief files (behavior): ran it", "tests: passed")
+    data(await cli(["assignment", "close", id, "--outcome", "success"], labelled))
+    expect(data(await cli(["assignment", "accept", id, "--rationale", "checked"]))).toMatchObject({
+      accepted: true,
+    })
+    expect(data(await cli(["assignment", "show", id, "--full"]))).toMatchObject({
+      acceptance: {
+        criteria: [{ criterion: "Brief files: written outside the tree", support: "ran it" }],
+      },
+    })
   })
 })
 
@@ -922,6 +1049,60 @@ describe("status", () => {
       (i) => i.id,
     )
     expect(ids).toEqual(ids.toSorted())
+  })
+
+  test("lists the Running and unaccepted Assignments of the Intent in use only, and counts the others'", async () => {
+    const first = await createIntent()
+    const firstRunning = String(data(await cli(["assignment", "dispatch"], writer())).id)
+    const firstDone = await runToClose(writer({ ownershipPaths: ["src/b.ts"] }), "agent-2")
+    const second = String(data(await cli(["intent", "create"], { objective: "Other" })).id)
+    const secondRunning = String(
+      data(await cli(["assignment", "dispatch"], writer({ ownershipPaths: ["src/c.ts"] }))).id,
+    )
+    const secondDone = await runToClose(writer({ ownershipPaths: ["src/d.ts"] }), "agent-3")
+    await runToClose(writer({ ownershipPaths: ["src/e.ts"] }), "agent-4", true)
+
+    // The second Intent is in use: its rows are listed and the first one gets counts.
+    const inSecond = data(await cli(["status"])) as {
+      inUse: string
+      intents: Array<Record<string, unknown>>
+      running: Array<{ id: string }>
+      unaccepted: Array<{ id: string }>
+    }
+    expect(inSecond.inUse).toBe(second)
+    expect(inSecond.running.map((row) => row.id)).toEqual([secondRunning])
+    expect(inSecond.unaccepted.map((row) => row.id)).toEqual([secondDone])
+    expect(inSecond.intents.find((row) => row.id === first)).toMatchObject({
+      running: 1,
+      unaccepted: 1,
+    })
+    expect(inSecond.intents.find((row) => row.id === second)).not.toHaveProperty("running")
+    const text = (await cli(["status"])).stdout
+    expect(text).not.toContain(firstRunning)
+    expect(text).not.toContain(firstDone)
+
+    data(await cli(["intent", "use", first]))
+    const inFirst = data(await cli(["status"])) as typeof inSecond
+    expect(inFirst.running.map((row) => row.id)).toEqual([firstRunning])
+    expect(inFirst.unaccepted.map((row) => row.id)).toEqual([firstDone])
+    expect(inFirst.intents.find((row) => row.id === second)).toMatchObject({
+      running: 1,
+      unaccepted: 1,
+    })
+  })
+
+  test("with several Intents open and none in use, only the counts show", async () => {
+    await createIntent()
+    const running = String(data(await cli(["assignment", "dispatch"], writer())).id)
+    data(await cli(["intent", "create"], { objective: "Other" }))
+    await rm(join(project, ".holyagent", "local", "active-intent"), { recursive: true })
+
+    const result = await cli(["status"])
+    const status = data(result) as { intents: Array<Record<string, unknown>> }
+    expect(status).not.toHaveProperty("inUse")
+    expect(status).not.toHaveProperty("running")
+    expect(status.intents.map((row) => row.running)).toEqual([1, 0])
+    expect(result.stdout).not.toContain(running)
   })
 
   test("only open Intents are read, so closed history is never loaded", async () => {
