@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-commits-ecea23f-and-41754dd-git",
   "objective": "Review commits ecea23f and 41754dd (git diff 45e7f8d..41754dd) on claude/nifty-faraday-jinmae for correctness and regressions against the merge-ready bar.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "ecea23f: state branch fetch from origin in packages/runtime/src/state/tree.ts, force-add of state, route efforts in route.ts.",
     "41754dd: brief files (packages/runtime/src/cli/brief.ts, assignment.ts), evidence label matching (report.ts acceptanceFrom), status trimming (overview.ts), session context dedup (sessioncontext.ts, hook.ts, session-reminder.md), and their tests."
@@ -46,5 +46,10 @@
     "assignment-0mvzjrnq1-q6xv",
     "assignment-0mvzjrnyn-61ew"
   ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-02T18:01:16.274Z"
+  },
   "createdAt": "2026-11-02T18:00:47.541Z"
 }
