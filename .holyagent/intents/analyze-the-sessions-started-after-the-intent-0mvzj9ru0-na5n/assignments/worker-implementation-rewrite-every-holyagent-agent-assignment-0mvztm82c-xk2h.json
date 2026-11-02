@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "rewrite-every-holyagent-agent",
   "objective": "Rewrite every HolyAgent agent instruction section and skill to be short, direct and objective, add \"Respond tersely.\" to every agent prompt, give the root TaskStop with a conflict-only stopping rule, apply guide gaps G1-G4, extract four moment-specific sections into skills, and remove the Billion Context cleanup everywhere.",
-  "state": "Running",
+  "state": "Cancelled",
   "scope": [
     "Instruction sources: packages/runtime/src/instructions (requirements.md first, then claude-5.5/ root, specialist and role sections), the assembly and tool grants in packages/integrations/claude/src/agents.ts, existing skills (setup-command.md, dev-server, user-busy) and the generated plugin (rebuild dist with bun packages/integrations/claude/build.ts).",
     "Guide research, already done (official pages fetched 2026-11-02): Opus 5.5 https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5, Sonnet 5.5 .../prompting-claude-sonnet-5-5, Haiku 5.5 .../prompting-claude-haiku-5-5, Opus 5 .../prompting-claude-opus-5. Read them yourself if you need detail. Gaps to close: G1 (Opus 5.5 unattended runs) the root does not end its own turn on a summary that announces the next step or an offer to wait, only when work is done or nothing can move without the user -> root/user-messages.md or task-list.md; G2 (Sonnet 5.5 open-ended requests) when asked for ideas, options or a plan, the root delivers that and stops until told to go ahead -> root/user-messages.md; G3 (Opus 5 written deliverable length) no filler sections, redundant summaries or boilerplate in written deliverables -> specialist/writing-bar.md; G4 (Opus 5 task scope) if a request seems mistaken or a better approach exists, say so in one sentence and continue as asked -> specialist/scope.md. Do not add progress narration (conflicts with the terse rule) or elapsed-time signals.",
@@ -83,7 +83,9 @@
     "agentId": "workflow:wf_327709b4-c3a/assignment-0mvztm82c-xk2h",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-02T22:18:44.436Z"
+    "startedAt": "2026-11-02T22:18:44.436Z",
+    "finishedAt": "2026-11-02T22:29:33.389Z"
   },
+  "result": "interrupted: Container restart stopped the workflow; partial edits remain in the tree.\n",
   "createdAt": "2026-11-02T22:18:44.436Z"
 }
