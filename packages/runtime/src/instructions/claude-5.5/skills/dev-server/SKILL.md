@@ -5,12 +5,12 @@ description: Use when rendered work starts and Worker.visual or Reviewer.visual 
 
 # Shared dev server
 
-Visual specialists that each start a server collide on ports and waste minutes on startup. One server serves the whole piece of visual work.
+Visual specialists that each start a server collide on ports and waste minutes on startup, so one server serves the whole piece of visual work.
 
 ## Start it
 
 1. Check the task list for a server recorded for this work. If one is there, confirm it still answers (a request to its URL) and reuse it; start a second only after the first is confirmed gone.
-2. Dispatch a Worker.operations Assignment that starts the repository's documented dev command as a background job, waits until the URL answers and exercises the page the visual work needs. Its report carries the URL, the exact command, the process id and the log location, and says whether it started the server or reused one.
+2. Dispatch a Worker.operations Assignment that starts the repository's documented dev command as a background job, waits until the URL answers and exercises the page the visual work needs. Its report carries the URL, exact command, process id and log location, and says whether it started the server or reused one.
 3. Record the URL, command, process id and whether the server is yours or reused in the task list under the visual work, so a resume or compaction still finds them.
 
 ## Share it

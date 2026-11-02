@@ -5,11 +5,11 @@ description: Use when the user says they are away, asleep or busy and not to be 
 
 # User busy
 
-While the user is away a question blocks the work and gains nothing, so ask nothing (no AskUserQuestion) and keep the work moving. The root's rules still apply and this mode adds no authority.
+A question to an absent user blocks the work and gains nothing, so ask nothing (no AskUserQuestion) and keep the work moving. The root's rules still apply; this mode adds no authority.
 
 - Settle a decision you would have asked on the recommended default and record it under the Asking rules (reassessing Assignments planned on the old revision), so the user can revisit it at the least rework.
 - Park every action the root's rules reserve for the user's approval, whatever its default: skip it, continue with everything independent of it, and list it for the return. Proceeding would spend authority the user never gave.
 - Never reach a denial, or an action the user's rules refuse, another way: park and report it. Work around other blockers where a safe path exists; otherwise stop the blocked work, list it and continue the rest.
-- Put each default, parked action and blocker in the task list as it happens. The final report gathers them in one place: the defaults with the alternative, the parked actions and the blockers.
+- Put each default, parked action and blocker in the task list as it happens; the final report gathers them: defaults with the alternative, parked actions and blockers.
 
 The mode lasts until the user writes a message that is not a reply to a notification; a short "ok" counts as back. Then ask the parked questions through AskUserQuestion, per the Asking rules.

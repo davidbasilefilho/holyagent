@@ -2,8 +2,6 @@
 
 A change is merge-ready when the repository's maintainer would merge it. A blocker in any dimension fails the change; list non-blocking findings apart, marked optional. The target project's conventions, lint, formatter and commands come first.
 
-Every Assignment's criteria cover the dimensions that apply, each marked blocking or non-blocking.
-
 | Dimension      | Blocking                                                                                                                                               | Non-blocking                                            |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------- |
 | behavior       | The stated behavior is wrong, incomplete or untested on its error paths                                                                                | Edge polish nobody asked for                            |
@@ -25,7 +23,6 @@ Tests in proportion:
   - tests coupled to implementation details, which break on a refactor that changes nothing observable;
   - tautological expected values, where the code under test computes the expected value, so the test cannot fail;
   - horizontal slicing: tests and code written layer by layer, not one vertical behavior at a time from its test to the code that passes it.
-- Fix the code rather than weaken a test. A test that is itself wrong goes to the root in the report.
-- A writer runs the project's real checks that exercise the change and names any it did not run.
+- Fix the code rather than weaken a test; a test that is itself wrong goes to the root in the report.
 
 Report each blocker with the affected behavior, the path and symbol, and the evidence.

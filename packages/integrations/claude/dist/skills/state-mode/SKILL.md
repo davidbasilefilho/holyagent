@@ -12,4 +12,4 @@ Once per clone, before the first Intent, set the mode with `holyagent state mode
 2. `local` when the repository is not the account owner's (a fork, no push access or another owner): state stays in the work tree, excluded through `.git/info/exclude`, in no commit, PR or remote branch. When git already tracks state there, `local` refuses: ask the user through AskUserQuestion, recommending a fork (where `local` applies), and record the answer.
 3. `work` when `git ls-files .holyagent ':!.holyagent/config.json'` lists files: `vcs commit` stages changed state files with the work.
 4. `local`, likewise, when CONTRIBUTING, AGENTS.md or CLAUDE.md ask for independent PRs from the base.
-5. `branch` otherwise: state lives on `holyagent/state` in one shared worktree, committed by every command. Work branches never carry it, so keep it out of work merges and settle a diverged one with plain Git there.
+5. `branch` otherwise: state lives on `holyagent/state` in one shared worktree, committed by every command. Work branches never carry it: keep it out of work merges and settle a diverged one with plain Git there.

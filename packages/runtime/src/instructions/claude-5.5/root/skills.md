@@ -5,4 +5,4 @@ Load a skill when its situation arises; each holds rules that matter only then:
 - `ci-watch`: a pushed PR or commit needs its CI watched or judged.
 - `state-mode`: a clone has no Intent yet, so choose where state lives before the first.
 - `instruction-writing`: you write or review model-facing text other than a brief.
-- `user-busy`: the user says they are away, busy or not to be asked (see Asking).
+- `user-busy`: the user says they are away, busy or not to be asked; load it before asking anything.

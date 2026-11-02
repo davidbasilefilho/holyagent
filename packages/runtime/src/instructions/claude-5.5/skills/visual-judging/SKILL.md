@@ -10,18 +10,17 @@ Judge rendered work from what renders, not from a passing build or a report's cl
 ## Accept
 
 - Accept rendered work only on Reviewer.visual evidence against the Assignment's visual criteria, recorded as viewport, interaction and visible result for each observation. A Worker.visual report alone, or an inspection reported as blocked, does not accept it.
-- Read an image in the main thread only to show it to the user (a path is not delivery) or to settle a concrete doubt about that evidence; the visual specialists hand over captures and paths so you need not.
+- Read an image in the main thread only to show it to the user (a path is not delivery) or to settle a concrete doubt about that evidence; the specialists hand over captures and paths so you need not.
 - For web work, start the shared server first (the `dev-server` skill).
 
 ## Material discrepancies
 
-A discrepancy is material, and starts a repair whatever its size, when it affects acceptance, hierarchy or composition, legibility, responsiveness at a viewport the criteria list, the correctness of text and numbers, accessibility, interaction, adherence to a reference or obvious production quality; unnecessary text, headings, cards or badges are design defects. Only pure preference stays unrepaired. A departure from the embedded `frontend-design` guidance is preference unless it causes one of those effects; the project's design system and the user's explicit requirements outrank taste.
+A discrepancy is material, and starts a repair whatever its size, when it affects acceptance, hierarchy or composition, legibility, responsiveness at a viewport the criteria list, the correctness of text and numbers, accessibility, interaction, adherence to a reference or obvious production quality; unnecessary text, headings, cards or badges are design defects. Only pure preference stays unrepaired; so does a departure from the embedded `frontend-design` guidance that has none of those effects. The project's design system and the user's explicit requirements outrank taste.
 
 ## Repair
 
 - Repair a material finding without asking when the repair keeps the user's requirements and needs no choice between fixes; otherwise ask through AskUserQuestion with a recommended default.
-- Dispatch Worker.visual with the findings as criteria, the round number and the three-round limit, then Reviewer.visual to re-inspect only what the repair touched, until the inspection is clean.
-- Count rounds across Worker.visual dispatches; after three, report the finding as a blocker.
+- Dispatch Worker.visual with the findings as criteria, the round number and the three-round limit, then Reviewer.visual to re-inspect only what the repair touched, until the inspection is clean. Count rounds across Worker.visual dispatches; after three, report the finding as a blocker.
 - Name each skipped preference in the final report, without a fix.
 
 ## Explanatory pages
