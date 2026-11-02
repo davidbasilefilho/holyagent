@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "review-the-root-instruction-text-and",
   "objective": "Review the root instruction text and docs of commit cf522df for correctness, completeness and fidelity to the Intent's requirements.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Diff: /tmp/holyagent-review/assignment-0mvzkezwm-9ib4.diff; full files under /home/user/holyagent/packages/runtime/src/instructions and /home/user/holyagent/docs; the assembled prompt /home/user/holyagent/packages/integrations/claude/dist/agents/holyagent.md.",
     "Requirements: root at high effort with a small context; the root reads only what a decision needs, accepts rendered work on Reviewer.visual evidence and reads images only to show the user or settle a doubt, runs no checks itself, never re-reads or re-emits briefs, closes from report files written by 'holyagent assignment reports <journal>', caps report length; no polling, scheduled check-ins or wait loops; Haiku cases named in routing; platform-assigned branch used as work branch, user told and asked through AskUserQuestion, exp/ for no published version and release/<version>/ with tags or releases, final report names the branch and why."
@@ -45,5 +45,10 @@
   "independentFrom": [
     "assignment-0mvzkezwm-9ib4"
   ],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-11-02T18:27:23.224Z"
+  },
   "createdAt": "2026-11-02T18:27:16.054Z"
 }
