@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "make-the-state-branch-start-from-the",
   "objective": "Make the state branch start from the remote's holyagent/state even when the clone has not fetched it, make state commits survive a .gitignore that ignores .holyagent/, and lower the effort of four specialist routes.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "packages/runtime/src/state/tree.ts ensureWorktree (about lines 427-472) and the state commit path that runs git add -A -- .holyagent.",
     "packages/runtime/src/domain/route.ts SPECS."
@@ -56,5 +56,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-02T17:43:10.360Z"
+  },
   "createdAt": "2026-11-02T17:43:01.849Z"
 }
