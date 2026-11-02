@@ -1,0 +1,85 @@
+{
+  "id": "assignment-0mvzkezwm-9ib4",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 2,
+  "roleTask": "Worker.implementation",
+  "slug": "give-the-root-high-effort-and-a-small",
+  "objective": "Give the root high effort and a small context, and rewrite its instruction text so it reads only what orchestration needs, plus the platform-assigned branch rule.",
+  "state": "Ready",
+  "scope": [
+    "requirements.md and requirements/ first, then packages/runtime/src/instructions/claude-5.5/root/ sections (and root-core.ts if the core rules change), then agents.ts, setup settings and docs. Facts from research (code.claude.com docs, 2026-11-02): agent frontmatter effort is ignored when the agent is the main thread (anthropics/claude-code#81677, #97829) but applies to subagents and is harmless; a plugin settings.json honors only agent and subagentStatusLine; effortLevel in user settings does not apply to Opus 5.5 while modelSettings.<model>.effortLevel does (v2.1.251+); autoCompactWindow and modelSettings.<model>.autoCompactWindow take 100000 to 1000000 tokens (v2.1.288+); CLAUDE_CODE_EFFORT_LEVEL overrides subagent frontmatter, so never set it. Verify the exact modelSettings key form for the Opus model on code.claude.com/docs/en/settings-reference before writing it.",
+    "Findings to act on (three sessions after 2026-10-30): root per-call context grew to 365k-747k tokens and its cache reads dominated its cost; the root read screenshots, ran gates and data checks itself, re-emitted dispatch briefs, polled ReadNotifications, ran sleep loops and scheduled re-checks while work ran, answered status-only wakes at length, and used the platform-reserved branch silently; haiku routes were underused while mechanical repairs and merge-conflict fixes went to Sonnet routes.",
+    "The CLI changes already committed (41754dd): assignment dispatch writes the brief to a file and prints a two-line prompt pointing to it; evidence lines may name a criterion by its label (text before its first colon); status lists only the Intent in use. A follow-up adds `holyagent assignment reports <journal.jsonl>`, which writes each workflow agent's report to a file keyed by its agent() label (the Assignment id) and prints id, path and word count, so the root closes with `holyagent assignment close <id> --outcome <o> < <path>` and workflow scripts return only `{ done: [ids] }`. Describe these in the dispatch and workflow sections."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md and AGENTS.md; behavior changes go to requirements.md first, then each instruction set covers it (tests in plugin.test.ts enforce the requirement phrases).",
+    "Size: the assembled root prompt (packages/integrations/claude/dist/agents/holyagent.md after a build) must not grow by more than 5% of its current 30.9 KB, and should shrink where existing text says the same thing twice; report the before and after byte counts.",
+    "Do not edit packages/runtime/src/cli other than setup.ts, packages/runtime/src/state, packages/runtime/src/domain or session-reminder.md: other writers own them.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. Run bun test on the changed test files, bun check, bun lint and bun fmt --check (mise may be missing; then run the bun commands directly). When done, stop and report under 700 words with the changed paths and a diff file under /tmp/holyagent-review/; do not add unrequested features or refactors (name them)."
+  ],
+  "criteria": [
+    {
+      "text": "Root effort: the generated root agent declares effort high; setup and doctor recommend modelSettings for the Opus model with effortLevel high and autoCompactWindow 200000; this repository's .claude/settings.json carries the same; docs/usage.md says how a cloud session or a Sonnet root gets the same settings, and why the plugin cannot ship them",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Lean root: the root text says it reads only what a decision needs, accepts rendered work on Reviewer.visual's recorded evidence and reads an image only to show the user or settle a concrete doubt, runs no gates, probes or data checks itself, never re-reads or re-emits a brief, closes from report files, and caps each brief's report length",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No polling: the root never polls notifications, schedules check-ins or runs wait loops while specialists or CI run; Monitor on gh pr checks --watch is the only CI wait; a wake that changes nothing gets one short line",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Routing: the routing text names concrete haiku cases (data, list or count corrections, conflict resolution in tests or generated files, gate runs, builds, screenshot capture) and states that the route table, not the brief, sets model and effort",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Branch rule: when the platform assigns a branch, the root uses it as the work branch, tells the user its name breaks the convention and asks through AskUserQuestion whether to open the PR from a branch that follows it; 'when the version workflow fits' becomes exp/<experiment>/<type>/<change> for work with no published version and release/<version>/<type>/<change> when the repository has tags or releases; the final report names the branch used and why whenever it departs from the convention; a test pins the new rule",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Tests: plugin.test.ts and the setup tests cover the root effort frontmatter, the recommended settings and the new requirement phrases; no test is weakened",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Size: the before and after byte counts of the assembled root prompt are reported and within the limit",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Scope: only the ownership paths change",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "diff-file",
+    "tests-run",
+    "prompt-size"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions/requirements.md",
+    "packages/runtime/src/instructions/requirements",
+    "packages/runtime/src/instructions/claude-5.5/root",
+    "packages/runtime/src/instructions/root-core.ts",
+    "packages/integrations/claude/src/agents.ts",
+    "packages/integrations/claude/tests/plugin.test.ts",
+    "packages/runtime/src/setup",
+    "packages/runtime/src/cli/setup.ts",
+    "packages/runtime/tests/setup.test.ts",
+    "packages/runtime/tests/settings.test.ts",
+    "docs",
+    "AGENTS.md",
+    ".claude/settings.json"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-02T18:01:10.726Z"
+}
