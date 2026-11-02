@@ -55,5 +55,34 @@
     "finishedAt": "2026-11-02T22:51:28.633Z"
   },
   "result": "result: BLOCKER found in the repair; the removal, plugin and regression criteria hold.\nchanged: none (a throwaway copy of 4724ca7 in the scratchpad was used for runs; the repo was not touched)\nchecks (run on `git archive 4724ca7` extracted to /tmp/claude-0/-home-user-holyagent/4ed813b5-dc1d-5f26-9e40-d77f95591930/scratchpad/snap2, because the shared tree is moving: docs/decisions.md is modified):\n- `bun check --no-script` -> exit 0, no type errors in 121 files.\n- `bun lint --no-script` -> exit 0, no problems in 122 files.\n- `bun fmt --no-script --check` -> all 241 files formatted.\n- `bun test` -> 993 pass, 2 skip, 0 fail across 34 files.\n- `mise` is not installed here, so `mise run verify` was not run. I ran the equivalent Bun gates directly.\n- `/code-review` ran on `386cb22...4724ca7`. I classified its five findings below.\n\nblockers:\n1. The state-branch repair is incomplete. `STATE_FILE` in packages/runtime/src/state/tree.ts:886 admits only `resume-notes.md` and `notes/**`.\n   - `legacy.ts` (lines 533-535 and 702-707) copies every file in a legacy Intent folder except `intent.json`/`intent.toon`, assignment files, the transaction file and `*.tmp`.\n   - The migrate help text (migrate.ts:167) says `plan.toon`, `plan.old-NNN.toon` and \"every other file\" of a holycodex folder are copied unchanged.\n   - I added `plan.toon` to the new test's fixture in the scratch copy. The state worktree then held `notes, plan.toon, resume-notes.md, intent.json`, but only the four admitted files were tracked. `plan.toon` stays untracked and never reaches the remote or another clone.\n   - Fix: admit any non-`.tmp` file under `intents/<x>/` that is not a record path. The alternative is to narrow what migrate copies. The test should then cover a `plan.toon`/`plan.old-001.toon` case.\n\nquestions: none\n\nnotes (optional):\n- tree.ts:458 `releaseGroup` skips the kill once `exitCode !== null`. A helper git forked can outlive an already-exited git on interruption. This is a narrow race and the guard is deliberate against pid reuse, so I treat it as acceptable. The `pid > 1` guard and its tests are correct.\n- The Billion Context removal is complete and consistent. A search of runtime/src and integrations/claude/src finds no dead references, and the setup, doctor and hook tests pass. Anyone with a stale proxy setting gets no warning any more, which looks like a deliberate product decision for the root to confirm.\n- Out of scope (instruction text), flagged for the rewrite in progress:\n  - setup-command.md says to restart whenever the report has a `+` line, which also happens on `--dry-run`.\n  - The rule to choose the state mode before the first Intent now lives only in the `state-mode` skill.\n\nevidence:\n- Repair: migrated notes are committed to the state branch and no stray file is, closing the previous blocker: FAILS. `resume-notes.md` and `notes/**` are committed and `stray.md` and `*.tmp` are not (state-branch.test.ts:574-614 passes), but `plan.toon` and any other copied note stay uncommitted (tree.ts:886; reproduced in the scratch copy).\n- Removal: removing the Billion Context cleanup leaves setup, doctor and the hook working with no dead references: holds. `leftovers.ts` and its tests are deleted, a search finds no stale references, and check, lint and the setup, doctor and hook tests pass.\n- Plugin: the root agent gets TaskStop and the four skills are generated and installed like the existing ones: holds. `ROOT_BUILTINS` gains `TaskStop` (agents.ts:85). The skills are generated from the `skills/` directory, and dist/skills/{ci-watch,instruction-writing,state-mode,visual-judging}/SKILL.md exist. plugin.test.ts asserts `SKILLS`, the skill content and that `TaskStop` is not denied.\n- Regressions: no existing behavior breaks; changes have tests: holds with the blocker above. The full suite is 993 pass and 0 fail. New tests exist for `killGroup`/`releaseGroup`, the migrate commit, and the plugin skills and tool.\n- checks-run: `bun check --no-script`, `bun lint --no-script`, `bun fmt --no-script --check` and `bun test` all exit 0, run in the scratchpad `snap2` copy of 4724ca7. `mise run verify` was not run because mise is not installed.\n",
+  "acceptance": {
+    "revision": 7,
+    "carriedFrom": 6,
+    "rationale": "Ran on a 4724ca7 archive; blocker reproduced (plan.toon copied by migrate stays untracked) goes to repair; removal and plugin criteria hold.",
+    "criteria": [
+      {
+        "criterion": "Repair: migrated notes are committed to the state branch and no stray file is, closing the previous blocker",
+        "support": "FAILS. `resume-notes.md` and `notes/**` are committed and `stray.md` and `*.tmp` are not (state-branch.test.ts:574-614 passes), but `plan.toon` and any other copied note stay uncommitted (tree.ts:886; reproduced in the scratch copy)."
+      },
+      {
+        "criterion": "Removal: removing the Billion Context cleanup leaves setup, doctor and the hook working with no dead references",
+        "support": "holds. `leftovers.ts` and its tests are deleted, a search finds no stale references, and check, lint and the setup, doctor and hook tests pass."
+      },
+      {
+        "criterion": "Plugin: the root agent gets TaskStop and the four skills are generated and installed like the existing ones",
+        "support": "holds. `ROOT_BUILTINS` gains `TaskStop` (agents.ts:85). The skills are generated from the `skills/` directory, and dist/skills/{ci-watch,instruction-writing,state-mode,visual-judging}/SKILL.md exist. plugin.test.ts asserts `SKILLS`, the skill content and that `TaskStop` is not denied."
+      },
+      {
+        "criterion": "Regressions: no existing behavior breaks; changes have tests",
+        "support": "holds with the blocker above. The full suite is 993 pass and 0 fail. New tests exist for `killGroup`/`releaseGroup`, the migrate commit, and the plugin skills and tool."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bun check --no-script`, `bun lint --no-script`, `bun fmt --no-script --check` and `bun test` all exit 0, run in the scratchpad `snap2` copy of 4724ca7. `mise run verify` was not run because mise is not installed."
+      }
+    ]
+  },
   "createdAt": "2026-11-02T22:39:59.882Z"
 }
