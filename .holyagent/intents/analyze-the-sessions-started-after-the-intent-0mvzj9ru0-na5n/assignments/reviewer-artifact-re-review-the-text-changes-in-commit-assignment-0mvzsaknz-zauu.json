@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mvzsaknz-zauu",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 2,
+  "roleTask": "Reviewer.artifact",
+  "slug": "re-review-the-text-changes-in-commit",
+  "objective": "Re-review the text changes in commit eee082a that put the workflow closing rule in requirements.md and make the docs refer to the root text.",
+  "state": "Running",
+  "scope": [
+    "The diff at /tmp/holyagent-review/final-head.diff, parts in packages/runtime/src/instructions/requirements.md, docs/cache-and-workflows.md and the assignment reports help in packages/runtime/src/cli/assignment.ts; read the current files and packages/runtime/src/instructions/claude-5.5/root/workflows.md as needed.",
+    "Previous finding: docs/cache-and-workflows.md:50 repeated the closing rule in full and requirements.md R-WORKFLOW no longer carried it. Expected: R-WORKFLOW states it, the docs refer to the root's workflow text, workflows.md:10 stays the one root statement."
+  ],
+  "constraints": [
+    "Read-only: make no edits.",
+    "Apply the Writing instructions rules in packages/integrations/claude/dist/agents/holyagent.md and the rules in .claude/CLAUDE.md and AGENTS.md.",
+    "Keep working until the review is done, then stop and report under 250 words; do not start further review rounds. Each evidence entry on one line as '<criterion label>: <support>'."
+  ],
+  "criteria": [
+    {
+      "text": "Single statement: closed or still open, with file:line support and no contradiction between requirements.md, workflows.md and the docs",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "verdict"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvzs4678-d8o6"
+  ],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-11-02T21:41:41.279Z"
+  },
+  "createdAt": "2026-11-02T21:41:41.279Z"
+}
