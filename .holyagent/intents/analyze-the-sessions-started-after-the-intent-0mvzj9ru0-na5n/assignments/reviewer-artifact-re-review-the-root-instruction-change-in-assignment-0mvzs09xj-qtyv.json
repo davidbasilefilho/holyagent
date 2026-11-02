@@ -1,0 +1,51 @@
+{
+  "id": "assignment-0mvzs09xj-qtyv",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 2,
+  "roleTask": "Reviewer.artifact",
+  "slug": "re-review-the-root-instruction-change-in",
+  "objective": "Re-review the root instruction change in commit 0cbedf0 that names where the workflow journal is and how an Assignment missing from the reports is closed.",
+  "state": "Running",
+  "scope": [
+    "The diff at /tmp/holyagent-review/0cbedf0.diff, the parts in packages/runtime/src/instructions/claude-5.5/root/workflows.md, packages/runtime/src/instructions/requirements.md, packages/runtime/src/cli/overview.ts plan notes and docs/cache-and-workflows.md; read the full current files as needed.",
+    "Previous finding C: workflows.md said only 'the run's journal'. Expected fix: say the Workflow completion notice names it in its diagnostics as <transcript dir>/journal.jsonl, and state once that after the run completes an Assignment the reports do not list is closed errored without further confirmation.",
+    "Previous small item: unify the report placeholder as <report-file> in the root text and plan notes.",
+    "The worker noted it removed the clause 'since these agents cannot be messaged' from workflows.md to stay under the 31161-byte root prompt cap, relying on dispatch.md saying a workflow agent's gap is a new draft with followUpOf."
+  ],
+  "constraints": [
+    "Read-only: make no edits.",
+    "Apply the instruction-writing rules of the root prompt (packages/integrations/claude/dist/agents/holyagent.md, section Writing instructions) and the repository rules in .claude/CLAUDE.md and AGENTS.md.",
+    "Keep working until the review is done, then stop and report under 350 words; do not start further review rounds. Each evidence entry on one line as '<criterion label>: <support>'."
+  ],
+  "criteria": [
+    {
+      "text": "Finding C: closed or still open, with file:line support",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Single statement: the closing rule is stated once in the root text and the other places refer to it, with no contradiction between workflows.md, dispatch.md, requirements.md and the docs",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Clarity: a reader with no context can find the journal and close an unlisted Assignment from the text alone",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "verdict"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvzrqoo2-qb6m"
+  ],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-11-02T21:33:40.807Z"
+  },
+  "createdAt": "2026-11-02T21:33:40.807Z"
+}
