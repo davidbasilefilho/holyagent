@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-commit-0cbedf0-the-repair-of",
   "objective": "Re-review commit 0cbedf0, the repair of two code blockers found in the review of 7ac8084, and say whether each is closed without new defects.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Only the diff of commit 0cbedf0 (git show 0cbedf0, also at /tmp/holyagent-review/0cbedf0.diff) in packages/runtime/src/state/tree.ts, packages/runtime/src/cli/report.ts, packages/runtime/src/cli/overview.ts and their tests.",
     "Previous finding A: tree.ts fetchEnvironment injected GIT_SSH_COMMAND unless GIT_SSH_COMMAND or GIT_SSH was set, overriding a configured core.sshCommand. Expected fix: keep the configured command and add BatchMode and ConnectTimeout non-interactively.",
@@ -51,7 +51,37 @@
     "agentId": "workflow:wf_8ec5aa0f-fbe/assignment-0mvzs09lb-r6w4",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-02T21:33:40.367Z"
+    "startedAt": "2026-11-02T21:33:40.367Z",
+    "finishedAt": "2026-11-02T21:36:41.803Z"
+  },
+  "result": "result: Both blockers are closed and I found no new blocking defect. The three runtime test files pass: `bun test packages/runtime/tests/state-branch.test.ts packages/runtime/tests/reports.test.ts packages/runtime/tests/cli.test.ts` -> exit 0, 108 pass, 0 fail.\n\nchanged: none (read-only)\n\nchecks: I did not run `mise run verify` and did not rebuild or diff the `dist` plugin output, so I did not check the generated copy of these changes.\n\nblockers: none\n\nquestions: none\n\nnotes (all optional):\n- `LIST_ITEM` at `report.ts:21` omits the `[ ]`/`[x]` prefix that the strip regex on the line below accepts. An unindented `[x] ran it` line under an empty key is therefore not support, while `- [x] ran it` is. The fix is small: derive `list` from whether the strip changed the line.\n- Appending the options to a `core.sshCommand` that is not OpenSSH-shaped (a wrapper, plink, or `ssh ... || true`) may misbehave. This is a design tradeoff.\n- When `GIT_SSH` is set together with `core.sshCommand`, `chosen` is true, so no BatchMode is added. Git ranks `core.sshCommand` above `GIT_SSH`. This edge existed before the repair.\n- An empty-string result still writes a file. This is out of scope.\n- Reviewing the first `/code-review` finding (plain prose under an empty key line is no longer accepted), I rejected it. That narrowing is the requested fix and is tested.\n- The `overview.ts` and `workflows.md` wording changes are outside the two blockers. I leave them as optional.\n\nevidence:\n- Finding A: closed. `tree.ts:491` reads `core.sshCommand` through `git config --get`, and `fetchEnvironment` builds `GIT_SSH_COMMAND` as `${configured ?? \"ssh\"} -o BatchMode=yes -o ConnectTimeout=5` (`tree.ts:440` onward). A value with spaces or quotes is appended verbatim to the string git runs as a shell command, so its quoting is kept. I did not run a quoted-path case. An env `GIT_SSH_COMMAND` or `GIT_SSH` is left alone, and a failing config read becomes \"no configured command\".\n- Finding B: closed. I checked these shapes in `report.ts:150-167` and the tests at `cli.test.ts:572-598`. Refused: `parses:` then unindented `Looks fine.`; `parses:` then a key line; `parses:` then a blank line then `- ran it`; unindented prose then a list. Accepted: `- ` and numbered items directly below, indented lines directly below, and nested sub-bullets (`cli.test.ts:~540`).\n- Null result: it now writes no file (`report.ts` `entry.result !== null`). `reports.test.ts:148` asserts it is neither listed nor written.\n- New defects: none. The config read adds one git spawn per fetch and cannot fail the fetch. The dist and doc changes are generated or wording only. I rated the other `/code-review` findings optional (see notes).\n- Tests: each fix has a test that fails without it. The core.sshCommand test (`state-branch.test.ts:371`) needs `Configured=yes` in the ssh log, which the old override of the configured command could not produce. The shape tests at `cli.test.ts:572-598` fail on the old code, which took any unindented line as support. The null-result test (`reports.test.ts:148`) fails on the old code, which wrote a `null` report.\n- verdict: both blockers closed, no new blocking defect, merge-ready from the code side.\n",
+  "acceptance": {
+    "revision": 2,
+    "rationale": "Verdict cites file:line and the tests that fail on the old code; consistent with the diff.",
+    "criteria": [
+      {
+        "criterion": "Finding A: closed or still open, with file:line support, including quoting of a core.sshCommand that contains spaces or quotes",
+        "support": "closed. `tree.ts:491` reads `core.sshCommand` through `git config --get`, and `fetchEnvironment` builds `GIT_SSH_COMMAND` as `${configured ?? \"ssh\"} -o BatchMode=yes -o ConnectTimeout=5` (`tree.ts:440` onward). A value with spaces or quotes is appended verbatim to the string git runs as a shell command, so its quoting is kept. I did not run a quoted-path case. An env `GIT_SSH_COMMAND` or `GIT_SSH` is left alone, and a failing config read becomes \"no configured command\"."
+      },
+      {
+        "criterion": "Finding B: closed or still open, with the shapes checked",
+        "support": "closed. I checked these shapes in `report.ts:150-167` and the tests at `cli.test.ts:572-598`. Refused: `parses:` then unindented `Looks fine.`; `parses:` then a key line; `parses:` then a blank line then `- ran it`; unindented prose then a list. Accepted: `- ` and numbered items directly below, indented lines directly below, and nested sub-bullets (`cli.test.ts:~540`)."
+      },
+      {
+        "criterion": "New defects: any blocking regression the repair introduced, or none, with support",
+        "support": "none. The config read adds one git spawn per fetch and cannot fail the fetch. The dist and doc changes are generated or wording only. I rated the other `/code-review` findings optional (see notes)."
+      },
+      {
+        "criterion": "Tests: each fix has a test that would fail without it",
+        "support": "each fix has a test that fails without it. The core.sshCommand test (`state-branch.test.ts:371`) needs `Configured=yes` in the ssh log, which the old override of the configured command could not produce. The shape tests at `cli.test.ts:572-598` fail on the old code, which took any unindented line as support. The null-result test (`reports.test.ts:148`) fails on the old code, which wrote a `null` report."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "verdict",
+        "support": "both blockers closed, no new blocking defect, merge-ready from the code side."
+      }
+    ]
   },
   "createdAt": "2026-11-02T21:33:40.367Z"
 }
