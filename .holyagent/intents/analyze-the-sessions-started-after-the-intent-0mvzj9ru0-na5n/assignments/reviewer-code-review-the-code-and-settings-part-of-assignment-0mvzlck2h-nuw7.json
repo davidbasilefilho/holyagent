@@ -1,0 +1,48 @@
+{
+  "id": "assignment-0mvzlck2h-nuw7",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 2,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-code-and-settings-part-of",
+  "objective": "Review the code and settings part of commit cf522df (root effort frontmatter, recommended modelSettings in setup and doctor, .claude/settings.json and their tests) for correctness and regressions.",
+  "state": "Ready",
+  "scope": [
+    "git show cf522df -- packages/integrations/claude/src/agents.ts packages/runtime/src/setup packages/runtime/src/cli/setup.ts .claude/settings.json packages/runtime/tests packages/integrations/claude/tests"
+  ],
+  "constraints": [
+    "Read-only: no file edits, no git writes. Keep working until everything asked is done, then stop and report; report under 600 words, findings each with path:line, severity (blocking or non-blocking) and a concrete failure scenario; do not launch other reviewers.",
+    "Check facts about Claude Code settings (modelSettings key form, effortLevel and autoCompactWindow ranges) against code.claude.com/docs/en/settings-reference rather than memory."
+  ],
+  "criteria": [
+    {
+      "text": "Behavior: setup and doctor add, keep and fix the modelSettings entry correctly without clobbering a user's own values, and the emitted root frontmatter is valid",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Regressions: existing setup keys, doctor exit codes and the generated agents are unchanged except as intended",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Tests: the new tests fail without the change and none is weakened (setup-cli count changes included)",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Settings: .claude/settings.json stays valid for Claude Code and changes nothing else",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "verified"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvzkezwm-9ib4"
+  ],
+  "createdAt": "2026-11-02T18:27:16.505Z"
+}
