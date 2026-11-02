@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "re-review-the-root-instruction-change-in",
   "objective": "Re-review the root instruction change in commit 0cbedf0 that names where the workflow journal is and how an Assignment missing from the reports is closed.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "The diff at /tmp/holyagent-review/0cbedf0.diff, the parts in packages/runtime/src/instructions/claude-5.5/root/workflows.md, packages/runtime/src/instructions/requirements.md, packages/runtime/src/cli/overview.ts plan notes and docs/cache-and-workflows.md; read the full current files as needed.",
     "Previous finding C: workflows.md said only 'the run's journal'. Expected fix: say the Workflow completion notice names it in its diagnostics as <transcript dir>/journal.jsonl, and state once that after the run completes an Assignment the reports do not list is closed errored without further confirmation.",
@@ -46,7 +46,33 @@
     "agentId": "workflow:wf_8ec5aa0f-fbe/assignment-0mvzs09xj-qtyv",
     "model": "haiku",
     "effort": "high",
-    "startedAt": "2026-11-02T21:33:40.807Z"
+    "startedAt": "2026-11-02T21:33:40.807Z",
+    "finishedAt": "2026-11-02T21:36:42.175Z"
+  },
+  "result": "result: One blocking gap remains (Single statement). Finding C is closed, and Clarity is met.\nchanged: none (read-only review)\nchecks: none run (no shell). Read the diff at /tmp/holyagent-review/0cbedf0.diff and the current files. Assumes the tree matches the diff; I did not confirm that the tree was stable.\nblockers: Single statement gap, below. Fix: restate the closing rule in requirements.md R-WORKFLOW and have docs/cache-and-workflows.md refer to workflows.md instead of repeating it.\nquestions: none\nnotes:\n- Placeholder: `<report-file>` is used in workflows.md, dispatch.md:5, dist/agents/holyagent.md:24 and overview.ts:195. The CLI help at assignment.ts:398 (and generated holyagent.js:12399) still says `< <path>`. Outside the named scope.\n- The 31161-byte cap is not in the repo (no match for \"31161\"), so that claim is unverified.\n- workflows.md dropped \"a gap becomes a new draft with followUpOf\". dispatch.md:7 still owns it, so nothing is lost.\n- workflows.md:10 is one long paragraph. \"by label\" (workflows.md) and \"named by its Assignment id\" (overview.ts:194) name the same key.\n- \"transcript dir\" is not defined in the root text. The reader takes its value from the notice.\nevidence:\nFinding C: closed. workflows.md:10 says the completion notice names the journal in its diagnostics as `<transcript dir>/journal.jsonl`, and says that after the run completes an unlisted Assignment is closed `errored` without further confirmation. The notice wording comes from the Workflow tool, outside this repo; plugin.test.ts:365-373 asserts the phrases but was not run.\nSingle statement: gap. docs/cache-and-workflows.md:50 repeats the closing rule in full instead of referring to workflows.md:10. requirements.md:328 (R-WORKFLOW) dropped the old closing clause (\"closed errored once its agent is confirmed gone\") without stating the new rule, so the requirement is silent on it. dist/agents/holyagent.md:105 says to change the behavior in requirements.md first. There is no direct contradiction: dispatch.md:7 (gap becomes a new draft with followUpOf) agrees with workflows.md:10, and overview.ts:195 refers to the root text correctly.\nClarity: met. workflows.md:10 gives the journal path, where the notice names it, the outcome `errored`, the timing (\"once the run has completed\") and the reason (\"cannot be messaged\") for closing without confirmation, so a reader with no context can act on it.\nverdict: Finding C is closed and Clarity is met. Single statement is a gap, because the closing rule is copied into docs/cache-and-workflows.md:50 and requirements.md R-WORKFLOW no longer carries it.\n",
+  "acceptance": {
+    "revision": 2,
+    "rationale": "Gap cited at docs/cache-and-workflows.md:50 and requirements.md R-WORKFLOW; taken to repair.",
+    "criteria": [
+      {
+        "criterion": "Finding C: closed or still open, with file:line support",
+        "support": "closed. workflows.md:10 says the completion notice names the journal in its diagnostics as `<transcript dir>/journal.jsonl`, and says that after the run completes an unlisted Assignment is closed `errored` without further confirmation. The notice wording comes from the Workflow tool, outside this repo; plugin.test.ts:365-373 asserts the phrases but was not run."
+      },
+      {
+        "criterion": "Single statement: the closing rule is stated once in the root text and the other places refer to it, with no contradiction between workflows.md, dispatch.md, requirements.md and the docs",
+        "support": "gap. docs/cache-and-workflows.md:50 repeats the closing rule in full instead of referring to workflows.md:10. requirements.md:328 (R-WORKFLOW) dropped the old closing clause (\"closed errored once its agent is confirmed gone\") without stating the new rule, so the requirement is silent on it. dist/agents/holyagent.md:105 says to change the behavior in requirements.md first. There is no direct contradiction: dispatch.md:7 (gap becomes a new draft with followUpOf) agrees with workflows.md:10, and overview.ts:195 refers to the root text correctly."
+      },
+      {
+        "criterion": "Clarity: a reader with no context can find the journal and close an unlisted Assignment from the text alone",
+        "support": "met. workflows.md:10 gives the journal path, where the notice names it, the outcome `errored`, the timing (\"once the run has completed\") and the reason (\"cannot be messaged\") for closing without confirmation, so a reader with no context can act on it."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "verdict",
+        "support": "Finding C is closed and Clarity is met. Single statement is a gap, because the closing rule is copied into docs/cache-and-workflows.md:50 and requirements.md R-WORKFLOW no longer carries it."
+      }
+    ]
   },
   "createdAt": "2026-11-02T21:33:40.807Z"
 }
