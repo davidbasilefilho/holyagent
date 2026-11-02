@@ -896,13 +896,11 @@ const STATE_FILE =
  */
 const stageState = (worktree: string, env: Environment, copied: ReadonlyArray<string>) =>
   Effect.gen(function* () {
-    yield* gitText(worktree, env, [
-      "add",
-      "-u",
-      "--",
-      STATE_DIRECTORY,
-      `:(exclude)${STATE_DIRECTORY}/local`,
-    ])
+    // Newer git rejects `add -u` for a pathspec that matches nothing git tracks, as on the first
+    // state commit, so only update what is tracked.
+    const tracked = [STATE_DIRECTORY, `:(exclude)${STATE_DIRECTORY}/local`]
+    if ((yield* gitText(worktree, env, ["ls-files", "--", ...tracked])) !== "")
+      yield* gitText(worktree, env, ["add", "-u", "--", ...tracked])
     const folder = join(worktree, STATE_DIRECTORY)
     const files = yield* io(folder, () =>
       Array.fromAsync(new Bun.Glob("**/*").scan({ cwd: folder, dot: true, onlyFiles: true })),

@@ -10528,13 +10528,9 @@ var migrateWorkTree = (top, common, worktree, env, commit) => {
 };
 var STATE_FILE = /^(?:config\.json|intents\/[^/]+\/(?:intent\.json|(?:assignments|branches|pulls)\/[^/]+\.json|resume-notes\.md|notes\/(?:.+\/)?[^/]+(?<!\.tmp)))$/;
 var stageState = (worktree, env, copied) => gen2(function* () {
-  yield* gitText(worktree, env, [
-    "add",
-    "-u",
-    "--",
-    STATE_DIRECTORY,
-    `:(exclude)${STATE_DIRECTORY}/local`
-  ]);
+  const tracked = [STATE_DIRECTORY, `:(exclude)${STATE_DIRECTORY}/local`];
+  if ((yield* gitText(worktree, env, ["ls-files", "--", ...tracked])) !== "")
+    yield* gitText(worktree, env, ["add", "-u", "--", ...tracked]);
   const folder = join2(worktree, STATE_DIRECTORY);
   const files = yield* io(folder, () => Array.fromAsync(new Bun.Glob("**/*").scan({ cwd: folder, dot: true, onlyFiles: true })));
   const named = copied.map((path) => toPosix(relative(folder, path))).filter((path) => path !== "" && !path.startsWith("../") && !/^local(?:\/|$)/.test(path));

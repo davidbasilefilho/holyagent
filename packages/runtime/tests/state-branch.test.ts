@@ -571,6 +571,48 @@ describe("a base branch that ignores the state folder", () => {
   })
 })
 
+describe("the first commit on a state branch that tracks nothing yet", () => {
+  test("git is never asked to update a pathspec that matches no tracked file", async () => {
+    const dir = await initRepo(OWNER)
+    await seed(dir, { "a.txt": "a\n" })
+    // A git that, like newer releases, rejects `add -u` for a pathspec that matches nothing tracked.
+    const bin = await scratch("holyagent-git-")
+    const real = Bun.which("git") ?? "git"
+    await writeFile(
+      join(bin, "git"),
+      [
+        "#!/bin/sh",
+        `if [ "$1" = add ] && [ "$2" = -u ]; then`,
+        "  shift 3",
+        `  if [ -z "$("${real}" ls-files -- "$@")" ]; then`,
+        `    echo "error: pathspec '$1' did not match any file(s) known to git" >&2`,
+        "    exit 128",
+        "  fi",
+        '  set -- add -u -- "$@"',
+        "fi",
+        `exec "${real}" "$@"`,
+        "",
+      ].join("\n"),
+      { mode: 0o755 },
+    )
+
+    const created = toon(
+      await vcs(
+        dir,
+        ["intent", "create"],
+        fakeGitHub().layer,
+        { objective: "Ship the parser" },
+        {
+          PATH: `${bin}:${process.env["PATH"] ?? ""}`,
+        },
+      ),
+    ) as { id: string }
+
+    const tracked = lines(await sh(dir, ["git", "ls-tree", "-r", "--name-only", STATE]))
+    expect(tracked.some((path) => path.endsWith(`${created.id}/intent.json`))).toBe(true)
+  })
+})
+
 describe("migrating the legacy state", () => {
   test("every file migrate copied into an Intent folder is committed, a stray file beside them is not", async () => {
     const dir = await initRepo(OWNER)
