@@ -13,7 +13,7 @@ packages/
     src/vcs/                    the vcs commands (commit, pr)
     src/instructions/
       claude-5.5/               root/, specialist/, roles/<role>/ (one file per section), root-core.ts, skills/
-      requirements/             cache.md, commit-text.md, mergeability.md: inputs to the instructions, not behavior
+      requirements/             cache.md, commit-text.md, context.md, mergeability.md: inputs to the instructions, not behavior
   integrations/claude/          turns the runtime into the Claude Code plugin
     build.ts, src/              the generator and the wrapper source
     vendor/frontend-design/     Anthropic's skill text and license, kept byte for byte; the visual roles embed it

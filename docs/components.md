@@ -56,7 +56,7 @@ Hosted setup needs a login or API key. With neither, `ctx7 setup --yes` would bl
 
 - Billion Context cleanup: what an earlier setup left in your Claude Code files is removed (matched by Billion Context's own install rules, listed in [usage.md](usage.md#install)), and each removal is printed; HolyAgent no longer installs or uses Billion Context;
 - ctx7: the package and the Context7 skill (above);
-- user settings: the missing keys among `attribution`, `includeGitInstructions`, `subagentPromptCacheTtl`, `extraKnownMarketplaces`, `enabledPlugins` and `permissions.deny` are added to `~/.claude/settings.json` (or the file in `CLAUDE_CONFIG_DIR`), and no value that is already set changes ([usage.md](usage.md#user-settings) lists them).
+- user settings: the missing keys among `attribution`, `includeGitInstructions`, `subagentPromptCacheTtl`, `modelSettings["claude-opus-5-5"]` (`effortLevel` and `autoCompactWindow`), `extraKnownMarketplaces`, `enabledPlugins` and `permissions.deny` are added to `~/.claude/settings.json` (or the file in `CLAUDE_CONFIG_DIR`), and no value that is already set changes ([usage.md](usage.md#user-settings) lists them).
 
 In a claude.ai cloud session (`CLAUDE_CODE_REMOTE=true`) there is no machine of yours to install on, so the ctx7 step is skipped and the other two still run. Setup does not register the plugin, which the two `claude plugin` commands do, and it does not check Bun's build.
 

@@ -41,7 +41,7 @@ describe("holyagent setup and doctor as commands", () => {
     expect(result.stderr).toBe("")
     expect(result.stdout).toContain("= billion-context: no leftovers\n")
     expect(result.stdout).toContain("+ includeGitInstructions: added false\n")
-    expect(result.stdout).toEndWith("dry run: would add 8, nothing written\n")
+    expect(result.stdout).toEndWith("dry run: would add 10, nothing written\n")
     expect(await Bun.file(settings()).exists()).toBe(false)
   })
 
@@ -49,7 +49,7 @@ describe("holyagent setup and doctor as commands", () => {
     const flags = ["setup", "--skip-ctx7", "--subagent-cache-ttl", "5m"]
     const first = await cli(flags)
     expect(first.code).toBe(0)
-    expect(first.stdout).toEndWith("added 8\n")
+    expect(first.stdout).toEndWith("added 10\n")
     const written = (await Bun.file(settings()).json()) as { subagentPromptCacheTtl?: string }
     expect(written.subagentPromptCacheTtl).toBe("5m")
     const second = await cli(flags)

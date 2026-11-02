@@ -116,6 +116,7 @@ export const ROOT_SECTIONS: ReadonlyArray<string> = [
   ...ROOT_CORE_FILES,
   "user-messages.md",
   "routing.md",
+  "context.md",
   "workflows.md",
   "search.md",
   "assignments.md",
@@ -229,6 +230,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
   "R-LANG": { section: "root/identity.md", phrase: "in the language of the user's latest message" },
   "R-OUTWARD": { section: "root/identity.md", phrase: "need the user's approval" },
   "R-DELEGATE": { section: "root/delegating.md", phrase: "go to specialists" },
+  "R-LEAN": { section: "root/context.md", phrase: "Run no gates, probes or data checks yourself" },
   "R-SEARCH": { section: "root/search.md", phrase: "Search file contents with `holyagent rg`" },
   "R-NORESOLVE": { section: "root/delegating.md", phrase: "stop and report it" },
   "R-ROUTE": { section: "root/routing.md", phrase: "cheapest specialist" },
@@ -244,7 +246,10 @@ export const REQUIREMENT_SECTIONS: Readonly<
   },
   "R-REVIEW": { section: "root/assignments.md", phrase: "gets an independent reviewer" },
   "R-FINISH": { section: "root/assignments.md", phrase: "one more repair round" },
-  "R-VISUAL": { section: "root/visual.md", phrase: "Read screenshots yourself in the main thread" },
+  "R-VISUAL": {
+    section: "root/visual.md",
+    phrase: "Read an image in the main thread only to show it to the user",
+  },
   "R-DEVSERVER": {
     section: "root/skills.md",
     phrase: "start the one server the visual specialists share",
@@ -257,6 +262,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
     section: "root/version-control.md",
     phrase: "Never force-push, and never push to the base, default or a protected branch",
   },
+  "R-BRANCH": { section: "root/version-control.md", phrase: "When the platform assigns a branch" },
   "R-STATE": {
     section: "root/version-control.md",
     phrase: "set the mode with `holyagent state mode <mode>`",
@@ -466,6 +472,10 @@ const rootAgent = async (): Promise<GeneratedFile> => {
     `name: ${PLUGIN_NAME}`,
     `description: ${JSON.stringify(ROOT_DESCRIPTION)}`,
     "model: opus",
+    // Claude Code ignores `effort` on the main thread (anthropics/claude-code#81677, #97829), so
+    // the root's real level comes from the user settings `holyagent setup` writes; the field
+    // documents the intent and applies where the root runs as a subagent.
+    "effort: high",
     `disallowedTools: ${denylist(ROOT_BUILTINS)}`,
   ])
   return {

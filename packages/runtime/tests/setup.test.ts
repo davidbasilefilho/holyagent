@@ -5,6 +5,8 @@ import { dirname, join } from "node:path"
 import { Effect } from "effect"
 
 import { doctor } from "../src/setup/doctor.ts"
+import { applyDefaults } from "../src/setup/json-file.ts"
+import { userSettingsDefaults } from "../src/setup/settings.ts"
 import { EMPTY_BUNFIG } from "../src/setup/shell.ts"
 import { setup, type SetupOptions } from "../src/setup/steps.ts"
 import { fakeShell, scratch, writeCompleteSettings } from "./setup-fixture.ts"
@@ -59,6 +61,8 @@ const SETTINGS_KEYS = [
   "attribution.sessionUrl",
   "includeGitInstructions",
   "subagentPromptCacheTtl",
+  "modelSettings.claude-opus-5-5.effortLevel",
+  "modelSettings.claude-opus-5-5.autoCompactWindow",
   "extraKnownMarketplaces.holyagent",
   "enabledPlugins.holyagent@holyagent",
   "permissions.deny",
@@ -82,6 +86,33 @@ describe("holyagent setup", () => {
     expect(settings.subagentPromptCacheTtl).toBe("1h")
     expect(settings.enabledPlugins).toEqual({ "holyagent@holyagent": true })
     expect(settings.permissions).toEqual({ deny: ["WebSearch", "WebFetch"] })
+    expect(settings.modelSettings).toEqual({
+      "claude-opus-5-5": { effortLevel: "high", autoCompactWindow: 200000 },
+    })
+  })
+
+  test("recommends high effort and a 200000-token window for Opus 5.5 but keeps a level the user saved", async () => {
+    await write(
+      ".claude/settings.json",
+      JSON.stringify({
+        modelSettings: { "claude-opus-5-5": { effortLevel: "xhigh" }, "claude-sonnet-5-5": {} },
+      }),
+    )
+    const shell = fakeShell({ commands: ["bun", "ctx7"] })
+    const report = await Effect.runPromise(
+      setup(env(), { ...BOTH, skipCtx7: true }).pipe(Effect.provide(shell.layer)),
+    )
+    expect(report.ok).toBe(true)
+    expect(report.lines).toContain(
+      '~ modelSettings.claude-opus-5-5.effortLevel: kept "xhigh" (recommended "high")',
+    )
+    expect(report.lines).toContain(
+      "+ modelSettings.claude-opus-5-5.autoCompactWindow: added 200000",
+    )
+    expect((await readJson(settingsFile())).modelSettings).toEqual({
+      "claude-opus-5-5": { effortLevel: "xhigh", autoCompactWindow: 200000 },
+      "claude-sonnet-5-5": {},
+    })
   })
 
   test("every child runs from the home directory, and bun add -g reads no env file and only the empty config", async () => {
@@ -326,9 +357,22 @@ describe("holyagent setup", () => {
       "enabledPlugins",
       "extraKnownMarketplaces",
       "includeGitInstructions",
+      "modelSettings",
       "permissions",
       "subagentPromptCacheTtl",
     ])
+  })
+})
+
+describe("this repository's settings", () => {
+  test(".claude/settings.json carries the same Opus 5.5 effort and window that setup recommends", async () => {
+    const project = (await Bun.file(
+      join(import.meta.dir, "../../../.claude/settings.json"),
+    ).json()) as {
+      modelSettings?: Record<string, unknown>
+    }
+    const { merged } = applyDefaults({}, userSettingsDefaults("1h"))
+    expect(project.modelSettings).toEqual(merged.modelSettings as Record<string, unknown>)
   })
 })
 
@@ -377,6 +421,28 @@ describe("holyagent doctor", () => {
     )
     expect(fixed.ok).toBe(true)
     expect((await readJson(settingsFile())).subagentPromptCacheTtl).toBe("1h")
+  })
+
+  test("settings that lack only the Opus 5.5 effort and window fail the check, and --fix adds them", async () => {
+    await writeCompleteSettings(claudeDirectory())
+    const complete = await readJson(settingsFile())
+    const { modelSettings: _omitted, ...withoutModel } = complete
+    await writeFile(settingsFile(), JSON.stringify(withoutModel))
+    const shell = fakeShell({ commands: ["bun", "ctx7"] })
+    const before = await Effect.runPromise(
+      doctor(env(), { fix: false }).pipe(Effect.provide(shell.layer)),
+    )
+    expect(before.ok).toBe(false)
+    expect(before.lines.find((line) => line.startsWith("FAIL settings"))).toContain(
+      "lacks modelSettings.claude-opus-5-5.effortLevel, modelSettings.claude-opus-5-5.autoCompactWindow",
+    )
+    const fixed = await Effect.runPromise(
+      doctor(env(), { fix: true }).pipe(Effect.provide(shell.layer)),
+    )
+    expect(fixed.ok).toBe(true)
+    expect((await readJson(settingsFile())).modelSettings).toEqual({
+      "claude-opus-5-5": { effortLevel: "high", autoCompactWindow: 200000 },
+    })
   })
 
   test("fails on each missing piece, checks the user settings, and has no plugin or canary check", async () => {

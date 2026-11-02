@@ -31,7 +31,7 @@ export const SETUP_COMMANDS: ReadonlyArray<Command> = [
     notes: [
       "installs ctx7 with the Context7 skill (needs CONTEXT7_API_KEY or a saved login)",
       "removes what an earlier Billion Context setup left in your Claude Code files (the local proxy base URL and DISABLE_AUTO_COMPACT in settings.json, its hook, the bili MCP server, commands/acp-cache.md, and its plugin and marketplace), only entries that match what it wrote, and prints each entry it removes",
-      "merges these keys into the user settings (CLAUDE_CONFIG_DIR, else ~/.claude/settings.json) without changing any value already set: attribution, includeGitInstructions, subagentPromptCacheTtl, extraKnownMarketplaces, enabledPlugins and permissions.deny for WebSearch and WebFetch",
+      "merges these keys into the user settings (CLAUDE_CONFIG_DIR, else ~/.claude/settings.json) without changing any value already set: attribution, includeGitInstructions, subagentPromptCacheTtl, modelSettings.claude-opus-5-5 (effortLevel high and autoCompactWindow 200000 for the root), extraKnownMarketplaces, enabledPlugins and permissions.deny for WebSearch and WebFetch",
       "a failed step is reported and the rest still run; in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) ctx7 is skipped and the settings are still merged",
     ],
     flags: {

@@ -553,6 +553,50 @@ describe("agents", () => {
     }
   })
 
+  test("the root declares high effort, which the specialists' route-set efforts do not follow", () => {
+    expect(field(agent("holyagent")?.content ?? "", "effort")).toBe("high")
+    for (const route of ROUTES)
+      expect(field(agent(route.agent)?.content ?? "", "effort")).toBe(route.effort)
+  })
+
+  test("the root keeps its context small, never polls, and routes mechanical work to haiku", () => {
+    const text = agent("holyagent")?.content ?? ""
+    for (const part of [
+      "Run no gates, probes or data checks yourself",
+      "never open or re-emit the brief",
+      "Close each Assignment from its report file",
+      "a cap on the report",
+      "Read an image in the main thread only to show it to the user (a path is not delivery) or to settle a concrete doubt",
+      "no scheduled check-ins or wait loops",
+      "a wake that changes nothing gets one short line",
+      "It is the only CI wait",
+      "The route table, not the brief, sets model and effort",
+      "data, list or count corrections",
+      "resolving conflicts in tests or generated files",
+      "Worker.validation for gate runs",
+      "builds and screenshot capture",
+      "`holyagent assignment reports <journal.jsonl>`",
+      "`{ done: [ids] }`",
+    ])
+      expect({ part, found: text.includes(part) }).toEqual({ part, found: true })
+    expect(text).not.toContain("read the image in the main thread")
+    expect(text).not.toContain("Read screenshots yourself")
+  })
+
+  test("a branch the platform assigns is the work branch, the user is asked about the convention, and the names follow the version state", () => {
+    const text = agent("holyagent")?.content ?? ""
+    for (const part of [
+      "When the platform assigns a branch",
+      "use it as the work branch",
+      "ask through AskUserQuestion whether to open the PR from a branch that follows it",
+      "names the branch used and why whenever it departs from the convention",
+      "`exp/<experiment>/<type>/<change>` for work with no published version",
+      "`release/<version>/<type>/<change>` when the repository has tags or releases",
+    ])
+      expect({ part, found: text.includes(part) }).toEqual({ part, found: true })
+    expect(text).not.toContain("when the version workflow fits")
+  })
+
   test("the removed skills are gone from the plugin, and the roles start with the built-in reviews", () => {
     const names = generated
       .filter((file) => file.path.endsWith("SKILL.md"))

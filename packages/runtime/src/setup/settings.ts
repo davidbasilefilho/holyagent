@@ -21,13 +21,25 @@ export const CACHE_TTLS = ["1h", "5m"] as const
 /** A prompt cache lifetime of {@link CACHE_TTLS}. */
 export type CacheTtl = (typeof CACHE_TTLS)[number]
 
-/** The user settings `holyagent setup` makes sure exist: the keys a plugin cannot set itself. */
+/**
+ * The canonical name Claude Code keys the Opus 5.5 entry of `modelSettings` by, the model the root
+ * runs on. The entry matches the model's alias and dated IDs too.
+ */
+export const ROOT_MODEL = "claude-opus-5-5"
+
+/**
+ * The user settings `holyagent setup` makes sure exist: the keys a plugin cannot set itself. The
+ * root's effort and compaction window are per-model entries, since a top-level `effortLevel` does
+ * not apply to Opus 5.5 and a plugin's own settings honor neither.
+ */
 export const userSettingsDefaults = (subagentCacheTtl: CacheTtl): ReadonlyArray<Default> => [
   { path: ["attribution", "commit"], value: "" },
   { path: ["attribution", "pr"], value: "" },
   { path: ["attribution", "sessionUrl"], value: false },
   { path: ["includeGitInstructions"], value: false },
   { path: ["subagentPromptCacheTtl"], value: subagentCacheTtl },
+  { path: ["modelSettings", ROOT_MODEL, "effortLevel"], value: "high" },
+  { path: ["modelSettings", ROOT_MODEL, "autoCompactWindow"], value: 200000 },
   {
     path: ["extraKnownMarketplaces", MARKETPLACE.name],
     value: { source: { source: "github", repo: MARKETPLACE.repo } },
