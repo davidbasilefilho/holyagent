@@ -10292,7 +10292,7 @@ var NON_INTERACTIVE_SSH_OPTIONS = "-o BatchMode=yes -o ConnectTimeout=5";
 var ASKPASS_VARIABLES = new Set(["SSH_ASKPASS", "SSH_ASKPASS_REQUIRE"]);
 var fetchEnvironment = (env, configured) => {
   const base = Object.fromEntries(Object.entries(gitEnvironment(env)).filter(([name]) => !ASKPASS_VARIABLES.has(name)));
-  const chosen = base["GIT_SSH_COMMAND"] !== undefined || base["GIT_SSH"] !== undefined;
+  const chosen = base["GIT_SSH_COMMAND"] !== undefined || configured === undefined && base["GIT_SSH"] !== undefined;
   return {
     ...base,
     GIT_TERMINAL_PROMPT: "0",
@@ -11973,7 +11973,7 @@ var renderJsonReport = (report) => [
 
 var EVIDENCE_HEADING = /^\s*evidence:\s*$/i;
 var indentOf = (line) => line.length - line.trimStart().length;
-var LIST_ITEM = /^(?:[-*+\u2022]|\d+[.)])\s+/;
+var LIST_MARKER = /^(?:[-*+\u2022]\s+|\d+[.)]\s+|\[[ xX]\]\s+)+/;
 var evidenceEntries = (report) => {
   const lines = report.split(/\r?\n/);
   const heading = lines.findLastIndex((line) => EVIDENCE_HEADING.test(line));
@@ -11987,7 +11987,8 @@ var evidenceEntries = (report) => {
       gap = true;
       continue;
     }
-    const text = line.trim().replace(/^(?:[-*+\u2022]\s+|\d+[.)]\s+|\[[ xX]\]\s+)+/, "");
+    const trimmed = line.trim();
+    const text = trimmed.replace(LIST_MARKER, "");
     const last = entries.length - 1;
     const above = entries[last];
     if (indentOf(line) > base && above !== undefined && !gap)
@@ -11996,7 +11997,7 @@ var evidenceEntries = (report) => {
         text: `${above.text}${above.text.endsWith(":") ? " " : "; "}${text}`
       };
     else
-      entries.push({ text, list: LIST_ITEM.test(line.trim()), gap });
+      entries.push({ text, list: LIST_MARKER.test(trimmed), gap });
     gap = false;
   }
   return entries;
@@ -12146,7 +12147,8 @@ var journalResults = (journal, source) => gen2(function* () {
     else if ("result" in entry && entry.result !== null) {
       const json = yield* decodeUnknownEffect2(JsonReport)(entry.result).pipe(option2);
       const report = typeof entry.result === "string" ? entry.result : json._tag === "Some" ? renderJsonReport(json.value) : JSON.stringify(entry.result, null, 2) ?? "";
-      results.push({ label: labels.get(entry.key), agentId: entry.agentId, report });
+      if (report.trim() !== "")
+        results.push({ label: labels.get(entry.key), agentId: entry.agentId, report });
     }
   }
   return results;
@@ -12396,7 +12398,7 @@ var ASSIGNMENT_COMMANDS = [
     output: "TOON: `reports` rows of id, path and words, one per Assignment id, and `notAssignmentIds` rows of label and agentId for results whose label is not an Assignment id (not written)",
     notes: [
       "the journal is the run's journal.jsonl: `started` entries (key, agentId, label) and `result` entries (key, agentId, result) joined by key; label each agent() with its Assignment id so its report lands in <id>.md",
-      "reports go to holyagent/reports in the git common directory (local/reports of the state folder outside git), beside the briefs; a repeated label keeps its last result. Read a report there, or close from it: `assignment close <id> --outcome success --accept <rationale> < <path>`",
+      "reports go to holyagent/reports in the git common directory (local/reports of the state folder outside git), beside the briefs; a repeated label keeps its last result. Read a report there, or close from it: `assignment close <id> --outcome success --accept <rationale> < <report-file>`",
       "a journal line that is not JSON, or a started or result entry without its fields, refuses the whole journal and writes nothing"
     ],
     flags: {},

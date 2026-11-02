@@ -14,13 +14,14 @@ const indentOf = (line: string) => line.length - line.trimStart().length
 /** One line of the evidence block with its list marker stripped. */
 interface EvidenceEntry {
   readonly text: string
-  /** Whether the line is a list item (bullet or number). */
+  /** Whether the line is a list item (bullet, number or checkbox). */
   readonly list: boolean
   /** Whether a blank line comes before it. */
   readonly gap: boolean
 }
 
-const LIST_ITEM = /^(?:[-*+•]|\d+[.)])\s+/
+/** The markers that open a list item: bullets, numbers and checkboxes, alone or stacked. */
+const LIST_MARKER = /^(?:[-*+•]\s+|\d+[.)]\s+|\[[ xX]\]\s+)+/
 
 /**
  * The entries of the report's last `evidence:` block, bullets stripped; none without the block. A
@@ -39,7 +40,8 @@ const evidenceEntries = (report: string): ReadonlyArray<EvidenceEntry> => {
       gap = true
       continue
     }
-    const text = line.trim().replace(/^(?:[-*+•]\s+|\d+[.)]\s+|\[[ xX]\]\s+)+/, "")
+    const trimmed = line.trim()
+    const text = trimmed.replace(LIST_MARKER, "")
     const last = entries.length - 1
     const above = entries[last]
     if (indentOf(line) > base && above !== undefined && !gap)
@@ -47,7 +49,7 @@ const evidenceEntries = (report: string): ReadonlyArray<EvidenceEntry> => {
         ...above,
         text: `${above.text}${above.text.endsWith(":") ? " " : "; "}${text}`,
       }
-    else entries.push({ text, list: LIST_ITEM.test(line.trim()), gap })
+    else entries.push({ text, list: LIST_MARKER.test(trimmed), gap })
     gap = false
   }
   return entries
@@ -301,7 +303,7 @@ export const journalResults = (journal: string, source: string) =>
         ),
       )
       if ("label" in entry) labels.set(entry.key, entry.label)
-      // A null result is no result: the agent returned nothing to write.
+      // A null result is no result, and neither is an empty one: the agent returned nothing to write.
       else if ("result" in entry && entry.result !== null) {
         const json = yield* Schema.decodeUnknownEffect(JsonReport)(entry.result).pipe(Effect.option)
         const report =
@@ -310,7 +312,8 @@ export const journalResults = (journal: string, source: string) =>
             : json._tag === "Some"
               ? renderJsonReport(json.value)
               : (JSON.stringify(entry.result, null, 2) ?? "")
-        results.push({ label: labels.get(entry.key), agentId: entry.agentId, report })
+        if (report.trim() !== "")
+          results.push({ label: labels.get(entry.key), agentId: entry.agentId, report })
       }
     }
     return results

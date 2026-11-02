@@ -395,7 +395,7 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
       "TOON: `reports` rows of id, path and words, one per Assignment id, and `notAssignmentIds` rows of label and agentId for results whose label is not an Assignment id (not written)",
     notes: [
       "the journal is the run's journal.jsonl: `started` entries (key, agentId, label) and `result` entries (key, agentId, result) joined by key; label each agent() with its Assignment id so its report lands in <id>.md",
-      "reports go to holyagent/reports in the git common directory (local/reports of the state folder outside git), beside the briefs; a repeated label keeps its last result. Read a report there, or close from it: `assignment close <id> --outcome success --accept <rationale> < <path>`",
+      "reports go to holyagent/reports in the git common directory (local/reports of the state folder outside git), beside the briefs; a repeated label keeps its last result. Read a report there, or close from it: `assignment close <id> --outcome success --accept <rationale> < <report-file>`",
       "a journal line that is not JSON, or a started or result entry without its fields, refuses the whole journal and writes nothing",
     ],
     flags: {},

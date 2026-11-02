@@ -161,6 +161,24 @@ describe("assignment reports", () => {
     expect(await readdir(join(project, ".holyagent", "local", "reports"))).toEqual([`${SECOND}.md`])
   })
 
+  test("an empty or whitespace result is no result: it is not listed and writes no file", async () => {
+    const path = await writeJournal(
+      started("k1", FIRST),
+      started("k2", SECOND),
+      started("k3", "assignment-0mvzlcjda-wxyz"),
+      result("k1", ""),
+      result("k3", " \n\t "),
+      result("k2", "Done."),
+    )
+
+    const done = await cli(["assignment", "reports", path])
+
+    expect(done.code).toBe(0)
+    const rows = decode(done.stdout) as { reports: Array<{ id: string }> }
+    expect(rows.reports.map((row) => row.id)).toEqual([SECOND])
+    expect(await readdir(join(project, ".holyagent", "local", "reports"))).toEqual([`${SECOND}.md`])
+  })
+
   test("a malformed journal is refused with a tagged error and writes nothing", async () => {
     const path = join(project, "journal.jsonl")
     for (const bad of [

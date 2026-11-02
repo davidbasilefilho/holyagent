@@ -419,9 +419,9 @@ const ASKPASS_VARIABLES: ReadonlySet<string> = new Set(["SSH_ASKPASS", "SSH_ASKP
 /**
  * The environment of the state fetch: no terminal, askpass program or interactive credential
  * manager prompt, and ssh in batch mode with a connect timeout. The user's own choice of ssh is
- * kept: `GIT_SSH_COMMAND` or `GIT_SSH` in the environment is left alone, and a configured
- * `core.sshCommand` (`configured`), which an injected `GIT_SSH_COMMAND` would override, runs with
- * the options appended.
+ * kept: `GIT_SSH_COMMAND` in the environment is left alone, and a configured `core.sshCommand`
+ * (`configured`), which an injected `GIT_SSH_COMMAND` would override, runs with the options
+ * appended, also beside `GIT_SSH`, which git ranks below it. `GIT_SSH` alone is left alone.
  */
 const fetchEnvironment = (
   env: Environment,
@@ -430,7 +430,9 @@ const fetchEnvironment = (
   const base = Object.fromEntries(
     Object.entries(gitEnvironment(env)).filter(([name]) => !ASKPASS_VARIABLES.has(name)),
   )
-  const chosen = base["GIT_SSH_COMMAND"] !== undefined || base["GIT_SSH"] !== undefined
+  const chosen =
+    base["GIT_SSH_COMMAND"] !== undefined ||
+    (configured === undefined && base["GIT_SSH"] !== undefined)
   return {
     ...base,
     GIT_TERMINAL_PROMPT: "0",

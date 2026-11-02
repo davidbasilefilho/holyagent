@@ -569,6 +569,20 @@ describe("report and prompt", () => {
     })
   })
 
+  test("an unindented checkbox item below a key line is support exactly when a dash checkbox item is", async () => {
+    await createIntent()
+    for (const item of ["[x] ran it", "- [x] ran it", "[ ] ran it"]) {
+      const id = await dispatchWriter()
+      data(await cli(["assignment", "record", id, "--agent", "agent-1"]))
+      const text = ["Built it.", "", "evidence:", "parses:", item, "tests: passed"].join("\n")
+      const accept = ["assignment", "close", id, "--outcome", "success", "--accept", "ok"]
+      expect(data(await cli(accept, text))).toMatchObject({ accepted: true })
+      expect(data(await cli(["assignment", "show", id, "--full"]))).toMatchObject({
+        acceptance: { criteria: [{ criterion: "parses", support: "ran it" }] },
+      })
+    }
+  })
+
   test("a key line followed by unindented text, or by a list after a blank line, is still no support", async () => {
     await createIntent()
     const id = await dispatchWriter()
