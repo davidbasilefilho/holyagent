@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "re-review-the-text-changes-in-commit",
   "objective": "Re-review the text changes in commit eee082a that put the workflow closing rule in requirements.md and make the docs refer to the root text.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "The diff at /tmp/holyagent-review/final-head.diff, parts in packages/runtime/src/instructions/requirements.md, docs/cache-and-workflows.md and the assignment reports help in packages/runtime/src/cli/assignment.ts; read the current files and packages/runtime/src/instructions/claude-5.5/root/workflows.md as needed.",
     "Previous finding: docs/cache-and-workflows.md:50 repeated the closing rule in full and requirements.md R-WORKFLOW no longer carried it. Expected: R-WORKFLOW states it, the docs refer to the root's workflow text, workflows.md:10 stays the one root statement."
@@ -34,7 +34,25 @@
     "agentId": "workflow:wf_4b555747-481/assignment-0mvzsaknz-zauu",
     "model": "haiku",
     "effort": "high",
-    "startedAt": "2026-11-02T21:41:41.279Z"
+    "startedAt": "2026-11-02T21:41:41.279Z",
+    "finishedAt": "2026-11-02T21:47:40.009Z"
+  },
+  "result": "result: closed. The closing rule is stated once in root text, requirements.md:24 states it, and docs/cache-and-workflows.md:50 refers to the root text without repeating it. No contradiction found.\nchanged: none\nchecks: none run (text-only criterion); grep sweep for \"cannot be messaged|does not list|errored\" across the repo; read the assertions at packages/integrations/claude/tests/plugin.test.ts:365-372 and packages/runtime/tests/cli.test.ts:1042, not executed\nblockers: none\nquestions: none\nnotes: docs/cache-and-workflows.md:50 says \"is in its workflow text\" without naming or linking the file, so a docs reader cannot resolve it. Consider naming `packages/runtime/src/instructions/claude-5.5/root/workflows.md`. The \"a workflow agent cannot be messaged, so draft a follow-up\" wording in assignment.ts:272 and errors.ts:116 covers gap follow-ups, a different rule, so it does not conflict.\nevidence:\nSingle statement: requirements.md:24 (R-WORKFLOW) says an Assignment that `assignment reports` does not list, once the run has completed, is \"closed errored without further confirmation, since a workflow agent cannot be messaged\"; workflows.md:10 says the same (\"close it with `--outcome errored` once the run has completed, without further confirmation\"); docs/cache-and-workflows.md:50 defers to \"its workflow text\" and does not restate the rule; no other file restates it, and the test at plugin.test.ts:365-372 pins the workflows.md wording.\nverdict: closed; the criterion is met on the current tree, with the workflow text as the single root statement and the docs pointing to it.\n",
+  "acceptance": {
+    "revision": 2,
+    "rationale": "Evidence cites file:line or command, exit code and counts on head eee082a.",
+    "criteria": [
+      {
+        "criterion": "Single statement: closed or still open, with file:line support and no contradiction between requirements.md, workflows.md and the docs",
+        "support": "requirements.md:24 (R-WORKFLOW) says an Assignment that `assignment reports` does not list, once the run has completed, is \"closed errored without further confirmation, since a workflow agent cannot be messaged\"; workflows.md:10 says the same (\"close it with `--outcome errored` once the run has completed, without further confirmation\"); docs/cache-and-workflows.md:50 defers to \"its workflow text\" and does not restate the rule; no other file restates it, and the test at plugin.test.ts:365-372 pins the workflows.md wording."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "verdict",
+        "support": "closed; the criterion is met on the current tree, with the workflow text as the single root statement and the docs pointing to it."
+      }
+    ]
   },
   "createdAt": "2026-11-02T21:41:41.279Z"
 }
