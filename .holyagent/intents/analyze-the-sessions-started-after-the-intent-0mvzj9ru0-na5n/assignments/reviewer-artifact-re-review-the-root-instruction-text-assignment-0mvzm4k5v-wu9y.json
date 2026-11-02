@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "re-review-the-root-instruction-text",
   "objective": "Re-review the root instruction text after commit 7ac8084 against the previous instruction-review findings.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Previous findings are in /home/user/holyagent/.git/holyagent/reports/assignment-0mvzlcjpy-6ufq.md (blockers: reports command missing, plan text contradicting workflows.md, no rule for an Assignment missing from the reports, rules stated twice; plus non-blocking notes). The repair diff is /tmp/holyagent-review/assignment-0mvzlp1ml-io0u.diff; assignment reports now exists (packages/runtime/src/cli/assignment.ts). Judge the repair diff and the assembled prompt packages/integrations/claude/dist/agents/holyagent.md only for these findings and anything the repair broke.",
     "Decision already taken: the force-push and protected-branch rule lives in version-control.md and the PreToolUse reminder, not in the 4,100-character core; this is not a finding."
@@ -43,7 +43,37 @@
     "agentId": "workflow:wf_c2fff0a8-5e6/assignment-0mvzm4k5v-wu9y",
     "model": "haiku",
     "effort": "high",
-    "startedAt": "2026-11-02T18:49:07.273Z"
+    "startedAt": "2026-11-02T18:49:07.273Z",
+    "finishedAt": "2026-11-02T18:55:04.229Z"
+  },
+  "result": "result: Not ready. The repair closes most of the prior findings, but it adds an acceptance-gate regression and leaves the journal-path blocker open.\nchanged: none (read-only review; diff read from /tmp/holyagent-review/assignment-0mvzlp1ml-io0u.diff, tree read with Read and Grep)\nchecks: none run (no shell in this role). Grep and Read only. The repair's own tests (cli.test.ts, plugin.test.ts, state-branch.test.ts) were not executed.\nblockers:\n1. /home/user/holyagent/packages/runtime/src/cli/report.ts:123-141 (with evidenceEntries at :19-34): a key line with empty support now takes every following unindented line, to the end of the report, as its support. Failure: the evidence block ends \"parses:\" then \"Looks fine.\" Before the repair, `assignment close --accept` refused (no support for \"parses\"). Now it accepts a blocking criterion with no command, exit code or count. The refusal is the stated invariant in /home/user/holyagent/docs/decisions.md:17. cli.test.ts:531-541 covers only a following key line, so nothing catches this.\n2. Prior blocker 1, journal path, still open: /home/user/holyagent/packages/runtime/src/instructions/claude-5.5/root/workflows.md:10 says only \"the run's journal\". Grep of the instructions and docs/usage.md finds no location. Failure: the root runs `assignment reports` on a guessed path, gets an error, then retypes reports (breaking R-REPORT) or leaves Assignments Running.\nquestions: Is /home/user/holyagent/packages/runtime/src/state/tree.ts:474-488 (credential helper restored for the background state fetch) and the report.ts acceptance change intended in this Assignment? Neither is among the prior findings, and the tree.ts change alters a credential path.\nnotes:\n- Prior notes: R-BRANCH \"whenever it departs\" is unchanged (version-control.md:127, requirements.md:436). The Intent wording is not visible to me, so I cannot say whether it blocks.\n- \"What reaches the user\" is still split: task-list.md:3 says \"only\" for decisions, blockers and the final report, while user-messages.md:10 lists verified results, outward actions and denials \"beyond what the task list names\". The qualifier is undefined.\n- \"confirmed gone\" (workflows.md:10, overview.ts:207) gives no check for workflow agents, which cannot be messaged.\n- The \"close it errored\" rule is now stated in five places: workflows.md:10, overview.ts:207, docs/cache-and-workflows.md:9, requirements.md:425, holyagent.md:64. Drift risk.\n- Placeholder mismatch: `<report-file>` (holyagent.md:24) against `<path>` (workflows.md:10, overview.ts:206).\n- Window text: usage.md:81, :88, :92 and decisions.md:17 still repeat it. settings.ts:27 and requirements/context.md:5 cite \"The root's effort and window\", a bold lead-in at usage.md:88 rather than a heading, so it resolves as text only.\n- The diff omits packages/integrations/claude/dist/scripts/holyagent.js, but the tree already has the new plan text there. The diff file is incomplete, or the tree moved after it was saved.\nevidence:\nClosed: prior 1 (command) closed: assignment.ts:390-420 and REPORTS_USAGE at :106 implement `assignment reports`. Prior 1 (journal path) open: workflows.md:10 gives no location. Prior 2 closed: overview.ts:203-207 says `{ done: [ids] }` and reports, and holyagent.js:13669-13670 has the new text with no \"keyed by Assignment id\" or \"null report\". Prior 3 closed: workflows.md:10 and holyagent.md:64 give the absent-Assignment rule. Prior 4 closed for the duplicates: context.md:3, :5, :7, delegating.md:3, stack-plan.md:7, ci.md:3, user-messages.md:6 and task-list.md:3 each keep one owner. The reach-list split remains (see notes).\nNo breakage: blocked by report.ts:123-141 (blocker 1). The journal gap (blocker 2) is also a gap in the repaired text. Route, plan and test-count checks are clean, as listed under verified.\nNotes: partly addressed. Routing (routing.md:1, route.ts:203 and :212) now covers the haiku audit and artifact roles. R-STATE is restored at version-control.md:126. Brief location is stated at usage.md:111. context.md:5, :7, :9 and ci.md:3 gained reasons or thresholds. Still open: R-BRANCH (version-control.md:127) and the window-text repetition.\nfindings: 1) report.ts:123-141 regression, blocking (blocker 1). 2) workflows.md:10 journal path, blocking, prior blocker still open. 3) tree.ts:474-488 out-of-scope credential change, non-blocking, question to root. 4) task-list.md:3 against user-messages.md:10, non-blocking. 5) workflows.md:10 \"confirmed gone\" lacks a check, non-blocking. 6) five copies of the errored rule, non-blocking. 7) `<report-file>` against `<path>`, style.\nverified: Test-count rules in holyagent.md each occur once: \"Run no gates, probes or data checks yourself\" at :51, \"never open or re-emit the brief\" at :22, \"Never force-push\" at :122, \"the push once the reviews accept\" at :83, \"Read only what a decision needs\" at :18. overview.ts plan text matches workflows.md:10 and the test strings in cli.test.ts:998-1005. Anchor #t3-code resolves to usage.md:149. Routing: route.ts:203 haiku for Reviewer.audit and route.ts:212 for Reviewer.artifact.\n",
+  "acceptance": {
+    "revision": 2,
+    "rationale": "Both blockers cite lines and failure scenarios; the multi-line evidence regression and the journal path go to repair.",
+    "criteria": [
+      {
+        "criterion": "Closed: each previous blocker is closed or still open, with the line that shows it",
+        "support": "prior 1 (command) closed: assignment.ts:390-420 and REPORTS_USAGE at :106 implement `assignment reports`. Prior 1 (journal path) open: workflows.md:10 gives no location. Prior 2 closed: overview.ts:203-207 says `{ done: [ids] }` and reports, and holyagent.js:13669-13670 has the new text with no \"keyed by Assignment id\" or \"null report\". Prior 3 closed: workflows.md:10 and holyagent.md:64 give the absent-Assignment rule. Prior 4 closed for the duplicates: context.md:3, :5, :7, delegating.md:3, stack-plan.md:7, ci.md:3, user-messages.md:6 and task-list.md:3 each keep one owner. The reach-list split remains (see notes)."
+      },
+      {
+        "criterion": "No breakage: the repair lost no behavior and introduced no contradiction or new duplicate",
+        "support": "blocked by report.ts:123-141 (blocker 1). The journal gap (blocker 2) is also a gap in the repaired text. Route, plan and test-count checks are clean, as listed under verified."
+      },
+      {
+        "criterion": "Notes: the non-blocking notes are addressed",
+        "support": "partly addressed. Routing (routing.md:1, route.ts:203 and :212) now covers the haiku audit and artifact roles. R-STATE is restored at version-control.md:126. Brief location is stated at usage.md:111. context.md:5, :7, :9 and ci.md:3 gained reasons or thresholds. Still open: R-BRANCH (version-control.md:127) and the window-text repetition."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "1) report.ts:123-141 regression, blocking (blocker 1). 2) workflows.md:10 journal path, blocking, prior blocker still open. 3) tree.ts:474-488 out-of-scope credential change, non-blocking, question to root. 4) task-list.md:3 against user-messages.md:10, non-blocking. 5) workflows.md:10 \"confirmed gone\" lacks a check, non-blocking. 6) five copies of the errored rule, non-blocking. 7) `<report-file>` against `<path>`, style."
+      },
+      {
+        "label": "verified",
+        "support": "Test-count rules in holyagent.md each occur once: \"Run no gates, probes or data checks yourself\" at :51, \"never open or re-emit the brief\" at :22, \"Never force-push\" at :122, \"the push once the reviews accept\" at :83, \"Read only what a decision needs\" at :18. overview.ts plan text matches workflows.md:10 and the test strings in cli.test.ts:998-1005. Anchor #t3-code resolves to usage.md:149. Routing: route.ts:203 haiku for Reviewer.audit and route.ts:212 for Reviewer.artifact."
+      }
+    ]
   },
   "createdAt": "2026-11-02T18:49:02.995Z"
 }
