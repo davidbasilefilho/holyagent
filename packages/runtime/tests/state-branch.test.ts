@@ -572,7 +572,7 @@ describe("a base branch that ignores the state folder", () => {
 })
 
 describe("migrating the legacy state", () => {
-  test("the notes copied into an Intent folder are committed, a stray file beside them is not", async () => {
+  test("every file migrate copied into an Intent folder is committed, a stray file beside them is not", async () => {
     const dir = await initRepo(OWNER)
     const folder = ".holyclaude/intents/take-over-legacy-state-intent-0mvp7hcqf-t7pm"
     await seed(dir, {
@@ -585,6 +585,8 @@ describe("migrating the legacy state", () => {
         revision: 1,
       }),
       [`${folder}/resume-notes.md`]: "# Resume\n",
+      [`${folder}/plan.toon`]: "plan: current\n",
+      [`${folder}/plan.old-001.toon`]: "plan: old\n",
       [`${folder}/notes/design.md`]: "design\n",
       [`${folder}/notes/deep/more.md`]: "more\n",
       [`${folder}/notes/scratch.tmp`]: "temporary\n",
@@ -592,7 +594,7 @@ describe("migrating the legacy state", () => {
 
     const done = toon(await holy(dir, ["migrate"])) as { migrated: boolean }
     expect(done.migrated).toBe(true)
-    // A file that is neither a record, the settings nor a copied note stays out of the commit.
+    // A file that is neither a record, the settings nor a file migrate copied stays out of the commit.
     const state = join(await stateTree(dir), ".holyagent")
     const migrated = (await readdir(join(state, "intents")))[0] ?? ""
     await writeFile(join(state, "intents", migrated, "stray.md"), "stray\n")
@@ -607,6 +609,8 @@ describe("migrating the legacy state", () => {
       "intent.json",
       "notes/deep/more.md",
       "notes/design.md",
+      "plan.old-001.toon",
+      "plan.toon",
       "resume-notes.md",
     ])
     expect(await sh(dir, ["git", "status", "--porcelain"])).toBe("")

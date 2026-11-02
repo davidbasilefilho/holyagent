@@ -1,5 +1,5 @@
 import { lstat, mkdir, readdir, realpath, rename, rm, rmdir, stat } from "node:fs/promises"
-import { basename, dirname, join, sep } from "node:path"
+import { basename, dirname, join, relative, sep } from "node:path"
 
 import { $ } from "bun"
 import { Effect, type Exit } from "effect"
@@ -889,9 +889,11 @@ const STATE_FILE =
  * Stages the changes under `.holyagent/` of the state worktree: the changes and removals of what
  * git already tracks there, then each file HolyAgent writes ({@link STATE_FILE}) with `-f`, because
  * a branch started from the base inherits its `.gitignore`, which may ignore the state folder as a
- * whole. Any other file stays unstaged whatever the ignore rules say, as does `local/`.
+ * whole. Any other file stays unstaged whatever the ignore rules say, as does `local/`, except the
+ * `copied` files a command wrote itself (absolute paths; one outside the state folder or in
+ * `local/` is ignored).
  */
-const stageState = (worktree: string, env: Environment) =>
+const stageState = (worktree: string, env: Environment, copied: ReadonlyArray<string>) =>
   Effect.gen(function* () {
     yield* gitText(worktree, env, [
       "add",
@@ -904,10 +906,15 @@ const stageState = (worktree: string, env: Environment) =>
     const files = yield* io(folder, () =>
       Array.fromAsync(new Bun.Glob("**/*").scan({ cwd: folder, dot: true, onlyFiles: true })),
     )
-    const wanted = files
-      .map((path) => toPosix(path))
-      .filter((path) => STATE_FILE.test(path))
-      .map((path) => `${STATE_DIRECTORY}/${path}`)
+    const named = copied
+      .map((path) => toPosix(relative(folder, path)))
+      .filter((path) => path !== "" && !path.startsWith("../") && !/^local(?:\/|$)/.test(path))
+    const wanted = [
+      ...new Set([
+        ...files.map((path) => toPosix(path)).filter((path) => STATE_FILE.test(path)),
+        ...named,
+      ]),
+    ].map((path) => `${STATE_DIRECTORY}/${path}`)
     if (wanted.length > 0)
       yield* gitText(worktree, env, ["--literal-pathspecs", "add", "-f", "--", ...wanted])
   })
@@ -917,9 +924,16 @@ const stageState = (worktree: string, env: Environment) =>
  * identity git has for the repository, and returns whether a commit was made. Nothing happens in
  * the `work` and `local` modes (the work commit or nobody carries the state), when the folder is
  * not in a worktree on the state branch (outside git, or on another branch), or when nothing
- * changed. Call it under the state lock.
+ * changed. `copied` lists files outside the usual record names that the caller wrote and wants
+ * committed (see {@link stageState}); every other stray file stays out. Call it under the state
+ * lock.
  */
-export const commitState = (directory: string, env: Environment, message: string) =>
+export const commitState = (
+  directory: string,
+  env: Environment,
+  message: string,
+  copied: ReadonlyArray<string> = [],
+) =>
   Effect.gen(function* () {
     const worktree = dirname(directory)
     if (!(yield* isDirectory(worktree))) return false
@@ -936,7 +950,7 @@ export const commitState = (directory: string, env: Environment, message: string
     const current = yield* git(worktree, env, ["symbolic-ref", "--short", "-q", "HEAD"])
     if (current.code !== 0 || current.stdout.trim() !== (yield* stateBranch(worktree, env)))
       return false
-    yield* stageState(worktree, env)
+    yield* stageState(worktree, env, copied)
     if (yield* gitSucceeds(worktree, env, ["diff", "--cached", "--quiet", "--", STATE_DIRECTORY]))
       return false
     yield* gitText(worktree, yield* committing(worktree, env), [

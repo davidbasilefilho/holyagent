@@ -9973,7 +9973,7 @@ var encodeLocal = (directory, change) => gen2(function* () {
   return files;
 });
 
-import { join as join3, relative, sep as sep3 } from "path";
+import { join as join3, relative as relative2, sep as sep3 } from "path";
 
 var IntentState = Literals(["Open", "Closed"]);
 var Intent = Struct({
@@ -10136,7 +10136,7 @@ var withFileLock = (file, use, patience = "short") => acquireUseRelease2(io(file
 var withStateLock = (directory, use) => acquireUseRelease2(ensureLocalDirectory(directory).pipe(andThen2(acquire(localFile(directory, "lock")))), () => use, (token) => release(localFile(directory, "lock"), token));
 
 import { lstat, mkdir as mkdir2, readdir, realpath, rename as rename2, rm as rm3, rmdir, stat } from "fs/promises";
-import { basename, dirname as dirname2, join as join2, sep as sep2 } from "path";
+import { basename, dirname as dirname2, join as join2, relative, sep as sep2 } from "path";
 var {$ } = globalThis.Bun;
 
 var looksLikeAgent = (identity) => identity.email.toLowerCase() === "noreply@anthropic.com" || /^claude\b/i.test(identity.name.trim());
@@ -10527,7 +10527,7 @@ var migrateWorkTree = (top, common, worktree, env, commit) => {
   }))))))));
 };
 var STATE_FILE = /^(?:config\.json|intents\/[^/]+\/(?:intent\.json|(?:assignments|branches|pulls)\/[^/]+\.json|resume-notes\.md|notes\/(?:.+\/)?[^/]+(?<!\.tmp)))$/;
-var stageState = (worktree, env) => gen2(function* () {
+var stageState = (worktree, env, copied) => gen2(function* () {
   yield* gitText(worktree, env, [
     "add",
     "-u",
@@ -10537,11 +10537,17 @@ var stageState = (worktree, env) => gen2(function* () {
   ]);
   const folder = join2(worktree, STATE_DIRECTORY);
   const files = yield* io(folder, () => Array.fromAsync(new Bun.Glob("**/*").scan({ cwd: folder, dot: true, onlyFiles: true })));
-  const wanted = files.map((path) => toPosix(path)).filter((path) => STATE_FILE.test(path)).map((path) => `${STATE_DIRECTORY}/${path}`);
+  const named = copied.map((path) => toPosix(relative(folder, path))).filter((path) => path !== "" && !path.startsWith("../") && !/^local(?:\/|$)/.test(path));
+  const wanted = [
+    ...new Set([
+      ...files.map((path) => toPosix(path)).filter((path) => STATE_FILE.test(path)),
+      ...named
+    ])
+  ].map((path) => `${STATE_DIRECTORY}/${path}`);
   if (wanted.length > 0)
     yield* gitText(worktree, env, ["--literal-pathspecs", "add", "-f", "--", ...wanted]);
 });
-var commitState = (directory, env, message) => gen2(function* () {
+var commitState = (directory, env, message, copied = []) => gen2(function* () {
   const worktree = dirname2(directory);
   if (!(yield* isDirectory(worktree)))
     return false;
@@ -10559,7 +10565,7 @@ var commitState = (directory, env, message) => gen2(function* () {
   const current = yield* git(worktree, env, ["symbolic-ref", "--short", "-q", "HEAD"]);
   if (current.code !== 0 || current.stdout.trim() !== (yield* stateBranch(worktree, env)))
     return false;
-  yield* stageState(worktree, env);
+  yield* stageState(worktree, env, copied);
   if (yield* gitSucceeds(worktree, env, ["diff", "--cached", "--quiet", "--", STATE_DIRECTORY]))
     return false;
   yield* gitText(worktree, yield* committing(worktree, env), [
@@ -10718,7 +10724,7 @@ var loadLinks = (directory, intents) => gen2(function* () {
   const pulls = [];
   for (const intent of intents) {
     const folder = intentFolder(directory, intent);
-    const prefix = relative(directory, folder);
+    const prefix = relative2(directory, folder);
     for (const file of yield* scan(directory, globBelow(prefix, "branches/*.json"))) {
       const path = join3(directory, file);
       const record = yield* readJson(BranchRecord, path);
@@ -10749,7 +10755,7 @@ var loadProject = (directory) => gen2(function* () {
 });
 var loadOpenProject = (directory) => gen2(function* () {
   const intents = (yield* loadIntents(directory)).filter((intent) => intent.state === "Open");
-  const relatives = yield* forEach2(intents, (intent) => scan(directory, globBelow(relative(directory, intentFolder(directory, intent)), "assignments/*.json")));
+  const relatives = yield* forEach2(intents, (intent) => scan(directory, globBelow(relative2(directory, intentFolder(directory, intent)), "assignments/*.json")));
   const assignments = yield* loadAssignments(directory, relatives.flat(), intents);
   return { intents, assignments };
 });
@@ -11274,7 +11280,7 @@ var prepareMessage = (parts, allowed) => checkedText(parts.join(`
 
 import { constants } from "fs";
 import { open as open2, realpath as realpath2 } from "fs/promises";
-import { join as join4, relative as relative2, sep as sep5 } from "path";
+import { join as join4, relative as relative3, sep as sep5 } from "path";
 
 var nowIso = currentTimeMillis2.pipe(map4((millis) => new Date(millis).toISOString()));
 var readReport = (host) => host.stdin.pipe(filterOrFail2((text) => text.trim() !== "", () => new StdinMissing({ reason: "stdin was empty" })));
@@ -11492,7 +11498,7 @@ var readBodyFile = (root, file) => {
     const base = yield* io(root, () => realpath2(root));
     if (real !== base && !real.startsWith(`${base}${sep5}`))
       return yield* refuse("resolves to a path outside the project");
-    const inside = toPosix(relative2(base, real));
+    const inside = toPosix(relative3(base, real));
     if (hasGitSegment(inside))
       return yield* refuse("is inside .git");
     const ignored = yield* Git.use((service) => service.run(["check-ignore", "-q", "--no-index", "--", inside]));
@@ -19784,7 +19790,7 @@ ${cleanedBelow}
   }, true)
 ];
 
-import { join as join15, relative as relative3 } from "path";
+import { join as join15, relative as relative4 } from "path";
 var {$: $4 } = globalThis.Bun;
 class NothingToMigrate extends TaggedError2("NothingToMigrate") {
   get message() {
@@ -19819,7 +19825,7 @@ var conflictsOf = (root, directory, found) => gen2(function* () {
   ]);
   const seen = new Map;
   const problems = [];
-  const shown = (path) => relative3(root, path);
+  const shown = (path) => relative4(root, path);
   for (const record of found.flatMap((gathered) => gathered.records)) {
     const first = seen.get(record.id);
     seen.set(record.id, record.from);
@@ -19842,9 +19848,10 @@ var writeAll = (found) => gen2(function* () {
   for (const kind of ["intent", "assignment"])
     for (const record of records.filter((candidate) => candidate.kind === kind))
       yield* commitFile(record.file.path, record.file.content);
-  for (const note of found.flatMap((gathered) => gathered.notes))
+  const notes = found.flatMap((gathered) => gathered.notes);
+  for (const note of notes)
     yield* io(note.to, () => Bun.write(note.to, Bun.file(note.from)));
-  return records;
+  return { records, copied: notes.map((note) => note.to) };
 });
 var reload = (directory, written) => loadProject(directory).pipe(mapError2((error) => new MigrationUnverified({ detail: error.message })), flatMap2((project) => {
   const ids = new Set([
@@ -19930,8 +19937,8 @@ var MIGRATE_COMMANDS = [
         const again = yield* conflictsOf(root, directory, found);
         if (again.length > 0)
           return yield* new MigrationRefused({ problems: again });
-        const records = yield* writeAll(found);
-        yield* commitState(directory, env, "chore(state): convert the legacy state");
+        const { records, copied } = yield* writeAll(found);
+        yield* commitState(directory, env, "chore(state): convert the legacy state", copied);
         return records;
       }));
       const loaded = yield* reload(directory, written);

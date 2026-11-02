@@ -89,16 +89,19 @@ const conflictsOf = (root: string, directory: string, found: ReadonlyArray<Gathe
     return problems
   })
 
-/** Writes the records, Intents first, then copies the notes. Call it under the lock. */
+/**
+ * Writes the records, Intents first, then copies the notes; returns the records and the paths of
+ * the copied files. Call it under the lock.
+ */
 const writeAll = (found: ReadonlyArray<Gathered>) =>
   Effect.gen(function* () {
     const records = found.flatMap((gathered) => gathered.records)
     for (const kind of ["intent", "assignment"] as const)
       for (const record of records.filter((candidate) => candidate.kind === kind))
         yield* commitFile(record.file.path, record.file.content)
-    for (const note of found.flatMap((gathered) => gathered.notes))
-      yield* io(note.to, () => Bun.write(note.to, Bun.file(note.from)))
-    return records
+    const notes = found.flatMap((gathered) => gathered.notes)
+    for (const note of notes) yield* io(note.to, () => Bun.write(note.to, Bun.file(note.from)))
+    return { records, copied: notes.map((note) => note.to) }
   })
 
 /** Reloads `.holyagent/` and checks that every record that was written is in it. */
@@ -215,8 +218,8 @@ export const MIGRATE_COMMANDS: ReadonlyArray<Command> = [
           Effect.gen(function* () {
             const again = yield* conflictsOf(root, directory, found)
             if (again.length > 0) return yield* new MigrationRefused({ problems: again })
-            const records = yield* writeAll(found)
-            yield* commitState(directory, env, "chore(state): convert the legacy state")
+            const { records, copied } = yield* writeAll(found)
+            yield* commitState(directory, env, "chore(state): convert the legacy state", copied)
             return records
           }),
         )

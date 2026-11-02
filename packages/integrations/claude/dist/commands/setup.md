@@ -9,7 +9,7 @@ Run HolyAgent's setup, show its report and tell the user whether to restart. Ste
 
 1. Run the plugin's own CLI, quoting both paths: `bun --no-env-file --config="${CLAUDE_PLUGIN_ROOT}/scripts/empty-bunfig.toml" "${CLAUDE_PLUGIN_ROOT}/scripts/holyagent.js" setup $ARGUMENTS`. Run nothing else: it installs ctx7 with its skill when it is missing and merges the recommended keys into the user settings without changing a value that is already set.
 2. Show the report exactly as the command printed it. Its lines start with `+` for added, `=` for already in place, `-` for skipped, `~` for kept or for something the user has to do, and `!` for a failed step; a failed step does not stop the others, and the command exits 1 when any step failed.
-3. Tell the user to **restart Claude Code** when the report has a `+` line, because Claude Code reads the user settings and skills at launch. Otherwise say that nothing needs a restart.
+3. Tell the user to **restart Claude Code** only after a real run (no `--dry-run` in the arguments) whose report has a `+` line, because Claude Code reads the user settings and skills at launch. A `--dry-run` also prints `+` lines but changes nothing, so then say that nothing was changed and nothing needs a restart, and that running the setup without `--dry-run` applies it. Otherwise say that nothing needs a restart.
 
 Notes:
 
