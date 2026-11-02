@@ -1,0 +1,54 @@
+{
+  "id": "assignment-0mvzut91g-3pmi",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 7,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-state-commit-after-holyagent",
+  "objective": "Make the state commit after holyagent migrate include exactly the files migrate copied, including plan.toon and every other legacy file.",
+  "state": "Running",
+  "scope": [
+    "packages/runtime/src/state/tree.ts STATE_FILE (~line 886) now admits only records, config, resume-notes.md and notes/**; packages/runtime/src/state/legacy.ts (~533-535, 702-707) copies every file of a legacy Intent folder except intent.json/intent.toon, assignment files, the transaction file and *.tmp, and migrate's help (packages/runtime/src/cli/migrate.ts:167) promises plan.toon, plan.old-NNN.toon and every other file are copied. Today plan.toon stays untracked in the state worktree.",
+    "Fix: have migrate pass the exact paths it copied to commitState so they are staged, keeping STATE_FILE strict so an unrelated stray file under .holyagent/ is still never committed."
+  ],
+  "constraints": [
+    "Do not edit packages/runtime/src/instructions or packages/integrations/claude (another writer, and it rebuilds dist after you).",
+    "No version-control writes (no git add, checkout, switch, stash, commit) and no edits under .git/ or .holyagent/; report changed paths.",
+    "Keep working until done; when done and checked, stop and report. Respond tersely."
+  ],
+  "criteria": [
+    {
+      "text": "Copied files: after migrate in branch state mode, git ls-tree of holyagent/state lists plan.toon, plan.old-001.toon, resume-notes.md and notes/** from the fixture, asserted by a test that fails on 35b4cd4",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Stray files: a stray file under .holyagent/ that migrate did not copy is never committed; the existing stray-file tests pass",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Gates: bun test on state-branch.test.ts and migrate.test.ts, bun check, bun lint and bun fmt --check exit 0",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/state",
+    "packages/runtime/src/cli/migrate.ts",
+    "packages/runtime/tests/state-branch.test.ts",
+    "packages/runtime/tests/migrate.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvzudk7e-98fk",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-02T22:52:11.908Z"
+  },
+  "createdAt": "2026-11-02T22:52:11.908Z"
+}
