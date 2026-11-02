@@ -10,7 +10,7 @@ Judge rendered work from what renders, not from a passing build or a report's cl
 ## Accept
 
 - Accept rendered work only on Reviewer.visual evidence against the Assignment's visual criteria, recorded as viewport, interaction and visible result for each observation. A Worker.visual report alone, or an inspection reported as blocked, does not accept it.
-- Read an image in the main thread only to show it to the user (a path is not delivery) or to settle a concrete doubt about that evidence; the specialists hand over captures and paths so you need not.
+- Read an image in the main thread only to show it to the user (a path is not delivery) or to settle a concrete doubt about that evidence; Reviewer.visual and Worker.visual hand over captures and paths so that you do not have to.
 - For web work, start the shared server first (the `dev-server` skill).
 
 ## Material discrepancies

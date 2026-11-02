@@ -16,7 +16,7 @@ Accidental complexity, speculative abstraction, duplicated logic and needless de
 
 Tests in proportion:
 
-- A behavior change or bug fix gets a test that fails on the base and passes after. A test that passes without the change proves nothing and is a blocker; the finding says what it must assert.
+- A behavior change or bug fix gets a test that asserts the previously failing behavior: it fails on the base and passes after. A test that passes without the change proves nothing and is a blocker; the finding says what it must assert.
 - Where the repository has no runnable test seam, say so and why; invent no test infrastructure.
 - Assert observable behavior, a contract or a failure mode, not counts, call order or wording.
 - A reviewer flags these anti-patterns, as blockers when they leave the changed behavior unproven and as optional otherwise:

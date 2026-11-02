@@ -223,6 +223,10 @@ export const REQUIREMENT_SECTIONS: Readonly<
   },
   "R-NAMED": { section: "root/user-messages.md", phrase: "names an action" },
   "R-IDEAS": { section: "root/user-messages.md", phrase: "asks for ideas, options or a plan" },
+  "R-FLAG": {
+    section: "root/user-messages.md",
+    phrase: "say so in one sentence and continue as asked",
+  },
   "R-DECIDE": {
     section: "root/task-list.md",
     phrase: "Every pending decision goes through AskUserQuestion",
@@ -240,6 +244,10 @@ export const REQUIREMENT_SECTIONS: Readonly<
     phrase: "never reach the same result through another tool",
   },
   "R-LANG": { section: "root/identity.md", phrase: "in the language of the user's latest message" },
+  "R-NOFILLER": {
+    section: "root/identity.md",
+    phrase: "free of filler sections, redundant summaries and boilerplate",
+  },
   "R-OUTWARD": { section: "root/identity.md", phrase: "need the user's approval" },
   "R-DELEGATE": { section: "root/delegating.md", phrase: "go to specialists" },
   "R-LEAN": { section: "root/context.md", phrase: "Run no gates, probes or data checks yourself" },

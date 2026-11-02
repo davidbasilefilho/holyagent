@@ -856,6 +856,16 @@ describe("agents", () => {
     }
   })
 
+  test("the root states its own mistaken-request and no-filler rules once, each mapped to a requirement", () => {
+    const root = agent("holyagent")?.content ?? ""
+    const once = (text: string, phrase: string) => text.split(phrase).length - 1
+    expect(once(root, "say so in one sentence and continue as asked")).toBe(1)
+    expect(once(root, "free of filler sections, redundant summaries and boilerplate")).toBe(1)
+    const requirements = read("packages/runtime/src/instructions", "requirements.md")
+    expect(requirements).toContain("- R-FLAG:")
+    expect(requirements).toContain("- R-NOFILLER:")
+  })
+
   test("the writing bar is in the implementation writer and the artifact reviewer once, and nowhere else", () => {
     const bar = read(`${CLAUDE}/specialist`, WRITING_BAR_SECTION).trim()
     for (const route of ROUTES) {
