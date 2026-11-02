@@ -1,0 +1,85 @@
+{
+  "id": "assignment-0mvzlp1ml-io0u",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 2,
+  "roleTask": "Worker.implementation",
+  "slug": "close-the-instruction-review-findings-on",
+  "objective": "Close the instruction-review findings on cf522df and the remaining open items, so the root text, the CLI it describes and the docs agree.",
+  "state": "Ready",
+  "scope": [
+    "Artifact review of cf522df (report at /home/user/holyagent/.git/holyagent/reports/assignment-0mvzlcjpy-6ufq.md, read it): blocker 2, packages/runtime/src/cli/overview.ts:91-92 plan notes still tell the root to return reports keyed by id, treat a null report as errored and pipe report text, which contradicts workflows.md ({ done: [ids] } and report files); blocker 3, workflows.md has no rule for an Assignment that `assignment reports` does not list (its agent died: close it errored, once confirmed); blocker 4, rules stated twice (delegating.md:3 and context.md:3/:5; dispatch.md:3 and context.md:7; stack-plan.md:7, assignments.md:12 and version-control.md:11; dispatch.md:9 and ci.md:3; identity.md:5 and version-control.md:11; user-messages.md:6/:10 and task-list.md:3): keep each rule in one section, the core (identity, delegating, dispatch, task-list) stays within its 4,100-character cap.",
+    "Its non-blocking notes: routing.md does not classify Reviewer.audit and Reviewer.artifact (haiku in route.ts); R-STATE's 'a mode moves no records' is missing from version-control.md; docs/usage.md omits the local/briefs fallback outside git; context.md and ci.md rules lack the reason beside them and context.md:9 lacks a concrete threshold; the window and effort text repeats across docs (keep one full statement, link the others).",
+    "Code findings: tree.ts fetchRemoteBranch passes -c credential.helper=, which drops stored non-interactive helpers, so a private https remote falls back to a base-started state branch whose history diverges from the remote's; keep the configured helpers and rely on GIT_TERMINAL_PROMPT=0, GCM_INTERACTIVE=never and the askpass removal. Evidence matching in cli/report.ts: a key line with nothing after its colon whose support follows on the next lines (list items, indented or not, up to the next key line) must count as support; the repair report's 'Fetch safety:' block failed this way.",
+    "Doctor (packages/runtime/src/setup/settings.ts and setup.ts): the modelSettings entry is keyed to claude-opus-5-5 while the root runs the opus alias; add a one-line note in docs/usage.md that the key follows the model the alias resolves to and must be updated when it moves."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md and AGENTS.md; behavior text goes to requirements.md first.",
+    "Size: the assembled root prompt (dist/agents/holyagent.md) must end no larger than its current size; report before and after bytes.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. Run bun test, bun check, bun lint, bun fmt --check, then rebuild the plugin with bun packages/integrations/claude/build.ts. When done, stop and report under 600 words, each evidence entry on one line as '<criterion label>: <support>', with the changed paths and a diff file under /tmp/holyagent-review/; name unrequested ideas instead of building them."
+  ],
+  "criteria": [
+    {
+      "text": "Plan text: plan's notes match workflows.md (scripts return { done: [ids] }, reports come from assignment reports, an Assignment it does not list is closed errored once its agent is confirmed gone)",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Absent rule: workflows.md states what to do with an Assignment assignment reports does not list",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No duplicates: each listed rule appears in one root section only, with no behavior lost and requirements.md still covered by the set",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Credentials: the state fetch keeps the configured credential helpers and stays non-interactive; the tests still pass",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Multi-line evidence: a key line with empty support followed by list lines counts as support, with a test using the 'Fetch safety:' shape",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Non-blocking notes: routing classifies audit and artifact, R-STATE line covered, usage.md fallback and model-key notes, reasons and threshold in context.md and ci.md, docs window text stated once",
+      "blocking": false,
+      "dimension": "style"
+    },
+    {
+      "text": "Gates: bun test, bun check, bun lint and bun fmt --check pass and dist matches a fresh build",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Size: the root prompt is no larger than before, with byte counts",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "diff-file",
+    "tests-run",
+    "prompt-size"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions/requirements.md",
+    "packages/runtime/src/instructions/requirements",
+    "packages/runtime/src/instructions/claude-5.5/root",
+    "packages/runtime/src/instructions/root-core.ts",
+    "packages/runtime/src/cli/overview.ts",
+    "packages/runtime/src/cli/report.ts",
+    "packages/runtime/src/state/tree.ts",
+    "packages/runtime/src/setup",
+    "packages/runtime/tests",
+    "packages/integrations/claude/tests",
+    "packages/integrations/claude/dist",
+    "docs"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvzkezwm-9ib4",
+  "createdAt": "2026-11-02T18:36:59.134Z"
+}
