@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "teach-the-agents-that-write-or-review",
   "objective": "Teach the agents that write or review context files (AGENTS.md, CLAUDE.md and similar) to leave out volatile and discoverable content, with the repository's convention first.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Where: packages/runtime/src/instructions/claude-5.5/roles/worker-implementation/instruction-text.md, roles/reviewer-artifact/instruction-text.md and skills/instruction-writing/SKILL.md (the agents that write or review instruction text); requirements.md first, with a REQUIREMENT_SECTIONS mapping in packages/integrations/claude/src/agents.ts. Not in other agents.",
     "Rule, user's words (pt-BR): \"incluir informações que mudam como caminhos de código, documentação, etc machucam performance. mas o padrão do repositório vem antes, se o repositório sai disso, isso só deve ser mudado se o usuário pergunta.\" State it in English: when writing or editing a context file, leave out content that changes or that the agent can discover from the repository (code and documentation paths, directory listings, codebase overviews) and include only instructions the code, README and docs do not already give (conventions, non-functional requirements, commands and tools to use); the repository's own convention comes first, and an existing file that departs from this is changed only when the user asks.",
@@ -50,7 +50,37 @@
     "agentId": "workflow:wf_ae63862b-73d/assignment-0mvzv9gzc-bi4h",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-02T23:04:48.697Z"
+    "startedAt": "2026-11-02T23:04:48.697Z",
+    "finishedAt": "2026-11-02T23:09:24.131Z"
+  },
+  "result": "result: The context-file rule is in worker-implementation, reviewer-artifact and the instruction-writing skill only, and the STATE_FILE comment is corrected. All four gates pass and dist is rebuilt.\n\nchanged:\n- /home/user/holyagent/packages/runtime/src/instructions/requirements.md (R-CONTEXT, R-WI-CONTEXT, R-RA-CONTEXT)\n- /home/user/holyagent/packages/runtime/src/instructions/claude-5.5/roles/worker-implementation/instruction-text.md\n- /home/user/holyagent/packages/runtime/src/instructions/claude-5.5/roles/reviewer-artifact/instruction-text.md\n- /home/user/holyagent/packages/runtime/src/instructions/claude-5.5/skills/instruction-writing/SKILL.md\n- /home/user/holyagent/packages/integrations/claude/src/agents.ts (3 REQUIREMENT_SECTIONS entries)\n- /home/user/holyagent/packages/integrations/claude/tests/plugin.test.ts (new reach test)\n- /home/user/holyagent/packages/runtime/src/state/tree.ts (STATE_FILE doc comment only)\n- /home/user/holyagent/packages/integrations/claude/dist/agents/worker-implementation.md, dist/agents/reviewer-artifact.md, dist/skills/instruction-writing/SKILL.md (rebuilt)\n\nchecks:\n- `bun check` -> 0, no type errors in 121 files.\n- `bun lint` -> 0, no problems in 122 files.\n- `bun fmt --check` -> 0, all 241 files formatted. It failed once on plugin.test.ts; I ran `bun fmt` on that file and re-ran.\n- `bun test` (full, before the format-only change) -> 0, 996 pass, 1 skip, 0 fail. I re-ran `bun test packages/integrations/claude` after formatting: 429 pass, 1 skip, 0 fail.\n- `bun packages/integrations/claude/build.ts` -> built 34 files.\n- `mise` is not installed here, so I ran the bun commands directly. `bun check` and `bun lint` printed mise-task wrapper output, so the Bun scripts call mise or bypass it.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- The skill intro now also says a rule tagged with an author comes from the cited study. I added it because the new rule cites a paper, not an Anthropic page.\n- The shipped STATE_FILE comment named `holyagent migrate` as the thing that copies the notes. The copied paths are actually passed to `commitState` by `packages/runtime/src/cli/migrate.ts`, and `stageState` stages them by name. I wrote the comment from that code, not from the brief's wording.\n- Diff file: /tmp/claude-0/-home-user-holyagent/4ed813b5-dc1d-5f26-9e40-d77f95591930/scratchpad/assignment-0mvzv9gzc-bi4h.diff\n\nevidence:\nchanged-paths: listed under `changed:` above.\nchecks-run: listed under `checks:` above.\nContext files: Reach is tested by the new test \"the context-file rule is in the implementation writer, the artifact reviewer and the instruction-writing skill only, convention first\" in `plugin.test.ts`. It checks the \"codebase overviews\" marker and both convention-first and only-when-asked clauses per agent and in the skill. The root and every other route must not contain the marker. The mapping test passes for R-CONTEXT, R-WI-CONTEXT and R-RA-CONTEXT. `requirements.md` cites arXiv 2602.11988 and marks the staleness harm \"Inference: ... no study measures it\".\nDoc comment: `packages/runtime/src/state/tree.ts` lines 880-885 say migrate passes every copied path to `commitState`, which stages them by name via `stageState`.\nGates: `bun check`, `bun lint`, `bun fmt --check` and `bun test` all exit 0, and dist was rebuilt before the final runs.\n",
+  "acceptance": {
+    "revision": 8,
+    "rationale": "Rule reaches only worker-implementation, reviewer-artifact and the instruction-writing skill with convention-first and only-when-asked clauses, cites 2602.11988 with staleness as inference, reach test added; STATE_FILE comment fixed; gates exit 0 after rebuild.",
+    "criteria": [
+      {
+        "criterion": "Context files: the rule reaches exactly worker-implementation, reviewer-artifact and the instruction-writing skill, with the repository-convention-first and change-only-when-asked clauses, and requirements.md cites arXiv 2602.11988 with the staleness harm marked as inference; mapped and tested",
+        "support": "Reach is tested by the new test \"the context-file rule is in the implementation writer, the artifact reviewer and the instruction-writing skill only, convention first\" in `plugin.test.ts`. It checks the \"codebase overviews\" marker and both convention-first and only-when-asked clauses per agent and in the skill. The root and every other route must not contain the marker. The mapping test passes for R-CONTEXT, R-WI-CONTEXT and R-RA-CONTEXT. `requirements.md` cites arXiv 2602.11988 and marks the staleness harm \"Inference: ... no study measures it\"."
+      },
+      {
+        "criterion": "Doc comment: the STATE_FILE comment describes the current staging",
+        "support": "`packages/runtime/src/state/tree.ts` lines 880-885 say migrate passes every copied path to `commitState`, which stages them by name via `stageState`."
+      },
+      {
+        "criterion": "Gates: bun check, bun lint, bun fmt --check and bun test exit 0 after rebuilding dist",
+        "support": "`bun check`, `bun lint`, `bun fmt --check` and `bun test` all exit 0, and dist was rebuilt before the final runs."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "listed under `changed:` above."
+      },
+      {
+        "label": "checks-run",
+        "support": "listed under `checks:` above."
+      }
+    ]
   },
   "createdAt": "2026-11-02T23:04:48.697Z"
 }
