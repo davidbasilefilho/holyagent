@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-three-blockers-the-re-reviews",
   "objective": "Repair the three blockers the re-reviews of 7ac8084 found, and the small items beside them.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "Blocker A (code review): packages/runtime/src/state/tree.ts:428 fetchEnvironment injects GIT_SSH_COMMAND unless the env sets GIT_SSH_COMMAND or GIT_SSH, which overrides a user's git config core.sshCommand (git's env var outranks it). Keep the user's core.sshCommand: when it is set, pass BatchMode and ConnectTimeout without replacing it (for example append the options to that command) or skip the injection; test with core.sshCommand set.",
     "Blocker B (artifact review): packages/runtime/src/cli/report.ts:123-141 a key line with empty support now takes every following unindented line to the end of the report as support, so 'parses:' followed by 'Looks fine.' accepts. Take as support only the contiguous list items (-, *, numbered) or indented lines directly below the key line, stopping at a blank line, the next key line or any unindented non-list line; test the 'Looks fine.' case is refused and the 'Fetch safety:' list case still accepted.",
@@ -68,7 +68,9 @@
     "agentId": "workflow:wf_6fa809b1-8ed/assignment-0mvzmcb7u-3l39",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-02T18:55:09.073Z"
+    "startedAt": "2026-11-02T18:55:09.073Z",
+    "finishedAt": "2026-11-02T21:25:59.512Z"
   },
+  "result": "errored: Launch failed: the session hit its usage limit after 6 tool calls; no report.\n",
   "createdAt": "2026-11-02T18:55:04.650Z"
 }
