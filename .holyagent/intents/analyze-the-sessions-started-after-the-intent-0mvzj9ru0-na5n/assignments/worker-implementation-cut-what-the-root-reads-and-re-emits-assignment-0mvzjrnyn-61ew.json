@@ -1,0 +1,76 @@
+{
+  "id": "assignment-0mvzjrnyn-61ew",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 2,
+  "roleTask": "Worker.implementation",
+  "slug": "cut-what-the-root-reads-and-re-emits",
+  "objective": "Cut what the root reads and re-emits: briefs stored as files behind a short dispatch prompt, evidence matched by criterion label, status trimmed to the Intent in use, and SessionStart context that states each rule and the takeover line once.",
+  "state": "Ready",
+  "scope": [
+    "packages/runtime/src/cli (assignment.ts dispatch and close, overview.ts status and plan, hook.ts, sessioncontext.ts), the domain modules that render dispatch prompts and match report evidence (not route.ts), the session-reminder.md instruction file used by SessionStart, and their tests."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md and AGENTS.md of the repository (Effect, Schema, JSDoc on exports, Bun APIs).",
+    "Other writers edit other paths of the same tree at the same time: touch only your ownership paths, and run the type-check, lint and the tests of your changed files (bun test <files>, mise run check, mise run lint) rather than judging others work in progress.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done and checked, stop and report with the changed paths and a diff-file evidence path (git diff -- <your paths>, new files included with git diff --no-index or git add -N avoided: list new files separately, saved under /tmp/holyagent-review/); do not add unrequested features or refactors (name them in the report).",
+    "Do not edit packages/runtime/src/instructions other than session-reminder.md, packages/integrations/claude/src, packages/runtime/src/state, packages/runtime/src/domain/route.ts or the test files state-branch, state-mode, route and fixtures: other writers own them."
+  ],
+  "criteria": [
+    {
+      "text": "Brief files: assignment dispatch (spawn and continue) and the entries of plan write each Assignment's full prompt to a file outside the work tree's tracked files and outside the committed state (for example under the git common directory's holyagent folder), and print instead a prompt of one or two lines that names the absolute path and tells the specialist to read it with the Read tool and follow it as its full task; the brief text itself is no longer printed",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Launch hook: the agent-launch hook still recognizes and records a launch whose prompt is the new short dispatch prompt",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Evidence labels: assignment close --accept and assignment accept match an evidence line against a criterion's label (the criterion text before its first colon), with the existing normalization, as well as against its full text and the evidence labels",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Status: holyagent status and the SessionStart status list unaccepted and Running Assignments only for the Intent in use, with a count per other open Intent",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Session context: the SessionStart and root-rules outputs carry the takeover line once, tell the main thread to read the holyagent agent file with the Read tool, and the session reminder repeats no rule the core rules in the same output already state",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Tests: each change has a test that fails without it; existing tests are updated, not weakened",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Scope: only the ownership paths change",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "diff-file",
+    "tests-run"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli",
+    "packages/runtime/src/domain/directive.ts",
+    "packages/runtime/src/domain/assignment.ts",
+    "packages/runtime/src/domain/lifecycle.ts",
+    "packages/runtime/src/domain/specialists.ts",
+    "packages/runtime/src/instructions/claude-5.5/session-reminder.md",
+    "packages/runtime/tests/cli.test.ts",
+    "packages/runtime/tests/directive.test.ts",
+    "packages/runtime/tests/lifecycle.test.ts",
+    "packages/runtime/tests/store.test.ts",
+    "packages/runtime/tests/status.test.ts",
+    "packages/integrations/claude/tests/hooks.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-02T17:43:02.159Z"
+}
