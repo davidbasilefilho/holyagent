@@ -1,0 +1,50 @@
+{
+  "id": "assignment-0mvzkei0l-e8gb",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 2,
+  "roleTask": "Reviewer.code",
+  "slug": "review-commits-ecea23f-and-41754dd-git",
+  "objective": "Review commits ecea23f and 41754dd (git diff 45e7f8d..41754dd) on claude/nifty-faraday-jinmae for correctness and regressions against the merge-ready bar.",
+  "state": "Ready",
+  "scope": [
+    "ecea23f: state branch fetch from origin in packages/runtime/src/state/tree.ts, force-add of state, route efforts in route.ts.",
+    "41754dd: brief files (packages/runtime/src/cli/brief.ts, assignment.ts), evidence label matching (report.ts acceptanceFrom), status trimming (overview.ts), session context dedup (sessioncontext.ts, hook.ts, session-reminder.md), and their tests."
+  ],
+  "constraints": [
+    "Read-only: no file edits, no git writes. Keep working until everything asked is done, then stop and report; report under 600 words, findings each with path:line, severity (blocking or non-blocking) and a concrete failure scenario; do not launch other reviewers.",
+    "The generated plugin under packages/integrations/claude/dist is rebuilt later; a stale dist is not a finding."
+  ],
+  "criteria": [
+    {
+      "text": "Behavior: each change does what its commit message says on its error paths too (offline fetch, missing remote, brief write failure, ambiguous labels, no Intent in use)",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Regressions: existing commands, hooks and outputs other tools rely on keep working (agent-launch recording, workflow hook, reconcile, plan)",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Tests: the new tests fail without their change and no test was weakened",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Repo standards: .claude/CLAUDE.md rules (Effect, Schema at boundaries, JSDoc on exports, Bun Shell)",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "verified"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvzjrnq1-q6xv",
+    "assignment-0mvzjrnyn-61ew"
+  ],
+  "createdAt": "2026-11-02T18:00:47.541Z"
+}
