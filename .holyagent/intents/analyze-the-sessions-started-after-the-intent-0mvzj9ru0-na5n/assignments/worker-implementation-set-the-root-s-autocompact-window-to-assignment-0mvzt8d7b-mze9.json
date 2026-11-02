@@ -1,0 +1,82 @@
+{
+  "id": "assignment-0mvzt8d7b-mze9",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "set-the-root-s-autocompact-window-to",
+  "objective": "Set the root's autocompact window to 450000 tokens, remove every size limit on instruction text, put the force-push rule back in the core, and fix three state and doctor defects.",
+  "state": "Running",
+  "scope": [
+    "Autocompact: change the recommended and shipped modelSettings.claude-opus-5-5.autoCompactWindow from 200000 to 450000 (packages/runtime/src/setup/settings.ts, packages/runtime/src/cli/setup.ts, .claude/settings.json, docs such as docs/usage.md and docs/decisions.md, requirements text, tests).",
+    "Size limits: find and remove every character, byte, word or line cap on instruction text: in code, build checks, tests (for example a core cap of about 4100 characters or a root prompt byte budget), requirements.md and requirements/, docs, and instruction text, including any root rule that an instruction deliverable must state its expected size relative to the text it replaces. Replace a removed rule, where one is needed, with a plain instruction to keep the text terse and direct. Leave limits on report length that briefs set for specialist replies alone; they are not instruction-text caps. If a cap lives in .claude/CLAUDE.md or AGENTS.md, do not edit it; name it in the report.",
+    "Force-push rule: restore 'never force-push, and never push to the base, default or a protected branch without the user's approval' to the core root text (packages/runtime/src/instructions/claude-5.5/root/identity.md or wherever the core is assembled), stated once there; the version-control section may refer to it instead of restating it.",
+    "Defect 1: holyagent doctor reports the effort setting as missing after the session effort is set with /effort auto; make doctor accept that state (read how /effort auto is stored by looking at the code that checks it) and test it.",
+    "Defect 2: a state fetch killed at its time limit (packages/runtime/src/state/tree.ts) can leave git helper child processes (ssh, credential helpers) running; kill the whole process group or otherwise ensure no helper survives, and test it.",
+    "Defect 3: the state commit runs git add -f -A over .holyagent excluding .holyagent/local, which force-adds any ignored file there; stage only the state files HolyAgent writes (or force-add past a .gitignore that ignores .holyagent/ as a whole while honoring ignores inside it), and test both the ignoring-.gitignore case and that a stray ignored file is not committed."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md and AGENTS.md: Effect, Effect Schema, Bun APIs, JSDoc, Conventional style. Behavior changes go to packages/runtime/src/instructions/requirements.md first, then the instruction sets, then the generated plugin.",
+    "Keep all instruction text you touch terse and direct.",
+    "Make no version-control writes and no edits under .git/ or .holyagent/; report changed paths.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. Do not add unrequested features or refactors; name them in the report. Run bun test, bun check, bun lint, bun fmt --check, then bun packages/integrations/claude/build.ts and rerun the tests. When done, stop and report under 450 words, each evidence entry on one line as '<criterion label>: <support>', with changed paths and a diff file /tmp/holyagent-review/limits.diff covering every changed file."
+  ],
+  "criteria": [
+    {
+      "text": "Autocompact: every recommended and shipped autocompact window for the root is 450000, docs and tests agree",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No size limits: no character, byte, word or line cap on instruction text remains in code, tests, build, requirements, docs or instruction text; each removed one listed with its file",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Force-push in core: the core root text states the rule once",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Doctor effort auto: doctor no longer reports the effort as missing after /effort auto; tested",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No surviving helpers: a fetch killed at its time limit leaves no helper process; tested",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Scoped state staging: a .gitignore ignoring .holyagent/ does not block the state commit, and a stray ignored file under .holyagent/ is not committed; tested",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Gates: bun test, bun check, bun lint and bun fmt --check pass and dist matches a fresh build",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "diff-file",
+    "tests-run"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src",
+    "packages/runtime/tests",
+    "packages/integrations/claude/src",
+    "packages/integrations/claude/tests",
+    "packages/integrations/claude/build.ts",
+    "packages/integrations/claude/dist",
+    "docs",
+    ".claude/settings.json"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-02T22:07:57.912Z"
+  },
+  "createdAt": "2026-11-02T22:07:57.912Z"
+}
