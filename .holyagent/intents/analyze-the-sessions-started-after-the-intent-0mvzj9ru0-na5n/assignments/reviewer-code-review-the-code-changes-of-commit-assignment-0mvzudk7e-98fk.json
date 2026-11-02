@@ -1,0 +1,56 @@
+{
+  "id": "assignment-0mvzudk7e-98fk",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 6,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-code-changes-of-commit",
+  "objective": "Review the code changes of commit 4724ca7 (range 386cb22..4724ca7) for correctness and regressions.",
+  "state": "Running",
+  "scope": [
+    "packages/runtime/src/state/tree.ts and tests/state-branch.test.ts: repair of the previous review's blocker (migrate notes not committed by stageState; now STATE_FILE also admits intents/<x>/resume-notes.md and notes/** except *.tmp) and the killGroup pid>1 / exited-child guard.",
+    "Billion Context removal: packages/runtime/src/setup/{check,doctor,environment,steps}.ts, deleted leftovers.ts, cli/hook.ts, cli/setup.ts and their tests.",
+    "packages/integrations/claude/src/{agents.ts,generate.ts}: TaskStop grant for the root, four new root skills generated, and tests/plugin.test.ts.",
+    "Instruction text (.md) is out of scope: it is being rewritten now. Use git show/diff on the commit, not the working tree, which another writer is editing."
+  ],
+  "constraints": [
+    "Read-only; no version-control writes (no checkout, switch, stash or add).",
+    "Respond tersely."
+  ],
+  "criteria": [
+    {
+      "text": "Repair: migrated notes are committed to the state branch and no stray file is, closing the previous blocker",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Removal: removing the Billion Context cleanup leaves setup, doctor and the hook working with no dead references",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Plugin: the root agent gets TaskStop and the four skills are generated and installed like the existing ones",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Regressions: no existing behavior breaks; changes have tests",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvzu0i0s-b9mu",
+    "assignment-0mvzu0hpz-adhv"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-02T22:39:59.882Z"
+  },
+  "createdAt": "2026-11-02T22:39:59.882Z"
+}
