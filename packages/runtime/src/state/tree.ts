@@ -407,6 +407,24 @@ const requireFree = (listed: ReadonlyArray<Listed>, path: string, branch: string
     }
   })
 
+/**
+ * Fetches the state branch from `origin` into its remote-tracking ref, for a clone that has never
+ * fetched it, and returns whether the ref exists afterwards. The fetch is quiet and never asks for
+ * credentials; an offline, missing or empty remote only means the branch starts from the base.
+ */
+const fetchRemoteBranch = (top: string, env: Environment, branch: string) =>
+  git(top, { ...env, GIT_TERMINAL_PROMPT: "0" }, [
+    "fetch",
+    "-q",
+    "--no-tags",
+    "origin",
+    `+refs/heads/${branch}:refs/remotes/origin/${branch}`,
+  ]).pipe(
+    Effect.flatMap((ran) =>
+      ran.code === 0 ? refExists(top, env, `refs/remotes/origin/${branch}`) : Effect.succeed(false),
+    ),
+  )
+
 /** The file whose presence says the state worktree at `path` is fully checked out. */
 const readyMarker = (path: string) => `${path}.ready`
 
@@ -420,9 +438,10 @@ type Ensured =
  * Finds or makes the state worktree at `path`, under the worktree lock, which every command that
  * finds it unfinished waits on: a worktree git has registered may still be checking out its files.
  * A new one is made from the local branch when it exists, else from its remote copy
- * `origin/<branch>`, else from the base branch head; with none of them it is `deferred` until the
- * base has a commit. With `make` false a missing worktree is `absent`. A finished worktree gets a
- * marker next to it, so that later commands pass without the lock.
+ * `origin/<branch>` (fetched first when the clone has no such ref), else from the base branch head;
+ * with none of them it is `deferred` until the base has a commit. With `make` false a missing
+ * worktree is `absent`. A finished worktree gets a marker next to it, so that later commands pass
+ * without the lock.
  */
 const ensureWorktree = (
   top: string,
@@ -449,7 +468,9 @@ const ensureWorktree = (
       yield* requireFree(yield* listWorktrees(top, env), path, branch)
       const add = [...BOOKKEEPING, "worktree", "add", "-q"]
       const local = yield* refExists(top, env, `refs/heads/${branch}`)
-      const remote = yield* refExists(top, env, `refs/remotes/origin/${branch}`)
+      const remote =
+        (yield* refExists(top, env, `refs/remotes/origin/${branch}`)) ||
+        (!local && (yield* fetchRemoteBranch(top, env, branch)))
       const start = local || remote ? undefined : yield* baseStart(top, env)
       const target = local
         ? [path, branch]
@@ -762,7 +783,16 @@ export const commitState = (directory: string, env: Environment, message: string
     const current = yield* git(worktree, env, ["symbolic-ref", "--short", "-q", "HEAD"])
     if (current.code !== 0 || current.stdout.trim() !== (yield* stateBranch(worktree, env)))
       return false
-    yield* gitText(worktree, env, ["add", "-A", "--", STATE_DIRECTORY])
+    // `-f` because a branch started from the base inherits its `.gitignore`, which may ignore the
+    // state folder; `local/` stays out, as its own ignore file would have kept it.
+    yield* gitText(worktree, env, [
+      "add",
+      "-f",
+      "-A",
+      "--",
+      STATE_DIRECTORY,
+      `:(exclude)${STATE_DIRECTORY}/local`,
+    ])
     if (yield* gitSucceeds(worktree, env, ["diff", "--cached", "--quiet", "--", STATE_DIRECTORY]))
       return false
     yield* gitText(worktree, yield* committing(worktree, env), [

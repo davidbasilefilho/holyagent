@@ -248,6 +248,66 @@ describe("the state branch", () => {
     )
     expect((await sh(second, ["git", "config", `branch.${STATE}.remote`])).trim()).toBe("origin")
   })
+
+  test("the state branch is fetched from origin when the clone has no remote-tracking ref for it", async () => {
+    const remote = await scratch("holyagent-origin-")
+    await sh(remote, ["git", "init", "--bare", "-q", "-b", "main", "."])
+    const first = await scratch("holyagent-clone-")
+    await sh(first, ["git", "clone", "-q", remote, "."])
+    await sh(first, ["git", "config", "user.name", OWNER.name])
+    await sh(first, ["git", "config", "user.email", OWNER.email])
+    await seed(first, { "a.txt": "a\n" })
+    await sh(first, ["git", "push", "-q", "origin", "main"])
+    const intent = await createIntent(first, "Ship the parser")
+    await sh(first, ["git", "push", "-q", "origin", STATE])
+
+    const second = await scratch("holyagent-clone-")
+    await sh(second, ["git", "clone", "-q", remote, "."])
+    await sh(second, ["git", "config", "user.name", OWNER.name])
+    await sh(second, ["git", "config", "user.email", OWNER.email])
+    await sh(second, ["git", "update-ref", "-d", `refs/remotes/origin/${STATE}`])
+    expect(await sh(second, ["git", "branch", "--all", "--list", `*${STATE}`])).toBe("")
+
+    const added = await createIntent(second, "Ship the printer")
+    const listed = toon(await holy(second, ["intent", "list"])) as {
+      intents: Array<{ id: string }>
+    }
+
+    expect(listed.intents.map((row) => row.id).toSorted()).toEqual([added, intent].toSorted())
+    await sh(second, [
+      "git",
+      "merge-base",
+      "--is-ancestor",
+      (await sh(first, ["git", "rev-parse", STATE])).trim(),
+      STATE,
+    ])
+    expect((await sh(second, ["git", "config", `branch.${STATE}.remote`])).trim()).toBe("origin")
+  })
+
+  test("a remote that cannot be reached leaves the state branch starting from the base", async () => {
+    const dir = await initRepo(OWNER)
+    await sh(dir, ["git", "remote", "add", "origin", join(dir, "missing-remote")])
+    const base = await seed(dir, { "a.txt": "a\n" })
+
+    await createIntent(dir, "Ship the parser")
+
+    expect((await sh(dir, ["git", "merge-base", STATE, "main"])).trim()).toBe(base)
+  })
+})
+
+describe("a base branch that ignores the state folder", () => {
+  test("state transitions are still committed on the state branch, and the work branch's ignore rules stay", async () => {
+    const dir = await initRepo(OWNER)
+    await seed(dir, { "a.txt": "a\n", ".gitignore": "/.holyagent/\n" })
+
+    const intent = await createIntent(dir, "Ship the parser")
+
+    const tracked = lines(await sh(dir, ["git", "ls-tree", "-r", "--name-only", STATE]))
+    expect(tracked.some((path) => path.includes(`${intent}`))).toBe(true)
+    expect(tracked.some((path) => path.startsWith(".holyagent/local/"))).toBe(false)
+    expect(await sh(dir, ["git", "show", "main:.gitignore"])).toBe("/.holyagent/\n")
+    expect(await sh(dir, ["git", "status", "--porcelain"])).toBe("")
+  })
 })
 
 describe("merging the state", () => {
