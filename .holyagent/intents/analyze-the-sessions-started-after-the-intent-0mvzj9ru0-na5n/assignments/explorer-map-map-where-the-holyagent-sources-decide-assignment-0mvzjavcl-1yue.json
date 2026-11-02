@@ -1,0 +1,53 @@
+{
+  "id": "assignment-0mvzjavcl-1yue",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 1,
+  "roleTask": "Explorer.map",
+  "slug": "map-where-the-holyagent-sources-decide",
+  "objective": "Map where the HolyAgent sources decide the root's model and effort, what text reaches the root's context at session start and per hook, how the state branch is created, and where the stack-plan branch rule lives, so fixes can be planned.",
+  "state": "Ready",
+  "scope": [
+    "Repository /home/user/holyagent, sources under packages/ (not dist/ except to measure sizes), docs/, scripts/."
+  ],
+  "constraints": [
+    "Read-only. Report under 1200 words, paths with line numbers, no file dumps. Keep working until everything asked is done, then stop and report."
+  ],
+  "criteria": [
+    {
+      "text": "Root effort: every place that sets or documents the root's reasoning effort or model (agent frontmatter generation in agents.ts, recommended user settings written by setup or doctor such as effortLevel, docs), with the current value",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Root context inputs: each text that reaches the root (assembled root prompt sections and their byte sizes, SessionStart hook output parts, root-rules hook, subagent-start, vcs-reminder, agent-launch outputs, status and plan output), with source path and approximate size in bytes, and which ones repeat the same rules",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "State branch creation: the function that creates or attaches the holyagent/state branch and worktree, and whether it starts from origin/holyagent/state when the remote has it but the local branch does not exist",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Branch naming: where the stack-plan branch naming rule lives in requirements.md and the claude-5.5 instruction set, and every test that pins that text",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Route table: the file that pins each specialist role's model and effort, and the tests that pin it",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "root-effort",
+    "root-context",
+    "state-branch",
+    "branch-naming",
+    "route-table"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-02T17:29:58.581Z"
+}
