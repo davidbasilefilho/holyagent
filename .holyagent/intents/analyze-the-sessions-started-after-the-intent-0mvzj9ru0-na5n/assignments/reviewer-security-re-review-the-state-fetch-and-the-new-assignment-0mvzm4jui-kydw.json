@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "re-review-the-state-fetch-and-the-new",
   "objective": "Re-review the state fetch and the new report files in commits 081a273 and 7ac8084 against the previous security findings.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Previous findings: (1, blocking) the fetch could prompt for credentials or hang under the worktree lock and from SessionStart; (2) add -f overrides an ignore of .holyagent/; (3) the brief is a mutable file. Diffs: /tmp/holyagent-review/assignment-0mvzlcjd8-cyp6.diff and /tmp/holyagent-review/assignment-0mvzlp1ml-io0u.diff; sources under /home/user/holyagent/packages/runtime/src (state/tree.ts fetchRemoteBranch, cli/program.ts, cli/hook.ts, cli/report.ts journalResults, cli/brief.ts writeReport).",
     "New sinks: journal label and result text into report file paths and contents."
@@ -40,5 +40,10 @@
     "assignment-0mvzlcjd8-cyp6",
     "assignment-0mvzlp1ml-io0u"
   ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-02T18:49:06.888Z"
+  },
   "createdAt": "2026-11-02T18:49:02.586Z"
 }
