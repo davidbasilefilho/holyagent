@@ -1,0 +1,65 @@
+{
+  "id": "assignment-0mvzv1hb7-ipum",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 7,
+  "roleTask": "Worker.implementation",
+  "slug": "restore-every-detail-the-instruction",
+  "objective": "Restore every detail the instruction rewrite lost and remove every ambiguity it introduced, as listed by the artifact review.",
+  "state": "Running",
+  "scope": [
+    "The review report is at /home/user/holyagent/.git/holyagent/reports/assignment-0mvzut8qh-qc2r.md: fix every item under blockers 1 (lost detail) and 2 (ambiguity), each at the cited file and line under packages/runtime/src/instructions/claude-5.5/ (and requirements.md R-WORKFLOW for the computed-agent-type and no-agentType cases). Compare with the old wording in /tmp/holyagent-review/text.diff or git show 386cb22:<path>.",
+    "Blocker 3 decision: both guide rules apply to the root too: add to the root text that its written deliverables (PR text, final report) carry no filler sections, redundant summaries or boilerplate, and that when a request seems mistaken or a better approach exists it says so in one sentence and continues as asked.",
+    "Also fix the review's notes: remove the rules root/instruction-guidelines.md repeats from skills/instruction-writing/SKILL.md (keep one owner, the root keeps only what every brief needs); restore the dropped reasons in root/context.md (output would land in your context; a long one cannot fill your context); restore 'most often missed' in session-reminder.md and 'a name with' in session-cloud-identity.md; give root/skills.md:6 its noun (before the first Intent of a clone).",
+    "Rebuild dist with bun packages/integrations/claude/build.ts at the end."
+  ],
+  "constraints": [
+    "The binding rule: shortening never removes detail or adds ambiguity. Restore wording rather than paraphrasing it again; prefer the old sentence when in doubt.",
+    "Do not edit packages/runtime/src/state, cli/migrate.ts or their tests.",
+    "No version-control writes and no edits under .git/ or .holyagent/; report changed paths.",
+    "Keep working until every item is fixed; when done and checked, stop and report. Respond tersely."
+  ],
+  "criteria": [
+    {
+      "text": "Detail restored: each blocker 1 item is restored, listed with file and line",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Ambiguity removed: each blocker 2 item is reworded so it admits only the old reading, listed with file and line",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Root rules: the root's no-filler and mistaken-request rules are present once, with requirement mappings",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Notes fixed: duplicates, dropped reasons and the three wording notes are fixed",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "Gates: bun check, bun lint, bun fmt --check and bun test exit 0 after rebuilding dist",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/integrations/claude"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvzut8qh-qc2r",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-02T22:58:35.876Z"
+  },
+  "createdAt": "2026-11-02T22:58:35.876Z"
+}
