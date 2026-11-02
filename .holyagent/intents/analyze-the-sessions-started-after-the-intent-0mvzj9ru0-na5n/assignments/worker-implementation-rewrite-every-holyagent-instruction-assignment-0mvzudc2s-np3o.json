@@ -1,0 +1,73 @@
+{
+  "id": "assignment-0mvzudc2s-np3o",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 6,
+  "roleTask": "Worker.implementation",
+  "slug": "rewrite-every-holyagent-instruction",
+  "objective": "Rewrite every HolyAgent instruction section and skill so it is short, direct and objective, without changing any behavior.",
+  "state": "Running",
+  "scope": [
+    "Commit 4724ca7 made only light wording edits to the specialist and role sections (all agents went from 34395 to 32835 words, mostly from moving root sections into skills). Rewrite them for real this time.",
+    "Every file under packages/runtime/src/instructions/claude-5.5/ (root/, specialist/, roles/, skills/, session-reminder and root-core text) and packages/integrations/claude/src/setup-command.md. Then rebuild dist with bun packages/integrations/claude/build.ts.",
+    "Method: state each rule once, in imperative voice, with its reason in a short clause where the reason helps apply it; cut restatements within and across sections, hedges, preamble, examples that only repeat a rule, and lists that a single sentence covers. Keep the per-model guidance the sets follow (official guides: https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5, ...-sonnet-5-5, ...-haiku-5-5), \"Respond tersely.\" in every agent, and the evidence-line report format that assignment close matches.",
+    "Also fix docs/decisions.md:57, which still says setup removes Billion Context leftovers: record that the cleanup was removed."
+  ],
+  "constraints": [
+    "No behavior change: every requirement in packages/runtime/src/instructions/requirements.md stays covered and the requirement-to-section mapping test passes; adjust mapped phrases in tests only where wording changed.",
+    "Introduce no size limit, cap or length check anywhere.",
+    "Do not edit .claude/CLAUDE.md or AGENTS.md.",
+    "No version-control writes (no git add, checkout, switch, stash or commit) and no edits under .git/ or .holyagent/; report changed paths.",
+    "Keep working until every file is done; when done and checked, stop and report. Respond tersely."
+  ],
+  "criteria": [
+    {
+      "text": "Rewrite: every instruction file and skill was rewritten, and the report lists any file left unchanged with a one-line reason",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Dedupe: the report lists each rule that was stated in more than one section and where it now lives once",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Word counts: before and after for each generated agent prompt, all agents combined, and the skills combined",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Behavior kept: the requirement mapping test and every plugin and instruction test pass, with no requirement dropped",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Gates: bun check, bun lint, bun fmt --check and bun test exit 0 after rebuilding dist",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Scope: only wording changes plus the decisions.md fix, inside the ownership paths",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/integrations/claude",
+    "docs/decisions.md",
+    "packages/runtime/tests/instructions.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvzu0hpz-adhv",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-02T22:39:49.348Z"
+  },
+  "createdAt": "2026-11-02T22:39:49.348Z"
+}
