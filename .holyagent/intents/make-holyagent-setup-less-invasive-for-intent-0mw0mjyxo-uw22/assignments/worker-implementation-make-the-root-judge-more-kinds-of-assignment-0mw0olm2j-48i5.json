@@ -1,0 +1,68 @@
+{
+  "id": "assignment-0mw0olm2j-48i5",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-root-judge-more-kinds-of",
+  "objective": "Make the root judge more kinds of verdicts on compact evidence while specialists keep the heavy work: an evidence-judging skill, a firm visual-judging trigger, Sonnet for artifact review, and design-option and root-cause rules.",
+  "state": "Running",
+  "scope": [
+    "Root instruction sections in packages/runtime/src/instructions/claude-5.5/root/ (skills.md, assignments.md, routing.md and the like), skills under packages/runtime/src/instructions/claude-5.5/skills/, the route table and agent definitions (find where Reviewer.artifact's model and effort are set, e.g. packages/runtime/src or packages/integrations/claude/src/agents.ts), the tests that pin them, docs/decisions.md, docs/components.md and docs/usage.md where they list skills or routes",
+    "Trace of the visual miss: /home/user/holyagent/.git/holyagent/reports/assignment-0mw0ndx08-lx7e.md"
+  ],
+  "constraints": [
+    "Maintainer's decisions (binding): the root stays the judge and delegates all heavy work; judging reads compact evidence (a reproduction, trace, quoted source, screenshot verdict, diff summary) produced by specialists, never raw logs or whole files, so tokens shift onto the smaller specialist models.",
+    "(1) New skill evidence-judging (description starts with the situation: 'Use when a specialist report carries a verdict the root must accept or reject: a blocking review finding, a research claim with conflicting sources or numbers, prose written for people, or a material design choice.'): findings triage: a blocking finding starts a repair only with a reproduction or source-to-sink trace from the reviewer; an unproven one goes back to the same reviewer for evidence (reviewers still do the heavy lifting); research: the root picks the authoritative source, keeps inference labeled, and has a specialist re-derive any number before it is published or decided on; prose for people (user docs, README, PR text, explanatory pages): reviewed by Reviewer.artifact, the root judges the excerpts it flags; design: for a choice that changes contracts, architecture or dependencies, an explorer returns 2-3 short options with trade-offs and the root picks or asks the user, routine choices stay with the writer; debugging: accept a root cause only when reproduction, cause and a fix that makes the reproduction pass close the chain. Keep it short and give the reason for each rule.",
+    "(2) Visual trigger: change the root skills section so visual-judging is loaded before the first Worker.visual or Reviewer.visual dispatch (not only at acceptance), and add inline in the acceptance section: say 'round N of 3' in each visual repair brief, at most three rounds per finding, one shared dev server for the visual specialists (dev-server), never open screenshots in the main thread. Extend the dev-server trigger to rendered work served from static or single-file builds, not only a running web app.",
+    "(3) Route Reviewer.artifact to Sonnet (keep its effort high), so prose and instruction-text reviews get a stronger reviewer; update every place that states the route (route table, agent frontmatter generation, root routing text that lists Haiku roles, docs).",
+    "(4) Point the root's skills section at evidence-judging with its trigger, in one line; keep the always-loaded root text terse.",
+    "Follow the holyagent instruction-writing guidance in the repo (packages/runtime/src/instructions/claude-5.5/skills/instruction-writing if present). Effect/JSDoc rules for any code. Add or update tests that pin the new text, the new skill's presence and the route.",
+    "Run node_modules/.bin/mise run build then node_modules/.bin/mise run verify. No version-control writes, no edits under .git/ or .holyagent/; report changed paths.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done and checked, stop and report; name unrequested features instead of adding them. Report in under 400 words; start each evidence line with the criterion label before its colon."
+  ],
+  "criteria": [
+    {
+      "text": "evidence skill: evidence-judging exists with the five rules, each with its reason, and the root points to it",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "visual trigger: visual-judging loads before the first visual dispatch and the round, shared-server and no-screenshot rules are inline",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "artifact route: Reviewer.artifact runs on Sonnet everywhere the route is stated",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "tests: tests pin the new text, skill and route",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "gates: mise run verify passes with dist rebuilt",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src",
+    "packages/runtime/tests",
+    "packages/integrations/claude",
+    "docs"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T12:46:04.027Z"
+  },
+  "createdAt": "2026-11-03T12:46:04.027Z"
+}
