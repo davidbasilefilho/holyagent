@@ -20,6 +20,12 @@ export const GIT_ENV = {
   GIT_TERMINAL_PROMPT: "0",
   // Sandboxes may inject url rewrites through the environment; tests talk to local repositories only.
   GIT_CONFIG_COUNT: "0",
+  // Fixture repositories name github.com as their origin; a fetch of the state branch from it went
+  // out through the sandbox proxy and took 1 to 57 seconds (cut off at 8), past the 5 second test
+  // timeout. Only local paths, ssh (a script stands in for it) and plain http (a test serves it from
+  // localhost) may be used, so a fetch over https fails at once, which the code under test treats
+  // as a remote without the branch.
+  GIT_ALLOW_PROTOCOL: "file:ssh:http",
 } as const
 
 /** Runs a command in a directory with the hermetic git environment and returns its text. */
