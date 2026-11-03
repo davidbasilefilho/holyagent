@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-the-repair-of-the-contention",
   "objective": "Re-review the repair of the contention-test blocker on release/0.2.0/fix/hook-lock-followups.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Previous blocker: hook-locks.test.ts expect(recorded).toBeGreaterThan(0) could fail with correct code on a slow runner, since all three hooks may legitimately hand back StateLocked. Optional notes: widen the deadline test upper bound from 2200 to 3000; rename the vague 'within' deadline helper.",
     "Review only the repair diff at /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/repA.diff (uncommitted in worktree /home/user/holyagent-hook-locks-a). Run the two changed test files there with bun test."
@@ -39,7 +39,33 @@
     "agentId": "workflow:wf_ff0fa830-690/assignment-0mw0vfjho-6112",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-03T15:57:23.181Z"
+    "startedAt": "2026-11-03T15:57:23.181Z",
+    "finishedAt": "2026-11-03T16:02:11.997Z"
+  },
+  "result": "result: both previous findings are closed and I found no regression.\n\nchanged: none (read-only)\n\nchecks:\n- `/code-review low <repA.diff path>` via Skill -> completed with no findings. The built-in skill took a diff path as its target because the repair is uncommitted, not a `<reviewed>...<repaired>` range.\n- `bun test tests/hook-locks.test.ts` in `/home/user/holyagent-hook-locks-a/packages/integrations/claude` -> exit 0, 3 pass, 0 fail\n- `bun test tests/state-hook-locks.test.ts` in `/home/user/holyagent-hook-locks-a/packages/runtime` -> exit 0, 4 pass, 0 fail\n- `rg` for `within` and `deadlineIn` in `/home/user/holyagent-hook-locks-a/packages/runtime` -> no stale `within(` call remains. `deadlineIn` is used in `hook.ts`, `lock.ts` and `state-hook-locks.test.ts`, and referenced in the `tree.ts` doc.\n- `mise run check` -> not run, `mise` is not installed here. The full `verify` gate (type-check, lint, format) is unchecked.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- The `dist/scripts/holyagent.js` hunks are consistent with the source rename. The bundler's `within2` in `scope.ts` becomes `within`, and the hook helper becomes `deadlineIn`. I read this in the diff and did not rebuild `dist`, so run `mise run build` once to confirm it reproduces.\n- The contention test passes when every hook hands back StateLocked, because the guard is `if (recorded > 0)`. A run with no recorded hook still checks the per-hook outcome regex, the `ms` bounds, the Intent list and a clean `git status`. The agent-in-Assignment check only runs when a hook recorded.\n- The deadline test upper bound is now 3000 and the vague helper is renamed, as the optional notes asked.\n\nevidence:\nThe contention test no longer fails when every hook hands back StateLocked, and keeps its bound and integrity checks: `hook-locks.test.ts` lines 154-186 in `/home/user/holyagent-hook-locks-a`. The `toBeGreaterThan(0)` is gone, the `ms` and regex checks and the intent-list and `git status` checks remain, and the file passes 3/3.\nThe repair introduces no regression: the rename is mechanical and no stale reference remains. Both changed test files pass (3/3 and 4/4). Type-check, lint and format were not run.\nfindings: none blocking; notes above.\nchecks-run: the two `bun test` runs and the `rg` search above; `mise run check` could not start.\n",
+  "acceptance": {
+    "revision": 2,
+    "rationale": "Ran both changed test files and confirmed the blocker closed.",
+    "criteria": [
+      {
+        "criterion": "The contention test no longer fails when every hook hands back StateLocked, and keeps its bound and integrity checks",
+        "support": "`hook-locks.test.ts` lines 154-186 in `/home/user/holyagent-hook-locks-a`. The `toBeGreaterThan(0)` is gone, the `ms` and regex checks and the intent-list and `git status` checks remain, and the file passes 3/3."
+      },
+      {
+        "criterion": "The repair introduces no regression",
+        "support": "the rename is mechanical and no stale reference remains. Both changed test files pass (3/3 and 4/4). Type-check, lint and format were not run."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "none blocking; notes above."
+      },
+      {
+        "label": "checks-run",
+        "support": "the two `bun test` runs and the `rg` search above; `mise run check` could not start."
+      }
+    ]
   },
   "createdAt": "2026-11-03T15:57:18.060Z"
 }
