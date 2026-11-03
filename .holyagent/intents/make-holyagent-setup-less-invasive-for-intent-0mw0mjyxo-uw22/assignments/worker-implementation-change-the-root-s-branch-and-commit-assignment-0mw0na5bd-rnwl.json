@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "change-the-root-s-branch-and-commit",
   "objective": "Change the root's branch and commit rules: never work on a platform-assigned branch such as claude/<name>, and make atomic Conventional commits on branches with squash merge as the default, below the target repository's conventions.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "packages/runtime/src/instructions/claude-5.5/root/version-control.md (Branches bullet, Stack plan), packages/runtime/src/instructions/requirements.md (R-BRANCH), any other instruction or hook text that tells the root to use the assigned branch (search packages/runtime/src with holyagent rg or rg, e.g. the claude.ai session-start text in packages/runtime/src/cli/hook.ts or instructions), and the tests that pin that text"
   ],
@@ -56,7 +56,41 @@
     "agentId": "workflow:wf_c1c2efe0-863/assignment-0mw0na5bd-rnwl",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-03T12:09:15.038Z"
+    "startedAt": "2026-11-03T12:09:15.038Z",
+    "finishedAt": "2026-11-03T12:16:59.130Z"
+  },
+  "result": "result: Branch and commit rules rewritten in the instruction text and R-BRANCH. The plugin test for dist-vs-sources fails because dist is stale, which is expected since I may not rebuild. Lint and format check also fail, but only on `packages/runtime/src/setup/record.ts`, which is untracked and not mine.\n\nchanged:\n- /home/user/holyagent/packages/runtime/src/instructions/claude-5.5/root/version-control.md: Branches bullet now says never work on a platform-assigned branch such as `claude/<name>`. If the conventional branch's push is refused, stop, report and ask through AskUserQuestion whether to push to the assigned branch; never work around it. New \"Commits and merges\" bullet covers atomic Conventional commits and squash merge by default with the PR title as the summary, repo conventions, branch protection and merge settings first. The merge-forward bullet adds the squash case.\n- /home/user/holyagent/packages/runtime/src/instructions/claude-5.5/root/stack-plan.md: after a lower PR squash-merges, merge the base into the next branch.\n- /home/user/holyagent/packages/runtime/src/instructions/requirements.md: R-BRANCH rewritten with the same rules.\n- /home/user/holyagent/packages/integrations/claude/src/agents.ts: the R-BRANCH anchor phrase now reads \"Never work on a branch the platform assigns\". Reformatted by `bun fmt`.\n- /home/user/holyagent/packages/integrations/claude/tests/plugin.test.ts: the branch test is replaced. It pins the new phrases and asserts the old ones (\"use it as the work branch\" and the like) are gone.\n- Diff file: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/branch-commit.diff\n\nchecks:\n- `mise run check` -> exit 0, no type errors.\n- `bun test packages/integrations/claude/tests packages/runtime/tests/instructions.test.ts` -> 435 pass, 1 skip, 1 fail. The failure is \"every committed generated file equals a fresh build\". Dist needs the build the commit hook runs.\n- `mise run lint` -> exit 1. The only warnings are `no-unnecessary-type-assertion` in `packages/runtime/src/setup/record.ts` (untracked, not in my ownership).\n- `mise run fmt:check` -> exit 1 on `packages/runtime/src/setup/record.ts` only. `agents.ts` was fixed.\n\nblockers: none for my paths. The root should rebuild dist (`mise run build`) at commit time, and the owner of `record.ts` must fix its lint and format failures before `verify` passes.\n\nquestions: none\n\nnotes:\n- `assignments.md` line 11 says to \"repair as new local commits\", which sits oddly beside atomic commits. Squash default covers it, so I left it.\n- I did not run `mise run test` in full. I ran only the two affected test locations above.\n\nevidence:\nbranch rule: version-control.md Branches bullet and requirements.md R-BRANCH (diff file); pinned by the plugin.test.ts branch test, which passes.\ncommit rule: version-control.md \"Commits and merges\" bullet and stack-plan.md squash merge-forward; pinned by the same test, which passes.\ntests: plugin.test.ts updated; 435 pass, and the one failure is stale dist (expected).\nchecks: check exit 0; lint exit 1 and fmt:check exit 1, both only on `record.ts` (untracked, not mine).\nchecks-run: `mise run check`, `lint`, `fmt:check`; `bun test` on `packages/integrations/claude/tests` and `packages/runtime/tests/instructions.test.ts`. Not run: `mise run test` in full, `mise run build`.\nchanged-paths: the five files listed above.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "rules rewritten and pinned by plugin test; only failures are stale dist and another writer's file",
+    "criteria": [
+      {
+        "criterion": "branch rule: instruction text and R-BRANCH no longer tell the root to use the platform-assigned branch, and say what to do when a push is refused",
+        "support": "version-control.md Branches bullet and requirements.md R-BRANCH (diff file); pinned by the plugin.test.ts branch test, which passes."
+      },
+      {
+        "criterion": "commit rule: atomic Conventional commits on branches and squash merge by default, below repo conventions",
+        "support": "version-control.md \"Commits and merges\" bullet and stack-plan.md squash merge-forward; pinned by the same test, which passes."
+      },
+      {
+        "criterion": "tests: tests that pin instruction text updated or added; affected tests pass",
+        "support": "plugin.test.ts updated; 435 pass, and the one failure is stale dist (expected)."
+      },
+      {
+        "criterion": "checks: type-check, lint, format check pass",
+        "support": "check exit 0; lint exit 1 and fmt:check exit 1, both only on `record.ts` (untracked, not mine)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`mise run check`, `lint`, `fmt:check`; `bun test` on `packages/integrations/claude/tests` and `packages/runtime/tests/instructions.test.ts`. Not run: `mise run test` in full, `mise run build`."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the five files listed above."
+      }
+    ]
   },
   "createdAt": "2026-11-03T12:09:09.482Z"
 }
