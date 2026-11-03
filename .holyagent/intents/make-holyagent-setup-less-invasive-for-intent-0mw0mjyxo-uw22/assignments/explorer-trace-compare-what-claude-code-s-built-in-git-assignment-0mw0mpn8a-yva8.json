@@ -1,0 +1,31 @@
+{
+  "id": "assignment-0mw0mpn8a-yva8",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Explorer.trace",
+  "slug": "compare-what-claude-code-s-built-in-git",
+  "objective": "Compare what Claude Code's built-in git instructions give the model (commit and PR workflow guidance, safety rules, git status snapshot) with what HolyAgent's own version-control instructions give the root and specialists, and list concrete gaps HolyAgent should cover now that setup turns the built-in ones off.",
+  "state": "Ready",
+  "scope": [
+    "HolyAgent's VCS text: packages/integrations/claude/src (root and specialist section files, hooks that add VCS context), docs/commit-authorship.md, docs/hooks.md, the holyagent vcs commit/pr implementation in packages/runtime.",
+    "Claude Code's built-in git guidance: what includeGitInstructions removes (from Claude Code docs or the plugin's own notes; if the exact text is not available locally, say so and work from documented behavior)."
+  ],
+  "constraints": [
+    "Read-only. For each gap give the rule Claude Code had, whether HolyAgent covers it (path:line), and a one-sentence proposed instruction for HolyAgent. Mark gaps that matter for safety (e.g. never skip hooks, never amend others' commits, never commit secrets, check status/diff before commit) separately from nice-to-haves.",
+    "Keep working until done; stop and report. Report in under 500 words."
+  ],
+  "criteria": [
+    {
+      "text": "gap list: each gap cites HolyAgent's coverage or its absence with paths",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "paths"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-03T11:53:12.922Z"
+}
