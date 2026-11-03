@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mw0tfzx5-p7rb",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.audit",
+  "slug": "check-that-commit-7b1bbfa-only-raises",
+  "objective": "Check that commit 7b1bbfa only raises the timeout of one vcs commit test for Windows, with an accurate comment, and weakens nothing.",
+  "state": "Running",
+  "scope": [
+    "Diff file: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/win-fix4-commit.diff (packages/runtime/tests/vcs-commit.test.ts). The test failed on the Windows CI runner at 5042ms against the 5000ms default; the writer reports four repository setups with git and CLI spawns as the cause."
+  ],
+  "constraints": [
+    "Read-only. Report in under 150 words."
+  ],
+  "criteria": [
+    {
+      "text": "The change only adds a test timeout and a comment, and no assertion changes",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The comment accurately states why the timeout is raised",
+      "blocking": false,
+      "dimension": "style"
+    }
+  ],
+  "evidence": [
+    "diff-file"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw0tbhii-548l"
+  ],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-11-03T15:01:40.121Z"
+  },
+  "createdAt": "2026-11-03T15:01:40.121Z"
+}
