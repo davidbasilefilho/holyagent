@@ -1,0 +1,46 @@
+{
+  "id": "assignment-0mw0nltgp-she3",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.code",
+  "slug": "review-commits-c3039b3-cece3c2-and",
+  "objective": "Review commits c3039b3, cece3c2 and 08dd8a5 (git safety rules and reminder hook, record-based setup undo with scope guards, branch and commit rules) on top of 4091f2a for correctness and regressions.",
+  "state": "Ready",
+  "scope": [
+    "git diff 4091f2a..HEAD excluding docs/ and README.md; diff file /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/range2-code.diff"
+  ],
+  "constraints": [
+    "Requirements: undo removes only keys and deny entries setup recorded (record under CLAUDE_CONFIG_DIR or ~/.claude/holyagent/setup-records.json, decoded with Effect Schema) that still hold setup's value; project/local scope trusts the git top-level only when it is cwd or an ancestor, refuses symlinked targets; instruction text: never bypass hooks/signing, no amend/rewrite of published history, secrets and status/diff check, no git config edits, non-interactive git; never work on a platform-assigned branch, stop and ask when a push is refused; atomic Conventional commits, squash merge default, repo conventions first. Repo rules in .claude/CLAUDE.md. Verify each finding with a reproduction or trace before marking it blocking.",
+    "Read-only; no version-control writes. Keep working until done; stop and report. Report in under 400 words, each finding marked blocking or non-blocking with file:line."
+  ],
+  "criteria": [
+    {
+      "text": "correctness: behavior matches the requirements incl. edge cases (corrupt record, concurrent records for two files, re-run setup after undo, Windows paths)",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "regressions: existing setup, doctor, hooks and instruction tests unaffected",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "instruction coherence: new rules do not contradict other root text (e.g. repair as new local commits vs atomic commits, merge-forward with squash)",
+      "blocking": false,
+      "dimension": "style"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw0mzj0n-m2yt",
+    "assignment-0mw0na54f-t4ud",
+    "assignment-0mw0na5bd-rnwl",
+    "assignment-0mw0na5ia-7ldi",
+    "assignment-0mw0mzj7r-jf9p"
+  ],
+  "createdAt": "2026-11-03T12:18:13.994Z"
+}
