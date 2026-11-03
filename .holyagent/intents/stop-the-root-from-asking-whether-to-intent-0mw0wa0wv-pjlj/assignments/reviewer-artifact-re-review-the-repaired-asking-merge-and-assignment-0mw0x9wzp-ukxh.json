@@ -1,0 +1,37 @@
+{
+  "id": "assignment-0mw0x9wzp-ukxh",
+  "intentId": "intent-0mw0wa0wv-pjlj",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.artifact",
+  "slug": "re-review-the-repaired-asking-merge-and",
+  "objective": "Re-review the repaired asking, merge and specialist-HEAD instruction changes against the eight findings of the previous review.",
+  "state": "Ready",
+  "scope": [
+    "Previous review with excerpts: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/review-q.md. Full current diff: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/branch2.diff. Agreed resolutions: (1) settling defaults are holyagent's or the repository's, not the root's own recommendation, and the recommended-default illustration is dropped; (2,4) one owner for the merge-method order in version-control.md; (3) the stacked-merge reconciliation lives once in stack-plan.md with the corrected condition (base tree equals the merged PR's head tree, else a normal merge); (5) the sources list lives in asking.md, task-list.md keeps a short stand-alone form; (6) specialist rule covers any command that changes HEAD, a branch, the index or the working tree of a shared checkout, with read-only alternatives; (7) leftover test assertions removed; (8) only plans the user did not ask for."
+  ],
+  "constraints": [
+    "Read-only. Quote excerpts for findings. Judge whether each finding is closed and nothing new is wrong or contradictory. Report in under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "The eight previous findings are closed",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The repair adds no contradiction or scope beyond the findings",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw0wvs52-1zla"
+  ],
+  "followUpOf": "assignment-0mw0wvsd2-3png",
+  "createdAt": "2026-11-03T16:48:54.853Z"
+}
