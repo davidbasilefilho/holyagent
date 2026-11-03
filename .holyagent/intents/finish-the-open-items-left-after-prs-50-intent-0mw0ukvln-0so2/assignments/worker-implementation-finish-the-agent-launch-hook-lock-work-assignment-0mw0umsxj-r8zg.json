@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "finish-the-agent-launch-hook-lock-work",
   "objective": "Finish the agent-launch hook lock work: bound the hook's total lock wait inside the 10s hook timeout, prove it with tests that run a real hook kill and multi-process contention, and fix the three open review notes.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree /home/user/holyagent-hook-locks, branch release/0.2.0/fix/hook-lock-followups (from main, which has PRs #50-#52). By the time you start, node_modules is installed and mise works there: run gates with 'bun run verify' (mise run verify through the dev dependency) or node_modules/.bin/mise run <task>; if that still fails, run the bun steps of mise.toml directly and say so.",
     "Current state: packages/runtime/src/state/lock.ts has a 'hook' patience (3s limit, 25ms poll, stuck at 3s). The agent-launch hook (packages/runtime/src/cli/hook.ts) passes 'hook' to resolveState (packages/runtime/src/state/tree.ts: exclude, worktree and migration locks) and updateState (store.ts). The bound is per lock: worst case about 9s (worktree + migration + state) against the 10s plugin hook timeout in packages/integrations/claude/dist/hooks/hooks.json. Replace it with one deadline for the whole hook invocation shared by every lock it takes (for example a deadline carried with the patience), so the total wait ends with clear margin inside 10s (aim at about 5s total), keeping CLI waits unchanged.",
@@ -66,5 +66,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T15:35:02.211Z"
+  },
   "createdAt": "2026-11-03T15:34:57.271Z"
 }
