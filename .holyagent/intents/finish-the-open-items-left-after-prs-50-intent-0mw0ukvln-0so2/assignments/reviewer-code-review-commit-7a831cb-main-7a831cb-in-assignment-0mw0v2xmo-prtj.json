@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-commit-7a831cb-main-7a831cb-in",
   "objective": "Review commit 7a831cb (main..7a831cb in /home/user/holyagent-hook-locks) that gives the agent-launch hook one lock deadline across all its locks, with real hook-kill and contention tests and three review-note fixes.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Requirements: the hook's total lock wait ends inside the 10s plugin hook timeout (dist/hooks/hooks.json) with margin, CLI waits unchanged; tests that run a real hook kill and multi-process contention; the lock test uses Bun APIs, the migration test removes only its marker, patience defaults live in one place.",
     "Review the committed range git diff main 7a831cb. Another writer edits the working tree of /home/user/holyagent-hook-locks at the same time, so read the commit, not the working tree. Gates run with node_modules/.bin/mise run <task> or bun run verify in /home/user/holyagent-hook-locks."
@@ -50,7 +50,41 @@
     "agentId": "workflow:wf_fa7ef042-f19/assignment-0mw0v2xmo-prtj",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-03T15:47:40.235Z"
+    "startedAt": "2026-11-03T15:47:40.235Z",
+    "finishedAt": "2026-11-03T15:56:32.958Z"
+  },
+  "result": "result: Behavior, regressions and repo-standards hold. The tests criterion has one blocker: a non-deterministic assertion in the contention test.\n\nchanged: none (read-only; scratch exports only)\n\nchecks (run on a `git archive` export of 7a831cb in the scratchpad, since the shared tree is being edited):\n- `bun check --no-script` -> exit 0, no type errors in 128 files.\n- `bun lint --no-script` -> exit 0, no problems in 129 files.\n- `bun fmt --no-script --check` -> exit 0, all 249 files formatted.\n- `bun test` (full suite) -> 1049 pass, 1 fail, 2 skip. The one failure is `host.test.ts` \"no execute bit on Windows\". It depends on git file modes, which `git archive` has no index for, so it is an export artifact.\n- `state-hook-locks.test.ts` -> 4 pass. `hook-locks.test.ts` -> 3 pass (13.9s).\n- `hook-locks.test.ts` copied onto the `main` export -> 2 pass-fail split: 1 pass, 2 fail (the two kill tests fail the `>= 4000` assertion at about 3.0s). So they fail without the change.\n- Fresh `build()` diffed against committed `dist` -> identical except the untracked `scripts/vendor`.\n- I did not run any of this on Windows.\n\nblockers:\n- tests: `packages/integrations/claude/tests/hook-locks.test.ts:~148`, `expect(recorded).toBeGreaterThan(0)`. The lock is unfair (25ms polling), and 3 CLI `intent create` commands hold it across git commits, ahead of 3 hooks that each have a 5s deadline. The test releases its own hold at 2s, which leaves hooks about 3s for three commits. On a slow Windows runner, with commits near 1s and six Bun processes starting at once, all three hooks can print the allowed StateLocked hand-back. The test then fails even though the code is correct. It also adds nothing: the regex on stdout already requires recorded-or-handed-back. Drop the assertion, and the later `expect(shown.stdout).toMatch(/agent: agent-\\d/)`, or make it conditional on `recorded > 0`.\n\nnotes (optional):\n- Behavior is correct:\n  - The deadline is created once and passed to `resolveState` and `updateState`.\n  - The deadline path stops retrying once `until` has passed, after one attempt.\n  - The named `short` and `long` waits are unchanged: same delay, limit, `times` and stuck logic.\n  - No `\"hook\"` patience references remain, and `hooks.json` timeouts are 10s.\n  - 5s of waiting plus process start leaves about 5s for the work done under the locks. The old worst case was 3s per lock, which could reach 9s or more.\n- Timing margins on Windows:\n  - Kill tests: ms is at least about 5s, so the `>= 4000` check has 1s of slack; the upper bound is 8s against an expected 5s plus start-up. This is acceptable.\n  - Deadline test (`state-hook-locks.test.ts`): the window is `>= 1400` and `< 2200` around a 1500ms deadline, so there is about 700ms of upper slack. Slow git calls after the deadline could occasionally exceed it. Widening to 3000 would be safer.\n- The first code-review finding (stuck limit fixed at `HOOK_WAIT_MS`) is rejected. It is documented and intentional, and a shorter deadline ends the wait by itself.\n- The work done while holding the locks is not bounded by the deadline (code-review finding at `hook.ts:333`). That was already true on the base, so I treat it as optional.\n- `Bun.spawn` in the new test is justified in a comment, and `hooks.test.ts` already uses it; the lint passes. Optional.\n- Optional: `within` is a vague name, and the bundler renames the private path helper to `within2` because of it. The `named` branch in `acquire` could be unified into a single time-based path.\n\nevidence:\n- The hook's total lock wait ends inside the 10s timeout with margin and CLI waits are unchanged: `lock.ts` `HOOK_WAIT_MS=5000` is shared through `within()`. The `WAITS` short and long values are unchanged. `state-hook-locks.test.ts` passes. The `hooks.json` timeout is 10.\n- The new tests exercise a real hook kill and multi-process contention, fail without the change, and are not flaky by construction, including on Windows: the kill tests fail on the `main` export (3.0s against `>= 4000`). The `recorded > 0` assertion makes this criterion fail.\n- No regressions and dist matches the sources: the full suite passes apart from the export artifact; the fresh build diff is empty.\n- The code follows .claude/CLAUDE.md (Effect, Schema at boundaries, JSDoc, Bun APIs): check, lint and fmt exit 0; the new exports (`Deadline`, `within`, `HOOK_WAIT_MS`, `STATE_PATIENCE`, `WORKTREE_PATIENCE`) all have JSDoc; the only deviation is the `Bun.spawn` note above.\n- findings: one blocker and the optional notes above.\n- checks-run: the commands under `checks`.\n",
+  "acceptance": {
+    "revision": 2,
+    "rationale": "Review ran the gates on an export of 7a831cb and showed the kill tests fail on main; its one blocker is concrete.",
+    "criteria": [
+      {
+        "criterion": "The hook's total lock wait ends inside the 10s timeout with margin and CLI waits are unchanged",
+        "support": "`lock.ts` `HOOK_WAIT_MS=5000` is shared through `within()`. The `WAITS` short and long values are unchanged. `state-hook-locks.test.ts` passes. The `hooks.json` timeout is 10."
+      },
+      {
+        "criterion": "The new tests exercise a real hook kill and multi-process contention, fail without the change, and are not flaky by construction, including on Windows",
+        "support": "the kill tests fail on the `main` export (3.0s against `>= 4000`). The `recorded > 0` assertion makes this criterion fail."
+      },
+      {
+        "criterion": "No regressions and dist matches the sources",
+        "support": "the full suite passes apart from the export artifact; the fresh build diff is empty."
+      },
+      {
+        "criterion": "The code follows .claude/CLAUDE.md (Effect, Schema at boundaries, JSDoc, Bun APIs)",
+        "support": "check, lint and fmt exit 0; the new exports (`Deadline`, `within`, `HOOK_WAIT_MS`, `STATE_PATIENCE`, `WORKTREE_PATIENCE`) all have JSDoc; the only deviation is the `Bun.spawn` note above."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "one blocker and the optional notes above."
+      },
+      {
+        "label": "checks-run",
+        "support": "the commands under `checks`."
+      }
+    ]
   },
   "createdAt": "2026-11-03T15:47:29.856Z"
 }
