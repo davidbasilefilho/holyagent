@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "extend-the-docs-with-the-branch-commit",
   "objective": "Extend the docs with the branch, commit and merge defaults, what claude.ai can and cannot be configured to do about branch pushes, the compaction-window calculation, record-based undo, and the updated commit/push reminder.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "docs/usage.md (Opinionated by design, Scope and undo, claude.ai section), docs/decisions.md, docs/hooks.md (vcs-reminder description is stale: it now names --no-verify, --no-gpg-sign, --amend, rebase -i and reset --hard), docs/commit-authorship.md if it mentions the assigned branch"
   ],
@@ -58,7 +58,45 @@
     "agentId": "workflow:wf_c1c2efe0-863/assignment-0mw0na5ia-7ldi",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-03T12:09:15.322Z"
+    "startedAt": "2026-11-03T12:09:15.322Z",
+    "finishedAt": "2026-11-03T12:16:59.411Z"
+  },
+  "result": "result: Docs updated for branches, commits and merges, claude.ai pushes, the window calculation, record-based undo and the reminder text.\nchanged: /home/user/holyagent/docs/usage.md, /home/user/holyagent/docs/decisions.md, /home/user/holyagent/docs/hooks.md\nchecks: `node_modules/.bin/mise run fmt` -> exit 0, \"Formatted 4 files, 240 unchanged\"; `node_modules/.bin/mise run fmt:check` -> exit 0, \"All 244 files are formatted\".\nblockers: none\nquestions: none\nnotes:\n- `mise run fmt` formats the whole repo, so it may have reformatted other workers' files under `packages/` (likely `record.ts`, `scope.ts`, `setup-scope.test.ts`). I did not edit them. Check `git diff` of those files if that matters.\n- `docs/commit-authorship.md` has no mention of the assigned branch or the `claude/` prefix, so I left it unchanged.\n- Window figures are copied from the report, whose author computed them by hand and asked for a spot check. I checked only the 114k optimum for B=30k, g=2k. The table assumes S = 10k, which is unmeasured, and the docs say so.\n- The branch-push sources are mixed. The routines setting comes from a mirror and a third-party how-to, and #91018 is a user report. The docs label each source this way.\n- The Codex Sol window is stated as conflicting (500k vs 272k). No figure is asserted.\n\nDiff: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/docs.diff\n\nevidence:\nbranch docs: `docs/usage.md` has a new \"Branches and merges\" entry under Opinionated by design and a \"Branch pushes in cloud sessions\" part in the claude.ai section. It covers the #24535 and #91018 reports, the cloud page with no restriction sentence found, and the routines \"Allow unrestricted branch pushes\" setting. It also says interactive sessions have no documented setting, the root stops and asks if a push is refused, and branch protection still applies. `docs/decisions.md` has a matching entry.\ncommit docs: the same \"Branches and merges\" entry in `docs/usage.md` and the `docs/decisions.md` entry. They cover atomic Conventional commits (readable review and bisect), squash merge by default (one commit per PR), and the repository's conventions first so the PR is mergeable.\nwindow docs: `docs/usage.md` has a \"Why 450000\" part with the cost model, the W* formula, the four-scenario table, the 967K comparison, the 300k minimax and the reasons 450000 stays. It also covers Codex compaction at 90% with the Sol conflict, and `/autocompact`, `CLAUDE_CODE_AUTO_COMPACT_WINDOW` and `modelSettings`. `docs/decisions.md` has a short note on the same.\nundo and hooks docs: `docs/usage.md` \"Scope and undo\" now describes the record under the user config folder, removal of recorded keys that still hold setup's value, `~` for kept values, the scope guards (ancestor top-level, symlink refusal) and the stop on an unreadable record. `docs/decisions.md` carries the matching undo and scope-guard reasons. `docs/hooks.md` `vcs-reminder` now names `--no-verify`, `--no-gpg-sign`, `--amend`, `rebase -i` and `reset --hard`.\nformat: `node_modules/.bin/mise run fmt:check` -> exit 0, \"All 244 files are formatted\".\nchecks-run: `node_modules/.bin/mise run fmt` -> exit 0; `node_modules/.bin/mise run fmt:check` -> exit 0.\nchanged-paths: `docs/usage.md`, `docs/decisions.md`, `docs/hooks.md`\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "docs sections added with labeled sources; fmt:check exit 0",
+    "criteria": [
+      {
+        "criterion": "branch docs: branch rule and claude.ai settings documented with sources and limits",
+        "support": "`docs/usage.md` has a new \"Branches and merges\" entry under Opinionated by design and a \"Branch pushes in cloud sessions\" part in the claude.ai section. It covers the #24535 and #91018 reports, the cloud page with no restriction sentence found, and the routines \"Allow unrestricted branch pushes\" setting. It also says interactive sessions have no documented setting, the root stops and asks if a push is refused, and branch protection still applies. `docs/decisions.md` has a matching entry."
+      },
+      {
+        "criterion": "commit docs: atomic commits and squash default documented with reasons and precedence",
+        "support": "the same \"Branches and merges\" entry in `docs/usage.md` and the `docs/decisions.md` entry. They cover atomic Conventional commits (readable review and bisect), squash merge by default (one commit per PR), and the repository's conventions first so the PR is mergeable."
+      },
+      {
+        "criterion": "window docs: cost model, table and the reason 450000 stays",
+        "support": "`docs/usage.md` has a \"Why 450000\" part with the cost model, the W* formula, the four-scenario table, the 967K comparison, the 300k minimax and the reasons 450000 stays. It also covers Codex compaction at 90% with the Sol conflict, and `/autocompact`, `CLAUDE_CODE_AUTO_COMPACT_WINDOW` and `modelSettings`. `docs/decisions.md` has a short note on the same."
+      },
+      {
+        "criterion": "undo and hooks docs: record-based undo, scope guards and the updated reminder described",
+        "support": "`docs/usage.md` \"Scope and undo\" now describes the record under the user config folder, removal of recorded keys that still hold setup's value, `~` for kept values, the scope guards (ancestor top-level, symlink refusal) and the stop on an unreadable record. `docs/decisions.md` carries the matching undo and scope-guard reasons. `docs/hooks.md` `vcs-reminder` now names `--no-verify`, `--no-gpg-sign`, `--amend`, `rebase -i` and `reset --hard`."
+      },
+      {
+        "criterion": "format: format check passes",
+        "support": "`node_modules/.bin/mise run fmt:check` -> exit 0, \"All 244 files are formatted\"."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`node_modules/.bin/mise run fmt` -> exit 0; `node_modules/.bin/mise run fmt:check` -> exit 0."
+      },
+      {
+        "label": "changed-paths",
+        "support": "`docs/usage.md`, `docs/decisions.md`, `docs/hooks.md`"
+      }
+    ]
   },
   "createdAt": "2026-11-03T12:09:09.730Z"
 }
