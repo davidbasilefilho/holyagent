@@ -5,7 +5,7 @@
   "roleTask": "Worker.debugging",
   "slug": "fix-the-windows-test-failures-in-the",
   "objective": "Fix the Windows test failures in the hooks, the plugin wrapper, the generated plugin and the vendored tools so the windows CI job passes those tests.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Failing tests (in /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/job-125934540228.log): hooks.test.ts (commit-msg x2, agent-launch, root-rules marker folder x4, hooks that need no state, the built wrapper x4, the hooks as the host runs them), plugin.test.ts (agent files sit where the plugin expects them; generated paths hold no extra file; the wrapper is the one executable), vendor.test.ts (pinned SHA-256, executable mode).",
     "Code: packages/integrations/claude (wrapper.sh, build.ts, generate.ts, vendor.ts, files.ts, tests) and packages/runtime/src/cli (hook.ts and the CLI entry). Likely causes: bun not found by bare name, POSIX shell wrapper on Windows, file mode bits Windows does not keep, folder permission checks (0700) that mean nothing on NTFS, CRLF checkouts changing SHA-256 (check .gitattributes), path separators."
@@ -46,5 +46,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T13:30:20.543Z"
+  },
   "createdAt": "2026-11-03T13:30:16.317Z"
 }
