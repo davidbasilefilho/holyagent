@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mw10hwwy-uuba",
+  "intentId": "intent-0mw0wa0wv-pjlj",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.testing",
+  "slug": "review-commit-3a8075d-git-diff-main",
+  "objective": "Review commit 3a8075d (git diff main 3a8075d in /home/user/holyagent-hook-locks) that keeps vcs test fixture repositories off the network with GIT_ALLOW_PROTOCOL.",
+  "state": "Running",
+  "scope": [
+    "Root cause reported by the writer: fixture repos use https://github.com/octo/project.git as origin, so intent create and vcs commit/pr fetch the state branch over the network (1-57s through the sandbox proxy), crossing the 5s test timeout. Fix: GIT_ENV in packages/runtime/tests/vcs-fixtures.ts adds GIT_ALLOW_PROTOCOL=file:ssh:http; new vcs-fixtures.test.ts asserts an https ls-remote is refused.",
+    "Judge whether the protocol allow-list could hide behavior the tests mean to cover (any test that expects an https fetch to succeed or to time out), whether ssh and http are needed, whether every spawn in those tests gets GIT_ENV, and whether earlier Windows timeout raises (for example the 60s timeout in vcs-commit.test.ts) are now unnecessary. Read the commit with git show/diff; never checkout or change the tree; run the vcs and state test files with bun test."
+  ],
+  "constraints": [
+    "Read-only. Scratch files only under /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad. Report in under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "The fix removes the network dependency without hiding behavior the tests cover",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The regression test fails without the fix and the vcs and state tests pass",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw0xtzop-q73w"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-03T18:19:06.850Z"
+  },
+  "createdAt": "2026-11-03T18:19:06.850Z"
+}
