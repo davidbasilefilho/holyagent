@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mw0oqnmw-bk8i",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-the-instruction-text-and-docs-of",
+  "objective": "Review the instruction text and docs of commit 9b4baa7 (evidence-judging skill, visual-judging trigger, Reviewer.artifact on Sonnet) for correctness, consistency and fit with the maintainer's decisions.",
+  "state": "Ready",
+  "scope": [
+    "Diff: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/judging.diff (dist excluded). Files under packages/runtime/src/instructions/claude-5.5/ (root/*.md, skills/*/SKILL.md), requirements.md, docs/decisions.md, docs/usage.md"
+  ],
+  "constraints": [
+    "Maintainer's decisions: the root judges compact evidence only and delegates all heavy work, shifting tokens to the smaller specialist models; findings triage needs a reproduction or trace; research claims: root picks the source, labels inference, a specialist re-derives numbers; prose for people reviewed by Reviewer.artifact (now Sonnet) with the root judging flagged excerpts; material design choices: an explorer returns 2-3 options and the root picks or asks; root cause accepted only when the chain closes.",
+    "Known inconsistency to rule on: root text says never open screenshots in the main thread, while skills/visual-judging/SKILL.md allows reading an image in the main thread to show it or settle a doubt. Say which wording should win given the decisions above.",
+    "Check that skill descriptions start with the situation (repo rule), the root text stays terse, and nothing contradicts other root sections. Read-only. Report in under 350 words, each finding blocking or non-blocking with file:line; start each evidence line with the criterion label before its colon."
+  ],
+  "criteria": [
+    {
+      "text": "decisions: the text implements the maintainer's decisions",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "consistency: no contradiction between root text, skills, requirements and docs",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "repo rules: skill descriptions open with the situation; JSDoc and style rules hold",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw0olm2j-48i5"
+  ],
+  "createdAt": "2026-11-03T12:49:59.336Z"
+}
