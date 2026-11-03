@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-the-zerover-scheme-change-and-0-2",
   "objective": "Review the ZeroVer scheme change and 0.2.0 bump in the latest commit on claude/nifty-faraday-jinmae (range origin/main..HEAD).",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "scripts/bump-version.ts and its test, mise.toml, package.json scripts, docs/development.md, and the version fields in manifests, bun.lock and dist plugin.json. The branch also has a merge commit of origin/main with no tree change."
   ],
@@ -42,7 +42,33 @@
     "agentId": "workflow:wf_aa2d258b-3f6/assignment-0mvzz4ukx-7bgs",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-03T00:53:11.505Z"
+    "startedAt": "2026-11-03T00:53:11.505Z",
+    "finishedAt": "2026-11-03T00:54:24.137Z"
+  },
+  "result": "result: No blockers. All three blocking criteria hold on the committed range `origin/main...HEAD` (199be87).\n\nchanged: none (read-only review)\n\nchecks:\n- `bun test scripts/bump-version.test.ts` -> exit 0, 37 pass, 0 fail.\n- `bun check` -> exit 0, no type errors in 121 files.\n- `bun lint` -> exit 0, no problems in 122 files.\n- `bun fmt --check` -> exit 0, all 241 files formatted.\n- `mise run verify` and `mise run build` were not run because `mise` is not installed in this environment. I ran the underlying `bun check`, `bun lint` and `bun fmt --check` directly.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- `/code-review` ran on `origin/main...HEAD` and returned 3 findings. I classified all three as optional (not blockers).\n- Optional: `parseVersion` still accepts a legacy `-Z` suffix (`scripts/bump-version.ts:55`) and drops it, so `0.3.2-1` patch-bumps to `0.3.3`. This is intentional and commented, and it matches the base behavior for that case. A test covers it. The repository is already at 0.2.0, so the branch is only dead code in practice.\n- Optional: the \"repository's versions\" test (`scripts/bump-version.test.ts` around line 238) only checks that the version parses. A committed `0.2.0-1` would still pass. Comparing `formatVersion(parseVersion(v))` with `v` would enforce the plain `0.X.Y` format.\n- Optional: the version-mismatch check compares raw strings (`bump-version.ts` around line 151), while parsing treats `0.3.2` and `0.3.2-1` as equal. Failing on the mismatch is the safe outcome.\n- Optional: `docs/usage.md:50` mentions the old label \"0.1.1-2\". It is a historical observation, not a version rule.\n- Read but not run: `mise run build` regeneration. The `dist/scripts/holyagent.js` diff is only the embedded version line, which matches what the build would produce.\n- The merge commit 5ca7c79 adds nothing to the range diff. `origin/main...HEAD` contains only 199be87.\n\nevidence:\n- Scheme: `scripts/bump-version.ts` has `BumpKind = \"minor\" | \"patch\"`, the `bumpVersion` switch has no hotfix case, and the CLI schema is `Literals([\"minor\",\"patch\"])`. `mise.toml` loses `bump:hotfix`, and `package.json` loses its `bump:hotfix` script. The suffixed-current-version cases (`0.3.2-1` patch gives `0.3.3`, minor gives `0.4.0`) are tested. `hotfix` is tested as exit 1 with a usage error. `rg` finds no `0.X.Y-Z` or hotfix wording outside the intentional legacy-input tests and the `docs/usage.md` historical note. `docs/development.md` and the `mise.toml` comment are updated to ZeroVer.\n- Version: `rg '\"version\"'` shows 0.2.0 in root `package.json`, `packages/runtime/package.json`, `packages/integrations/claude/package.json`, `plugin.json` and `marketplace.json`. The `bun.lock` entries for both workspaces and the embedded `holyagent.js` string are also 0.2.0. No 0.1.2 strings remain. The 11-file diff touches only the scheme code and tests, docs, `mise.toml`, the `package.json` scripts and version fields.\n- Regressions: `bun test scripts/bump-version.test.ts` exits 0 with 37 pass and 0 fail. The tests cover minor and patch bumps, round-trip, legacy `-Z` input, hotfix and major rejection, the CLI output, and the repository's own manifests.\n- checks-run: `bun test scripts/bump-version.test.ts` -> 0 (37 pass); `bun check` -> 0; `bun lint` -> 0; `bun fmt --check` -> 0. `mise run verify` and `mise run build` were not run (mise is not installed).\n",
+  "acceptance": {
+    "revision": 11,
+    "rationale": "Ran bump-version tests, check, lint and fmt on 199be87; scheme, version and test criteria verified with file evidence; optional findings named.",
+    "criteria": [
+      {
+        "criterion": "Scheme: only minor and patch remain, a suffixed current version bumps to a plain 0.X.Y, hotfix is rejected, and no 0.X.Y-Z wording or task remains",
+        "support": "`scripts/bump-version.ts` has `BumpKind = \"minor\" | \"patch\"`, the `bumpVersion` switch has no hotfix case, and the CLI schema is `Literals([\"minor\",\"patch\"])`. `mise.toml` loses `bump:hotfix`, and `package.json` loses its `bump:hotfix` script. The suffixed-current-version cases (`0.3.2-1` patch gives `0.3.3`, minor gives `0.4.0`) are tested. `hotfix` is tested as exit 1 with a usage error. `rg` finds no `0.X.Y-Z` or hotfix wording outside the intentional legacy-input tests and the `docs/usage.md` historical note. `docs/development.md` and the `mise.toml` comment are updated to ZeroVer."
+      },
+      {
+        "criterion": "Version: every version field reads 0.2.0 and nothing else changed beyond the scheme",
+        "support": "`rg '\"version\"'` shows 0.2.0 in root `package.json`, `packages/runtime/package.json`, `packages/integrations/claude/package.json`, `plugin.json` and `marketplace.json`. The `bun.lock` entries for both workspaces and the embedded `holyagent.js` string are also 0.2.0. No 0.1.2 strings remain. The 11-file diff touches only the scheme code and tests, docs, `mise.toml`, the `package.json` scripts and version fields."
+      },
+      {
+        "criterion": "Regressions: bump-version tests pass and cover the changed behavior",
+        "support": "`bun test scripts/bump-version.test.ts` exits 0 with 37 pass and 0 fail. The tests cover minor and patch bumps, round-trip, legacy `-Z` input, hotfix and major rejection, the CLI output, and the repository's own manifests."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bun test scripts/bump-version.test.ts` -> 0 (37 pass); `bun check` -> 0; `bun lint` -> 0; `bun fmt --check` -> 0. `mise run verify` and `mise run build` were not run (mise is not installed)."
+      }
+    ]
   },
   "createdAt": "2026-11-03T00:53:11.505Z"
 }
