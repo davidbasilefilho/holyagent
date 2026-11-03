@@ -1,0 +1,36 @@
+{
+  "id": "assignment-0mw0os0e5-2sbu",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.security",
+  "slug": "assess-the-ci-change-in-commit-b0ad3bc",
+  "objective": "Assess the CI change in commit b0ad3bc (windows job installs with bun install --frozen-lockfile --ignore-scripts) for security issues.",
+  "state": "Running",
+  "scope": [
+    "Diff: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/ci-fix.diff; full workflow: /home/user/holyagent-setup-scope/.github/workflows/ci.yml"
+  ],
+  "constraints": [
+    "Read-only. Report in under 200 words, findings blocking or non-blocking; start each evidence line with the criterion label before its colon."
+  ],
+  "criteria": [
+    {
+      "text": "security: no validated vulnerability introduced",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw0oo02p-zb5u"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T12:51:02.525Z"
+  },
+  "createdAt": "2026-11-03T12:51:02.525Z"
+}
