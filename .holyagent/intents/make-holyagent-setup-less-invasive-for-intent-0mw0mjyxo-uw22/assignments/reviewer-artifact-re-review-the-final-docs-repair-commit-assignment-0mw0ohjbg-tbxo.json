@@ -1,0 +1,36 @@
+{
+  "id": "assignment-0mw0ohjbg-tbxo",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.artifact",
+  "slug": "re-review-the-final-docs-repair-commit",
+  "objective": "Re-review the final docs repair commit 0ef4ea2 against the two blockers it fixes.",
+  "state": "Running",
+  "scope": [
+    "Diff: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/docs-final.diff. Findings it fixes: /home/user/holyagent/.git/holyagent/reports/assignment-0mw0ob8qh-h5n9.md. Code: packages/runtime/src/setup/settings.ts (enabledPlugins add and undo), check.ts, scope.ts"
+  ],
+  "constraints": [
+    "Judge only whether the two blockers are closed and the diff adds no new inaccuracy. Read-only. Report in under 200 words; start each evidence line with the criterion label before its colon."
+  ],
+  "criteria": [
+    {
+      "text": "closed: both blockers resolved without a new inaccuracy",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw0of7y4-psze"
+  ],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-11-03T12:42:53.836Z"
+  },
+  "createdAt": "2026-11-03T12:42:53.836Z"
+}
