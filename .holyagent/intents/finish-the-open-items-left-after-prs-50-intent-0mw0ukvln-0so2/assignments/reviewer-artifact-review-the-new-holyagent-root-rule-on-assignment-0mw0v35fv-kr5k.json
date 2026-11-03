@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "review-the-new-holyagent-root-rule-on",
   "objective": "Review the new holyagent root rule on branch deletion and the AGENTS.md note on running mise from the dev dependency, as model-facing instruction text.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Diff files: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/rule.diff (root instructions under packages/runtime/src/instructions, possibly hook text, tests and rebuilt dist) and /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/agents-md.diff (AGENTS.md).",
     "Intended rule: the root deletes branches (local or remote, merged or not) only when the user asks, and never proposes deleting them or lists undeleted branches as remaining work; reason: the maintainer keeps branches unless asked, and branch deletion is destructive. Intended note: gates run through node_modules/.bin/mise (or bun run verify) after bun install, since mise is a dev dependency and not on PATH; mise run sets up the canary Bun the gates need.",
@@ -45,7 +45,33 @@
     "agentId": "workflow:wf_fa7ef042-f19/assignment-0mw0v35fv-kr5k",
     "model": "haiku",
     "effort": "high",
-    "startedAt": "2026-11-03T15:47:44.863Z"
+    "startedAt": "2026-11-03T15:47:44.863Z",
+    "finishedAt": "2026-11-03T15:56:33.569Z"
+  },
+  "result": "result: Both changes are accurate in substance, but the branch rule's requirements line lacks its reason and cleanup coverage, the AGENTS.md note duplicates and diverges from the README and docs, and the branch rule's reason is weak. Read-only review; no edits.\nchanged: none\nchecks: none run (no shell; Read and Grep only). The diffs apply to the worktree `/home/user/holyagent-hook-locks`. The main checkout `/home/user/holyagent` does not have the changes, so I read the worktree. The writer may still be editing it.\nblockers: none\nquestions: Does a root-created scratch branch fall under \"never propose deleting\"? The rule as written covers it too, which may be intended.\nnotes:\n- Latent conflict: `version-control.md:11` says \"The repository's conventions, branch protection and merge settings come first\", while `:12` says \"Keep every branch otherwise\". A repo that deletes head branches on merge, or `gh pr merge --delete-branch`, is not addressed. Suggest one sentence: the root does not pass `--delete-branch` and does not undo a repo auto-delete.\n- `plugin.test.ts` (~line 390) pins prose substrings, including the classifier clause. Any rewording breaks the test.\n- The brief's optional `bun run verify` is not in the artifact. Not a defect, since `package.json` scripts run with `node_modules/.bin` on PATH.\n- Unverified: \"usually not on PATH in a cloud container\" and \"shared `.git/hooks`\". No `node_modules` exists in the worktree, so `node_modules/.bin/mise` could not be checked.\n\nevidence:\nThe branch rule is clear, carries its reason, covers cleanup, final reports and proposals, and conflicts with no other rule: gap. The set text is clear and covers cleanup, reports and proposals (`packages/runtime/src/instructions/claude-5.5/root/version-control.md:12`; generated `packages/integrations/claude/dist/agents/holyagent.md:133`). Gaps: (1) `requirements.md:48` R-BRANCH, the source the sets are written from, has no reason and no \"cleanup\" or \"in a report\" coverage: \"Delete a branch, local or remote, merged or not, only when the user asks, and never propose deleting branches, offer it as an AskUserQuestion option or list undeleted branches as remaining work.\" (2) The reason, `version-control.md:12`, is \"deleting is destructive, so the auto-mode classifier blocks it\". That states a runtime fact, not the maintainer's reason (\"keeps branches unless asked\"), and could be read as applying only in auto mode. (3) The merge-setting conflict in the notes is unaddressed.\nThe AGENTS.md note is accurate and states its reason: gap (minor). Accurate: `mise.toml:15` postinstall, `:66-68` verify, `:48-51` fmt:check, `scripts/toolchain.ts` upgrade, and mise as a devDependency in `package.json:30`. Gaps: (1) the invocation `node_modules/.bin/mise run verify` (`AGENTS.md:13`) differs from the documented `bunx --no-install mise run verify` (`README.md:38`, `docs/development.md:38`, `:45`, which says to run gates through `bunx --no-install mise run <task>`). (2) Why a worktree needs its own install is not stated.\nNeither change goes beyond its purpose: gap. The branch rule stays in scope. The AGENTS.md note repeats what the README and docs already give: \"`bun install --frozen-lockfile`, mise is a dev dependency, `mise run verify`, postinstall upgrades to canary\" (`README.md:35-38`, `docs/development.md:36-41`). The unique parts are the worktree install, the \"missing mise is not a reason to skip the gates\" rule and the hooks sentence. Trim to those, with a pointer to `docs/development.md`.\nfindings: 1) requirements R-BRANCH lacks reason and cleanup coverage (`requirements.md:48`). 2) Branch rule reason cites the classifier (`version-control.md:12`). 3) AGENTS.md invocation diverges from documented `bunx --no-install mise` (`AGENTS.md:13` vs `README.md:38`). 4) AGENTS.md note duplicates README and docs (`AGENTS.md:13` vs `README.md:35-38`). 5) Worktree-install reason missing (`AGENTS.md:13`).\n",
+  "acceptance": {
+    "revision": 2,
+    "rationale": "Findings quote exact lines in the diff and docs.",
+    "criteria": [
+      {
+        "criterion": "The branch rule is clear, carries its reason, covers cleanup, final reports and proposals, and conflicts with no other rule",
+        "support": "gap. The set text is clear and covers cleanup, reports and proposals (`packages/runtime/src/instructions/claude-5.5/root/version-control.md:12`; generated `packages/integrations/claude/dist/agents/holyagent.md:133`). Gaps: (1) `requirements.md:48` R-BRANCH, the source the sets are written from, has no reason and no \"cleanup\" or \"in a report\" coverage: \"Delete a branch, local or remote, merged or not, only when the user asks, and never propose deleting branches, offer it as an AskUserQuestion option or list undeleted branches as remaining work.\" (2) The reason, `version-control.md:12`, is \"deleting is destructive, so the auto-mode classifier blocks it\". That states a runtime fact, not the maintainer's reason (\"keeps branches unless asked\"), and could be read as applying only in auto mode. (3) The merge-setting conflict in the notes is unaddressed."
+      },
+      {
+        "criterion": "The AGENTS.md note is accurate and states its reason",
+        "support": "gap (minor). Accurate: `mise.toml:15` postinstall, `:66-68` verify, `:48-51` fmt:check, `scripts/toolchain.ts` upgrade, and mise as a devDependency in `package.json:30`. Gaps: (1) the invocation `node_modules/.bin/mise run verify` (`AGENTS.md:13`) differs from the documented `bunx --no-install mise run verify` (`README.md:38`, `docs/development.md:38`, `:45`, which says to run gates through `bunx --no-install mise run <task>`). (2) Why a worktree needs its own install is not stated."
+      },
+      {
+        "criterion": "Neither change goes beyond its purpose",
+        "support": "gap. The branch rule stays in scope. The AGENTS.md note repeats what the README and docs already give: \"`bun install --frozen-lockfile`, mise is a dev dependency, `mise run verify`, postinstall upgrades to canary\" (`README.md:35-38`, `docs/development.md:36-41`). The unique parts are the worktree install, the \"missing mise is not a reason to skip the gates\" rule and the hooks sentence. Trim to those, with a pointer to `docs/development.md`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "1) requirements R-BRANCH lacks reason and cleanup coverage (`requirements.md:48`). 2) Branch rule reason cites the classifier (`version-control.md:12`). 3) AGENTS.md invocation diverges from documented `bunx --no-install mise` (`AGENTS.md:13` vs `README.md:38`). 4) AGENTS.md note duplicates README and docs (`AGENTS.md:13` vs `README.md:35-38`). 5) Worktree-install reason missing (`AGENTS.md:13`)."
+      }
+    ]
   },
   "createdAt": "2026-11-03T15:47:39.979Z"
 }
