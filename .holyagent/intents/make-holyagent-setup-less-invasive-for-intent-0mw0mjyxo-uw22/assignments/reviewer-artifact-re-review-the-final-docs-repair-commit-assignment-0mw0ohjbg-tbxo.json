@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "re-review-the-final-docs-repair-commit",
   "objective": "Re-review the final docs repair commit 0ef4ea2 against the two blockers it fixes.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Diff: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/docs-final.diff. Findings it fixes: /home/user/holyagent/.git/holyagent/reports/assignment-0mw0ob8qh-h5n9.md. Code: packages/runtime/src/setup/settings.ts (enabledPlugins add and undo), check.ts, scope.ts"
   ],
@@ -31,7 +31,25 @@
     "agentId": "workflow:wf_40d0ebbf-140/assignment-0mw0ohjbg-tbxo",
     "model": "haiku",
     "effort": "high",
-    "startedAt": "2026-11-03T12:42:53.836Z"
+    "startedAt": "2026-11-03T12:42:53.836Z",
+    "finishedAt": "2026-11-03T12:44:32.793Z"
+  },
+  "result": "result: Both blockers are closed and the diff adds no new inaccuracy I can confirm. Two residual notes, neither in the diff.\nchanged: none\nchecks: none run (read-only; Read and Grep only, no shell)\nblockers: none\nquestions: none\nnotes:\n- docs/usage.md:109 adds \"(both take `--scope`; see `claude plugin --help`)\". Nothing in the repo confirms the CLI flags. Unverified, not contradicted.\n- docs/usage.md:161 (not in the diff, pre-existing) says \"run `--undo` to stop that\" for `enabledPlugins`. When the plugin install wrote the key first, undo keeps it (settings.ts:219-221 gives `unrecorded`), so the sentence now contradicts usage.md:109 and should be fixed.\nevidence:\nclosed: blocker 1 fixed. usage.md:109 and :117 match settings.ts:181-182 (removes only on equal recorded value), :219-221 (`unrecorded` keeps a key setup did not add) and record via addRecorded (settings.ts:107-111). blocker 2 fixed. hooks.md:26 matches scope.ts:112-125 (cwd plus nearest `.git` ancestor) and check.ts:24-33 (project and local files count toward present keys). The hook passes cwd (cli/hook.ts:233).\nfindings: diff hunks checked are hooks.md:18 (new line 26), usage.md:31, :40 (new line 109) and :49 (new line 117). See the notes for the residual items.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "both blockers closed; residual note fixed next",
+    "criteria": [
+      {
+        "criterion": "closed: both blockers resolved without a new inaccuracy",
+        "support": "blocker 1 fixed. usage.md:109 and :117 match settings.ts:181-182 (removes only on equal recorded value), :219-221 (`unrecorded` keeps a key setup did not add) and record via addRecorded (settings.ts:107-111). blocker 2 fixed. hooks.md:26 matches scope.ts:112-125 (cwd plus nearest `.git` ancestor) and check.ts:24-33 (project and local files count toward present keys). The hook passes cwd (cli/hook.ts:233)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "diff hunks checked are hooks.md:18 (new line 26), usage.md:31, :40 (new line 109) and :49 (new line 117). See the notes for the residual items."
+      }
+    ]
   },
   "createdAt": "2026-11-03T12:42:53.836Z"
 }
