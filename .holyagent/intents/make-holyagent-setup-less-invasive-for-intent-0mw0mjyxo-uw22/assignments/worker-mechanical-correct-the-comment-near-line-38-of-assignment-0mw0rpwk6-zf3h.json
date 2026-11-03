@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mw0rpwk6-zf3h",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Worker.mechanical",
+  "slug": "correct-the-comment-near-line-38-of",
+  "objective": "Correct the comment near line 38 of packages/integrations/claude/tests/host.test.ts so it states accurately which tests exercise the win32 branch of isExecutable.",
+  "state": "Running",
+  "scope": [
+    "The comment says the win32 branch is checked by 'the test below and the one above'. The test above (the real-platform isExecutable test) takes the win32 branch only when running on Windows; the explicit-win32 test ('is the mode the repository commits for it on Windows') takes it on every platform. Reword the comment to say that, in one or two plain sentences."
+  ],
+  "constraints": [
+    "Change only that comment; no code or assertion changes.",
+    "Make no version-control writes and no edits under .git/ or .holyagent/; report the changed path.",
+    "Run `bun test packages/integrations/claude/tests/host.test.ts` and `bun fmt --no-script --check` afterwards and report the counts and exit codes.",
+    "Keep working until done, then stop and report in under 150 words."
+  ],
+  "criteria": [
+    {
+      "text": "The comment names accurately which tests take the win32 branch and when",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "Only the comment changed, and host.test.ts and the format check pass",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/claude/tests/host.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-03T14:13:23.094Z"
+  },
+  "createdAt": "2026-11-03T14:13:23.094Z"
+}
