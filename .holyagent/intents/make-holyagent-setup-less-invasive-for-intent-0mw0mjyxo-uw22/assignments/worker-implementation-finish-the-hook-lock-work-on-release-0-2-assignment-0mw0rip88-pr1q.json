@@ -1,0 +1,68 @@
+{
+  "id": "assignment-0mw0rip88-pr1q",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "finish-the-hook-lock-work-on-release-0-2",
+  "objective": "Finish the hook-lock work on release/0.2.0/fix/windows-tests: bound every state lock the agent-launch hook takes within the 10s hook timeout, and make the withFileLock doc state which patience levels fail at once.",
+  "state": "Running",
+  "scope": [
+    "Checkout /home/user/holyagent, branch release/0.2.0/fix/windows-tests. Commit b1dec34 added a 'hook' patience (3s limit, 25ms poll) in packages/runtime/src/state/lock.ts and passes it from the agent-launch hook (packages/runtime/src/cli/hook.ts ~337) into updateState.",
+    "A review found that the same hook path also calls resolveState, which takes other locks with longer waits (a worktree lock around 60s and a migration lock around 30s), so the hook can still outlast its 10s timeout there. Pass the hook patience (or an equivalent bound) through those locks when called from the hook path, keeping CLI defaults unchanged. Use the existing patience mechanism.",
+    "The withFileLock JSDoc says a busy lock 'fails at once' without saying that this applies to the short and hook patience but not long. Correct the wording."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md and AGENTS.md: Effect for effects and tagged errors, no try/catch/new Promise/async in runtime and CLI source, JSDoc on exported items, Bun APIs.",
+    "Make no version-control writes and no edits under .git/ or .holyagent/; report changed paths. Scratch files only under /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad.",
+    "Rebuild the generated plugin (mise run build, or bun scripts/vendor.ts then bun packages/integrations/claude/build.ts if mise is missing) since runtime sources are bundled into dist.",
+    "Add a test that fails without the resolveState change where one is practical; if a lock wait cannot be triggered in a test, say why and what you checked instead. Do not weaken or skip existing tests.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When done and checked, stop and report: name unrequested features, tests, files or refactors instead of adding them, and launch no reviewers. A summary announcing a next step or an offer to wait is not a stop.",
+    "Run real checks: changed tests, then check, lint, fmt --check and the full suite (mise run verify, or the bun steps directly if mise is missing, naming that). Write the full diff to /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/hook-locks.diff and list it as diff-file evidence.",
+    "Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "Every state lock taken on the agent-launch hook path gives up within the hook budget, and CLI commands keep their defaults",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A test covers the bounded resolveState locks on the hook path, or the report says why one is impractical and what was checked",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The withFileLock JSDoc states which patience levels fail at once",
+      "blocking": false,
+      "dimension": "style"
+    },
+    {
+      "text": "The full suite, type-check, lint and format pass, and dist is rebuilt",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "The change stays within these two items",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "diff-file",
+    "verify"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src",
+    "packages/runtime/tests",
+    "packages/integrations/claude/dist",
+    "packages/integrations/claude/tests/hooks.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T14:07:47.000Z"
+  },
+  "createdAt": "2026-11-03T14:07:47.000Z"
+}
