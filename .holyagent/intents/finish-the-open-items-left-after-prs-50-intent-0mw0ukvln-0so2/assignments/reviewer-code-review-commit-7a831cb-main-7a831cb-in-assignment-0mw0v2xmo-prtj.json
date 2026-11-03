@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-commit-7a831cb-main-7a831cb-in",
   "objective": "Review commit 7a831cb (main..7a831cb in /home/user/holyagent-hook-locks) that gives the agent-launch hook one lock deadline across all its locks, with real hook-kill and contention tests and three review-note fixes.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Requirements: the hook's total lock wait ends inside the 10s plugin hook timeout (dist/hooks/hooks.json) with margin, CLI waits unchanged; tests that run a real hook kill and multi-process contention; the lock test uses Bun APIs, the migration test removes only its marker, patience defaults live in one place.",
     "Review the committed range git diff main 7a831cb. Another writer edits the working tree of /home/user/holyagent-hook-locks at the same time, so read the commit, not the working tree. Gates run with node_modules/.bin/mise run <task> or bun run verify in /home/user/holyagent-hook-locks."
@@ -46,5 +46,10 @@
   "independentFrom": [
     "assignment-0mw0umsxj-r8zg"
   ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T15:47:40.235Z"
+  },
   "createdAt": "2026-11-03T15:47:29.856Z"
 }
