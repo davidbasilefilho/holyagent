@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.testing",
   "slug": "review-commit-3a8075d-git-diff-main",
   "objective": "Review commit 3a8075d (git diff main 3a8075d in /home/user/holyagent-hook-locks) that keeps vcs test fixture repositories off the network with GIT_ALLOW_PROTOCOL.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Root cause reported by the writer: fixture repos use https://github.com/octo/project.git as origin, so intent create and vcs commit/pr fetch the state branch over the network (1-57s through the sandbox proxy), crossing the 5s test timeout. Fix: GIT_ENV in packages/runtime/tests/vcs-fixtures.ts adds GIT_ALLOW_PROTOCOL=file:ssh:http; new vcs-fixtures.test.ts asserts an https ls-remote is refused.",
     "Judge whether the protocol allow-list could hide behavior the tests mean to cover (any test that expects an https fetch to succeed or to time out), whether ssh and http are needed, whether every spawn in those tests gets GIT_ENV, and whether earlier Windows timeout raises (for example the 60s timeout in vcs-commit.test.ts) are now unnecessary. Read the commit with git show/diff; never checkout or change the tree; run the vcs and state test files with bun test."
@@ -38,7 +38,33 @@
     "agentId": "workflow:wf_8a215b4e-ab1/assignment-0mw10hwwy-uuba",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-03T18:19:06.850Z"
+    "startedAt": "2026-11-03T18:19:06.850Z",
+    "finishedAt": "2026-11-03T18:20:21.141Z"
+  },
+  "result": "result: The fix holds. The regression test fails on the base and the 142 vcs and state tests pass with the fix. One optional cleanup remains.\nchanged: none (read-only; scratch copy of the base under the scratchpad `base/` directory)\nchecks:\n- `bun test packages/runtime/tests/vcs-*.test.ts packages/runtime/tests/state-*.test.ts` -> exit 0, 142 pass, 0 fail, 7 files, 24.6s.\n- Base run with `vcs-fixtures.ts` taken from `3a8075d~1` and the new test file, in a `git archive` copy -> exit 1, 1 fail. Git reaches the network and answers \"could not read Username for 'https://github.com'\" instead of \"not allowed\".\nblockers: none\nnotes:\n- No test depends on an https fetch succeeding or timing out. The https origins in `vcs-pr.test.ts` and `state-branch.test.ts` (lines 25 and 777) only give `vcs pr` an owner and repository. A refused fetch counts as a remote without the state branch, which the code already handles.\n- ssh and http are both needed. `state-branch.test.ts` uses an `ssh://` origin with a stub `ssh` script (lines 327-404, the hang-timeout tests at 446 and 521), and a local http server at line 433 (`http://localhost`).\n- Every spawn in the fixtures goes through `sh` and `initRepo`/`run`, which pass `GIT_ENV` (`vcs-fixtures.ts` lines 35, 124 and 129). `state-hook-locks.test.ts` passes `GIT_ENV` directly. I found no spawn without it.\n- Optional: the 60s timeout on one test in `vcs-commit.test.ts` (line 355) looks unnecessary now. I did not measure it against the fix, so I can't tell whether it was raised for Windows spawn cost or for network latency. The same is true of the win32 60s default in `state-branch.test.ts` (line 29). Both are harmless.\n- The new test checks the \"not allowed\" wording from git, which could change between git versions. This is optional.\nevidence:\nfindings: The notes above. The \"not allowed\" wording is the only fragile spot; nothing blocks.\nchecks-run: Both `bun test` runs listed under checks.\nThe fix removes the network dependency without hiding behavior the tests cover: No test expects an https fetch to succeed or time out. The ssh and http protocols are still used by the tests, and every spawn gets `GIT_ENV`.\nThe regression test fails without the fix and the vcs and state tests pass: The base run failed 1 of 1 with the proxy-path message. The fixed tree passed 142 of 142.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Ran the base and fixed tree: regression test red on base, 142 vcs/state tests green; traced every spawn to GIT_ENV.",
+    "criteria": [
+      {
+        "criterion": "The fix removes the network dependency without hiding behavior the tests cover",
+        "support": "No test expects an https fetch to succeed or time out. The ssh and http protocols are still used by the tests, and every spawn gets `GIT_ENV`."
+      },
+      {
+        "criterion": "The regression test fails without the fix and the vcs and state tests pass",
+        "support": "The base run failed 1 of 1 with the proxy-path message. The fixed tree passed 142 of 142."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "The notes above. The \"not allowed\" wording is the only fragile spot; nothing blocks."
+      },
+      {
+        "label": "checks-run",
+        "support": "Both `bun test` runs listed under checks."
+      }
+    ]
   },
   "createdAt": "2026-11-03T18:19:06.850Z"
 }
