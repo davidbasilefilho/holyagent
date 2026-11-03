@@ -67,25 +67,57 @@ const claim = (file: string) =>
   })
 
 /**
- * How long a contender waits for a lock: a holder that commits to git keeps it for a while, and a
- * plugin hook, which the host kills after 10 seconds, waits only a few seconds so that it fails
- * cleanly with StateLocked instead.
+ * How long a contender waits for a lock: a holder that commits to git keeps it for a while
+ * (`"short"`), and one that checks out a large repository for longer (`"long"`). A plugin hook,
+ * which the host kills after 10 seconds, passes a {@link Deadline} instead, shared by every lock it
+ * takes, so that it fails cleanly with StateLocked in time.
  */
-export type Patience = "short" | "long" | "hook"
+export type Patience = "short" | "long" | Deadline
 
 /**
- * Each patience polls every `delay` milliseconds for at most `limit` milliseconds. With `stuck`, a
- * lock that a live process took longer ago than the limit is respected at once: its holder is
- * stuck, not busy, and a contender that waited on it would only wait the whole limit.
+ * The moment, in epoch milliseconds, after which a contender stops waiting. One deadline is passed
+ * to every lock a caller takes, so the waits add up to the deadline and not to a limit for each.
+ */
+export interface Deadline {
+  readonly until: number
+}
+
+/**
+ * How long a plugin hook waits for all its locks together, in milliseconds. The host kills a hook
+ * after 10 seconds (`hooks.json`), and the hook has its own work to do besides waiting, so half of
+ * that is spent at most.
+ */
+export const HOOK_WAIT_MS = 5_000
+
+/** A {@link Deadline} `ms` milliseconds from now. */
+export const within = (ms: number) =>
+  Effect.map(Clock.currentTimeMillis, (now): Deadline => ({ until: now + ms }))
+
+/**
+ * The patience of a caller whose lock is held across a git commit, which takes a while on Windows
+ * or in a large tree: the state lock, and the migration that takes it. One definition, so that the
+ * callers that default to it stay in step.
+ */
+export const STATE_PATIENCE: Patience = "short"
+
+/**
+ * The patience of a caller whose lock is held by work as slow as a checkout of a large repository
+ * (the worktree lock) or left behind by a holder that died (the exclude lock).
+ */
+export const WORKTREE_PATIENCE: Patience = "long"
+
+/**
+ * Each named patience polls every `delay` milliseconds for at most `limit` milliseconds. With
+ * `stuck`, a lock that a live process took longer ago than the limit is respected at once: its
+ * holder is stuck, not busy, and a contender that waited on it would only wait the whole limit.
  */
 const WAITS = {
-  // The state lock is held across a git commit, which takes a while on Windows or in a large tree.
   short: { delay: 25, limit: 30_000, stuck: true },
-  // For a holder that works for as long as a checkout of a large repository takes, about a minute.
   long: { delay: 50, limit: 60_000, stuck: false },
-  // Well inside the 10 second timeout of a plugin hook, which also has its own work to do.
-  hook: { delay: 25, limit: 3_000, stuck: true },
 } as const
+
+/** A deadline polls like `short`, and takes a lock held for longer than the hook's wait as stuck. */
+const DEADLINE_WAIT = { delay: 25, limit: HOOK_WAIT_MS, stuck: true } as const
 
 /** True unless the lock was taken by a live process more than `limit` milliseconds ago. */
 const holderBusy = (file: string, limit: number) =>
@@ -94,19 +126,22 @@ const holderBusy = (file: string, limit: number) =>
     return owner === undefined || (yield* Clock.currentTimeMillis) - owner.acquiredAt < limit
   })
 
-const acquire = (file: string, patience: Patience = "short") => {
-  const { delay, limit, stuck } = WAITS[patience]
+const acquire = (file: string, patience: Patience) => {
+  const named = typeof patience === "string"
+  const { delay, limit, stuck } = named ? WAITS[patience] : DEADLINE_WAIT
   return claim(file).pipe(
     Effect.catchTag("StateLocked", (locked) =>
       breakIfStale(file).pipe(Effect.andThen(Effect.fail(locked))),
     ),
     Effect.retry({
       schedule: Schedule.spaced(delay),
-      times: limit / delay,
+      ...(named ? { times: limit / delay } : {}),
       while: (error) =>
-        error._tag === "StateLocked" && stuck
-          ? holderBusy(file, limit)
-          : error._tag === "StateLocked",
+        Effect.gen(function* () {
+          if (error._tag !== "StateLocked") return false
+          if (!named && (yield* Clock.currentTimeMillis) >= patience.until) return false
+          return stuck ? yield* holderBusy(file, limit) : true
+        }),
     }),
   )
 }
@@ -125,15 +160,16 @@ const release = (file: string, token: string) =>
  * created exclusively; one left by a dead process is broken, and the lock is released whatever the
  * outcome. A contender retries until its patience runs out, then fails with StateLocked: up to 30
  * seconds with `"short"` (the default; a holder keeps the lock for as long as a git commit takes),
- * a minute with `"long"` for a holder that does slow work, or 3 seconds with `"hook"` for a caller
- * under a hook timeout. With `"short"` and `"hook"`, a lock a live process has held longer than the
- * limit fails at once, since its holder is stuck; `"long"` never does and waits the whole limit.
- * The folder of the file is made when it is missing.
+ * a minute with `"long"` for a holder that does slow work, or until a {@link Deadline} for a caller
+ * under a hook timeout, which shares it among all its locks. With `"short"` and a deadline, a lock
+ * a live process has held longer than the limit (the whole wait for a deadline) fails at once,
+ * since its holder is stuck; `"long"` never does and waits the whole limit. The folder of the file
+ * is made when it is missing.
  */
 export const withFileLock = <A, E, R>(
   file: string,
   use: Effect.Effect<A, E, R>,
-  patience: Patience = "short",
+  patience: Patience = STATE_PATIENCE,
 ) =>
   Effect.acquireUseRelease(
     io(file, () => mkdir(dirname(file), { recursive: true })).pipe(
@@ -150,7 +186,7 @@ export const withFileLock = <A, E, R>(
 export const withStateLock = <A, E, R>(
   directory: string,
   use: Effect.Effect<A, E, R>,
-  patience: Patience = "short",
+  patience: Patience = STATE_PATIENCE,
 ) =>
   Effect.acquireUseRelease(
     ensureLocalDirectory(directory).pipe(

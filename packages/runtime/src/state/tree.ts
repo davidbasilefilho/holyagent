@@ -9,7 +9,13 @@ import { looksLikeAgent } from "../vcs/identity.ts"
 import { StateIo, StateModeRefused } from "./errors.ts"
 import { commitFile, hasCode, io, readText } from "./files.ts"
 import { CONFIG_FILE, STATE_DIRECTORY, TRACKED_STATE_PATHSPEC } from "./layout.ts"
-import { type Patience, withFileLock, withStateLock } from "./lock.ts"
+import {
+  type Patience,
+  STATE_PATIENCE,
+  withFileLock,
+  withStateLock,
+  WORKTREE_PATIENCE,
+} from "./lock.ts"
 import { parseStateMode, STATE_MODE_KEY, type StateMode } from "./mode.ts"
 
 // In the default `branch` mode the Intent state lives on one branch of its own, checked out in one
@@ -182,7 +188,7 @@ const editExclude = <E, R>(
   env: Environment,
   edit: (lines: ReadonlyArray<string>) => Effect.Effect<ReadonlyArray<string>, E, R>,
   done?: (lines: ReadonlyArray<string>) => boolean,
-  patience: Patience = "long",
+  patience: Patience = WORKTREE_PATIENCE,
 ) =>
   Effect.gen(function* () {
     const path = yield* excludePath(top, env)
@@ -582,7 +588,7 @@ const ensureWorktree = (
   branch: string,
   path: string,
   options: { readonly make: boolean; readonly peek: boolean; readonly online: boolean },
-  patience: Patience = "long",
+  patience: Patience = WORKTREE_PATIENCE,
 ) =>
   withFileLock(
     join(common, "holyagent", "worktree.lock"),
@@ -819,7 +825,7 @@ const migrateWorkTree = (
   worktree: string,
   env: Environment,
   commit: (message: string) => Effect.Effect<boolean, StateIo>,
-  patience: Patience = "short",
+  patience: Patience = STATE_PATIENCE,
 ) => {
   const source = join(top, STATE_DIRECTORY)
   const target = join(worktree, STATE_DIRECTORY)
@@ -1022,8 +1028,8 @@ const locate = (cwd: string, env: Environment) =>
  * nothing touches the network: a state branch that exists nowhere locally is not made, since only a
  * fetch can tell whether the remote has it, and the state counts as absent until a command that may
  * fetch makes it. With `patience`, every lock it takes (exclude, worktree and migration) is waited
- * for that long at most, so a plugin hook passes `"hook"` to give up inside the host's hook
- * timeout; without it each lock keeps the wait its holder needs.
+ * for that long at most, so a plugin hook passes one deadline (see {@link within}) to give up
+ * inside the host's hook timeout; without it each lock keeps the wait its holder needs.
  */
 export const resolveState = (
   cwd: string,
@@ -1225,6 +1231,6 @@ export const setStateMode = (cwd: string, env: Environment, mode: StateMode) =>
           )
         return { previous, mode }
       }),
-      "long",
+      WORKTREE_PATIENCE,
     )
   })
