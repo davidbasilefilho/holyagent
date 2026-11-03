@@ -1,0 +1,57 @@
+{
+  "id": "assignment-0mw0wvs52-1zla",
+  "intentId": "intent-0mw0wa0wv-pjlj",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "define-in-general-terms-in-the-root-s",
+  "objective": "Define in general terms, in the root's asking rules, what makes a question unnecessary, so the root never asks one, with the merge, method and branch cases only as illustrations.",
+  "state": "Ready",
+  "scope": [
+    "Worktree /home/user/holyagent-hook-locks, branch release/0.2.0/fix/no-merge-question, with uncommitted changes from the previous writer (merge question removed; a new asking.md bullet saying a choice the repository convention or a holyagent default settles is applied and recorded, never asked; R-DEFAULTS, R-MERGEWAIT, R-S-HEAD). Build on them; do not revert them.",
+    "The maintainer's words: 'in general, unnecessary questions must not be asked' and 'but it must define generically what that means'. Write one general test in packages/runtime/src/instructions/claude-5.5/root/asking.md (and wherever the root rules restate when to ask, such as the task-list/AskUserQuestion rule and user-messages.md, so they agree): a question is unnecessary when its answer would not change what the root does, or when something already settles it (the user's words or an earlier answer, the repository's conventions, a holyagent default or recommended option, the code, or a fact a specialist can establish). Only a question that passes the test is asked. Then give a short list of common unnecessary questions as illustrations of the test (asking whether to merge or which method, offering to delete branches, asking permission for an action the user named, confirming a plan before doing it, offering to continue or wait, choosing between options when one is the recommended default). Fold the existing R-DEFAULTS bullet into this general rule rather than leaving two overlapping rules, keeping the repository-convention-first order.",
+    "Add or update a requirement entry (for example R-NOASK) with a plugin test per the repository pattern. Follow /root/.claude/plugins/synced/03eb801d-6ff6-4373-b5b1-f94edf359a3e_0f3e6ee9-af2e-4c2c-8d3c-9be25ca27713/holyagent~g2/skills/instruction-writing/SKILL.md."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md and AGENTS.md. Make no version-control writes and no edits under .git/ or .holyagent/; do not move HEAD of any checkout. Report changed paths. Scratch files only under /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad.",
+    "Keep the change to the asking rules and the places that restate them.",
+    "Rebuild with bunx --no-install mise run build and run bunx --no-install mise run verify in /home/user/holyagent-hook-locks.",
+    "Keep working until done; when done and checked, stop and report, naming unrequested changes instead of making them, and launch no reviewers.",
+    "Write the full diff of the worktree's uncommitted changes (all files, including the previous writer's) to /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/branch.diff and your own changes alone to /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/uq.diff; list both as evidence. Report in under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "The root's asking rules define generically what makes a question unnecessary, as one test, and the root asks only questions that pass it",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Examples are illustrations of the test, not the rule, and the repository-convention-first default rule is folded in without duplication",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Every root rule that says when to ask agrees with the test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A requirement entry and plugin test cover it, mise run verify passes and dist is rebuilt",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "diff-file",
+    "verify"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/integrations/claude/dist",
+    "packages/integrations/claude/tests",
+    "packages/integrations/claude/src"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw0wb7wa-xv5a",
+  "createdAt": "2026-11-03T16:37:55.382Z"
+}
