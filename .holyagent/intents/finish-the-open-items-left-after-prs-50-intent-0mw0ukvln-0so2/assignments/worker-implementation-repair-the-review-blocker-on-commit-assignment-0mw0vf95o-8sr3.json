@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-review-blocker-on-commit",
   "objective": "Repair the review blocker on commit 7a831cb: make the multi-process contention test deterministic, and apply the review's optional timing and naming notes.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-hook-locks-a, branch release/0.2.0/fix/hook-lock-followups at 7a831cb. It has no node_modules yet: run 'bun install --frozen-lockfile' there first (that also installs the repository's lefthook hooks, which is expected), then gates through bunx --no-install mise run <task>.",
     "Blocker: packages/integrations/claude/tests/hook-locks.test.ts around line 148, expect(recorded).toBeGreaterThan(0). The lock is unfair (25ms polling); 3 CLI intent create commands can hold it across git commits ahead of 3 hooks with a 5s deadline, and the test releases its own hold at 2s, so on a slow Windows runner all three hooks can legitimately hand back StateLocked and the test fails with correct code. The stdout regex already requires recorded-or-handed-back. Remove that assertion and make the later expect(shown.stdout).toMatch(/agent: agent-\\d/) conditional on a hook having recorded, keeping every integrity check.",
@@ -52,7 +52,37 @@
     "agentId": "workflow:wf_ff0fa830-690/assignment-0mw0vf95o-8sr3",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-03T15:57:18.827Z"
+    "startedAt": "2026-11-03T15:57:18.827Z",
+    "finishedAt": "2026-11-03T16:02:11.370Z"
+  },
+  "result": "result: Blocker fixed and both optional notes applied; `mise run verify` passes (1051 pass, 1 skip, 0 fail) and dist is rebuilt.\n\nchanged (all under /home/user/holyagent-hook-locks-a):\n- packages/integrations/claude/tests/hook-locks.test.ts\n- packages/runtime/tests/state-hook-locks.test.ts\n- packages/runtime/src/state/lock.ts\n- packages/runtime/src/state/tree.ts (a `{@link}` reference only)\n- packages/runtime/src/cli/hook.ts (the import and the one call to the renamed helper)\n- packages/integrations/claude/dist/scripts/holyagent.js (rebuilt)\n\nchecks:\n- `bunx --no-install mise run build` -> built 35 files.\n- `bunx --no-install mise run verify` -> format check clean, 128 files with no type errors, lint clean, 1051 pass / 1 skip / 0 fail. I read this from the printed summary; the exit code was masked by a `tail` pipe.\n- The first `verify` run failed format check on two files, so I ran `mise run fmt` and re-ran `build` and `verify`.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- `packages/runtime/src/cli/hook.ts` is outside the ownership paths. I edited it because the rename of `within` to `deadlineIn` would break it otherwise. The root should record it as a changed path.\n- The `if (recorded > 0)` condition is the only change to the contention test's assertions; the other integrity checks are unchanged.\n- The deadline test's upper bound is now 3000ms instead of 2200ms.\n\nevidence:\nThe contention test no longer requires a hook to record, and keeps its bound and integrity checks: `packages/integrations/claude/tests/hook-locks.test.ts` around line 180. `expect(recorded).toBeGreaterThan(0)` is gone and the agent check is conditional on `recorded > 0`. The exit-code, time-bound, stdout recorded-or-handed-back, intent-list and clean-worktree checks are untouched.\nThe deadline test's upper bound is widened and the deadline helper has a clear name: `toBeLessThan(3000)` in `packages/runtime/tests/state-hook-locks.test.ts`. `within` is now `deadlineIn` in `packages/runtime/src/state/lock.ts`, with callers updated in `hook.ts` and the test.\nmise run verify passes and dist is rebuilt: the `build` and `verify` runs above.\ndiff-file: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/repA.diff\nverify: `bunx --no-install mise run verify`, 1051 pass / 1 skip / 0 fail, after `build`.\n",
+  "acceptance": {
+    "revision": 2,
+    "rationale": "Contention test no longer requires a record; bounds widened; verify 1051 pass; re-review closed the blocker.",
+    "criteria": [
+      {
+        "criterion": "The contention test no longer requires a hook to record, and keeps its bound and integrity checks",
+        "support": "`packages/integrations/claude/tests/hook-locks.test.ts` around line 180. `expect(recorded).toBeGreaterThan(0)` is gone and the agent check is conditional on `recorded > 0`. The exit-code, time-bound, stdout recorded-or-handed-back, intent-list and clean-worktree checks are untouched."
+      },
+      {
+        "criterion": "The deadline test's upper bound is widened and the deadline helper has a clear name",
+        "support": "`toBeLessThan(3000)` in `packages/runtime/tests/state-hook-locks.test.ts`. `within` is now `deadlineIn` in `packages/runtime/src/state/lock.ts`, with callers updated in `hook.ts` and the test."
+      },
+      {
+        "criterion": "mise run verify passes and dist is rebuilt",
+        "support": "the `build` and `verify` runs above."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/repA.diff"
+      },
+      {
+        "label": "verify",
+        "support": "`bunx --no-install mise run verify`, 1051 pass / 1 skip / 0 fail, after `build`."
+      }
+    ]
   },
   "createdAt": "2026-11-03T15:57:04.668Z"
 }
