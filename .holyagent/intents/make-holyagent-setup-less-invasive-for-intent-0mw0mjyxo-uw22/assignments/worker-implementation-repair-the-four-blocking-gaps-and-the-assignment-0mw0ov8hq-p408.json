@@ -1,0 +1,53 @@
+{
+  "id": "assignment-0mw0ov8hq-p408",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-four-blocking-gaps-and-the",
+  "objective": "Repair the four blocking gaps and the notes from the review of the evidence-judging commit so the instruction text is complete and consistent.",
+  "state": "Running",
+  "scope": [
+    "Findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw0oqnmw-bk8i.md (blockers 1-4 and notes) and the notes in /home/user/holyagent/.git/holyagent/reports/assignment-0mw0oqvk8-nrv7.md",
+    "packages/runtime/src/instructions/claude-5.5/ (root/assignments.md, skills/evidence-judging, skills/visual-judging, roles/reviewer-artifact, roles/explorer-*), requirements.md, the tests that pin them, docs/decisions.md, docs/usage.md"
+  ],
+  "constraints": [
+    "1: give Reviewer.artifact a prose-for-people bar (audience, claims against sources, tone, what a skeptical reader needs) and tell it to quote the excerpts it flags, so the root judges excerpts. 2: say in evidence-judging that the root's brief asks the explorer for two or three options with trade-offs (and add one line to the explorer method text that, when a brief asks for options, it returns them short with trade-offs). 3: the screenshot rule follows visual-judging (read an image in the main thread only to show it to the user or settle a doubt); assignments.md points to visual-judging instead of repeating the visual rules, and the plugin test pinning the absolute string changes with it; docs/decisions.md matches. 4: a blocking finding starts a repair only with evidence: a reproduction from a reviewer with a shell, a file:line trace from a reviewer without one, or a Reviewer.visual observation (viewport, interaction, visible result) for visual findings; state this in evidence-judging and point to it from assignments.md. Notes: assignments.md:7 'judged from the diff' becomes the diff summary and check output; state the three-round rule in one place plus pointers; docs/usage.md:103 skill list either complete or dropped; tighten plugin.test.ts:815 to the full sonnet review list.",
+    "Keep root text terse. Run node_modules/.bin/mise run build then node_modules/.bin/mise run verify. No version-control writes, no edits under .git/ or .holyagent/; report changed paths. Keep working until done; stop and report. Report in under 350 words; start each evidence line with the criterion label before its colon."
+  ],
+  "criteria": [
+    {
+      "text": "blockers: review blockers 1-4 resolved",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "notes: review notes addressed",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "gates: mise run verify passes with dist rebuilt",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src",
+    "packages/runtime/tests",
+    "packages/integrations/claude",
+    "docs"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw0olm2j-48i5",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T12:53:32.991Z"
+  },
+  "createdAt": "2026-11-03T12:53:32.991Z"
+}
