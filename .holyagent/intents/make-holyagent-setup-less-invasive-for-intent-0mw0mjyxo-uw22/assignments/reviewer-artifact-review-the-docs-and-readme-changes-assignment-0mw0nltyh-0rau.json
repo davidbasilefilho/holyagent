@@ -44,6 +44,7 @@
     "assignment-0mw0mzj7r-jf9p"
   ],
   "specialist": {
+    "agentId": "workflow:wf_ab5e7640-c2e/assignment-0mw0nltyh-0rau",
     "model": "haiku",
     "effort": "high",
     "startedAt": "2026-11-03T12:18:19.777Z"
