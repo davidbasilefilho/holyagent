@@ -1,0 +1,16 @@
+{
+  "id": "intent-0mw0ukvln-0so2",
+  "slug": "finish-the-open-items-left-after-prs-50",
+  "objective": "Finish the open items left after PRs #50-#52: the review notes and hook-lock work, and make mise run in this container through the repository dev dependency so the gates run as mise run verify.",
+  "requirements": [
+    "Fix the three review notes: the new lock test uses Bun APIs instead of node:fs/promises where Bun has them; the migration test removes only the marker it means to, not the whole folder; the lock patience defaults live in one place instead of being kept in step by hand",
+    "Bound the agent-launch hook total lock wait, not only each lock, so it ends inside the 10s plugin hook timeout",
+    "Exercise the real hook kill and multi-process lock contention with tests that run them, not only by reading code",
+    "mise is already a dev dependency (package.json, node_modules/.bin/mise); make the gates run through it in this container (mise install with the canary Bun its postinstall sets up) and document how a session runs mise from the dev dependency",
+    "Merged branches stay on GitHub unless the user asks to remove them",
+    "Artifacts in English; follow .claude/CLAUDE.md and AGENTS.md; mise run verify passes; work on conventional branches with atomic Conventional Commits; PRs merge by squash"
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-03T15:33:27.419Z"
+}
