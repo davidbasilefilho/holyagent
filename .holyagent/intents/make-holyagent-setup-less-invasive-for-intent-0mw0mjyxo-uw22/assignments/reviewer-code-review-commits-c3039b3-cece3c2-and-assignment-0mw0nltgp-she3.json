@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-commits-c3039b3-cece3c2-and",
   "objective": "Review commits c3039b3, cece3c2 and 08dd8a5 (git safety rules and reminder hook, record-based setup undo with scope guards, branch and commit rules) on top of 4091f2a for correctness and regressions.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "git diff 4091f2a..HEAD excluding docs/ and README.md; diff file /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/range2-code.diff"
   ],
@@ -42,5 +42,10 @@
     "assignment-0mw0na5ia-7ldi",
     "assignment-0mw0mzj7r-jf9p"
   ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T12:18:19.154Z"
+  },
   "createdAt": "2026-11-03T12:18:13.994Z"
 }
