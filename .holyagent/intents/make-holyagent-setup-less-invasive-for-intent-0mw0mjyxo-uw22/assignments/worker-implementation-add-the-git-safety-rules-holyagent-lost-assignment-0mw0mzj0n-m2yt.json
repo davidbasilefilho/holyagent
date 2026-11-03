@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "add-the-git-safety-rules-holyagent-lost",
   "objective": "Add the git safety rules HolyAgent lost when setup turned off Claude Code's built-in git instructions to the root's version-control instruction text and to the vcs-reminder hook.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Gap analysis to work from: /home/user/holyagent/.git/holyagent/reports/assignment-0mw0mpn8a-yva8.md (items S1-S7, N2, N3)",
     "packages/runtime/src/instructions/claude-5.5/root/version-control.md (and pr-text.md for N2/N3)",
@@ -57,7 +57,41 @@
     "agentId": "workflow:wf_0da99c86-c6e/assignment-0mw0mzj0n-m2yt",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-03T12:00:58.664Z"
+    "startedAt": "2026-11-03T12:00:58.664Z",
+    "finishedAt": "2026-11-03T12:08:01.033Z"
+  },
+  "result": "result: S1-S7, N2 and N3 are now in the root text, the vcs-reminder names hook bypass and history rewrite, dist is rebuilt, and `mise run verify` passes. One rule departs from the brief (see notes).\n\nchanged:\n- /home/user/holyagent/packages/runtime/src/instructions/claude-5.5/root/version-control.md\n- /home/user/holyagent/packages/runtime/src/instructions/claude-5.5/root/pr-text.md\n- /home/user/holyagent/packages/runtime/src/cli/hook.ts\n- /home/user/holyagent/packages/integrations/claude/tests/hooks.test.ts\n- /home/user/holyagent/packages/integrations/claude/dist/agents/holyagent.md and /home/user/holyagent/packages/integrations/claude/dist/scripts/holyagent.js (both from the rebuild)\n\nThe README.md, docs/components.md, docs/decisions.md and docs/usage.md edits in `git status` are not mine.\n\nchecks:\n- `mise run build` -> exit 0, 34 files built.\n- `mise run verify` -> exit 0: no type errors in 123 files, lint clean in 124 files, 1012 pass, 1 skip, 0 fail. I only saw the tail of the output, so I did not see the format step itself.\n- My first `verify` run failed 1 test (`plugin.test.ts`: the static root text must not contain \"vcs identity\"). I reworded the rule and re-ran; it now passes.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- The git config rule says to leave config unchanged and, if `vcs commit` refuses the identity, to follow its error and report it. The brief wanted \"except through `holyagent vcs identity`\", but an existing test keeps that phrase out of the static root text; the cloud session-start hook supplies it. The refusal error already tells the root how to fix it.\n- `VCS_REMINDER` stays one line and still carries no permission decision. The added text avoids the word \"deny\", which an existing hook test greps for. The `docs/hooks.md` description of the reminder is now slightly stale. docs/ is out of my scope, so the docs owner should update it.\n- The rules are in the root text without a `holyagent:instruction-writing` pass; I wrote each as a rule plus its reason.\n\nevidence:\nrules added: `root/version-control.md` has new bullets covering S1-S7 (pre-commit status/diff and secrets check, hook/signing bypass, hook failure with no amend, amend and history rewrite, git config, non-interactive git), each with a reason. `root/pr-text.md` covers N2 and N3 (base...HEAD diff, full commit list, PR template).\nhook: `VCS_REMINDER` in `hook.ts` now names `--no-verify`, `--no-gpg-sign`, `--amend`, `rebase -i` and `reset --hard`. The test in `hooks.test.ts` (\"adds the one-line reminder as context...\") asserts those terms, a single line and no `permissionDecision`.\ngates: `mise run verify` exit 0 (1012 pass, 0 fail); `mise run build` exit 0, dist rebuilt.\nscope limits: I edited nothing under docs/ or README.md; they appear modified in `git status` from another writer.\nchecks-run: `mise run build` exit 0; `mise run verify` exit 0 (type-check, lint, tests); one earlier `verify` run failed 1 test and was fixed.\nchanged-paths: the five paths under \"changed\" above.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "verify exit 0; rules and hook test added; review follows at end",
+    "criteria": [
+      {
+        "criterion": "rules added: S1-S7, N2 and N3 are covered in the root instruction text with reasons",
+        "support": "`root/version-control.md` has new bullets covering S1-S7 (pre-commit status/diff and secrets check, hook/signing bypass, hook failure with no amend, amend and history rewrite, git config, non-interactive git), each with a reason. `root/pr-text.md` covers N2 and N3 (base...HEAD diff, full commit list, PR template)."
+      },
+      {
+        "criterion": "hook: vcs-reminder names hook bypass and history rewrite, stays additive, with a test",
+        "support": "`VCS_REMINDER` in `hook.ts` now names `--no-verify`, `--no-gpg-sign`, `--amend`, `rebase -i` and `reset --hard`. The test in `hooks.test.ts` (\"adds the one-line reminder as context...\") asserts those terms, a single line and no `permissionDecision`."
+      },
+      {
+        "criterion": "gates: mise run verify passes and dist rebuilt",
+        "support": "`mise run verify` exit 0 (1012 pass, 0 fail); `mise run build` exit 0, dist rebuilt."
+      },
+      {
+        "criterion": "scope limits: no edits to docs/ or README.md",
+        "support": "I edited nothing under docs/ or README.md; they appear modified in `git status` from another writer."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`mise run build` exit 0; `mise run verify` exit 0 (type-check, lint, tests); one earlier `verify` run failed 1 test and was fixed."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the five paths under \"changed\" above."
+      }
+    ]
   },
   "createdAt": "2026-11-03T12:00:54.024Z"
 }
