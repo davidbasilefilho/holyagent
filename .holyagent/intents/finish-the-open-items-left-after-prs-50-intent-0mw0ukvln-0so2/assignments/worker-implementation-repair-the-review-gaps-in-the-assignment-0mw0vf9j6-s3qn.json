@@ -1,0 +1,61 @@
+{
+  "id": "assignment-0mw0vf9j6-s3qn",
+  "intentId": "intent-0mw0ukvln-0so2",
+  "intentRevision": 2,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-review-gaps-in-the",
+  "objective": "Repair the review gaps in the uncommitted branch-deletion rule and AGENTS.md mise note in worktree /home/user/holyagent-hook-locks.",
+  "state": "Ready",
+  "scope": [
+    "Worktree /home/user/holyagent-hook-locks, branch release/0.2.0/feat/branch-deletion-rule; changes are uncommitted in AGENTS.md, packages/runtime/src/instructions/claude-5.5/root/version-control.md, packages/runtime/src/instructions/requirements.md, packages/integrations/claude/tests/plugin.test.ts and the generated packages/integrations/claude/dist/agents/holyagent.md. Review findings to fix:",
+    "1) requirements.md R-BRANCH (around line 48) states the branch rule without its reason or its coverage of cleanup after merges and final reports; add both.",
+    "2) version-control.md (around line 12) gives the reason as 'deleting is destructive, so the auto-mode classifier blocks it'. The real reason is the maintainer's: branches are the user's to remove, they keep history and references after a merge, and deleting is destructive. State that; the classifier may be mentioned only as a consequence.",
+    "3) Close the latent conflict with 'the repository's conventions, branch protection and merge settings come first': add that the root does not pass --delete-branch (or the API equivalent) when merging, and leaves a repository's own auto-delete-on-merge setting as it is.",
+    "4) AGENTS.md note: use the documented invocation 'bunx --no-install mise run <task>' (README.md and docs/development.md), trim what repeats README/docs to a pointer to docs/development.md, and keep only the unique parts: a missing mise on PATH is no reason to skip the gates or run bun steps by hand; each git worktree needs its own bun install because node_modules is not shared between worktrees; bun install's prepare step installs the repository's lefthook hooks into the shared .git/hooks, which is expected.",
+    "plugin.test.ts pins prose substrings of the rule; update those to the new wording rather than loosening them.",
+    "Write instruction text following /root/.claude/plugins/synced/03eb801d-6ff6-4373-b5b1-f94edf359a3e_0f3e6ee9-af2e-4c2c-8d3c-9be25ca27713/holyagent/skills/instruction-writing/SKILL.md."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md and AGENTS.md. Make no version-control writes and no edits under .git/ or .holyagent/; report changed paths. Scratch files only under /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad.",
+    "Keep the change to these findings.",
+    "Run bunx --no-install mise run build and bunx --no-install mise run verify in /home/user/holyagent-hook-locks.",
+    "Keep working until done; when done and checked, stop and report, naming unrequested changes instead of making them, and launch no reviewers.",
+    "Write the full diff of the worktree's uncommitted changes (git diff, all files) to /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/repB.diff as diff-file evidence. Report in under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "R-BRANCH and version-control.md give the maintainer's reason and cover cleanup after merges, final reports and proposals",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The rule says the root does not pass --delete-branch and leaves a repository's auto-delete setting as it is",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The AGENTS.md note uses bunx --no-install mise, points to docs/development.md, and keeps only the unique parts with their reasons",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "mise run verify passes and dist is rebuilt",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "diff-file",
+    "verify"
+  ],
+  "ownershipPaths": [
+    "AGENTS.md",
+    "packages/runtime/src/instructions",
+    "packages/integrations/claude/tests/plugin.test.ts",
+    "packages/integrations/claude/dist/agents"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw0v35fv-kr5k",
+  "createdAt": "2026-11-03T15:57:05.154Z"
+}
