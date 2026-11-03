@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mw0v35fv-kr5k",
+  "intentId": "intent-0mw0ukvln-0so2",
+  "intentRevision": 2,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-the-new-holyagent-root-rule-on",
+  "objective": "Review the new holyagent root rule on branch deletion and the AGENTS.md note on running mise from the dev dependency, as model-facing instruction text.",
+  "state": "Ready",
+  "scope": [
+    "Diff files: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/rule.diff (root instructions under packages/runtime/src/instructions, possibly hook text, tests and rebuilt dist) and /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/agents-md.diff (AGENTS.md).",
+    "Intended rule: the root deletes branches (local or remote, merged or not) only when the user asks, and never proposes deleting them or lists undeleted branches as remaining work; reason: the maintainer keeps branches unless asked, and branch deletion is destructive. Intended note: gates run through node_modules/.bin/mise (or bun run verify) after bun install, since mise is a dev dependency and not on PATH; mise run sets up the canary Bun the gates need.",
+    "Judge against the instruction-writing skill at /root/.claude/plugins/synced/03eb801d-6ff6-4373-b5b1-f94edf359a3e_0f3e6ee9-af2e-4c2c-8d3c-9be25ca27713/holyagent/skills/instruction-writing/SKILL.md: a reason beside the rule, says what to do, no conflict with other version-control rules, no scope beyond the rule."
+  ],
+  "constraints": [
+    "Read-only. Quote the exact excerpt for every finding.",
+    "Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "The branch rule is clear, carries its reason, covers cleanup, final reports and proposals, and conflicts with no other rule",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The AGENTS.md note is accurate and states its reason",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Neither change goes beyond its purpose",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw0v2xug-0gj7",
+    "assignment-0mw0v2y3a-qf3t"
+  ],
+  "createdAt": "2026-11-03T15:47:39.979Z"
+}
