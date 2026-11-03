@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "define-in-general-terms-in-the-root-s",
   "objective": "Define in general terms, in the root's asking rules, what makes a question unnecessary, so the root never asks one, with the merge, method and branch cases only as illustrations.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree /home/user/holyagent-hook-locks, branch release/0.2.0/fix/no-merge-question, with uncommitted changes from the previous writer (merge question removed; a new asking.md bullet saying a choice the repository convention or a holyagent default settles is applied and recorded, never asked; R-DEFAULTS, R-MERGEWAIT, R-S-HEAD). Build on them; do not revert them.",
     "The maintainer's words: 'in general, unnecessary questions must not be asked' and 'but it must define generically what that means'. Write one general test in packages/runtime/src/instructions/claude-5.5/root/asking.md (and wherever the root rules restate when to ask, such as the task-list/AskUserQuestion rule and user-messages.md, so they agree): a question is unnecessary when its answer would not change what the root does, or when something already settles it (the user's words or an earlier answer, the repository's conventions, a holyagent default or recommended option, the code, or a fact a specialist can establish). Only a question that passes the test is asked. Then give a short list of common unnecessary questions as illustrations of the test (asking whether to merge or which method, offering to delete branches, asking permission for an action the user named, confirming a plan before doing it, offering to continue or wait, choosing between options when one is the recommended default). Fold the existing R-DEFAULTS bullet into this general rule rather than leaving two overlapping rules, keeping the repository-convention-first order.",
@@ -53,5 +53,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mw0wb7wa-xv5a",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T16:38:00.134Z"
+  },
   "createdAt": "2026-11-03T16:37:55.382Z"
 }
