@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mvzz4ukx-7bgs",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 11,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-zerover-scheme-change-and-0-2",
+  "objective": "Review the ZeroVer scheme change and 0.2.0 bump in the latest commit on claude/nifty-faraday-jinmae (range origin/main..HEAD).",
+  "state": "Running",
+  "scope": [
+    "scripts/bump-version.ts and its test, mise.toml, package.json scripts, docs/development.md, and the version fields in manifests, bun.lock and dist plugin.json. The branch also has a merge commit of origin/main with no tree change."
+  ],
+  "constraints": [
+    "Read-only; no version-control writes.",
+    "Respond tersely."
+  ],
+  "criteria": [
+    {
+      "text": "Scheme: only minor and patch remain, a suffixed current version bumps to a plain 0.X.Y, hotfix is rejected, and no 0.X.Y-Z wording or task remains",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Version: every version field reads 0.2.0 and nothing else changed beyond the scheme",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Regressions: bump-version tests pass and cover the changed behavior",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mvzz1ejr-fula"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T00:53:11.505Z"
+  },
+  "createdAt": "2026-11-03T00:53:11.505Z"
+}
