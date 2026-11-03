@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "change-the-root-s-branch-and-commit",
   "objective": "Change the root's branch and commit rules: never work on a platform-assigned branch such as claude/<name>, and make atomic Conventional commits on branches with squash merge as the default, below the target repository's conventions.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "packages/runtime/src/instructions/claude-5.5/root/version-control.md (Branches bullet, Stack plan), packages/runtime/src/instructions/requirements.md (R-BRANCH), any other instruction or hook text that tells the root to use the assigned branch (search packages/runtime/src with holyagent rg or rg, e.g. the claude.ai session-start text in packages/runtime/src/cli/hook.ts or instructions), and the tests that pin that text"
   ],
@@ -52,5 +52,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T12:09:15.038Z"
+  },
   "createdAt": "2026-11-03T12:09:09.482Z"
 }
