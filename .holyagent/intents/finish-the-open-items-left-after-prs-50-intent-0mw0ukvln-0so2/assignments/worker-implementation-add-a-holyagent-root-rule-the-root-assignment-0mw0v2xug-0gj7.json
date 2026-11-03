@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "add-a-holyagent-root-rule-the-root",
   "objective": "Add a holyagent root rule: the root deletes branches (local or remote, merged or not) only when the user asks, and never proposes deleting them or lists undeleted branches as remaining work.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree /home/user/holyagent-hook-locks, branch release/0.2.0/feat/branch-deletion-rule. Root instruction sources live in packages/runtime/src/instructions/claude-5.5/root/ (version-control.md holds the branch, push and merge rules; identity.md holds the never-force-push rule); packages/runtime/src/instructions/requirements.md lists requirement ids with tests (R-BRANCH exists); the agent-launch and PreToolUse VCS reminder text is in packages/runtime/src/cli/hook.ts. The generated plugin is under packages/integrations/claude/dist (mise run build).",
     "Why the rule exists: after merging stacked PRs, a root proposed deleting the merged branches and listed them as an open item; the maintainer wants branches kept unless asked, and the auto-mode classifier also blocks branch deletion as destructive. Put the rule where the root reads its version-control rules, worded with its reason, so it covers cleanup after merges, final reports and AskUserQuestion options. Add a requirement entry with a test if the requirements file pattern calls for one.",
@@ -54,5 +54,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T15:47:40.530Z"
+  },
   "createdAt": "2026-11-03T15:47:30.137Z"
 }
