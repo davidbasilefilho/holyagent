@@ -1,0 +1,52 @@
+{
+  "id": "assignment-0mw0vf95o-8sr3",
+  "intentId": "intent-0mw0ukvln-0so2",
+  "intentRevision": 2,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-review-blocker-on-commit",
+  "objective": "Repair the review blocker on commit 7a831cb: make the multi-process contention test deterministic, and apply the review's optional timing and naming notes.",
+  "state": "Ready",
+  "scope": [
+    "Worktree /home/user/holyagent-hook-locks-a, branch release/0.2.0/fix/hook-lock-followups at 7a831cb. It has no node_modules yet: run 'bun install --frozen-lockfile' there first (that also installs the repository's lefthook hooks, which is expected), then gates through bunx --no-install mise run <task>.",
+    "Blocker: packages/integrations/claude/tests/hook-locks.test.ts around line 148, expect(recorded).toBeGreaterThan(0). The lock is unfair (25ms polling); 3 CLI intent create commands can hold it across git commits ahead of 3 hooks with a 5s deadline, and the test releases its own hold at 2s, so on a slow Windows runner all three hooks can legitimately hand back StateLocked and the test fails with correct code. The stdout regex already requires recorded-or-handed-back. Remove that assertion and make the later expect(shown.stdout).toMatch(/agent: agent-\\d/) conditional on a hook having recorded, keeping every integrity check.",
+    "Optional notes to apply: in packages/runtime/tests/state-hook-locks.test.ts the deadline test window (>= 1400 and < 2200 around 1500ms) has only about 700ms of upper slack; widen the upper bound to 3000. In packages/runtime/src/state/lock.ts, 'within' is a vague name that the bundler also renames to within2 because of a private helper clash; rename it to a clear name (for example deadlineIn) across callers."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md and AGENTS.md. Make no version-control writes and no edits under .git/ or .holyagent/; report changed paths. Scratch files only under /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad.",
+    "Rebuild dist with bunx --no-install mise run build, then run bunx --no-install mise run verify.",
+    "Do not weaken any other assertion.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When done and checked, stop and report; name unrequested changes instead of making them, and launch no reviewers. A summary that announces a next step, or an offer to wait, is not a stop.",
+    "Write the diff to /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/repA.diff as diff-file evidence. Report in under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "The contention test no longer requires a hook to record, and keeps its bound and integrity checks",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The deadline test's upper bound is widened and the deadline helper has a clear name",
+      "blocking": false,
+      "dimension": "style"
+    },
+    {
+      "text": "mise run verify passes and dist is rebuilt",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "diff-file",
+    "verify"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/state",
+    "packages/runtime/tests/state-hook-locks.test.ts",
+    "packages/integrations/claude/tests/hook-locks.test.ts",
+    "packages/integrations/claude/dist/scripts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw0v2xmo-prtj",
+  "createdAt": "2026-11-03T15:57:04.668Z"
+}
