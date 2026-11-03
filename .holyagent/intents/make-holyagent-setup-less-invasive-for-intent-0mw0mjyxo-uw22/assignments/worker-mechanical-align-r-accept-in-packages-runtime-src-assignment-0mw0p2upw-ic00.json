@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mw0p2upw-ic00",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Worker.mechanical",
+  "slug": "align-r-accept-in-packages-runtime-src",
+  "objective": "Align R-ACCEPT in packages/runtime/src/instructions/requirements.md (around line 40) and docs/usage.md (around line 180) with root/assignments.md: delegated work is judged from the diff summary and the check output, not the diff.",
+  "state": "Running",
+  "scope": [],
+  "constraints": [
+    "Change only that wording in those two files; if a test pins the old phrase, update it. Run node_modules/.bin/mise run build then node_modules/.bin/mise run verify. No version-control writes. Report in under 120 words; start each evidence line with the criterion label before its colon."
+  ],
+  "criteria": [
+    {
+      "text": "wording: requirements.md and usage.md say diff summary like assignments.md",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "gates: verify passes with dist rebuilt",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions/requirements.md",
+    "docs/usage.md",
+    "packages/integrations/claude",
+    "packages/runtime/tests"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw0ov8hq-p408",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-03T12:59:28.389Z"
+  },
+  "createdAt": "2026-11-03T12:59:28.389Z"
+}
