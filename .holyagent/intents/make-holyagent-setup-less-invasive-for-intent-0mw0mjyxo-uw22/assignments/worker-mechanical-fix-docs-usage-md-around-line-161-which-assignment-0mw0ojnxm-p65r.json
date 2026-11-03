@@ -32,6 +32,7 @@
   "independentFrom": [],
   "followUpOf": "assignment-0mw0of7y4-psze",
   "specialist": {
+    "agentId": "workflow:wf_179c1d71-34b/assignment-0mw0ojnxm-p65r",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-03T12:44:33.130Z"
