@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mw0ommi5-8xnw",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Worker.validation",
+  "slug": "summarize-why-the-new-windows-ci-job",
+  "objective": "Summarize why the new windows CI job failed on PR 50 (job 125925364754, run 41638409715, head 951c899) so the failures can be fixed in a follow-up.",
+  "state": "Running",
+  "scope": [],
+  "constraints": [
+    "Fetch the log with gh api repos/davidbasilefilho/holyagent/actions/jobs/125925364754/logs (REST only; GraphQL is blocked) into a file outside the repository. Report: which step failed, the test totals (pass/fail/skip), and the failures grouped by cause (e.g. path separators, line endings, shell spawning, symlinks, permissions) with a count and 1-2 example test names and messages per group. Say whether any failure touches code this PR changed (packages/runtime/src/setup, cli/setup.ts, cli/hook.ts, instructions) or whether all are in untouched areas.",
+    "Read-only; no version-control writes; do not re-run the job. Report in under 300 words; give the log file path; start each evidence line with the criterion label before its colon."
+  ],
+  "criteria": [
+    {
+      "text": "failure summary: failed step, totals and grouped causes with counts",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "pr attribution: whether any failure is in code this PR changed",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "log-file"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-03T12:46:51.245Z"
+  },
+  "createdAt": "2026-11-03T12:46:51.245Z"
+}
