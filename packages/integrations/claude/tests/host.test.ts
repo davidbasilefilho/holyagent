@@ -30,10 +30,21 @@ describe("whether a file of the repository can be run", () => {
   const wrapper = join(PLUGIN, "scripts", "holyagent")
   const bundle = join(PLUGIN, "scripts", "holyagent.js")
 
-  test("is its execute bit where the file system has one", async () => {
-    expect(await isExecutable(wrapper, "linux")).toBe(true)
-    expect(await isExecutable(bundle, "linux")).toBe(false)
+  test("is what the repository commits for it on the platform that runs the tests", async () => {
+    expect(await isExecutable(wrapper)).toBe(true)
+    expect(await isExecutable(bundle)).toBe(false)
   })
+
+  // Skipped on Windows only: NTFS keeps no execute bit, so `stat` reads every file as
+  // non-executable there. `isExecutable` has the matching branch (the committed mode) for win32,
+  // which the test below and the one above check.
+  test.skipIf(process.platform === "win32")(
+    "is its execute bit where the file system has one",
+    async () => {
+      expect(await isExecutable(wrapper, "linux")).toBe(true)
+      expect(await isExecutable(bundle, "linux")).toBe(false)
+    },
+  )
 
   test("is the mode the repository commits for it on Windows, which keeps no execute bit", async () => {
     expect(await isExecutable(wrapper, "win32")).toBe(true)

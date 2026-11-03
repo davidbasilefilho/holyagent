@@ -1488,7 +1488,9 @@ describe("hook session-start, after a resume or compaction", () => {
     } finally {
       await rm(big, { recursive: true, force: true })
     }
-  })
+    // About 30 CLI starts in a row (14 dispatches, 14 records, 2 hooks): a start costs several
+    // times more on Windows, which puts the run past the 5 s default.
+  }, 40_000)
 
   test("prints nothing without a .holyagent folder, whatever the source", async () => {
     for (const source of ["resume", "compact"])

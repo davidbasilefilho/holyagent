@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync } from "node:fs"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { join, win32 } from "node:path"
 
 import { $ } from "bun"
 
@@ -989,7 +989,11 @@ describe("agents", () => {
   })
 
   test("agent files sit where the plugin expects them", () => {
-    expect(AGENTS).toBe("packages/integrations/claude/dist/agents")
+    // The folder is joined with the platform's separator; the plugin and git expect it with `/`.
+    expect(toPosix(AGENTS)).toBe("packages/integrations/claude/dist/agents")
+    expect(toPosix(win32.join("packages", "integrations", "claude", "dist", "agents"), "\\")).toBe(
+      "packages/integrations/claude/dist/agents",
+    )
   })
 })
 
