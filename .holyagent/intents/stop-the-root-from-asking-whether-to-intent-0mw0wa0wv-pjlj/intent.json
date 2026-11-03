@@ -1,14 +1,15 @@
 {
   "id": "intent-0mw0wa0wv-pjlj",
   "slug": "stop-the-root-from-asking-whether-to",
-  "objective": "Stop the root from asking whether to merge once PRs are reviewed and green: it reports them ready in the final report and merges only when the user says so, using the recorded or default merge method without asking how.",
+  "objective": "Stop the root from asking whether to merge once PRs are reviewed and green, and stop specialists from moving HEAD in the shared checkout.",
   "requirements": [
     "The root does not ask (AskUserQuestion or text) whether to merge reviewed, green PRs; it states in the final report that they are ready to merge and waits for the user to say merge",
     "When the user says merge, the root merges at once with the method already recorded (repository convention, an earlier answer, or the default squash bottom-up for a stack, reconciling stacked branches with a no-content merge) and asks nothing about the method",
     "Merging still needs the user to name it; this removes only the question",
+    "Specialists, reviewers included, never change HEAD, branches or the index of a shared checkout (no checkout, switch, stash, reset); to read a commit they use git show, git diff or git archive into the scratchpad, because a reviewer once left the main checkout detached at the commit it reviewed",
     "Artifacts in English; follow .claude/CLAUDE.md and AGENTS.md; mise run verify passes; conventional branch with atomic Conventional Commits; PR merges by squash"
   ],
-  "revision": 1,
+  "revision": 2,
   "state": "Open",
   "createdAt": "2026-11-03T16:21:00.320Z"
 }
