@@ -5,7 +5,7 @@
   "roleTask": "Worker.debugging",
   "slug": "fix-the-windows-test-failures-that-come",
   "objective": "Fix the Windows test failures that come from the runtime (state branch and store, vcs, report files, CLI paths, setup temp files, state-folder globs) so the windows CI job passes those tests.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Failing tests (in /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/job-125934540228.log): state-branch.test.ts (state worktree, merging the state, moving the state, recording branches, starting the state in a large tree, fetch of the remote state branch incl. ssh, credential helpers and group kill, each worktree keeps its own Intent), store.test.ts (2), reports.test.ts (1), cli.test.ts (process; report and prompt, RUNNER~1 short paths), setup-files.test.ts (stale temp file, RUNNER~1), windows-paths.test.ts (backslash glob).",
     "Likely causes to check: 8.3 short paths vs long paths (realpath/resolve), 5000ms default test timeouts too short for git on Windows runners (raise per-test timeouts only where the operation is legitimately slow, and say so), process-group kill semantics that do not exist on Windows, ssh/credential config passing, file modes, CRLF."
@@ -51,5 +51,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T13:30:20.179Z"
+  },
   "createdAt": "2026-11-03T13:30:15.419Z"
 }
