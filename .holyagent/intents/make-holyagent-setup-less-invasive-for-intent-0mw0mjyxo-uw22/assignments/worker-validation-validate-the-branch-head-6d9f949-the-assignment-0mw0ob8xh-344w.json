@@ -5,7 +5,7 @@
   "roleTask": "Worker.validation",
   "slug": "validate-the-branch-head-6d9f949-the",
   "objective": "Validate the branch head 6d9f949: the full gates and the generated plugin in step with sources.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [],
   "constraints": [
     "Run node_modules/.bin/mise run verify (type-check, lint, format check, tests) and node_modules/.bin/mise run build followed by git status --short to confirm the build changes nothing. If mise cannot run the canary Bun gates, say exactly which ran and which did not. Read-only apart from build output; no version-control writes. Report in under 150 words; start each evidence line with the criterion label before its colon."
@@ -28,5 +28,10 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-03T12:38:05.252Z"
+  },
   "createdAt": "2026-11-03T12:38:00.438Z"
 }
