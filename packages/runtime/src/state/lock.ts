@@ -66,22 +66,44 @@ const claim = (file: string) =>
     return owner.token
   })
 
-/** How long a contender waits for a lock: a holder usually keeps it for milliseconds. */
+/** How long a contender waits for a lock: a holder that commits to git keeps it for a while. */
 type Patience = "short" | "long"
 
+/**
+ * Each patience polls every `delay` milliseconds for at most `limit` milliseconds. With `stuck`, a
+ * lock that a live process took longer ago than the limit is respected at once: its holder is
+ * stuck, not busy, and a contender that waited on it would only wait the whole limit.
+ */
 const WAITS = {
-  short: { schedule: Schedule.exponential("10 millis", 1.5), times: 10 },
+  // The state lock is held across a git commit, which takes a while on Windows or in a large tree.
+  short: { delay: 25, limit: 30_000, stuck: true },
   // For a holder that works for as long as a checkout of a large repository takes, about a minute.
-  long: { schedule: Schedule.spaced("50 millis"), times: 1200 },
+  long: { delay: 50, limit: 60_000, stuck: false },
 } as const
 
-const acquire = (file: string, patience: Patience = "short") =>
-  claim(file).pipe(
+/** True unless the lock was taken by a live process more than `limit` milliseconds ago. */
+const holderBusy = (file: string, limit: number) =>
+  Effect.gen(function* () {
+    const owner = yield* readOwner(file)
+    return owner === undefined || (yield* Clock.currentTimeMillis) - owner.acquiredAt < limit
+  })
+
+const acquire = (file: string, patience: Patience = "short") => {
+  const { delay, limit, stuck } = WAITS[patience]
+  return claim(file).pipe(
     Effect.catchTag("StateLocked", (locked) =>
       breakIfStale(file).pipe(Effect.andThen(Effect.fail(locked))),
     ),
-    Effect.retry({ ...WAITS[patience], while: (error) => error._tag === "StateLocked" }),
+    Effect.retry({
+      schedule: Schedule.spaced(delay),
+      times: limit / delay,
+      while: (error) =>
+        error._tag === "StateLocked" && stuck
+          ? holderBusy(file, limit)
+          : error._tag === "StateLocked",
+    }),
   )
+}
 
 /** Removes the lock file, but only while it still carries the token. Never fails. */
 const release = (file: string, token: string) =>
@@ -95,9 +117,10 @@ const release = (file: string, token: string) =>
 /**
  * Runs `use` while holding the lock file, so two processes never interleave. The lock is a file
  * created exclusively; one left by a dead process is broken, and the lock is released whatever the
- * outcome. A contender retries for about a second (a holder keeps the lock for milliseconds), or
- * about a minute with `patience: "long"` for a holder that does slow work, then fails with
- * StateLocked. The folder of the file is made when it is missing.
+ * outcome. A contender retries for up to 30 seconds (a holder keeps the lock for as long as a git
+ * commit takes; a lock a live process has held longer than that fails at once), or a minute with
+ * `patience: "long"` for a holder that does slow work, then fails with StateLocked. The folder of
+ * the file is made when it is missing.
  */
 export const withFileLock = <A, E, R>(
   file: string,

@@ -49,8 +49,11 @@ describe("glob patterns for the state folder", () => {
     expect(await scan(globBelow(folder, "assignments/*.json", WINDOWS))).toHaveLength(1)
   })
 
-  test("the pattern a Windows join() would give reads backslashes as escapes and finds nothing", async () => {
-    expect(await scan("intents\\x-1\\assignments/*.json")).toEqual([])
+  test("the pattern a Windows join() would give reads backslashes as escapes on POSIX and finds nothing", async () => {
+    // Bun's glob on Windows reads a backslash as a separator, so there the pattern finds the file
+    // (reported with backslashes); the slash form above is the one that works on both.
+    const found = await scan("intents\\x-1\\assignments/*.json")
+    expect(found).toEqual(process.platform === "win32" ? ["intents\\x-1\\assignments\\a.json"] : [])
   })
 })
 

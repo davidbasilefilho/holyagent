@@ -446,14 +446,27 @@ const fetchEnvironment = (
 /**
  * Kills the process group of a detached child: git's helpers (ssh, credential helpers) are its
  * children, and a kill of git alone would leave them running. A group that is already gone is not
- * an error. Windows has no process groups, so the child alone is killed there.
+ * an error. Windows has no process groups, so `taskkill /T` ends the child and the tree of
+ * processes below it, and the child is killed on its own as well in case that fails. `platform` is
+ * a parameter so a test can stand in for either system.
  */
-export const killGroup = (child: Pick<Bun.Subprocess, "pid" | "kill">) =>
-  Effect.try(() => {
-    if (process.platform === "win32") return child.kill("SIGKILL")
-    // A negative pid of -1 reaches every process the user may signal, and 0 or 1 is no child's group.
-    if (Number.isInteger(child.pid) && child.pid > 1) process.kill(-child.pid, "SIGKILL")
-  }).pipe(Effect.ignore)
+export const killGroup = (
+  child: Pick<Bun.Subprocess, "pid" | "kill">,
+  platform: string = process.platform,
+) => {
+  // A pid of 0 or 1 is no child's: a negative one reaches every process the user may signal.
+  const real = Number.isInteger(child.pid) && child.pid > 1
+  return platform === "win32"
+    ? (real
+        ? Effect.tryPromise(() => $`taskkill /pid ${child.pid} /T /F`.quiet().nothrow()).pipe(
+            Effect.ignore,
+          )
+        : Effect.void
+      ).pipe(Effect.andThen(Effect.try(() => child.kill("SIGKILL"))), Effect.ignore)
+    : Effect.try(() => {
+        if (real) process.kill(-child.pid, "SIGKILL")
+      }).pipe(Effect.ignore)
+}
 
 /**
  * Releases a bounded child: when its use failed or was interrupted, kills its group unless the
@@ -462,7 +475,8 @@ export const killGroup = (child: Pick<Bun.Subprocess, "pid" | "kill">) =>
 export const releaseGroup = (
   child: Pick<Bun.Subprocess, "pid" | "kill" | "exitCode">,
   exit: Exit.Exit<unknown, unknown>,
-) => (exit._tag === "Failure" && child.exitCode === null ? killGroup(child) : Effect.void)
+  platform: string = process.platform,
+) => (exit._tag === "Failure" && child.exitCode === null ? killGroup(child, platform) : Effect.void)
 
 /**
  * Runs git for its exit code only and, after `timeout` milliseconds, kills it and every helper it

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import * as filesystem from "node:fs/promises"
-import { readdir, readFile, stat, symlink, writeFile } from "node:fs/promises"
+import { readdir, readFile, realpath, stat, symlink, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
 import { Effect, Option } from "effect"
@@ -19,7 +19,9 @@ let remove: () => Promise<void>
 
 beforeEach(async () => {
   const made = await scratch("holyagent-setup-files-")
-  directory = made.directory
+  // The real path: on Windows the temporary folder is named by its 8.3 short form (`RUNNER~1`), and
+  // writeJsonObject names the long form in its errors.
+  directory = await realpath(made.directory)
   remove = made.remove
 })
 afterEach(() => remove())

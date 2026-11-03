@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readdir, rm, stat } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir, realpath, rm, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -10,13 +10,16 @@ import { Effect } from "effect"
 import { StdinMissing } from "../src/cli/errors.ts"
 import { run } from "../src/cli/program.ts"
 import { dispatchedAssignment } from "../src/cli/report.ts"
+import { fromGitPath } from "../src/domain/paths.ts"
 
 let project: string
 let home: string
 
 beforeEach(async () => {
-  project = await mkdtemp(join(tmpdir(), "holyagent-cli-"))
-  home = await mkdtemp(join(tmpdir(), "holyagent-home-"))
+  // The real path: on Windows the temporary folder is named by its 8.3 short form (`RUNNER~1`), and
+  // git and the CLI report the long form, so a path built from the short one would never match.
+  project = await realpath(await mkdtemp(join(tmpdir(), "holyagent-cli-")))
+  home = await realpath(await mkdtemp(join(tmpdir(), "holyagent-home-")))
 })
 afterEach(() =>
   Promise.all([
@@ -1390,7 +1393,10 @@ describe("process", () => {
       .find((block) => block.includes("\nbranch refs/heads/holyagent/state"))
       ?.split("\n")[0]
       ?.replace("worktree ", "")
-    expect(worktree).toStartWith(join(project, ".git", "holyagent"))
+    // Git prints `C:/repo/...` on Windows, and join() gives backslashes there.
+    expect(worktree === undefined ? undefined : fromGitPath(worktree)).toStartWith(
+      join(project, ".git", "holyagent"),
+    )
     expect((await stat(join(worktree ?? "", ".holyagent", "intents"))).isDirectory()).toBe(true)
 
     const unknown = await $`bun ${main} bogus`.cwd(inner).quiet().nothrow()

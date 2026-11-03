@@ -9,6 +9,7 @@ import { type AssignmentDraft, createAssignment } from "../src/domain/assignment
 import { DEFAULT_CONFIG } from "../src/domain/directive.ts"
 import { closeIntent, createIntent } from "../src/domain/intent.ts"
 import { dispatch, record } from "../src/domain/lifecycle.ts"
+import { toPosix } from "../src/domain/paths.ts"
 import { stateDirectory } from "../src/state/layout.ts"
 import { WorkTree } from "../src/state/local.ts"
 import { loadOpenProject, readState, updateState } from "../src/state/store.ts"
@@ -79,8 +80,9 @@ const snapshot = async (): Promise<Record<string, string>> => {
   )
 }
 
+/** The paths below a folder, `/`-separated whatever the platform, sorted. */
 const files = async (path: string): Promise<string[]> =>
-  (await readdir(path, { recursive: true })).toSorted()
+  (await readdir(path, { recursive: true })).map((entry) => toPosix(entry)).toSorted()
 
 describe("state store", () => {
   test("an empty directory reads as an empty project", async () => {
@@ -282,6 +284,21 @@ describe("state store", () => {
     )
     const error = await Effect.runPromise(Effect.flip(seed()))
     expect(error._tag).toBe("StateLocked")
+  })
+
+  test("a lock a live process holds for a while, as a slow git commit does, is waited for", async () => {
+    const lock = join(directory, "local/lock")
+    await mkdir(join(directory, "local"), { recursive: true })
+    await Bun.write(
+      lock,
+      JSON.stringify({ pid: process.pid, token: "busy", acquiredAt: Date.now() }),
+    )
+    // Longer than a second, which is what a contender used to wait before giving up.
+    setTimeout(() => void rm(lock, { force: true }), 1500)
+
+    await Effect.runPromise(seed())
+
+    expect((await Effect.runPromise(readState(directory))).project.intents).toHaveLength(1)
   })
 })
 

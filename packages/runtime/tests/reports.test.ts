@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { mkdtemp, readdir, rm } from "node:fs/promises"
+import { mkdtemp, readdir, realpath, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -13,7 +13,9 @@ import { run } from "../src/cli/program.ts"
 let project: string
 
 beforeEach(async () => {
-  project = await mkdtemp(join(tmpdir(), "holyagent-reports-"))
+  // The real path: on Windows the temporary folder is named by its 8.3 short form (`RUNNER~1`), and
+  // the CLI reports the long form.
+  project = await realpath(await mkdtemp(join(tmpdir(), "holyagent-reports-")))
 })
 afterEach(() => rm(project, { recursive: true, force: true }))
 

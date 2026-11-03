@@ -4366,13 +4366,6 @@ var toStepWithMetadata = (schedule) => clockWith((clock) => map2(toStep(schedule
     });
   });
 }));
-var exponential = (base, factor = 2) => {
-  const baseMillis = toMillis(fromInputUnsafe(base));
-  return fromStepWithMetadata(succeed3((meta) => {
-    const duration = millis(baseMillis * Math.pow(factor, meta.attempt - 1));
-    return succeed3([duration, duration]);
-  }));
-};
 var passthrough = (self) => fromStep(map2(toStep(self), (step) => (now, input) => matchEffect2(step(now, input), {
   onSuccess: (result) => succeed3([input, result[1]]),
   onFailure: failCause,
@@ -10127,10 +10120,21 @@ var claim = (file) => gen2(function* () {
   return owner.token;
 });
 var WAITS = {
-  short: { schedule: exponential("10 millis", 1.5), times: 10 },
-  long: { schedule: spaced("50 millis"), times: 1200 }
+  short: { delay: 25, limit: 30000, stuck: true },
+  long: { delay: 50, limit: 60000, stuck: false }
 };
-var acquire = (file, patience = "short") => claim(file).pipe(catchTag2("StateLocked", (locked) => breakIfStale(file).pipe(andThen2(fail5(locked)))), retry2({ ...WAITS[patience], while: (error) => error._tag === "StateLocked" }));
+var holderBusy = (file, limit) => gen2(function* () {
+  const owner = yield* readOwner(file);
+  return owner === undefined || (yield* currentTimeMillis2) - owner.acquiredAt < limit;
+});
+var acquire = (file, patience = "short") => {
+  const { delay, limit, stuck } = WAITS[patience];
+  return claim(file).pipe(catchTag2("StateLocked", (locked) => breakIfStale(file).pipe(andThen2(fail5(locked)))), retry2({
+    schedule: spaced(delay),
+    times: limit / delay,
+    while: (error) => error._tag === "StateLocked" && stuck ? holderBusy(file, limit) : error._tag === "StateLocked"
+  }));
+};
 var release = (file, token) => readOwner(file).pipe(flatMap2((owner) => owner?.token === token ? io(file, () => rm2(file, { force: true })) : void_3), ignore2);
 var withFileLock = (file, use, patience = "short") => acquireUseRelease2(io(file, () => mkdir(dirname(file), { recursive: true })).pipe(andThen2(acquire(file, patience))), () => use, (token) => release(file, token));
 var withStateLock = (directory, use) => acquireUseRelease2(ensureLocalDirectory(directory).pipe(andThen2(acquire(localFile(directory, "lock")))), () => use, (token) => release(localFile(directory, "lock"), token));
@@ -10333,13 +10337,14 @@ var fetchEnvironment = (env, configured) => {
     ...chosen ? {} : { GIT_SSH_COMMAND: `${configured ?? "ssh"} ${NON_INTERACTIVE_SSH_OPTIONS}` }
   };
 };
-var killGroup = (child) => try_2(() => {
-  if (process.platform === "win32")
-    return child.kill("SIGKILL");
-  if (Number.isInteger(child.pid) && child.pid > 1)
-    process.kill(-child.pid, "SIGKILL");
-}).pipe(ignore2);
-var releaseGroup = (child, exit) => exit._tag === "Failure" && child.exitCode === null ? killGroup(child) : void_3;
+var killGroup = (child, platform = process.platform) => {
+  const real = Number.isInteger(child.pid) && child.pid > 1;
+  return platform === "win32" ? (real ? tryPromise2(() => $`taskkill /pid ${child.pid} /T /F`.quiet().nothrow()).pipe(ignore2) : void_3).pipe(andThen2(try_2(() => child.kill("SIGKILL"))), ignore2) : try_2(() => {
+    if (real)
+      process.kill(-child.pid, "SIGKILL");
+  }).pipe(ignore2);
+};
+var releaseGroup = (child, exit, platform = process.platform) => exit._tag === "Failure" && child.exitCode === null ? killGroup(child, platform) : void_3;
 var gitBounded = (cwd, env, args, timeout) => acquireUseRelease2(try_2({
   try: () => Bun.spawn(["git", ...args], {
     cwd,
