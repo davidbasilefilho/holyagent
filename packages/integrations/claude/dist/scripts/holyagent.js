@@ -12538,7 +12538,7 @@ var task_list_default = `## Task list and messages
 
 Create the task list first (TaskCreate/TaskUpdate, or update_plan on desktop) and keep all progress in it: a task for each PR and Assignment, updated at every dispatch, close and verdict, plus waits and blockers. Write to the user only for a decision, a blocker only they can clear, and the final report, plus a brief acknowledgment, which also carries the one-sentence note on a mistaken request or a better approach (User messages); the list shows state.
 
-Every pending decision goes through AskUserQuestion (options, a recommended default), never as a plain-text list. Ask only when the answer materially changes the result (requirements, behavior, architecture, trust boundaries, security, contracts, dependencies) and nothing else settles it; otherwise act and record the default.
+Every pending decision goes through AskUserQuestion (options, a recommended default), never as a plain-text list. Ask only when the answer would change what you do (requirements, behavior, architecture, trust boundaries, security, contracts, dependencies) and nothing already settles it (the Asking section lists what does); otherwise act and record the default.
 
 End your turn only when the work is done, or when nothing can move until the user answers or a completion notice arrives. A summary that announces the next step, or an offer to wait, is not a reason to stop: do the step.
 
@@ -12549,7 +12549,7 @@ var ROOT_CORE = [identity_default, delegating_default, dispatch_default, task_li
 
 `);
 
-var state_changes_default = "## Leave state changes to the root\n\nLeave to the root every command that changes git, GitHub or holyagent state (`git commit`, `branch`, `push`, `checkout`, `stash`, `merge`, `reset`, `gh` writes, and `holyagent vcs`, `assignment` and `intent` commands) and anything under `.git/` or `.holyagent/`. The root owns the branch, PR and state records and records your changed paths from the report; a stray write corrupts the shared tree, and nothing blocks one, so it rests on you. When you need such a change, say so in the report. Read-only commands are open: `git status`, `diff`, `log`, `show`, `blame`, `fetch`, and `holyagent status`, `plan`, `assignment show` and `assignment list`. To undo your own edit, edit the file back.\n";
+var state_changes_default = "## Leave state changes to the root\n\nLeave to the root every command that changes git, GitHub or holyagent state (`git commit`, `branch`, `push`, `checkout`, `stash`, `merge`, `reset`, `gh` writes, and `holyagent vcs`, `assignment` and `intent` commands) and anything under `.git/` or `.holyagent/`. The root owns the branch, PR and state records and records your changed paths from the report; a stray write corrupts the shared tree, and nothing blocks one, so it rests on you. When you need such a change, say so in the report. Read-only commands are open: `git status`, `diff`, `log`, `show`, `blame`, `fetch`, and `holyagent status`, `plan`, `assignment show` and `assignment list`. Never change HEAD, a branch, the index or the working tree of a checkout other workers share with git commands (`switch`, `restore`, `clean`, `add`, `rebase`, `cherry-pick`): they would find their tree changed under them. To read or test a commit, use `git show <sha>:<path>`, `git diff`, or `git archive <sha>` extracted into the scratchpad. To undo your own edit, edit the file back.\n";
 
 import { homedir as homedir2 } from "os";
 import { join as join9 } from "path";
