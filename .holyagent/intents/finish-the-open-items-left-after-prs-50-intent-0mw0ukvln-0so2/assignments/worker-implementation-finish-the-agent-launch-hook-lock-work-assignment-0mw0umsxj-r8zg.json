@@ -1,0 +1,70 @@
+{
+  "id": "assignment-0mw0umsxj-r8zg",
+  "intentId": "intent-0mw0ukvln-0so2",
+  "intentRevision": 2,
+  "roleTask": "Worker.implementation",
+  "slug": "finish-the-agent-launch-hook-lock-work",
+  "objective": "Finish the agent-launch hook lock work: bound the hook's total lock wait inside the 10s hook timeout, prove it with tests that run a real hook kill and multi-process contention, and fix the three open review notes.",
+  "state": "Ready",
+  "scope": [
+    "Worktree /home/user/holyagent-hook-locks, branch release/0.2.0/fix/hook-lock-followups (from main, which has PRs #50-#52). By the time you start, node_modules is installed and mise works there: run gates with 'bun run verify' (mise run verify through the dev dependency) or node_modules/.bin/mise run <task>; if that still fails, run the bun steps of mise.toml directly and say so.",
+    "Current state: packages/runtime/src/state/lock.ts has a 'hook' patience (3s limit, 25ms poll, stuck at 3s). The agent-launch hook (packages/runtime/src/cli/hook.ts) passes 'hook' to resolveState (packages/runtime/src/state/tree.ts: exclude, worktree and migration locks) and updateState (store.ts). The bound is per lock: worst case about 9s (worktree + migration + state) against the 10s plugin hook timeout in packages/integrations/claude/dist/hooks/hooks.json. Replace it with one deadline for the whole hook invocation shared by every lock it takes (for example a deadline carried with the patience), so the total wait ends with clear margin inside 10s (aim at about 5s total), keeping CLI waits unchanged.",
+    "Tests that run, not just read: (1) a test that starts several real CLI or hook processes contending for the same state lock and checks each either finishes or fails with StateLocked within its bound, with no corrupted state; (2) a test that runs the real agent-launch hook as the host does under a 10s kill (spawn with a timeout and kill on expiry), with every hook-path lock held by live processes, and checks the hook exits by itself before the kill with the StateLocked hand-back. Keep them deterministic (hold locks with live pids, assert on bounds with margin).",
+    "Review notes: packages/runtime/tests/state-hook-locks.test.ts uses node:fs/promises mkdir/writeFile where Bun APIs (Bun.write, which creates parents) do the job; its migration test removes the whole 'migrated' folder where it should remove only its marker; the patience defaults of editExclude/ensureWorktree ('long'), migrateWorkTree and updateState/withStateLock ('short') are kept in step by hand: define them in one place each caller reads."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md and AGENTS.md: Effect for effects and tagged errors, no try/catch/new Promise/async in runtime and CLI source, Effect Schema at data boundaries, JSDoc on exported items, Bun APIs, Bun Shell for spawns.",
+    "Make no version-control writes and no edits under .git/ or .holyagent/; report changed paths. Scratch files only under /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad.",
+    "Rebuild the generated plugin (mise run build) since runtime sources are bundled into dist.",
+    "Each new behavior gets a test that fails without it; show red then green. Do not weaken or skip tests. Use explicit per-test timeouts with Windows headroom for spawn-heavy tests, as the suite does elsewhere.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When done and checked, stop and report; name unrequested features or refactors instead of making them, and launch no reviewers. A summary that announces a next step, or an offer to wait, is not a stop.",
+    "Run mise run verify (or name why not) before reporting. Write the full diff to /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/hook-followups.diff as diff-file evidence.",
+    "Report in under 400 words; long logs in the scratchpad."
+  ],
+  "criteria": [
+    {
+      "text": "The agent-launch hook's total lock wait across all locks ends inside the 10s hook timeout with margin, and CLI waits are unchanged",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A test runs several processes contending for the state lock and checks bounds and state integrity",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "A test runs the real hook under a 10s kill with the hook-path locks held and shows it exits by itself first",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The three review notes are fixed: Bun APIs in the lock test, marker-only removal, patience defaults in one place",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "mise run verify passes and dist is rebuilt",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "No test weakened or skipped, and the change stays within these items",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "diff-file",
+    "verify",
+    "red-green"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src",
+    "packages/runtime/tests",
+    "packages/integrations/claude/tests",
+    "packages/integrations/claude/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-03T15:34:57.271Z"
+}
