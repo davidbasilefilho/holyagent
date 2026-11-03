@@ -1,0 +1,58 @@
+{
+  "id": "assignment-0mw0mzj7r-jf9p",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "document-that-holyagent-is-opinionated",
+  "objective": "Document that HolyAgent is opinionated on purpose and give the sourced reason for each setting and behavior setup applies, how to confine it to one project and how to undo it, so a newcomer (or their agent) can judge the trade-offs.",
+  "state": "Ready",
+  "scope": [
+    "docs/usage.md: replace the User settings table's thin Why column with an 'Opinionated by design' section (or rework User settings) explaining each decision; document setup --scope user|project|local, setup --undo and doctor --scope (see packages/runtime/src/cli/setup.ts and packages/integrations/claude/src/setup-command.md for the exact behavior and report legend)",
+    "docs/decisions.md: add a 'Changed since the audit' entry for scope/undo and the Windows CI job, and correct facts below",
+    "README.md: one bullet in '## Why HolyAgent?' saying it is opinionated and linking to the new section; keep the exact README section structure from AGENTS.md"
+  ],
+  "constraints": [
+    "Research to cite: /home/user/holyagent/.git/holyagent/reports/assignment-0mw0mpn0w-v4vg.md. Use only facts it marks confirmed, and state the reason honestly where it is a design choice.",
+    "Decisions and the maintainer's reasons: (1) permissions.deny WebSearch/WebFetch, web work through the Exa connector: better search quality (context.dev benchmark: Exa highlights 75.6% groundedness vs WebFetch 50.4%; note the author sells a competing product), WebFetch is lossy by design (a small model summarizes the page), Exa returns highlights/clean markdown with less noise, and one web route keeps behavior predictable across sessions and machines. Say clearly it needs the Exa connector and how to drop the deny. (2) Opus at high effort for the root: the root adapts to the request, plans, judges and accepts; mistakes there cost the most, while cheap Haiku/Sonnet specialists do volume; agent effort frontmatter is ignored on the main thread (claude-code#81677, #97829) so only settings can set it. (3) autoCompactWindow 450000: every call re-reads the whole context, so a call's cost grows linearly with context size even though Anthropic charges the same per-token rate up to 1M (no long-context tier); Claude Code compacts Opus 5.5 at about 967K by default; 450k matches what Codex uses for GPT 6.1 Sol (Codex compacts at 90% of the window, and Sol's default window in Codex is 500k, so about 450k; say this is derived, not published by OpenAI); keep the project audit numbers from decisions.md (365-747k per call). (4) includeGitInstructions false: the built-in commit/PR instructions add Co-Authored-By and 'Generated with Claude Code' attribution and their own commit workflow, conflicting with commits authored by the user through holyagent vcs commit (cloud sessions commit as Claude by default, which vcs identity fixes by setting the user as author), and they cost context every call; HolyAgent's root carries its own git safety rules instead (never bypass hooks, no amend/rewrite of published history, secrets check, status/diff before commit, non-interactive git, no git config edits). Remove the unverified claim that it removes 'the git status snapshot' unless you can source it; say only commit and PR instructions. (5) attribution keys: same authorship reason. (6) subagentPromptCacheTtl 1h: keep existing reason. (7) the root takes every session and settings are user-wide: install once and use everywhere, a plugin can set only agent and subagentStatusLine (plugin docs), and consistency (every session follows the same Intent/review/commit rules); now --scope project/local confines it and --undo backs it out. (8) Cost note: on a Pro plan a high-effort Opus root uses limits faster; say Sonnet root option exists (link existing section) without inventing numbers. (9) Windows: a CI job now runs tests on windows-latest; known failures are being tracked, do not claim a count.",
+    "Cite sources inline as links. English. Concise, no filler; each decision: what it sets, why, how to change it. Follow AGENTS.md README rule. Do not edit packages/ or .github/. No version-control writes, no edits under .git/ or .holyagent/.",
+    "Run mise run verify (fmt check covers markdown; mise may be at node_modules/.bin/mise). Keep working until done; stop and report. Report in under 350 words."
+  ],
+  "criteria": [
+    {
+      "text": "opinionated section: every setting setup applies and the root-takes-every-session behavior has what, why (sourced or marked as design choice) and how to change",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "scope and undo documented accurately against the CLI",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "facts: no claim beyond the research report; snapshot claim removed or sourced; 450k Codex figure marked derived",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "README structure: sections unchanged, one bullet added",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "gates: mise run verify passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "docs",
+    "README.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-03T12:00:54.279Z"
+}
