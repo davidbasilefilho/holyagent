@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "review-the-branch-s-instruction-changes",
   "objective": "Review the branch's instruction changes as model-facing text: no merge question, settle choices repository-convention-first then holyagent default, a generic test for unnecessary questions, and specialists never moving HEAD in a shared checkout.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Full diff: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/branch.diff (worktree /home/user/holyagent-hook-locks, uncommitted). Maintainer's intent, verbatim where quoted: the root asked an unnecessary merge question seen in other sessions; 'use the holyagent default/recommended, but prioritize the repo default'; 'in general, unnecessary questions must not be asked'; 'but it must define generically what that means'. Merging still needs the user to say merge; only the question goes. A reviewer had run git checkout in the shared checkout, leaving it detached.",
     "Judge against /root/.claude/plugins/synced/03eb801d-6ff6-4373-b5b1-f94edf359a3e_0f3e6ee9-af2e-4c2c-8d3c-9be25ca27713/holyagent~g2/skills/instruction-writing/SKILL.md: one general test with its reason, examples as illustrations only, no contradiction with other root rules (asking.md, task-list/AskUserQuestion rule, user-messages.md, version-control.md, stack-plan.md, ci-watch), no new authority to merge, and the specialist rule names read-only alternatives."
@@ -47,7 +47,37 @@
     "agentId": "workflow:wf_68dd2d5f-1f1/assignment-0mw0wvsd2-3png",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-03T16:38:00.419Z"
+    "startedAt": "2026-11-03T16:38:00.419Z",
+    "finishedAt": "2026-11-03T16:48:54.312Z"
+  },
+  "result": "result: gaps found in 3 of 4 blocking criteria. Findings below; acceptance verdicts are in the evidence block.\n\nfindings:\n1. **Recommended-default illustration overrides the AskUserQuestion rule (blocking, behavior).**\n   - Excerpt, asking.md: \"and a choice between options when one is the recommended default\".\n   - Contradicting rule, task-list.md: \"Every pending decision goes through AskUserQuestion (options, a recommended default)\".\n   - Every asked question carries a recommended default, so the illustration makes every question \"fail the test\". It also overrides rules that deliberately ask, such as the push-refusal case in version-control.md: \"ask through AskUserQuestion whether to push to the assigned branch instead\".\n   - The test text has the same problem: \"a holyagent default or recommended option\" conflates holyagent's own defaults with the root's own recommendation.\n   - Fix: drop the illustration, and limit the test to defaults that holyagent rules or the repository define.\n\n2. **Source order conflicts between asking.md and the merge rule (blocking, behavior).**\n   - asking.md lists \"the user's words or an earlier answer, the target repository's conventions…\" and then says \"Check in that order\".\n   - version-control.md says \"the repository's convention (…), else the method the user chose earlier, else the holyagent default\".\n   - For the merge method, asking.md puts the earlier answer before the convention and the merge rule puts it after.\n   - Fix: state the convention-first order once, in the merge rule only, and drop \"Check in that order\" from asking.md, or reconcile the two.\n\n3. **New merge procedure is outside the stated purpose (blocking, scope).**\n   - Excerpt: \"after each squash, retarget the next PR to the base and reconcile its branch with `git merge -s ours <base>` (no content), pushed, once the base's tree equals the tree of the branch that PR was stacked on\".\n   - A grep of the instructions finds `-s ours` only in the new text (version-control.md, requirements.md R-MERGEWAIT), so it is new behavior.\n   - It is not \"remove the question\" or \"order of methods\".\n   - The tree-equality condition also never holds if the base moved, so the step can stall.\n   - Fix: keep \"default is squash\", which \"Commits and merges\" already says, and remove the procedure.\n\n4. **Merge method order is stated three times (non-blocking, wordy).** The copies are in asking.md (\"merging waits for the user to name it, then follows the repository's convention, an earlier answer, the default; see Version control\"), version-control.md \"Merging\" and R-MERGEWAIT. Squash-as-default is also repeated against \"Commits and merges\". Keep one owner.\n\n5. **Same list of settling sources written in two places (non-blocking, wordy).** The list appears in task-list.md (\"the user's words or an earlier answer, the repository's conventions, a holyagent default or recommended option, the code, a fact a specialist can establish\") and in asking.md. Keep it in asking.md and have task-list.md point there.\n\n6. **Specialist rule: imprecise and incomplete (non-blocking).**\n   - Excerpt: \"Never move HEAD, change a branch or touch the index of a checkout other workers share (`checkout`, `switch`, `stash`, `reset`, `worktree add`)\".\n   - `worktree add` does not move the shared checkout's HEAD.\n   - `git add`, `restore`, `clean`, `rebase`, `cherry-pick` and `merge` are not named, though the opening sentence covers `merge`.\n   - The read-only alternatives (`git show <sha>:<path>`, `git diff`, `git archive <sha>` into the scratchpad) are named, so that part is met.\n   - The rule is also repeated in reviewer-code range.md and reviewer-testing method.md. This is acceptable for the incident, but it is a third copy.\n\n7. **Leftover tests (non-blocking, scope).** plugin.test.ts asserts the absence of strings from a discarded draft: `\"Apply, without asking, a choice the target repository's convention settles\"` and `\"- R-DEFAULTS:\"`. Remove them.\n\n8. **\"confirmation of a plan before doing it\" (non-blocking).** It sits uneasily with user-messages.md: \"When the user asks for ideas, options or a plan, deliver that and stop until they tell you to go ahead\". Add \"that the user did not ask for\".\n\nevidence:\n- The unnecessary-question test is generic, carries its reason, and every root rule on asking agrees with it: gap. The test and its reason are in asking.md, but finding 1 contradicts task-list.md and the version-control push-refusal ask, and finding 2 conflicts on order.\n- The merge rules remove the question without granting merge authority, and the method order is repository convention, earlier answer, holyagent default: gap. The question is removed, and R-OUTWARD and identity.md still require the user to name the merge. Finding 2 covers the order conflict with asking.md, and finding 3 covers the added procedure.\n- The specialist rule forbids moving HEAD, branches or the index of a shared checkout and names read-only alternatives: met, with wording nits (finding 6). The rule is in state-changes.md and propagated to all 19 agent files and the generated script.\n- No change goes beyond these purposes: gap. Finding 3 (the merge procedure) and finding 7 (leftover test assertions).\n- findings: listed above.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Every finding quotes the excerpt and the conflicting rule.",
+    "criteria": [
+      {
+        "criterion": "The unnecessary-question test is generic, carries its reason, and every root rule on asking agrees with it",
+        "support": "gap. The test and its reason are in asking.md, but finding 1 contradicts task-list.md and the version-control push-refusal ask, and finding 2 conflicts on order."
+      },
+      {
+        "criterion": "The merge rules remove the question without granting merge authority, and the method order is repository convention, earlier answer, holyagent default",
+        "support": "gap. The question is removed, and R-OUTWARD and identity.md still require the user to name the merge. Finding 2 covers the order conflict with asking.md, and finding 3 covers the added procedure."
+      },
+      {
+        "criterion": "The specialist rule forbids moving HEAD, branches or the index of a shared checkout and names read-only alternatives",
+        "support": "met, with wording nits (finding 6). The rule is in state-changes.md and propagated to all 19 agent files and the generated script."
+      },
+      {
+        "criterion": "No change goes beyond these purposes",
+        "support": "gap. Finding 3 (the merge procedure) and finding 7 (leftover test assertions)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "listed above."
+      }
+    ]
   },
   "createdAt": "2026-11-03T16:37:55.670Z"
 }
