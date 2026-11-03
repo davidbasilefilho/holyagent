@@ -5,7 +5,7 @@
   "roleTask": "Librarian.research",
   "slug": "find-whether-claude-code-on-the-web",
   "objective": "Find whether Claude Code on the web (claude.ai cloud sessions) restricts git pushes to the session's assigned claude/<name> branch, and which setting or environment option lets a session push branches with other names.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Official docs: https://code.claude.com/docs/en/claude-code-on-the-web and related pages (environments, network, GitHub proxy, branch/push permissions), the claude.ai environment settings, anthropics/claude-code issues about branch push restrictions in web sessions"
   ],
@@ -35,7 +35,29 @@
     "agentId": "workflow:wf_4bcdbca7-0c3/assignment-0mw0n5d4g-08qm",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-03T12:05:30.262Z"
+    "startedAt": "2026-11-03T12:05:30.262Z",
+    "finishedAt": "2026-11-03T12:07:17.966Z"
+  },
+  "result": "result: Pushes in web sessions were restricted to `claude/*` branches. The current docs no longer clearly say this for interactive sessions. Routines have a documented per-repo setting. Interactive sessions have no documented setting.\n\n**Push restriction (sourced)**\n- Issue #24535 (opened 2026-02-09, https://github.com/anthropics/claude-code/issues/24535): \"the git proxy restricts pushes to only `claude/*` branches.\" Pushing to the assigned feature branch returned a 403, and the reporter could push `claude/pr-129-review-fixes-KKnEk`.\n- Zenn article (2026-02-17, https://zenn.dev/aromarious/articles/20260217-entire-on-ccweb) paraphrases the then-official docs: the proxy \"Restricts git push operations to the current working branch.\" It shows an HTTP 403 for `entire/checkpoints/v1` and `main`. This is a secondary source; I did not find that sentence in the current official page.\n- Official page https://code.claude.com/docs/en/claude-code-on-the-web (fetched 2026-11-03): it says only that GitHub operations \"go through the GitHub proxy, which attaches the credential on the server side.\" I read the first ~40K characters in full. A later fetch (~81 KB) was only grepped for \"unrestricted\" and \"claude/\", and the \"claude/\" hits were not read in context. I found no sentence in the page limiting pushes to a branch. The restriction may have been removed or reworded.\n- Issue #91018 (2026-08-31, https://github.com/anthropics/claude-code/issues/91018): the web UI picks a branch and shows \"Claude will push directly to dev\". A commit landed directly on `dev`. So by then, interactive sessions pushed to the selected branch. This is a user report, not official documentation.\n- Issue #57356 (https://github.com/anthropics/claude-code/issues/57356): pushes updating `main` returned a 403 from the proxy. Anthropic's ashwin-ant commented on 2026-05-14: \"This should be fixed now.\" This suggests the proxy's behavior changed over time.\n\n**Setting**\n- Routines (scheduled cloud runs) have a documented option. The docs wording, via the claude-wiki mirror of https://code.claude.com/docs/en/routines (the routines page itself did not return text): \"By default, Claude can only push to branches prefixed with `claude/`... enable Allow unrestricted branch pushes for that repository.\"\n- UI path, from a third-party how-to (israynotarray.com, 2026-05-25): claude.ai/code/routines, open the routine, click the pencil icon (Edit routine), find Permissions, check \"Allow unrestricted branch pushes\" for the repo, save. GitHub branch protection still applies.\n- Issue #44949 reports a scheduled task pushed to `main` with that option off. The restriction may not always be enforced.\n- Interactive web sessions: no documented setting. The session's selected branch is the one it pushes to. Issue #91018 says no setting can change this.\n\n**Not found:** an official statement of the current rule for interactive sessions, and any environment option that unlocks other branch names.\n\nevidence:\npush restriction: https://github.com/anthropics/claude-code/issues/24535 (claude/* only, 403 on others, Feb 2026), https://github.com/anthropics/claude-code/issues/91018 (selected branch pushable, Aug 2026), and https://code.claude.com/docs/en/claude-code-on-the-web (no current restriction sentence found)\nsetting: Routines only, \"Allow unrestricted branch pushes\" per repo under Permissions on claude.ai/code/routines; none documented for interactive sessions\nsources: the URLs above plus https://zenn.dev/aromarious/articles/20260217-entire-on-ccweb, https://claude-wiki.com/automate-work-with-routines.html, https://github.com/anthropics/claude-code/issues/44949, https://github.com/anthropics/claude-code/issues/57356\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "push restriction and setting answered with sources; none documented for interactive sessions",
+    "criteria": [
+      {
+        "criterion": "push restriction: documented answer on whether pushes are limited to the assigned branch, with sources",
+        "support": "https://github.com/anthropics/claude-code/issues/24535 (claude/* only, 403 on others, Feb 2026), https://github.com/anthropics/claude-code/issues/91018 (selected branch pushable, Aug 2026), and https://code.claude.com/docs/en/claude-code-on-the-web (no current restriction sentence found)"
+      },
+      {
+        "criterion": "setting: the setting that changes it, or a clear statement that none is documented",
+        "support": "Routines only, \"Allow unrestricted branch pushes\" per repo under Permissions on claude.ai/code/routines; none documented for interactive sessions"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "sources",
+        "support": "the URLs above plus https://zenn.dev/aromarious/articles/20260217-entire-on-ccweb, https://claude-wiki.com/automate-work-with-routines.html, https://github.com/anthropics/claude-code/issues/44949, https://github.com/anthropics/claude-code/issues/57356"
+      }
+    ]
   },
   "createdAt": "2026-11-03T12:05:26.320Z"
 }
