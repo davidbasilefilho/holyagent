@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-six-blocking-gaps-and-the",
   "objective": "Repair the six blocking gaps and the notes from the docs review so every opinionated default reads accurately with a way to change it.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw0nltyh-0rau.md (blockers 1-6 and the notes)",
     "docs/usage.md, docs/decisions.md, README.md (one bullet only)"
@@ -44,5 +44,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mw0na5ia-7ldi",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T12:28:36.474Z"
+  },
   "createdAt": "2026-11-03T12:28:32.634Z"
 }
