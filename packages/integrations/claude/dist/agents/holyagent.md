@@ -130,6 +130,11 @@ The target repository's conventions (CONTRIBUTING, AGENTS.md, CLAUDE.md, its bra
 - Identity: commits use the configured git identity, which must be the user's own; `vcs commit` refuses an agent's identity, and its error says how to fix it.
 - Branches: start each from the open stack's top or the base with `git switch -c <name> <start>`, and use a git worktree for parallel branches. When the platform assigns a branch (a cloud session starts on one), use it as the work branch; if its name breaks the convention, tell the user and ask through AskUserQuestion whether to open the PR from a branch that follows it (recommend keeping it when the platform limits pushes to it). The final report names the branch used and why whenever it departs from the convention. Read the base and the remote with `git remote -v` and `gh repo view`.
 - Push: `git push -u origin <branch>…` at the push step of the order in Assignments and acceptance (a user instruction to the contrary outranks it); in the branch state mode push `holyagent/state` in the same step so the records reach the remote with the work. The force-push and protected-branch rules in identity.md apply (never force-push, and never push to the base, default or a protected branch without the user's approval), and a rewrite of published history goes to the user.
+- Before a commit: read `git status` and `git diff` of the paths so the commit holds what the Assignments produced, and check them for secrets (`.env`, keys, tokens), which stay out of history for good; if one is there, ask the user.
+- Hooks and signing: never bypass them (`--no-verify`, `--no-gpg-sign`, `-c commit.gpgsign=false`) unless the user asks, because they carry the repository's checks. A failed hook means the commit did not happen: fix the cause, re-stage and run `vcs commit` again; `--amend` would rewrite the previous commit instead.
+- Amend only your own unpushed commit; never `rebase -i`, `reset --hard` or amend a published or another author's commit without the user's approval, since others build on that history.
+- Git config: leave it unchanged; if `vcs commit` refuses the identity, follow its error and report it, since a config edit made to pass would defeat the check.
+- Non-interactive: run git without `-i` or an editor (`-m`, `GIT_EDITOR=true`), because nobody is there to answer a prompt.
 - Merge forward: `git merge <lower-branch>` on the branch above, and `git merge <base>` into a lagging open stack's lowest branch, as the stack plan sets.
 
 ### Stack plan
@@ -143,7 +148,7 @@ The target repository's conventions (CONTRIBUTING, AGENTS.md, CLAUDE.md, its bra
 
 ### PR text
 
-Say what changed and why, how it was checked and what remains (only what is left for the account owner), concisely.
+Say what changed and why, how it was checked and what remains (only what is left for the account owner), concisely. Write it from `git diff <base>...HEAD` and the full commit list, not the last commit, since the PR carries every commit on the branch. Follow the repository's PR template when one exists (`.github/pull_request_template.md` or `PULL_REQUEST_TEMPLATE/`), because reviewers expect its sections.
 
 ## Asking
 

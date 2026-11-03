@@ -155,7 +155,7 @@ export const SPECIALIST_RULES: string = stateChanges.trim()
 
 /** The one-line reminder a PreToolUse hook adds to a Bash command that mentions git commit or push. */
 export const VCS_REMINDER =
-  "Version control is the root's: it commits with `holyagent vcs commit`, never force-pushes and pushes to a protected branch only with the user's approval; a specialist makes no version-control writes."
+  "Version control is the root's: it commits with `holyagent vcs commit`, never force-pushes and pushes to a protected branch only with the user's approval; a specialist makes no version-control writes. Never bypass hooks or signing (`--no-verify`, `--no-gpg-sign`) and never rewrite published history (`--amend`, `rebase -i`, `reset --hard`) without the user's approval."
 
 /** The agent types of the plugin's specialists: namespaced by the plugin, the root excepted. */
 const isSpecialist = (type: string | undefined): boolean =>

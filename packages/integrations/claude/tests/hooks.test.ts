@@ -200,6 +200,10 @@ describe("hook vcs-reminder", () => {
       expect(text).toContain("protected branch")
       expect(text).toContain("approval")
       expect(text).toContain("no version-control writes")
+      expect(text).toContain("--no-verify")
+      expect(text).toContain("--no-gpg-sign")
+      expect(text).toContain("rewrite published history")
+      expect(text).toContain("rebase -i")
       expect(text.trim().split("\n")).toHaveLength(1)
       expect(result.stdout).not.toContain("permissionDecision")
     }

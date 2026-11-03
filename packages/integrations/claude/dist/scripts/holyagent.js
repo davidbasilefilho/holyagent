@@ -19709,7 +19709,7 @@ var HAND_BACK = {
 };
 var postToolUse = (additionalContext) => output({ hookEventName: "PostToolUse", additionalContext });
 var SPECIALIST_RULES = state_changes_default.trim();
-var VCS_REMINDER = "Version control is the root's: it commits with `holyagent vcs commit`, never force-pushes and pushes to a protected branch only with the user's approval; a specialist makes no version-control writes.";
+var VCS_REMINDER = "Version control is the root's: it commits with `holyagent vcs commit`, never force-pushes and pushes to a protected branch only with the user's approval; a specialist makes no version-control writes. Never bypass hooks or signing (`--no-verify`, `--no-gpg-sign`) and never rewrite published history (`--amend`, `rebase -i`, `reset --hard`) without the user's approval.";
 var isSpecialist = (type) => type !== undefined && type.startsWith("holyagent:") && !ROOT_AGENTS.has(type);
 var MENTIONS_GIT_WRITE = /git[\s\S]*(?:commit|push)/i;
 var fileSetting = (key) => gitMaybe(["config", "--show-origin", "--get", key]).pipe(map4((line) => {
