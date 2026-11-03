@@ -6,7 +6,8 @@
     "Keep the opinionated defaults; add --scope user|project|local to holyagent setup (default user) and holyagent setup --undo that removes only what setup writes",
     "Document that HolyAgent is opinionated and explain the reason for every setting and behavior setup applies, how to scope it and how to undo it",
     "Add a windows-latest CI job that runs the test suite; fixing the Windows failures is out of scope",
-    "Artifacts in English; follow .claude/CLAUDE.md and AGENTS.md; mise run verify passes; README keeps its fixed section structure"
+    "Artifacts in English; follow .claude/CLAUDE.md and AGENTS.md; mise run verify passes; README keeps its fixed section structure",
+    "The root no longer uses a platform-assigned branch (such as claude/<name> in a claude.ai cloud session) as the work branch: it creates branches that follow the repository convention, and this delivery lands on such branches"
   ],
   "revision": 1,
   "state": "Open",
