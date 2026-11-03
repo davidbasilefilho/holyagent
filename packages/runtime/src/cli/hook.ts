@@ -334,7 +334,7 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
         if (!(yield* hasStateFolder(directory))) return yield* new StateFolderMissing()
         const type = payload.tool_input?.subagent_type
         yield* recordLaunch(
-          (transition) => updateState(directory, transition, call.env),
+          (transition) => updateState(directory, transition, call.env, "hook"),
           id,
           agentId,
           {

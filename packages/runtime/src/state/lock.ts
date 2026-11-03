@@ -66,8 +66,12 @@ const claim = (file: string) =>
     return owner.token
   })
 
-/** How long a contender waits for a lock: a holder that commits to git keeps it for a while. */
-type Patience = "short" | "long"
+/**
+ * How long a contender waits for a lock: a holder that commits to git keeps it for a while, and a
+ * plugin hook, which the host kills after 10 seconds, waits only a few seconds so that it fails
+ * cleanly with StateLocked instead.
+ */
+export type Patience = "short" | "long" | "hook"
 
 /**
  * Each patience polls every `delay` milliseconds for at most `limit` milliseconds. With `stuck`, a
@@ -79,6 +83,8 @@ const WAITS = {
   short: { delay: 25, limit: 30_000, stuck: true },
   // For a holder that works for as long as a checkout of a large repository takes, about a minute.
   long: { delay: 50, limit: 60_000, stuck: false },
+  // Well inside the 10 second timeout of a plugin hook, which also has its own work to do.
+  hook: { delay: 25, limit: 3_000, stuck: true },
 } as const
 
 /** True unless the lock was taken by a live process more than `limit` milliseconds ago. */
@@ -119,8 +125,9 @@ const release = (file: string, token: string) =>
  * created exclusively; one left by a dead process is broken, and the lock is released whatever the
  * outcome. A contender retries for up to 30 seconds (a holder keeps the lock for as long as a git
  * commit takes; a lock a live process has held longer than that fails at once), or a minute with
- * `patience: "long"` for a holder that does slow work, then fails with StateLocked. The folder of
- * the file is made when it is missing.
+ * `patience: "long"` for a holder that does slow work, or 3 seconds with `patience: "hook"` for a
+ * caller under a hook timeout, then fails with StateLocked. The folder of the file is made when it
+ * is missing.
  */
 export const withFileLock = <A, E, R>(
   file: string,
@@ -137,11 +144,17 @@ export const withFileLock = <A, E, R>(
 
 /**
  * Runs `use` while holding the state lock (`local/lock` of the state folder), so two processes
- * never interleave their reads and writes.
+ * never interleave their reads and writes. `patience` is as for {@link withFileLock}.
  */
-export const withStateLock = <A, E, R>(directory: string, use: Effect.Effect<A, E, R>) =>
+export const withStateLock = <A, E, R>(
+  directory: string,
+  use: Effect.Effect<A, E, R>,
+  patience: Patience = "short",
+) =>
   Effect.acquireUseRelease(
-    ensureLocalDirectory(directory).pipe(Effect.andThen(acquire(localFile(directory, "lock")))),
+    ensureLocalDirectory(directory).pipe(
+      Effect.andThen(acquire(localFile(directory, "lock"), patience)),
+    ),
     () => use,
     (token) => release(localFile(directory, "lock"), token),
   )

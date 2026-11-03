@@ -10121,7 +10121,8 @@ var claim = (file) => gen2(function* () {
 });
 var WAITS = {
   short: { delay: 25, limit: 30000, stuck: true },
-  long: { delay: 50, limit: 60000, stuck: false }
+  long: { delay: 50, limit: 60000, stuck: false },
+  hook: { delay: 25, limit: 3000, stuck: true }
 };
 var holderBusy = (file, limit) => gen2(function* () {
   const owner = yield* readOwner(file);
@@ -10137,7 +10138,7 @@ var acquire = (file, patience = "short") => {
 };
 var release = (file, token) => readOwner(file).pipe(flatMap2((owner) => owner?.token === token ? io(file, () => rm2(file, { force: true })) : void_3), ignore2);
 var withFileLock = (file, use, patience = "short") => acquireUseRelease2(io(file, () => mkdir(dirname(file), { recursive: true })).pipe(andThen2(acquire(file, patience))), () => use, (token) => release(file, token));
-var withStateLock = (directory, use) => acquireUseRelease2(ensureLocalDirectory(directory).pipe(andThen2(acquire(localFile(directory, "lock")))), () => use, (token) => release(localFile(directory, "lock"), token));
+var withStateLock = (directory, use, patience = "short") => acquireUseRelease2(ensureLocalDirectory(directory).pipe(andThen2(acquire(localFile(directory, "lock"), patience))), () => use, (token) => release(localFile(directory, "lock"), token));
 
 import { lstat, mkdir as mkdir2, readdir, realpath, rename as rename2, rm as rm3, rmdir, stat } from "fs/promises";
 import { basename, dirname as dirname2, join as join2, relative, sep as sep2 } from "path";
@@ -10837,14 +10838,14 @@ var describe = (change) => {
   const more = records.length - MAX_LISTED;
   return `chore(state): record ${records.length === 0 ? "state" : shown}${more > 0 ? ` and ${more} more` : ""}`;
 };
-var updateState = (directory, transition, env = {}) => withStateLock(directory, gen2(function* () {
+var updateState = (directory, transition, env = {}, patience = "short") => withStateLock(directory, gen2(function* () {
   const snapshot = yield* readSnapshot(directory);
   const result = yield* transition(snapshot);
   yield* persist(directory, snapshot.project, result);
   if (result.intents !== undefined || result.assignments !== undefined || result.branches !== undefined || result.pulls !== undefined)
     yield* commitState(directory, env, describe(result));
   return result;
-}));
+}), patience);
 
 var {$: $2 } = globalThis.Bun;
 var spawn = (program, args, options) => promise2(() => {
@@ -19934,7 +19935,7 @@ var HOOK_COMMANDS = [
       if (!(yield* hasStateFolder(directory)))
         return yield* new StateFolderMissing;
       const type = payload.tool_input?.subagent_type;
-      yield* recordLaunch((transition) => updateState(directory, transition, call.env), id, agentId, {
+      yield* recordLaunch((transition) => updateState(directory, transition, call.env, "hook"), id, agentId, {
         type: typeof type === "string" ? type : undefined
       });
       return postToolUse(`holyagent: recorded agent ${agentId} for ${id}.`);

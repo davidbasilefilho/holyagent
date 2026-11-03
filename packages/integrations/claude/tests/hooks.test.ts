@@ -106,7 +106,8 @@ const additionalOf = (stdout: string) => String(addedContext(stdout)?.additional
 const brokenGit = async (folder: string): Promise<Record<string, string>> => {
   const config = join(folder, "gitconfig")
   await writeFile(config, "[broken\n")
-  return { GIT_CONFIG_GLOBAL: config, GIT_CONFIG_NOSYSTEM: "1" }
+  // The C locale keeps git's message in English, which the tests assert on, whatever the host's.
+  return { GIT_CONFIG_GLOBAL: config, GIT_CONFIG_NOSYSTEM: "1", LC_ALL: "C", LANGUAGE: "C" }
 }
 
 describe("hook subagent-start", () => {
@@ -1652,6 +1653,28 @@ describe("hook agent-launch", () => {
       await rm(dir, { recursive: true, force: true })
     }
   })
+
+  test("gives up on a state lock a live process holds well inside the 10 second hook timeout", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "holyagent-hook-launch-busy-"))
+    try {
+      const { id, prompt } = await dispatched(dir)
+      // The lock of this live test process, taken just now, so a contender would keep waiting.
+      const lock = join(dir, ".holyagent", "local", "lock")
+      await writeFile(
+        lock,
+        JSON.stringify({ pid: process.pid, token: "busy", acquiredAt: Date.now() }),
+      )
+      const started = Date.now()
+      const result = await hook("agent-launch", launch(prompt, background("agent-4", prompt)), dir)
+      expect(Date.now() - started).toBeLessThan(8000)
+      expect(result.code).toBe(0)
+      expect(result.stdout).toContain(`could not record the launch of ${id} (StateLocked)`)
+      await rm(lock)
+      expect(await agentRow(dir, id)).not.toContain("agent-4")
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  }, 40_000)
 
   test("makes no state folder in a project that has none", async () => {
     const bare = await mkdtemp(join(tmpdir(), "holyagent-hook-launch-bare-"))
