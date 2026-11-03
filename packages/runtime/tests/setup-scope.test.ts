@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { mkdir, readdir, realpath, symlink, writeFile } from "node:fs/promises"
+import { mkdir, readdir, realpath, stat, symlink, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
 import { $ } from "bun"
@@ -19,8 +19,10 @@ beforeEach(async () => {
   const made = await scratch("holyagent-setup-scope-")
   home = made.directory
   remove = made.remove
-  // The scope resolves the real paths of the working directory and the git top-level.
+  // The scope resolves the real paths of the working directory and the git top-level, and trusts
+  // a top-level only when it holds a .git entry.
   await mkdir(nested(), { recursive: true })
+  await mkdir(join(repo(), ".git"), { recursive: true })
 })
 afterEach(() => remove())
 
@@ -89,6 +91,15 @@ describe("holyagent setup --scope", () => {
     expect(await exists(userFile())).toBe(false)
     expect(await exists(localFile())).toBe(false)
   })
+
+  test.skipIf(process.platform === "win32")(
+    "the record file is readable by its owner alone",
+    async () => {
+      await runSetup("project")
+      const record = join(home, "claude", "holyagent", "setup-records.json")
+      expect((await stat(record)).mode & 0o777).toBe(0o600)
+    },
+  )
 
   test("local writes .claude/settings.local.json in the git top-level", async () => {
     const report = await runSetup("local")
@@ -324,11 +335,42 @@ describe("holyagent setup --scope guards", () => {
     )
     expect(report.ok).toBe(true)
     expect(report.lines[1]).toBe(
-      `~ project settings: git names ${elsewhere} as the top-level, which is not the current directory or above it; using ${nested()}`,
+      `~ project settings: git names ${elsewhere} as the top-level, which is not the current directory or an ancestor holding a .git entry; using ${nested()}`,
     )
     expect(report.lines[2]).toBe(join(nested(), ".claude", "settings.json"))
     expect(await exists(join(nested(), ".claude", "settings.json"))).toBe(true)
     expect(await readdir(elsewhere)).toEqual([])
+  })
+
+  test("a git top-level without a .git entry is ignored, even above the working directory", async () => {
+    // A crafted core.worktree can name an ancestor, such as the home folder, that is no repository.
+    const ancestor = join(home, "plain")
+    const inside = join(ancestor, "work")
+    await mkdir(inside, { recursive: true })
+    const report = await Effect.runPromise(
+      setup(env(), { ...options("project"), cwd: inside }).pipe(
+        Effect.provide(namingTop(ancestor).layer),
+      ),
+    )
+    expect(report.lines[1]).toBe(
+      `~ project settings: git names ${ancestor} as the top-level, which is not the current directory or an ancestor holding a .git entry; using ${inside}`,
+    )
+    expect(await exists(join(inside, ".claude", "settings.json"))).toBe(true)
+    expect(await exists(join(ancestor, ".claude", "settings.json"))).toBe(false)
+  })
+
+  test("outside a repository the report says the current directory is used", async () => {
+    const shell = fakeShell({
+      commands: ["bun"],
+      respond: (line) =>
+        line === "git rev-parse --show-toplevel"
+          ? { exitCode: 128, stderr: "fatal: not a git repository" }
+          : undefined,
+    })
+    const report = await Effect.runPromise(
+      setup(env(), options("local")).pipe(Effect.provide(shell.layer)),
+    )
+    expect(report.lines[1]).toBe(`~ local settings: not inside a git repository; using ${nested()}`)
   })
 
   test("a git top-level that does not exist is ignored too", async () => {
@@ -425,6 +467,27 @@ describe("holyagent setup --scope guards", () => {
 })
 
 describe("holyagent doctor --scope", () => {
+  test("names a refused git top-level like setup does", async () => {
+    const elsewhere = join(home, "elsewhere")
+    await mkdir(elsewhere, { recursive: true })
+    const shell = fakeShell({
+      commands: ["bun", "ctx7"],
+      respond: (line) =>
+        line === "git rev-parse --show-toplevel" ? { stdout: `${elsewhere}\n` } : undefined,
+    })
+    const report = await Effect.runPromise(
+      doctor(env(), { fix: false, scope: "project", cwd: nested() }).pipe(
+        Effect.provide(shell.layer),
+      ),
+    )
+    expect(report.lines[0]).toBe(
+      `~ project settings: git names ${elsewhere} as the top-level, which is not the current directory or an ancestor holding a .git entry; using ${nested()}`,
+    )
+    expect(report.lines.join("\n")).toContain(
+      `FAIL settings: ${join(nested(), ".claude", "settings.json")} lacks`,
+    )
+  })
+
   test("checks the file of the scope and --fix merges into it", async () => {
     const shell = fakeShell({
       commands: ["bun", "ctx7"],

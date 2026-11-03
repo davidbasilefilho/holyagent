@@ -62,7 +62,8 @@ const save = (env: Env, files: Records) => {
       ]),
     ),
   }
-  return writeJsonObject(recordPath(env), body)
+  // It names absolute project paths: readable by the user alone.
+  return writeJsonObject(recordPath(env), body, { mode: 0o600 })
 }
 
 /**

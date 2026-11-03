@@ -1,5 +1,5 @@
 import { lstat, realpath } from "node:fs/promises"
-import { isAbsolute, join, relative, resolve, sep } from "node:path"
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 
 import { Effect } from "effect"
 
@@ -26,6 +26,13 @@ const within = (parent: string, child: string) => {
 /** The real path, or undefined when it cannot be resolved (it does not exist, say). */
 const real = (path: string) =>
   Effect.tryPromise(() => realpath(path)).pipe(Effect.orElseSucceed(() => undefined))
+
+/** Whether anything (a folder, or the file a linked worktree has) exists at `path`. */
+const present = (path: string) =>
+  Effect.tryPromise(() => lstat(path)).pipe(
+    Effect.as(true),
+    Effect.orElseSucceed(() => false),
+  )
 
 /** Whether the entry at `path` is itself a symlink; a missing entry is not. */
 const isSymlink = (path: string) =>
@@ -54,10 +61,11 @@ export interface SettingsTarget {
  * The settings file of a scope. `user` is the file of `userFiles` (`CLAUDE_CONFIG_DIR`, else
  * `~/.claude`), with no process spawned. `project` and `local` live in `.claude` of the git
  * top-level of `cwd`, else of `cwd` itself when it is not inside a repository or git is missing.
- * The top-level counts only when it is `cwd` or an ancestor of it (compared as real paths), since a
- * crafted `core.worktree` can make git name any directory; otherwise `cwd` is used and the notice
- * says so. For `project` and `local`, a `.claude` folder or settings file that is a symlink fails
- * with SetupFailure, so a repository cannot redirect the write; `user` follows its links as
+ * The top-level counts only when it is `cwd` or an ancestor of it (compared as real paths) and
+ * holds a `.git` entry, since a crafted `core.worktree` can make git name any directory, an
+ * ancestor of `cwd` included; otherwise `cwd` is used and the notice says so, as it does outside a
+ * repository. For `project` and `local`, a `.claude` folder or settings file that is a symlink
+ * fails with SetupFailure, so a repository cannot redirect the write; `user` follows its links as
  * before.
  */
 export const settingsFile = Effect.fn("settingsFile")(function* (
@@ -76,12 +84,14 @@ export const settingsFile = Effect.fn("settingsFile")(function* (
     named !== undefined &&
     realTop !== undefined &&
     realCwd !== undefined &&
-    within(realTop, realCwd)
+    within(realTop, realCwd) &&
+    (yield* present(join(named, ".git")))
   const root = trusted ? named : cwd
-  const notice =
-    named !== undefined && !trusted
-      ? `git names ${named} as the top-level, which is not the current directory or above it; using ${cwd}`
-      : undefined
+  const notice = trusted
+    ? undefined
+    : named === undefined
+      ? `not inside a git repository; using ${cwd}`
+      : `git names ${named} as the top-level, which is not the current directory or an ancestor holding a .git entry; using ${cwd}`
   const folder = join(root, ".claude")
   const file = join(folder, scope === "project" ? "settings.json" : "settings.local.json")
   for (const path of [folder, file]) {
@@ -92,4 +102,24 @@ export const settingsFile = Effect.fn("settingsFile")(function* (
     }
   }
   return { file, ...(notice === undefined ? {} : { notice }) } satisfies SettingsTarget
+})
+
+/**
+ * The project and local settings files that may hold the keys of a session started in `cwd`, for
+ * the SessionStart check, which spawns nothing: the files of `cwd` and of its nearest ancestor with
+ * a `.git` entry (the folder `settingsFile` picks inside a repository). The files need not exist.
+ */
+export const projectSettingsFiles = Effect.fn("projectSettingsFiles")(function* (cwd: string) {
+  const roots = [resolve(cwd)]
+  for (let folder = resolve(cwd); ; folder = dirname(folder)) {
+    if (yield* present(join(folder, ".git"))) {
+      if (folder !== roots[0]) roots.push(folder)
+      break
+    }
+    if (dirname(folder) === folder) break
+  }
+  return roots.flatMap((root) => [
+    join(root, ".claude", "settings.json"),
+    join(root, ".claude", "settings.local.json"),
+  ])
 })

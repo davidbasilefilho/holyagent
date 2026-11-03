@@ -12496,7 +12496,7 @@ var ASSIGNMENT_COMMANDS = [
 ];
 
 import { stat as stat2 } from "fs/promises";
-import { join as join15 } from "path";
+import { join as join16 } from "path";
 
 var delegating_default = "## Delegating\n\nEdits, runs, checks, reviews, research and investigation go to specialists. Read only what a decision needs; your Bash is for the holyagent CLI, Git and `gh`. If a `holyagent:*` agent type does not resolve, stop and report it; general-purpose agents are no stand-in. If the user forbids subagents, work to the same criteria and name each waived review.\n";
 
@@ -12584,12 +12584,105 @@ var userFiles = (env) => {
   };
 };
 
-import { chmod, mkdir as mkdir3, realpath as realpath3, rename as rename3, rm as rm4, writeFile } from "fs/promises";
-import { basename as basename2, dirname as dirname3, join as join10 } from "path";
+import { lstat as lstat2, realpath as realpath3 } from "fs/promises";
+import { dirname as dirname3, isAbsolute as isAbsolute2, join as join11, relative as relative4, resolve as resolve5, sep as sep6 } from "path";
 
 class SetupFailure extends TaggedError2("SetupFailure") {
 }
 
+import { delimiter, join as join10 } from "path";
+var {$: $3 } = globalThis.Bun;
+var pathKey = (env, insensitive = process.platform === "win32") => {
+  if (!insensitive || env.PATH !== undefined)
+    return "PATH";
+  return Object.keys(env).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
+};
+var pathWithBunBin = (env, options) => {
+  const key = pathKey(env, options.insensitive);
+  const root = options.bunInstall ? options.bunInstall : join10(options.home, ".bun");
+  const bunBin = join10(root, "bin");
+  return { key, value: `${env[key] ?? ""}${options.delimiter ?? delimiter}${bunBin}`, bunBin };
+};
+var findCommand = (env, command, options) => {
+  const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory(env), bunInstall: env.BUN_INSTALL });
+  return fromNullishOr(Bun.which(command, {
+    PATH: options?.includeBunBin ? bunBin.value : env[bunBin.key] ?? ""
+  }));
+};
+var EMPTY_BUNFIG = join10(import.meta.dir, "empty-bunfig.toml");
+
+class Shell extends Service()("holyagent/Shell") {
+  static live = (env) => {
+    const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory(env), bunInstall: env.BUN_INSTALL });
+    return succeed5(Shell, Shell.of({
+      which: (command, options) => sync2(() => findCommand(env, command, options)),
+      run: (command, args, options) => tryPromise2({
+        try: () => $3`${command} ${args}`.cwd(options.cwd).env(Object.fromEntries(Object.entries({ ...env, [bunBin.key]: bunBin.value }).filter((entry) => entry[1] !== undefined))).quiet().nothrow().then((result) => ({
+          exitCode: result.exitCode,
+          stdout: result.stdout.toString(),
+          stderr: result.stderr.toString()
+        })),
+        catch: (error) => String(error)
+      }).pipe(catch_2((message) => succeed6({ exitCode: 127, stdout: "", stderr: message })))
+    }));
+  };
+}
+
+var SCOPES = ["user", "project", "local"];
+var within = (parent, child) => {
+  const path = relative4(parent, child);
+  return path === "" || path !== ".." && !path.startsWith(`..${sep6}`) && !isAbsolute2(path);
+};
+var real = (path) => tryPromise2(() => realpath3(path)).pipe(orElseSucceed2(() => {
+  return;
+}));
+var present2 = (path) => tryPromise2(() => lstat2(path)).pipe(as2(true), orElseSucceed2(() => false));
+var isSymlink = (path) => tryPromise2({
+  try: () => lstat2(path),
+  catch: (cause) => cause
+}).pipe(map4((stats) => stats.isSymbolicLink()), catch_2((error) => error.code === "ENOENT" || error.code === "ENOTDIR" ? succeed6(false) : fail5(new SetupFailure({ message: `cannot inspect ${path}: ${error.message}` }))));
+var settingsFile = fn2("settingsFile")(function* (env, scope, cwd) {
+  if (scope === "user")
+    return { file: userFiles(env).settings };
+  const shell = yield* Shell;
+  const top = yield* shell.run("git", ["rev-parse", "--show-toplevel"], { cwd });
+  const line = top.stdout.trim();
+  const named = top.exitCode === 0 && line !== "" ? resolve5(line) : undefined;
+  const realTop = named === undefined ? undefined : yield* real(named);
+  const realCwd = yield* real(cwd);
+  const trusted = named !== undefined && realTop !== undefined && realCwd !== undefined && within(realTop, realCwd) && (yield* present2(join11(named, ".git")));
+  const root = trusted ? named : cwd;
+  const notice = trusted ? undefined : named === undefined ? `not inside a git repository; using ${cwd}` : `git names ${named} as the top-level, which is not the current directory or an ancestor holding a .git entry; using ${cwd}`;
+  const folder = join11(root, ".claude");
+  const file = join11(folder, scope === "project" ? "settings.json" : "settings.local.json");
+  for (const path of [folder, file]) {
+    if (yield* isSymlink(path)) {
+      return yield* new SetupFailure({
+        message: `${path} is a symlink; refusing to write through it in the ${scope} scope. Replace it with a real ${path === folder ? "folder" : "file"} and run again`
+      });
+    }
+  }
+  return { file, ...notice === undefined ? {} : { notice } };
+});
+var projectSettingsFiles = fn2("projectSettingsFiles")(function* (cwd) {
+  const roots = [resolve5(cwd)];
+  for (let folder = resolve5(cwd);; folder = dirname3(folder)) {
+    if (yield* present2(join11(folder, ".git"))) {
+      if (folder !== roots[0])
+        roots.push(folder);
+      break;
+    }
+    if (dirname3(folder) === folder)
+      break;
+  }
+  return roots.flatMap((root) => [
+    join11(root, ".claude", "settings.json"),
+    join11(root, ".claude", "settings.local.json")
+  ]);
+});
+
+import { chmod, mkdir as mkdir3, realpath as realpath4, rename as rename3, rm as rm4, writeFile } from "fs/promises";
+import { basename as basename2, dirname as dirname4, join as join12 } from "path";
 var JsonObjectText = fromJsonString2(Record(String4, Unknown2), {
   space: 2
 });
@@ -12617,12 +12710,12 @@ var readJsonObjectSnapshot = (path) => gen2(function* () {
 var writeJsonObject = (path, value, options) => replaceJsonObject(path, value, options).pipe(asVoid2);
 var replaceJsonObject = (path, value, options, unchangedSince) => gen2(function* () {
   const exists = yield* fileOperation(path, "write", () => Bun.file(path).exists());
-  const target = exists ? yield* fileOperation(path, "write", () => realpath3(path)) : path;
+  const target = exists ? yield* fileOperation(path, "write", () => realpath4(path)) : path;
   const mode = options?.mode ?? (exists ? (yield* fileOperation(target, "write", () => Bun.file(target).stat())).mode & 511 : undefined);
   const text = (yield* encodeEffect(JsonObjectText)(value, strict2).pipe(mapError2((error) => new SetupFailure({ message: `cannot encode ${path}: ${error.message}` })))) + `
 `;
-  const temporary = join10(dirname3(target), `.${basename2(target)}.${process.pid}.tmp`);
-  yield* fileOperation(dirname3(target), "write", () => mkdir3(dirname3(target), { recursive: true }));
+  const temporary = join12(dirname4(target), `.${basename2(target)}.${process.pid}.tmp`);
+  yield* fileOperation(dirname4(target), "write", () => mkdir3(dirname4(target), { recursive: true }));
   yield* tryPromise2({
     try: () => writeFile(temporary, text, { flag: "wx", ...mode === undefined ? {} : { mode } }),
     catch: (cause) => cause
@@ -12672,7 +12765,7 @@ var applyDefaults = (existing, defaults) => {
   return { merged, entries: [...entries.values()] };
 };
 
-import { join as join11, resolve as resolve5 } from "path";
+import { join as join13, resolve as resolve6 } from "path";
 var RecordedKey = Struct({
   path: NonEmptyArray(String4),
   value: Unknown2
@@ -12680,8 +12773,8 @@ var RecordedKey = Struct({
 var RecordFile = Struct({
   files: Record(String4, Struct({ keys: ArraySchema(RecordedKey) }))
 });
-var recordPath = (env) => join11(userFiles(env).claudeDir, "holyagent", "setup-records.json");
-var keyOf = (file) => resolve5(file);
+var recordPath = (env) => join13(userFiles(env).claudeDir, "holyagent", "setup-records.json");
+var keyOf = (file) => resolve6(file);
 var load = (env) => gen2(function* () {
   const path = recordPath(env);
   const raw = yield* readJsonObject(path);
@@ -12701,7 +12794,7 @@ var save = (env, files) => {
       { keys: keys.map((key) => ({ ...key })) }
     ]))
   };
-  return writeJsonObject(recordPath(env), body);
+  return writeJsonObject(recordPath(env), body, { mode: 384 });
 };
 var readRecorded = fn2("readRecorded")(function* (env, file) {
   return (yield* load(env))[keyOf(file)] ?? [];
@@ -12724,7 +12817,7 @@ var clearRecorded = fn2("clearRecorded")(function* (env, file) {
 });
 
 var added = (text) => `+ ${text}`;
-var present2 = (text) => `= ${text}`;
+var present3 = (text) => `= ${text}`;
 var skipped = (text) => `- ${text}`;
 var hint = (text) => `~ ${text}`;
 var failed2 = (what, result) => {
@@ -12874,65 +12967,37 @@ var missingSettingKeys = fn2("missingSettingKeys")(function* (file) {
   return applyDefaults(existing, defaultsFor(existing, "1h")).entries.filter((entry) => entry.status === "added").map((entry) => entry.path);
 });
 
-import { delimiter, join as join12 } from "path";
-var {$: $3 } = globalThis.Bun;
-var pathKey = (env, insensitive = process.platform === "win32") => {
-  if (!insensitive || env.PATH !== undefined)
-    return "PATH";
-  return Object.keys(env).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
-};
-var pathWithBunBin = (env, options) => {
-  const key = pathKey(env, options.insensitive);
-  const root = options.bunInstall ? options.bunInstall : join12(options.home, ".bun");
-  const bunBin = join12(root, "bin");
-  return { key, value: `${env[key] ?? ""}${options.delimiter ?? delimiter}${bunBin}`, bunBin };
-};
-var findCommand = (env, command, options) => {
-  const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory(env), bunInstall: env.BUN_INSTALL });
-  return fromNullishOr(Bun.which(command, {
-    PATH: options?.includeBunBin ? bunBin.value : env[bunBin.key] ?? ""
-  }));
-};
-var EMPTY_BUNFIG = join12(import.meta.dir, "empty-bunfig.toml");
-
-class Shell extends Service()("holyagent/Shell") {
-  static live = (env) => {
-    const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory(env), bunInstall: env.BUN_INSTALL });
-    return succeed5(Shell, Shell.of({
-      which: (command, options) => sync2(() => findCommand(env, command, options)),
-      run: (command, args, options) => tryPromise2({
-        try: () => $3`${command} ${args}`.cwd(options.cwd).env(Object.fromEntries(Object.entries({ ...env, [bunBin.key]: bunBin.value }).filter((entry) => entry[1] !== undefined))).quiet().nothrow().then((result) => ({
-          exitCode: result.exitCode,
-          stdout: result.stdout.toString(),
-          stderr: result.stderr.toString()
-        })),
-        catch: (error) => String(error)
-      }).pipe(catch_2((message) => succeed6({ exitCode: 127, stdout: "", stderr: message })))
-    }));
-  };
-}
-
-var setupNotice = (env) => {
+var setupNotice = (env, cwd) => {
   if (inCloudSession(env))
     return succeed6(undefined);
   const missing = isNone2(findCommand(env, "ctx7", { includeBunBin: true })) ? ["ctx7"] : [];
-  return missingSettingKeys(userFiles(env).settings).pipe(orElseSucceed2(() => []), map4((keys) => {
+  const lacking = (file) => missingSettingKeys(file).pipe(map4((keys) => keys), orElseSucceed2(() => {
+    return;
+  }));
+  const missingKeys = gen2(function* () {
+    const user = yield* missingSettingKeys(userFiles(env).settings);
+    if (cwd === undefined || user.length === 0)
+      return user;
+    const others = yield* all2((yield* projectSettingsFiles(cwd)).map(lacking));
+    return user.filter((key) => others.every((keys) => keys === undefined || keys.includes(key)));
+  });
+  return missingKeys.pipe(orElseSucceed2(() => []), map4((keys) => {
     const lacking = [...missing, ...keys.length === 0 ? [] : ["user settings keys"]];
     return lacking.length === 0 ? undefined : `holyagent: setup is incomplete (missing ${lacking.join(", ")}). Offer the user to run /holyagent:setup, which installs and configures; do not run it unasked.`;
   }));
 };
 
-import { lstat as lstat2, mkdir as mkdir4, open as open3 } from "fs/promises";
+import { lstat as lstat3, mkdir as mkdir4, open as open3 } from "fs/promises";
 import { tmpdir, userInfo } from "os";
-import { join as join13 } from "path";
+import { join as join14 } from "path";
 var SAFE_SESSION = /^[\w.-]{1,80}$/;
 var isSessionId = (id) => id !== undefined && SAFE_SESSION.test(id) && !/^\.+$/.test(id);
-var markers = () => join13(tmpdir(), `holyagent-sessions-${(process.getuid?.() ?? userInfo().username).toString().replace(/[^\w.-]/g, "_")}`);
-var markerOf = (sessionId) => join13(markers(), sessionId);
+var markers = () => join14(tmpdir(), `holyagent-sessions-${(process.getuid?.() ?? userInfo().username).toString().replace(/[^\w.-]/g, "_")}`);
+var markerOf = (sessionId) => join14(markers(), sessionId);
 var ensureMarkers = () => {
   const folder = markers();
   const uid = process.getuid?.();
-  return io(folder, () => mkdir4(folder, { recursive: true, mode: 448 })).pipe(andThen2(io(folder, () => lstat2(folder))), filterOrFail2((found) => found.isDirectory() && (uid === undefined || found.uid === uid && (found.mode & 18) === 0), () => new StateIo({
+  return io(folder, () => mkdir4(folder, { recursive: true, mode: 448 })).pipe(andThen2(io(folder, () => lstat3(folder))), filterOrFail2((found) => found.isDirectory() && (uid === undefined || found.uid === uid && (found.mode & 18) === 0), () => new StateIo({
     path: folder,
     cause: new Error("not a private directory owned by the current user")
   })));
@@ -12941,7 +13006,7 @@ var create = (sessionId) => ensureMarkers().pipe(andThen2(io(markerOf(sessionId)
 var markRulesDelivered = (sessionId) => create(sessionId).pipe(asVoid2);
 var claimRulesDelivery = create;
 
-import { join as join14 } from "path";
+import { join as join15 } from "path";
 var LEGACY_FOLDERS = {
   holyclaude: ".holyclaude",
   holycodex: ".holycodex"
@@ -13097,7 +13162,7 @@ var byFolder = (paths) => {
   return folders;
 };
 var convertibleFolders = (source, files) => byFolder(source === "holyclaude" ? files.filter((path) => path.startsWith("intents/")).map((path) => path.slice(8)) : files.filter((path) => !path.startsWith(".")));
-var legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join14(root, LEGACY_FOLDERS[source])).pipe(map4((files) => convertibleFolders(source, files).size > 0))).pipe(map4((sources) => sources.map((source) => LEGACY_FOLDERS[source])));
+var legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join15(root, LEGACY_FOLDERS[source])).pipe(map4((files) => convertibleFolders(source, files).size > 0))).pipe(map4((sources) => sources.map((source) => LEGACY_FOLDERS[source])));
 var isoOf = (millis) => {
   const date = new Date(millis);
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
@@ -13218,13 +13283,13 @@ var holyclaudeAssignment = (legacy, roleTask, siblings) => {
 };
 var gatherHolyclaude = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holyclaude;
-  const legacy = join14(root, folderName);
+  const legacy = join15(root, folderName);
   const intents = convertibleFolders("holyclaude", yield* listFiles(legacy));
   if (intents.size === 0)
     return;
   const state = collector("holyclaude");
   for (const [folder, inside] of intents) {
-    const base = join14(legacy, "intents", folder);
+    const base = join15(legacy, "intents", folder);
     const shown = (relative) => `${folderName}/intents/${folder}/${relative}`;
     if (!inside.includes("intent.json")) {
       unconvertible(state, shown("").slice(0, -1), "the folder has no intent.json");
@@ -13232,7 +13297,7 @@ var gatherHolyclaude = (root, directory) => gen2(function* () {
     }
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.json$/.test(path));
     const notes = inside.filter((path) => path !== "intent.json" && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join14(base, "intent.json"));
+    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join15(base, "intent.json"));
     const intent = yield* intentRecord(directory, shown("intent.json"), "problem" in read ? read : holyclaudeIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.json"), intent.problem);
@@ -13243,10 +13308,10 @@ var gatherHolyclaude = (root, directory) => gen2(function* () {
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join14(base, path), to: join14(target, path) });
+      state.notes.push({ from: join15(base, path), to: join15(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join14(base, path));
+      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join15(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (assignment.value.intent_id !== intent.value.intent.id)
@@ -13348,13 +13413,13 @@ var holycodexAssignment = (legacy, roleTask, intent, siblings) => {
 var TRANSACTION_FILE = ".holycodex-transaction.toon";
 var gatherHolycodex = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holycodex;
-  const legacy = join14(root, folderName);
+  const legacy = join15(root, folderName);
   const folders = convertibleFolders("holycodex", yield* listFiles(legacy));
   if (folders.size === 0)
     return;
   const state = collector("holycodex");
   for (const [folder, inside] of folders) {
-    const base = join14(legacy, folder);
+    const base = join15(legacy, folder);
     const shown = (relative) => `${folderName}/${folder}/${relative}`;
     if (!inside.includes("intent.toon")) {
       unconvertible(state, `${folderName}/${folder}`, "the folder has no intent.toon");
@@ -13368,7 +13433,7 @@ var gatherHolycodex = (root, directory) => gen2(function* () {
       });
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.toon$/.test(path));
     const notes = inside.filter((path) => path !== "intent.toon" && path !== TRANSACTION_FILE && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join14(base, "intent.toon"));
+    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join15(base, "intent.toon"));
     const intent = yield* intentRecord(directory, shown("intent.toon"), "problem" in read ? read : holycodexIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.toon"), intent.problem);
@@ -13379,10 +13444,10 @@ var gatherHolycodex = (root, directory) => gen2(function* () {
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join14(base, path), to: join14(target, path) });
+      state.notes.push({ from: join15(base, path), to: join15(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join14(base, path));
+      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join15(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (mapId("intent", assignment.value.intent_id) !== intent.value.intent.id)
@@ -19789,7 +19854,7 @@ var HAND_BACK = {
 };
 var postToolUse = (additionalContext) => output({ hookEventName: "PostToolUse", additionalContext });
 var SPECIALIST_RULES = state_changes_default.trim();
-var VCS_REMINDER = "Version control is the root's: it commits with `holyagent vcs commit`, never force-pushes and pushes to a protected branch only with the user's approval; a specialist makes no version-control writes. Never bypass hooks or signing (`--no-verify`, `--no-gpg-sign`) and never rewrite published history (`--amend`, `rebase -i`, `reset --hard`) without the user's approval.";
+var VCS_REMINDER = "Version control is the root's: it commits with `holyagent vcs commit`, never force-pushes and pushes to a protected branch only with the user's approval; a specialist makes no version-control writes. Bypass hooks or signing (`--no-verify`, `--no-gpg-sign`) only when the user asks. Amend only your own unpushed commit, and never `rebase -i`, `reset --hard` or amend a published or another author's commit without the user's approval.";
 var isSpecialist = (type) => type !== undefined && type.startsWith("holyagent:") && !ROOT_AGENTS.has(type);
 var MENTIONS_GIT_WRITE = /git[\s\S]*(?:commit|push)/i;
 var fileSetting = (key) => gitMaybe(["config", "--show-origin", "--get", key]).pipe(map4((line) => {
@@ -19808,11 +19873,11 @@ var rootCore = (payload, call) => ROOT_AGENTS.has(payload.agent_type) ? undefine
 `).replaceAll("${CLAUDE_PLUGIN_ROOT}", () => call.env.CLAUDE_PLUGIN_ROOT ?? "${CLAUDE_PLUGIN_ROOT}");
 var isMainThread = (payload) => payload.agent_id === undefined && !isSpecialist(payload.agent_type);
 var HOOK_COMMANDS = [
-  hook("session-start", "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread, and in a claude.ai cloud session, `CLAUDE_CODE_REMOTE=true`, the steps that set the commit author to the user), always ending with a short block of the rules the core root rules leave out; one line that offers /holyagent:setup when ctx7 or a recommended user-settings key is missing (nothing in a cloud session, nothing installed or written); for a project with no .holyagent and a .holyclaude or .holycodex folder that holds state to convert, a notice naming the folder and `holyagent migrate`, with the same rules; for a project with none of the three, the core root rules with that line and the reminder when the holyagent agent is not the main thread, otherwise nothing", (payload, call) => {
+  hook("session-start", "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread, and in a claude.ai cloud session, `CLAUDE_CODE_REMOTE=true`, the steps that set the commit author to the user), always ending with a short block of the rules the core root rules leave out; one line that offers /holyagent:setup when ctx7 or a recommended settings key is missing from the user settings and from the project and local settings of the session's folder (nothing in a cloud session, nothing installed or written); for a project with no .holyagent and a .holyclaude or .holycodex folder that holds state to convert, a notice naming the folder and `holyagent migrate`, with the same rules; for a project with none of the three, the core root rules with that line and the reminder when the holyagent agent is not the main thread, otherwise nothing", (payload, call) => {
     const core = rootCore(payload, call);
     const cloud = inCloudSession(call.env) ? CLOUD_IDENTITY : undefined;
     return gen2(function* () {
-      const notice = yield* setupNotice(call.env);
+      const notice = yield* setupNotice(call.env, call.cwd);
       if (!(yield* hasStateFolder(call.directory))) {
         const found = yield* legacyFoldersWithState(call.root);
         if (found.length === 0) {
@@ -19907,7 +19972,7 @@ var HOOK_COMMANDS = [
       const message = cleaned.split(`
 `).filter((line) => !line.startsWith(comment)).join(`
 `);
-      const phrases = forbiddenPhrases(message, (yield* readSettings([join15(call.root, STATE_DIRECTORY)])).allowWords);
+      const phrases = forbiddenPhrases(message, (yield* readSettings([join16(call.root, STATE_DIRECTORY)])).allowWords);
       if (phrases.length > 0)
         return yield* new MessageRefused({ phrases });
       if (cleaned !== above.trim() || cleanedBelow !== below.trim())
@@ -19928,7 +19993,7 @@ ${cleanedBelow}
   }, true)
 ];
 
-import { join as join16, relative as relative4 } from "path";
+import { join as join17, relative as relative5 } from "path";
 var {$: $4 } = globalThis.Bun;
 class NothingToMigrate extends TaggedError2("NothingToMigrate") {
   get message() {
@@ -19963,7 +20028,7 @@ var conflictsOf = (root, directory, found) => gen2(function* () {
   ]);
   const seen = new Map;
   const problems = [];
-  const shown = (path) => relative4(root, path);
+  const shown = (path) => relative5(root, path);
   for (const record of found.flatMap((gathered) => gathered.records)) {
     const first = seen.get(record.id);
     seen.set(record.id, record.from);
@@ -20017,7 +20082,7 @@ var mentionsOf = (root, folders) => gen2(function* () {
   const names = yield* io(root, () => Array.fromAsync(new Bun.Glob("*").scan({ cwd: root, dot: true, onlyFiles: true })));
   const hits = [];
   for (const name of names.toSorted()) {
-    const text = yield* readText(join16(root, name));
+    const text = yield* readText(join17(root, name));
     if (text !== undefined && folders.some((folder) => text.includes(folder)))
       hits.push(name);
   }
@@ -20091,51 +20156,13 @@ var MIGRATE_COMMANDS = [
   }
 ];
 
-import { lstat as lstat3, realpath as realpath4 } from "fs/promises";
-import { isAbsolute as isAbsolute2, join as join17, relative as relative5, resolve as resolve6, sep as sep6 } from "path";
-var SCOPES = ["user", "project", "local"];
-var within = (parent, child) => {
-  const path = relative5(parent, child);
-  return path === "" || path !== ".." && !path.startsWith(`..${sep6}`) && !isAbsolute2(path);
-};
-var real = (path) => tryPromise2(() => realpath4(path)).pipe(orElseSucceed2(() => {
-  return;
-}));
-var isSymlink = (path) => tryPromise2({
-  try: () => lstat3(path),
-  catch: (cause) => cause
-}).pipe(map4((stats) => stats.isSymbolicLink()), catch_2((error) => error.code === "ENOENT" || error.code === "ENOTDIR" ? succeed6(false) : fail5(new SetupFailure({ message: `cannot inspect ${path}: ${error.message}` }))));
-var settingsFile = fn2("settingsFile")(function* (env, scope, cwd) {
-  if (scope === "user")
-    return { file: userFiles(env).settings };
-  const shell = yield* Shell;
-  const top = yield* shell.run("git", ["rev-parse", "--show-toplevel"], { cwd });
-  const line = top.stdout.trim();
-  const named = top.exitCode === 0 && line !== "" ? resolve6(line) : undefined;
-  const realTop = named === undefined ? undefined : yield* real(named);
-  const realCwd = yield* real(cwd);
-  const trusted = named !== undefined && realTop !== undefined && realCwd !== undefined && within(realTop, realCwd);
-  const root = trusted ? named : cwd;
-  const notice = named !== undefined && !trusted ? `git names ${named} as the top-level, which is not the current directory or above it; using ${cwd}` : undefined;
-  const folder = join17(root, ".claude");
-  const file = join17(folder, scope === "project" ? "settings.json" : "settings.local.json");
-  for (const path of [folder, file]) {
-    if (yield* isSymlink(path)) {
-      return yield* new SetupFailure({
-        message: `${path} is a symlink; refusing to write through it in the ${scope} scope. Replace it with a real ${path === folder ? "folder" : "file"} and run again`
-      });
-    }
-  }
-  return { file, ...notice === undefined ? {} : { notice } };
-});
-
 import { join as join18 } from "path";
 var CLOUD_SKIP = "skipped in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true), which has no machine of yours to install it on";
 var neutralDirectory = (env) => homeDirectory(env);
 var ensureGlobal = fn2("ensureGlobal")(function* (env, command, packageName, dryRun) {
   const shell = yield* Shell;
   if (isSome2(yield* shell.which(command, { includeBunBin: true }))) {
-    return { usable: true, lines: [present2(`${command}: already installed`)] };
+    return { usable: true, lines: [present3(`${command}: already installed`)] };
   }
   if (dryRun) {
     return {
@@ -20162,7 +20189,7 @@ var installCtx7 = fn2("installCtx7")(function* (env, dryRun) {
     return global.lines;
   const skillReady = (yield* fileExists2(join18(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join18(files.claudeDir, "rules", "context7.md")));
   if (skillReady)
-    return [...global.lines, present2("ctx7 skill: already installed")];
+    return [...global.lines, present3("ctx7 skill: already installed")];
   const apiKey = env.CONTEXT7_API_KEY === "" ? undefined : env.CONTEXT7_API_KEY;
   const setupArgs = ["setup", "--cli", "--claude", "--yes"];
   const args = apiKey !== undefined ? [...setupArgs, "--api-key", apiKey] : (yield* fileExists2(files.ctx7Credentials)) ? setupArgs : undefined;
@@ -20242,13 +20269,14 @@ var doctor = fn2("doctor")(function* (env, options) {
     ]);
     return { lines, ok: false };
   }
-  const { file } = located;
+  const { file, notice } = located;
+  const noted = (lines) => notice === undefined ? lines : [hint(`${scope} settings: ${notice}`), ...lines];
   const before = yield* checks(env, file, scope);
   const failing = (name) => before.some((line) => line.startsWith(`FAIL ${name}:`));
   const fixes = options.fix && !inCloudSession(env) ? [...failing("ctx7") ? yield* asStep("ctx7", installCtx7(env, false)) : []] : [];
   const settingsFixes = options.fix && failing("settings") ? yield* asStep(`${scope} settings`, mergeUserSettings({ env, file, subagentCacheTtl: "1h", dryRun: false })) : [];
   const ran = [...fixes, ...settingsFixes];
-  const lines = ran.length === 0 ? before : [...ran, ...yield* checks(env, file, scope)];
+  const lines = noted(ran.length === 0 ? before : [...ran, ...yield* checks(env, file, scope)]);
   return { lines, ok: lines.every((line) => !line.startsWith("FAIL ")) };
 });
 
@@ -20268,7 +20296,7 @@ var SETUP_COMMANDS = [
     notes: [
       "installs ctx7 with the Context7 skill (needs CONTEXT7_API_KEY or a saved login)",
       "merges these keys into the settings file of --scope without changing any value already set: attribution, includeGitInstructions, subagentPromptCacheTtl, modelSettings.claude-opus-5-5 (effortLevel high and autoCompactWindow 450000 for the root), extraKnownMarketplaces, enabledPlugins and permissions.deny for WebSearch and WebFetch",
-      "--scope picks the file like Claude Code's scopes: user (default) is CLAUDE_CONFIG_DIR/settings.json, else ~/.claude/settings.json; project is .claude/settings.json and local is .claude/settings.local.json, both in the git top-level of the current directory when that is the current directory or above it, else in the current directory (a `~` line says so); project and local refuse a symlinked settings file or .claude folder with a `!` line; ctx7 is installed for the user whatever the scope",
+      "--scope picks the file like Claude Code's scopes: user (default) is CLAUDE_CONFIG_DIR/settings.json, else ~/.claude/settings.json; project is .claude/settings.json and local is .claude/settings.local.json, both in the git top-level of the current directory when that is the current directory or above it and holds a .git entry, else in the current directory (a `~` line says so, outside a repository too); project and local refuse a symlinked settings file or .claude folder with a `!` line; ctx7 is installed for the user whatever the scope",
       "setup records the keys it adds, per settings file, in holyagent/setup-records.json under CLAUDE_CONFIG_DIR (else ~/.claude), outside the project",
       "--undo removes from the --scope file only what that record says setup added, and only while the value still equals what setup wrote: a changed value, and a key with no record (set before setup or by an earlier version), is kept and reported with `~`, so remove it by hand; permissions.deny loses only the entries setup added, and parent objects left empty are dropped; removed keys print `-` lines (`= nothing to remove` when absent); the file's record is cleared; ctx7 stays installed; honors --dry-run",
       "a failed step is reported and the rest still run; in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) ctx7 is skipped and the settings are still merged"

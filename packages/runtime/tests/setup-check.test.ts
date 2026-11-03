@@ -57,6 +57,47 @@ describe("the setup check of the SessionStart hook", () => {
     expect(await Effect.runPromise(setupNotice(env()))).toBeUndefined()
   })
 
+  describe("with the session folder", () => {
+    const settingsAt = (folder: string, name: string) => join(folder, ".claude", name)
+
+    test("stops once the project settings of the folder hold the keys", async () => {
+      await installPrograms(home)
+      expect(await Effect.runPromise(setupNotice(env(), project))).toContain("user settings keys")
+      await writeCompleteSettings(join(project, ".claude"))
+      expect(await Effect.runPromise(setupNotice(env(), project))).toBeUndefined()
+      // Without the folder, only the user settings count, as before.
+      expect(await Effect.runPromise(setupNotice(env()))).toContain("user settings keys")
+    })
+
+    test("stops once the local settings hold the keys, found from a folder below the repository", async () => {
+      await installPrograms(home)
+      await mkdir(join(project, ".git"), { recursive: true })
+      const below = join(project, "packages", "app")
+      await mkdir(below, { recursive: true })
+      await writeCompleteSettings(join(project, ".claude"))
+      await Bun.write(
+        settingsAt(project, "settings.local.json"),
+        await Bun.file(settingsAt(project, "settings.json")).text(),
+      )
+      await Bun.write(settingsAt(project, "settings.json"), "{}")
+      expect(await Effect.runPromise(setupNotice(env(), below))).toBeUndefined()
+    })
+
+    test("still reports a key that no settings file holds", async () => {
+      await installPrograms(home)
+      await mkdir(join(project, ".claude"), { recursive: true })
+      await writeFile(settingsAt(project, "settings.json"), '{"includeGitInstructions":false}')
+      expect(await Effect.runPromise(setupNotice(env(), project))).toContain("user settings keys")
+    })
+
+    test("a project file that is not a JSON object hides nothing", async () => {
+      await installPrograms(home)
+      await mkdir(join(project, ".claude"), { recursive: true })
+      await writeFile(settingsAt(project, "settings.json"), "[1]")
+      expect(await Effect.runPromise(setupNotice(env(), project))).toContain("user settings keys")
+    })
+  })
+
   test("says nothing in a claude.ai cloud session, whatever is missing", async () => {
     expect(
       await Effect.runPromise(setupNotice(env({ CLAUDE_CODE_REMOTE: "true" }))),

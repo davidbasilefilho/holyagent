@@ -3,7 +3,7 @@ import { Effect, Option } from "effect"
 import { inCloudSession } from "../vcs/identity.ts"
 import type { Env } from "./environment.ts"
 import { SetupFailure } from "./errors.ts"
-import { type Report } from "./report.ts"
+import { hint, type Report } from "./report.ts"
 import { type Scope, settingsFile } from "./scope.ts"
 import { mergeUserSettings, missingSettingKeys } from "./settings.ts"
 import { Shell } from "./shell.ts"
@@ -84,7 +84,10 @@ export const doctor = Effect.fn("doctor")(function* (
     ])
     return { lines, ok: false } satisfies Report
   }
-  const { file } = located
+  const { file, notice } = located
+  // Like setup, name a git top-level that was refused; the settings check names the file used.
+  const noted = (lines: ReadonlyArray<string>) =>
+    notice === undefined ? lines : [hint(`${scope} settings: ${notice}`), ...lines]
   const before = yield* checks(env, file, scope)
   const failing = (name: string) => before.some((line) => line.startsWith(`FAIL ${name}:`))
   const fixes =
@@ -99,6 +102,6 @@ export const doctor = Effect.fn("doctor")(function* (
         )
       : []
   const ran = [...fixes, ...settingsFixes]
-  const lines = ran.length === 0 ? before : [...ran, ...(yield* checks(env, file, scope))]
+  const lines = noted(ran.length === 0 ? before : [...ran, ...(yield* checks(env, file, scope))])
   return { lines, ok: lines.every((line) => !line.startsWith("FAIL ")) } satisfies Report
 })

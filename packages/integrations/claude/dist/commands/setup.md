@@ -13,7 +13,7 @@ Run HolyAgent's setup, show its report and tell the user whether to restart. Ste
 
 Notes:
 
-- `--scope project` writes `.claude/settings.json` and `--scope local` writes `.claude/settings.local.json`, in the git top-level of the current directory when that is the current directory or above it (else the current directory itself, with a `~` line saying so), so HolyAgent can be tried in one repository; they refuse a settings file or `.claude` folder that is a symlink. ctx7 is still installed for the user. Pass the same `--scope` to `holyagent doctor`.
+- `--scope project` writes `.claude/settings.json` and `--scope local` writes `.claude/settings.local.json`, in the git top-level of the current directory when that is the current directory or above it and holds a `.git` entry (else the current directory itself, with a `~` line saying so, outside a repository too), so HolyAgent can be tried in one repository; they refuse a settings file or `.claude` folder that is a symlink. ctx7 is still installed for the user. Pass the same `--scope` to `holyagent doctor`.
 - Setup records what it adds, per settings file, outside the project. `--undo` removes only recorded keys whose value still equals what setup wrote, and from `permissions.deny` only the entries setup added; a changed value or a key with no record (set before setup, or by an earlier version) stays and is reported with `~`, for the user to remove by hand. It drops objects it leaves empty and does not uninstall ctx7.
 - Run it again after fixing whatever a `!` line names; finished steps print `=` and change nothing.
 - A `- ctx7 skill` line that names `CONTEXT7_API_KEY` means ctx7 needs that variable or a login (`ctx7 login`) before its skill can be set up; run the setup again after.
