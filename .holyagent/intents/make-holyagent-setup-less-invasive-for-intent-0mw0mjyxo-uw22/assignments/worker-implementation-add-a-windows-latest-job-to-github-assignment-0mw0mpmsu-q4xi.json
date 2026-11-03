@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "add-a-windows-latest-job-to-github",
   "objective": "Add a windows-latest job to .github/workflows/ci.yml that installs the toolchain the existing Linux test job uses and runs the test suite, so Windows failures show up on every PR.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [],
   "constraints": [
     "Mirror the existing Linux job's setup steps (Bun canary through mise or however ci.yml installs it today); pin actions the same way the file already does.",
@@ -34,5 +34,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T11:53:16.548Z"
+  },
   "createdAt": "2026-11-03T11:53:12.366Z"
 }
