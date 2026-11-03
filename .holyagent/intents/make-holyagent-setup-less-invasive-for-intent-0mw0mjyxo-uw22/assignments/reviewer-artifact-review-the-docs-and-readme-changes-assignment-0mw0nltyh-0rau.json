@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mw0nltyh-0rau",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-the-docs-and-readme-changes",
+  "objective": "Review the docs and README changes (commits 785bf71 and 285c8b6) as the explanation a skeptical newcomer, or their agent, reads to decide whether HolyAgent is worth using.",
+  "state": "Ready",
+  "scope": [
+    "Diff file: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/range2-docs.diff; current docs/usage.md (Opinionated by design, Scope and undo, claude.ai), docs/decisions.md, docs/hooks.md, README.md",
+    "Sources the docs must match: .git/holyagent/reports/assignment-0mw0mpn0w-v4vg.md, assignment-0mw0n5d4g-08qm.md, assignment-0mw0n5dbt-lx2v.md; CLI behavior: packages/runtime/src/cli/setup.ts, packages/integrations/claude/src/setup-command.md"
+  ],
+  "constraints": [
+    "Check: every setting setup applies has what/why/how-to-change; claims match the sources and inference is labeled; scope/undo text matches the CLI; README keeps exactly its sections (AGENTS.md); no filler; links resolve to existing anchors.",
+    "Read-only; no version-control writes. Keep working until done; stop and report. Report in under 400 words, each finding marked blocking or non-blocking with file:line."
+  ],
+  "criteria": [
+    {
+      "text": "accuracy: claims match sources and CLI",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "completeness: each opinionated default has what, why and how to change",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "README structure and links intact",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw0mzj0n-m2yt",
+    "assignment-0mw0na54f-t4ud",
+    "assignment-0mw0na5bd-rnwl",
+    "assignment-0mw0na5ia-7ldi",
+    "assignment-0mw0mzj7r-jf9p"
+  ],
+  "createdAt": "2026-11-03T12:18:14.634Z"
+}
