@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-review-blocker-on-commit",
   "objective": "Repair the review blocker on commit 7a831cb: make the multi-process contention test deterministic, and apply the review's optional timing and naming notes.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree /home/user/holyagent-hook-locks-a, branch release/0.2.0/fix/hook-lock-followups at 7a831cb. It has no node_modules yet: run 'bun install --frozen-lockfile' there first (that also installs the repository's lefthook hooks, which is expected), then gates through bunx --no-install mise run <task>.",
     "Blocker: packages/integrations/claude/tests/hook-locks.test.ts around line 148, expect(recorded).toBeGreaterThan(0). The lock is unfair (25ms polling); 3 CLI intent create commands can hold it across git commits ahead of 3 hooks with a 5s deadline, and the test releases its own hold at 2s, so on a slow Windows runner all three hooks can legitimately hand back StateLocked and the test fails with correct code. The stdout regex already requires recorded-or-handed-back. Remove that assertion and make the later expect(shown.stdout).toMatch(/agent: agent-\\d/) conditional on a hook having recorded, keeping every integrity check.",
@@ -48,5 +48,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mw0v2xmo-prtj",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T15:57:18.827Z"
+  },
   "createdAt": "2026-11-03T15:57:04.668Z"
 }
