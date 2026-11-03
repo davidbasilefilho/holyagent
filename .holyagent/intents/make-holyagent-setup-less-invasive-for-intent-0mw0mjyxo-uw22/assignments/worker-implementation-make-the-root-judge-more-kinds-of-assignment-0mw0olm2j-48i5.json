@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "make-the-root-judge-more-kinds-of",
   "objective": "Make the root judge more kinds of verdicts on compact evidence while specialists keep the heavy work: an evidence-judging skill, a firm visual-judging trigger, Sonnet for artifact review, and design-option and root-cause rules.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Root instruction sections in packages/runtime/src/instructions/claude-5.5/root/ (skills.md, assignments.md, routing.md and the like), skills under packages/runtime/src/instructions/claude-5.5/skills/, the route table and agent definitions (find where Reviewer.artifact's model and effort are set, e.g. packages/runtime/src or packages/integrations/claude/src/agents.ts), the tests that pin them, docs/decisions.md, docs/components.md and docs/usage.md where they list skills or routes",
     "Trace of the visual miss: /home/user/holyagent/.git/holyagent/reports/assignment-0mw0ndx08-lx7e.md"
@@ -63,7 +63,45 @@
     "agentId": "workflow:wf_7a4e8c17-702/assignment-0mw0olm2j-48i5",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-03T12:46:04.027Z"
+    "startedAt": "2026-11-03T12:46:04.027Z",
+    "finishedAt": "2026-11-03T12:49:57.077Z"
+  },
+  "result": "result: all four changes are in and `mise run verify` passes on the rebuilt dist.\n\nchanged:\n- Skills and root text under `/home/user/holyagent/packages/runtime/src/instructions/claude-5.5/`:\n  - New `skills/evidence-judging/SKILL.md`, with the five rules and a reason beside each.\n  - `skills/visual-judging/SKILL.md`: the description now opens \"Use before the first Worker.visual or Reviewer.visual dispatch\".\n  - `skills/dev-server/SKILL.md`: now covers static and single-file builds served over a URL.\n  - `root/skills.md`: the `visual-judging` line is now a before-first-dispatch trigger, one `evidence-judging` line is added, and `dev-server` is extended to static builds.\n  - `root/assignments.md`: the `visual-judging` pointer is now \"loaded before the first visual dispatch\", and the repair rule says \"round N of 3\", at most three rounds per finding, one shared dev server and no screenshots in the main thread.\n  - `root/routing.md`: Reviewer.artifact moved from the Haiku list to the Sonnet list.\n- `/home/user/holyagent/packages/runtime/src/domain/route.ts`: Reviewer.artifact is now `sonnet` with effort `high`.\n- `/home/user/holyagent/packages/runtime/src/instructions/requirements.md`: R-ROUTE, R-VISUAL and R-DEVSERVER updated, and a new R-EVIDENCE added.\n- `/home/user/holyagent/packages/integrations/claude/src/agents.ts`: the R-EVIDENCE mapping.\n- Tests:\n  - `/home/user/holyagent/packages/runtime/tests/route.test.ts`\n  - `/home/user/holyagent/packages/runtime/tests/instructions.test.ts`\n  - `/home/user/holyagent/packages/integrations/claude/tests/plugin.test.ts`\n- Docs: `/home/user/holyagent/docs/decisions.md` (new entry), `development.md`, `usage.md` and `pi/claude-parity.md`.\n- Rebuilt dist under `/home/user/holyagent/packages/integrations/claude/dist/`: holyagent.md, reviewer-artifact.md, the three skills above, and scripts/holyagent.js.\n\nchecks:\n- `mise run build` -> exit 0, 35 files built.\n- `mise run verify` -> exit 0:\n  - type-check: no errors in 124 files\n  - lint: no problems in 125 files\n  - format check: all 245 files formatted\n  - tests: 1035 pass, 1 skip, 0 fail\n- The first verify run failed the format check on 2 files. I ran `bun fmt` on those two, rebuilt and re-ran, and the run above is the clean one.\n\nblockers: none\nquestions: none\nnotes:\n- I added a `docs/decisions.md` entry, a requirement (R-EVIDENCE) and its mapping in `agents.ts`, because the requirements test enforces that every requirement and skill is mapped.\n- `bun fmt` also realigned table columns in `docs/pi/claude-parity.md` (40 lines touched, mostly whitespace).\n- `visual-judging` still says \"read an image in the main thread only to show it or settle a doubt\". The root text now says \"never open screenshots in the main thread\" as the brief asked, so the two differ slightly. I left the skill alone because an existing test pins its wording.\n- The diff is at `/tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/impl.diff`. It includes the new skill but not the dist files.\n\nevidence:\n- evidence skill: `evidence-judging` exists at `/home/user/holyagent/packages/runtime/src/instructions/claude-5.5/skills/evidence-judging/SKILL.md` with the five rules and their reasons, and `root/skills.md` points to it. The plugin.test.ts test \"the evidence-judging skill opens with the situation…\" pins the skill text and the root line.\n- visual trigger: `root/skills.md` and `root/assignments.md` hold the load-before-first-dispatch and the round, shared-server and no-screenshot rules. The plugin.test.ts test \"the root loads visual-judging before the first visual dispatch…\" pins them.\n- artifact route: `route.ts` sets Reviewer.artifact to `sonnet`/`high`, and `routing.md`, `requirements.md` and `usage.md` agree. The route.test.ts test and the plugin.test.ts test \"Reviewer.artifact is a sonnet agent…\" pin it, and the generated `dist/agents/reviewer-artifact.md` is rebuilt.\n- tests: the three test files above, plus the updated skill lists in `instructions.test.ts` and `plugin.test.ts`; 0 fail in `mise run verify`.\n- gates: `mise run build` then `mise run verify` -> exit 0.\n- checks-run: `mise run build` -> exit 0; `mise run verify` -> exit 0 (1035 pass, 1 skip, 0 fail).\n- changed-paths: listed under `changed:`.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "four changes in; verify exit 0 (1035 pass); review follows",
+    "criteria": [
+      {
+        "criterion": "evidence skill: evidence-judging exists with the five rules, each with its reason, and the root points to it",
+        "support": "`evidence-judging` exists at `/home/user/holyagent/packages/runtime/src/instructions/claude-5.5/skills/evidence-judging/SKILL.md` with the five rules and their reasons, and `root/skills.md` points to it. The plugin.test.ts test \"the evidence-judging skill opens with the situation…\" pins the skill text and the root line."
+      },
+      {
+        "criterion": "visual trigger: visual-judging loads before the first visual dispatch and the round, shared-server and no-screenshot rules are inline",
+        "support": "`root/skills.md` and `root/assignments.md` hold the load-before-first-dispatch and the round, shared-server and no-screenshot rules. The plugin.test.ts test \"the root loads visual-judging before the first visual dispatch…\" pins them."
+      },
+      {
+        "criterion": "artifact route: Reviewer.artifact runs on Sonnet everywhere the route is stated",
+        "support": "`route.ts` sets Reviewer.artifact to `sonnet`/`high`, and `routing.md`, `requirements.md` and `usage.md` agree. The route.test.ts test and the plugin.test.ts test \"Reviewer.artifact is a sonnet agent…\" pin it, and the generated `dist/agents/reviewer-artifact.md` is rebuilt."
+      },
+      {
+        "criterion": "tests: tests pin the new text, skill and route",
+        "support": "the three test files above, plus the updated skill lists in `instructions.test.ts` and `plugin.test.ts`; 0 fail in `mise run verify`."
+      },
+      {
+        "criterion": "gates: mise run verify passes with dist rebuilt",
+        "support": "`mise run build` then `mise run verify` -> exit 0."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`mise run build` -> exit 0; `mise run verify` -> exit 0 (1035 pass, 1 skip, 0 fail)."
+      },
+      {
+        "label": "changed-paths",
+        "support": "listed under `changed:`."
+      }
+    ]
   },
   "createdAt": "2026-11-03T12:46:04.027Z"
 }
