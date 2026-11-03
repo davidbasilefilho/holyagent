@@ -1,0 +1,58 @@
+{
+  "id": "assignment-0mw0v2xug-0gj7",
+  "intentId": "intent-0mw0ukvln-0so2",
+  "intentRevision": 2,
+  "roleTask": "Worker.implementation",
+  "slug": "add-a-holyagent-root-rule-the-root",
+  "objective": "Add a holyagent root rule: the root deletes branches (local or remote, merged or not) only when the user asks, and never proposes deleting them or lists undeleted branches as remaining work.",
+  "state": "Ready",
+  "scope": [
+    "Worktree /home/user/holyagent-hook-locks, branch release/0.2.0/feat/branch-deletion-rule. Root instruction sources live in packages/runtime/src/instructions/claude-5.5/root/ (version-control.md holds the branch, push and merge rules; identity.md holds the never-force-push rule); packages/runtime/src/instructions/requirements.md lists requirement ids with tests (R-BRANCH exists); the agent-launch and PreToolUse VCS reminder text is in packages/runtime/src/cli/hook.ts. The generated plugin is under packages/integrations/claude/dist (mise run build).",
+    "Why the rule exists: after merging stacked PRs, a root proposed deleting the merged branches and listed them as an open item; the maintainer wants branches kept unless asked, and the auto-mode classifier also blocks branch deletion as destructive. Put the rule where the root reads its version-control rules, worded with its reason, so it covers cleanup after merges, final reports and AskUserQuestion options. Add a requirement entry with a test if the requirements file pattern calls for one.",
+    "Write the text following the instruction-writing skill: read /root/.claude/plugins/synced/03eb801d-6ff6-4373-b5b1-f94edf359a3e_0f3e6ee9-af2e-4c2c-8d3c-9be25ca27713/holyagent/skills/instruction-writing/SKILL.md first."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md and AGENTS.md. Make no version-control writes and no edits under .git/ or .holyagent/; report changed paths. Scratch files only under /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad.",
+    "Keep the change to this rule: no rewording of unrelated rules.",
+    "Rebuild the plugin with node_modules/.bin/mise run build and run node_modules/.bin/mise run verify (gates work there).",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When done and checked, stop and report; name unrequested features, files or refactors instead of making them, and launch no reviewers. A summary that announces a next step, or an offer to wait, is not a stop.",
+    "Write the full diff (including dist) to /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/rule.diff and list it as diff-file evidence.",
+    "Report in under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "The root rules say branches are deleted only when the user asks and are never proposed or listed as remaining work, with the reason",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A test or requirement check covers the rule where the repository pattern has one",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "mise run verify passes and dist is rebuilt",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "The change stays within this rule",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "diff-file",
+    "verify"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/runtime/src/cli/hook.ts",
+    "packages/integrations/claude/dist",
+    "packages/integrations/claude/tests",
+    "packages/runtime/tests"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-03T15:47:30.137Z"
+}
