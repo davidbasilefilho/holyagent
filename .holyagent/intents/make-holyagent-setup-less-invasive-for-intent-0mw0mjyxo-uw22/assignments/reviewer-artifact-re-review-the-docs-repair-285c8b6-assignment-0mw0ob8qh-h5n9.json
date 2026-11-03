@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "re-review-the-docs-repair-285c8b6",
   "objective": "Re-review the docs repair (285c8b6..6d9f949, docs/ and README.md) against the six blockers of the previous docs review.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Repair diff: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/repair-docs2.diff. Previous findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw0nltyh-0rau.md. CLI behavior: packages/runtime/src/setup/check.ts, scope.ts, record.ts, packages/runtime/src/cli/hook.ts (VCS_REMINDER)"
   ],
@@ -34,5 +34,10 @@
     "assignment-0mw0o58oc-ygen",
     "assignment-0mw0oa7k3-g28o"
   ],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-11-03T12:38:04.941Z"
+  },
   "createdAt": "2026-11-03T12:38:00.186Z"
 }
