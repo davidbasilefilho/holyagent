@@ -1,0 +1,10 @@
+{
+  "id": "pull-0mw0xtgol-hnct",
+  "intentId": "intent-0mw0wa0wv-pjlj",
+  "number": 55,
+  "url": "https://github.com/davidbasilefilho/holyagent/pull/55",
+  "branch": "release/0.2.0/fix/no-merge-question",
+  "base": "main",
+  "created": true,
+  "recordedAt": "2026-11-03T17:04:06.837Z"
+}
