@@ -5,7 +5,7 @@
   "roleTask": "Worker.debugging",
   "slug": "find-and-fix-why-vcs-tests-exceed-the-5s",
   "objective": "Find and fix why vcs tests exceed the 5s default timeout under a full mise run verify in this container (a different test each run; each passes alone), so the local gates pass reliably.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-hook-locks, branch release/0.2.0/fix/vcs-test-timeouts at origin/main (which includes the hook lock deadline change of PR #53). Observed today on a branch based on main: two full 'bunx --no-install mise run verify' runs failed with vcs tests timing out at 5s, for example 'vcs pr > a body file inside .git or ignored by git is not published' and 'recording branches and pull requests on the Intent > vcs commit records its branch and commit, and vcs pr the pull request, in versioned state' (4 failures in one run); the files pass alone and the suite passes with --timeout 60000; later full runs passed. Earlier, on Windows CI, one vcs-commit test hit 5042ms and got a 60s timeout.",
     "Reproduce first: run the full suite several times (and with the test files' concurrency as configured), time the vcs tests, and compare against main before #53 (git show/git archive of 29cd4a5 into the scratchpad, never checkout) to see whether the lock change, shared machine load, or the tests' own spawn count drives it. Fix the cause. If the cause is inherent spawn cost (many git and CLI starts per test), give those tests or files an explicit timeout with Windows headroom the way the suite does elsewhere (per-test timeout or setDefaultTimeout in the file), with a comment naming the measured cost; say why that is the cause and not a symptom."
@@ -52,7 +52,41 @@
     "agentId": "workflow:wf_5be440f3-423/assignment-0mw0xtzop-q73w",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-03T17:04:31.465Z"
+    "startedAt": "2026-11-03T17:04:31.465Z",
+    "finishedAt": "2026-11-03T18:19:04.932Z"
+  },
+  "result": "result: Root cause found and fixed. Two consecutive full `bunx --no-install mise run verify` runs pass.\n\n**Root cause (one line):** The fixture repos use `https://github.com/octo/project.git` as origin. `intent create` and `vcs commit/pr` fetch the state branch from it, so the tests made real network calls through the sandbox proxy that took 1 to 57 s. The production fetch is cut off at 8 s, so a different test crossed the 5 s timeout each run.\n\n**Timing evidence**\n- Unfixed, `state-branch.test.ts` alone failed 2 of 12 runs, and `state-branch` plus `vcs-*` failed 2 of 15, with no CPU load.\n- Instrumenting `vcs()` showed the first `intent create` of the failing test taking 4977 ms and still unfinished at the timeout.\n- `git ls-remote origin` on the same URL took 56564 ms, 57803 ms, 3926 ms, 1341 ms and 1632 ms in separate calls.\n- Pre-#53 main (29cd4a5) failed the same way (`vcs pr` body-file test timed out at 5.0 s). The lock change is not the cause.\n- Not the cause: signing (3 signs of about 90 ms in a full run), and 3 concurrent full suites (all passed, vcs max 0.7 s).\n- With 8 or more CPU-burner processes the vcs tests slow 2 to 5x, so heavy shared load can still push them over.\n- Fixed: `state-branch` plus `vcs-*` passed 25 of 25 runs, against 2 failures in 15 unfixed.\n\n**Fix**\n- `packages/runtime/tests/vcs-fixtures.ts`: `GIT_ENV` gains `GIT_ALLOW_PROTOCOL: \"file:ssh:http\"`, with a comment. `ssh` is kept for the ssh-script tests and `http` for the localhost credential-helper test. An https fetch now fails at once, which the code treats as a remote without the branch. No timeout was raised.\n- `packages/runtime/tests/vcs-fixtures.test.ts` (new): regression test that `git ls-remote origin` on a github.com origin is refused with \"not allowed\". Red before the fix, green after.\n\n**Checks**\n- `bunx --no-install mise run verify` run 1: exit 0, 1053 pass, 1 skip, 0 fail, 1054 tests across 39 files, type-check and lint clean, 250 files formatted, 102.8 s.\n- Run 2: identical counts, 104.5 s.\n- A third full run with junit also passed: 1053 pass, 0 fail. Slowest vcs-related tests were 0.465 s (state-branch \"records its branch and commit\"), 0.237 s, 0.206 s and 0.193 s (vcs-pr \"body file\").\n- The 1 skip was already there. No source changed, so no rebuild was needed.\n- Instrumentation tag `VTO-TRACE`: none left; the temporary `/tmp/vto-trace.log` is deleted.\n\n**Notes:**\n- The Windows CI timeouts (5042 ms in vcs-commit; 7.3 s on the state-branch test) probably come from the same network fetch, but I could not verify that here.\n- `hooks.test.ts` and `hook-locks.test.ts` also run with the same `GIT_ENV`, so they gain the same protection.\n\nblockers: none\nquestions: none\n\nevidence:\nThe root cause of the vcs test timeouts is identified with timing evidence: the real https fetch to github.com in fixture repos; `git ls-remote` took 1.3 to 57 s; the unfixed failure rate was 2 of 12 and 2 of 15; pre-#53 main also failed.\nThe fix addresses that cause, and two consecutive full verify runs pass: `GIT_ALLOW_PROTOCOL` in `vcs-fixtures.ts`; verify runs 1 and 2 both exit 0 with 1053 pass, 0 fail (logs `vto-verify1.log` and `vto-verify2.log` in the scratchpad).\nNo test is skipped or weakened: no test edited; one test added; the skip count is unchanged at 1.\ndiff-file: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/vto.diff\nverify: two consecutive `bunx --no-install mise run verify` runs, exit 0, 1053 pass / 1 skip / 0 fail (102.8 s and 104.5 s). Slowest vcs tests in a third full run: 0.465 s, 0.237 s, 0.206 s and 0.193 s.\nroot-cause: the fixture origin is the real `https://github.com/octo/project.git`, so the state fetch goes out over the network; `GIT_ALLOW_PROTOCOL` in `GIT_ENV` stops it, and the regression test in `vcs-fixtures.test.ts` was red before and is green now.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Root cause shown with timings (real https fetch from fixture origins, 1-57s), pre-#53 baseline fails too, red-green regression test, two consecutive verify passes.",
+    "criteria": [
+      {
+        "criterion": "The root cause of the vcs test timeouts is identified with timing evidence",
+        "support": "the real https fetch to github.com in fixture repos; `git ls-remote` took 1.3 to 57 s; the unfixed failure rate was 2 of 12 and 2 of 15; pre-#53 main also failed."
+      },
+      {
+        "criterion": "The fix addresses that cause, and two consecutive full verify runs pass",
+        "support": "`GIT_ALLOW_PROTOCOL` in `vcs-fixtures.ts`; verify runs 1 and 2 both exit 0 with 1053 pass, 0 fail (logs `vto-verify1.log` and `vto-verify2.log` in the scratchpad)."
+      },
+      {
+        "criterion": "No test is skipped or weakened",
+        "support": "no test edited; one test added; the skip count is unchanged at 1."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/vto.diff"
+      },
+      {
+        "label": "verify",
+        "support": "two consecutive `bunx --no-install mise run verify` runs, exit 0, 1053 pass / 1 skip / 0 fail (102.8 s and 104.5 s). Slowest vcs tests in a third full run: 0.465 s, 0.237 s, 0.206 s and 0.193 s."
+      },
+      {
+        "label": "root-cause",
+        "support": "the fixture origin is the real `https://github.com/octo/project.git`, so the state fetch goes out over the network; `GIT_ALLOW_PROTOCOL` in `GIT_ENV` stops it, and the regression test in `vcs-fixtures.test.ts` was red before and is green now."
+      }
+    ]
   },
   "createdAt": "2026-11-03T17:04:31.465Z"
 }
