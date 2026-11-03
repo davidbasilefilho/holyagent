@@ -1,0 +1,14 @@
+{
+  "id": "intent-0mw0mjyxo-uw22",
+  "slug": "make-holyagent-setup-less-invasive-for",
+  "objective": "Make holyagent setup less invasive for someone trying it (choosable settings scope and an undo) and document that the project is opinionated, with the reason for each decision, plus a Windows CI job that exposes the Windows test failures.",
+  "requirements": [
+    "Keep the opinionated defaults; add --scope user|project|local to holyagent setup (default user) and holyagent setup --undo that removes only what setup writes",
+    "Document that HolyAgent is opinionated and explain the reason for every setting and behavior setup applies, how to scope it and how to undo it",
+    "Add a windows-latest CI job that runs the test suite; fixing the Windows failures is out of scope",
+    "Artifacts in English; follow .claude/CLAUDE.md and AGENTS.md; mise run verify passes; README keeps its fixed section structure"
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-03T11:48:48.157Z"
+}
