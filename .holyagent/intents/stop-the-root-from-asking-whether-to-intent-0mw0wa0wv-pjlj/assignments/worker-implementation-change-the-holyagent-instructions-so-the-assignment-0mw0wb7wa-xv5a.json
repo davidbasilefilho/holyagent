@@ -1,0 +1,69 @@
+{
+  "id": "assignment-0mw0wb7wa-xv5a",
+  "intentId": "intent-0mw0wa0wv-pjlj",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "change-the-holyagent-instructions-so-the",
+  "objective": "Change the holyagent instructions so the root never asks whether or how to merge reviewed green PRs, settles such choices repository-convention-first then holyagent-default without asking, and so specialists never move HEAD in a shared checkout.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-hook-locks, branch release/0.2.0/fix/no-merge-question (from main). Instruction sources: packages/runtime/src/instructions/claude-5.5/root/ (asking.md, version-control.md, stack-plan.md, assignments.md, user-messages.md, identity.md), packages/runtime/src/instructions/claude-5.5/skills/ci-watch/SKILL.md (merge-readiness), packages/runtime/src/instructions/claude-5.5/specialist/ (state-changes.md, merge-ready.md), packages/runtime/src/instructions/claude-5.5/roles/reviewer-*/ ; requirement ids in packages/runtime/src/instructions/requirements.md with tests in packages/integrations/claude/tests/plugin.test.ts; generated plugin under packages/integrations/claude/dist (bunx --no-install mise run build).",
+    "Change 1 (root): after PRs are reviewed and green, a root asked the user 'Should I merge them?' with method options, a question the maintainer has seen repeatedly and calls unnecessary. New behavior: the root does not ask whether to merge; it says in the final report that the PRs are ready to merge and waits. Merging still needs the user to name it. When the user says merge, the root merges at once without asking the method: the repository's convention first (merge settings, CONTRIBUTING, PR history), else an earlier answer, else the holyagent default (squash, bottom-up for a stack, retargeting each next PR to the base and reconciling its branch with a no-content 'git merge -s ours' after checking the base tree equals the PR's base tree). Also add the general rule the maintainer stated: use the holyagent default or recommended option, but put the repository's convention first; a choice either settles is applied and recorded in the Intent, never asked. Find and fix every place that tells the root to ask about merging or offers merge as an AskUserQuestion (search for merge, AskUserQuestion, approval).",
+    "Change 2 (specialists): a code reviewer ran 'git checkout <sha>' in the shared main checkout and left it detached. Specialists, reviewers included, never change HEAD, branches or the index of a shared checkout (no checkout, switch, stash, reset, worktree add); to read or test a commit they use git show, git diff, or git archive <sha> into the scratchpad. Put this where specialists read their version-control limits (specialist/state-changes.md and the reviewer role texts as fits).",
+    "Keep the two changes in separate files where possible and report which changed paths belong to change 1 and which to change 2, so they can be committed separately. Write instruction text following /root/.claude/plugins/synced/03eb801d-6ff6-4373-b5b1-f94edf359a3e_0f3e6ee9-af2e-4c2c-8d3c-9be25ca27713/holyagent~g2/skills/instruction-writing/SKILL.md."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md and AGENTS.md. Make no version-control writes and no edits under .git/ or .holyagent/; report changed paths. Scratch files only under /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad. Do not move HEAD of any checkout.",
+    "Keep the change to these two behaviors; no rewording of unrelated rules.",
+    "Add or update requirement entries and their plugin tests per the repository pattern.",
+    "Rebuild with bunx --no-install mise run build and run bunx --no-install mise run verify in /home/user/holyagent-hook-locks (run bun install --frozen-lockfile there first if node_modules is missing).",
+    "Keep working until done; when done and checked, stop and report, naming unrequested changes instead of making them, and launch no reviewers. A summary that announces a next step, or an offer to wait, is not a stop.",
+    "Write the full diff to /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/mq.diff as diff-file evidence. Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "No root instruction tells the root to ask whether or how to merge reviewed green PRs; the final report states they are ready and merging waits for the user to say so",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "On the user's merge, the method follows repository convention, then an earlier answer, then the holyagent default, without a question",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The general rule (repository convention first, then holyagent default or recommendation, never asked) is stated where the root decides whether to ask",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Specialist instructions forbid changing HEAD, branches or the index of a shared checkout and name the read-only alternatives",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Requirements and plugin tests cover the changes, mise run verify passes, and dist is rebuilt",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "diff-file",
+    "verify",
+    "path-split"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/integrations/claude/dist",
+    "packages/integrations/claude/tests",
+    "packages/integrations/claude/src"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T16:21:56.026Z"
+  },
+  "createdAt": "2026-11-03T16:21:56.026Z"
+}
