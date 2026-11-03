@@ -1,0 +1,51 @@
+{
+  "id": "assignment-0mw0rc909-ls7m",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-repair-commit-b1dec34",
+  "objective": "Re-review the repair commit b1dec34 (range b319468..b1dec34 on release/0.2.0/fix/windows-tests) against the two review notes it addresses.",
+  "state": "Ready",
+  "scope": [
+    "Previous review notes: (1) lock.ts waits up to 30s on a live lock holder while plugin hooks have a 10s timeout, so the agent-launch hook (packages/runtime/src/cli/hook.ts ~337, updateState) could be killed instead of failing with StateLocked; (2) hooks.test.ts brokenGit asserts the English 'bad config line', which fails under a localized git; LC_ALL=C fixes it.",
+    "Review only the diff of b319468..b1dec34 (git diff b319468 b1dec34). Another writer may be editing the working tree at the same time, so read the committed range, not the working tree."
+  ],
+  "constraints": [
+    "Read-only: no edits, no version-control writes, nothing under .git/ or .holyagent/. Scratch files only under /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad.",
+    "Do not add requirements beyond the two notes; mark anything else non-blocking.",
+    "Report in under 400 words; put long output in the scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "The agent-launch hook gives up on a live-held state lock well inside the 10s hook timeout and CLI commands keep the 30s default",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The new hook-patience test fails without the change and is not flaky by construction",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "brokenGit runs git with a C locale so its assertion is locale-independent",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "No regressions or weakened tests in the range",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw0r596u-3zna"
+  ],
+  "followUpOf": "assignment-0mw0qxa1i-b280",
+  "createdAt": "2026-11-03T14:02:46.042Z"
+}
