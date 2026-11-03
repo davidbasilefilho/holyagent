@@ -1,0 +1,55 @@
+{
+  "id": "assignment-0mw0of7y4-psze",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Worker.mechanical",
+  "slug": "fix-the-two-doc-inaccuracies-and-two",
+  "objective": "Fix the two doc inaccuracies and two notes from the docs re-review.",
+  "state": "Running",
+  "scope": [
+    "Findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw0ob8qh-h5n9.md"
+  ],
+  "constraints": [
+    "(1) docs/usage.md around line 148: replace the claim that --undo does not disable the plugin with what the code does: --undo removes enabledPlugins[\"holyagent@holyagent\"] when setup recorded adding it (packages/runtime/src/setup/settings.ts:51 and undo at :219-221); when the plugin install wrote it first, undo keeps it and reports ~, so disable or uninstall the plugin at that scope to turn it off. Keep it consistent with usage.md around line 141. (2) docs/hooks.md around line 26: the check reads settings.json in CLAUDE_CONFIG_DIR (or ~/.claude) plus the project and local settings files of the session folder (packages/runtime/src/setup/check.ts:32, scope.ts:112-125). (3) usage.md around line 102: say 'the settings step's only other write is its record' (setup also installs ctx7 and its skill). (4) usage.md around line 139: keep the claude plugin uninstall / disable --scope user commands only if https://code.claude.com/docs/en/discover-plugins or the plugin CLI reference shows them; if you cannot check, mark them as 'see claude plugin --help' instead of asserting flags.",
+    "Edit only docs/usage.md and docs/hooks.md. Run node_modules/.bin/mise run fmt:check. No version-control writes. Report in under 150 words; start each evidence line with the criterion label before its colon."
+  ],
+  "criteria": [
+    {
+      "text": "undo text: usage.md states when --undo removes the plugin enablement and when it keeps it",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "hooks text: hooks.md names all settings files the check reads",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "notes: the two notes addressed",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "format: format check passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "docs/usage.md",
+    "docs/hooks.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw0nz2t6-6lgz",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-03T12:41:05.788Z"
+  },
+  "createdAt": "2026-11-03T12:41:05.788Z"
+}
