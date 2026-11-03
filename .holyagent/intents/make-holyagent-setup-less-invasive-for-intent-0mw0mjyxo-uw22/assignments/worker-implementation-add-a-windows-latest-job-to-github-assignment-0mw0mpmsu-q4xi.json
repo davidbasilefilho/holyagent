@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mw0mpmsu-q4xi",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "add-a-windows-latest-job-to-github",
+  "objective": "Add a windows-latest job to .github/workflows/ci.yml that installs the toolchain the existing Linux test job uses and runs the test suite, so Windows failures show up on every PR.",
+  "state": "Ready",
+  "scope": [],
+  "constraints": [
+    "Mirror the existing Linux job's setup steps (Bun canary through mise or however ci.yml installs it today); pin actions the same way the file already does.",
+    "The job reports failures; do not mark it continue-on-error unless the existing file has a pattern for known-failing jobs; if you think it should be non-blocking at first, say so in the report instead of deciding. Fixing Windows test failures is out of scope.",
+    "Only edit .github/workflows/ci.yml. Validate YAML syntax locally (e.g. parse it with Bun). No version-control writes, no edits under .git/ or .holyagent/.",
+    "Keep working until done; stop and report. Report in under 250 words."
+  ],
+  "criteria": [
+    {
+      "text": "windows job: a windows-latest job runs the test suite with the same toolchain setup as the Linux job",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "yaml valid: ci.yml parses and existing jobs are unchanged",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    ".github/workflows/ci.yml"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-03T11:53:12.366Z"
+}
