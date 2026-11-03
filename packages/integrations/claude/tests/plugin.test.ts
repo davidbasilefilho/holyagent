@@ -764,12 +764,14 @@ describe("agents", () => {
     )
     for (const part of [
       "never from raw logs or whole files",
-      "starts a repair only with a reproduction or a source-to-sink trace",
+      "starts a repair only with evidence from the reviewer",
+      "a file:line trace (for a vulnerability, source to sink) from one without",
+      "a Reviewer.visual observation (viewport, interaction, visible result)",
       "back to the same reviewer for that evidence",
       "have a specialist re-derive any number before it is published or decided on",
       "keep inference labeled as inference",
       "Reviewer.artifact reviews it and you judge the excerpts it flags",
-      "an explorer returns two or three short options with their trade-offs",
+      "your brief asks an explorer for two or three short options with their trade-offs",
       "Routine choices stay with the writer",
       "a reproduction, the cause it shows, and a fix that makes the reproduction pass",
     ])
@@ -783,15 +785,12 @@ describe("agents", () => {
     )
   })
 
-  test("the root loads visual-judging before the first visual dispatch and states the repair-round rules inline", () => {
+  test("the root loads visual-judging before the first visual dispatch and points to it for the repair-round rules", () => {
     const root = agent("holyagent")?.content ?? ""
     for (const part of [
       "`visual-judging`: load it before the first Worker.visual or Reviewer.visual dispatch",
       "loaded before the first visual dispatch",
-      'say "round N of 3"',
-      "at most three rounds per finding",
-      "one shared dev server (`dev-server`)",
-      "never open screenshots in the main thread",
+      "starts a repair and a re-review once it carries the evidence `evidence-judging` requires",
       "a served static or single-file build",
     ])
       expect({ part, found: root.includes(part) }).toEqual({ part, found: true })
@@ -812,7 +811,7 @@ describe("agents", () => {
     const sonnet = routing.split("\n").find((line) => line.startsWith("- Sonnet")) ?? ""
     expect(haiku).toContain("Reviewer.audit")
     expect(haiku).not.toContain("Reviewer.artifact")
-    expect(sonnet).toContain("artifact")
+    expect(sonnet).toContain("the artifact, code, testing and security reviews")
     const requirements = read("packages/runtime/src/instructions", "requirements.md")
     expect(requirements).toContain("(Reviewer.artifact) goes to a sonnet route")
   })
@@ -823,6 +822,8 @@ describe("agents", () => {
       "visual-judging": [
         "A discrepancy is material, and starts a repair whatever its size",
         "Read an image in the main thread only to show it to the user (a path is not delivery) or to settle a concrete doubt",
+        'say "round N of 3"',
+        "at most three rounds per finding",
         "after three, report the finding as a blocker",
         "`html_render`",
       ],

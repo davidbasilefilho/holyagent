@@ -20,7 +20,7 @@ A discrepancy is material, and starts a repair whatever its size, when it affect
 ## Repair
 
 - Repair a material finding without asking when the repair keeps the user's requirements and needs no choice between fixes; otherwise ask through AskUserQuestion with a recommended default.
-- Dispatch Worker.visual with the findings as criteria, the round number and the three-round limit, then Reviewer.visual to re-inspect only what the repair touched, until the inspection is clean. Count rounds across Worker.visual dispatches; after three, report the finding as a blocker.
+- Dispatch Worker.visual with the findings as criteria and say "round N of 3" in the brief, then Reviewer.visual to re-inspect only what the repair touched, until the inspection is clean. Allow at most three rounds per finding, counted across Worker.visual dispatches; after three, report the finding as a blocker.
 - Name each skipped preference in the final report, without a fix.
 
 ## Explanatory pages
