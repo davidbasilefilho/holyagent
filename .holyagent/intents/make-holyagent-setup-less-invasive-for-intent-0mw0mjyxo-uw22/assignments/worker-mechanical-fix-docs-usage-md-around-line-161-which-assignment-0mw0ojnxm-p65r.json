@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mw0ojnxm-p65r",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Worker.mechanical",
+  "slug": "fix-docs-usage-md-around-line-161-which",
+  "objective": "Fix docs/usage.md around line 161, which says to run --undo to stop the enabledPlugins entry: say --undo removes it only when setup recorded adding it, otherwise disable or uninstall the plugin at that scope, matching usage.md around line 109.",
+  "state": "Running",
+  "scope": [],
+  "constraints": [
+    "Edit only that sentence in docs/usage.md. Run node_modules/.bin/mise run fmt:check. No version-control writes. Report in under 100 words; start each evidence line with the criterion label before its colon."
+  ],
+  "criteria": [
+    {
+      "text": "sentence: usage.md no longer says --undo always stops the plugin entry",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "format: format check passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "docs/usage.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw0of7y4-psze",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-03T12:44:33.130Z"
+  },
+  "createdAt": "2026-11-03T12:44:33.130Z"
+}
