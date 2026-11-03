@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "add-scope-user-project-local-and-undo-to",
   "objective": "Add --scope user|project|local and --undo to `holyagent setup` (and --scope to `holyagent doctor`), keeping today's opinionated defaults and default scope user.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "packages/runtime/src/cli/setup.ts and packages/runtime/src/setup/* (settings merge, report, doctor)",
     "packages/runtime/tests/setup*.test.ts",
@@ -59,5 +59,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T11:53:16.230Z"
+  },
   "createdAt": "2026-11-03T11:53:11.955Z"
 }
