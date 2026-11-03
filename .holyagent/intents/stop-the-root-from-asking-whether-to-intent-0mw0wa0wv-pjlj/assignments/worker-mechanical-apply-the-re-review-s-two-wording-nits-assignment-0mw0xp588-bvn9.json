@@ -1,0 +1,46 @@
+{
+  "id": "assignment-0mw0xp588-bvn9",
+  "intentId": "intent-0mw0wa0wv-pjlj",
+  "intentRevision": 3,
+  "roleTask": "Worker.mechanical",
+  "slug": "apply-the-re-review-s-two-wording-nits",
+  "objective": "Apply the re-review's two wording nits to the specialist HEAD rule in packages/runtime/src/instructions/claude-5.5/specialist/state-changes.md and rebuild.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-hook-locks, uncommitted changes present; keep them. Nit 1: the phrase 'the working tree of a checkout other workers share' could read as forbidding a writer's own file edits; make it say the rule is about git commands (for example 'with git commands') so ordinary edits inside ownership paths are clearly allowed. Nit 2: the parenthetical command list repeats commit, merge, checkout, stash and reset from the sentence before it; remove the repetition so each command is named once."
+  ],
+  "constraints": [
+    "Change only that rule's wording (and any plugin.test.ts phrase that pins the exact old wording). Make no version-control writes, no edits under .git/ or .holyagent/, and do not move HEAD. Scratch files only under /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad.",
+    "Rebuild with bunx --no-install mise run build, then run bunx --no-install mise run verify -- if a test times out, rerun that test file alone and report both results.",
+    "Write the diff of your change to /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/nits2.diff. Keep working until done, then stop and report in under 150 words."
+  ],
+  "criteria": [
+    {
+      "text": "The rule says it concerns git commands and names each command once",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "Build passes and verify results are reported with counts",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "diff-file",
+    "verify"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions/claude-5.5/specialist",
+    "packages/integrations/claude/dist",
+    "packages/integrations/claude/tests/plugin.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-03T17:00:45.368Z"
+  },
+  "createdAt": "2026-11-03T17:00:45.368Z"
+}
