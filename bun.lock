@@ -15,14 +15,14 @@
     },
     "packages/integrations/claude": {
       "name": "@holyagent/claude",
-      "version": "0.1.2-3",
+      "version": "0.2.0",
       "dependencies": {
         "@holyagent/runtime": "workspace:*",
       },
     },
     "packages/runtime": {
       "name": "@holyagent/runtime",
-      "version": "0.1.2-3",
+      "version": "0.2.0",
       "bin": {
         "holyagent-runtime": "./src/cli/main.ts",
       },

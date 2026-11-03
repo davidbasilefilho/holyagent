@@ -3,22 +3,21 @@ import { join } from "node:path"
 import { Console, Data, Effect, Schema } from "effect"
 
 /** The positions a bump can advance. */
-export type BumpKind = "minor" | "patch" | "hotfix"
+export type BumpKind = "minor" | "patch"
 
-/** A version `0.<minor>.<patch>` with an optional `-<hotfix>` suffix. The major is always 0. */
+/** A version `0.<minor>.<patch>`. The major is always 0 (ZeroVer). */
 export interface Version {
   readonly minor: number
   readonly patch: number
-  readonly hotfix?: number
 }
 
-/** A string is not a `0.X.Y` or `0.X.Y-Z` version. */
+/** A string is not a `0.X.Y` version. */
 export class InvalidVersion extends Data.TaggedError("InvalidVersion")<{
   readonly input: string
 }> {
   /** The description shown to the user. */
   override get message() {
-    return `Invalid version ${JSON.stringify(this.input)}; expected 0.X.Y or 0.X.Y-Z without leading zeros`
+    return `Invalid version ${JSON.stringify(this.input)}; expected 0.X.Y without leading zeros`
   }
 }
 
@@ -44,45 +43,40 @@ export class VersionMismatch extends Data.TaggedError("VersionMismatch")<{
   }
 }
 
-/** The command line arguments are not `<minor|patch|hotfix> [root]`. */
+/** The command line arguments are not `<minor|patch> [root]`. */
 export class Usage extends Data.TaggedError("Usage")<{ readonly kind: string | undefined }> {
   /** The description shown to the user. */
   override get message() {
-    return `Expected minor, patch or hotfix and an optional root directory; got ${this.kind ?? "nothing"}`
+    return `Expected minor or patch and an optional root directory; got ${this.kind ?? "nothing"}`
   }
 }
 
 const NUMBER = String.raw`(0|[1-9]\d*)`
-const VERSION = new RegExp(String.raw`^0\.${NUMBER}\.${NUMBER}(?:-([1-9]\d*))?$`)
-
-/** Parses `0.X.Y` or `0.X.Y-Z`, failing with InvalidVersion on anything else. */
-export const parseVersion = (input: string): Effect.Effect<Version, InvalidVersion> => {
-  const [, minor, patch, hotfix] = VERSION.exec(input) ?? []
-  return minor === undefined || patch === undefined
-    ? Effect.fail(new InvalidVersion({ input }))
-    : Effect.succeed({
-        minor: Number(minor),
-        patch: Number(patch),
-        ...(hotfix === undefined ? {} : { hotfix: Number(hotfix) }),
-      })
-}
-
-/** Renders a version as `0.X.Y`, with `-Z` when it has a hotfix. */
-export const formatVersion = ({ minor, patch, hotfix }: Version): string =>
-  `0.${minor}.${patch}${hotfix === undefined ? "" : `-${hotfix}`}`
+// A `-Z` suffix is tolerated on input only: earlier releases used it, so a repository still on one
+// can bump out of it. It is dropped on parse and never written.
+const VERSION = new RegExp(String.raw`^0\.${NUMBER}\.${NUMBER}(?:-[1-9]\d*)?$`)
 
 /**
- * Advances one position and resets the later ones: minor clears patch and hotfix, patch clears
- * hotfix.
+ * Parses `0.X.Y`, failing with InvalidVersion on anything else. A legacy `-Z` suffix is accepted
+ * and dropped.
  */
+export const parseVersion = (input: string): Effect.Effect<Version, InvalidVersion> => {
+  const [, minor, patch] = VERSION.exec(input) ?? []
+  return minor === undefined || patch === undefined
+    ? Effect.fail(new InvalidVersion({ input }))
+    : Effect.succeed({ minor: Number(minor), patch: Number(patch) })
+}
+
+/** Renders a version as `0.X.Y`. */
+export const formatVersion = ({ minor, patch }: Version): string => `0.${minor}.${patch}`
+
+/** Advances one position and resets the later one: minor clears patch. */
 export const bumpVersion = (version: Version, kind: BumpKind): Version => {
   switch (kind) {
     case "minor":
       return { minor: version.minor + 1, patch: 0 }
     case "patch":
       return { minor: version.minor, patch: version.patch + 1 }
-    case "hotfix":
-      return { minor: version.minor, patch: version.patch, hotfix: (version.hotfix ?? 0) + 1 }
   }
 }
 
@@ -142,7 +136,7 @@ const lockfileWithVersion = (text: string, version: string) =>
         ),
       )
 
-const BumpKindArgument = Schema.Literals(["minor", "patch", "hotfix"])
+const BumpKindArgument = Schema.Literals(["minor", "patch"])
 
 /**
  * Reads the version files and `bun.lock` under `root`, refuses when the files disagree, then writes
@@ -180,8 +174,8 @@ export const bumpVersions = (
   })
 
 /**
- * Runs `<minor|patch|hotfix> [root]`: bumps the versions under `root` (the repository root by
- * default), prints `old -> new`, or prints the failure and sets a failing exit code.
+ * Runs `<minor|patch> [root]`: bumps the versions under `root` (the repository root by default),
+ * prints `old -> new`, or prints the failure and sets a failing exit code.
  */
 export const main = (args: ReadonlyArray<string>) =>
   Effect.gen(function* () {
