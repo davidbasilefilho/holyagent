@@ -6,6 +6,7 @@ import { join } from "node:path"
 
 import { $ } from "bun"
 
+import { toPosix } from "../../../runtime/src/domain/paths.ts"
 import { ROUTES } from "../../../runtime/src/domain/route.ts"
 import { ROOT_CORE_FILES } from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
 import { build } from "../build.ts"
@@ -26,6 +27,7 @@ import {
 import { DIST_DIRECTORY, VENDOR_DIRECTORY } from "../src/files.ts"
 import { generate, GENERATED_PATHS, MARKETPLACE_PATH } from "../src/generate.ts"
 import { fresh, PLUGIN, ROOT } from "./built.ts"
+import { isExecutable } from "./host.ts"
 
 const read = (...path: Array<string>) => readFileSync(join(ROOT, ...path), "utf8")
 const CLAUDE = "packages/runtime/src/instructions/claude-5.5"
@@ -46,7 +48,7 @@ const filesBelow = async (path: string): Promise<ReadonlyArray<string>> => {
   const absolute = join(ROOT, path)
   if (await Bun.file(absolute).exists()) return [path]
   return (await Array.fromAsync(new Bun.Glob("**/*").scan({ cwd: absolute, dot: true })))
-    .map((file) => join(path, file))
+    .map((file) => toPosix(join(path, file)))
     .toSorted()
 }
 
@@ -118,7 +120,7 @@ describe("the generated plugin is in step with its sources", () => {
 
   test("the wrapper is the one executable", async () => {
     const wrapper = join(PLUGIN, "scripts", "holyagent")
-    expect((await Bun.file(wrapper).stat()).mode & 0o111).not.toBe(0)
+    expect(await isExecutable(wrapper)).toBe(true)
     expect(generated.filter((file) => file.executable).map((file) => file.path)).toEqual([
       "packages/integrations/claude/dist/scripts/holyagent",
     ])

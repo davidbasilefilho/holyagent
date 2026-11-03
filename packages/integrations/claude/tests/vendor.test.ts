@@ -1,10 +1,11 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtemp, rm, stat } from "node:fs/promises"
+import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { deflateRawSync } from "node:zlib"
 
 import { TARGETS, TOOLS } from "../../../runtime/src/cli/tools.ts"
+import { toPosix } from "../../../runtime/src/domain/paths.ts"
 import { VENDOR_DIRECTORY } from "../src/files.ts"
 import {
   ASSETS,
@@ -16,6 +17,7 @@ import {
   vendorProblems,
 } from "../src/vendor.ts"
 import { ROOT } from "./built.ts"
+import { isExecutable } from "./host.ts"
 
 const vendor = join(ROOT, VENDOR_DIRECTORY)
 
@@ -44,12 +46,11 @@ describe("the vendored tools of the plugin", () => {
   test("are exactly the pinned files, each program with its pinned SHA-256", async () => {
     expect(await vendorProblems(vendor)).toEqual([])
     const present = await Array.fromAsync(new Bun.Glob("**/*").scan({ cwd: vendor }))
-    expect(present.toSorted()).toEqual([...expectedFiles()])
+    expect(present.map((file) => toPosix(file)).toSorted()).toEqual([...expectedFiles()])
   })
 
   test("are executable where the platform needs the mode", async () => {
-    for (const asset of ASSETS)
-      expect(((await stat(join(vendor, binaryOf(asset)))).mode & 0o111) !== 0).toBe(true)
+    for (const asset of ASSETS) expect(await isExecutable(join(vendor, binaryOf(asset)))).toBe(true)
   })
 })
 
