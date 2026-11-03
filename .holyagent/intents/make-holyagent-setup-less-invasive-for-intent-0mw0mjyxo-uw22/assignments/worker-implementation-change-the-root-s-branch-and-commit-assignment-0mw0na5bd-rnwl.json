@@ -1,0 +1,56 @@
+{
+  "id": "assignment-0mw0na5bd-rnwl",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "change-the-root-s-branch-and-commit",
+  "objective": "Change the root's branch and commit rules: never work on a platform-assigned branch such as claude/<name>, and make atomic Conventional commits on branches with squash merge as the default, below the target repository's conventions.",
+  "state": "Ready",
+  "scope": [
+    "packages/runtime/src/instructions/claude-5.5/root/version-control.md (Branches bullet, Stack plan), packages/runtime/src/instructions/requirements.md (R-BRANCH), any other instruction or hook text that tells the root to use the assigned branch (search packages/runtime/src with holyagent rg or rg, e.g. the claude.ai session-start text in packages/runtime/src/cli/hook.ts or instructions), and the tests that pin that text"
+  ],
+  "constraints": [
+    "Branch rule: the root creates its work branches with names that follow the repository convention (or the exp/... / release/<version>/<type>/<change> fallback) even when the platform starts the session on an assigned branch such as claude/<name>; the assigned branch is not used for work. If a push of the conventional branch is refused (claude.ai cloud sessions have historically restricted pushes to claude/* branches), stop that line, report the blocker and ask through AskUserQuestion whether to push to the assigned branch instead; never work around the refusal. Reason: the maintainer wants branch names that follow the repository's convention, and the claude/ names carry no meaning.",
+    "Commit and merge rule: on a branch, each commit is atomic (one logical change that builds and passes on its own, the generated plugin included) and semantic (Conventional Commits); PRs merge by squash by default, with the PR title as the Conventional summary. The target repository's conventions (CONTRIBUTING, AGENTS.md, branch protection, merge settings, history) come first: mergeability. Keep the existing merge-forward rule for stacks working with squash merges (after a lower PR squash-merges, merge the base into the next branch). Reason: atomic commits keep review and bisect readable on the branch, squash keeps the base history one commit per PR.",
+    "Keep the root text terse (it is re-read each call); say what to do and why. Do not touch packages/runtime/src/setup, docs/ or README.md.",
+    "Do not run mise run build and do not edit packages/integrations/claude/dist: another writer runs in parallel and the commit hook regenerates dist. Run the type-check, lint, format check and the tests that cover your change (node_modules/.bin/mise run check, lint, fmt:check or the equivalent tasks in mise.toml, plus bun test on the affected files); name any check you could not run.",
+    "No version-control writes, no edits under .git/ or .holyagent/; report changed paths.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done and checked, stop and report; name unrequested features instead of adding them. Report in under 350 words."
+  ],
+  "criteria": [
+    {
+      "text": "branch rule: instruction text and R-BRANCH no longer tell the root to use the platform-assigned branch, and say what to do when a push is refused",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "commit rule: atomic Conventional commits on branches and squash merge by default, below repo conventions",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "tests: tests that pin instruction text updated or added; affected tests pass",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "checks: type-check, lint, format check pass",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/runtime/src/cli/hook.ts",
+    "packages/runtime/tests/instructions.test.ts",
+    "packages/integrations/claude/tests",
+    "packages/integrations/claude/src/agents.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-03T12:09:09.482Z"
+}
