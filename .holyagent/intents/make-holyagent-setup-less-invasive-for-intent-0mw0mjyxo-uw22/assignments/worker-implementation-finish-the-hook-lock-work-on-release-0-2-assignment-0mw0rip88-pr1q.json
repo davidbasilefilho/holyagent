@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "finish-the-hook-lock-work-on-release-0-2",
   "objective": "Finish the hook-lock work on release/0.2.0/fix/windows-tests: bound every state lock the agent-launch hook takes within the 10s hook timeout, and make the withFileLock doc state which patience levels fail at once.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Checkout /home/user/holyagent, branch release/0.2.0/fix/windows-tests. Commit b1dec34 added a 'hook' patience (3s limit, 25ms poll) in packages/runtime/src/state/lock.ts and passes it from the agent-launch hook (packages/runtime/src/cli/hook.ts ~337) into updateState.",
     "A review found that the same hook path also calls resolveState, which takes other locks with longer waits (a worktree lock around 60s and a migration lock around 30s), so the hook can still outlast its 10s timeout there. Pass the hook patience (or an equivalent bound) through those locks when called from the hook path, keeping CLI defaults unchanged. Use the existing patience mechanism.",
@@ -63,7 +63,41 @@
     "agentId": "workflow:wf_8b5aa53f-328/assignment-0mw0rip88-pr1q",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-03T14:07:47.000Z"
+    "startedAt": "2026-11-03T14:07:47.000Z",
+    "finishedAt": "2026-11-03T14:13:06.752Z"
+  },
+  "result": "result: Every state lock on the agent-launch hook path now gives up within the hook patience. CLI defaults are unchanged. The `withFileLock` JSDoc now says which patience levels fail at once.\n\nchanged:\n- /home/user/holyagent/packages/runtime/src/state/tree.ts — `resolveState(cwd, env, ensure, online, patience?)` passes `patience` to the exclude, worktree and migration locks. Without it each lock keeps its old wait (exclude and worktree \"long\", migration \"short\").\n- /home/user/holyagent/packages/runtime/src/cli/hook.ts — the agent-launch hook calls `resolveState(..., false, \"hook\")`.\n- /home/user/holyagent/packages/runtime/src/state/lock.ts — JSDoc only: \"short\" and \"hook\" fail at once on a lock held longer than their limit; \"long\" never does.\n- /home/user/holyagent/packages/runtime/tests/state-hook-locks.test.ts (new)\n- /home/user/holyagent/packages/integrations/claude/dist/scripts/holyagent.js (rebuilt)\n\nchecks (mise is not installed, so I ran the bun steps directly):\n- `bun scripts/vendor.ts && bun packages/integrations/claude/build.ts` -> exit 0; only `dist/scripts/holyagent.js` changed.\n- `bun check --no-script` -> exit 0, no type errors in 127 files.\n- `bun lint --no-script` -> exit 0, no problems in 128 files.\n- `bun fmt --no-script --check` -> exit 0, all 248 files formatted.\n- `bun test` -> exit 0, 1047 pass, 1 skip, 0 fail.\n- New test file -> 3 pass. With the `resolveState` patience change disabled (the call in the test unchanged), all 3 fail: they time out or return a non-StateLocked error.\n\nblockers: none\nquestions: none\n\nnotes:\n- The bound is per lock, not total. If the exclude, worktree and migration locks are all contended, plus the `updateState` lock, the hook could still wait about 3s each, over 10s. Practically only one is contended at a time. A total bound would need a timeout around the hook, which I did not add.\n- The brief says the migration lock waits about 30s. That matches the \"short\" default.\n- There is no test that a CLI call keeps the 30s and 60s waits, because it cannot be run in a reasonable time. The unchanged defaults are visible in the diff (`editExclude` \"long\", `ensureWorktree` \"long\", `migrateWorkTree` \"short\").\n\nevidence:\nEvery state lock taken on the agent-launch hook path gives up within the hook budget, and CLI commands keep their defaults: `tree.ts` threads `patience` through the exclude, worktree and migration locks. `hook.ts` passes \"hook\", and `updateState` already did. Defaults are kept when `patience` is undefined.\nA test covers the bounded resolveState locks on the hook path, or the report says why one is impractical and what was checked: `packages/runtime/tests/state-hook-locks.test.ts` covers the exclude, worktree and migration locks. 3 pass, and all 3 fail without the change.\nThe full suite, type-check, lint and format pass, and dist is rebuilt: `bun test` exit 0 (1047 pass); `bun check`, `bun lint` and `bun fmt --check` exit 0; dist rebuilt with `bun scripts/vendor.ts && bun packages/integrations/claude/build.ts`.\nThe change stays within these two items: the diff touches only the `resolveState` patience threading, the `withFileLock` JSDoc, the new test and the rebuilt dist.\ndiff-file: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/hook-locks.diff\nverify: the bun steps above, since mise is missing; all exit 0.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Hook-path locks bounded with a red-then-green test; full suite, check, lint, fmt pass; dist rebuilt.",
+    "criteria": [
+      {
+        "criterion": "Every state lock taken on the agent-launch hook path gives up within the hook budget, and CLI commands keep their defaults",
+        "support": "`tree.ts` threads `patience` through the exclude, worktree and migration locks. `hook.ts` passes \"hook\", and `updateState` already did. Defaults are kept when `patience` is undefined."
+      },
+      {
+        "criterion": "A test covers the bounded resolveState locks on the hook path, or the report says why one is impractical and what was checked",
+        "support": "`packages/runtime/tests/state-hook-locks.test.ts` covers the exclude, worktree and migration locks. 3 pass, and all 3 fail without the change."
+      },
+      {
+        "criterion": "The full suite, type-check, lint and format pass, and dist is rebuilt",
+        "support": "`bun test` exit 0 (1047 pass); `bun check`, `bun lint` and `bun fmt --check` exit 0; dist rebuilt with `bun scripts/vendor.ts && bun packages/integrations/claude/build.ts`."
+      },
+      {
+        "criterion": "The change stays within these two items",
+        "support": "the diff touches only the `resolveState` patience threading, the `withFileLock` JSDoc, the new test and the rebuilt dist."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/hook-locks.diff"
+      },
+      {
+        "label": "verify",
+        "support": "the bun steps above, since mise is missing; all exit 0."
+      }
+    ]
   },
   "createdAt": "2026-11-03T14:07:47.000Z"
 }
