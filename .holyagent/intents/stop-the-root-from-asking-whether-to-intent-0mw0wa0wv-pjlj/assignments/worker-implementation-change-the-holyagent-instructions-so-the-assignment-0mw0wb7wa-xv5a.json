@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "change-the-holyagent-instructions-so-the",
   "objective": "Change the holyagent instructions so the root never asks whether or how to merge reviewed green PRs, settles such choices repository-convention-first then holyagent-default without asking, and so specialists never move HEAD in a shared checkout.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-hook-locks, branch release/0.2.0/fix/no-merge-question (from main). Instruction sources: packages/runtime/src/instructions/claude-5.5/root/ (asking.md, version-control.md, stack-plan.md, assignments.md, user-messages.md, identity.md), packages/runtime/src/instructions/claude-5.5/skills/ci-watch/SKILL.md (merge-readiness), packages/runtime/src/instructions/claude-5.5/specialist/ (state-changes.md, merge-ready.md), packages/runtime/src/instructions/claude-5.5/roles/reviewer-*/ ; requirement ids in packages/runtime/src/instructions/requirements.md with tests in packages/integrations/claude/tests/plugin.test.ts; generated plugin under packages/integrations/claude/dist (bunx --no-install mise run build).",
     "Change 1 (root): after PRs are reviewed and green, a root asked the user 'Should I merge them?' with method options, a question the maintainer has seen repeatedly and calls unnecessary. New behavior: the root does not ask whether to merge; it says in the final report that the PRs are ready to merge and waits. Merging still needs the user to name it. When the user says merge, the root merges at once without asking the method: the repository's convention first (merge settings, CONTRIBUTING, PR history), else an earlier answer, else the holyagent default (squash, bottom-up for a stack, retargeting each next PR to the base and reconciling its branch with a no-content 'git merge -s ours' after checking the base tree equals the PR's base tree). Also add the general rule the maintainer stated: use the holyagent default or recommended option, but put the repository's convention first; a choice either settles is applied and recorded in the Intent, never asked. Find and fix every place that tells the root to ask about merging or offers merge as an AskUserQuestion (search for merge, AskUserQuestion, approval).",
@@ -64,7 +64,49 @@
     "agentId": "workflow:wf_8cb6a298-884/assignment-0mw0wb7wa-xv5a",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-03T16:21:56.026Z"
+    "startedAt": "2026-11-03T16:21:56.026Z",
+    "finishedAt": "2026-11-03T16:37:55.003Z"
+  },
+  "result": "result: Both changes are done and `mise run verify` passes (exit 0, 1054 pass, 1 skip, 0 fail). The first run failed on one new test; I fixed that test and reran. Merging is no longer asked, and specialists are barred from moving HEAD, branches or the index of a shared checkout.\n\nchanged: all paths are in `/home/user/holyagent-hook-locks`.\n\npath-split:\n- **Change 1 only (root merge behavior):**\n  - `packages/runtime/src/instructions/claude-5.5/root/asking.md`\n  - `packages/runtime/src/instructions/claude-5.5/root/version-control.md`\n  - `packages/runtime/src/instructions/claude-5.5/root/assignments.md`\n  - `packages/runtime/src/instructions/claude-5.5/skills/ci-watch/SKILL.md`\n  - `packages/integrations/claude/dist/skills/ci-watch/SKILL.md`\n  - `packages/integrations/claude/dist/agents/holyagent.md`\n- **Change 2 only (specialist HEAD rule):**\n  - `packages/runtime/src/instructions/claude-5.5/specialist/state-changes.md`\n  - `packages/runtime/src/instructions/claude-5.5/roles/reviewer-code/range.md`\n  - `packages/runtime/src/instructions/claude-5.5/roles/reviewer-testing/method.md`\n  - the 18 specialist files under `packages/integrations/claude/dist/agents/` (everything except `holyagent.md`)\n- **Shared by both changes:**\n  - `packages/runtime/src/instructions/requirements.md` adds `R-DEFAULTS` and `R-MERGEWAIT` for change 1, and `R-S-HEAD` for change 2.\n  - `packages/integrations/claude/src/agents.ts` holds the matching three `REQUIREMENT_SECTIONS` entries.\n  - `packages/integrations/claude/tests/plugin.test.ts` has one new test for each change.\n  - `packages/integrations/claude/dist/scripts/holyagent.js` is the rebuilt bundle.\n  - These need `git add -p`, or one combined commit.\n\nchecks:\n- `bunx --no-install mise run build` -> exit 0, 35 files built.\n- `bunx --no-install mise run verify` -> exit 0; type-check, lint (129 files) and format are clean. The log is `/tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/verify.log`.\n- I made the instruction edits with a Python script instead of the Edit tool. The diff is the same either way.\n\nblockers: none\nquestions: none\nnotes: `root/stack-plan.md` still says to merge the base into the next branch after a squash-merge. I left it alone because it covers the merge-forward case and does not conflict with the new rule.\n\nevidence:\n- diff-file: `/tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/mq.diff`\n- verify: `bunx --no-install mise run verify` -> exit 0, 1054 pass, 0 fail\n- path-split: see the three groups under `changed:`\n- No root instruction tells the root to ask whether or how to merge reviewed green PRs; the final report states they are ready and merging waits for the user to say so: `version-control.md` \"Merging\" bullet, `assignments.md` finish bullet and `ci-watch/SKILL.md`; test \"the root never asks whether or how to merge...\"\n- On the user's merge, the method follows repository convention, then an earlier answer, then the holyagent default, without a question: the same \"Merging\" bullet states the order and the squash, bottom-up and `git merge -s ours` default; `R-MERGEWAIT`\n- The general rule (repository convention first, then holyagent default or recommendation, never asked) is stated where the root decides whether to ask: new bullet in `root/asking.md`; `R-DEFAULTS`\n- Specialist instructions forbid changing HEAD, branches or the index of a shared checkout and name the read-only alternatives: `specialist/state-changes.md` (every specialist), plus `reviewer-code/range.md` and `reviewer-testing/method.md`; `R-S-HEAD`; test \"every specialist, reviewers included...\"\n- Requirements and plugin tests cover the changes, mise run verify passes, and dist is rebuilt: `requirements.md`, `agents.ts` and `plugin.test.ts` are updated; the build and verify exits are above, and `verify` includes the requirement-section check.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Rules placed in asking, version-control, assignments and ci-watch for the root and state-changes for every specialist, with requirements and tests; verify exit 0.",
+    "criteria": [
+      {
+        "criterion": "No root instruction tells the root to ask whether or how to merge reviewed green PRs; the final report states they are ready and merging waits for the user to say so",
+        "support": "`version-control.md` \"Merging\" bullet, `assignments.md` finish bullet and `ci-watch/SKILL.md`; test \"the root never asks whether or how to merge...\""
+      },
+      {
+        "criterion": "On the user's merge, the method follows repository convention, then an earlier answer, then the holyagent default, without a question",
+        "support": "the same \"Merging\" bullet states the order and the squash, bottom-up and `git merge -s ours` default; `R-MERGEWAIT`"
+      },
+      {
+        "criterion": "The general rule (repository convention first, then holyagent default or recommendation, never asked) is stated where the root decides whether to ask",
+        "support": "new bullet in `root/asking.md`; `R-DEFAULTS`"
+      },
+      {
+        "criterion": "Specialist instructions forbid changing HEAD, branches or the index of a shared checkout and name the read-only alternatives",
+        "support": "`specialist/state-changes.md` (every specialist), plus `reviewer-code/range.md` and `reviewer-testing/method.md`; `R-S-HEAD`; test \"every specialist, reviewers included...\""
+      },
+      {
+        "criterion": "Requirements and plugin tests cover the changes, mise run verify passes, and dist is rebuilt",
+        "support": "`requirements.md`, `agents.ts` and `plugin.test.ts` are updated; the build and verify exits are above, and `verify` includes the requirement-section check."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff-file",
+        "support": "`/tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/mq.diff`"
+      },
+      {
+        "label": "verify",
+        "support": "`bunx --no-install mise run verify` -> exit 0, 1054 pass, 0 fail"
+      },
+      {
+        "label": "path-split",
+        "support": "see the three groups under `changed:`"
+      }
+    ]
   },
   "createdAt": "2026-11-03T16:21:56.026Z"
 }
