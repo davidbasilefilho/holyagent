@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "align-r-accept-in-packages-runtime-src",
   "objective": "Align R-ACCEPT in packages/runtime/src/instructions/requirements.md (around line 40) and docs/usage.md (around line 180) with root/assignments.md: delegated work is judged from the diff summary and the check output, not the diff.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [],
   "constraints": [
     "Change only that wording in those two files; if a test pins the old phrase, update it. Run node_modules/.bin/mise run build then node_modules/.bin/mise run verify. No version-control writes. Report in under 120 words; start each evidence line with the criterion label before its colon."
@@ -38,7 +38,29 @@
     "agentId": "workflow:wf_9224d622-0e7/assignment-0mw0p2upw-ic00",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-03T12:59:28.389Z"
+    "startedAt": "2026-11-03T12:59:28.389Z",
+    "finishedAt": "2026-11-03T13:01:51.856Z"
+  },
+  "result": "result: R-ACCEPT wording aligned in requirements.md (line 40) and usage.md (line 180) to \"diff summary and the check output\"; build and verify pass.\nchanged: packages/runtime/src/instructions/requirements.md, docs/usage.md\nchecks: `node_modules/.bin/mise run build` -> 0 (35 files built); `node_modules/.bin/mise run verify` -> 0 (1035 pass, 1 skip, 0 fail, 1036 tests in 35 files; formatter, type-check and lint clean)\nblockers: none\nquestions: none\nnotes: no test pins the old phrase; the existing R-ACCEPT phrase check in agents.ts targets assignments.md and still matches. Dist was regenerated with no tracked diff.\nevidence:\nwording: both files now say \"diff summary and the check output\"; diff at /home/user/holyagent/../claude-0-ic00.diff\ngates: verify exit 0 after build exit 0, log at /home/user/holyagent/../claude-0-verify.log\nchecks-run: build and verify as above\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "wording aligned; verify passes",
+    "criteria": [
+      {
+        "criterion": "wording: requirements.md and usage.md say diff summary like assignments.md",
+        "support": "both files now say \"diff summary and the check output\"; diff at /home/user/holyagent/../claude-0-ic00.diff"
+      },
+      {
+        "criterion": "gates: verify passes with dist rebuilt",
+        "support": "verify exit 0 after build exit 0, log at /home/user/holyagent/../claude-0-verify.log"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "build and verify as above"
+      }
+    ]
   },
   "createdAt": "2026-11-03T12:59:28.389Z"
 }
