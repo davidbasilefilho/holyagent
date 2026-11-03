@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "re-review-the-docs-repair-285c8b6",
   "objective": "Re-review the docs repair (285c8b6..6d9f949, docs/ and README.md) against the six blockers of the previous docs review.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Repair diff: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/repair-docs2.diff. Previous findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw0nltyh-0rau.md. CLI behavior: packages/runtime/src/setup/check.ts, scope.ts, record.ts, packages/runtime/src/cli/hook.ts (VCS_REMINDER)"
   ],
@@ -38,7 +38,9 @@
     "agentId": "workflow:wf_eae59170-576/assignment-0mw0ob8qh-h5n9",
     "model": "haiku",
     "effort": "high",
-    "startedAt": "2026-11-03T12:38:04.941Z"
+    "startedAt": "2026-11-03T12:38:04.941Z",
+    "finishedAt": "2026-11-03T12:41:05.452Z"
   },
+  "result": "result: Blockers 1, 2, 4, 5 and 6 are closed, and the confinement commands of blocker 3 are added. The repair adds two inaccuracies, so it is not ready.\nchanged: none\nchecks: none run (read-only, no shell; Read and Grep only). Tree read as on disk; repair hunks checked against `/tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/repair-docs2.diff`. Paths below are under /home/user/holyagent.\nblockers:\n1. docs/usage.md:148 says \"`--undo` does not disable the plugin\". That is false when setup added the key. settings.ts:51 adds `enabledPlugins[\"holyagent@holyagent\"]`, record.ts keeps it, and undoUserSettings (settings.ts:219-221, take at :181-182) removes it. It only holds when the plugin install wrote the key first, and then undo reports it `~`. It also contradicts usage.md:141.\n2. docs/hooks.md:26 says the check reads only \"a read of `settings.json` in `CLAUDE_CONFIG_DIR`\". check.ts:32 also reads the project and local files from projectSettingsFiles (scope.ts:112-125), which the same bullet now describes.\nquestions: none\nnotes:\n- docs/usage.md:102: \"Its only other write is its record\" holds only for the settings step. `holyagent setup` also installs ctx7 and its skill (steps.ts:62-102). Say \"the settings step's only other write\".\n- docs/usage.md:139: `claude plugin uninstall`, `disable --scope user` and the teammates' project-install step have no source beyond the install `--scope` check (assignment-0mw0nz2t6-6lgz.md:19). Unverified, not contradicted.\nevidence:\nblockers closed: blocker 1 at usage.md:67 and :151 (json-file.ts:206-207 gives `kept`); blocker 2 at usage.md:177 (version-control.md:7 names CONTRIBUTING, AGENTS.md, CLAUDE.md); blocker 3 commands at usage.md:131-139; blocker 4 at usage.md:30 and hooks.md:37/:61 (check.ts:24-33, scope.ts:112-125; hooks.md:26 is finding 2); blocker 5 at usage.md:101 (record.ts:30-31, 66 mode 0o600); blocker 6 at usage.md:172 and decisions.md:23. Finding 1 leaves the blocker 3 sentence inaccurate.\nno new inaccuracy: not met. Finding 1 (usage.md:148) and finding 2 (hooks.md:26).\nfindings: the two blockers and two notes above, all with paths and lines.\n",
   "createdAt": "2026-11-03T12:38:00.186Z"
 }
