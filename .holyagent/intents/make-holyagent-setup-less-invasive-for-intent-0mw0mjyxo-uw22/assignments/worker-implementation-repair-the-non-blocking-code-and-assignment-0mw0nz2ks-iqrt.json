@@ -1,0 +1,48 @@
+{
+  "id": "assignment-0mw0nz2ks-iqrt",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-non-blocking-code-and",
+  "objective": "Repair the non-blocking code and security findings on the setup and reminder changes.",
+  "state": "Ready",
+  "scope": [
+    "Findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw0nltgp-she3.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw0nltpu-mlxp.md; doc review finding 4 and the last note in /home/user/holyagent/.git/holyagent/reports/assignment-0mw0nltyh-0rau.md",
+    "packages/runtime/src/setup, packages/runtime/src/cli/setup.ts, packages/runtime/src/cli/hook.ts, packages/integrations/claude/src/setup-command.md, their tests"
+  ],
+  "constraints": [
+    "Fix: (a) VCS_REMINDER wording in hook.ts matches root/version-control.md (amend allowed only for your own unpushed commit; bypass only when the user asks); (b) doctor prints the rejected-top-level notice like setup; (c) the record file is written with mode 0o600; (d) the session-start setup notice (check.ts setupNotice) counts the project and local settings of the session's folder, so it stops after setup --scope project|local in that project; (e) setup-command.md and setup.ts help match what scope.ts prints when project scope falls back to cwd outside a repository (either print the ~ line there too or fix the text; printing it is preferred); (f) trust a git top-level only when it is cwd or an ancestor AND contains a .git entry.",
+    "Leave as is and do not change: write order of record vs settings, cross-process record locking, resolve() key, check-then-write race; they are accepted trade-offs.",
+    "Effect, Schema, JSDoc per .claude/CLAUDE.md. Each fix gets a test that fails without it where testable.",
+    "Run node_modules/.bin/mise run verify (or bun check, bun lint, bun fmt --check and bun test if mise is missing), and mise run build so the dist test passes; name what you could not run.",
+    "No version-control writes, no edits under .git/ or .holyagent/; report changed paths.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done and checked, stop and report; name unrequested features instead of adding them. Report in under 350 words."
+  ],
+  "criteria": [
+    {
+      "text": "fixes a-f applied, each with a test where testable",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "gates: verify passes with dist rebuilt",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/setup",
+    "packages/runtime/src/cli/setup.ts",
+    "packages/runtime/src/cli/hook.ts",
+    "packages/runtime/tests",
+    "packages/integrations/claude"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw0na54f-t4ud",
+  "createdAt": "2026-11-03T12:28:32.333Z"
+}
