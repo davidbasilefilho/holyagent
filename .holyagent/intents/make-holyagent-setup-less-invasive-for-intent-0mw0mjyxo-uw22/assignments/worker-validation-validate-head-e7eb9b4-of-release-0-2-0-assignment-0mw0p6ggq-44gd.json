@@ -1,0 +1,37 @@
+{
+  "id": "assignment-0mw0p6ggq-44gd",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Worker.validation",
+  "slug": "validate-head-e7eb9b4-of-release-0-2-0",
+  "objective": "Validate head e7eb9b4 of release/0.2.0/feat/evidence-judging: full gates and the generated plugin in step with sources.",
+  "state": "Running",
+  "scope": [],
+  "constraints": [
+    "Run node_modules/.bin/mise run verify, then node_modules/.bin/mise run build and git status --short to confirm the build changes nothing. Write logs to the scratchpad /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad, not elsewhere. No version-control writes. Report in under 120 words; start each evidence line with the criterion label before its colon."
+  ],
+  "criteria": [
+    {
+      "text": "verify: mise run verify exits 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "dist: a fresh build leaves the tree clean",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-03T13:02:16.538Z"
+  },
+  "createdAt": "2026-11-03T13:02:16.538Z"
+}
