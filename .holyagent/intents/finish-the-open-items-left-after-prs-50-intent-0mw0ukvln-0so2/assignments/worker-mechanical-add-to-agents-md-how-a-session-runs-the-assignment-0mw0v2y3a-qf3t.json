@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "add-to-agents-md-how-a-session-runs-the",
   "objective": "Add to AGENTS.md how a session runs the gates through the mise dev dependency, so specialists stop reporting mise as missing.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree /home/user/holyagent-hook-locks, file AGENTS.md (rules for working in this repository, each with its reason). Facts: mise is a dev dependency (package.json devDependencies 'mise', trustedDependencies), so after 'bun install --frozen-lockfile' it is at node_modules/.bin/mise; it is usually not on PATH in a cloud container. 'bun run verify' works because bun puts node_modules/.bin on PATH for package scripts, and node_modules/.bin/mise run <task> runs any task. mise run installs the tools in mise.toml first; its postinstall hook upgrades that Bun to canary, which the gates need (the container's own bun is stable; 'mise run toolchain' checks it). A worktree needs its own bun install. bun install runs the prepare script, which installs the repository's lefthook git hooks into the shared .git/hooks; that is expected.",
     "Add one short bullet (or a few lines) under the most fitting existing section, matching the file's style: the rule plus its reason ('a missing mise on PATH is not a reason to skip the gates or run bun steps by hand')."
@@ -38,5 +38,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-03T15:47:40.827Z"
+  },
   "createdAt": "2026-11-03T15:47:30.454Z"
 }
