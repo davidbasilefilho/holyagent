@@ -1,0 +1,50 @@
+{
+  "id": "assignment-0mw0v2xmo-prtj",
+  "intentId": "intent-0mw0ukvln-0so2",
+  "intentRevision": 2,
+  "roleTask": "Reviewer.code",
+  "slug": "review-commit-7a831cb-main-7a831cb-in",
+  "objective": "Review commit 7a831cb (main..7a831cb in /home/user/holyagent-hook-locks) that gives the agent-launch hook one lock deadline across all its locks, with real hook-kill and contention tests and three review-note fixes.",
+  "state": "Ready",
+  "scope": [
+    "Requirements: the hook's total lock wait ends inside the 10s plugin hook timeout (dist/hooks/hooks.json) with margin, CLI waits unchanged; tests that run a real hook kill and multi-process contention; the lock test uses Bun APIs, the migration test removes only its marker, patience defaults live in one place.",
+    "Review the committed range git diff main 7a831cb. Another writer edits the working tree of /home/user/holyagent-hook-locks at the same time, so read the commit, not the working tree. Gates run with node_modules/.bin/mise run <task> or bun run verify in /home/user/holyagent-hook-locks."
+  ],
+  "constraints": [
+    "Read-only. Scratch files only under /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad.",
+    "Judge flakiness of the timing-based tests on a slow Windows runner (the CI has windows-latest) and say whether margins hold.",
+    "Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "The hook's total lock wait ends inside the 10s timeout with margin and CLI waits are unchanged",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The new tests exercise a real hook kill and multi-process contention, fail without the change, and are not flaky by construction, including on Windows",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "No regressions and dist matches the sources",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The code follows .claude/CLAUDE.md (Effect, Schema at boundaries, JSDoc, Bun APIs)",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw0umsxj-r8zg"
+  ],
+  "createdAt": "2026-11-03T15:47:29.856Z"
+}
