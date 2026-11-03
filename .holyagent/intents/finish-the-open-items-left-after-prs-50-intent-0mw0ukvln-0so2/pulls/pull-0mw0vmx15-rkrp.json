@@ -1,0 +1,10 @@
+{
+  "id": "pull-0mw0vmx15-rkrp",
+  "intentId": "intent-0mw0ukvln-0so2",
+  "number": 53,
+  "url": "https://github.com/davidbasilefilho/holyagent/pull/53",
+  "branch": "release/0.2.0/fix/hook-lock-followups",
+  "base": "main",
+  "created": true,
+  "recordedAt": "2026-11-03T16:03:02.202Z"
+}
