@@ -5,7 +5,7 @@
   "roleTask": "Librarian.research",
   "slug": "research-and-calculate-the-auto-compact",
   "objective": "Research and calculate the auto-compact window that minimizes cost for HolyAgent's Opus 5.5 root without hurting quality, and say whether a default better than 450000 tokens exists.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Cost model: each root call re-reads its whole context as cache reads (Opus 5.5: $4/MTok input, cache write 1.25x for 5m and 2x for 1h TTL, cache read 0.1x? check the pricing page: https://platform.claude.com/docs/en/about-claude/pricing) plus new tokens; context grows by g tokens per call from a post-compaction base B; compaction at window W costs a summarization call (reads W, writes a summary) and a cold cache rewrite of the new prefix. Derive cost per call averaged over a compaction cycle as a function of W, B, g, and find the minimizing W analytically (it should be around sqrt-type optimum: W* = B + sqrt(2*g*C_compact/r_read)-style); compute numbers for plausible B (30k-80k: system prompt + tools + rules + summary) and g (2k-15k per call), and include compaction quality loss as a qualitative constraint.",
     "Quality evidence: long-context degradation (context rot) studies and Anthropic/OpenAI guidance on compaction; Claude Code's default (~967K for 1M models) and its /autocompact range 100K-1M; Codex: compaction at 90% of window, GPT 6.1 Sol 500k window (derived ~450k).",
@@ -38,5 +38,10 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-03T12:05:30.632Z"
+  },
   "createdAt": "2026-11-03T12:05:26.586Z"
 }
