@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { mkdir, realpath, writeFile } from "node:fs/promises"
+import { mkdir, readdir, realpath, symlink, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
 import { $ } from "bun"
@@ -19,6 +19,8 @@ beforeEach(async () => {
   const made = await scratch("holyagent-setup-scope-")
   home = made.directory
   remove = made.remove
+  // The scope resolves the real paths of the working directory and the git top-level.
+  await mkdir(nested(), { recursive: true })
 })
 afterEach(() => remove())
 
@@ -149,11 +151,13 @@ describe("holyagent setup --undo", () => {
     expect(await readJson(userFile())).toMatchObject({ includeGitInstructions: false })
   })
 
-  test("a value that differs stays and is reported with ~; the rest of its parent goes", async () => {
+  test("a recorded value that was changed stays and is reported with ~; the rest of its parent goes", async () => {
+    await runSetup("project")
+    const written = await readJson(projectFile())
     await write(projectFile(), {
+      ...written,
       includeGitInstructions: true,
-      subagentPromptCacheTtl: "1h",
-      attribution: { commit: "Co-Authored-By: me", pr: "", sessionUrl: false },
+      attribution: { ...(written["attribution"] as object), commit: "Co-Authored-By: me" },
       modelSettings: {
         "claude-opus-5-5": { effortLevel: "xhigh", autoCompactWindow: 450000 },
         "claude-sonnet-5-5": { effortLevel: "low" },
@@ -168,7 +172,6 @@ describe("holyagent setup --undo", () => {
       "- modelSettings.claude-opus-5-5.autoCompactWindow: removed 450000",
     )
     expect(report.lines).toContain('- subagentPromptCacheTtl: removed "1h"')
-    expect(report.lines).toContain("= enabledPlugins.holyagent@holyagent: nothing to remove")
     expect(await readJson(projectFile())).toEqual({
       includeGitInstructions: true,
       attribution: { commit: "Co-Authored-By: me" },
@@ -179,8 +182,11 @@ describe("holyagent setup --undo", () => {
     })
   })
 
-  test("keeps a pre-existing deny entry and drops only WebSearch and WebFetch", async () => {
+  test("keeps a deny entry setup did not add and drops only the ones it added", async () => {
+    await runSetup("project")
+    const written = await readJson(projectFile())
     await write(projectFile(), {
+      ...written,
       permissions: { deny: ["Bash(rm:*)", "WebSearch", "WebFetch"], allow: ["Read"] },
     })
     const report = await runSetup("project", { undo: true })
@@ -190,8 +196,74 @@ describe("holyagent setup --undo", () => {
     })
   })
 
+  test("a value setup did not record adding is kept with ~, even when it equals setup's", async () => {
+    // Set by the user before setup ran: the same values, but setup added none of them.
+    await write(projectFile(), {
+      includeGitInstructions: false,
+      enabledPlugins: { "holyagent@holyagent": true },
+      permissions: { deny: ["WebSearch", "WebFetch"] },
+    })
+    await runSetup("project")
+    const report = await runSetup("project", { undo: true })
+    expect(report.lines).toContain(
+      "~ includeGitInstructions: kept false (setup did not record adding it; remove it by hand if you want it gone)",
+    )
+    expect(report.lines).toContain(
+      '~ permissions.deny: kept ["WebSearch","WebFetch"] (setup did not record adding it; remove it by hand if you want it gone)',
+    )
+    expect(report.lines).toContain('- subagentPromptCacheTtl: removed "1h"')
+    const after = await readJson(projectFile())
+    expect(after).toMatchObject({
+      includeGitInstructions: false,
+      enabledPlugins: { "holyagent@holyagent": true },
+      permissions: { deny: ["WebSearch", "WebFetch"] },
+    })
+    expect(after).not.toHaveProperty("subagentPromptCacheTtl")
+  })
+
+  test("a file with no record at all is left untouched and nothing is created", async () => {
+    // The state of a file that earlier-version setup wrote: no record exists.
+    await runSetup("project")
+    await Bun.write(join(home, "claude", "holyagent", "setup-records.json"), "{}")
+    const before = await Bun.file(projectFile()).text()
+    const report = await runSetup("project", { undo: true })
+    expect(report.lines.at(-1)).toBe("no changes")
+    expect(
+      report.lines.some((line) => line.startsWith("~ includeGitInstructions: kept false")),
+    ).toBe(true)
+    expect(await Bun.file(projectFile()).text()).toBe(before)
+  })
+
+  test("the record is per file and cleared by --undo, so a second undo changes nothing", async () => {
+    await runSetup("project")
+    await runSetup("local")
+    await runSetup("project", { undo: true })
+    expect(await readJson(projectFile())).toEqual({})
+    expect(await readJson(localFile())).toMatchObject({ includeGitInstructions: false })
+    // The project record is gone: values written again by hand are no longer setup's.
+    await write(projectFile(), { includeGitInstructions: false })
+    const again = await runSetup("project", { undo: true })
+    expect(again.lines.at(-1)).toBe("no changes")
+    expect(await readJson(projectFile())).toEqual({ includeGitInstructions: false })
+    // The local record survived.
+    expect((await runSetup("local", { undo: true })).lines.at(-1)).toBe("removed 10")
+  })
+
+  test("a record that does not decode fails the step and changes nothing", async () => {
+    await runSetup("project")
+    const record = join(home, "claude", "holyagent", "setup-records.json")
+    await Bun.write(record, JSON.stringify({ files: {}, extra: 1 }))
+    const before = await Bun.file(projectFile()).text()
+    const report = await runSetup("project", { undo: true })
+    expect(report.ok).toBe(false)
+    expect(report.lines.some((line) => line.startsWith("! project settings: "))).toBe(true)
+    expect(await Bun.file(projectFile()).text()).toBe(before)
+  })
+
   test("a deny list holding only setup's entries is dropped with an emptied permissions object", async () => {
-    await write(projectFile(), { permissions: { deny: ["WebSearch"] } })
+    await runSetup("project")
+    const written = await readJson(projectFile())
+    await write(projectFile(), { permissions: written["permissions"] })
     await runSetup("project", { undo: true })
     expect(await readJson(projectFile())).toEqual({})
   })
@@ -232,6 +304,124 @@ describe("holyagent setup --undo", () => {
     expect(report.lines.some((line) => line.startsWith("! project settings: "))).toBe(true)
     expect(await Bun.file(projectFile()).text()).toBe("[1]")
   })
+})
+
+describe("holyagent setup --scope guards", () => {
+  /** A fake shell whose git names `top` as the top-level. */
+  const namingTop = (top: string) =>
+    fakeShell({
+      commands: ["bun"],
+      respond: (line) =>
+        line === "git rev-parse --show-toplevel" ? { stdout: `${top}\n` } : undefined,
+    })
+
+  test("a git top-level that is not above the current directory is ignored, and the report says so", async () => {
+    // A crafted core.worktree makes git name a directory the working directory is not in.
+    const elsewhere = join(home, "elsewhere")
+    await mkdir(elsewhere, { recursive: true })
+    const report = await Effect.runPromise(
+      setup(env(), options("project")).pipe(Effect.provide(namingTop(elsewhere).layer)),
+    )
+    expect(report.ok).toBe(true)
+    expect(report.lines[1]).toBe(
+      `~ project settings: git names ${elsewhere} as the top-level, which is not the current directory or above it; using ${nested()}`,
+    )
+    expect(report.lines[2]).toBe(join(nested(), ".claude", "settings.json"))
+    expect(await exists(join(nested(), ".claude", "settings.json"))).toBe(true)
+    expect(await readdir(elsewhere)).toEqual([])
+  })
+
+  test("a git top-level that does not exist is ignored too", async () => {
+    const report = await Effect.runPromise(
+      setup(env(), options("local")).pipe(Effect.provide(namingTop(join(home, "missing")).layer)),
+    )
+    expect(report.lines[2]).toBe(join(nested(), ".claude", "settings.local.json"))
+  })
+
+  test("the git top-level may be the working directory itself", async () => {
+    const report = await Effect.runPromise(
+      setup(env(), { ...options("project"), cwd: repo() }).pipe(
+        Effect.provide(namingTop(repo()).layer),
+      ),
+    )
+    expect(report.lines[1]).toBe(projectFile())
+  })
+
+  test.skipIf(process.platform === "win32")(
+    "a symlinked .claude folder is refused and nothing is written",
+    async () => {
+      const target = join(home, "target")
+      await mkdir(target, { recursive: true })
+      await symlink(target, join(repo(), ".claude"))
+      for (const scope of ["project", "local"] as const) {
+        for (const undo of [false, true]) {
+          const report = await runSetup(scope, { undo })
+          expect(report.ok).toBe(false)
+          expect(
+            report.lines.some(
+              (line) =>
+                line.startsWith("! ") && line.includes("is a symlink") && line.includes(".claude"),
+            ),
+          ).toBe(true)
+        }
+      }
+      expect(await readdir(target)).toEqual([])
+    },
+  )
+
+  test.skipIf(process.platform === "win32")(
+    "a symlinked settings file is refused and its target stays as it was",
+    async () => {
+      const victim = join(home, "victim.json")
+      await writeFile(victim, "{}")
+      await mkdir(dirname(projectFile()), { recursive: true })
+      await symlink(victim, projectFile())
+      const report = await runSetup("project")
+      expect(report.ok).toBe(false)
+      expect(report.lines.some((line) => line.startsWith("! project settings: "))).toBe(true)
+      expect(await Bun.file(victim).text()).toBe("{}")
+      expect(await exists(userFile())).toBe(false)
+    },
+  )
+
+  test.skipIf(process.platform === "win32")(
+    "doctor reports a symlinked target as a failing settings check and fixes nothing",
+    async () => {
+      const victim = join(home, "victim.json")
+      await writeFile(victim, "{}")
+      await mkdir(dirname(localFile()), { recursive: true })
+      await symlink(victim, localFile())
+      const shell = fakeShell({
+        commands: ["bun", "ctx7"],
+        respond: (line) =>
+          line === "git rev-parse --show-toplevel" ? { stdout: `${repo()}\n` } : undefined,
+      })
+      const report = await Effect.runPromise(
+        doctor(env(), { fix: true, scope: "local", cwd: nested() }).pipe(
+          Effect.provide(shell.layer),
+        ),
+      )
+      expect(report.ok).toBe(false)
+      expect(report.lines.find((line) => line.startsWith("FAIL settings"))).toContain(
+        "is a symlink",
+      )
+      expect(await Bun.file(victim).text()).toBe("{}")
+    },
+  )
+
+  test.skipIf(process.platform === "win32")(
+    "the user scope still writes through a symlinked settings file",
+    async () => {
+      const real = join(home, "dotfiles", "settings.json")
+      await mkdir(dirname(real), { recursive: true })
+      await writeFile(real, "{}")
+      await mkdir(dirname(userFile()), { recursive: true })
+      await symlink(real, userFile())
+      const report = await runSetup("user")
+      expect(report.ok).toBe(true)
+      expect(await readJson(real)).toMatchObject({ includeGitInstructions: false })
+    },
+  )
 })
 
 describe("holyagent doctor --scope", () => {

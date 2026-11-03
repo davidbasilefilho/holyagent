@@ -7704,7 +7704,7 @@ var describeFailure = (error) => {
   };
 };
 
-import { join as join19 } from "path";
+import { join as join20 } from "path";
 
 var NULL_LITERAL = "null";
 var DELIMITERS = {
@@ -12496,7 +12496,7 @@ var ASSIGNMENT_COMMANDS = [
 ];
 
 import { stat as stat2 } from "fs/promises";
-import { join as join14 } from "path";
+import { join as join15 } from "path";
 
 var delegating_default = "## Delegating\n\nEdits, runs, checks, reviews, research and investigation go to specialists. Read only what a decision needs; your Bash is for the holyagent CLI, Git and `gh`. If a `holyagent:*` agent type does not resolve, stop and report it; general-purpose agents are no stand-in. If the user forbids subagents, work to the same criteria and name each waived review.\n";
 
@@ -12672,6 +12672,57 @@ var applyDefaults = (existing, defaults) => {
   return { merged, entries: [...entries.values()] };
 };
 
+import { join as join11, resolve as resolve5 } from "path";
+var RecordedKey = Struct({
+  path: NonEmptyArray(String4),
+  value: Unknown2
+});
+var RecordFile = Struct({
+  files: Record(String4, Struct({ keys: ArraySchema(RecordedKey) }))
+});
+var recordPath = (env) => join11(userFiles(env).claudeDir, "holyagent", "setup-records.json");
+var keyOf = (file) => resolve5(file);
+var load = (env) => gen2(function* () {
+  const path = recordPath(env);
+  const raw = yield* readJsonObject(path);
+  if (Object.keys(raw).length === 0)
+    return {};
+  const decoded = yield* decodeUnknownEffect2(RecordFile)(raw, {
+    onExcessProperty: "error"
+  }).pipe(mapError2((error) => new SetupFailure({
+    message: `${path} is not a setup record: ${error.message}; fix or delete it`
+  })));
+  return Object.fromEntries(Object.entries(decoded.files).map(([file, { keys }]) => [file, keys]));
+});
+var save = (env, files) => {
+  const body = {
+    files: Object.fromEntries(Object.entries(files).map(([file, keys]) => [
+      file,
+      { keys: keys.map((key) => ({ ...key })) }
+    ]))
+  };
+  return writeJsonObject(recordPath(env), body);
+};
+var readRecorded = fn2("readRecorded")(function* (env, file) {
+  return (yield* load(env))[keyOf(file)] ?? [];
+});
+var addRecorded = fn2("addRecorded")(function* (env, file, added) {
+  if (added.length === 0)
+    return;
+  const files = yield* load(env);
+  const key = keyOf(file);
+  const names = new Set(added.map((item) => item.path.join("\x00")));
+  const earlier = (files[key] ?? []).filter((item) => !names.has(item.path.join("\x00")));
+  yield* save(env, { ...files, [key]: [...earlier, ...added] });
+});
+var clearRecorded = fn2("clearRecorded")(function* (env, file) {
+  const files = yield* load(env);
+  const key = keyOf(file);
+  if (!(key in files))
+    return;
+  yield* save(env, Object.fromEntries(Object.entries(files).filter(([name]) => name !== key)));
+});
+
 var added = (text) => `+ ${text}`;
 var present2 = (text) => `= ${text}`;
 var skipped = (text) => `- ${text}`;
@@ -12719,16 +12770,30 @@ var describe2 = ({ path, status, value, wanted }) => {
   }
 };
 var mergeUserSettings = fn2("mergeUserSettings")(function* (options) {
-  const { file } = options;
+  const { file, env } = options;
   const existing = yield* readJsonObject(file);
-  const { merged, entries } = applyDefaults(existing, defaultsFor(existing, options.subagentCacheTtl));
-  const added = entries.filter((entry) => entry.status === "added").length;
-  if (added > 0 && !options.dryRun)
+  const defaults = defaultsFor(existing, options.subagentCacheTtl);
+  const { merged, entries } = applyDefaults(existing, defaults);
+  const names = new Set(entries.filter((entry) => entry.status === "added").map((entry) => entry.path));
+  const added = names.size;
+  if (added > 0 && !options.dryRun) {
+    yield* readRecorded(env, file);
     yield* writeJsonObject(file, merged);
+    yield* addRecorded(env, file, defaults.filter(({ path }) => names.has(path.join("."))));
+  }
   const summary = added === 0 ? "no changes" : options.dryRun ? `dry run: would add ${added}, nothing written` : `added ${added}`;
   return [file, ...entries.map(describe2), summary];
 });
 var without = (node, key) => Object.fromEntries(Object.entries(node).filter(([name]) => name !== key));
+var valueAt = (node, path) => {
+  let current = node;
+  for (const key of path) {
+    if (!isJsonObject2(current))
+      return;
+    current = current[key];
+  }
+  return current;
+};
 var take = (node, path, depth, wanted) => {
   const key = path[depth];
   const full = path.join(".");
@@ -12772,20 +12837,35 @@ var describeRemoval = ({ path, status, value, wanted }) => {
       return `= ${path}: nothing to remove`;
     case "kept":
       return `~ ${path}: kept ${show(value)} (setup writes ${show(wanted)})`;
+    case "unrecorded":
+      return `~ ${path}: kept ${show(value)} (setup did not record adding it; remove it by hand if you want it gone)`;
   }
 };
 var undoUserSettings = fn2("undoUserSettings")(function* (options) {
-  const { file } = options;
+  const { file, env } = options;
   let result = yield* readJsonObject(file);
+  const recorded = yield* readRecorded(env, file);
+  const plan = [
+    ...recorded,
+    ...userSettingsDefaults("1h").filter(({ path }) => !recorded.some((item) => item.path.join(".") === path.join("."))).map(({ path }) => ({ path, value: undefined }))
+  ];
   const removals = [];
-  for (const { path, value } of userSettingsDefaults(options.subagentCacheTtl)) {
+  for (const { path, value } of plan) {
+    if (value === undefined) {
+      const existing = valueAt(result, path);
+      removals.push(existing === undefined ? { path: path.join("."), status: "absent", value: undefined, wanted: undefined } : { path: path.join("."), status: "unrecorded", value: existing, wanted: undefined });
+      continue;
+    }
     const [next, removal] = take(result, path, 0, value);
     result = next;
     removals.push(removal);
   }
   const removed = removals.filter((removal) => removal.status === "removed").length;
-  if (removed > 0 && !options.dryRun)
-    yield* writeJsonObject(file, result);
+  if (!options.dryRun) {
+    if (removed > 0)
+      yield* writeJsonObject(file, result);
+    yield* clearRecorded(env, file);
+  }
   const summary = removed === 0 ? "no changes" : options.dryRun ? `dry run: would remove ${removed}, nothing written` : `removed ${removed}`;
   return [file, ...removals.map(describeRemoval), summary];
 });
@@ -12794,7 +12874,7 @@ var missingSettingKeys = fn2("missingSettingKeys")(function* (file) {
   return applyDefaults(existing, defaultsFor(existing, "1h")).entries.filter((entry) => entry.status === "added").map((entry) => entry.path);
 });
 
-import { delimiter, join as join11 } from "path";
+import { delimiter, join as join12 } from "path";
 var {$: $3 } = globalThis.Bun;
 var pathKey = (env, insensitive = process.platform === "win32") => {
   if (!insensitive || env.PATH !== undefined)
@@ -12803,8 +12883,8 @@ var pathKey = (env, insensitive = process.platform === "win32") => {
 };
 var pathWithBunBin = (env, options) => {
   const key = pathKey(env, options.insensitive);
-  const root = options.bunInstall ? options.bunInstall : join11(options.home, ".bun");
-  const bunBin = join11(root, "bin");
+  const root = options.bunInstall ? options.bunInstall : join12(options.home, ".bun");
+  const bunBin = join12(root, "bin");
   return { key, value: `${env[key] ?? ""}${options.delimiter ?? delimiter}${bunBin}`, bunBin };
 };
 var findCommand = (env, command, options) => {
@@ -12813,7 +12893,7 @@ var findCommand = (env, command, options) => {
     PATH: options?.includeBunBin ? bunBin.value : env[bunBin.key] ?? ""
   }));
 };
-var EMPTY_BUNFIG = join11(import.meta.dir, "empty-bunfig.toml");
+var EMPTY_BUNFIG = join12(import.meta.dir, "empty-bunfig.toml");
 
 class Shell extends Service()("holyagent/Shell") {
   static live = (env) => {
@@ -12844,11 +12924,11 @@ var setupNotice = (env) => {
 
 import { lstat as lstat2, mkdir as mkdir4, open as open3 } from "fs/promises";
 import { tmpdir, userInfo } from "os";
-import { join as join12 } from "path";
+import { join as join13 } from "path";
 var SAFE_SESSION = /^[\w.-]{1,80}$/;
 var isSessionId = (id) => id !== undefined && SAFE_SESSION.test(id) && !/^\.+$/.test(id);
-var markers = () => join12(tmpdir(), `holyagent-sessions-${(process.getuid?.() ?? userInfo().username).toString().replace(/[^\w.-]/g, "_")}`);
-var markerOf = (sessionId) => join12(markers(), sessionId);
+var markers = () => join13(tmpdir(), `holyagent-sessions-${(process.getuid?.() ?? userInfo().username).toString().replace(/[^\w.-]/g, "_")}`);
+var markerOf = (sessionId) => join13(markers(), sessionId);
 var ensureMarkers = () => {
   const folder = markers();
   const uid = process.getuid?.();
@@ -12861,7 +12941,7 @@ var create = (sessionId) => ensureMarkers().pipe(andThen2(io(markerOf(sessionId)
 var markRulesDelivered = (sessionId) => create(sessionId).pipe(asVoid2);
 var claimRulesDelivery = create;
 
-import { join as join13 } from "path";
+import { join as join14 } from "path";
 var LEGACY_FOLDERS = {
   holyclaude: ".holyclaude",
   holycodex: ".holycodex"
@@ -13017,7 +13097,7 @@ var byFolder = (paths) => {
   return folders;
 };
 var convertibleFolders = (source, files) => byFolder(source === "holyclaude" ? files.filter((path) => path.startsWith("intents/")).map((path) => path.slice(8)) : files.filter((path) => !path.startsWith(".")));
-var legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join13(root, LEGACY_FOLDERS[source])).pipe(map4((files) => convertibleFolders(source, files).size > 0))).pipe(map4((sources) => sources.map((source) => LEGACY_FOLDERS[source])));
+var legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join14(root, LEGACY_FOLDERS[source])).pipe(map4((files) => convertibleFolders(source, files).size > 0))).pipe(map4((sources) => sources.map((source) => LEGACY_FOLDERS[source])));
 var isoOf = (millis) => {
   const date = new Date(millis);
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
@@ -13138,13 +13218,13 @@ var holyclaudeAssignment = (legacy, roleTask, siblings) => {
 };
 var gatherHolyclaude = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holyclaude;
-  const legacy = join13(root, folderName);
+  const legacy = join14(root, folderName);
   const intents = convertibleFolders("holyclaude", yield* listFiles(legacy));
   if (intents.size === 0)
     return;
   const state = collector("holyclaude");
   for (const [folder, inside] of intents) {
-    const base = join13(legacy, "intents", folder);
+    const base = join14(legacy, "intents", folder);
     const shown = (relative) => `${folderName}/intents/${folder}/${relative}`;
     if (!inside.includes("intent.json")) {
       unconvertible(state, shown("").slice(0, -1), "the folder has no intent.json");
@@ -13152,7 +13232,7 @@ var gatherHolyclaude = (root, directory) => gen2(function* () {
     }
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.json$/.test(path));
     const notes = inside.filter((path) => path !== "intent.json" && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join13(base, "intent.json"));
+    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join14(base, "intent.json"));
     const intent = yield* intentRecord(directory, shown("intent.json"), "problem" in read ? read : holyclaudeIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.json"), intent.problem);
@@ -13163,10 +13243,10 @@ var gatherHolyclaude = (root, directory) => gen2(function* () {
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join13(base, path), to: join13(target, path) });
+      state.notes.push({ from: join14(base, path), to: join14(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join13(base, path));
+      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join14(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (assignment.value.intent_id !== intent.value.intent.id)
@@ -13268,13 +13348,13 @@ var holycodexAssignment = (legacy, roleTask, intent, siblings) => {
 var TRANSACTION_FILE = ".holycodex-transaction.toon";
 var gatherHolycodex = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holycodex;
-  const legacy = join13(root, folderName);
+  const legacy = join14(root, folderName);
   const folders = convertibleFolders("holycodex", yield* listFiles(legacy));
   if (folders.size === 0)
     return;
   const state = collector("holycodex");
   for (const [folder, inside] of folders) {
-    const base = join13(legacy, folder);
+    const base = join14(legacy, folder);
     const shown = (relative) => `${folderName}/${folder}/${relative}`;
     if (!inside.includes("intent.toon")) {
       unconvertible(state, `${folderName}/${folder}`, "the folder has no intent.toon");
@@ -13288,7 +13368,7 @@ var gatherHolycodex = (root, directory) => gen2(function* () {
       });
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.toon$/.test(path));
     const notes = inside.filter((path) => path !== "intent.toon" && path !== TRANSACTION_FILE && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join13(base, "intent.toon"));
+    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join14(base, "intent.toon"));
     const intent = yield* intentRecord(directory, shown("intent.toon"), "problem" in read ? read : holycodexIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.toon"), intent.problem);
@@ -13299,10 +13379,10 @@ var gatherHolycodex = (root, directory) => gen2(function* () {
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join13(base, path), to: join13(target, path) });
+      state.notes.push({ from: join14(base, path), to: join14(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join13(base, path));
+      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join14(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (mapId("intent", assignment.value.intent_id) !== intent.value.intent.id)
@@ -19827,7 +19907,7 @@ var HOOK_COMMANDS = [
       const message = cleaned.split(`
 `).filter((line) => !line.startsWith(comment)).join(`
 `);
-      const phrases = forbiddenPhrases(message, (yield* readSettings([join14(call.root, STATE_DIRECTORY)])).allowWords);
+      const phrases = forbiddenPhrases(message, (yield* readSettings([join15(call.root, STATE_DIRECTORY)])).allowWords);
       if (phrases.length > 0)
         return yield* new MessageRefused({ phrases });
       if (cleaned !== above.trim() || cleanedBelow !== below.trim())
@@ -19848,7 +19928,7 @@ ${cleanedBelow}
   }, true)
 ];
 
-import { join as join15, relative as relative4 } from "path";
+import { join as join16, relative as relative4 } from "path";
 var {$: $4 } = globalThis.Bun;
 class NothingToMigrate extends TaggedError2("NothingToMigrate") {
   get message() {
@@ -19937,7 +20017,7 @@ var mentionsOf = (root, folders) => gen2(function* () {
   const names = yield* io(root, () => Array.fromAsync(new Bun.Glob("*").scan({ cwd: root, dot: true, onlyFiles: true })));
   const hits = [];
   for (const name of names.toSorted()) {
-    const text = yield* readText(join15(root, name));
+    const text = yield* readText(join16(root, name));
     if (text !== undefined && folders.some((folder) => text.includes(folder)))
       hits.push(name);
   }
@@ -20011,19 +20091,45 @@ var MIGRATE_COMMANDS = [
   }
 ];
 
-import { join as join16, resolve as resolve5 } from "path";
+import { lstat as lstat3, realpath as realpath4 } from "fs/promises";
+import { isAbsolute as isAbsolute2, join as join17, relative as relative5, resolve as resolve6, sep as sep6 } from "path";
 var SCOPES = ["user", "project", "local"];
+var within = (parent, child) => {
+  const path = relative5(parent, child);
+  return path === "" || path !== ".." && !path.startsWith(`..${sep6}`) && !isAbsolute2(path);
+};
+var real = (path) => tryPromise2(() => realpath4(path)).pipe(orElseSucceed2(() => {
+  return;
+}));
+var isSymlink = (path) => tryPromise2({
+  try: () => lstat3(path),
+  catch: (cause) => cause
+}).pipe(map4((stats) => stats.isSymbolicLink()), catch_2((error) => error.code === "ENOENT" || error.code === "ENOTDIR" ? succeed6(false) : fail5(new SetupFailure({ message: `cannot inspect ${path}: ${error.message}` }))));
 var settingsFile = fn2("settingsFile")(function* (env, scope, cwd) {
   if (scope === "user")
-    return userFiles(env).settings;
+    return { file: userFiles(env).settings };
   const shell = yield* Shell;
   const top = yield* shell.run("git", ["rev-parse", "--show-toplevel"], { cwd });
   const line = top.stdout.trim();
-  const root = top.exitCode === 0 && line !== "" ? resolve5(line) : cwd;
-  return join16(root, ".claude", scope === "project" ? "settings.json" : "settings.local.json");
+  const named = top.exitCode === 0 && line !== "" ? resolve6(line) : undefined;
+  const realTop = named === undefined ? undefined : yield* real(named);
+  const realCwd = yield* real(cwd);
+  const trusted = named !== undefined && realTop !== undefined && realCwd !== undefined && within(realTop, realCwd);
+  const root = trusted ? named : cwd;
+  const notice = named !== undefined && !trusted ? `git names ${named} as the top-level, which is not the current directory or above it; using ${cwd}` : undefined;
+  const folder = join17(root, ".claude");
+  const file = join17(folder, scope === "project" ? "settings.json" : "settings.local.json");
+  for (const path of [folder, file]) {
+    if (yield* isSymlink(path)) {
+      return yield* new SetupFailure({
+        message: `${path} is a symlink; refusing to write through it in the ${scope} scope. Replace it with a real ${path === folder ? "folder" : "file"} and run again`
+      });
+    }
+  }
+  return { file, ...notice === undefined ? {} : { notice } };
 });
 
-import { join as join17 } from "path";
+import { join as join18 } from "path";
 var CLOUD_SKIP = "skipped in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true), which has no machine of yours to install it on";
 var neutralDirectory = (env) => homeDirectory(env);
 var ensureGlobal = fn2("ensureGlobal")(function* (env, command, packageName, dryRun) {
@@ -20054,7 +20160,7 @@ var installCtx7 = fn2("installCtx7")(function* (env, dryRun) {
   const global = yield* ensureGlobal(env, "ctx7", "ctx7", dryRun);
   if (!global.usable)
     return global.lines;
-  const skillReady = (yield* fileExists2(join17(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join17(files.claudeDir, "rules", "context7.md")));
+  const skillReady = (yield* fileExists2(join18(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join18(files.claudeDir, "rules", "context7.md")));
   if (skillReady)
     return [...global.lines, present2("ctx7 skill: already installed")];
   const apiKey = env.CONTEXT7_API_KEY === "" ? undefined : env.CONTEXT7_API_KEY;
@@ -20079,19 +20185,27 @@ var asStep = (label, step) => step.pipe(catchTag2("SetupFailure", (error) => suc
 var setup = fn2("setup")(function* (env, options) {
   const scope = options.scope ?? "user";
   const label = `${scope} settings`;
-  const file = yield* settingsFile(env, scope, options.cwd ?? process.cwd());
-  const settings = { file, subagentCacheTtl: options.subagentCacheTtl, dryRun: options.dryRun };
+  const onSettings = (run) => asStep(label, gen2(function* () {
+    const target = yield* settingsFile(env, scope, options.cwd ?? process.cwd());
+    const lines = yield* run(target.file);
+    return target.notice === undefined ? lines : [hint(`${label}: ${target.notice}`), ...lines];
+  }));
   if (options.undo === true) {
     const lines = [
-      hint("ctx7: left installed; --undo only removes the settings setup wrote"),
-      ...yield* asStep(label, undoUserSettings(settings))
+      hint("ctx7: left installed; --undo only removes the settings setup recorded adding"),
+      ...yield* onSettings((file) => undoUserSettings({ env, file, dryRun: options.dryRun }))
     ];
     return { lines, ok: !lines.some((line) => line.startsWith("! ")) };
   }
   const cloud = inCloudSession(env);
   const lines = [
     ...options.skipCtx7 ? [skipped("ctx7: skipped by flag")] : cloud ? [skipped(`ctx7: ${CLOUD_SKIP}`)] : yield* asStep("ctx7", installCtx7(env, options.dryRun)),
-    ...yield* asStep(label, mergeUserSettings(settings))
+    ...yield* onSettings((file) => mergeUserSettings({
+      env,
+      file,
+      subagentCacheTtl: options.subagentCacheTtl,
+      dryRun: options.dryRun
+    }))
   ];
   return { lines, ok: !lines.some((line) => line.startsWith("! ")) };
 });
@@ -20119,11 +20233,20 @@ var checkSettings = (file, scope) => missingSettingKeys(file).pipe(map4((missing
 var checks = (env, file, scope) => all2([checkBun, checkCommand(env, "ctx7"), checkSettings(file, scope)]);
 var doctor = fn2("doctor")(function* (env, options) {
   const scope = options.scope ?? "user";
-  const file = yield* settingsFile(env, scope, options.cwd ?? process.cwd());
+  const located = yield* settingsFile(env, scope, options.cwd ?? process.cwd()).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
+  if (located instanceof SetupFailure) {
+    const lines = yield* all2([
+      checkBun,
+      checkCommand(env, "ctx7"),
+      succeed6(fail6("settings", located.message))
+    ]);
+    return { lines, ok: false };
+  }
+  const { file } = located;
   const before = yield* checks(env, file, scope);
   const failing = (name) => before.some((line) => line.startsWith(`FAIL ${name}:`));
   const fixes = options.fix && !inCloudSession(env) ? [...failing("ctx7") ? yield* asStep("ctx7", installCtx7(env, false)) : []] : [];
-  const settingsFixes = options.fix && failing("settings") ? yield* asStep(`${scope} settings`, mergeUserSettings({ file, subagentCacheTtl: "1h", dryRun: false })) : [];
+  const settingsFixes = options.fix && failing("settings") ? yield* asStep(`${scope} settings`, mergeUserSettings({ env, file, subagentCacheTtl: "1h", dryRun: false })) : [];
   const ran = [...fixes, ...settingsFixes];
   const lines = ran.length === 0 ? before : [...ran, ...yield* checks(env, file, scope)];
   return { lines, ok: lines.every((line) => !line.startsWith("FAIL ")) };
@@ -20145,8 +20268,9 @@ var SETUP_COMMANDS = [
     notes: [
       "installs ctx7 with the Context7 skill (needs CONTEXT7_API_KEY or a saved login)",
       "merges these keys into the settings file of --scope without changing any value already set: attribution, includeGitInstructions, subagentPromptCacheTtl, modelSettings.claude-opus-5-5 (effortLevel high and autoCompactWindow 450000 for the root), extraKnownMarketplaces, enabledPlugins and permissions.deny for WebSearch and WebFetch",
-      "--scope picks the file like Claude Code's scopes: user (default) is CLAUDE_CONFIG_DIR/settings.json, else ~/.claude/settings.json; project is .claude/settings.json and local is .claude/settings.local.json, both in the git top-level of the current directory, else in the current directory; ctx7 is installed for the user whatever the scope",
-      "--undo removes from the --scope file only the values setup writes: a key whose value differs is kept and reported with `~`, permissions.deny loses only WebSearch and WebFetch, and parent objects left empty are dropped; removed keys print `-` lines (`= nothing to remove` when absent); ctx7 stays installed; compares subagentPromptCacheTtl with --subagent-cache-ttl (default 1h); honors --dry-run",
+      "--scope picks the file like Claude Code's scopes: user (default) is CLAUDE_CONFIG_DIR/settings.json, else ~/.claude/settings.json; project is .claude/settings.json and local is .claude/settings.local.json, both in the git top-level of the current directory when that is the current directory or above it, else in the current directory (a `~` line says so); project and local refuse a symlinked settings file or .claude folder with a `!` line; ctx7 is installed for the user whatever the scope",
+      "setup records the keys it adds, per settings file, in holyagent/setup-records.json under CLAUDE_CONFIG_DIR (else ~/.claude), outside the project",
+      "--undo removes from the --scope file only what that record says setup added, and only while the value still equals what setup wrote: a changed value, and a key with no record (set before setup or by an earlier version), is kept and reported with `~`, so remove it by hand; permissions.deny loses only the entries setup added, and parent objects left empty are dropped; removed keys print `-` lines (`= nothing to remove` when absent); the file's record is cleared; ctx7 stays installed; honors --dry-run",
       "a failed step is reported and the rest still run; in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) ctx7 is skipped and the settings are still merged"
     ],
     flags: {
@@ -20219,14 +20343,14 @@ var STATE_COMMANDS = [
   }
 ];
 
-import { join as join18 } from "path";
+import { join as join19 } from "path";
 var {$: $5 } = globalThis.Bun;
 var TARGETS = [
   { id: "darwin-arm64", platform: "darwin", arch: "arm64", suffix: "" },
   { id: "linux-x64", platform: "linux", arch: "x64", suffix: "" },
   { id: "windows-x64", platform: "win32", arch: "x64", suffix: ".exe" }
 ];
-var BUNDLED_TOOLS = join18(import.meta.dir, "vendor");
+var BUNDLED_TOOLS = join19(import.meta.dir, "vendor");
 
 class UnsupportedPlatform extends TaggedError2("UnsupportedPlatform") {
   get message() {
@@ -20243,7 +20367,7 @@ var selectTarget = (platform, arch) => {
   const target = TARGETS.find((candidate) => candidate.platform === platform && candidate.arch === arch);
   return target === undefined ? fail5(new UnsupportedPlatform({ platform, arch })) : succeed6(target);
 };
-var toolPath = (directory, tool, target) => join18(directory, target.id, `${tool}${target.suffix}`);
+var toolPath = (directory, tool, target) => join19(directory, target.id, `${tool}${target.suffix}`);
 var runTool = (options) => gen2(function* () {
   const path = toolPath(options.directory, options.tool, options.target);
   if (!(yield* promise2(() => Bun.file(path).exists())))
@@ -20312,7 +20436,7 @@ var topHelp = () => [
 ].join(`
 `);
 var callFor = (args, host, emit, command) => gen2(function* () {
-  const { root, directory } = command.stateless === true ? { root: host.cwd, directory: join19(host.cwd, STATE_DIRECTORY) } : yield* resolveState(host.cwd, host.env, typeof command.state === "function" ? command.state(args) : command.state ?? "ifPresent", command.path[0] !== "hook");
+  const { root, directory } = command.stateless === true ? { root: host.cwd, directory: join20(host.cwd, STATE_DIRECTORY) } : yield* resolveState(host.cwd, host.env, typeof command.state === "function" ? command.state(args) : command.state ?? "ifPresent", command.path[0] !== "hook");
   const inline = stringFlag(args, INPUT_FLAG);
   return {
     args,

@@ -2,6 +2,7 @@ import { Effect, Option } from "effect"
 
 import { inCloudSession } from "../vcs/identity.ts"
 import type { Env } from "./environment.ts"
+import { SetupFailure } from "./errors.ts"
 import { type Report } from "./report.ts"
 import { type Scope, settingsFile } from "./scope.ts"
 import { mergeUserSettings, missingSettingKeys } from "./settings.ts"
@@ -71,7 +72,19 @@ export const doctor = Effect.fn("doctor")(function* (
   options: { readonly fix: boolean; readonly scope?: Scope; readonly cwd?: string },
 ) {
   const scope = options.scope ?? "user"
-  const file = yield* settingsFile(env, scope, options.cwd ?? process.cwd())
+  const located = yield* settingsFile(env, scope, options.cwd ?? process.cwd()).pipe(
+    Effect.catchTag("SetupFailure", (error) => Effect.succeed(error)),
+  )
+  if (located instanceof SetupFailure) {
+    // The target is refused (a symlink): report it as the failing settings check, fix nothing.
+    const lines = yield* Effect.all([
+      checkBun,
+      checkCommand(env, "ctx7"),
+      Effect.succeed(fail("settings", located.message)),
+    ])
+    return { lines, ok: false } satisfies Report
+  }
+  const { file } = located
   const before = yield* checks(env, file, scope)
   const failing = (name: string) => before.some((line) => line.startsWith(`FAIL ${name}:`))
   const fixes =
@@ -82,7 +95,7 @@ export const doctor = Effect.fn("doctor")(function* (
     options.fix && failing("settings")
       ? yield* asStep(
           `${scope} settings`,
-          mergeUserSettings({ file, subagentCacheTtl: "1h", dryRun: false }),
+          mergeUserSettings({ env, file, subagentCacheTtl: "1h", dryRun: false }),
         )
       : []
   const ran = [...fixes, ...settingsFixes]

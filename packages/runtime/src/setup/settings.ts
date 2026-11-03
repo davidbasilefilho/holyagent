@@ -1,5 +1,6 @@
 import { Effect, Equal } from "effect"
 
+import { type Env } from "./environment.ts"
 import {
   applyDefaults,
   type Default,
@@ -9,6 +10,7 @@ import {
   readJsonObject,
   writeJsonObject,
 } from "./json-file.ts"
+import { addRecorded, clearRecorded, readRecorded, type Recorded } from "./record.ts"
 import { show } from "./report.ts"
 
 /** The marketplace and plugin the user settings point Claude Code at. */
@@ -78,23 +80,36 @@ const describe = ({ path, status, value, wanted }: Entry): string => {
 /**
  * Adds the missing keys to the settings file `file` (the user, project or local settings, see
  * `settingsFile`), creating it when needed. Existing keys and values are never changed, and the
- * file is written only when something was added (and not at all on a dry run). Returns the report
- * lines: the file, one line per key and a summary. Fails with SetupFailure when the file cannot be
- * read as a JSON object or written.
+ * file is written only when something was added (and not at all on a dry run). The keys it added
+ * are recorded outside the project (see `recordPath`), which is what `--undo` removes. Returns the
+ * report lines: the file, one line per key and a summary. Fails with SetupFailure when the file or
+ * the record cannot be read or written; a record that cannot be read fails before anything is
+ * written.
  */
 export const mergeUserSettings = Effect.fn("mergeUserSettings")(function* (options: {
+  readonly env: Env
   readonly file: string
   readonly subagentCacheTtl: CacheTtl
   readonly dryRun: boolean
 }) {
-  const { file } = options
+  const { file, env } = options
   const existing = yield* readJsonObject(file)
-  const { merged, entries } = applyDefaults(
-    existing,
-    defaultsFor(existing, options.subagentCacheTtl),
+  const defaults = defaultsFor(existing, options.subagentCacheTtl)
+  const { merged, entries } = applyDefaults(existing, defaults)
+  const names = new Set(
+    entries.filter((entry) => entry.status === "added").map((entry) => entry.path),
   )
-  const added = entries.filter((entry) => entry.status === "added").length
-  if (added > 0 && !options.dryRun) yield* writeJsonObject(file, merged)
+  const added = names.size
+  if (added > 0 && !options.dryRun) {
+    // Read the record first, so one that cannot be decoded stops the run before the settings change.
+    yield* readRecorded(env, file)
+    yield* writeJsonObject(file, merged)
+    yield* addRecorded(
+      env,
+      file,
+      defaults.filter(({ path }) => names.has(path.join("."))),
+    )
+  }
   const summary =
     added === 0
       ? "no changes"
@@ -107,14 +122,24 @@ export const mergeUserSettings = Effect.fn("mergeUserSettings")(function* (optio
 /** One planned removal: `removed` when setup's value is there, `absent` when nothing of it is. */
 interface Removal {
   readonly path: string
-  readonly status: "removed" | "absent" | "kept"
-  /** What was taken out, or the existing value for `kept`. */
+  readonly status: "removed" | "absent" | "kept" | "unrecorded"
+  /** What was taken out, or the existing value for `kept` and `unrecorded`. */
   readonly value: unknown
   readonly wanted: unknown
 }
 
 const without = (node: JsonObject, key: string): JsonObject =>
   Object.fromEntries(Object.entries(node).filter(([name]) => name !== key))
+
+/** The value at `path`, or undefined when a level is missing or not an object. */
+const valueAt = (node: JsonObject, path: readonly string[]): unknown => {
+  let current: unknown = node
+  for (const key of path) {
+    if (!isJsonObject(current)) return undefined
+    current = current[key]
+  }
+  return current
+}
 
 /**
  * Takes setup's value for `path` out of `node`. A scalar or object is removed only when equal to
@@ -165,32 +190,56 @@ const describeRemoval = ({ path, status, value, wanted }: Removal): string => {
       return `= ${path}: nothing to remove`
     case "kept":
       return `~ ${path}: kept ${show(value)} (setup writes ${show(wanted)})`
+    case "unrecorded":
+      return `~ ${path}: kept ${show(value)} (setup did not record adding it; remove it by hand if you want it gone)`
   }
 }
 
 /**
- * Backs out what {@link mergeUserSettings} wrote from the settings file `file`: only values equal to
- * the ones setup writes are removed, so a changed value stays and is reported as kept. From
- * `permissions.deny` only the WebSearch and WebFetch entries go, and a parent object left empty is
- * dropped. The file is rewritten only when something was removed (and not on a dry run), and a
- * missing file is not created. Returns the report lines: the file, one line per key and a summary.
- * Fails with SetupFailure when the file cannot be read as a JSON object or written.
+ * Backs out what {@link mergeUserSettings} recorded for the settings file `file`. A recorded key is
+ * removed only while its value still equals what setup wrote (from a list such as
+ * `permissions.deny`, only the entries setup added), so a changed value stays and is reported as
+ * kept. A key that setup has no record of adding, such as one that was there before setup or was
+ * added by an earlier version, stays and is reported with a hint. A parent object left empty is
+ * dropped. The file is rewritten only when something was removed (and not on a dry run), a missing
+ * file is not created, and the record of the file is cleared after a real run. Returns the report
+ * lines: the file, one line per key and a summary. Fails with SetupFailure when the file or the
+ * record cannot be read as JSON or written.
  */
 export const undoUserSettings = Effect.fn("undoUserSettings")(function* (options: {
+  readonly env: Env
   readonly file: string
-  readonly subagentCacheTtl: CacheTtl
   readonly dryRun: boolean
 }) {
-  const { file } = options
+  const { file, env } = options
   let result = yield* readJsonObject(file)
+  const recorded = yield* readRecorded(env, file)
+  const plan: ReadonlyArray<Recorded> = [
+    ...recorded,
+    ...userSettingsDefaults("1h")
+      .filter(({ path }) => !recorded.some((item) => item.path.join(".") === path.join(".")))
+      .map(({ path }) => ({ path, value: undefined })),
+  ]
   const removals: Array<Removal> = []
-  for (const { path, value } of userSettingsDefaults(options.subagentCacheTtl)) {
+  for (const { path, value } of plan) {
+    if (value === undefined) {
+      const existing = valueAt(result, path)
+      removals.push(
+        existing === undefined
+          ? { path: path.join("."), status: "absent", value: undefined, wanted: undefined }
+          : { path: path.join("."), status: "unrecorded", value: existing, wanted: undefined },
+      )
+      continue
+    }
     const [next, removal] = take(result, path, 0, value)
     result = next
     removals.push(removal)
   }
   const removed = removals.filter((removal) => removal.status === "removed").length
-  if (removed > 0 && !options.dryRun) yield* writeJsonObject(file, result)
+  if (!options.dryRun) {
+    if (removed > 0) yield* writeJsonObject(file, result)
+    yield* clearRecorded(env, file)
+  }
   const summary =
     removed === 0
       ? "no changes"
