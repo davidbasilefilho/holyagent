@@ -1,0 +1,10 @@
+{
+  "id": "pull-0mw0p9dh6-rz9d",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "number": 51,
+  "url": "https://github.com/davidbasilefilho/holyagent/pull/51",
+  "branch": "release/0.2.0/feat/evidence-judging",
+  "base": "release/0.2.0/feat/setup-scope-and-defaults",
+  "created": true,
+  "recordedAt": "2026-11-03T13:04:32.634Z"
+}
