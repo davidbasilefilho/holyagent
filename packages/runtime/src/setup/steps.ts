@@ -6,7 +6,6 @@ import { inCloudSession } from "../vcs/identity.ts"
 import { type Env, homeDirectory, userFiles } from "./environment.ts"
 import type { SetupFailure } from "./errors.ts"
 import { fileExists } from "./json-file.ts"
-import { cleanupLeftovers } from "./leftovers.ts"
 import { added, failed, hint, present, type Report, skipped } from "./report.ts"
 import { type CacheTtl, mergeUserSettings } from "./settings.ts"
 import { EMPTY_BUNFIG, Shell } from "./shell.ts"
@@ -118,16 +117,14 @@ export interface SetupOptions {
 }
 
 /**
- * Sets up HolyAgent for the current user: ctx7, the recommended keys of the user settings, and the
- * removal of what an earlier Billion Context setup left in the Claude Code files. Every step checks
- * its own result first, and a step that fails does not stop the next one. On a dry run nothing is
- * installed, removed or written, and the lines say what would be. In a claude.ai cloud session ctx7
- * is skipped, and the settings are still merged.
+ * Sets up HolyAgent for the current user: ctx7 and the recommended keys of the user settings. Every
+ * step checks its own result first, and a step that fails does not stop the next one. On a dry run
+ * nothing is installed or written, and the lines say what would be. In a claude.ai cloud session
+ * ctx7 is skipped, and the settings are still merged.
  */
 export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptions) {
   const cloud = inCloudSession(env)
   const lines = [
-    ...(yield* asStep("billion-context", cleanupLeftovers(env, options.dryRun))),
     ...(options.skipCtx7
       ? [skipped("ctx7: skipped by flag")]
       : cloud

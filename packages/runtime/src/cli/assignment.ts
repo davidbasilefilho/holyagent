@@ -1,3 +1,5 @@
+import { resolve } from "node:path"
+
 import { Effect, Schema } from "effect"
 
 import { accept } from "../domain/acceptance.ts"
@@ -14,13 +16,15 @@ import { closeAssignment, dispatch, record } from "../domain/lifecycle.ts"
 import { Revision } from "../domain/primitives.ts"
 import { findAssignment, findIntent, type Project } from "../domain/project.ts"
 import { RoleTask, routeFor } from "../domain/route.ts"
+import { io } from "../state/files.ts"
 import { readState, type Snapshot } from "../state/store.ts"
 import { booleanFlag, choiceFlag, requiredFlag, stringFlag } from "./args.ts"
+import { writeBrief, writeReport } from "./brief.ts"
 import { nowIso } from "./context.ts"
 import { AgentMismatch, Usage } from "./errors.ts"
 import { resolveIntent } from "./intent.ts"
 import { JsonReport, renderJsonReport } from "./jsonreport.ts"
-import { acceptanceFrom, renderPrompt } from "./report.ts"
+import { acceptanceFrom, dispatchPrompt, journalResults, renderPrompt } from "./report.ts"
 import { type Call, type Command, WithTrailer } from "./types.ts"
 import { assignmentRow, assignmentView, byId, present } from "./views.ts"
 
@@ -99,6 +103,10 @@ const CLOSE_USAGE =
   "assignment close <id> --outcome success|failure|errored|interrupted|stopped [--accept <rationale>] [--report-json]"
 const LIST_USAGE = "assignment list [--state <state>] [--all] [--full]"
 
+const REPORTS_USAGE = "assignment reports <journal.jsonl>"
+
+const wordCount = (text: string): number => text.split(/\s+/).filter((word) => word !== "").length
+
 const withoutNamespace = (type: string | undefined): string | undefined =>
   type?.startsWith(`${PLUGIN_NAMESPACE}:`) === true ? type.slice(PLUGIN_NAMESPACE.length + 1) : type
 
@@ -170,12 +178,13 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
       "Start an Assignment and say how to run it: spawn an agent or continue a warm one. A new draft is created and started in one step",
     input: `{id} for a Ready Assignment, or a new draft ${DRAFT_SHAPE}`,
     output:
-      "TOON fields (id, state, agent/model/effort or continue, reason), then a line `prompt:` alone, then the specialist prompt verbatim to the end; pass that text as it is: as the prompt of its agent() in your inline workflow script first, to the Agent tool only when the Workflow tool is disabled or unavailable, and by SendMessage only for a warm continuation",
+      "TOON fields (id, state, agent/model/effort or continue, reason), then a line `prompt:` alone, then a two-line specialist prompt that names the brief file the full Assignment was written to; pass that text as it is: as the prompt of its agent() in your inline workflow script first, to the Agent tool only when the Workflow tool is disabled or unavailable, and by SendMessage only for a warm continuation. The brief itself is never printed: the specialist reads it with the Read tool",
     notes: [...DRAFT_NOTES, 'dispatching a Ready Assignment takes {"id": "<id>"}'],
     flags: { input: "string" },
     positionals: 0,
-    run: ({ update, config, inputBy }) =>
+    run: (call) =>
       Effect.gen(function* () {
+        const { update, config, inputBy } = call
         const request = yield* inputBy((raw) =>
           typeof raw === "object" && raw !== null && "id" in raw ? ExistingRef : AssignmentInput,
         ).pipe(
@@ -196,7 +205,16 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
             const id = "id" in request ? request.id : newAssignmentId
             const project =
               "id" in request ? snapshot.project : yield* withPlanned(snapshot, request, id, now)
-            return yield* dispatch(project, snapshot.specialists, id, now, settings)
+            const dispatched = yield* dispatch(project, snapshot.specialists, id, now, settings)
+            // Written before the transition commits, so a brief that cannot be stored leaves the
+            // Assignment Ready instead of Running with no prompt to send.
+            const agent = `${PLUGIN_NAMESPACE}:${routeFor(dispatched.assignment.roleTask).agent}`
+            const path = yield* writeBrief(
+              call,
+              dispatched.assignment.id,
+              renderPrompt(dispatched.assignment, agent),
+            )
+            return { ...dispatched, prompt: dispatchPrompt(dispatched.assignment, agent, path) }
           }),
         )
         return new WithTrailer(
@@ -206,10 +224,7 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
             ...directiveView(started.directive),
           },
           "prompt",
-          renderPrompt(
-            started.assignment,
-            `${PLUGIN_NAMESPACE}:${routeFor(started.assignment.roleTask).agent}`,
-          ),
+          started.prompt,
         )
       }),
   },
@@ -253,7 +268,7 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
       "the specialist's report as raw text. Required for success; optional for the other outcomes, which store the outcome name when it is empty. With --accept it ends with `evidence:` and one `<criterion or evidence label>: <support>` line per blocking criterion and required label. With --report-json it is a JSON report object returned by an agent() that was given a schema ({status: done|partial|blocked, changed_paths, checks: [{command, exit}], blockers, notes, evidence: [{key, support}]}), which is stored as the text of such a report (fields beyond these are kept in it)",
     notes: [
       "pass the report through a quoted heredoc so it stays intact",
-      "--accept applies to success only and reads the last `evidence:` block: one `<criterion text or evidence label>: <support>` line per blocking criterion and per required label. The text before the colon matches the criterion ignoring case, spacing, trailing punctuation, a leading `[blocking]` and a trailing `(dimension)`; a support may continue on indented lines below its entry. Evidence for a different criterion matches nothing. Accept only support you judge true",
+      "--accept applies to success only and reads the last `evidence:` block: one `<criterion text or evidence label>: <support>` line per blocking criterion and per required label. The text before the colon matches the criterion, or its label (the criterion's text before its first colon, unless two criteria share it), ignoring case, spacing, trailing punctuation, a leading `[blocking]` and a trailing `(dimension)`; a support may continue on indented lines below its entry. Evidence for a different criterion matches nothing. Accept only support you judge true",
       "an evidence gap (InsufficientAcceptance) records nothing: SendMessage the missing support to the same subagent, then close again with the corrected report, or when the Assignment is already Succeeded and not accepted, close it as success again or run `assignment accept <id> --rationale <text> --report` with the corrected report on stdin; a workflow agent cannot be messaged, so draft a follow-up with followUpOf",
       "outcomes: success; failure (the work failed); errored (the agent died or returned no report); interrupted (its agent is gone after a resume or compaction); stopped (you stopped it). A report from an inline workflow script is the specialist's own text: pass it verbatim on stdin, with --report-json only for a JSON report object",
     ],
@@ -369,6 +384,40 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
           revision: assignment.acceptance?.revision,
           carriedFrom: assignment.acceptance?.carriedFrom,
         })
+      }),
+  },
+  {
+    path: ["assignment", "reports"],
+    usage: REPORTS_USAGE,
+    summary:
+      "Write the results of a Workflow run's journal to report files named by Assignment id, and list them",
+    output:
+      "TOON: `reports` rows of id, path and words, one per Assignment id, and `notAssignmentIds` rows of label and agentId for results whose label is not an Assignment id (not written)",
+    notes: [
+      "the journal is the run's journal.jsonl: `started` entries (key, agentId, label) and `result` entries (key, agentId, result) joined by key; label each agent() with its Assignment id so its report lands in <id>.md",
+      "reports go to holyagent/reports in the git common directory (local/reports of the state folder outside git), beside the briefs; a repeated label keeps its last result. Read a report there, or close from it: `assignment close <id> --outcome success --accept <rationale> < <report-file>`",
+      "a journal line that is not JSON, or a started or result entry without its fields, refuses the whole journal and writes nothing",
+    ],
+    flags: {},
+    positionals: 1,
+    state: "peek",
+    run: (call) =>
+      Effect.gen(function* () {
+        const source = resolve(call.cwd, idArgument(call.args.positionals))
+        const journal = yield* io(source, () => Bun.file(source).text())
+        const results = yield* journalResults(journal, source)
+        const byId = new Map<string, { readonly report: string }>()
+        const strays: Array<{ label: string; agentId: string }> = []
+        for (const { label, agentId, report } of results) {
+          if (label !== undefined && Schema.is(AssignmentId)(label)) byId.set(label, { report })
+          else strays.push({ label: label ?? "", agentId })
+        }
+        const reports = yield* Effect.forEach([...byId], ([id, { report }]) =>
+          writeReport(call, id, report).pipe(
+            Effect.map((path) => ({ id, path, words: wordCount(report) })),
+          ),
+        )
+        return { reports, notAssignmentIds: strays }
       }),
   },
   {

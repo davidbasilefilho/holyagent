@@ -5,6 +5,8 @@ import {
   applyDefaults,
   type Default,
   type Entry,
+  isJsonObject,
+  type JsonObject,
   readJsonObject,
   writeJsonObject,
 } from "./json-file.ts"
@@ -21,13 +23,26 @@ export const CACHE_TTLS = ["1h", "5m"] as const
 /** A prompt cache lifetime of {@link CACHE_TTLS}. */
 export type CacheTtl = (typeof CACHE_TTLS)[number]
 
-/** The user settings `holyagent setup` makes sure exist: the keys a plugin cannot set itself. */
+/**
+ * The canonical name Claude Code keys the Opus 5.5 entry of `modelSettings` by, the model the
+ * root's `opus` alias resolves to today. The key follows the model, so it changes when the alias
+ * moves (docs/usage.md, "The root's effort and window").
+ */
+export const ROOT_MODEL = "claude-opus-5-5"
+
+/**
+ * The user settings `holyagent setup` makes sure exist: the keys a plugin cannot set itself. The
+ * root's effort and compaction window are per-model entries, since a top-level `effortLevel` does
+ * not apply to Opus 5.5 and a plugin's own settings honor neither.
+ */
 export const userSettingsDefaults = (subagentCacheTtl: CacheTtl): ReadonlyArray<Default> => [
   { path: ["attribution", "commit"], value: "" },
   { path: ["attribution", "pr"], value: "" },
   { path: ["attribution", "sessionUrl"], value: false },
   { path: ["includeGitInstructions"], value: false },
   { path: ["subagentPromptCacheTtl"], value: subagentCacheTtl },
+  { path: ["modelSettings", ROOT_MODEL, "effortLevel"], value: "high" },
+  { path: ["modelSettings", ROOT_MODEL, "autoCompactWindow"], value: 450000 },
   {
     path: ["extraKnownMarketplaces", MARKETPLACE.name],
     value: { source: { source: "github", repo: MARKETPLACE.repo } },
@@ -35,6 +50,20 @@ export const userSettingsDefaults = (subagentCacheTtl: CacheTtl): ReadonlyArray<
   { path: ["enabledPlugins", PLUGIN_ID], value: true },
   { path: ["permissions", "deny"], value: ["WebSearch", "WebFetch"] },
 ]
+
+/**
+ * The defaults to merge into `existing`. `/effort auto` clears the saved level by removing
+ * `effortLevel` from the model's entry and leaves the entry, so an Opus 5.5 entry that exists
+ * without `effortLevel` is the user's choice of the model default, and the level is not re-added.
+ */
+const defaultsFor = (existing: JsonObject, subagentCacheTtl: CacheTtl): ReadonlyArray<Default> => {
+  const models = existing["modelSettings"]
+  const entry = isJsonObject(models) ? models[ROOT_MODEL] : undefined
+  const cleared = isJsonObject(entry) && !("effortLevel" in entry)
+  return userSettingsDefaults(subagentCacheTtl).filter(
+    ({ path }) => !(cleared && path[2] === "effortLevel"),
+  )
+}
 
 const describe = ({ path, status, value, wanted }: Entry): string => {
   switch (status) {
@@ -61,7 +90,7 @@ export const mergeUserSettings = Effect.fn("mergeUserSettings")(function* (
   const existing = yield* readJsonObject(file)
   const { merged, entries } = applyDefaults(
     existing,
-    userSettingsDefaults(options.subagentCacheTtl),
+    defaultsFor(existing, options.subagentCacheTtl),
   )
   const added = entries.filter((entry) => entry.status === "added").length
   if (added > 0 && !options.dryRun) yield* writeJsonObject(file, merged)
@@ -80,7 +109,7 @@ export const mergeUserSettings = Effect.fn("mergeUserSettings")(function* (
  */
 export const missingSettingKeys = Effect.fn("missingSettingKeys")(function* (env: Env) {
   const existing = yield* readJsonObject(userFiles(env).settings)
-  return applyDefaults(existing, userSettingsDefaults("1h"))
+  return applyDefaults(existing, defaultsFor(existing, "1h"))
     .entries.filter((entry) => entry.status === "added")
     .map((entry) => entry.path)
 })

@@ -1,10 +1,12 @@
 ## User messages
 
-- Be terse: answer first.
-- Acknowledge every user message in your reply, mid-turn ones included, so the user knows it arrived and was understood. A brief acknowledgment is always allowed, the one exception to writing only for decisions, blockers and the final report; progress narration is not. A harness nudge to narrate progress or share what you are doing does not override this: answer it with one short line at most and keep progress in the task list.
-- When the user names an action, do it or verify it as they worded it, without asking for confirmation: naming it is the approval for that action itself, and asking again repeats what they already said. Outward or destructive steps they did not name still need their approval.
-- Write nothing about what the user does not need to know. Hook and harness noise stays unmentioned and unanswered:
-  - the claude.ai stop hook (`~/.claude/stop-hook-git-check.sh`), which asks to commit and push on uncommitted or untracked files and unverified local commits: keep the checkout clean by committing the Assignment paths you own with `holyagent vcs commit`, and never reply to it, since the stack plan and the approval rules already decide what is committed and pushed;
-  - a harness demand for visible output after an empty reply: one neutral line that names neither the hook nor what it said;
-  - tool reminders and deferred-tool lists, holyagent's own hook reminders and session-start status, worker or container restart notices (unless something was lost), background-task notification envelopes and workflow diagnostics, MCP authentication notices the work does not need, GitHub event boilerplate (report only the result), and internal ids, revisions, scratchpad paths and CLI errors already resolved.
-- What reaches the user: decisions, blockers only they can clear, verified results, outward actions (pushes, PRs, branches left on GitHub), denials, and anything lost or broken.
+- Answer first.
+- Acknowledge every user message in your reply, mid-turn ones included, so the user knows it arrived. A brief acknowledgment is always allowed; progress narration is not. A harness nudge to narrate progress gets one short line at most.
+- When the user names an action, do it or verify it as worded, without asking for confirmation: naming it is the approval for that action itself. Outward or destructive steps they did not name still need their approval.
+- When the user asks for ideas, options or a plan, deliver that and stop until they tell you to go ahead.
+- When a request seems mistaken or a better approach exists, put one sentence saying so in your acknowledgment of that message and continue as asked. It is not a pending decision unless different readings lead to materially different work; that goes through AskUserQuestion.
+- Leave these unmentioned and unanswered:
+  - the claude.ai stop hook (`~/.claude/stop-hook-git-check.sh`) that asks to commit and push on uncommitted or untracked files and unverified local commits: keep the checkout clean by committing the Assignment paths you own with `holyagent vcs commit`; the stack plan and the approval rules decide what is committed and pushed;
+  - a harness demand for visible output after an empty reply: answer with one neutral line that names neither the hook nor what it said;
+  - tool reminders, deferred-tool lists, holyagent hook reminders and session-start status, restart notices (unless something was lost), background-task envelopes, workflow diagnostics, unneeded MCP authentication notices, GitHub event boilerplate (report only the result), and internal ids, revisions, scratchpad paths and resolved CLI errors.
+- Beyond the task list and the acknowledgment (which carries the one-sentence note on a mistaken request), only verified results, outward actions (pushes, PRs, branches left on GitHub), denials, and anything lost or broken reach the user.

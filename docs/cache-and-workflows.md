@@ -4,9 +4,9 @@ The model never reasons about the prompt cache, its lifetime or cost. The design
 
 ## Mechanisms
 
-**Static first.** Every prompt puts stable material before task specifics. The agent files, skills and instruction text hold no dates, counters or state. The specialist prompt that `assignment dispatch` prints has a fixed order (role line, objective, scope, constraints, ownership paths, criteria, required evidence, closing instruction). Changing the system prompt, the tools or the roster mid-session would invalidate the prompt cache, so such changes ship only as versioned releases. The audit of the predecessor found this layout cost nothing: no tool, agent or skill changes across 402 session starts.
+**Static first.** Every prompt puts stable material before task specifics. The agent files, skills and instruction text hold no dates, counters or state. The brief that `assignment dispatch` writes to a file, and points the specialist to in a two-line prompt, has a fixed order (role line, objective, scope, constraints, ownership paths, criteria, required evidence, closing instruction). Changing the system prompt, the tools or the roster mid-session would invalidate the prompt cache, so such changes ship only as versioned releases. The audit of the predecessor found this layout cost nothing: no tool, agent or skill changes across 402 session starts.
 
-**Warm reuse is the CLI's decision.** `assignment dispatch` prints either a spawn (`agent`, `model`, `effort`, `reason`) or `continue: <agentId>` with the same specialist prompt to send. The root only obeys. The CLI continues a specialist when it passes every stage, in order:
+**Warm reuse is the CLI's decision.** `assignment dispatch` prints either a spawn (`agent`, `model`, `effort`, `reason`) or `continue: <agentId>` with the same two-line prompt to send. The root only obeys. The CLI continues a specialist when it passes every stage, in order:
 
 1. it is idle and has the same role task;
 2. it has the same model and effort, so its prompt prefix is identical;
@@ -27,9 +27,9 @@ A workflow runs one or more Assignments in one call. The plugin ships no workflo
 The script is plain JavaScript with these parts:
 
 - a literal `export const meta = { name, description }` first;
-- one `agent(prompt, { agentType: "holyagent:<agent>", model, effort })` per Assignment, with the dispatched prompt, model and effort, identical within a phase so the prompt prefix is shared, and no `schema`, so the call returns the specialist's own report;
+- one `agent(prompt, { agentType: "holyagent:<agent>", model, effort, label })` per Assignment, with the dispatched prompt, model and effort and `label` set to the Assignment id, identical within a phase so the prompt prefix is shared, and no `schema`, so the call returns the specialist's own report;
 - `pipeline()` over the Assignments by default (no barrier between stages), `parallel()` only where a stage needs every earlier result, and a review stage after the writers it reviews;
-- a returned object of the reports keyed by Assignment id.
+- a returned object `{ done: [ids] }` of the Assignments whose agent returned a report; the reports stay out of the Workflow result, and so out of the root's context.
 
 Work that would continue a warm specialist stays out of the workflow, since a workflow's agents are new and cannot be messaged; the warm context is worth more.
 
@@ -43,7 +43,8 @@ An inline script whose every `agent()` call passes a string-literal `agentType` 
 
 ```text
 assignment record <id> --agent workflow:<run-id>/<id>
-assignment close <id> --outcome <o> [--accept "<rationale>"]   # the entry's report on stdin, verbatim
+assignment reports <journal.jsonl>                              # writes each agent's report to a file keyed by its label; prints id, path, word count
+assignment close <id> --outcome <o> [--accept "<rationale>"]   # the entry's report file on stdin, verbatim
 ```
 
-The agent id must have exactly that form, naming its own Assignment. The root passes each report to `assignment close` exactly as the specialist returned it and never retypes or summarizes it, since the CLI stores and checks that text. A null report means the agent died: close it `errored`. Workflow agents (`workflow:` ids) are never continued; a gap in their report is a new draft with `followUpOf`.
+The agent id must have exactly that form, naming its own Assignment. The root passes each report file to `assignment close` exactly as the specialist returned it and never retypes or summarizes it, since the CLI stores and checks that text. What the root does with an Assignment that `assignment reports` does not list is in its workflow text. Workflow agents (`workflow:` ids) are never continued; a gap in their report is a new draft with `followUpOf`.

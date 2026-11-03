@@ -1,11 +1,24 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import { mkdir, readdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
-import { Effect } from "effect"
+import { $ } from "bun"
+import { Effect, Exit } from "effect"
 
 import { loadProject } from "../src/state/store.ts"
-import { cleanup, fakeGitHub, initRepo, put, scratch, seed, sh, toon, vcs } from "./vcs-fixtures.ts"
+import { fetchRemoteBranch, killGroup, releaseGroup } from "../src/state/tree.ts"
+import {
+  cleanup,
+  fakeGitHub,
+  GIT_ENV,
+  initRepo,
+  put,
+  scratch,
+  seed,
+  sh,
+  toon,
+  vcs,
+} from "./vcs-fixtures.ts"
 
 afterEach(cleanup)
 
@@ -247,6 +260,402 @@ describe("the state branch", () => {
       (await sh(first, ["git", "rev-parse", STATE])).trim(),
     )
     expect((await sh(second, ["git", "config", `branch.${STATE}.remote`])).trim()).toBe("origin")
+  })
+
+  test("the state branch is fetched from origin when the clone has no remote-tracking ref for it", async () => {
+    const remote = await scratch("holyagent-origin-")
+    await sh(remote, ["git", "init", "--bare", "-q", "-b", "main", "."])
+    const first = await scratch("holyagent-clone-")
+    await sh(first, ["git", "clone", "-q", remote, "."])
+    await sh(first, ["git", "config", "user.name", OWNER.name])
+    await sh(first, ["git", "config", "user.email", OWNER.email])
+    await seed(first, { "a.txt": "a\n" })
+    await sh(first, ["git", "push", "-q", "origin", "main"])
+    const intent = await createIntent(first, "Ship the parser")
+    await sh(first, ["git", "push", "-q", "origin", STATE])
+
+    const second = await scratch("holyagent-clone-")
+    await sh(second, ["git", "clone", "-q", remote, "."])
+    await sh(second, ["git", "config", "user.name", OWNER.name])
+    await sh(second, ["git", "config", "user.email", OWNER.email])
+    await sh(second, ["git", "update-ref", "-d", `refs/remotes/origin/${STATE}`])
+    expect(await sh(second, ["git", "branch", "--all", "--list", `*${STATE}`])).toBe("")
+
+    const added = await createIntent(second, "Ship the printer")
+    const listed = toon(await holy(second, ["intent", "list"])) as {
+      intents: Array<{ id: string }>
+    }
+
+    expect(listed.intents.map((row) => row.id).toSorted()).toEqual([added, intent].toSorted())
+    await sh(second, [
+      "git",
+      "merge-base",
+      "--is-ancestor",
+      (await sh(first, ["git", "rev-parse", STATE])).trim(),
+      STATE,
+    ])
+    expect((await sh(second, ["git", "config", `branch.${STATE}.remote`])).trim()).toBe("origin")
+  })
+
+  test("a remote that cannot be reached leaves the state branch starting from the base", async () => {
+    const dir = await initRepo(OWNER)
+    await sh(dir, ["git", "remote", "add", "origin", join(dir, "missing-remote")])
+    const base = await seed(dir, { "a.txt": "a\n" })
+
+    await createIntent(dir, "Ship the parser")
+
+    expect((await sh(dir, ["git", "merge-base", STATE, "main"])).trim()).toBe(base)
+  })
+})
+
+describe("the fetch of the remote state branch", () => {
+  /**
+   * A clone whose origin is an ssh URL and whose `ssh` is a script that logs how it was called (its
+   * arguments and the askpass variables) and then runs `behavior`, so nothing leaves the machine.
+   */
+  const overSsh = async (behavior: string) => {
+    const dir = await initRepo(OWNER)
+    await seed(dir, { "a.txt": "a\n" })
+    await sh(dir, ["git", "remote", "add", "origin", "ssh://git@example.invalid/octo/project.git"])
+    const bin = await scratch("holyagent-bin-")
+    const log = join(bin, "ssh.log")
+    const script = join(bin, "ssh")
+    await writeFile(
+      script,
+      `#!/bin/sh\necho "args: $*" >> "${log}"\necho "askpass: [${"$"}{SSH_ASKPASS-unset}] [${"$"}{GIT_ASKPASS-unset}]" >> "${log}"\n${behavior}\n`,
+      { mode: 0o755 },
+    )
+    const env = { PATH: `${bin}:${process.env["PATH"] ?? ""}` }
+    const logged = async () => ((await Bun.file(log).exists()) ? await Bun.file(log).text() : "")
+    return { dir, bin, script, env, logged }
+  }
+
+  test("ssh runs in batch mode with a connect timeout and no askpass program", async () => {
+    const { dir, env, logged } = await overSsh("exit 255")
+
+    toon(
+      await vcs(
+        dir,
+        ["intent", "create"],
+        fakeGitHub().layer,
+        { objective: "Ship the parser" },
+        { ...env, SSH_ASKPASS: "/bin/false", GIT_ASKPASS: "/bin/false" },
+      ),
+    )
+
+    const log = await logged()
+    expect(log).toContain("BatchMode=yes")
+    expect(log).toContain("ConnectTimeout=")
+    expect(log).toContain("askpass: [unset] []")
+    // An unreachable remote still leaves a working state branch.
+    expect((await sh(dir, ["git", "rev-parse", "--verify", STATE])).trim()).not.toBe("")
+  })
+
+  test("an ssh command the user chose is kept", async () => {
+    const { dir, script, logged } = await overSsh("exit 255")
+
+    toon(
+      await vcs(
+        dir,
+        ["intent", "create"],
+        fakeGitHub().layer,
+        { objective: "Ship the parser" },
+        { GIT_SSH_COMMAND: `${script} -o Chosen=yes` },
+      ),
+    )
+
+    const log = await logged()
+    expect(log).toContain("Chosen=yes")
+    expect(log).not.toContain("BatchMode")
+  })
+
+  test("a configured core.sshCommand is still used, in batch mode with a connect timeout", async () => {
+    const { dir, script, logged } = await overSsh("exit 255")
+    await sh(dir, ["git", "config", "core.sshCommand", `${script} -o Configured=yes`])
+
+    toon(await vcs(dir, ["intent", "create"], fakeGitHub().layer, { objective: "Ship the parser" }))
+
+    const log = await logged()
+    expect(log).toContain("Configured=yes")
+    expect(log).toContain("BatchMode=yes")
+    expect(log).toContain("ConnectTimeout=")
+  })
+
+  test("a configured core.sshCommand wins over GIT_SSH, so it gets the batch options too", async () => {
+    const { dir, script, logged } = await overSsh("exit 255")
+    await sh(dir, ["git", "config", "core.sshCommand", `${script} -o Configured=yes`])
+
+    toon(
+      await vcs(
+        dir,
+        ["intent", "create"],
+        fakeGitHub().layer,
+        { objective: "Ship the parser" },
+        { GIT_SSH: join(dir, "not-used-ssh") },
+      ),
+    )
+
+    const log = await logged()
+    expect(log).toContain("Configured=yes")
+    expect(log).toContain("BatchMode=yes")
+    expect(log).toContain("ConnectTimeout=")
+  })
+
+  test("the credential helpers the user configured still answer an https remote", async () => {
+    const dir = await initRepo(OWNER)
+    await seed(dir, { "a.txt": "a\n" })
+    const bin = await scratch("holyagent-bin-")
+    const log = join(bin, "helper.log")
+    const helper = join(bin, "helper.sh")
+    await writeFile(helper, `#!/bin/sh\necho "$1" >> "${log}"\n`, { mode: 0o755 })
+    // A server that demands credentials, so git asks its helper for them.
+    const server = Bun.serve({
+      port: 0,
+      fetch: () =>
+        new Response("denied", { status: 401, headers: { "WWW-Authenticate": 'Basic realm="x"' } }),
+    })
+    try {
+      await sh(dir, [
+        "git",
+        "remote",
+        "add",
+        "origin",
+        `http://localhost:${server.port}/octo/p.git`,
+      ])
+      await sh(dir, ["git", "config", "credential.helper", helper])
+
+      const found = await Effect.runPromise(fetchRemoteBranch(dir, GIT_ENV, STATE))
+
+      expect(found).toBe(false)
+      expect(await Bun.file(log).text()).toContain("get")
+    } finally {
+      await server.stop(true)
+    }
+  })
+
+  test("a fetch that hangs is killed at its timeout and counts as no remote branch", async () => {
+    const { dir, script } = await overSsh("sleep 5")
+    const started = Date.now()
+
+    const found = await Effect.runPromise(
+      fetchRemoteBranch(dir, { ...GIT_ENV, GIT_SSH_COMMAND: script }, STATE, 300),
+    )
+
+    expect(found).toBe(false)
+    expect(Date.now() - started).toBeLessThan(4000)
+  })
+
+  describe("the group kill", () => {
+    /** Runs `body` with `process.kill` recorded instead of sent. */
+    const recording = async (body: () => Promise<void>) => {
+      const calls: Array<[number, string | number | undefined]> = []
+      const spy = spyOn(process, "kill").mockImplementation((pid, signal) => {
+        calls.push([pid, signal])
+        return true
+      })
+      try {
+        await body()
+      } finally {
+        spy.mockRestore()
+      }
+      return calls
+    }
+    const kill = () => {}
+    const failed = Exit.fail("interrupted")
+
+    test("never signals a pid of 1 or less, which would reach every process or none", async () => {
+      const calls = await recording(async () => {
+        for (const pid of [1, 0, -1, -7, 1.5, Number.NaN, undefined as unknown as number])
+          await Effect.runPromise(killGroup({ pid, kill }))
+      })
+
+      expect(calls).toEqual([])
+    })
+
+    test("signals the group of a child with a real pid", async () => {
+      const calls = await recording(() => Effect.runPromise(killGroup({ pid: 4242, kill })))
+
+      expect(calls).toEqual([[-4242, "SIGKILL"]])
+    })
+
+    test("a failed use kills the group of a running child but not of one that already exited", async () => {
+      const calls = await recording(async () => {
+        await Effect.runPromise(releaseGroup({ pid: 4242, kill, exitCode: null }, failed))
+        await Effect.runPromise(releaseGroup({ pid: 4343, kill, exitCode: 0 }, failed))
+        await Effect.runPromise(releaseGroup({ pid: 4444, kill, exitCode: 128 }, failed))
+        await Effect.runPromise(releaseGroup({ pid: 4545, kill, exitCode: null }, Exit.succeed(0)))
+      })
+
+      expect(calls).toEqual([[-4242, "SIGKILL"]])
+    })
+  })
+
+  test("a fetch killed at its timeout leaves no helper process running", async () => {
+    const pidFile = join(await scratch("holyagent-pid-"), "helper.pid")
+    // The helper stands for an ssh or credential helper that git started and then hangs on.
+    const { dir, script } = await overSsh(`sleep 30 &\necho $! > "${pidFile}"\nwait`)
+
+    const found = await Effect.runPromise(
+      fetchRemoteBranch(dir, { ...GIT_ENV, GIT_SSH_COMMAND: script }, STATE, 1500),
+    )
+
+    expect(found).toBe(false)
+    const pid = Number((await Bun.file(pidFile).text()).trim())
+    expect(pid).toBeGreaterThan(1)
+    // A killed process nobody reaps stays a zombie (state Z) until its parent does; it runs no code.
+    const alive = async () => {
+      for (let attempt = 0; attempt < 20; attempt++) {
+        const state = (await $`ps -o stat= -p ${pid}`.quiet().nothrow().text()).trim()
+        if (state === "" || state.startsWith("Z")) return false
+        await Bun.sleep(50)
+      }
+      return true
+    }
+    expect(await alive()).toBe(false)
+  })
+
+  test("a hook makes no network call, and the next command fetches", async () => {
+    const { dir, env, logged } = await overSsh("exit 255")
+    // A work tree that already holds state is a project that keeps state, which makes the state worktree.
+    await put(dir, { ".holyagent/local/note.json": "{}\n" })
+    const payload = { hook_event_name: "SessionStart", source: "startup" }
+
+    const hooked = await vcs(dir, ["hook", "session-start"], fakeGitHub().layer, payload, env)
+
+    expect(hooked.stderr).toBe("")
+    expect(await logged()).toBe("")
+    expect(await sh(dir, ["git", "branch", "--list", STATE])).toBe("")
+
+    toon(await vcs(dir, ["intent", "list"], fakeGitHub().layer, undefined, env))
+
+    expect(await logged()).toContain("BatchMode=yes")
+  })
+})
+
+describe("a base branch that ignores the state folder", () => {
+  test("state transitions are still committed on the state branch, and the work branch's ignore rules stay", async () => {
+    const dir = await initRepo(OWNER)
+    await seed(dir, { "a.txt": "a\n", ".gitignore": "/.holyagent/\n" })
+
+    const intent = await createIntent(dir, "Ship the parser")
+
+    const tracked = lines(await sh(dir, ["git", "ls-tree", "-r", "--name-only", STATE]))
+    expect(tracked.some((path) => path.includes(`${intent}`))).toBe(true)
+    expect(tracked.some((path) => path.startsWith(".holyagent/local/"))).toBe(false)
+    expect(await sh(dir, ["git", "show", "main:.gitignore"])).toBe("/.holyagent/\n")
+    expect(await sh(dir, ["git", "status", "--porcelain"])).toBe("")
+  })
+
+  test("a stray file that its own ignore rule covers is never committed, a record always is", async () => {
+    const dir = await initRepo(OWNER)
+    await seed(dir, { "a.txt": "a\n", ".gitignore": "/.holyagent/\n" })
+    const first = await createIntent(dir, "Ship the parser")
+    const tree = await stateTree(dir)
+    const state = join(tree, ".holyagent")
+    const folder = (await readdir(join(state, "intents")))[0] ?? ""
+    await writeFile(join(state, ".gitignore"), "scratch.txt\nintents/*/notes.json\n")
+    await writeFile(join(state, "scratch.txt"), "stray\n")
+    await writeFile(join(state, "intents", folder, "notes.json"), "{}\n")
+    await writeFile(join(state, "intents", folder, "draft.tmp"), "stray\n")
+
+    const second = await createIntent(dir, "Ship the lexer")
+
+    const tracked = lines(await sh(dir, ["git", "ls-tree", "-r", "--name-only", STATE]))
+    expect(tracked.some((path) => path.includes(`${first}/intent.json`))).toBe(true)
+    expect(tracked.some((path) => path.includes(`${second}/intent.json`))).toBe(true)
+    for (const stray of ["scratch.txt", "notes.json", "draft.tmp", ".holyagent/.gitignore"])
+      expect({ stray, committed: tracked.some((path) => path.endsWith(stray)) }).toEqual({
+        stray,
+        committed: false,
+      })
+  })
+})
+
+describe("the first commit on a state branch that tracks nothing yet", () => {
+  test("git is never asked to update a pathspec that matches no tracked file", async () => {
+    const dir = await initRepo(OWNER)
+    await seed(dir, { "a.txt": "a\n" })
+    // A git that, like newer releases, rejects `add -u` for a pathspec that matches nothing tracked.
+    const bin = await scratch("holyagent-git-")
+    const real = Bun.which("git") ?? "git"
+    await writeFile(
+      join(bin, "git"),
+      [
+        "#!/bin/sh",
+        `if [ "$1" = add ] && [ "$2" = -u ]; then`,
+        "  shift 3",
+        `  if [ -z "$("${real}" ls-files -- "$@")" ]; then`,
+        `    echo "error: pathspec '$1' did not match any file(s) known to git" >&2`,
+        "    exit 128",
+        "  fi",
+        '  set -- add -u -- "$@"',
+        "fi",
+        `exec "${real}" "$@"`,
+        "",
+      ].join("\n"),
+      { mode: 0o755 },
+    )
+
+    const created = toon(
+      await vcs(
+        dir,
+        ["intent", "create"],
+        fakeGitHub().layer,
+        { objective: "Ship the parser" },
+        {
+          PATH: `${bin}:${process.env["PATH"] ?? ""}`,
+        },
+      ),
+    ) as { id: string }
+
+    const tracked = lines(await sh(dir, ["git", "ls-tree", "-r", "--name-only", STATE]))
+    expect(tracked.some((path) => path.endsWith(`${created.id}/intent.json`))).toBe(true)
+  })
+})
+
+describe("migrating the legacy state", () => {
+  test("every file migrate copied into an Intent folder is committed, a stray file beside them is not", async () => {
+    const dir = await initRepo(OWNER)
+    const folder = ".holyclaude/intents/take-over-legacy-state-intent-0mvp7hcqf-t7pm"
+    await seed(dir, {
+      "a.txt": "a\n",
+      ".gitignore": "/.holyagent/\n",
+      [`${folder}/intent.json`]: JSON.stringify({
+        id: "intent-0mvp7hcqf-t7pm",
+        objective: "Take over legacy state",
+        requirements: "Convert it.",
+        revision: 1,
+      }),
+      [`${folder}/resume-notes.md`]: "# Resume\n",
+      [`${folder}/plan.toon`]: "plan: current\n",
+      [`${folder}/plan.old-001.toon`]: "plan: old\n",
+      [`${folder}/notes/design.md`]: "design\n",
+      [`${folder}/notes/deep/more.md`]: "more\n",
+      [`${folder}/notes/scratch.tmp`]: "temporary\n",
+    })
+
+    const done = toon(await holy(dir, ["migrate"])) as { migrated: boolean }
+    expect(done.migrated).toBe(true)
+    // A file that is neither a record, the settings nor a file migrate copied stays out of the commit.
+    const state = join(await stateTree(dir), ".holyagent")
+    const migrated = (await readdir(join(state, "intents")))[0] ?? ""
+    await writeFile(join(state, "intents", migrated, "stray.md"), "stray\n")
+    await createIntent(dir, "Ship the lexer")
+
+    const tracked = lines(await sh(dir, ["git", "ls-tree", "-r", "--name-only", STATE]))
+    const prefix = `.holyagent/intents/${migrated}/`
+    const inside = tracked
+      .filter((path) => path.startsWith(prefix))
+      .map((path) => path.slice(prefix.length))
+    expect(inside.toSorted()).toEqual([
+      "intent.json",
+      "notes/deep/more.md",
+      "notes/design.md",
+      "plan.old-001.toon",
+      "plan.toon",
+      "resume-notes.md",
+    ])
+    expect(await sh(dir, ["git", "status", "--porcelain"])).toBe("")
   })
 })
 

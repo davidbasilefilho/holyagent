@@ -52,19 +52,17 @@ Hosted setup needs a login or API key. With neither, `ctx7 setup --yes` would bl
 
 ## What `holyagent setup` and `holyagent doctor` do
 
-`holyagent setup [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7]` runs three steps, each of which checks its own result first:
+`holyagent setup [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7]` runs two steps, each of which checks its own result first:
 
-- Billion Context cleanup: what an earlier setup left in your Claude Code files is removed (matched by Billion Context's own install rules, listed in [usage.md](usage.md#install)), and each removal is printed; HolyAgent no longer installs or uses Billion Context;
 - ctx7: the package and the Context7 skill (above);
-- user settings: the missing keys among `attribution`, `includeGitInstructions`, `subagentPromptCacheTtl`, `extraKnownMarketplaces`, `enabledPlugins` and `permissions.deny` are added to `~/.claude/settings.json` (or the file in `CLAUDE_CONFIG_DIR`), and no value that is already set changes ([usage.md](usage.md#user-settings) lists them).
+- user settings: the missing keys among `attribution`, `includeGitInstructions`, `subagentPromptCacheTtl`, `modelSettings["claude-opus-5-5"]` (`effortLevel` and `autoCompactWindow`), `extraKnownMarketplaces`, `enabledPlugins` and `permissions.deny` are added to `~/.claude/settings.json` (or the file in `CLAUDE_CONFIG_DIR`), and no value that is already set changes ([usage.md](usage.md#user-settings) lists them).
 
-In a claude.ai cloud session (`CLAUDE_CODE_REMOTE=true`) there is no machine of yours to install on, so the ctx7 step is skipped and the other two still run. Setup does not register the plugin, which the two `claude plugin` commands do, and it does not check Bun's build.
+In a claude.ai cloud session (`CLAUDE_CODE_REMOTE=true`) there is no machine of yours to install on, so the ctx7 step is skipped and the other still runs. Setup does not register the plugin, which the two `claude plugin` commands do, and it does not check Bun's build.
 
 `holyagent doctor [--fix]` prints one line per check and exits 1 when any fails:
 
 - `bun` is on `PATH`;
 - `ctx7` is on `PATH` (it passes in a cloud session, where setup leaves it out);
 - the user settings have the keys `holyagent setup` writes;
-- no leftovers of an earlier Billion Context setup remain in your Claude Code files, and those files can be read (a `warn` line that does not fail the run; `holyagent setup` removes them).
 
-`--fix` runs the setup steps behind a failing check and checks again; it never installs Bun and leaves leftovers to `holyagent setup`. `/holyagent:setup` runs `holyagent setup` from a session, and the session-start hook adds one line suggesting it while `ctx7` or a key is missing or setup can remove a Billion Context leftover ([hooks.md](hooks.md)).
+`--fix` runs the setup steps behind a failing check and checks again; it never installs Bun. `/holyagent:setup` runs `holyagent setup` from a session, and the session-start hook adds one line suggesting it while `ctx7` or a key is missing ([hooks.md](hooks.md)).

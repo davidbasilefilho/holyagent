@@ -29,6 +29,14 @@ describe("route table", () => {
     expect(routeFor("Worker.validation").mutability).toBe("ReadOnly")
   })
 
+  test("the cheap worker routes and integration run at medium effort", () => {
+    for (const roleTask of ["Worker.operations", "Worker.validation", "Worker.mechanical"] as const)
+      expect(routeFor(roleTask)).toMatchObject({ model: "haiku", effort: "medium" })
+    expect(routeFor("Worker.integration")).toMatchObject({ model: "sonnet", effort: "medium" })
+    for (const roleTask of ["Worker.implementation", "Worker.debugging", "Worker.visual"] as const)
+      expect(routeFor(roleTask)).toMatchObject({ model: "sonnet", effort: "high" })
+  })
+
   test("only workers write, and every Reviewer reviews", () => {
     for (const route of ROUTES) {
       expect(isWriter(route.roleTask)).toBe(route.mutability === "ScopedWrite")

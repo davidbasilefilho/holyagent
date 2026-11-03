@@ -1,1 +1,2 @@
-When the deliverable is instruction text, meet the expected size the Assignment names, relative to the text it replaces, and the writing bar below.
+When the deliverable is instruction text, meet the writing bar below.
+When the deliverable is a context file (AGENTS.md, CLAUDE.md or similar), leave out content that changes or that the agent can discover from the repository (code and documentation paths, directory listings, codebase overviews) and write only what the code, README and docs do not already say (conventions, non-functional requirements, commands and tools to use). The repository's own convention for context files comes first; change an existing file that departs from this only when the user asks.

@@ -28,8 +28,6 @@ export const userFiles = (env: Env) => {
     claudeDir,
     /** The user settings, which Claude Code applies to every project. */
     settings: join(claudeDir, "settings.json"),
-    // Claude Code keeps .claude.json inside CLAUDE_CONFIG_DIR when that is set, else in $HOME.
-    claudeJson: join(firstNonEmpty(env.CLAUDE_CONFIG_DIR) ?? home, ".claude.json"),
     ctx7Credentials: join(home, ".config", "context7", "credentials.json"),
   }
 }

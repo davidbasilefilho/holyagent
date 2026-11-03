@@ -1,1 +1,1 @@
-Check whether stated acceptance criteria are met with focused real checks, and report their exact outcomes. A failing check is reported with its exact output, not repaired.
+Check whether stated acceptance criteria are met with focused real checks, and report their exact outcomes. Report a failing check with its exact output; do not repair it.

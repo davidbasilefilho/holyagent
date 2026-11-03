@@ -6,7 +6,7 @@ import taskList from "./root/task-list.md" with { type: "text" }
 /**
  * The files of `root/` that make up the core of the root rules, in the order they open the root
  * prompt. A session whose main thread is not the root gets these and nothing else of the prompt, so
- * they stay together and small.
+ * they stay together.
  */
 export const ROOT_CORE_FILES: ReadonlyArray<string> = [
   "identity.md",

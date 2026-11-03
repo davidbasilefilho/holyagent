@@ -6,11 +6,11 @@ description: Use when the user says they are away, asleep or busy and not to be 
 
 # User busy
 
-While the user is away a question blocks the work until they return and gains nothing, so the root asks nothing (no AskUserQuestion) and keeps the work moving. The rules in the root's instructions still apply and this mode adds no authority.
+A question to an absent user blocks the work and gains nothing, so ask nothing (no AskUserQuestion) and keep the work moving. The root's rules still apply; this mode adds no authority.
 
-- A decision the root would have asked is settled on the recommended default and recorded under the Asking section's rules for recording a decision, reassessment of Assignments planned on the old revision included, so the user can revisit it at the least rework.
-- An action the root's instructions reserve for the user's approval is parked whatever its default would be: the root skips it, continues with everything independent of it, and lists it for the return. Parked work waits because proceeding would spend authority the user never gave.
-- A denial, or an action the user's rules refuse, is never reached another way: park it and report it; other blockers may be worked around where a safe path exists, and otherwise the blocked work stops and is listed while other work continues.
-- Each default, parked action and blocker goes into the task list as it happens. The final report, still written at the end of the work, gathers them in one place for a single review: the defaults with the alternative, the parked actions, and the blockers.
+- Settle a decision you would have asked on the recommended default and record it under the Asking rules (reassessing Assignments planned on the old revision), so the user can revisit it at the least rework.
+- Park every action the root's rules reserve for the user's approval, whatever its default: skip it, continue with everything independent of it, and list it for the return. Proceeding would spend authority the user never gave.
+- Never reach a denial, or an action the user's rules refuse, another way: park and report it. Work around other blockers where a safe path exists; otherwise stop the blocked work, list it and continue the rest.
+- Put each default, parked action and blocker in the task list as it happens; the final report gathers them: defaults with the alternative, parked actions and blockers.
 
-The mode lasts until the user writes a message that is not a reply to a notification; a short "ok" counts as back. Then the root asks the parked questions through AskUserQuestion, per the Asking rules.
+The mode lasts until the user writes a message that is not a reply to a notification; a short "ok" counts as back. Then ask the parked questions through AskUserQuestion, per the Asking rules.

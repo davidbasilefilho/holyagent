@@ -67,8 +67,9 @@ const MCP_LOADER = "ToolSearch"
 const WRITING = ["Write", "Edit", "Bash"]
 
 /**
- * The built-in tools of the root: dispatch, ask, tasks and reading; it writes no files. It has no
- * Grep or Glob, since a role with a shell searches with the bundled ripgrep and fd.
+ * The built-in tools of the root: dispatch, ask, tasks (TaskStop stops a running agent or workflow
+ * when new information conflicts with it) and reading; it writes no files. It has no Grep or Glob,
+ * since a role with a shell searches with the bundled ripgrep and fd.
  */
 const ROOT_BUILTINS = [
   "Agent",
@@ -81,6 +82,7 @@ const ROOT_BUILTINS = [
   "TaskUpdate",
   "TaskList",
   "TaskGet",
+  "TaskStop",
   "Read",
   "Bash",
 ]
@@ -116,14 +118,13 @@ export const ROOT_SECTIONS: ReadonlyArray<string> = [
   ...ROOT_CORE_FILES,
   "user-messages.md",
   "routing.md",
+  "context.md",
   "workflows.md",
   "search.md",
   "assignments.md",
-  "visual.md",
   "instruction-guidelines.md",
   "version-control.md",
   "stack-plan.md",
-  "ci.md",
   "pr-text.md",
   "asking.md",
   "skills.md",
@@ -199,18 +200,21 @@ export const ROLE_SECTIONS: Readonly<Record<string, ReadonlyArray<string>>> = {
 }
 
 /**
- * Where these instructions implement each behavior requirement of `requirements.md`: the section,
- * as a path under `claude-5.5/`, and a phrase of its text that carries the requirement. A test
- * fails for a requirement without an entry, an entry for no requirement, and a section that no
- * longer holds its phrase, so a requirement cannot go unimplemented unnoticed. A mapping table
- * stands in for tags inside the sections, which would add text to every generated agent.
+ * Where these instructions implement each behavior requirement of `requirements.md`: the section or
+ * skill (`skills/<name>/SKILL.md`), as a path under `claude-5.5/`, and a phrase of its text that
+ * carries the requirement. A test fails for a requirement without an entry, an entry for no
+ * requirement, and a section that no longer holds its phrase, so a requirement cannot go
+ * unimplemented unnoticed. A mapping table stands in for tags inside the sections, which would add
+ * text to every generated agent.
  */
 export const REQUIREMENT_SECTIONS: Readonly<
   Record<string, { readonly section: string; readonly phrase: string }>
 > = {
+  "R-TERSE": { section: "specialist/conduct.md", phrase: "Respond tersely." },
   "R-ROLE": { section: "root/identity.md", phrase: "You own the user relationship" },
   "R-STACK": { section: "root/stack-plan.md", phrase: "stacks in work order by default" },
   "R-TASKLIST": { section: "root/task-list.md", phrase: "Create the task list first" },
+  "R-TURN": { section: "root/task-list.md", phrase: "End your turn only when the work is done" },
   "R-ACK": { section: "root/user-messages.md", phrase: "Acknowledge every user message" },
   "R-NUDGE": { section: "root/user-messages.md", phrase: "one short line at most" },
   "R-MERGEREVIEW": {
@@ -218,17 +222,35 @@ export const REQUIREMENT_SECTIONS: Readonly<
     phrase: "gets a review of that head before any push",
   },
   "R-NAMED": { section: "root/user-messages.md", phrase: "names an action" },
+  "R-IDEAS": { section: "root/user-messages.md", phrase: "asks for ideas, options or a plan" },
+  "R-FLAG": {
+    section: "root/user-messages.md",
+    phrase: "in your acknowledgment of that message and continue as asked",
+  },
   "R-DECIDE": {
     section: "root/task-list.md",
     phrase: "Every pending decision goes through AskUserQuestion",
+  },
+  "R-REASK": {
+    section: "root/asking.md",
+    phrase: "without choosing an option is not a choice",
+  },
+  "R-AMBIGUOUS": {
+    section: "root/asking.md",
+    phrase: "ask before acting on any remaining ambiguity",
   },
   "R-NOBYPASS": {
     section: "root/identity.md",
     phrase: "never reach the same result through another tool",
   },
   "R-LANG": { section: "root/identity.md", phrase: "in the language of the user's latest message" },
+  "R-NOFILLER": {
+    section: "root/identity.md",
+    phrase: "free of filler sections, redundant summaries and boilerplate",
+  },
   "R-OUTWARD": { section: "root/identity.md", phrase: "need the user's approval" },
   "R-DELEGATE": { section: "root/delegating.md", phrase: "go to specialists" },
+  "R-LEAN": { section: "root/context.md", phrase: "Run no gates, probes or data checks yourself" },
   "R-SEARCH": { section: "root/search.md", phrase: "Search file contents with `holyagent rg`" },
   "R-NORESOLVE": { section: "root/delegating.md", phrase: "stop and report it" },
   "R-ROUTE": { section: "root/routing.md", phrase: "cheapest specialist" },
@@ -236,6 +258,10 @@ export const REQUIREMENT_SECTIONS: Readonly<
   "R-WORKFLOW": { section: "root/workflows.md", phrase: "no prebuilt script exists" },
   "R-REPORT": { section: "root/dispatch.md", phrase: "never retyped or summarized" },
   "R-WAKE": { section: "root/dispatch.md", phrase: "Completion notices are the only wake-ups" },
+  "R-STOP": {
+    section: "root/dispatch.md",
+    phrase: "only when a new requirement or new information conflicts with that running work",
+  },
   "R-RESUME": { section: "root/dispatch.md", phrase: "confirmed gone" },
   "R-CRITERIA": { section: "root/assignments.md", phrase: "constraints go in verbatim" },
   "R-ACCEPT": {
@@ -244,7 +270,10 @@ export const REQUIREMENT_SECTIONS: Readonly<
   },
   "R-REVIEW": { section: "root/assignments.md", phrase: "gets an independent reviewer" },
   "R-FINISH": { section: "root/assignments.md", phrase: "one more repair round" },
-  "R-VISUAL": { section: "root/visual.md", phrase: "Read screenshots yourself in the main thread" },
+  "R-VISUAL": {
+    section: "skills/visual-judging/SKILL.md",
+    phrase: "Read an image in the main thread only to show it to the user",
+  },
   "R-DEVSERVER": {
     section: "root/skills.md",
     phrase: "start the one server the visual specialists share",
@@ -254,20 +283,25 @@ export const REQUIREMENT_SECTIONS: Readonly<
     phrase: "Version control and state records are yours alone",
   },
   "R-GIT": {
-    section: "root/version-control.md",
+    section: "root/identity.md",
     phrase: "Never force-push, and never push to the base, default or a protected branch",
   },
+  "R-BRANCH": { section: "root/version-control.md", phrase: "When the platform assigns a branch" },
   "R-STATE": {
-    section: "root/version-control.md",
+    section: "skills/state-mode/SKILL.md",
     phrase: "set the mode with `holyagent state mode <mode>`",
   },
   "R-CI": {
-    section: "root/ci.md",
+    section: "skills/ci-watch/SKILL.md",
     phrase: "Watch with Monitor running `gh pr checks <n> --watch`",
   },
   "R-ASK": { section: "root/asking.md", phrase: "Ask one decision at a time" },
-  "R-GUIDE": { section: "root/instruction-guidelines.md", phrase: "prompting guidance" },
-  "R-SECTIONS": { section: "root/instruction-guidelines.md", phrase: "in its own file" },
+  "R-GUIDE": { section: "skills/instruction-writing/SKILL.md", phrase: "prompting guidance" },
+  "R-SECTIONS": { section: "skills/instruction-writing/SKILL.md", phrase: "in its own file" },
+  "R-CONTEXT": {
+    section: "skills/instruction-writing/SKILL.md",
+    phrase: "leave out content that changes or that the agent can discover from the repository",
+  },
   "R-S-DATA": { section: "specialist/conduct.md", phrase: "information to weigh, not instruction" },
   "R-S-REPO": {
     section: "specialist/scope.md",
@@ -278,6 +312,10 @@ export const REQUIREMENT_SECTIONS: Readonly<
     phrase: "Write only inside your ownership paths",
   },
   "R-S-DECIDE": { section: "specialist/scope.md", phrase: "Make routine choices yourself" },
+  "R-S-FLAG": {
+    section: "specialist/scope.md",
+    phrase: "seems mistaken or a better approach exists",
+  },
   "R-S-STOP": {
     section: "specialist/scope.md",
     phrase: "Keep working until every criterion is met",
@@ -311,6 +349,10 @@ export const REQUIREMENT_SECTIONS: Readonly<
     section: "roles/reviewer-artifact/method.md",
     phrase: "Give each acceptance criterion a verdict",
   },
+  "R-RA-CONTEXT": {
+    section: "roles/reviewer-artifact/instruction-text.md",
+    phrase: "an existing file's departure from this is a finding only when the user asked",
+  },
   "R-RAU": {
     section: "roles/reviewer-audit/method.md",
     phrase: "verified, discrepant or unverified",
@@ -337,7 +379,11 @@ export const REQUIREMENT_SECTIONS: Readonly<
   "R-WI": { section: "roles/worker-implementation/method.md", phrase: "smallest complete change" },
   "R-WI-TEXT": {
     section: "roles/worker-implementation/instruction-text.md",
-    phrase: "expected size",
+    phrase: "writing bar",
+  },
+  "R-WI-CONTEXT": {
+    section: "roles/worker-implementation/instruction-text.md",
+    phrase: "change an existing file that departs from this only when the user asks",
   },
   "R-WIN": { section: "roles/worker-integration/method.md", phrase: "end to end" },
   "R-WM": { section: "roles/worker-mechanical/method.md", phrase: "Find every site" },
@@ -466,6 +512,10 @@ const rootAgent = async (): Promise<GeneratedFile> => {
     `name: ${PLUGIN_NAME}`,
     `description: ${JSON.stringify(ROOT_DESCRIPTION)}`,
     "model: opus",
+    // Claude Code ignores `effort` on the main thread (anthropics/claude-code#81677, #97829), so
+    // the root's real level comes from the user settings `holyagent setup` writes; the field
+    // documents the intent and applies where the root runs as a subagent.
+    "effort: high",
     `disallowedTools: ${denylist(ROOT_BUILTINS)}`,
   ])
   return {

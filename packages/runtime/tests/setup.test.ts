@@ -5,6 +5,8 @@ import { dirname, join } from "node:path"
 import { Effect } from "effect"
 
 import { doctor } from "../src/setup/doctor.ts"
+import { applyDefaults } from "../src/setup/json-file.ts"
+import { userSettingsDefaults } from "../src/setup/settings.ts"
 import { EMPTY_BUNFIG } from "../src/setup/shell.ts"
 import { setup, type SetupOptions } from "../src/setup/steps.ts"
 import { fakeShell, scratch, writeCompleteSettings } from "./setup-fixture.ts"
@@ -59,18 +61,19 @@ const SETTINGS_KEYS = [
   "attribution.sessionUrl",
   "includeGitInstructions",
   "subagentPromptCacheTtl",
+  "modelSettings.claude-opus-5-5.effortLevel",
+  "modelSettings.claude-opus-5-5.autoCompactWindow",
   "extraKnownMarketplaces.holyagent",
   "enabledPlugins.holyagent@holyagent",
   "permissions.deny",
 ]
 
 describe("holyagent setup", () => {
-  test("on a fresh machine installs ctx7 and merges the user settings, with no Billion Context to remove", async () => {
+  test("on a fresh machine installs ctx7 and merges the user settings", async () => {
     const shell = fakeShell({ commands: ["bun"] })
     const report = await Effect.runPromise(setup(env(), BOTH).pipe(Effect.provide(shell.layer)))
     expect(shell.lines()).toEqual([bunAdd("ctx7")])
     expect(report.ok).toBe(true)
-    expect(report.lines).toContain("= billion-context: no leftovers")
     expect(report.lines.filter((line) => line.startsWith("- "))).toEqual([
       "- ctx7 skill: no CONTEXT7_API_KEY and no saved login; run `ctx7 login` or export CONTEXT7_API_KEY, then re-run",
     ])
@@ -82,6 +85,33 @@ describe("holyagent setup", () => {
     expect(settings.subagentPromptCacheTtl).toBe("1h")
     expect(settings.enabledPlugins).toEqual({ "holyagent@holyagent": true })
     expect(settings.permissions).toEqual({ deny: ["WebSearch", "WebFetch"] })
+    expect(settings.modelSettings).toEqual({
+      "claude-opus-5-5": { effortLevel: "high", autoCompactWindow: 450000 },
+    })
+  })
+
+  test("recommends high effort and a 450000-token window for Opus 5.5 but keeps a level the user saved", async () => {
+    await write(
+      ".claude/settings.json",
+      JSON.stringify({
+        modelSettings: { "claude-opus-5-5": { effortLevel: "xhigh" }, "claude-sonnet-5-5": {} },
+      }),
+    )
+    const shell = fakeShell({ commands: ["bun", "ctx7"] })
+    const report = await Effect.runPromise(
+      setup(env(), { ...BOTH, skipCtx7: true }).pipe(Effect.provide(shell.layer)),
+    )
+    expect(report.ok).toBe(true)
+    expect(report.lines).toContain(
+      '~ modelSettings.claude-opus-5-5.effortLevel: kept "xhigh" (recommended "high")',
+    )
+    expect(report.lines).toContain(
+      "+ modelSettings.claude-opus-5-5.autoCompactWindow: added 450000",
+    )
+    expect((await readJson(settingsFile())).modelSettings).toEqual({
+      "claude-opus-5-5": { effortLevel: "xhigh", autoCompactWindow: 450000 },
+      "claude-sonnet-5-5": {},
+    })
   })
 
   test("every child runs from the home directory, and bun add -g reads no env file and only the empty config", async () => {
@@ -108,7 +138,7 @@ describe("holyagent setup", () => {
     expect(run2.ok).toBe(true)
     expect(run2.lines.filter((line) => /^[+!~-] /.test(line))).toEqual([])
     expect(run2.lines.filter((line) => line.startsWith("= "))).toHaveLength(
-      SETTINGS_KEYS.length + 3,
+      SETTINGS_KEYS.length + 2,
     )
     expect(run2.lines.at(-1)).toBe("no changes")
     expect(await read(settingsFile())).toBe(settingsAfterFirst)
@@ -175,7 +205,6 @@ describe("holyagent setup", () => {
     )
     expect(shell.calls).toEqual([])
     expect(report.ok).toBe(true)
-    expect(report.lines).toContain("= billion-context: no leftovers")
     expect(report.lines).toContain("+ ctx7: would install with bun add -g ctx7")
     expect(report.lines).toContain("+ ctx7 skill: would install with ctx7 setup --cli --claude")
     expect(report.lines.at(-1)).toBe(`dry run: would add ${SETTINGS_KEYS.length}, nothing written`)
@@ -195,27 +224,6 @@ describe("holyagent setup", () => {
     expect(await Bun.file(settingsFile()).exists()).toBe(true)
   })
 
-  test("a failed Billion Context removal is reported and ctx7 and the settings still follow", async () => {
-    await write(
-      ".claude/plugins/installed_plugins.json",
-      JSON.stringify({ plugins: { "billion-context@billion-context": [{}] } }),
-    )
-    const shell = fakeShell({
-      commands: ["bun", "claude"],
-      respond: (line) =>
-        line.startsWith("claude plugin uninstall") ? { exitCode: 2, stdout: "in use" } : undefined,
-    })
-    const report = await Effect.runPromise(
-      setup(env({ CONTEXT7_API_KEY: "ctx7sk-test" }), BOTH).pipe(Effect.provide(shell.layer)),
-    )
-    expect(report.ok).toBe(false)
-    expect(report.lines).toContain(
-      "! billion-context: claude plugin uninstall billion-context@billion-context failed (exit 2): in use",
-    )
-    expect(shell.lines()).toContain("ctx7 setup --cli --claude --yes --api-key ctx7sk-test")
-    expect(await Bun.file(settingsFile()).exists()).toBe(true)
-  })
-
   test("a settings file that is not a JSON object is reported and left exactly as it was", async () => {
     await write(".claude/settings.json", "[1]")
     const shell = fakeShell({ commands: ["bun"] })
@@ -226,34 +234,6 @@ describe("holyagent setup", () => {
     )
     expect(await read(settingsFile())).toBe("[1]")
     expect(shell.lines()).toContain(bunAdd("ctx7"))
-  })
-
-  test("removes what an earlier Billion Context setup left, and --dry-run only lists it", async () => {
-    const proxy = "http://127.0.0.1:18787/bili/https://api.anthropic.com"
-    await write(
-      ".claude/settings.json",
-      JSON.stringify({ theme: "dark", env: { ANTHROPIC_BASE_URL: proxy } }),
-    )
-    const shell = () => fakeShell({ commands: ["bun", "claude"] })
-    const skip = { ...BOTH, skipCtx7: true }
-
-    const dry = await Effect.runPromise(
-      setup(env(), { ...skip, dryRun: true }).pipe(Effect.provide(shell().layer)),
-    )
-    expect(dry.lines).toContain(
-      `+ billion-context: would remove env.ANTHROPIC_BASE_URL from ${settingsFile()}`,
-    )
-    expect((await readJson(settingsFile())).env).toBeDefined()
-
-    const real = await Effect.runPromise(setup(env(), skip).pipe(Effect.provide(shell().layer)))
-    expect(real.ok).toBe(true)
-    expect(real.lines).toContain(
-      `+ billion-context: removed env.ANTHROPIC_BASE_URL from ${settingsFile()}`,
-    )
-    const settings = await readJson(settingsFile())
-    expect(settings.theme).toBe("dark")
-    expect(settings.env).toBeUndefined()
-    expect(settings.includeGitInstructions).toBe(false)
   })
 
   test("the skip flag leaves ctx7 alone", async () => {
@@ -326,14 +306,27 @@ describe("holyagent setup", () => {
       "enabledPlugins",
       "extraKnownMarketplaces",
       "includeGitInstructions",
+      "modelSettings",
       "permissions",
       "subagentPromptCacheTtl",
     ])
   })
 })
 
+describe("this repository's settings", () => {
+  test(".claude/settings.json carries the same Opus 5.5 effort and window that setup recommends", async () => {
+    const project = (await Bun.file(
+      join(import.meta.dir, "../../../.claude/settings.json"),
+    ).json()) as {
+      modelSettings?: Record<string, unknown>
+    }
+    const { merged } = applyDefaults({}, userSettingsDefaults("1h"))
+    expect(project.modelSettings).toEqual(merged.modelSettings as Record<string, unknown>)
+  })
+})
+
 describe("holyagent doctor", () => {
-  test("passes when bun, ctx7 and the settings keys are in place and no Billion Context is left", async () => {
+  test("passes when bun, ctx7 and the settings keys are in place", async () => {
     await writeCompleteSettings(claudeDirectory())
     const shell = fakeShell({ commands: ["bun", "ctx7"] })
     const report = await Effect.runPromise(
@@ -344,7 +337,6 @@ describe("holyagent doctor", () => {
       "ok   bun: /fake/bin/bun",
       "ok   ctx7: /fake/bin/ctx7",
       `ok   settings: ${settingsFile()}`,
-      "ok   billion-context: no leftovers from an earlier setup",
     ])
     expect(shell.calls).toEqual([])
   })
@@ -379,6 +371,49 @@ describe("holyagent doctor", () => {
     expect((await readJson(settingsFile())).subagentPromptCacheTtl).toBe("1h")
   })
 
+  test("settings that lack only the Opus 5.5 effort and window fail the check, and --fix adds them", async () => {
+    await writeCompleteSettings(claudeDirectory())
+    const complete = await readJson(settingsFile())
+    const { modelSettings: _omitted, ...withoutModel } = complete
+    await writeFile(settingsFile(), JSON.stringify(withoutModel))
+    const shell = fakeShell({ commands: ["bun", "ctx7"] })
+    const before = await Effect.runPromise(
+      doctor(env(), { fix: false }).pipe(Effect.provide(shell.layer)),
+    )
+    expect(before.ok).toBe(false)
+    expect(before.lines.find((line) => line.startsWith("FAIL settings"))).toContain(
+      "lacks modelSettings.claude-opus-5-5.effortLevel, modelSettings.claude-opus-5-5.autoCompactWindow",
+    )
+    const fixed = await Effect.runPromise(
+      doctor(env(), { fix: true }).pipe(Effect.provide(shell.layer)),
+    )
+    expect(fixed.ok).toBe(true)
+    expect((await readJson(settingsFile())).modelSettings).toEqual({
+      "claude-opus-5-5": { effortLevel: "high", autoCompactWindow: 450000 },
+    })
+  })
+
+  test("an Opus 5.5 entry that /effort auto left without effortLevel passes the check and stays as it is", async () => {
+    await writeCompleteSettings(claudeDirectory())
+    const complete = await readJson(settingsFile())
+    await writeFile(
+      settingsFile(),
+      JSON.stringify({
+        ...complete,
+        modelSettings: { "claude-opus-5-5": { autoCompactWindow: 450000 } },
+      }),
+    )
+    const shell = fakeShell({ commands: ["bun", "ctx7"] })
+    const report = await Effect.runPromise(
+      doctor(env(), { fix: true }).pipe(Effect.provide(shell.layer)),
+    )
+    expect(report.ok).toBe(true)
+    expect(report.lines.find((line) => line.startsWith("ok   settings"))).toBeDefined()
+    expect((await readJson(settingsFile())).modelSettings).toEqual({
+      "claude-opus-5-5": { autoCompactWindow: 450000 },
+    })
+  })
+
   test("fails on each missing piece, checks the user settings, and has no plugin or canary check", async () => {
     const shell = fakeShell({ commands: [] })
     const cwdSettings = join(process.cwd(), ".claude", "settings.json")
@@ -390,7 +425,6 @@ describe("holyagent doctor", () => {
       "FAIL bun: ",
       "FAIL ctx7:",
       "FAIL setti",
-      "ok   billi",
     ])
     expect(report.lines[2]).toContain(settingsFile())
     expect(report.lines[2]).not.toContain(cwdSettings)
@@ -424,11 +458,10 @@ describe("holyagent doctor", () => {
       "ctx7 setup --cli --claude --yes --api-key ctx7sk-test",
     ])
     expect(report.ok).toBe(true)
-    expect(report.lines.slice(-4)).toEqual([
+    expect(report.lines.slice(-3)).toEqual([
       "ok   bun: /fake/bin/bun",
       "ok   ctx7: /fake/bin/ctx7",
       `ok   settings: ${settingsFile()}`,
-      "ok   billion-context: no leftovers from an earlier setup",
     ])
   })
 
@@ -465,41 +498,5 @@ describe("holyagent doctor", () => {
     expect(report.ok).toBe(true)
     expect(report.lines.filter((line) => line.includes("by design"))).toHaveLength(1)
     expect(await Bun.file(settingsFile()).exists()).toBe(true)
-  })
-
-  test("warns, without failing, when Billion Context leftovers remain, and says how to clear them", async () => {
-    await writeCompleteSettings(claudeDirectory())
-    const settings = await readJson(settingsFile())
-    await writeFile(
-      settingsFile(),
-      JSON.stringify({
-        ...settings,
-        env: { ANTHROPIC_BASE_URL: "http://127.0.0.1:18787/bili/https://api.anthropic.com" },
-      }),
-    )
-    const shell = fakeShell({ commands: ["bun", "ctx7"] })
-    const report = await Effect.runPromise(
-      doctor(env(), { fix: false }).pipe(Effect.provide(shell.layer)),
-    )
-    const line = report.lines.find((entry) => entry.startsWith("warn billion-context"))
-    expect(line).toContain("env.ANTHROPIC_BASE_URL")
-    expect(line).toEndWith("run /holyagent:setup")
-    expect(report.ok).toBe(true)
-    expect(shell.calls).toEqual([])
-  })
-
-  test("warns that it could not check when a Claude Code file cannot be read, instead of saying no leftovers", async () => {
-    await writeCompleteSettings(claudeDirectory())
-    await write(".claude/plugins/installed_plugins.json", "not json")
-    await write(".claude/plugins/known_marketplaces.json", "[]")
-    const shell = fakeShell({ commands: ["bun", "ctx7"] })
-    const report = await Effect.runPromise(
-      doctor(env(), { fix: false }).pipe(Effect.provide(shell.layer)),
-    )
-    const line = report.lines.find((entry) => entry.includes("billion-context"))
-    expect(line).toStartWith("warn billion-context: not checked")
-    expect(line).toContain("installed_plugins.json")
-    expect(line).toContain("known_marketplaces.json")
-    expect(report.ok).toBe(true)
   })
 })
