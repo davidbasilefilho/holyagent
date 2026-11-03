@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-the-repair-commit-b1dec34",
   "objective": "Re-review the repair commit b1dec34 (range b319468..b1dec34 on release/0.2.0/fix/windows-tests) against the two review notes it addresses.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Previous review notes: (1) lock.ts waits up to 30s on a live lock holder while plugin hooks have a 10s timeout, so the agent-launch hook (packages/runtime/src/cli/hook.ts ~337, updateState) could be killed instead of failing with StateLocked; (2) hooks.test.ts brokenGit asserts the English 'bad config line', which fails under a localized git; LC_ALL=C fixes it.",
     "Review only the diff of b319468..b1dec34 (git diff b319468 b1dec34). Another writer may be editing the working tree at the same time, so read the committed range, not the working tree."
@@ -47,5 +47,10 @@
     "assignment-0mw0r596u-3zna"
   ],
   "followUpOf": "assignment-0mw0qxa1i-b280",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T14:02:49.765Z"
+  },
   "createdAt": "2026-11-03T14:02:46.042Z"
 }
