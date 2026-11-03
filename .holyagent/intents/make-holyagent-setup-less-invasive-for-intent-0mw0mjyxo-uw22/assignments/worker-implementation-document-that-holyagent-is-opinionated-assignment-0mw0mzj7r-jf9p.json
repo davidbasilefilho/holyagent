@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "document-that-holyagent-is-opinionated",
   "objective": "Document that HolyAgent is opinionated on purpose and give the sourced reason for each setting and behavior setup applies, how to confine it to one project and how to undo it, so a newcomer (or their agent) can judge the trade-offs.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "docs/usage.md: replace the User settings table's thin Why column with an 'Opinionated by design' section (or rework User settings) explaining each decision; document setup --scope user|project|local, setup --undo and doctor --scope (see packages/runtime/src/cli/setup.ts and packages/integrations/claude/src/setup-command.md for the exact behavior and report legend)",
     "docs/decisions.md: add a 'Changed since the audit' entry for scope/undo and the Windows CI job, and correct facts below",
@@ -54,5 +54,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T12:00:58.958Z"
+  },
   "createdAt": "2026-11-03T12:00:54.279Z"
 }
