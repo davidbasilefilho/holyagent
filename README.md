@@ -24,6 +24,7 @@ Restart Claude Code afterwards. The root runs on Opus; [docs/usage.md](docs/usag
 - **A warm cache, by design.** Prompts put stable material first, specialists are reused while their cache is alive, and the CLI embeds the timing so the model carries none of that reasoning. See [docs/cache-and-workflows.md](docs/cache-and-workflows.md).
 - **State outside the conversation.** Intents and Assignments live in `.holyagent/`, so a resumed or compacted session picks up exactly where the work stands, through a small, bounded session-start hook ([docs/hooks.md](docs/hooks.md)).
 - **Commits you own.** `holyagent vcs` commits and opens pull requests as the account owner, keeps agent attribution out of the text and refuses what looks like an agent identity ([docs/commit-authorship.md](docs/commit-authorship.md)).
+- **Opinionated on purpose.** It denies Claude Code's own web tools in favor of Exa, runs the root on Opus at high effort, compacts at 450000 tokens and turns off Claude Code's git instructions and attribution. Each choice has a stated reason and a way to change it, and `holyagent setup --scope local` confines the settings to one repository while `--undo` backs them out ([docs/usage.md](docs/usage.md#opinionated-by-design)).
 - **Every rule has a reason.** The standing decisions and their evidence are written down in [docs/decisions.md](docs/decisions.md), and what the plugin installs and configures is explained in [docs/components.md](docs/components.md).
 
 ## Development
