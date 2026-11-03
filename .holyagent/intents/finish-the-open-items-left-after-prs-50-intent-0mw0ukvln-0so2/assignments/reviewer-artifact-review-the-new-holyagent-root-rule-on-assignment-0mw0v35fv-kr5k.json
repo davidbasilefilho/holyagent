@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "review-the-new-holyagent-root-rule-on",
   "objective": "Review the new holyagent root rule on branch deletion and the AGENTS.md note on running mise from the dev dependency, as model-facing instruction text.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Diff files: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/rule.diff (root instructions under packages/runtime/src/instructions, possibly hook text, tests and rebuilt dist) and /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/agents-md.diff (AGENTS.md).",
     "Intended rule: the root deletes branches (local or remote, merged or not) only when the user asks, and never proposes deleting them or lists undeleted branches as remaining work; reason: the maintainer keeps branches unless asked, and branch deletion is destructive. Intended note: gates run through node_modules/.bin/mise (or bun run verify) after bun install, since mise is a dev dependency and not on PATH; mise run sets up the canary Bun the gates need.",
@@ -41,5 +41,10 @@
     "assignment-0mw0v2xug-0gj7",
     "assignment-0mw0v2y3a-qf3t"
   ],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-11-03T15:47:44.863Z"
+  },
   "createdAt": "2026-11-03T15:47:39.979Z"
 }
