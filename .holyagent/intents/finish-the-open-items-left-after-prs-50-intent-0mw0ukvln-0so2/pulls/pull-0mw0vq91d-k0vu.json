@@ -1,0 +1,10 @@
+{
+  "id": "pull-0mw0vq91d-k0vu",
+  "intentId": "intent-0mw0ukvln-0so2",
+  "number": 54,
+  "url": "https://github.com/davidbasilefilho/holyagent/pull/54",
+  "branch": "release/0.2.0/feat/branch-deletion-rule",
+  "base": "release/0.2.0/fix/hook-lock-followups",
+  "created": true,
+  "recordedAt": "2026-11-03T16:05:37.729Z"
+}
