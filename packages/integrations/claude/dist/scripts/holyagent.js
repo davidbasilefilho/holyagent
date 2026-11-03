@@ -7704,7 +7704,7 @@ var describeFailure = (error) => {
   };
 };
 
-import { join as join18 } from "path";
+import { join as join19 } from "path";
 
 var NULL_LITERAL = "null";
 var DELIMITERS = {
@@ -12718,8 +12718,8 @@ var describe2 = ({ path, status, value, wanted }) => {
       return `~ ${path}: kept ${show(value)} (recommended ${show(wanted)})`;
   }
 };
-var mergeUserSettings = fn2("mergeUserSettings")(function* (env, options) {
-  const file = userFiles(env).settings;
+var mergeUserSettings = fn2("mergeUserSettings")(function* (options) {
+  const { file } = options;
   const existing = yield* readJsonObject(file);
   const { merged, entries } = applyDefaults(existing, defaultsFor(existing, options.subagentCacheTtl));
   const added = entries.filter((entry) => entry.status === "added").length;
@@ -12728,8 +12728,69 @@ var mergeUserSettings = fn2("mergeUserSettings")(function* (env, options) {
   const summary = added === 0 ? "no changes" : options.dryRun ? `dry run: would add ${added}, nothing written` : `added ${added}`;
   return [file, ...entries.map(describe2), summary];
 });
-var missingSettingKeys = fn2("missingSettingKeys")(function* (env) {
-  const existing = yield* readJsonObject(userFiles(env).settings);
+var without = (node, key) => Object.fromEntries(Object.entries(node).filter(([name]) => name !== key));
+var take = (node, path, depth, wanted) => {
+  const key = path[depth];
+  const full = path.join(".");
+  const current = node[key];
+  const absent = { path: full, status: "absent", value: undefined, wanted };
+  if (current === undefined)
+    return [node, absent];
+  if (depth < path.length - 1) {
+    if (!isJsonObject2(current))
+      return [node, absent];
+    const [child, removal] = take(current, path, depth + 1, wanted);
+    if (removal.status !== "removed")
+      return [node, removal];
+    return [
+      Object.keys(child).length === 0 ? without(node, key) : { ...node, [key]: child },
+      removal
+    ];
+  }
+  if (Array.isArray(wanted)) {
+    if (!Array.isArray(current))
+      return [node, { ...absent, status: "kept", value: current }];
+    const named = (item) => wanted.some((entry) => equals(item, entry));
+    const gone = current.filter(named);
+    if (gone.length === 0)
+      return [node, absent];
+    const left = current.filter((item) => !named(item));
+    return [
+      left.length === 0 ? without(node, key) : { ...node, [key]: left },
+      { path: full, status: "removed", value: gone, wanted }
+    ];
+  }
+  if (!equals(current, wanted))
+    return [node, { ...absent, status: "kept", value: current }];
+  return [without(node, key), { path: full, status: "removed", value: current, wanted }];
+};
+var describeRemoval = ({ path, status, value, wanted }) => {
+  switch (status) {
+    case "removed":
+      return `- ${path}: removed ${show(value)}`;
+    case "absent":
+      return `= ${path}: nothing to remove`;
+    case "kept":
+      return `~ ${path}: kept ${show(value)} (setup writes ${show(wanted)})`;
+  }
+};
+var undoUserSettings = fn2("undoUserSettings")(function* (options) {
+  const { file } = options;
+  let result = yield* readJsonObject(file);
+  const removals = [];
+  for (const { path, value } of userSettingsDefaults(options.subagentCacheTtl)) {
+    const [next, removal] = take(result, path, 0, value);
+    result = next;
+    removals.push(removal);
+  }
+  const removed = removals.filter((removal) => removal.status === "removed").length;
+  if (removed > 0 && !options.dryRun)
+    yield* writeJsonObject(file, result);
+  const summary = removed === 0 ? "no changes" : options.dryRun ? `dry run: would remove ${removed}, nothing written` : `removed ${removed}`;
+  return [file, ...removals.map(describeRemoval), summary];
+});
+var missingSettingKeys = fn2("missingSettingKeys")(function* (file) {
+  const existing = yield* readJsonObject(file);
   return applyDefaults(existing, defaultsFor(existing, "1h")).entries.filter((entry) => entry.status === "added").map((entry) => entry.path);
 });
 
@@ -12775,7 +12836,7 @@ var setupNotice = (env) => {
   if (inCloudSession(env))
     return succeed6(undefined);
   const missing = isNone2(findCommand(env, "ctx7", { includeBunBin: true })) ? ["ctx7"] : [];
-  return missingSettingKeys(env).pipe(orElseSucceed2(() => []), map4((keys) => {
+  return missingSettingKeys(userFiles(env).settings).pipe(orElseSucceed2(() => []), map4((keys) => {
     const lacking = [...missing, ...keys.length === 0 ? [] : ["user settings keys"]];
     return lacking.length === 0 ? undefined : `holyagent: setup is incomplete (missing ${lacking.join(", ")}). Offer the user to run /holyagent:setup, which installs and configures; do not run it unasked.`;
   }));
@@ -19950,7 +20011,19 @@ var MIGRATE_COMMANDS = [
   }
 ];
 
-import { join as join16 } from "path";
+import { join as join16, resolve as resolve5 } from "path";
+var SCOPES = ["user", "project", "local"];
+var settingsFile = fn2("settingsFile")(function* (env, scope, cwd) {
+  if (scope === "user")
+    return userFiles(env).settings;
+  const shell = yield* Shell;
+  const top = yield* shell.run("git", ["rev-parse", "--show-toplevel"], { cwd });
+  const line = top.stdout.trim();
+  const root = top.exitCode === 0 && line !== "" ? resolve5(line) : cwd;
+  return join16(root, ".claude", scope === "project" ? "settings.json" : "settings.local.json");
+});
+
+import { join as join17 } from "path";
 var CLOUD_SKIP = "skipped in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true), which has no machine of yours to install it on";
 var neutralDirectory = (env) => homeDirectory(env);
 var ensureGlobal = fn2("ensureGlobal")(function* (env, command, packageName, dryRun) {
@@ -19981,7 +20054,7 @@ var installCtx7 = fn2("installCtx7")(function* (env, dryRun) {
   const global = yield* ensureGlobal(env, "ctx7", "ctx7", dryRun);
   if (!global.usable)
     return global.lines;
-  const skillReady = (yield* fileExists2(join16(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join16(files.claudeDir, "rules", "context7.md")));
+  const skillReady = (yield* fileExists2(join17(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join17(files.claudeDir, "rules", "context7.md")));
   if (skillReady)
     return [...global.lines, present2("ctx7 skill: already installed")];
   const apiKey = env.CONTEXT7_API_KEY === "" ? undefined : env.CONTEXT7_API_KEY;
@@ -20004,10 +20077,21 @@ var installCtx7 = fn2("installCtx7")(function* (env, dryRun) {
 });
 var asStep = (label, step) => step.pipe(catchTag2("SetupFailure", (error) => succeed6([`! ${label}: ${error.message}`])));
 var setup = fn2("setup")(function* (env, options) {
+  const scope = options.scope ?? "user";
+  const label = `${scope} settings`;
+  const file = yield* settingsFile(env, scope, options.cwd ?? process.cwd());
+  const settings = { file, subagentCacheTtl: options.subagentCacheTtl, dryRun: options.dryRun };
+  if (options.undo === true) {
+    const lines = [
+      hint("ctx7: left installed; --undo only removes the settings setup wrote"),
+      ...yield* asStep(label, undoUserSettings(settings))
+    ];
+    return { lines, ok: !lines.some((line) => line.startsWith("! ")) };
+  }
   const cloud = inCloudSession(env);
   const lines = [
     ...options.skipCtx7 ? [skipped("ctx7: skipped by flag")] : cloud ? [skipped(`ctx7: ${CLOUD_SKIP}`)] : yield* asStep("ctx7", installCtx7(env, options.dryRun)),
-    ...yield* asStep("user settings", mergeUserSettings(env, options))
+    ...yield* asStep(label, mergeUserSettings(settings))
   ];
   return { lines, ok: !lines.some((line) => line.startsWith("! ")) };
 });
@@ -20030,44 +20114,57 @@ var checkCommand = (env, command) => gen2(function* () {
   const anywhere = yield* shell.which(command, { includeBunBin: true });
   return isSome2(anywhere) ? pass(command, `${anywhere.value} (not on PATH; add its directory to PATH)`) : fail6(command, `not found on PATH or in Bun's bin directory; ${FIX}`);
 });
-var checkSettings = (env) => missingSettingKeys(env).pipe(map4((missing) => missing.length === 0 ? pass("settings", userFiles(env).settings) : fail6("settings", `${userFiles(env).settings} lacks ${missing.join(", ")}; ${FIX}`)), catchTag2("SetupFailure", (error) => succeed6(fail6("settings", error.message))));
-var checks = (env) => all2([checkBun, checkCommand(env, "ctx7"), checkSettings(env)]);
+var fixFor = (scope) => scope === "user" ? FIX : `run /holyagent:setup --scope ${scope}, or \`holyagent doctor --fix --scope ${scope}\``;
+var checkSettings = (file, scope) => missingSettingKeys(file).pipe(map4((missing) => missing.length === 0 ? pass("settings", file) : fail6("settings", `${file} lacks ${missing.join(", ")}; ${fixFor(scope)}`)), catchTag2("SetupFailure", (error) => succeed6(fail6("settings", error.message))));
+var checks = (env, file, scope) => all2([checkBun, checkCommand(env, "ctx7"), checkSettings(file, scope)]);
 var doctor = fn2("doctor")(function* (env, options) {
-  const before = yield* checks(env);
+  const scope = options.scope ?? "user";
+  const file = yield* settingsFile(env, scope, options.cwd ?? process.cwd());
+  const before = yield* checks(env, file, scope);
   const failing = (name) => before.some((line) => line.startsWith(`FAIL ${name}:`));
   const fixes = options.fix && !inCloudSession(env) ? [...failing("ctx7") ? yield* asStep("ctx7", installCtx7(env, false)) : []] : [];
-  const settingsFixes = options.fix && failing("settings") ? yield* asStep("user settings", mergeUserSettings(env, { subagentCacheTtl: "1h", dryRun: false })) : [];
+  const settingsFixes = options.fix && failing("settings") ? yield* asStep(`${scope} settings`, mergeUserSettings({ file, subagentCacheTtl: "1h", dryRun: false })) : [];
   const ran = [...fixes, ...settingsFixes];
-  const lines = ran.length === 0 ? before : [...ran, ...yield* checks(env)];
+  const lines = ran.length === 0 ? before : [...ran, ...yield* checks(env, file, scope)];
   return { lines, ok: lines.every((line) => !line.startsWith("FAIL ")) };
 });
 
 var CacheTtlFlag = Literals(CACHE_TTLS);
+var ScopeFlag = Literals(SCOPES);
 var printed = (report) => new Verbatim(`${report.lines.join(`
 `)}
 `, "", report.ok ? 0 : 1);
-var SETUP_USAGE = "setup [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7]";
+var SETUP_USAGE = "setup [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7]";
+var DOCTOR_USAGE = "doctor [--scope user|project|local] [--fix]";
 var SETUP_COMMANDS = [
   {
     path: ["setup"],
     usage: SETUP_USAGE,
     summary: "Install and configure what HolyAgent needs beside the plugin, skipping every step already done",
-    output: "report lines: `+` added, `=` already in place, `-` skipped, `~` kept or needs you, `!` failed; exit 1 when any step failed",
+    output: "report lines: `+` added, `=` already in place, `-` skipped (with --undo: removed), `~` kept or needs you, `!` failed; exit 1 when any step failed",
     notes: [
       "installs ctx7 with the Context7 skill (needs CONTEXT7_API_KEY or a saved login)",
-      "merges these keys into the user settings (CLAUDE_CONFIG_DIR, else ~/.claude/settings.json) without changing any value already set: attribution, includeGitInstructions, subagentPromptCacheTtl, modelSettings.claude-opus-5-5 (effortLevel high and autoCompactWindow 450000 for the root), extraKnownMarketplaces, enabledPlugins and permissions.deny for WebSearch and WebFetch",
+      "merges these keys into the settings file of --scope without changing any value already set: attribution, includeGitInstructions, subagentPromptCacheTtl, modelSettings.claude-opus-5-5 (effortLevel high and autoCompactWindow 450000 for the root), extraKnownMarketplaces, enabledPlugins and permissions.deny for WebSearch and WebFetch",
+      "--scope picks the file like Claude Code's scopes: user (default) is CLAUDE_CONFIG_DIR/settings.json, else ~/.claude/settings.json; project is .claude/settings.json and local is .claude/settings.local.json, both in the git top-level of the current directory, else in the current directory; ctx7 is installed for the user whatever the scope",
+      "--undo removes from the --scope file only the values setup writes: a key whose value differs is kept and reported with `~`, permissions.deny loses only WebSearch and WebFetch, and parent objects left empty are dropped; removed keys print `-` lines (`= nothing to remove` when absent); ctx7 stays installed; compares subagentPromptCacheTtl with --subagent-cache-ttl (default 1h); honors --dry-run",
       "a failed step is reported and the rest still run; in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) ctx7 is skipped and the settings are still merged"
     ],
     flags: {
+      scope: "string",
+      undo: "boolean",
       "dry-run": "boolean",
       "subagent-cache-ttl": "string",
       "skip-ctx7": "boolean"
     },
     stateless: true,
     positionals: 0,
-    run: ({ args, env }) => gen2(function* () {
+    run: ({ args, env, cwd }) => gen2(function* () {
+      const scope = yield* choiceFlag(ScopeFlag, "scope", stringFlag(args, "scope") ?? "user", SETUP_USAGE);
       const subagentCacheTtl = yield* choiceFlag(CacheTtlFlag, "subagent-cache-ttl", stringFlag(args, "subagent-cache-ttl") ?? "1h", SETUP_USAGE);
       const report = yield* setup(env, {
+        scope,
+        undo: booleanFlag(args, "undo"),
+        cwd,
         subagentCacheTtl,
         dryRun: booleanFlag(args, "dry-run"),
         skipCtx7: booleanFlag(args, "skip-ctx7")
@@ -20077,16 +20174,20 @@ var SETUP_COMMANDS = [
   },
   {
     path: ["doctor"],
-    usage: "doctor [--fix]",
-    summary: "Check bun, ctx7 and the user settings; exit 1 when a check fails",
+    usage: DOCTOR_USAGE,
+    summary: "Check bun, ctx7 and the settings of a scope; exit 1 when a check fails",
     output: "one line per check, `ok   <name>: \u2026` or `FAIL <name>: \u2026`; exit 1 when any check failed",
     notes: [
+      "--scope picks the settings file to check, as for setup (user by default); --fix then merges into that file",
       "--fix runs the setup steps behind a failing check, prints their lines, then checks again; it never installs Bun"
     ],
-    flags: { fix: "boolean" },
+    flags: { scope: "string", fix: "boolean" },
     stateless: true,
     positionals: 0,
-    run: ({ args, env }) => doctor(env, { fix: booleanFlag(args, "fix") }).pipe(map4(printed), provide3(Shell.live(env)))
+    run: ({ args, env, cwd }) => gen2(function* () {
+      const scope = yield* choiceFlag(ScopeFlag, "scope", stringFlag(args, "scope") ?? "user", DOCTOR_USAGE);
+      return printed(yield* doctor(env, { fix: booleanFlag(args, "fix"), scope, cwd }));
+    }).pipe(provide3(Shell.live(env)))
   }
 ];
 
@@ -20118,14 +20219,14 @@ var STATE_COMMANDS = [
   }
 ];
 
-import { join as join17 } from "path";
+import { join as join18 } from "path";
 var {$: $5 } = globalThis.Bun;
 var TARGETS = [
   { id: "darwin-arm64", platform: "darwin", arch: "arm64", suffix: "" },
   { id: "linux-x64", platform: "linux", arch: "x64", suffix: "" },
   { id: "windows-x64", platform: "win32", arch: "x64", suffix: ".exe" }
 ];
-var BUNDLED_TOOLS = join17(import.meta.dir, "vendor");
+var BUNDLED_TOOLS = join18(import.meta.dir, "vendor");
 
 class UnsupportedPlatform extends TaggedError2("UnsupportedPlatform") {
   get message() {
@@ -20142,7 +20243,7 @@ var selectTarget = (platform, arch) => {
   const target = TARGETS.find((candidate) => candidate.platform === platform && candidate.arch === arch);
   return target === undefined ? fail5(new UnsupportedPlatform({ platform, arch })) : succeed6(target);
 };
-var toolPath = (directory, tool, target) => join17(directory, target.id, `${tool}${target.suffix}`);
+var toolPath = (directory, tool, target) => join18(directory, target.id, `${tool}${target.suffix}`);
 var runTool = (options) => gen2(function* () {
   const path = toolPath(options.directory, options.tool, options.target);
   if (!(yield* promise2(() => Bun.file(path).exists())))
@@ -20211,7 +20312,7 @@ var topHelp = () => [
 ].join(`
 `);
 var callFor = (args, host, emit, command) => gen2(function* () {
-  const { root, directory } = command.stateless === true ? { root: host.cwd, directory: join18(host.cwd, STATE_DIRECTORY) } : yield* resolveState(host.cwd, host.env, typeof command.state === "function" ? command.state(args) : command.state ?? "ifPresent", command.path[0] !== "hook");
+  const { root, directory } = command.stateless === true ? { root: host.cwd, directory: join19(host.cwd, STATE_DIRECTORY) } : yield* resolveState(host.cwd, host.env, typeof command.state === "function" ? command.state(args) : command.state ?? "ifPresent", command.path[0] !== "hook");
   const inline = stringFlag(args, INPUT_FLAG);
   return {
     args,

@@ -1,6 +1,5 @@
-import { Effect } from "effect"
+import { Effect, Equal } from "effect"
 
-import { type Env, userFiles } from "./environment.ts"
 import {
   applyDefaults,
   type Default,
@@ -77,16 +76,18 @@ const describe = ({ path, status, value, wanted }: Entry): string => {
 }
 
 /**
- * Adds the missing keys to the user settings file (see `userFiles`), creating it when needed.
- * Existing keys and values are never changed, and the file is written only when something was added
- * (and not at all on a dry run). Returns the report lines: the file, one line per key and a
- * summary. Fails with SetupFailure when the file cannot be read as a JSON object or written.
+ * Adds the missing keys to the settings file `file` (the user, project or local settings, see
+ * `settingsFile`), creating it when needed. Existing keys and values are never changed, and the
+ * file is written only when something was added (and not at all on a dry run). Returns the report
+ * lines: the file, one line per key and a summary. Fails with SetupFailure when the file cannot be
+ * read as a JSON object or written.
  */
-export const mergeUserSettings = Effect.fn("mergeUserSettings")(function* (
-  env: Env,
-  options: { readonly subagentCacheTtl: CacheTtl; readonly dryRun: boolean },
-) {
-  const file = userFiles(env).settings
+export const mergeUserSettings = Effect.fn("mergeUserSettings")(function* (options: {
+  readonly file: string
+  readonly subagentCacheTtl: CacheTtl
+  readonly dryRun: boolean
+}) {
+  const { file } = options
   const existing = yield* readJsonObject(file)
   const { merged, entries } = applyDefaults(
     existing,
@@ -103,12 +104,108 @@ export const mergeUserSettings = Effect.fn("mergeUserSettings")(function* (
   return [file, ...entries.map(describe), summary] as ReadonlyArray<string>
 })
 
+/** One planned removal: `removed` when setup's value is there, `absent` when nothing of it is. */
+interface Removal {
+  readonly path: string
+  readonly status: "removed" | "absent" | "kept"
+  /** What was taken out, or the existing value for `kept`. */
+  readonly value: unknown
+  readonly wanted: unknown
+}
+
+const without = (node: JsonObject, key: string): JsonObject =>
+  Object.fromEntries(Object.entries(node).filter(([name]) => name !== key))
+
 /**
- * The key paths the user settings lack, without writing anything. Fails with SetupFailure when the
- * file cannot be read as a JSON object.
+ * Takes setup's value for `path` out of `node`. A scalar or object is removed only when equal to
+ * `wanted`. A list is cut by the entries `wanted` names, so the user's own entries stay. A parent
+ * object that the removal leaves empty is dropped too.
  */
-export const missingSettingKeys = Effect.fn("missingSettingKeys")(function* (env: Env) {
-  const existing = yield* readJsonObject(userFiles(env).settings)
+const take = (
+  node: JsonObject,
+  path: readonly [string, ...Array<string>],
+  depth: number,
+  wanted: unknown,
+): readonly [JsonObject, Removal] => {
+  const key = path[depth] as string
+  const full = path.join(".")
+  const current = node[key]
+  const absent = { path: full, status: "absent", value: undefined, wanted } satisfies Removal
+  if (current === undefined) return [node, absent]
+  if (depth < path.length - 1) {
+    // A scalar or list where setup needs an object means setup wrote nothing here.
+    if (!isJsonObject(current)) return [node, absent]
+    const [child, removal] = take(current, path, depth + 1, wanted)
+    if (removal.status !== "removed") return [node, removal]
+    return [
+      Object.keys(child).length === 0 ? without(node, key) : { ...node, [key]: child },
+      removal,
+    ]
+  }
+  if (Array.isArray(wanted)) {
+    if (!Array.isArray(current)) return [node, { ...absent, status: "kept", value: current }]
+    const named = (item: unknown) => wanted.some((entry) => Equal.equals(item, entry))
+    const gone = current.filter(named)
+    if (gone.length === 0) return [node, absent]
+    const left = current.filter((item) => !named(item))
+    return [
+      left.length === 0 ? without(node, key) : { ...node, [key]: left },
+      { path: full, status: "removed", value: gone, wanted },
+    ]
+  }
+  if (!Equal.equals(current, wanted)) return [node, { ...absent, status: "kept", value: current }]
+  return [without(node, key), { path: full, status: "removed", value: current, wanted }]
+}
+
+const describeRemoval = ({ path, status, value, wanted }: Removal): string => {
+  switch (status) {
+    case "removed":
+      return `- ${path}: removed ${show(value)}`
+    case "absent":
+      return `= ${path}: nothing to remove`
+    case "kept":
+      return `~ ${path}: kept ${show(value)} (setup writes ${show(wanted)})`
+  }
+}
+
+/**
+ * Backs out what {@link mergeUserSettings} wrote from the settings file `file`: only values equal to
+ * the ones setup writes are removed, so a changed value stays and is reported as kept. From
+ * `permissions.deny` only the WebSearch and WebFetch entries go, and a parent object left empty is
+ * dropped. The file is rewritten only when something was removed (and not on a dry run), and a
+ * missing file is not created. Returns the report lines: the file, one line per key and a summary.
+ * Fails with SetupFailure when the file cannot be read as a JSON object or written.
+ */
+export const undoUserSettings = Effect.fn("undoUserSettings")(function* (options: {
+  readonly file: string
+  readonly subagentCacheTtl: CacheTtl
+  readonly dryRun: boolean
+}) {
+  const { file } = options
+  let result = yield* readJsonObject(file)
+  const removals: Array<Removal> = []
+  for (const { path, value } of userSettingsDefaults(options.subagentCacheTtl)) {
+    const [next, removal] = take(result, path, 0, value)
+    result = next
+    removals.push(removal)
+  }
+  const removed = removals.filter((removal) => removal.status === "removed").length
+  if (removed > 0 && !options.dryRun) yield* writeJsonObject(file, result)
+  const summary =
+    removed === 0
+      ? "no changes"
+      : options.dryRun
+        ? `dry run: would remove ${removed}, nothing written`
+        : `removed ${removed}`
+  return [file, ...removals.map(describeRemoval), summary] as ReadonlyArray<string>
+})
+
+/**
+ * The key paths the settings file `file` lacks, without writing anything. Fails with SetupFailure
+ * when the file cannot be read as a JSON object.
+ */
+export const missingSettingKeys = Effect.fn("missingSettingKeys")(function* (file: string) {
+  const existing = yield* readJsonObject(file)
   return applyDefaults(existing, defaultsFor(existing, "1h"))
     .entries.filter((entry) => entry.status === "added")
     .map((entry) => entry.path)

@@ -1,7 +1,7 @@
 import { Effect, Option } from "effect"
 
 import { inCloudSession } from "../vcs/identity.ts"
-import type { Env } from "./environment.ts"
+import { type Env, userFiles } from "./environment.ts"
 import { missingSettingKeys } from "./settings.ts"
 import { findCommand } from "./shell.ts"
 
@@ -17,7 +17,7 @@ import { findCommand } from "./shell.ts"
 export const setupNotice = (env: Env): Effect.Effect<string | undefined> => {
   if (inCloudSession(env)) return Effect.succeed(undefined)
   const missing = Option.isNone(findCommand(env, "ctx7", { includeBunBin: true })) ? ["ctx7"] : []
-  return missingSettingKeys(env).pipe(
+  return missingSettingKeys(userFiles(env).settings).pipe(
     Effect.orElseSucceed((): ReadonlyArray<string> => []),
     Effect.map((keys) => {
       const lacking = [...missing, ...(keys.length === 0 ? [] : ["user settings keys"])]
