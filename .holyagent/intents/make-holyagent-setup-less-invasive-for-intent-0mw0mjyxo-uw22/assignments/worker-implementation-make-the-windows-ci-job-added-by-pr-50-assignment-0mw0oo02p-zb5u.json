@@ -1,0 +1,53 @@
+{
+  "id": "assignment-0mw0oo02p-zb5u",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-windows-ci-job-added-by-pr-50",
+  "objective": "Make the windows CI job (added by PR 50) get past dependency install so it runs the test suite: today `mise run toolchain` / `bun install --frozen-lockfile` fails on windows-latest because the mise npm package preinstall fetches @jdxcode/mise-windows-x64@2026.10.24, which npm returns 404 for.",
+  "state": "Running",
+  "scope": [
+    "Work ONLY in the git worktree /home/user/holyagent-setup-scope (branch release/0.2.0/feat/setup-scope-and-defaults); the ownership paths below are relative to that worktree, not to /home/user/holyagent, where another writer is busy. Files: .github/workflows/ci.yml, and if needed mise.toml, package.json, bun.lock.",
+    "Log of the failing job: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/job-125925364754.log"
+  ],
+  "constraints": [
+    "Find the real cause first: check on the npm registry (npm view @jdxcode/mise-windows-x64 versions, npm view mise optionalDependencies) whether 2026.10.24 for windows is missing or published under another name, and how the Linux job avoids it. Prefer the smallest correct fix: e.g. bump the mise dev dependency to a version whose windows package exists (regenerating bun.lock with bun install), or install the Windows toolchain the way mise-action already provides it and skip the npm mise binary on Windows. Do not skip, disable or mark the tests continue-on-error, and do not drop the windows job.",
+    "Keep the Linux check job unchanged unless the fix (e.g. a lockfile bump) must apply to both; then run node_modules/.bin/mise run verify in the worktree.",
+    "No version-control writes, no edits under .git/ or .holyagent/; report changed paths (absolute, in the worktree). Keep working until done; stop and report. Report in under 300 words; start each evidence line with the criterion label before its colon."
+  ],
+  "criteria": [
+    {
+      "text": "cause: the registry facts behind the 404 are stated",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "fix: the windows job can install dependencies and reach the test step, without skipping tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "gates: verify passes in the worktree when shared files changed; ci.yml parses",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    ".github/workflows/ci.yml",
+    "mise.toml",
+    "package.json",
+    "bun.lock"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T12:47:55.489Z"
+  },
+  "createdAt": "2026-11-03T12:47:55.489Z"
+}
