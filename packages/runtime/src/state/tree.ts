@@ -1028,7 +1028,7 @@ const locate = (cwd: string, env: Environment) =>
  * nothing touches the network: a state branch that exists nowhere locally is not made, since only a
  * fetch can tell whether the remote has it, and the state counts as absent until a command that may
  * fetch makes it. With `patience`, every lock it takes (exclude, worktree and migration) is waited
- * for that long at most, so a plugin hook passes one deadline (see {@link within}) to give up
+ * for that long at most, so a plugin hook passes one deadline (see {@link deadlineIn}) to give up
  * inside the host's hook timeout; without it each lock keeps the wait its holder needs.
  */
 export const resolveState = (

@@ -10,7 +10,7 @@ import { claimRulesDelivery, isSessionId, markRulesDelivered } from "../state/de
 import { hasCode, io } from "../state/files.ts"
 import { STATE_DIRECTORY } from "../state/layout.ts"
 import { legacyFoldersWithState } from "../state/legacy.ts"
-import { HOOK_WAIT_MS, within } from "../state/lock.ts"
+import { deadlineIn, HOOK_WAIT_MS } from "../state/lock.ts"
 import { readOpenState, updateState } from "../state/store.ts"
 import { resolveState } from "../state/tree.ts"
 import { MessageRefused } from "../vcs/errors.ts"
@@ -331,7 +331,7 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
       return Effect.gen(function* () {
         if (agentId === undefined) return yield* new AgentIdMissing()
         // One deadline for every lock this hook takes, so the waits add up to less than the host's timeout.
-        const patience = yield* within(HOOK_WAIT_MS)
+        const patience = yield* deadlineIn(HOOK_WAIT_MS)
         const { directory } = yield* resolveState(call.cwd, call.env, "ifPresent", false, patience)
         // The state folder is not made here: a project without one has no Assignment to record.
         if (!(yield* hasStateFolder(directory))) return yield* new StateFolderMissing()

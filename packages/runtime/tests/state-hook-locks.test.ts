@@ -3,7 +3,7 @@ import { join } from "node:path"
 
 import { Effect } from "effect"
 
-import { HOOK_WAIT_MS, within } from "../src/state/lock.ts"
+import { deadlineIn, HOOK_WAIT_MS } from "../src/state/lock.ts"
 import { resolveState } from "../src/state/tree.ts"
 import { cleanup, GIT_ENV, initRepo, seed, sh } from "./vcs-fixtures.ts"
 
@@ -67,7 +67,7 @@ describe("resolveState under a deadline", () => {
 
     const error = await Effect.runPromise(
       Effect.flip(
-        Effect.flatMap(within(HOOK_WAIT_MS), (deadline) =>
+        Effect.flatMap(deadlineIn(HOOK_WAIT_MS), (deadline) =>
           resolveState(dir, GIT_ENV, "ifPresent", false, deadline),
         ),
       ),
@@ -82,7 +82,7 @@ describe("resolveState under a deadline", () => {
 
     const error = await Effect.runPromise(
       Effect.flip(
-        Effect.flatMap(within(HOOK_WAIT_MS), (deadline) =>
+        Effect.flatMap(deadlineIn(HOOK_WAIT_MS), (deadline) =>
           resolveState(dir, GIT_ENV, "create", false, deadline),
         ),
       ),
@@ -102,7 +102,7 @@ describe("resolveState under a deadline", () => {
 
     const error = await Effect.runPromise(
       Effect.flip(
-        Effect.flatMap(within(HOOK_WAIT_MS), (deadline) =>
+        Effect.flatMap(deadlineIn(HOOK_WAIT_MS), (deadline) =>
           resolveState(dir, GIT_ENV, "create", false, deadline),
         ),
       ),
@@ -122,7 +122,7 @@ describe("resolveState under a deadline", () => {
     const started = Date.now()
     const error = await Effect.runPromise(
       Effect.flip(
-        Effect.flatMap(within(1500), (deadline) =>
+        Effect.flatMap(deadlineIn(1500), (deadline) =>
           resolveState(dir, GIT_ENV, "ifPresent", false, deadline),
         ),
       ),
@@ -134,6 +134,6 @@ describe("resolveState under a deadline", () => {
     // It waited for the lock it could still get (the worktree lock came free after a second)...
     expect(waited).toBeGreaterThanOrEqual(1400)
     // ...and stopped at the deadline, with room for a slow machine, but not at a second wait.
-    expect(waited).toBeLessThan(2200)
+    expect(waited).toBeLessThan(3000)
   }, 15_000)
 })

@@ -90,7 +90,7 @@ export interface Deadline {
 export const HOOK_WAIT_MS = 5_000
 
 /** A {@link Deadline} `ms` milliseconds from now. */
-export const within = (ms: number) =>
+export const deadlineIn = (ms: number) =>
   Effect.map(Clock.currentTimeMillis, (now): Deadline => ({ until: now + ms }))
 
 /**
