@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-six-blocking-gaps-and-the",
   "objective": "Repair the six blocking gaps and the notes from the docs review so every opinionated default reads accurately with a way to change it.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw0nltyh-0rau.md (blockers 1-6 and the notes)",
     "docs/usage.md, docs/decisions.md, README.md (one bullet only)"
@@ -48,7 +48,33 @@
     "agentId": "workflow:wf_adf1559b-346/assignment-0mw0nz2t6-6lgz",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-03T12:28:36.474Z"
+    "startedAt": "2026-11-03T12:28:36.474Z",
+    "finishedAt": "2026-11-03T12:33:03.353Z"
+  },
+  "result": "result: Six blockers and the notes are fixed in the docs, with one README bullet adjusted. `fmt:check` passes and the README keeps its six sections.\n\nchanged:\n- /home/user/holyagent/docs/usage.md\n- /home/user/holyagent/docs/decisions.md\n- /home/user/holyagent/README.md (one bullet)\n- Diff: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/docs.diff\n\nchecks:\n- `node_modules/.bin/mise run fmt` -> exit 0. It reformatted 3 files, which includes `packages/runtime/src/setup/check.ts` and `scope.ts`. I did not edit those; they are another writer's pending changes.\n- `mise run fmt:check` -> exit 0, \"All 244 files are formatted\".\n- README headings checked: `## How do I install it?`, `## Why HolyAgent?`, `## Development`, `## Special thanks`, `## License`.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- `claude plugin install --scope project|local` is confirmed on the discover-plugins page. Install acts on user scope when the flag is absent. I documented install at scope, plus uninstall or `disable --scope user` for an existing user copy.\n- The \"lossy by design\" sentence is confirmed on the live tools-reference page (WebFetch tool behavior). I cited the page directly and reworded the paraphrase to its text (\"separate model call\"), since \"small, fast model\" came from the secondary source.\n- The marketplace and plugin keys: I did not confirm any sync or reinstall mechanism, so the text says only that they declare the marketplace and enable the plugin, so a reinstall or another machine reading the file finds both.\n- `docs/hooks.md` lines 7 and 26 still describe the session-start notice as checking user settings only. It is outside my ownership; it needs the same update once the `check.ts` change lands.\n- The scope text and the notice claim in `usage.md` (blocker 4) describe `check.ts` as the other writer is making it. Confirm that change lands.\n- `setup-command.md` and `setup.ts` promise a `~` line for the cwd fallback outside a repository, but `scope.ts` prints it only for an untrusted top-level (source text, not changed).\n\nevidence:\n- blockers 1-6 from the docs review resolved: all six fixed in the diff file above.\n  - 1: `usage.md` table and the `subagentPromptCacheTtl` paragraph say to edit the key and give the $8 against $5 price trade-off.\n  - 2: the branches paragraph says to state the rule in `AGENTS.md`, `CLAUDE.md` or `CONTRIBUTING`, or tell the root.\n  - 3: Scope and undo gives the exact `--scope` commands, and the Opinionated paragraph points to them and says `--undo` does not disable the plugin.\n  - 4: the setup paragraph says the notice also counts the session folder's project and local settings.\n  - 5: User settings names `holyagent/setup-records.json`, mode 600.\n  - 6: `usage.md` and `decisions.md` mark the high-growth statement as inference.\n- format check passes and README structure intact: `mise run fmt:check` exit 0; five headings listed above.\n- checks-run: `mise run fmt` exit 0, `mise run fmt:check` exit 0.\n- changed-paths: `docs/usage.md`, `docs/decisions.md`, `README.md`.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "six blockers addressed with sources; fmt:check exit 0; re-review follows",
+    "criteria": [
+      {
+        "criterion": "blockers 1-6 from the docs review resolved",
+        "support": "all six fixed in the diff file above.; 1: `usage.md` table and the `subagentPromptCacheTtl` paragraph say to edit the key and give the $8 against $5 price trade-off.; 2: the branches paragraph says to state the rule in `AGENTS.md`, `CLAUDE.md` or `CONTRIBUTING`, or tell the root.; 3: Scope and undo gives the exact `--scope` commands, and the Opinionated paragraph points to them and says `--undo` does not disable the plugin.; 4: the setup paragraph says the notice also counts the session folder's project and local settings.; 5: User settings names `holyagent/setup-records.json`, mode 600.; 6: `usage.md` and `decisions.md` mark the high-growth statement as inference."
+      },
+      {
+        "criterion": "format check passes and README structure intact",
+        "support": "`mise run fmt:check` exit 0; five headings listed above."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`mise run fmt` exit 0, `mise run fmt:check` exit 0."
+      },
+      {
+        "label": "changed-paths",
+        "support": "`docs/usage.md`, `docs/decisions.md`, `README.md`."
+      }
+    ]
   },
   "createdAt": "2026-11-03T12:28:32.634Z"
 }
