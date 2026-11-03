@@ -1,0 +1,63 @@
+{
+  "id": "assignment-0mw0mpmhe-6ulw",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "add-scope-user-project-local-and-undo-to",
+  "objective": "Add --scope user|project|local and --undo to `holyagent setup` (and --scope to `holyagent doctor`), keeping today's opinionated defaults and default scope user.",
+  "state": "Ready",
+  "scope": [
+    "packages/runtime/src/cli/setup.ts and packages/runtime/src/setup/* (settings merge, report, doctor)",
+    "packages/runtime/tests/setup*.test.ts",
+    "packages/integrations/claude/src/setup-command.md (argument-hint and notes for the new flags)",
+    "the generated plugin under packages/integrations/claude/dist, rebuilt with `mise run build`"
+  ],
+  "constraints": [
+    "Scope picks the settings file the same way Claude Code names its scopes: user = CLAUDE_CONFIG_DIR/settings.json else ~/.claude/settings.json (today's behavior, still the default); project = <git top-level of the cwd, else cwd>/.claude/settings.json; local = the same folder's .claude/settings.local.json. Reason: someone trying HolyAgent can confine it to one repository instead of every project.",
+    "--scope project and local merge the same keys with the same never-overwrite rule. extraKnownMarketplaces and enabledPlugins stay in the chosen file too.",
+    "--undo removes from the chosen scope's file only values equal to what setup writes: a key whose value differs is left alone and reported with `~`; from permissions.deny it removes only the WebSearch and WebFetch entries and drops the list/permissions object only if it becomes empty; from modelSettings[\"claude-opus-5-5\"] only effortLevel high and autoCompactWindow 450000, dropping empty parent objects. It does not uninstall ctx7. It honors --dry-run. Report lines use `-` for removed (or a clearly documented marker consistent with the existing report legend) and `=` for nothing to remove. Reason: a user must be able to back out exactly what setup changed.",
+    "Use Effect and Effect Schema per .claude/CLAUDE.md (no try/catch, no async functions, tagged errors, decode with onExcessProperty error); JSDoc on every exported item; validate --scope values with a clear error.",
+    "Update the setup usage/help text in setup.ts. Do not edit docs/ or README.md (another writer owns them) and do not touch .github/.",
+    "No version-control writes, no edits under .git/ or .holyagent/; report changed paths.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When done and checked, stop and report; name unrequested features instead of adding them. Do not stop on a summary that announces a next step.",
+    "Report in under 400 words; put long logs in a file outside the repository and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "scope flag: --scope user|project|local writes to the right file, default user unchanged, invalid value rejected",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "undo: --undo removes only values equal to setup's, keeps differing ones, cleans empty parents, honors --dry-run, leaves ctx7",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "tests: new tests cover each scope, undo (including a differing value kept and a pre-existing deny entry kept) and an invalid scope, and fail without the change",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "gates: mise run verify passes and mise run build regenerated dist",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "scope limits: no edits to docs/, README.md or .github/",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "packages/runtime",
+    "packages/integrations/claude"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-03T11:53:11.955Z"
+}
