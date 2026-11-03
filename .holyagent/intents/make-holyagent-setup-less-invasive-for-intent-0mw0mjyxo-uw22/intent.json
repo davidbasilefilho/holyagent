@@ -7,7 +7,10 @@
     "Document that HolyAgent is opinionated and explain the reason for every setting and behavior setup applies, how to scope it and how to undo it",
     "Add a windows-latest CI job that runs the test suite; fixing the Windows failures is out of scope",
     "Artifacts in English; follow .claude/CLAUDE.md and AGENTS.md; mise run verify passes; README keeps its fixed section structure",
-    "The root no longer uses a platform-assigned branch (such as claude/<name> in a claude.ai cloud session) as the work branch: it creates branches that follow the repository convention, and this delivery lands on such branches"
+    "The root no longer uses a platform-assigned branch (such as claude/<name> in a claude.ai cloud session) as the work branch: it creates branches that follow the repository convention, and this delivery lands on such branches",
+    "Document any claude.ai setting the user must change for that branch rule to work",
+    "Research and calculate whether a better default auto-compact window than 450000 exists; keep 450000 unless a better default is shown, and document the calculation",
+    "HolyAgent default: PRs merge by squash, while branches carry atomic, semantic (Conventional Commits) commits; the target repository conventions (mergeability) come first"
   ],
   "revision": 1,
   "state": "Open",
