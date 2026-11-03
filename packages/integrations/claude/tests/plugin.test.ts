@@ -384,6 +384,32 @@ describe("agents", () => {
     expect(text).toContain("`<transcript dir>/journal.jsonl`")
   })
 
+  test("the root deletes branches only when the user asks and never proposes it or lists kept branches as work", () => {
+    const content = (agent("holyagent")?.content ?? "").toLowerCase()
+    for (const part of [
+      "branches are the user's to remove: they keep history and references after a merge, and deleting is destructive",
+      "delete a branch, local or remote, merged or not, only when the user asks",
+      "do not pass `--delete-branch` (or the api equivalent) when merging",
+      "leave a repository's own auto-delete-on-merge setting as it is",
+      "do not propose deleting them",
+      "offer deletion as an askuserquestion option",
+      "list kept branches as remaining work or cleanup in a report",
+    ])
+      expect({ part, found: content.includes(part) }).toEqual({ part, found: true })
+    const requirement = read("packages/runtime/src/instructions", "requirements.md")
+      .split("\n")
+      .find((line) => line.startsWith("- R-BRANCH:"))
+    for (const part of [
+      "they keep history and references after a merge",
+      "only when the user asks",
+      "after a merge, in the final report and in proposals",
+      "do not pass --delete-branch when merging",
+      "auto-delete-on-merge setting as it is",
+      "remaining work or cleanup",
+    ])
+      expect({ part, found: requirement?.includes(part) }).toEqual({ part, found: true })
+  })
+
   test("the static root text holds no cloud identity guidance: the session-start hook adds it in a cloud session", () => {
     const content = agent("holyagent")?.content ?? ""
     for (const part of ["get_me", "vcs identity", "users.noreply.github.com"])
