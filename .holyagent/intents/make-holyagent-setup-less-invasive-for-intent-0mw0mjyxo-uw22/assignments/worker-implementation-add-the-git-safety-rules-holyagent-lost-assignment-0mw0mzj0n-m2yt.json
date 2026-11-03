@@ -54,6 +54,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "workflow:wf_0da99c86-c6e/assignment-0mw0mzj0n-m2yt",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-03T12:00:58.664Z"
