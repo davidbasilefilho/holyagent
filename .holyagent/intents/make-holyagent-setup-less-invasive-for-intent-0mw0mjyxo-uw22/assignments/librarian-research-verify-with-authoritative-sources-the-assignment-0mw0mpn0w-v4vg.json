@@ -5,7 +5,7 @@
   "roleTask": "Librarian.research",
   "slug": "verify-with-authoritative-sources-the",
   "objective": "Verify, with authoritative sources, the maintainer's stated reasons for HolyAgent's opinionated setup defaults, separating sourced facts from inference.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Claim 1 (web tools): the Exa search/fetch connector gives better search quality and uses fewer tokens than Claude Code's built-in WebSearch/WebFetch, and one web route keeps behavior predictable. Find what WebFetch actually returns into context (it runs a small model over the page and returns its output; check current docs) and what Exa web_search/web_fetch return (highlights, size limits).",
     "Claim 2 (long context cost): the cost of a call grows with the tokens re-read each call, so a session at 700k tokens costs more per call than one at 450k even at the same price per token; check Anthropic pricing for long context (is there a >200k price tier for current Opus/Sonnet 5.x?), cache read pricing, and Claude Code's default auto-compact threshold and window for Opus 5.5 (1M context?).",
@@ -36,5 +36,10 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-03T11:53:16.853Z"
+  },
   "createdAt": "2026-11-03T11:53:12.656Z"
 }
