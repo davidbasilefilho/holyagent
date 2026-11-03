@@ -99,4 +99,4 @@ Do not edit generated files; each carries a note naming its source. `.prettierig
 
 ## Versioning
 
-Versions are `0.X.Y-Z`, where Z is the hotfix number; 0.1.0 is the first release. The version lives in the `package.json` files, and the build copies the one in `packages/integrations/claude/package.json` into `plugin.json` and `.claude-plugin/marketplace.json`; a test checks they agree. Release work branches as `release/<version>/<type>/<change>`, one branch and one PR per reviewable change.
+Versions follow ZeroVer, `0.X.Y`: the major stays 0, a minor bump advances X and resets Y, and a patch bump advances Y; 0.1.0 was the first release. The version lives in the `package.json` files, and the build copies the one in `packages/integrations/claude/package.json` into `plugin.json` and `.claude-plugin/marketplace.json`; a test checks they agree. Release work branches as `release/<version>/<type>/<change>`, one branch and one PR per reviewable change.

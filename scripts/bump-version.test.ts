@@ -35,8 +35,6 @@ describe("bumpVersion", () => {
   test.each([
     ["0.1.0", "minor", "0.2.0"],
     ["0.1.0", "patch", "0.1.1"],
-    ["0.1.0", "hotfix", "0.1.0-1"],
-    ["0.3.2-1", "hotfix", "0.3.2-2"],
     ["0.3.2-1", "patch", "0.3.3"],
     ["0.3.2-1", "minor", "0.4.0"],
     ["0.9.9", "minor", "0.10.0"],
@@ -45,8 +43,12 @@ describe("bumpVersion", () => {
     expect(bump(from, kind)).toBe(to)
   })
 
-  test.each(["0.1.0", "0.3.2-1", "0.12.34-56"])("%s round-trips through parse and format", (v) => {
+  test.each(["0.1.0", "0.12.34"])("%s round-trips through parse and format", (v) => {
     expect(Effect.runSync(parseVersion(v).pipe(Effect.map(formatVersion)))).toBe(v)
+  })
+
+  test("a legacy -Z suffix is accepted on input and never written", () => {
+    expect(Effect.runSync(parseVersion("0.3.2-1").pipe(Effect.map(formatVersion)))).toBe("0.3.2")
   })
 
   test.each([
@@ -126,7 +128,6 @@ describe("bumpVersions", () => {
   test.each([
     ["minor", "0.4.0"],
     ["patch", "0.3.3"],
-    ["hotfix", "0.3.2-2"],
   ] as const)("a %s bump writes %s to every file and changes nothing else", async (kind, to) => {
     const before = VERSION_FILES.map(read)
     expect(await Effect.runPromise(bumpVersions(root, kind))).toEqual({ from: "0.3.2-1", to })
@@ -136,20 +137,14 @@ describe("bumpVersions", () => {
     expect(read(LOCKFILE)).toBe(lockfile(to))
   })
 
-  test("a hotfix bump of a release version starts the hotfix count at 1", async () => {
-    for (const file of VERSION_FILES) write(file, manifest(file, "0.1.0"))
-    write(LOCKFILE, lockfile("0.1.0"))
-    expect((await Effect.runPromise(bumpVersions(root, "hotfix"))).to).toBe("0.1.0-1")
-  })
-
   test("rewrites the repository's own manifests keeping their formatting", async () => {
     for (const file of [...VERSION_FILES, LOCKFILE]) {
       mkdirSync(dirname(join(root, file)), { recursive: true })
       cpSync(join(repository, file), join(root, file))
     }
     const before = state()
-    const { from, to } = await Effect.runPromise(bumpVersions(root, "hotfix"))
-    expect(to).toBe(bump(from, "hotfix"))
+    const { from, to } = await Effect.runPromise(bumpVersions(root, "patch"))
+    expect(to).toBe(bump(from, "patch"))
     const after = state()
     before.forEach((text, index) => {
       expect(after[index]).toBe(
@@ -218,10 +213,10 @@ describe("the command line", () => {
   }
 
   test("prints the old and new version and exits 0", async () => {
-    const { code, out } = await run("hotfix", root)
+    const { code, out } = await run("patch", root)
     expect(code).toBe(0)
-    expect(out.trim()).toBe("0.3.2-1 -> 0.3.2-2")
-    expect(read("package.json")).toContain(`"version": "0.3.2-2"`)
+    expect(out.trim()).toBe("0.3.2-1 -> 0.3.3")
+    expect(read("package.json")).toContain(`"version": "0.3.3"`)
   })
 
   test("prints the tagged error and exits 1 on disagreement", async () => {
@@ -232,11 +227,14 @@ describe("the command line", () => {
     expect(err).toContain("packages/integrations/claude/package.json 0.3.1")
   })
 
-  test("prints usage and exits 1 on an unknown bump", async () => {
-    const { code, err } = await run("major", root)
-    expect(code).toBe(1)
-    expect(err).toContain("error: Usage")
-  })
+  test.each(["major", "hotfix"])(
+    "prints usage and exits 1 on the unknown bump %s",
+    async (kind) => {
+      const { code, err } = await run(kind, root)
+      expect(code).toBe(1)
+      expect(err).toContain("error: Usage")
+    },
+  )
 })
 
 describe("the repository's versions", () => {

@@ -1,6 +1,6 @@
 {
   "name": "holyagent",
-  "version": "0.1.2-3",
+  "version": "0.2.0",
   "private": true,
   "license": "Apache-2.0",
   "workspaces": [
@@ -9,7 +9,6 @@
   ],
   "type": "module",
   "scripts": {
-    "bump:hotfix": "mise run bump:hotfix",
     "bump:minor": "mise run bump:minor",
     "bump:patch": "mise run bump:patch",
     "prepare": "mise run prepare",

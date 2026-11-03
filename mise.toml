@@ -67,7 +67,7 @@ run = "bun packages/integrations/claude/build.ts"
 description = "Run every read-only gate: check, lint, fmt:check and test"
 depends = ["check", "lint", "fmt:check", "test"]
 
-# One version for every package and manifest (0.X.Y, or 0.X.Y-Z for the Zth hotfix). The script
+# One version for every package and manifest (ZeroVer, 0.X.Y). The script
 # rewrites the package.json files and bun.lock, and the build regenerates the plugin manifests from
 # them, so commit the result of the task as a whole.
 
@@ -78,7 +78,3 @@ run = ["bun scripts/bump-version.ts minor", { task = "build" }]
 [tasks."bump:patch"]
 description = "Bump the patch version (0.X.Y to 0.X.(Y+1)) everywhere and rebuild the plugin"
 run = ["bun scripts/bump-version.ts patch", { task = "build" }]
-
-[tasks."bump:hotfix"]
-description = "Bump the hotfix version (0.X.Y to 0.X.Y-1, 0.X.Y-1 to 0.X.Y-2) everywhere and rebuild the plugin"
-run = ["bun scripts/bump-version.ts hotfix", { task = "build" }]
