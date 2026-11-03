@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-review-gaps-in-the",
   "objective": "Repair the review gaps in the uncommitted branch-deletion rule and AGENTS.md mise note in worktree /home/user/holyagent-hook-locks.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-hook-locks, branch release/0.2.0/feat/branch-deletion-rule; changes are uncommitted in AGENTS.md, packages/runtime/src/instructions/claude-5.5/root/version-control.md, packages/runtime/src/instructions/requirements.md, packages/integrations/claude/tests/plugin.test.ts and the generated packages/integrations/claude/dist/agents/holyagent.md. Review findings to fix:",
     "1) requirements.md R-BRANCH (around line 48) states the branch rule without its reason or its coverage of cleanup after merges and final reports; add both.",
@@ -61,7 +61,41 @@
     "agentId": "workflow:wf_ff0fa830-690/assignment-0mw0vf9j6-s3qn",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-03T15:57:19.138Z"
+    "startedAt": "2026-11-03T15:57:19.138Z",
+    "finishedAt": "2026-11-03T16:02:11.660Z"
+  },
+  "result": "result: all four review findings fixed; build and verify pass.\nchanged (all in /home/user/holyagent-hook-locks):\n- AGENTS.md\n- packages/runtime/src/instructions/requirements.md\n- packages/runtime/src/instructions/claude-5.5/root/version-control.md\n- packages/integrations/claude/tests/plugin.test.ts\n- packages/integrations/claude/dist/agents/holyagent.md (regenerated)\n\nchecks:\n- `bunx --no-install mise run build` -> exit 0, 35 files built.\n- `bunx --no-install mise run verify` -> exit 0. Type-check clean, lint clean, format clean. Tests: 1052 pass, 1 skip, 0 fail.\n\nblockers: none\nquestions: none\nnotes: No unrequested changes. The test now pins the new wording in both the root text and R-BRANCH, and asserts the same set of parts in each, with no loosening.\n\nevidence:\nR-BRANCH and version-control.md give the maintainer's reason and cover cleanup after merges, final reports and proposals: R-BRANCH in requirements.md and the \"Branch deletion\" bullet in version-control.md both open with the user-owned reason (history and references kept after a merge, deleting destructive). Both then cover merges, final reports and proposals, and the test asserts those parts. The classifier appears only as a consequence in version-control.md. See repB.diff.\nThe rule says the root does not pass --delete-branch and leaves a repository's auto-delete setting as it is: both files say so, and the test asserts it. See repB.diff.\nThe AGENTS.md note uses bunx --no-install mise, points to docs/development.md, and keeps only the unique parts with their reasons: one bullet in AGENTS.md with the `bunx --no-install mise run <task>` invocation, a pointer to `docs/development.md`, the missing-mise rule, the per-worktree `bun install` (node_modules is not shared), and the lefthook `prepare` note. See repB.diff.\nmise run verify passes and dist is rebuilt: verify exit 0 as above. Build exit 0 and dist/agents/holyagent.md shows as modified.\ndiff-file: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/repB.diff\nverify: `bunx --no-install mise run verify` -> exit 0, 1052 pass, 0 fail.\n",
+  "acceptance": {
+    "revision": 2,
+    "rationale": "Rule carries the maintainer's reason, --delete-branch and auto-delete covered; AGENTS.md trimmed; verify 1052 pass; re-review closed all five.",
+    "criteria": [
+      {
+        "criterion": "R-BRANCH and version-control.md give the maintainer's reason and cover cleanup after merges, final reports and proposals",
+        "support": "R-BRANCH in requirements.md and the \"Branch deletion\" bullet in version-control.md both open with the user-owned reason (history and references kept after a merge, deleting destructive). Both then cover merges, final reports and proposals, and the test asserts those parts. The classifier appears only as a consequence in version-control.md. See repB.diff."
+      },
+      {
+        "criterion": "The rule says the root does not pass --delete-branch and leaves a repository's auto-delete setting as it is",
+        "support": "both files say so, and the test asserts it. See repB.diff."
+      },
+      {
+        "criterion": "The AGENTS.md note uses bunx --no-install mise, points to docs/development.md, and keeps only the unique parts with their reasons",
+        "support": "one bullet in AGENTS.md with the `bunx --no-install mise run <task>` invocation, a pointer to `docs/development.md`, the missing-mise rule, the per-worktree `bun install` (node_modules is not shared), and the lefthook `prepare` note. See repB.diff."
+      },
+      {
+        "criterion": "mise run verify passes and dist is rebuilt",
+        "support": "verify exit 0 as above. Build exit 0 and dist/agents/holyagent.md shows as modified."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/repB.diff"
+      },
+      {
+        "label": "verify",
+        "support": "`bunx --no-install mise run verify` -> exit 0, 1052 pass, 0 fail."
+      }
+    ]
   },
   "createdAt": "2026-11-03T15:57:05.154Z"
 }
