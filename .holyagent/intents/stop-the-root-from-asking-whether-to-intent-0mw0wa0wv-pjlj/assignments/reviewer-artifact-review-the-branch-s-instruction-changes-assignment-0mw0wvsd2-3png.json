@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "review-the-branch-s-instruction-changes",
   "objective": "Review the branch's instruction changes as model-facing text: no merge question, settle choices repository-convention-first then holyagent default, a generic test for unnecessary questions, and specialists never moving HEAD in a shared checkout.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Full diff: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/branch.diff (worktree /home/user/holyagent-hook-locks, uncommitted). Maintainer's intent, verbatim where quoted: the root asked an unnecessary merge question seen in other sessions; 'use the holyagent default/recommended, but prioritize the repo default'; 'in general, unnecessary questions must not be asked'; 'but it must define generically what that means'. Merging still needs the user to say merge; only the question goes. A reviewer had run git checkout in the shared checkout, leaving it detached.",
     "Judge against /root/.claude/plugins/synced/03eb801d-6ff6-4373-b5b1-f94edf359a3e_0f3e6ee9-af2e-4c2c-8d3c-9be25ca27713/holyagent~g2/skills/instruction-writing/SKILL.md: one general test with its reason, examples as illustrations only, no contradiction with other root rules (asking.md, task-list/AskUserQuestion rule, user-messages.md, version-control.md, stack-plan.md, ci-watch), no new authority to merge, and the specialist rule names read-only alternatives."
@@ -43,5 +43,10 @@
   "independentFrom": [
     "assignment-0mw0wb7wa-xv5a"
   ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T16:38:00.419Z"
+  },
   "createdAt": "2026-11-03T16:37:55.670Z"
 }
