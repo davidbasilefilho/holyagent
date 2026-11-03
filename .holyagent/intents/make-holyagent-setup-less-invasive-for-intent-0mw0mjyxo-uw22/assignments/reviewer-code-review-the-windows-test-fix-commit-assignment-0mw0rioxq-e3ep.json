@@ -1,0 +1,50 @@
+{
+  "id": "assignment-0mw0rioxq-e3ep",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-windows-test-fix-commit",
+  "objective": "Review the Windows test-fix commit b1dec34..252fedc on release/0.2.0/fix/windows-tests for correctness and test integrity.",
+  "state": "Running",
+  "scope": [
+    "It fixes 3 tests that failed only on windows-latest CI (log: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/job-125958444273.log): agents path compared with backslashes (plugin.test.ts), execute bit read via stat on NTFS (host.test.ts, split into a real-platform test plus a POSIX test skipped on win32), and a 5000ms timeout on a large-state session-start test running about 30 CLI starts (hooks.test.ts, now 40s).",
+    "Review only the committed diff b1dec34..252fedc. Another writer may edit the working tree at the same time, so read the committed range, not the working tree."
+  ],
+  "constraints": [
+    "Read-only: no edits, no version-control writes, nothing under .git/ or .holyagent/. Scratch files only under /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad.",
+    "Do not add requirements beyond the three failures; mark anything else non-blocking.",
+    "Report in under 400 words; put long output in the scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Each change addresses its Windows failure without hiding a real defect",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No assertion is weakened, and the win32 skip covers only behavior absent on Windows and is documented",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The changed tests pass on Linux",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw0rc998-jz8r"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T14:07:46.622Z"
+  },
+  "createdAt": "2026-11-03T14:07:46.622Z"
+}
