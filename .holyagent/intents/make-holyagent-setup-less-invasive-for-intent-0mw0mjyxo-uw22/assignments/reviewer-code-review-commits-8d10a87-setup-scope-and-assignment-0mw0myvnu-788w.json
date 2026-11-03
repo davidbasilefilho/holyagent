@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mw0myvnu-788w",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.code",
+  "slug": "review-commits-8d10a87-setup-scope-and",
+  "objective": "Review commits 8d10a87 (setup --scope and --undo) and 4091f2a (Windows CI job) on branch claude/blissful-wozniak-arfpxn against base 89ed6d8 for correctness and regressions.",
+  "state": "Ready",
+  "scope": [
+    "git diff 89ed6d8..4091f2a; the generated dist is rebuilt output, check only that it matches a fresh mise run build"
+  ],
+  "constraints": [
+    "Requirements: --scope user|project|local (default user, today's behavior unchanged; project = <git top-level else cwd>/.claude/settings.json; local = .claude/settings.local.json there); --undo removes only values equal to what setup writes, keeps differing values (~), removes only WebSearch/WebFetch from permissions.deny, drops empty parents, honors --dry-run, leaves ctx7. Repo rules: Effect/Schema, no try/catch or async, JSDoc on exports (.claude/CLAUDE.md).",
+    "Known and accepted: undo compares subagentPromptCacheTtl against --subagent-cache-ttl (default 1h); the SessionStart notice still checks user settings only. Report them only if they cause a real defect.",
+    "Read-only; no version-control writes. Keep working until done; stop and report. Report in under 400 words with each finding marked blocking or non-blocking."
+  ],
+  "criteria": [
+    {
+      "text": "correctness: scope and undo behave as required, including edge cases (missing file, non-object JSON, nested empty objects, Windows paths)",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "regressions: default setup and doctor behavior unchanged",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "standards: repo code rules followed",
+      "blocking": false,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw0mpmhe-6ulw",
+    "assignment-0mw0mpmsu-q4xi"
+  ],
+  "createdAt": "2026-11-03T12:00:23.755Z"
+}
