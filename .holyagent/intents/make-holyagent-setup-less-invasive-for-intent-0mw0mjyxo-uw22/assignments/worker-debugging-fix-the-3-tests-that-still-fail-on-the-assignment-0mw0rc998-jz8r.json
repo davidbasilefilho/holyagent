@@ -1,0 +1,60 @@
+{
+  "id": "assignment-0mw0rc998-jz8r",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Worker.debugging",
+  "slug": "fix-the-3-tests-that-still-fail-on-the",
+  "objective": "Fix the 3 tests that still fail on the windows-latest CI job of release/0.2.0/fix/windows-tests so the job passes, without skipping or weakening them.",
+  "state": "Ready",
+  "scope": [
+    "Checkout: /home/user/holyagent on branch release/0.2.0/fix/windows-tests (head b1dec34). The CI job log for b319468 is at /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/job-125958444273.log (1028 pass, 12 skip, 3 fail; search for '(fail)' and the error text above each).",
+    "Failing tests: (a) 'agents > agent files sit where the plugin expects them'; (b) 'hook session-start, after a resume or compaction > keeps the static text first and the whole within the context budget for a large state' (hit the 5000ms default timeout on Windows); (c) 'whether a file of the repository can be run > is its execute bit where the file system has one'.",
+    "Windows is not available locally. Diagnose from the log and the code, and where a fix depends on platform, route it through an injectable platform parameter (as packages/integrations/claude/tests/host.ts and tree.ts killGroup already do) so the Windows path is exercised on Linux too. Earlier Windows fixes used realpath, POSIX-normalized paths and longer timeouts on win32; prefer the cause over a timeout when the log shows one.",
+    "A test may be skipped on win32 only when the behavior genuinely does not exist there (for example POSIX execute bits on NTFS), with a comment that says why, and only if the production code has the matching platform branch; say which in the report."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md and AGENTS.md: Effect for effects and tagged errors, no try/catch/new Promise/async in runtime and CLI source, JSDoc on exported items, Bun APIs.",
+    "Make no version-control writes (no git add/commit/checkout/stash) and no edits under .git/ or .holyagent/; report changed paths. Scratch files only under /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad.",
+    "Rebuild the generated plugin (mise run build, or bun scripts/vendor.ts then bun packages/integrations/claude/build.ts if mise is missing) when plugin sources change.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report: name unrequested features, tests, files or refactors instead of adding them, and launch no reviewers. A summary announcing a next step or an offer to wait is not a stop.",
+    "Run real checks before reporting: the changed test files, then check, lint, fmt --check and the full test suite (mise run verify, or the bun steps directly if mise is missing, naming that). Write the full diff to /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/win-fix3.diff and list it as diff-file evidence.",
+    "Report in under 400 words, with the root cause of each failure in one line; put long logs in the scratchpad."
+  ],
+  "criteria": [
+    {
+      "text": "Each of the 3 failures has a stated root cause and a fix that addresses it on Windows",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No test is weakened, and any win32 skip is limited to behavior absent on Windows and documented",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The full suite, type-check, lint and format pass on Linux",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The change stays within the 3 failures",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "diff-file",
+    "verify",
+    "root-causes"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src",
+    "packages/runtime/tests",
+    "packages/integrations/claude/tests",
+    "packages/integrations/claude/src",
+    "packages/integrations/claude/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-03T14:02:46.364Z"
+}
