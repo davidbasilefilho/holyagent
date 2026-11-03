@@ -5,7 +5,7 @@
   "roleTask": "Explorer.trace",
   "slug": "compare-what-claude-code-s-built-in-git",
   "objective": "Compare what Claude Code's built-in git instructions give the model (commit and PR workflow guidance, safety rules, git status snapshot) with what HolyAgent's own version-control instructions give the root and specialists, and list concrete gaps HolyAgent should cover now that setup turns the built-in ones off.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "HolyAgent's VCS text: packages/integrations/claude/src (root and specialist section files, hooks that add VCS context), docs/commit-authorship.md, docs/hooks.md, the holyagent vcs commit/pr implementation in packages/runtime.",
     "Claude Code's built-in git guidance: what includeGitInstructions removes (from Claude Code docs or the plugin's own notes; if the exact text is not available locally, say so and work from documented behavior)."
@@ -27,5 +27,10 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-03T11:53:17.165Z"
+  },
   "createdAt": "2026-11-03T11:53:12.922Z"
 }
