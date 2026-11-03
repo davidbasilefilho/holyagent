@@ -1,0 +1,34 @@
+{
+  "id": "assignment-0mw0oqvk8-nrv7",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-code-part-of-commit-9b4baa7",
+  "objective": "Review the code part of commit 9b4baa7: the Reviewer.artifact route change in packages/runtime/src/domain/route.ts, the R-EVIDENCE mapping in packages/integrations/claude/src/agents.ts, and the tests in route.test.ts, instructions.test.ts and plugin.test.ts.",
+  "state": "Ready",
+  "scope": [],
+  "constraints": [
+    "Check that the route change reaches the generated agent (dist/agents/reviewer-artifact.md) and dispatch output, that no other code keys on Reviewer.artifact being Haiku (e.g. warm-reuse or cache logic grouping by model), and that the tests fail without the change. Run bun test on the three test files. Read-only. Report in under 250 words, findings blocking or non-blocking with file:line; start each evidence line with the criterion label before its colon."
+  ],
+  "criteria": [
+    {
+      "text": "route: the change is complete and nothing depends on the old model",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "tests: the tests pin the change and pass",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw0olm2j-48i5"
+  ],
+  "createdAt": "2026-11-03T12:50:09.608Z"
+}
