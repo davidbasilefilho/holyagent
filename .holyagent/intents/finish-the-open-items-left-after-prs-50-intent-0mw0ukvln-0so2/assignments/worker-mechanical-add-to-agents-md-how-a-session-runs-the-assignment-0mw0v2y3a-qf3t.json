@@ -1,0 +1,42 @@
+{
+  "id": "assignment-0mw0v2y3a-qf3t",
+  "intentId": "intent-0mw0ukvln-0so2",
+  "intentRevision": 2,
+  "roleTask": "Worker.mechanical",
+  "slug": "add-to-agents-md-how-a-session-runs-the",
+  "objective": "Add to AGENTS.md how a session runs the gates through the mise dev dependency, so specialists stop reporting mise as missing.",
+  "state": "Ready",
+  "scope": [
+    "Worktree /home/user/holyagent-hook-locks, file AGENTS.md (rules for working in this repository, each with its reason). Facts: mise is a dev dependency (package.json devDependencies 'mise', trustedDependencies), so after 'bun install --frozen-lockfile' it is at node_modules/.bin/mise; it is usually not on PATH in a cloud container. 'bun run verify' works because bun puts node_modules/.bin on PATH for package scripts, and node_modules/.bin/mise run <task> runs any task. mise run installs the tools in mise.toml first; its postinstall hook upgrades that Bun to canary, which the gates need (the container's own bun is stable; 'mise run toolchain' checks it). A worktree needs its own bun install. bun install runs the prepare script, which installs the repository's lefthook git hooks into the shared .git/hooks; that is expected.",
+    "Add one short bullet (or a few lines) under the most fitting existing section, matching the file's style: the rule plus its reason ('a missing mise on PATH is not a reason to skip the gates or run bun steps by hand')."
+  ],
+  "constraints": [
+    "Change only AGENTS.md. Make no version-control writes and no edits under .git/ or .holyagent/; report changed paths. Scratch files only under /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad.",
+    "Do not change .claude/CLAUDE.md (maintainer permission required).",
+    "Run node_modules/.bin/mise run fmt:check in /home/user/holyagent-hook-locks and report its exit code.",
+    "Write the diff to /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/agents-md.diff and list it as diff-file evidence.",
+    "Keep working until done, then stop and report in under 150 words."
+  ],
+  "criteria": [
+    {
+      "text": "AGENTS.md says how to run the gates through the dev-dependency mise, with the reason",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Only AGENTS.md changed and the format check passes",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "diff-file",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "AGENTS.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-03T15:47:30.454Z"
+}
