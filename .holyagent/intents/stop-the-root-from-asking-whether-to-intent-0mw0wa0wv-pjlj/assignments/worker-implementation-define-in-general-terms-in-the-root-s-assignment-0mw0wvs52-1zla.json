@@ -61,5 +61,37 @@
     "finishedAt": "2026-11-03T16:48:54.059Z"
   },
   "result": "result: Asking rules now define one general test for an unnecessary question; verify passes and dist is rebuilt.\n\nThe test: a question is unnecessary when its answer would not change what the root does, or when something already settles it. The sources that settle it are the user's words or an earlier answer, the repository's conventions, a holyagent default or recommended option, the mergeability dimensions, the code, or a fact a specialist can establish. They are checked in that order, so the repository convention comes before the holyagent default.\n\nThe common unnecessary questions are a short illustration bullet in `asking.md`, not the rule. They are merge or method, branch deletion, permission for a pushing the reviewed branches or for a named action, confirming a plan, continue or wait, and choosing when one option is the recommended default.\n\nR-DEFAULTS and the old \"before asking, check\" bullet are folded into the test, with no overlap left.\n\nchanged:\n- `packages/runtime/src/instructions/claude-5.5/root/asking.md`\n- `packages/runtime/src/instructions/claude-5.5/root/task-list.md`\n- `packages/runtime/src/instructions/requirements.md`\n- `packages/integrations/claude/src/agents.ts`\n- `packages/integrations/claude/tests/plugin.test.ts`\n- The rebuilt dist files under `packages/integrations/claude/dist`, plus the previous writer's existing changes.\n\nchecks:\n- `bunx --no-install mise run build` -> 0.\n- `bunx --no-install mise run verify` -> 0; 0 fail, type-check clean (128 files).\n- One earlier verify run in this session returned 1 with its output suppressed. The rerun passed with no change to the tree, so I take it as a flake, but I did not capture its cause.\n\nnotes:\n- R-NOASK is the general test and R-ASK keeps only \"one at a time, plain words, record\".\n- `task-list.md` states a short version of the test, naming the fields kept (\"trust boundaries\", etc.) and pointing to Asking. That file is part of the core root text, which a `sessioncontext` test requires to stand alone without `asking.md`, so it cannot only point there.\n- R-MERGEWAIT and the \"Merging\" bullet in `version-control.md` stay as the merge illustration, with the method detail.\n- `uq.diff` is reconstructed by reverting only my edits in copies of the 5 source files. It does not include dist, which is derived.\n\nevidence:\n- The root's asking rules define generically what makes a question unnecessary, as one test, and the root asks only questions that pass it: `asking.md` first bullet, `task-list.md` decision paragraph, R-NOASK in `requirements.md`; the new test in `plugin.test.ts` passes.\n- Examples are illustrations of the test, not the rule, and the repository-convention-first default rule is folded in without duplication: the second `asking.md` bullet is worded as illustrations; the new test asserts R-DEFAULTS and \"Apply, without asking, a choice…\" are gone.\n- Every root rule that says when to ask agrees with the test: `task-list.md` and R-NOASK rewritten; `user-messages.md`, R-NAMED and R-AMBIGUOUS checked and unchanged.\n- A requirement entry and plugin test cover it, mise run verify passes and dist is rebuilt: R-NOASK in `requirements.md` and `agents.ts`; the new test in `plugin.test.ts`; build exit 0, verify exit 0.\n- diff-file: `/tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/branch.diff` (full worktree), `/tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/uq.diff` (my changes only)\n- verify: `bunx --no-install mise run verify` -> exit 0; log at `/tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/verify.log`\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Its review findings were repaired by assignment-0mw0x9wst-83dq and the re-review closed them.",
+    "criteria": [
+      {
+        "criterion": "The root's asking rules define generically what makes a question unnecessary, as one test, and the root asks only questions that pass it",
+        "support": "`asking.md` first bullet, `task-list.md` decision paragraph, R-NOASK in `requirements.md`; the new test in `plugin.test.ts` passes."
+      },
+      {
+        "criterion": "Examples are illustrations of the test, not the rule, and the repository-convention-first default rule is folded in without duplication",
+        "support": "the second `asking.md` bullet is worded as illustrations; the new test asserts R-DEFAULTS and \"Apply, without asking, a choice…\" are gone."
+      },
+      {
+        "criterion": "Every root rule that says when to ask agrees with the test",
+        "support": "`task-list.md` and R-NOASK rewritten; `user-messages.md`, R-NAMED and R-AMBIGUOUS checked and unchanged."
+      },
+      {
+        "criterion": "A requirement entry and plugin test cover it, mise run verify passes and dist is rebuilt",
+        "support": "R-NOASK in `requirements.md` and `agents.ts`; the new test in `plugin.test.ts`; build exit 0, verify exit 0."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff-file",
+        "support": "`/tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/branch.diff` (full worktree), `/tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/uq.diff` (my changes only)"
+      },
+      {
+        "label": "verify",
+        "support": "`bunx --no-install mise run verify` -> exit 0; log at `/tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/verify.log`"
+      }
+    ]
+  },
   "createdAt": "2026-11-03T16:37:55.382Z"
 }
