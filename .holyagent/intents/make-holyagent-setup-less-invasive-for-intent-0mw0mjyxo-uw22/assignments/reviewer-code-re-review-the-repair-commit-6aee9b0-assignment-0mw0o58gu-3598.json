@@ -1,0 +1,32 @@
+{
+  "id": "assignment-0mw0o58gu-3598",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-repair-commit-6aee9b0",
+  "objective": "Re-review the repair commit 6aee9b0 against the earlier non-blocking findings it addresses.",
+  "state": "Ready",
+  "scope": [
+    "Repair diff: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/repair-code.diff (git show 6aee9b0). Earlier findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw0nltgp-she3.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw0nltpu-mlxp.md; fixes asked: (a) reminder wording matches version-control.md, (b) doctor prints the rejected-top-level notice, (c) record mode 0o600, (d) setup notice counts project/local settings of the session folder, (e) fallback outside a repository reported, (f) top-level trusted only when cwd/ancestor and holding .git"
+  ],
+  "constraints": [
+    "Judge only the repair diff; verify each blocking finding with a reproduction or trace.",
+    "Read-only; no version-control writes. Keep working until done; stop and report. Report in under 300 words, each finding blocking or non-blocking with file:line."
+  ],
+  "criteria": [
+    {
+      "text": "repair: fixes a-f correct and no regression introduced",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw0nz2ks-iqrt"
+  ],
+  "createdAt": "2026-11-03T12:33:19.902Z"
+}
