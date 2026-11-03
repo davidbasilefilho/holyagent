@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mw0p1uqj-alkx",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Worker.validation",
+  "slug": "summarize-the-windows-test-failures-on",
+  "objective": "Summarize the Windows test failures on PR 50 (job 125928307711, head b0ad3bc) and separate failures in code this PR changed from failures already present on main.",
+  "state": "Running",
+  "scope": [],
+  "constraints": [
+    "Fetch the log with gh api repos/davidbasilefilho/holyagent/actions/jobs/125928307711/logs into /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/job-125928307711.log (REST only). Report totals (pass/fail/skip), failures grouped by cause with counts and 1-2 example test names and messages per group, and a list of failing test files. Mark each failing test file that this PR added or changed: git diff --name-only main...release/0.2.0/feat/setup-scope-and-defaults (read-only git). For failures in files this PR changed, say whether the failure is in new code (e.g. setup-scope.test.ts, setup-check.test.ts, hooks.test.ts) or an existing pattern.",
+    "Read-only; no version-control writes; do not re-run the job. Report in under 400 words; start each evidence line with the criterion label before its colon."
+  ],
+  "criteria": [
+    {
+      "text": "failure summary: totals and grouped causes with counts and example tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "pr attribution: failures in files this PR changed are listed separately",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "log-file"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-03T12:58:41.755Z"
+  },
+  "createdAt": "2026-11-03T12:58:41.755Z"
+}
