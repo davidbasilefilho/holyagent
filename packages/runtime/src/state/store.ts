@@ -11,7 +11,7 @@ import { CorruptRecord, StateIo } from "./errors.ts"
 import { commitFile, encodeJson, type File, hasCode, io, readJson } from "./files.ts"
 import { assignmentFile, branchFile, intentFile, intentFolder, pullFile } from "./layout.ts"
 import { encodeLocal, type Local, type LocalChange, readLocal } from "./local.ts"
-import { withStateLock } from "./lock.ts"
+import { type Patience, withStateLock } from "./lock.ts"
 import { commitState, type Environment } from "./tree.ts"
 
 /**
@@ -265,12 +265,14 @@ const describe = (change: StateChange): string => {
  * changed). A transition that fails, or a record that cannot be encoded, writes nothing. The files
  * are then written one by one, so a crash between two leaves the earlier ones written; every file
  * on its own is whole. `env` is the environment git runs with for the commit; git's own (the
- * process environment) is always the base.
+ * process environment) is always the base. `patience` is how long a busy lock is waited for (see
+ * {@link withStateLock}); a plugin hook passes `"hook"` to give up inside the host's hook timeout.
  */
 export const updateState = <A extends StateChange, E>(
   directory: string,
   transition: (snapshot: Snapshot) => Effect.Effect<A, E>,
   env: Environment = {},
+  patience: Patience = "short",
 ) =>
   withStateLock(
     directory,
@@ -287,4 +289,5 @@ export const updateState = <A extends StateChange, E>(
         yield* commitState(directory, env, describe(result))
       return result
     }),
+    patience,
   )

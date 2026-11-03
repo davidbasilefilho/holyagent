@@ -1,10 +1,11 @@
-import { afterEach, describe, expect, spyOn, test } from "bun:test"
-import { mkdir, readdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises"
+import { afterAll, afterEach, describe, expect, setDefaultTimeout, spyOn, test } from "bun:test"
+import { cp, mkdir, readdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import { $ } from "bun"
 import { Effect, Exit } from "effect"
 
+import { fromGitPath, toPosix } from "../src/domain/paths.ts"
 import { loadProject } from "../src/state/store.ts"
 import { fetchRemoteBranch, killGroup, releaseGroup } from "../src/state/tree.ts"
 import {
@@ -21,6 +22,12 @@ import {
 } from "./vcs-fixtures.ts"
 
 afterEach(cleanup)
+
+// Every test runs a dozen or more git processes, and process creation on Windows is slow enough
+// (2 to 5 seconds a test on the CI runner) to pass Bun's 5 second default; a slow test there is not
+// a hung one. Linux and macOS keep the default.
+if (process.platform === "win32") setDefaultTimeout(60_000)
+afterAll(() => setDefaultTimeout(5_000))
 
 const OWNER = { name: "Octo", email: "42+octo@users.noreply.github.com" }
 const STATE = "holyagent/state"
@@ -61,7 +68,8 @@ const stateTree = async (dir: string, branch = STATE) => {
   const block = blocks.find((text) => text.includes(`\nbranch refs/heads/${branch}`))
   const path = block?.split("\n")[0]?.replace("worktree ", "")
   if (path === undefined) throw new Error(`no worktree has ${branch} checked out`)
-  return path
+  // Git prints `C:/repo/...` on Windows; the commands name the same folder with backslashes.
+  return fromGitPath(path)
 }
 
 const lines = (text: string) => text.split("\n").filter((line) => line !== "")
@@ -318,8 +326,10 @@ describe("the fetch of the remote state branch", () => {
     await seed(dir, { "a.txt": "a\n" })
     await sh(dir, ["git", "remote", "add", "origin", "ssh://git@example.invalid/octo/project.git"])
     const bin = await scratch("holyagent-bin-")
-    const log = join(bin, "ssh.log")
-    const script = join(bin, "ssh")
+    // Git runs the ssh command through a POSIX shell, where a backslash escapes the next character,
+    // so the paths in the command and in the script are written the way git prints them.
+    const log = toPosix(join(bin, "ssh.log"))
+    const script = toPosix(join(bin, "ssh"))
     await writeFile(
       script,
       `#!/bin/sh\necho "args: $*" >> "${log}"\necho "askpass: [${"$"}{SSH_ASKPASS-unset}] [${"$"}{GIT_ASKPASS-unset}]" >> "${log}"\n${behavior}\n`,
@@ -405,8 +415,8 @@ describe("the fetch of the remote state branch", () => {
     const dir = await initRepo(OWNER)
     await seed(dir, { "a.txt": "a\n" })
     const bin = await scratch("holyagent-bin-")
-    const log = join(bin, "helper.log")
-    const helper = join(bin, "helper.sh")
+    const log = toPosix(join(bin, "helper.log"))
+    const helper = toPosix(join(bin, "helper.sh"))
     await writeFile(helper, `#!/bin/sh\necho "$1" >> "${log}"\n`, { mode: 0o755 })
     // A server that demands credentials, so git asks its helper for them.
     const server = Bun.serve({
@@ -466,32 +476,50 @@ describe("the fetch of the remote state branch", () => {
     test("never signals a pid of 1 or less, which would reach every process or none", async () => {
       const calls = await recording(async () => {
         for (const pid of [1, 0, -1, -7, 1.5, Number.NaN, undefined as unknown as number])
-          await Effect.runPromise(killGroup({ pid, kill }))
+          await Effect.runPromise(killGroup({ pid, kill }, "linux"))
       })
 
       expect(calls).toEqual([])
     })
 
     test("signals the group of a child with a real pid", async () => {
-      const calls = await recording(() => Effect.runPromise(killGroup({ pid: 4242, kill })))
+      const calls = await recording(() =>
+        Effect.runPromise(killGroup({ pid: 4242, kill }, "linux")),
+      )
 
       expect(calls).toEqual([[-4242, "SIGKILL"]])
     })
 
     test("a failed use kills the group of a running child but not of one that already exited", async () => {
       const calls = await recording(async () => {
-        await Effect.runPromise(releaseGroup({ pid: 4242, kill, exitCode: null }, failed))
-        await Effect.runPromise(releaseGroup({ pid: 4343, kill, exitCode: 0 }, failed))
-        await Effect.runPromise(releaseGroup({ pid: 4444, kill, exitCode: 128 }, failed))
-        await Effect.runPromise(releaseGroup({ pid: 4545, kill, exitCode: null }, Exit.succeed(0)))
+        await Effect.runPromise(releaseGroup({ pid: 4242, kill, exitCode: null }, failed, "linux"))
+        await Effect.runPromise(releaseGroup({ pid: 4343, kill, exitCode: 0 }, failed, "linux"))
+        await Effect.runPromise(releaseGroup({ pid: 4444, kill, exitCode: 128 }, failed, "linux"))
+        await Effect.runPromise(
+          releaseGroup({ pid: 4545, kill, exitCode: null }, Exit.succeed(0), "linux"),
+        )
       })
 
       expect(calls).toEqual([[-4242, "SIGKILL"]])
     })
+
+    test("on Windows, which has no process groups, the child is killed itself and no group is signalled", async () => {
+      const killed: Array<string | number | undefined> = []
+      // A pid no process has, so the tree kill that Windows runs first reaches nothing real.
+      const child = {
+        pid: 2_000_000_000,
+        kill: (signal?: string | number) => void killed.push(signal),
+      }
+
+      const calls = await recording(() => Effect.runPromise(killGroup(child, "win32")))
+
+      expect(calls).toEqual([])
+      expect(killed).toEqual(["SIGKILL"])
+    })
   })
 
   test("a fetch killed at its timeout leaves no helper process running", async () => {
-    const pidFile = join(await scratch("holyagent-pid-"), "helper.pid")
+    const pidFile = toPosix(join(await scratch("holyagent-pid-"), "helper.pid"))
     // The helper stands for an ssh or credential helper that git started and then hangs on.
     const { dir, script } = await overSsh(`sleep 30 &\necho $! > "${pidFile}"\nwait`)
 
@@ -817,7 +845,7 @@ describe("moving the state found in a work tree", () => {
     const dir = await initRepo(OWNER)
     await seed(dir, { "a.txt": "a\n" })
     const { plain, id } = await legacyState("Ship the parser")
-    await sh(dir, ["cp", "-r", join(plain, ".holyagent"), join(dir, ".holyagent")])
+    await cp(join(plain, ".holyagent"), join(dir, ".holyagent"), { recursive: true })
 
     const listed = toon(await holy(dir, ["intent", "list"])) as {
       intents: Array<{ id: string; inUse: boolean }>
@@ -838,7 +866,7 @@ describe("moving the state found in a work tree", () => {
 
     // The marker is per work tree: state written there later is not picked up again.
     const late = await legacyState("Ship the printer")
-    await sh(dir, ["cp", "-r", join(late.plain, ".holyagent"), join(dir, ".holyagent")])
+    await cp(join(late.plain, ".holyagent"), join(dir, ".holyagent"), { recursive: true })
     const again = toon(await holy(dir, ["intent", "list"])) as { intents: Array<{ id: string }> }
     expect(again.intents.map((row) => row.id)).toEqual([id])
   })
@@ -847,7 +875,7 @@ describe("moving the state found in a work tree", () => {
     const dir = await initRepo(OWNER)
     await seed(dir, { "a.txt": "a\n" })
     const { plain, id } = await legacyState("Ship the parser")
-    await sh(dir, ["cp", "-r", join(plain, ".holyagent"), join(dir, ".holyagent")])
+    await cp(join(plain, ".holyagent"), join(dir, ".holyagent"), { recursive: true })
     const tree = join(await scratch("holyagent-worktree-"), "tree")
     await sh(dir, ["git", "worktree", "add", "-q", "-b", "feature", tree])
 
@@ -863,7 +891,7 @@ describe("moving the state found in a work tree", () => {
     const dir = await initRepo(OWNER)
     const { plain, id } = await legacyState("Ship the parser")
     await put(dir, { "a.txt": "a\n" })
-    await sh(dir, ["cp", "-r", join(plain, ".holyagent"), join(dir, ".holyagent")])
+    await cp(join(plain, ".holyagent"), join(dir, ".holyagent"), { recursive: true })
     await writeFile(join(dir, ".holyagent", "local", ".gitignore"), "*\n")
     await sh(dir, ["git", "add", "-A"])
     await sh(dir, ["git", "commit", "-q", "-m", "seed"])

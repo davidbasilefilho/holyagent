@@ -2,10 +2,11 @@ import { describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync } from "node:fs"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { join, win32 } from "node:path"
 
 import { $ } from "bun"
 
+import { toPosix } from "../../../runtime/src/domain/paths.ts"
 import { ROUTES } from "../../../runtime/src/domain/route.ts"
 import { ROOT_CORE_FILES } from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
 import { build } from "../build.ts"
@@ -26,6 +27,7 @@ import {
 import { DIST_DIRECTORY, VENDOR_DIRECTORY } from "../src/files.ts"
 import { generate, GENERATED_PATHS, MARKETPLACE_PATH } from "../src/generate.ts"
 import { fresh, PLUGIN, ROOT } from "./built.ts"
+import { isExecutable } from "./host.ts"
 
 const read = (...path: Array<string>) => readFileSync(join(ROOT, ...path), "utf8")
 const CLAUDE = "packages/runtime/src/instructions/claude-5.5"
@@ -46,7 +48,7 @@ const filesBelow = async (path: string): Promise<ReadonlyArray<string>> => {
   const absolute = join(ROOT, path)
   if (await Bun.file(absolute).exists()) return [path]
   return (await Array.fromAsync(new Bun.Glob("**/*").scan({ cwd: absolute, dot: true })))
-    .map((file) => join(path, file))
+    .map((file) => toPosix(join(path, file)))
     .toSorted()
 }
 
@@ -118,7 +120,7 @@ describe("the generated plugin is in step with its sources", () => {
 
   test("the wrapper is the one executable", async () => {
     const wrapper = join(PLUGIN, "scripts", "holyagent")
-    expect((await Bun.file(wrapper).stat()).mode & 0o111).not.toBe(0)
+    expect(await isExecutable(wrapper)).toBe(true)
     expect(generated.filter((file) => file.executable).map((file) => file.path)).toEqual([
       "packages/integrations/claude/dist/scripts/holyagent",
     ])
@@ -987,13 +989,20 @@ describe("agents", () => {
   })
 
   test("agent files sit where the plugin expects them", () => {
-    expect(AGENTS).toBe("packages/integrations/claude/dist/agents")
+    // The folder is joined with the platform's separator; the plugin and git expect it with `/`.
+    expect(toPosix(AGENTS)).toBe("packages/integrations/claude/dist/agents")
+    expect(toPosix(win32.join("packages", "integrations", "claude", "dist", "agents"), "\\")).toBe(
+      "packages/integrations/claude/dist/agents",
+    )
   })
 })
 
 const available = (await $`claude --version`.quiet().nothrow()).exitCode === 0
 
 describe("claude plugin validate", () => {
+  // The external claude CLI starts a fresh process per check; on a loaded machine (the parallel
+  // verify gates, other workers) that can outlast the 5 s default, so the checks get a longer one.
+  const VALIDATE_TIMEOUT = 30_000
   const check = async (directory: string) => {
     const result = await $`claude plugin validate --strict ${directory}`.quiet().nothrow()
     return { code: result.exitCode, text: `${result.stdout.toString()}${result.stderr.toString()}` }
@@ -1009,17 +1018,25 @@ describe("claude plugin validate", () => {
     expect(own).not.toMatch(/×|Found \d+ (?:error|warning)/)
   }
 
-  test.skipIf(!available)("the built plugin passes strict validation", async () => {
-    const { code, text } = await check(PLUGIN)
-    expect(code).toBe(0)
-    clean(text)
-  })
+  test.skipIf(!available)(
+    "the built plugin passes strict validation",
+    async () => {
+      const { code, text } = await check(PLUGIN)
+      expect(code).toBe(0)
+      clean(text)
+    },
+    VALIDATE_TIMEOUT,
+  )
 
-  test.skipIf(!available)("the repository root marketplace passes strict validation", async () => {
-    const { code, text } = await check(ROOT)
-    expect(code).toBe(0)
-    clean(text)
-  })
+  test.skipIf(!available)(
+    "the repository root marketplace passes strict validation",
+    async () => {
+      const { code, text } = await check(ROOT)
+      expect(code).toBe(0)
+      clean(text)
+    },
+    VALIDATE_TIMEOUT,
+  )
 
   test.skipIf(available)("is skipped because the claude CLI is not installed", () => {
     console.warn("claude is not on PATH: plugin validation did not run")

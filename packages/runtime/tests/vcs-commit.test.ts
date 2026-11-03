@@ -332,6 +332,8 @@ describe("vcs commit in a claude.ai cloud session", () => {
 })
 
 describe("vcs commit outside a claude.ai cloud session", () => {
+  // Four repositories, each with its own git and CLI spawns: about 5s on a Windows runner, where
+  // spawning is slow, so the 5s default is too tight. Linux takes well under 1s.
   test("the author setting is ignored: an agent's user identity is still refused, and the user's is used", async () => {
     for (const env of [{}, { CLAUDE_CODE_REMOTE: "false" }, { CLAUDE_CODE_REMOTE: "1" }]) {
       const dir = await cloudRepo()
@@ -350,5 +352,5 @@ describe("vcs commit outside a claude.ai cloud session", () => {
     await put(dir, { "a.txt": "a2\n" })
     toon(await commitA(dir, {}))
     expect(await whoOf(dir)).toBe(`Octo <${OWNER.email}>|Octo <${OWNER.email}>`)
-  })
+  }, 60_000)
 })
