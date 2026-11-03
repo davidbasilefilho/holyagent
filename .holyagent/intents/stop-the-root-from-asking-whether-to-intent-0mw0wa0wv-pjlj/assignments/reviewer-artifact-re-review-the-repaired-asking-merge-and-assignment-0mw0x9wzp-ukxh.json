@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "re-review-the-repaired-asking-merge-and",
   "objective": "Re-review the repaired asking, merge and specialist-HEAD instruction changes against the eight findings of the previous review.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Previous review with excerpts: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/review-q.md. Full current diff: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/branch2.diff. Agreed resolutions: (1) settling defaults are holyagent's or the repository's, not the root's own recommendation, and the recommended-default illustration is dropped; (2,4) one owner for the merge-method order in version-control.md; (3) the stacked-merge reconciliation lives once in stack-plan.md with the corrected condition (base tree equals the merged PR's head tree, else a normal merge); (5) the sources list lives in asking.md, task-list.md keeps a short stand-alone form; (6) specialist rule covers any command that changes HEAD, a branch, the index or the working tree of a shared checkout, with read-only alternatives; (7) leftover test assertions removed; (8) only plans the user did not ask for."
   ],
@@ -37,7 +37,29 @@
     "agentId": "workflow:wf_b9dc13e9-fdb/assignment-0mw0x9wzp-ukxh",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-03T16:48:59.906Z"
+    "startedAt": "2026-11-03T16:48:59.906Z",
+    "finishedAt": "2026-11-03T17:00:32.057Z"
+  },
+  "result": "result: all eight findings are closed, and the repair adds no new contradiction. Three non-blocking nits remain. The repair is in the worktree /home/user/holyagent-hook-locks, not in /home/user/holyagent, so I read that tree and branch2.diff. They agree. I ran no checks.\n\nfindings (status of the previous eight):\n1. Closed. The recommended-default illustration is gone. asking.md now says \"a default that holyagent's rules or the repository define … not your own recommendation for the question\". This no longer clashes with task-list.md or the push-refusal ask.\n2. Closed. asking.md no longer says \"Check in that order\". The order lives in version-control.md \"Merging\": \"the repository's convention …, else the method the user chose earlier, else the holyagent default\".\n3. Closed as agreed. `-s ours` appears once in instruction text (stack-plan.md). It carries the corrected condition: \"if the base's tree equals the merged PR's head tree … else merge the base and resolve as for any merge-forward\". R-MERGEWAIT and version-control.md no longer carry it.\n4. Closed. asking.md only points to \"Version control sets the method\". R-MERGEWAIT in requirements.md still lists the order in parentheses. That is the spec file, so I count it as acceptable.\n5. Closed. task-list.md now reads \"(the Asking section lists what does)\", and the list lives in asking.md.\n6. Closed. The rule now names `restore`, `clean`, `add`, `commit`, `merge`, `rebase` and `cherry-pick`, drops `worktree add`, and gives read-only alternatives. It is propagated to all agents and the generated script. The reviewer-code and reviewer-testing mentions are short pointers.\n7. Closed. A search of the worktree finds no `R-DEFAULTS` or \"Apply, without asking\".\n8. Closed. asking.md now reads \"confirmation of a plan the user did not ask for\".\n\nnotes (non-blocking):\n- \"the working tree of a checkout other workers share\" could be read as forbidding a writer's file edits. The parenthetical command list and \"Write only inside your ownership paths\" make the intent clear. Optionally say \"via git commands\".\n- The specialist rule's list repeats `commit`, `merge`, `checkout`, `stash` and `reset` from the sentence before it.\n- The \"These common questions fail the test\" bullet repeats rules owned elsewhere (merging, branch deletion, push). Each entry has a pointer, so I count it as acceptable.\n\nevidence:\n- The eight previous findings are closed: each is checked above against asking.md, version-control.md, stack-plan.md, task-list.md, state-changes.md, requirements.md and plugin.test.ts in /home/user/holyagent-hook-locks.\n- The repair adds no contradiction or scope beyond the findings: new text is limited to the agreed resolutions. The R-NOASK, R-MERGEWAIT and R-S-HEAD phrases in agents.ts match the instruction text, and the test assertions match the new wording.\n- findings: listed above.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Each finding checked against the named files.",
+    "criteria": [
+      {
+        "criterion": "The eight previous findings are closed",
+        "support": "each is checked above against asking.md, version-control.md, stack-plan.md, task-list.md, state-changes.md, requirements.md and plugin.test.ts in /home/user/holyagent-hook-locks."
+      },
+      {
+        "criterion": "The repair adds no contradiction or scope beyond the findings",
+        "support": "new text is limited to the agreed resolutions. The R-NOASK, R-MERGEWAIT and R-S-HEAD phrases in agents.ts match the instruction text, and the test assertions match the new wording."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "listed above."
+      }
+    ]
   },
   "createdAt": "2026-11-03T16:48:54.853Z"
 }
