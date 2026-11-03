@@ -1,0 +1,33 @@
+{
+  "id": "assignment-0mw0myvut-d9g3",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.security",
+  "slug": "assess-commits-8d10a87-and-4091f2a-for",
+  "objective": "Assess commits 8d10a87 and 4091f2a for security issues: setup now writes and deletes keys in user, project and local Claude Code settings files (including permissions.deny), and a new CI job runs on windows-latest.",
+  "state": "Ready",
+  "scope": [
+    "Diff file: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/range1.diff (excludes generated dist)",
+    "Focus: path resolution for project/local scope (git top-level, symlinks, cwd), undo removing permission deny entries a user relied on, file writes outside the intended file, CI job permissions, pinned actions, secret exposure"
+  ],
+  "constraints": [
+    "Read-only. Substantiate each finding with source-to-sink evidence. Keep working until done; stop and report. Report in under 400 words, each finding marked blocking or non-blocking."
+  ],
+  "criteria": [
+    {
+      "text": "security: no validated vulnerability introduced by the change",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw0mpmhe-6ulw",
+    "assignment-0mw0mpmsu-q4xi"
+  ],
+  "createdAt": "2026-11-03T12:00:24.005Z"
+}
