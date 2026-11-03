@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mw0qoc6q-rjua",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Worker.debugging",
+  "slug": "find-and-fix-the-one-linux-test-failure",
+  "objective": "Find and fix the one Linux test failure in mise run verify on head 0948e70 of release/0.2.0/fix/windows-tests, introduced by the Windows fixes in e69a3f0 and 0948e70.",
+  "state": "Running",
+  "scope": [
+    "Verify log: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/verify-win.log (1041 pass, 1 fail). Commits: git show e69a3f0 0948e70."
+  ],
+  "constraints": [
+    "Reproduce it first (bun test on the failing file; run it several times if it may be timing-dependent, e.g. the 30s lock patience or a concurrency test), name the cause, fix it without weakening the test or undoing the Windows fixes, and show it passing. If the cause is a stale generated dist, run node_modules/.bin/mise run build. Then run node_modules/.bin/mise run verify.",
+    "No version-control writes, no edits under .git/ or .holyagent/; report changed paths. Keep working until verify passes; stop and report. Report in under 250 words; start each evidence line with the criterion label before its colon."
+  ],
+  "criteria": [
+    {
+      "text": "cause: the failing test, its reproduction and cause are named",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "verify: mise run verify exits 0 with no test weakened",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "packages"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T13:44:10.419Z"
+  },
+  "createdAt": "2026-11-03T13:44:10.419Z"
+}
