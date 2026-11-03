@@ -36,8 +36,8 @@ describe("whether a file of the repository can be run", () => {
   })
 
   // Skipped on Windows only: NTFS keeps no execute bit, so `stat` reads every file as
-  // non-executable there. `isExecutable` has the matching branch (the committed mode) for win32,
-  // which the test below and the one above check.
+  // non-executable there. The win32 branch of `isExecutable` (the committed mode) is taken by the
+  // test below on every platform, and by the test above only when the suite runs on Windows.
   test.skipIf(process.platform === "win32")(
     "is its execute bit where the file system has one",
     async () => {
