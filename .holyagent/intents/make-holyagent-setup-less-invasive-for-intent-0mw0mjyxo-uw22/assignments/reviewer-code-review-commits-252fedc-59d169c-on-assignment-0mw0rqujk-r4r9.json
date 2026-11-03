@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-commits-252fedc-59d169c-on",
   "objective": "Review commits 252fedc..59d169c on release/0.2.0/fix/windows-tests: the hook-path bound on the state resolution locks, and a test comment fix.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "05c12b9 threads an optional patience through resolveState (packages/runtime/src/state/tree.ts) into the exclude, worktree and migration locks, and the agent-launch hook (packages/runtime/src/cli/hook.ts) passes the 3s 'hook' patience so it gives up before the 10s plugin hook timeout; CLI callers keep their defaults (exclude and worktree 'long', migration 'short'). It adds packages/runtime/tests/state-hook-locks.test.ts, rebuilds dist, and fixes the withFileLock JSDoc. The last commit rewords a comment in host.test.ts.",
     "The writer notes the bound is per lock, not total: several contended locks could still sum past 10s. Judge whether that matters in practice.",
@@ -47,7 +47,37 @@
     "agentId": "workflow:wf_6ea00afa-fe3/assignment-0mw0rqujk-r4r9",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-03T14:14:07.136Z"
+    "startedAt": "2026-11-03T14:14:07.136Z",
+    "finishedAt": "2026-11-03T14:18:53.154Z"
+  },
+  "result": "result: No blockers. Every lock on the agent-launch hook path takes the hook patience, the new tests fail without it, and dist matches the sources.\n\nI ran the built-in `/code-review` on `252fedc...59d169c`. Its four findings are classified below; none is a blocker.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- **Per-lock bound, rejected as a blocker.** The built-in review claimed four sequential 3 s locks, up to 12 s. That is wrong. The exclude lock is taken only in `local` mode, and the worktree and migration locks only in `branch` mode, so the modes are exclusive. The worst case is worktree (3 s), migration (3 s) and state (3 s), about 9 s of waiting. The `hook` patience also has `stuck: true`, so a lock a live process has held longer than 3 s fails at once. Reaching 9 s needs three different holders, each releasing just under 3 s, on top of the git work. That is negligible in practice, and the old code was unbounded.\n- **Hook command skips the default resolve.** The `agent-launch` hook is declared stateless, so `callFor` in `program.ts` does not call `resolveState` for it. The handler's single `resolveState(..., \"hook\")` plus `updateState(..., \"hook\")` are the only lock takers on that path. CLI callers still use the defaults (exclude and worktree \"long\", migration \"short\"), since `patience` stays `undefined` for them.\n- **Optional: `node:fs/promises` in the new test.** It uses `mkdir` and `writeFile` where `Bun.write` would do. This is a project-rule nit.\n- **Optional: the migration test's marker removal.** It removes the whole `migrated` directory. A marker move would make it fail loudly, not pass silently, so this is only a diagnosis nuisance.\n- **Optional: defaults by hand.** The patience defaults across the three functions are kept in sync by hand, which is fragile only if a new caller forgets to forward `patience`.\n- **Only read, not run:** the real 10 s host timeout and a concurrent multi-process contention scenario.\n\nchecks-run:\n- `bun test packages/runtime/tests/state-hook-locks.test.ts packages/integrations/claude/tests/host.test.ts` -> 9 pass, 0 fail.\n- Full `bun test` -> 1047 pass, 1 skip, 0 fail.\n- `bun check --no-script` -> no type errors in 127 files.\n- `bun lint --no-script` -> no problems in 128 files.\n- `bun fmt --no-script --check` -> all 248 files formatted.\n- `mise` is not installed here, so I used the Bun commands directly.\n- Scratch copy of the new test with `\"hook\"` removed, at `/tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/nohook.test.ts` -> 3 of 3 fail. The first two fail on the assertion and the migration test times out at 5 s.\n- `bun packages/integrations/claude/build.ts` -> built 35 files, `git status` clean afterwards, so dist matches the sources.\n\nevidence:\nEvery lock on the agent-launch hook path gives up within the hook patience and CLI callers keep their defaults: `hook.ts:332` passes \"hook\". `tree.ts` forwards `patience` to `ensureExcluded`, `ensureWorktree` and `migrateWorkTree`, and `store.ts` already did so for `updateState`. The `agent-launch` command is stateless, so `program.ts` takes no default-patience resolve first. Defaults are unchanged for CLI callers. The bound is per lock, about 9 s at worst, and I judge that negligible.\nThe new tests fail without the change and are not flaky by construction: the three tests hold a live-pid lock aged 10 s, which is past the 3 s hook limit, so they fail at once with no wall-clock dependence. With `\"hook\"` removed (scratch copy above), all 3 fail.\nNo regressions, and the dist matches the sources: full `bun test` passed (1047 pass, 0 fail), check, lint and fmt passed, and rebuilding dist left the tree clean.\nfindings: no blockers; the four built-in findings are classified under notes (one rejected, three optional).\nchecks-run: see the checks-run list above.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "No blockers; new tests red without the change, full suite/check/lint/fmt pass, dist rebuild clean.",
+    "criteria": [
+      {
+        "criterion": "Every lock on the agent-launch hook path gives up within the hook patience and CLI callers keep their defaults",
+        "support": "`hook.ts:332` passes \"hook\". `tree.ts` forwards `patience` to `ensureExcluded`, `ensureWorktree` and `migrateWorkTree`, and `store.ts` already did so for `updateState`. The `agent-launch` command is stateless, so `program.ts` takes no default-patience resolve first. Defaults are unchanged for CLI callers. The bound is per lock, about 9 s at worst, and I judge that negligible."
+      },
+      {
+        "criterion": "The new tests fail without the change and are not flaky by construction",
+        "support": "the three tests hold a live-pid lock aged 10 s, which is past the 3 s hook limit, so they fail at once with no wall-clock dependence. With `\"hook\"` removed (scratch copy above), all 3 fail."
+      },
+      {
+        "criterion": "No regressions, and the dist matches the sources",
+        "support": "full `bun test` passed (1047 pass, 0 fail), check, lint and fmt passed, and rebuilding dist left the tree clean."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "no blockers; the four built-in findings are classified under notes (one rejected, three optional)."
+      },
+      {
+        "label": "checks-run",
+        "support": "see the checks-run list above."
+      }
+    ]
   },
   "createdAt": "2026-11-03T14:14:07.136Z"
 }
