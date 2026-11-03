@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "make-the-vcs-reminder-description-in",
   "objective": "Make the vcs-reminder description in docs/hooks.md (around line 49) match the reminder text in packages/runtime/src/cli/hook.ts (VCS_REMINDER, around line 158): hook or signing bypass only when the user asks, amend only your own unpushed commit, rebase -i, reset --hard or amending a published or another author's commit need the user's approval.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [],
   "constraints": [
     "Edit only docs/hooks.md, keep the rest of the file and its uncommitted notice edits as they are. Run node_modules/.bin/mise run fmt:check (bun fmt --no-script docs/hooks.md if it fails on this file). No version-control writes. Report in under 120 words; start each evidence line with the criterion label before its colon."
@@ -36,7 +36,33 @@
     "agentId": "workflow:wf_5345e262-e41/assignment-0mw0oa7k3-g28o",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-03T12:37:12.003Z"
+    "startedAt": "2026-11-03T12:37:12.003Z",
+    "finishedAt": "2026-11-03T12:37:46.795Z"
+  },
+  "result": "result: docs/hooks.md vcs-reminder paragraph now states the VCS_REMINDER rules (hook/signing bypass only on user request; amend only own unpushed commit; rebase -i, reset --hard, amending published or others' commits need user approval). Format check passes.\nchanged: docs/hooks.md\nchecks: `node_modules/.bin/mise run fmt:check` -> exit 0, \"All 244 files are formatted.\"\nblockers: none\nquestions: none\nnotes: The diff also shows table-row and session-start whitespace/formatting changes that I did not make; they are the pre-existing uncommitted edits, left as found.\nevidence:\nreminder doc: docs/hooks.md vcs-reminder paragraph (~line 49) matches VCS_REMINDER in packages/runtime/src/cli/hook.ts:158\nformat: fmt:check exit 0, 244 files formatted\nchecks-run: fmt:check -> exit 0\nchanged-paths: docs/hooks.md (diff saved at /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/hooks-md.diff)\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "hooks.md reminder text aligned; fmt:check run",
+    "criteria": [
+      {
+        "criterion": "reminder doc: hooks.md describes the reminder as hook.ts states it",
+        "support": "docs/hooks.md vcs-reminder paragraph (~line 49) matches VCS_REMINDER in packages/runtime/src/cli/hook.ts:158"
+      },
+      {
+        "criterion": "format: format check passes",
+        "support": "fmt:check exit 0, 244 files formatted"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "fmt:check -> exit 0"
+      },
+      {
+        "label": "changed-paths",
+        "support": "docs/hooks.md (diff saved at /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/hooks-md.diff)"
+      }
+    ]
   },
   "createdAt": "2026-11-03T12:37:12.003Z"
 }
