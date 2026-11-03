@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "update-docs-hooks-md-where-it-says-the",
   "objective": "Update docs/hooks.md where it says the session-start setup notice checks user settings only: it now counts the user settings plus the project and local settings of the session folder (cwd and the nearest ancestor holding a .git entry), so it stops once a scoped setup ran there.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [],
   "constraints": [
     "Edit only docs/hooks.md (around lines 7 and 26); match the wording of packages/runtime/src/setup/check.ts and docs/usage.md. Run node_modules/.bin/mise run fmt:check. Write the diff to /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/hooks-docs.diff with git diff (read-only git use). No version-control writes. Report in under 150 words."
@@ -31,5 +31,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-03T12:33:24.279Z"
+  },
   "createdAt": "2026-11-03T12:33:20.172Z"
 }
