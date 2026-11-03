@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "add-a-windows-latest-job-to-github",
   "objective": "Add a windows-latest job to .github/workflows/ci.yml that installs the toolchain the existing Linux test job uses and runs the test suite, so Windows failures show up on every PR.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [],
   "constraints": [
     "Mirror the existing Linux job's setup steps (Bun canary through mise or however ci.yml installs it today); pin actions the same way the file already does.",
@@ -38,7 +38,33 @@
     "agentId": "workflow:wf_a818f60c-f7c/assignment-0mw0mpmsu-q4xi",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-03T11:53:16.548Z"
+    "startedAt": "2026-11-03T11:53:16.548Z",
+    "finishedAt": "2026-11-03T11:59:58.315Z"
+  },
+  "result": "result: Added a `windows` job (windows-latest) to ci.yml. It runs `mise run test`. I have not run it on a Windows runner, so whether the suite passes there is unknown.\nchanged: /home/user/holyagent/.github/workflows/ci.yml\nchecks: `bun -e` with `Bun.YAML.parse` on ci.yml -> exit 0, jobs are check, windows, installers, and windows has 5 steps. `git diff --stat` -> 23 insertions, 0 deletions, so the existing jobs are unchanged.\nblockers: none\nquestions: none\nnotes:\n- The job does not use continue-on-error, and ci.yml has no pattern for known-failing jobs. It reports failures as asked.\n- The Windows suite may fail on its first run. If so, you may want it non-blocking until it is green, but I did not decide that.\n- The job mirrors the Linux `check` job: same pinned checkout and mise-action SHAs, then `mise run toolchain`, `bun install --frozen-lockfile`, and `mise run test`. It leaves out verify, build, plugin validation and shellcheck, since the brief asked only for the test suite.\n- The mise.toml postinstall hook is a Bun script, and its comment says it runs under cmd on native Windows. The canary Bun upgrade is therefore expected to work there, but only the first run will show it.\n- The diff is at /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/ci.diff.\n\nevidence:\nwindows job: a `windows` job with `runs-on: windows-latest` runs `mise run test` after jdx/mise-action, `mise run toolchain` and `bun install --frozen-lockfile`. These are the same setup steps as the `check` job, at lines 68-92 of ci.yml.\nyaml valid: Bun YAML parse exit 0. The diff has no removed lines, so the existing jobs are unchanged.\nchecks-run: Bun YAML parse of ci.yml (exit 0) and `git diff --stat` (23 insertions, 0 deletions). I did not run `mise run verify`, because the change is workflow YAML only.\nchanged-paths: /home/user/holyagent/.github/workflows/ci.yml\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "windows-latest job mirrors check job; YAML parses; additions only",
+    "criteria": [
+      {
+        "criterion": "windows job: a windows-latest job runs the test suite with the same toolchain setup as the Linux job",
+        "support": "a `windows` job with `runs-on: windows-latest` runs `mise run test` after jdx/mise-action, `mise run toolchain` and `bun install --frozen-lockfile`. These are the same setup steps as the `check` job, at lines 68-92 of ci.yml."
+      },
+      {
+        "criterion": "yaml valid: ci.yml parses and existing jobs are unchanged",
+        "support": "Bun YAML parse exit 0. The diff has no removed lines, so the existing jobs are unchanged."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "Bun YAML parse of ci.yml (exit 0) and `git diff --stat` (23 insertions, 0 deletions). I did not run `mise run verify`, because the change is workflow YAML only."
+      },
+      {
+        "label": "changed-paths",
+        "support": "/home/user/holyagent/.github/workflows/ci.yml"
+      }
+    ]
   },
   "createdAt": "2026-11-03T11:53:12.366Z"
 }
