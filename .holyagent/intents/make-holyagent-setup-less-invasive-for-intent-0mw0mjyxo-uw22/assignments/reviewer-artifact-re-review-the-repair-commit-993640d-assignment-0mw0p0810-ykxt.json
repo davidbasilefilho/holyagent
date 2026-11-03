@@ -1,0 +1,37 @@
+{
+  "id": "assignment-0mw0p0810-ykxt",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.artifact",
+  "slug": "re-review-the-repair-commit-993640d",
+  "objective": "Re-review the repair commit 993640d against the four blockers of the previous review.",
+  "state": "Running",
+  "scope": [
+    "Repair diff: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/judging-repair.diff. Previous findings: .git/holyagent/reports/assignment-0mw0oqnmw-bk8i.md"
+  ],
+  "constraints": [
+    "Judge only whether blockers 1-4 are closed and the repair adds no new contradiction. Read-only. Report in under 250 words; start each evidence line with the criterion label before its colon."
+  ],
+  "criteria": [
+    {
+      "text": "closed: blockers 1-4 resolved without a new contradiction",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw0ov8hq-p408",
+    "assignment-0mw0olm2j-48i5"
+  ],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-11-03T12:57:25.669Z"
+  },
+  "createdAt": "2026-11-03T12:57:25.669Z"
+}
