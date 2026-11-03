@@ -1,0 +1,48 @@
+{
+  "id": "assignment-0mw0nz2t6-6lgz",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-six-blocking-gaps-and-the",
+  "objective": "Repair the six blocking gaps and the notes from the docs review so every opinionated default reads accurately with a way to change it.",
+  "state": "Ready",
+  "scope": [
+    "Findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw0nltyh-0rau.md (blockers 1-6 and the notes)",
+    "docs/usage.md, docs/decisions.md, README.md (one bullet only)"
+  ],
+  "constraints": [
+    "1: the cache TTL is changed by editing subagentPromptCacheTtl (the flag applies only when the key is missing); state the 1h vs 5m trade-off with prices from the pricing page as cited in /home/user/holyagent/.git/holyagent/reports/assignment-0mw0n5dbt-lx2v.md (1h cache write $8/MTok vs 5m $5/MTok for Opus 5.5). 2: give how to change the branch and merge defaults (the repository's own conventions override them; say where to state them, e.g. AGENTS.md or CONTRIBUTING, or tell the root). 3: confining to one repository also needs the plugin installed at that scope: check the Claude Code plugin docs (https://code.claude.com/docs/en/plugins and the plugin CLI reference) for claude plugin install --scope project|local and document the exact commands; if the docs do not confirm a scope flag, say so and describe disabling the plugin elsewhere via enabledPlugins. 4: after this repair the session-start notice also counts the session folder's project and local settings, so it stops once a scoped setup ran there; describe that. 5: say setup also writes its record at <CLAUDE_CONFIG_DIR or ~/.claude>/holyagent/setup-records.json (mode 600). 6: mark the high-growth statement as inference from the recorded 365-747k context sizes, not a measured growth rate. Notes: attribute the WebFetch 'lossy by design' quote correctly (the research saw it via a secondary source; the docs writer earlier checked the live tools-reference page, so cite the page only if you can confirm the sentence there, else cite as quoted); mention claude-code#101067 (Opus 5.5 compacting at 281K-845K on 2.1.296 against the documented ~967K) beside the 967K comparison; give the marketplace/plugin keys a real why (they keep the plugin installed and on after a reinstall or across machines that sync settings; if not sure, keep it to what the keys do); replace 'known failures are being tracked' with what is true: the windows CI job runs the tests and shows the failures.",
+    "README keeps its exact sections; adjust the bullet only if a claim in it is no longer true. English, concise. Run node_modules/.bin/mise run fmt then fmt:check. Do not edit packages/.",
+    "No version-control writes, no edits under .git/ or .holyagent/; report changed paths.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done and checked, stop and report; name unrequested features instead of adding them. Report in under 350 words."
+  ],
+  "criteria": [
+    {
+      "text": "blockers 1-6 from the docs review resolved",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "review notes addressed",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "format check passes and README structure intact",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "docs",
+    "README.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw0na5ia-7ldi",
+  "createdAt": "2026-11-03T12:28:32.634Z"
+}
