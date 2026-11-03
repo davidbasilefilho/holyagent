@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mw0vfjho-6112",
+  "intentId": "intent-0mw0ukvln-0so2",
+  "intentRevision": 2,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-repair-of-the-contention",
+  "objective": "Re-review the repair of the contention-test blocker on release/0.2.0/fix/hook-lock-followups.",
+  "state": "Ready",
+  "scope": [
+    "Previous blocker: hook-locks.test.ts expect(recorded).toBeGreaterThan(0) could fail with correct code on a slow runner, since all three hooks may legitimately hand back StateLocked. Optional notes: widen the deadline test upper bound from 2200 to 3000; rename the vague 'within' deadline helper.",
+    "Review only the repair diff at /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/repA.diff (uncommitted in worktree /home/user/holyagent-hook-locks-a). Run the two changed test files there with bun test."
+  ],
+  "constraints": [
+    "Read-only. Judge only whether the previous findings are closed and the repair breaks nothing. Report in under 250 words."
+  ],
+  "criteria": [
+    {
+      "text": "The contention test no longer fails when every hook hands back StateLocked, and keeps its bound and integrity checks",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The repair introduces no regression",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw0vf95o-8sr3"
+  ],
+  "followUpOf": "assignment-0mw0v2xmo-prtj",
+  "createdAt": "2026-11-03T15:57:18.060Z"
+}
