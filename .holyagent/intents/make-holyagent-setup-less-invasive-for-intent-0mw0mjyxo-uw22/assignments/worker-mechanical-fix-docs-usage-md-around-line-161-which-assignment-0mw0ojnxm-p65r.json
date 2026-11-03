@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "fix-docs-usage-md-around-line-161-which",
   "objective": "Fix docs/usage.md around line 161, which says to run --undo to stop the enabledPlugins entry: say --undo removes it only when setup recorded adding it, otherwise disable or uninstall the plugin at that scope, matching usage.md around line 109.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [],
   "constraints": [
     "Edit only that sentence in docs/usage.md. Run node_modules/.bin/mise run fmt:check. No version-control writes. Report in under 100 words; start each evidence line with the criterion label before its colon."
@@ -35,7 +35,29 @@
     "agentId": "workflow:wf_179c1d71-34b/assignment-0mw0ojnxm-p65r",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-03T12:44:33.130Z"
+    "startedAt": "2026-11-03T12:44:33.130Z",
+    "finishedAt": "2026-11-03T12:45:00.288Z"
+  },
+  "result": "result: docs/usage.md line 161 now says `--undo` removes the enabledPlugins entry only when setup recorded adding it, otherwise disable or uninstall at that scope. Only that sentence changed.\nchanged: docs/usage.md\nchecks: `node_modules/.bin/mise run fmt:check` -> exit 0, \"All 244 files are formatted.\"\nblockers: none\nquestions: none\nnotes: none\nevidence:\nsentence: usage.md no longer says --undo always stops the plugin entry: docs/usage.md:161 now reads \"`--undo` removes ... only when setup recorded adding it; otherwise it keeps the key and reports `~`\", matching usage.md:109\nformat: node_modules/.bin/mise run fmt:check exit 0\nchecks-run: fmt:check exit 0 (244 files); git diff --stat docs/usage.md shows 1 line changed\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "sentence aligned with undo behavior; fmt:check",
+    "criteria": [
+      {
+        "criterion": "sentence: usage.md no longer says --undo always stops the plugin entry",
+        "support": "docs/usage.md:161 now reads \"`--undo` removes ... only when setup recorded adding it; otherwise it keeps the key and reports `~`\", matching usage.md:109"
+      },
+      {
+        "criterion": "format: format check passes",
+        "support": "node_modules/.bin/mise run fmt:check exit 0"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "fmt:check exit 0 (244 files); git diff --stat docs/usage.md shows 1 line changed"
+      }
+    ]
   },
   "createdAt": "2026-11-03T12:44:33.130Z"
 }
