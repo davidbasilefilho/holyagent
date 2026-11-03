@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mw0oa7k3-g28o",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Worker.mechanical",
+  "slug": "make-the-vcs-reminder-description-in",
+  "objective": "Make the vcs-reminder description in docs/hooks.md (around line 49) match the reminder text in packages/runtime/src/cli/hook.ts (VCS_REMINDER, around line 158): hook or signing bypass only when the user asks, amend only your own unpushed commit, rebase -i, reset --hard or amending a published or another author's commit need the user's approval.",
+  "state": "Running",
+  "scope": [],
+  "constraints": [
+    "Edit only docs/hooks.md, keep the rest of the file and its uncommitted notice edits as they are. Run node_modules/.bin/mise run fmt:check (bun fmt --no-script docs/hooks.md if it fails on this file). No version-control writes. Report in under 120 words; start each evidence line with the criterion label before its colon."
+  ],
+  "criteria": [
+    {
+      "text": "reminder doc: hooks.md describes the reminder as hook.ts states it",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "format: format check passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "docs/hooks.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw0o58oc-ygen",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-03T12:37:12.003Z"
+  },
+  "createdAt": "2026-11-03T12:37:12.003Z"
+}
