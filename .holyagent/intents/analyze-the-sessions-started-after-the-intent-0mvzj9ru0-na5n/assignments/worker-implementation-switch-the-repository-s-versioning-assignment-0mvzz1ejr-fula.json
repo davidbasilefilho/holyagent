@@ -1,0 +1,59 @@
+{
+  "id": "assignment-0mvzz1ejr-fula",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 10,
+  "roleTask": "Worker.implementation",
+  "slug": "switch-the-repository-s-versioning",
+  "objective": "Switch the repository's versioning scheme to ZeroVer 0.X.Y only, removing the -Z hotfix suffix, and finish the 0.2.0 bump in the same change.",
+  "state": "Running",
+  "scope": [
+    "Hotfix scheme references: scripts/bump-version.ts, scripts/bump-version.test.ts, mise.toml (comment near line 70 and the bump:hotfix task), package.json (scripts) and docs/development.md. Remove the hotfix mode and the 0.X.Y-Z wording everywhere, keep minor and patch, and make the script refuse or reject a version with a suffix if it parses one (decide by the code; a current 0.X.Y-Z input to minor/patch should still produce 0.(X+1).0 / 0.X.(Y+1)).",
+    "An interrupted earlier step already ran the minor bump: package.json, packages/*/package.json, .claude-plugin/marketplace.json, bun.lock and dist plugin.json should read 0.2.0 (they show as modified). Verify they all read 0.2.0 and fix any that do not.",
+    "mise is not installed: run the bun commands directly. Rebuild with bun packages/integrations/claude/build.ts at the end."
+  ],
+  "constraints": [
+    "Change only the versioning scheme and the version values.",
+    "No version-control writes and no edits under .git/ or .holyagent/; report changed paths.",
+    "Keep working until done; when done and checked, stop and report. Respond tersely."
+  ],
+  "criteria": [
+    {
+      "text": "Scheme: no hotfix mode, task, script or 0.X.Y-Z wording remains outside history; bump-version tests cover minor and patch, including from a suffixed current version, and pass",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Version: every manifest, package.json, bun.lock and generated plugin.json read 0.2.0",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Gates: bun check, bun lint, bun fmt --check and bun test exit 0 after rebuilding dist",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "scripts",
+    "mise.toml",
+    "package.json",
+    "bun.lock",
+    "docs/development.md",
+    ".claude-plugin",
+    "packages/runtime/package.json",
+    "packages/integrations/claude"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mvzyzq3y-j9vz",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T00:50:30.760Z"
+  },
+  "createdAt": "2026-11-03T00:50:30.760Z"
+}
