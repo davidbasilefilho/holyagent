@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-the-repair-commit-b1dec34",
   "objective": "Re-review the repair commit b1dec34 (range b319468..b1dec34 on release/0.2.0/fix/windows-tests) against the two review notes it addresses.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Previous review notes: (1) lock.ts waits up to 30s on a live lock holder while plugin hooks have a 10s timeout, so the agent-launch hook (packages/runtime/src/cli/hook.ts ~337, updateState) could be killed instead of failing with StateLocked; (2) hooks.test.ts brokenGit asserts the English 'bad config line', which fails under a localized git; LC_ALL=C fixes it.",
     "Review only the diff of b319468..b1dec34 (git diff b319468 b1dec34). Another writer may be editing the working tree at the same time, so read the committed range, not the working tree."
@@ -51,7 +51,41 @@
     "agentId": "workflow:wf_04c93d9a-423/assignment-0mw0rc909-ls7m",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-03T14:02:49.765Z"
+    "startedAt": "2026-11-03T14:02:49.765Z",
+    "finishedAt": "2026-11-03T14:07:23.697Z"
+  },
+  "result": "result: Repair addresses both notes; no blockers. Built-in /code-review ran on b319468...b1dec34; its six findings are classified below.\n\nchanged: none (read-only)\n\nchecks:\n- `mise run verify` -> not run, mise is not installed here (exit 127).\n- `bun test packages/integrations/claude/tests/hooks.test.ts -t agent-launch` -> exit 0, 12 pass, 0 fail, including the new busy-lock test.\n- `bun test packages/runtime` -> exit 0, 558 pass, 0 fail.\n- `bunx tsc --noEmit -p .` -> exit 0.\n- Not run: lint and format, and the new test against the base dist. Failing on the base is argued from the code, not shown by a run.\n- Log: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/checks.log\n\nblockers: none\n\nquestions: none\n\nnotes (all optional, none blocking):\n- code-review finding on `resolveState` locks (worktree 60s, migration 30s) in the hook path: it is real but outside the two notes. The note named `updateState`.\n- code-review finding that the `hook` patience lowers the stuck threshold to 3s: rejected. Total wait is capped at 3s either way, so failing early on an old holder changes nothing observable.\n- code-review finding that work under the lock (read and git commit) is unbounded: it predates this range and only bounds acquisition.\n- The `withFileLock` doc says \"fails at once\" without saying that only `short` and `hook` do this, not `long`. Optional wording fix.\n- In the new test, `rm(lock)` is not in a `finally`. It only removes a lock file inside a temp dir that is removed anyway.\n- There is no runtime-level unit test for `\"hook\"` patience. Coverage comes from the end-to-end test against dist.\n- The working tree has unrelated uncommitted edits to `host.test.ts` and `plugin.test.ts`. They are outside the range and were not reviewed.\n\nevidence:\n- The agent-launch hook gives up on a live-held state lock well inside the 10s hook timeout and CLI commands keep the 30s default: `hook.ts:337` passes `\"hook\"`, which waits 3s at most. `updateState` and `withStateLock` default to `\"short\"` (30s), so CLI callers are unchanged. The dist bundle matches the source diff. Read, not timed against a real host kill.\n- The new hook-patience test fails without the change and is not flaky by construction: the test plants a lock owned by the live test pid with `acquiredAt` of now, so it is never broken as stale. Without the change the hook would wait the full 30s and miss the `<8000` assertion (reasoned, not run). With the change the wait is about 3s, leaving 5s of margin, and the test timeout is 40s. It passes in the agent-launch run.\n- brokenGit runs git with a C locale so its assertion is locale-independent: `hooks.test.ts` brokenGit env adds `LC_ALL: \"C\"` and `LANGUAGE: \"C\"`.\n- No regressions or weakened tests in the range: the diff only adds a test and a lock patience variant, and deletes no assertions. 558 runtime tests pass and tsc is clean.\n- findings: no blockers; six code-review claims classified above, all optional or rejected.\n- checks-run: see checks above; mise verify, lint and format were not run.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "No blockers; both notes verified in the committed range with passing hook and runtime tests.",
+    "criteria": [
+      {
+        "criterion": "The agent-launch hook gives up on a live-held state lock well inside the 10s hook timeout and CLI commands keep the 30s default",
+        "support": "`hook.ts:337` passes `\"hook\"`, which waits 3s at most. `updateState` and `withStateLock` default to `\"short\"` (30s), so CLI callers are unchanged. The dist bundle matches the source diff. Read, not timed against a real host kill."
+      },
+      {
+        "criterion": "The new hook-patience test fails without the change and is not flaky by construction",
+        "support": "the test plants a lock owned by the live test pid with `acquiredAt` of now, so it is never broken as stale. Without the change the hook would wait the full 30s and miss the `<8000` assertion (reasoned, not run). With the change the wait is about 3s, leaving 5s of margin, and the test timeout is 40s. It passes in the agent-launch run."
+      },
+      {
+        "criterion": "brokenGit runs git with a C locale so its assertion is locale-independent",
+        "support": "`hooks.test.ts` brokenGit env adds `LC_ALL: \"C\"` and `LANGUAGE: \"C\"`."
+      },
+      {
+        "criterion": "No regressions or weakened tests in the range",
+        "support": "the diff only adds a test and a lock patience variant, and deletes no assertions. 558 runtime tests pass and tsc is clean."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "no blockers; six code-review claims classified above, all optional or rejected."
+      },
+      {
+        "label": "checks-run",
+        "support": "see checks above; mise verify, lint and format were not run."
+      }
+    ]
   },
   "createdAt": "2026-11-03T14:02:46.042Z"
 }
