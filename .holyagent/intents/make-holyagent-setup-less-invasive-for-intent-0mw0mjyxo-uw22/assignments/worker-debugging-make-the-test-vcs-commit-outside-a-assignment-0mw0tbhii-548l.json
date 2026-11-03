@@ -1,0 +1,63 @@
+{
+  "id": "assignment-0mw0tbhii-548l",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Worker.debugging",
+  "slug": "make-the-test-vcs-commit-outside-a",
+  "objective": "Make the test 'vcs commit outside a claude.ai cloud session > the author setting is ignored: an agent's user identity is still refused, and the user's is used' pass reliably on the windows-latest CI job, without weakening it.",
+  "state": "Running",
+  "scope": [
+    "Checkout /home/user/holyagent, branch release/0.2.0/fix/windows-tests, head 59d169c. The Windows job at 59d169c failed only this test, at 5042ms (the 5000ms default timeout); 1048 tests ran in 430s. The same test passed on Windows at 252fedc. Log: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/job-125973988560.log (search '(fail)' and the lines above it).",
+    "Find whether the test simply runs several git and CLI spawns that take longer than 5s on Windows (earlier fixes gave such tests an explicit timeout, e.g. 40_000 for long hook tests, or setDefaultTimeout(60_000) on win32 in a file) or whether something in 252fedc..59d169c slowed it (for example the lock patience change in packages/runtime/src/state). Fix the cause; if it is only Windows spawn cost, give the test or its file a Windows-adequate timeout the way earlier fixes did, with a comment. Also look for sibling tests in the same describe that run similar work and sit close to 5s in the log, and treat them the same way."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md and AGENTS.md (Effect in runtime source, JSDoc, Bun APIs).",
+    "Make no version-control writes and no edits under .git/ or .holyagent/; report changed paths. Scratch files only under /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad.",
+    "Rebuild the generated plugin (bun scripts/vendor.ts then bun packages/integrations/claude/build.ts, since mise is missing) only if plugin or runtime sources change.",
+    "Do not skip or weaken tests.",
+    "Keep working until done; stop to ask only when you cannot go on. When done and checked, stop and report; name unrequested changes instead of making them, and launch no reviewers.",
+    "Run real checks: the changed test file, then bun check --no-script, bun lint --no-script, bun fmt --no-script --check and the full bun test. Write the diff to /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/win-fix4.diff as diff-file evidence.",
+    "Report in under 300 words with the root cause in one line."
+  ],
+  "criteria": [
+    {
+      "text": "The root cause of the Windows timeout is stated and the fix addresses it",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No test is skipped or weakened",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The full suite, type-check, lint and format pass on Linux",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The change stays within this failure and its near-timeout siblings",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "diff-file",
+    "verify",
+    "root-cause"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/tests",
+    "packages/integrations/claude/tests",
+    "packages/runtime/src",
+    "packages/integrations/claude/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T14:58:09.643Z"
+  },
+  "createdAt": "2026-11-03T14:58:09.643Z"
+}
