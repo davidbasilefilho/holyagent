@@ -1,8 +1,10 @@
 import { Effect, Option } from "effect"
 
 import { inCloudSession } from "../vcs/identity.ts"
-import { type Env, userFiles } from "./environment.ts"
-import { type Report } from "./report.ts"
+import type { Env } from "./environment.ts"
+import { SetupFailure } from "./errors.ts"
+import { hint, type Report } from "./report.ts"
+import { type Scope, settingsFile } from "./scope.ts"
 import { mergeUserSettings, missingSettingKeys } from "./settings.ts"
 import { Shell } from "./shell.ts"
 import { asStep, installCtx7 } from "./steps.ts"
@@ -38,27 +40,55 @@ const checkCommand = (env: Env, command: string) =>
       : fail(command, `not found on PATH or in Bun's bin directory; ${FIX}`)
   })
 
-const checkSettings = (env: Env) =>
-  missingSettingKeys(env).pipe(
+/** The fix for failing settings; a scope other than user is named, or the fix would target user. */
+const fixFor = (scope: Scope) =>
+  scope === "user"
+    ? FIX
+    : `run /holyagent:setup --scope ${scope}, or \`holyagent doctor --fix --scope ${scope}\``
+
+const checkSettings = (file: string, scope: Scope) =>
+  missingSettingKeys(file).pipe(
     Effect.map((missing) =>
       missing.length === 0
-        ? pass("settings", userFiles(env).settings)
-        : fail("settings", `${userFiles(env).settings} lacks ${missing.join(", ")}; ${FIX}`),
+        ? pass("settings", file)
+        : fail("settings", `${file} lacks ${missing.join(", ")}; ${fixFor(scope)}`),
     ),
     Effect.catchTag("SetupFailure", (error) => Effect.succeed(fail("settings", error.message))),
   )
 
-const checks = (env: Env) => Effect.all([checkBun, checkCommand(env, "ctx7"), checkSettings(env)])
+const checks = (env: Env, file: string, scope: Scope) =>
+  Effect.all([checkBun, checkCommand(env, "ctx7"), checkSettings(file, scope)])
 
 /**
  * Checks the environment HolyAgent needs, one line per check: `bun` and `ctx7` on PATH, the
- * recommended keys of the user settings (not those of a project). In a claude.ai cloud session
- * `ctx7` passes, since setup leaves it out there. With `fix`, the setup steps behind a failing
- * check run first, their lines come before the checks, and the checks then run again; Bun is never
- * installed. The report is ok when no check fails.
+ * recommended keys of the settings of the chosen scope (`user` unless set; `project` and `local`
+ * are found from `cwd`, the process directory when absent). In a claude.ai cloud session `ctx7`
+ * passes, since setup leaves it out there. With `fix`, the setup steps behind a failing check run
+ * first, their lines come before the checks, and the checks then run again; Bun is never installed.
+ * The report is ok when no check fails.
  */
-export const doctor = Effect.fn("doctor")(function* (env: Env, options: { readonly fix: boolean }) {
-  const before = yield* checks(env)
+export const doctor = Effect.fn("doctor")(function* (
+  env: Env,
+  options: { readonly fix: boolean; readonly scope?: Scope; readonly cwd?: string },
+) {
+  const scope = options.scope ?? "user"
+  const located = yield* settingsFile(env, scope, options.cwd ?? process.cwd()).pipe(
+    Effect.catchTag("SetupFailure", (error) => Effect.succeed(error)),
+  )
+  if (located instanceof SetupFailure) {
+    // The target is refused (a symlink): report it as the failing settings check, fix nothing.
+    const lines = yield* Effect.all([
+      checkBun,
+      checkCommand(env, "ctx7"),
+      Effect.succeed(fail("settings", located.message)),
+    ])
+    return { lines, ok: false } satisfies Report
+  }
+  const { file, notice } = located
+  // Like setup, name a git top-level that was refused; the settings check names the file used.
+  const noted = (lines: ReadonlyArray<string>) =>
+    notice === undefined ? lines : [hint(`${scope} settings: ${notice}`), ...lines]
+  const before = yield* checks(env, file, scope)
   const failing = (name: string) => before.some((line) => line.startsWith(`FAIL ${name}:`))
   const fixes =
     options.fix && !inCloudSession(env)
@@ -67,11 +97,11 @@ export const doctor = Effect.fn("doctor")(function* (env: Env, options: { readon
   const settingsFixes =
     options.fix && failing("settings")
       ? yield* asStep(
-          "user settings",
-          mergeUserSettings(env, { subagentCacheTtl: "1h", dryRun: false }),
+          `${scope} settings`,
+          mergeUserSettings({ env, file, subagentCacheTtl: "1h", dryRun: false }),
         )
       : []
   const ran = [...fixes, ...settingsFixes]
-  const lines = ran.length === 0 ? before : [...ran, ...(yield* checks(env))]
+  const lines = noted(ran.length === 0 ? before : [...ran, ...(yield* checks(env, file, scope))])
   return { lines, ok: lines.every((line) => !line.startsWith("FAIL ")) } satisfies Report
 })

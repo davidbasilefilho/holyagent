@@ -7,7 +7,8 @@ import { type Env, homeDirectory, userFiles } from "./environment.ts"
 import type { SetupFailure } from "./errors.ts"
 import { fileExists } from "./json-file.ts"
 import { added, failed, hint, present, type Report, skipped } from "./report.ts"
-import { type CacheTtl, mergeUserSettings } from "./settings.ts"
+import { type Scope, settingsFile } from "./scope.ts"
+import { type CacheTtl, mergeUserSettings, undoUserSettings } from "./settings.ts"
 import { EMPTY_BUNFIG, Shell } from "./shell.ts"
 
 /** Why ctx7 is left out of a claude.ai cloud session. */
@@ -114,15 +115,45 @@ export interface SetupOptions {
   readonly subagentCacheTtl: CacheTtl
   readonly dryRun: boolean
   readonly skipCtx7: boolean
+  /** The settings scope to write, `user` when absent. */
+  readonly scope?: Scope
+  /** Back out the settings setup wrote instead of writing them; ctx7 is left installed. */
+  readonly undo?: boolean
+  /** The directory a `project` or `local` scope is found from, the process directory when absent. */
+  readonly cwd?: string
 }
 
 /**
- * Sets up HolyAgent for the current user: ctx7 and the recommended keys of the user settings. Every
- * step checks its own result first, and a step that fails does not stop the next one. On a dry run
- * nothing is installed or written, and the lines say what would be. In a claude.ai cloud session
- * ctx7 is skipped, and the settings are still merged.
+ * Sets up HolyAgent for the current user: ctx7 and the recommended keys of the settings of the
+ * chosen scope (`user` unless set). Every step checks its own result first, and a step that fails
+ * does not stop the next one. On a dry run nothing is installed or written, and the lines say what
+ * would be. In a claude.ai cloud session ctx7 is skipped, and the settings are still merged. With
+ * `undo` only the settings change: the values setup recorded adding are removed from the chosen
+ * scope's file, and ctx7 stays installed. A `project` or `local` target that is a symlink is
+ * refused with a `!` line and nothing is written to the settings.
  */
 export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptions) {
+  const scope = options.scope ?? "user"
+  const label = `${scope} settings`
+  // A target that cannot be used (a symlink) is a failed settings step, not an abort.
+  const onSettings = (
+    run: (file: string) => Effect.Effect<ReadonlyArray<string>, SetupFailure, Shell>,
+  ) =>
+    asStep(
+      label,
+      Effect.gen(function* () {
+        const target = yield* settingsFile(env, scope, options.cwd ?? process.cwd())
+        const lines = yield* run(target.file)
+        return target.notice === undefined ? lines : [hint(`${label}: ${target.notice}`), ...lines]
+      }),
+    )
+  if (options.undo === true) {
+    const lines = [
+      hint("ctx7: left installed; --undo only removes the settings setup recorded adding"),
+      ...(yield* onSettings((file) => undoUserSettings({ env, file, dryRun: options.dryRun }))),
+    ]
+    return { lines, ok: !lines.some((line) => line.startsWith("! ")) } satisfies Report
+  }
   const cloud = inCloudSession(env)
   const lines = [
     ...(options.skipCtx7
@@ -130,7 +161,14 @@ export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptio
       : cloud
         ? [skipped(`ctx7: ${CLOUD_SKIP}`)]
         : yield* asStep("ctx7", installCtx7(env, options.dryRun))),
-    ...(yield* asStep("user settings", mergeUserSettings(env, options))),
+    ...(yield* onSettings((file) =>
+      mergeUserSettings({
+        env,
+        file,
+        subagentCacheTtl: options.subagentCacheTtl,
+        dryRun: options.dryRun,
+      }),
+    )),
   ]
   return { lines, ok: !lines.some((line) => line.startsWith("! ")) } satisfies Report
 })

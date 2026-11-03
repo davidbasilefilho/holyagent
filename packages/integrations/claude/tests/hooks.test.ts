@@ -200,6 +200,17 @@ describe("hook vcs-reminder", () => {
       expect(text).toContain("protected branch")
       expect(text).toContain("approval")
       expect(text).toContain("no version-control writes")
+      expect(text).toContain("--no-verify")
+      expect(text).toContain("--no-gpg-sign")
+      // The same rules as root/version-control.md: bypassing needs the user's ask, amending is
+      // for the root's own unpushed commit, and other history rewrites need the user's approval.
+      expect(text).toContain(
+        "Bypass hooks or signing (`--no-verify`, `--no-gpg-sign`) only when the user asks",
+      )
+      expect(text).toContain("Amend only your own unpushed commit")
+      expect(text).toContain(
+        "`rebase -i`, `reset --hard` or amend a published or another author's commit",
+      )
       expect(text.trim().split("\n")).toHaveLength(1)
       expect(result.stdout).not.toContain("permissionDecision")
     }

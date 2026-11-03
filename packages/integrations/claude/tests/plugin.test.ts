@@ -622,17 +622,28 @@ describe("agents", () => {
     expect(text).not.toContain("Read screenshots yourself")
   })
 
-  test("a branch the platform assigns is the work branch, the user is asked about the convention, and the names follow the version state", () => {
+  test("the root never works on a platform-assigned branch, asks when the conventional push is refused, and commits atomically with squash merge by default", () => {
     const text = agent("holyagent")?.content ?? ""
     for (const part of [
-      "When the platform assigns a branch",
-      "use it as the work branch",
-      "ask through AskUserQuestion whether to open the PR from a branch that follows it",
-      "names the branch used and why whenever it departs from the convention",
+      "Never work on a branch the platform assigns",
+      "create the conventional branch and leave the assigned one alone",
+      "If the push of the conventional branch is refused",
+      "ask through AskUserQuestion whether to push to the assigned branch instead; never work around the refusal",
       "`exp/<experiment>/<type>/<change>` for work with no published version",
       "`release/<version>/<type>/<change>` when the repository has tags or releases",
+      "each commit on a branch is atomic",
+      "a Conventional Commit",
+      "PRs merge by squash by default, with the PR title as the Conventional summary",
+      "The repository's conventions, branch protection and merge settings come first",
+      "After a lower PR squash-merges, merge the base into the next branch",
     ])
       expect({ part, found: text.includes(part) }).toEqual({ part, found: true })
+    for (const part of [
+      "use it as the work branch",
+      "When the platform assigns a branch",
+      "whether to open the PR from a branch that follows it",
+    ])
+      expect({ part, found: text.includes(part) }).toEqual({ part, found: false })
     expect(text).not.toContain("when the version workflow fits")
   })
 

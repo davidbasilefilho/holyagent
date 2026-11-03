@@ -52,14 +52,14 @@ Hosted setup needs a login or API key. With neither, `ctx7 setup --yes` would bl
 
 ## What `holyagent setup` and `holyagent doctor` do
 
-`holyagent setup [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7]` runs two steps, each of which checks its own result first:
+`holyagent setup [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7]` runs two steps, each of which checks its own result first:
 
 - ctx7: the package and the Context7 skill (above);
-- user settings: the missing keys among `attribution`, `includeGitInstructions`, `subagentPromptCacheTtl`, `modelSettings["claude-opus-5-5"]` (`effortLevel` and `autoCompactWindow`), `extraKnownMarketplaces`, `enabledPlugins` and `permissions.deny` are added to `~/.claude/settings.json` (or the file in `CLAUDE_CONFIG_DIR`), and no value that is already set changes ([usage.md](usage.md#user-settings) lists them).
+- settings: the missing keys (in the file of `--scope`, the user settings by default) among `attribution`, `includeGitInstructions`, `subagentPromptCacheTtl`, `modelSettings["claude-opus-5-5"]` (`effortLevel` and `autoCompactWindow`), `extraKnownMarketplaces`, `enabledPlugins` and `permissions.deny` are added to `~/.claude/settings.json` (or the file in `CLAUDE_CONFIG_DIR`) for `--scope user`, or to the project's `.claude/settings.json` or `.claude/settings.local.json`, and no value that is already set changes ([usage.md](usage.md#user-settings) lists them).
 
 In a claude.ai cloud session (`CLAUDE_CODE_REMOTE=true`) there is no machine of yours to install on, so the ctx7 step is skipped and the other still runs. Setup does not register the plugin, which the two `claude plugin` commands do, and it does not check Bun's build.
 
-`holyagent doctor [--fix]` prints one line per check and exits 1 when any fails:
+`holyagent doctor [--scope user|project|local] [--fix]` prints one line per check and exits 1 when any fails:
 
 - `bun` is on `PATH`;
 - `ctx7` is on `PATH` (it passes in a cloud session, where setup leaves it out);
