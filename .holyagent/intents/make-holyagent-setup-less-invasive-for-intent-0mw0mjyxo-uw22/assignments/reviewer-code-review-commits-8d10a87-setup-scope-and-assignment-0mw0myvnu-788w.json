@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-commits-8d10a87-setup-scope-and",
   "objective": "Review commits 8d10a87 (setup --scope and --undo) and 4091f2a (Windows CI job) on branch claude/blissful-wozniak-arfpxn against base 89ed6d8 for correctness and regressions.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "git diff 89ed6d8..4091f2a; the generated dist is rebuilt output, check only that it matches a fresh mise run build"
   ],
@@ -40,5 +40,10 @@
     "assignment-0mw0mpmhe-6ulw",
     "assignment-0mw0mpmsu-q4xi"
   ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T12:00:58.123Z"
+  },
   "createdAt": "2026-11-03T12:00:23.755Z"
 }
