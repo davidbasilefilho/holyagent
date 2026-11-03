@@ -1,0 +1,57 @@
+{
+  "id": "assignment-0mw0mzj0n-m2yt",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "add-the-git-safety-rules-holyagent-lost",
+  "objective": "Add the git safety rules HolyAgent lost when setup turned off Claude Code's built-in git instructions to the root's version-control instruction text and to the vcs-reminder hook.",
+  "state": "Ready",
+  "scope": [
+    "Gap analysis to work from: /home/user/holyagent/.git/holyagent/reports/assignment-0mw0mpn8a-yva8.md (items S1-S7, N2, N3)",
+    "packages/runtime/src/instructions/claude-5.5/root/version-control.md (and pr-text.md for N2/N3)",
+    "packages/runtime/src/cli/hook.ts (vcs-reminder text) and its tests",
+    "generated plugin via mise run build"
+  ],
+  "constraints": [
+    "Add as concise instruction text, each rule with its reason (repo style): never bypass hooks or signing (--no-verify, --no-gpg-sign, -c commit.gpgsign=false) unless the user asks; when a hook fails the commit did not happen, so fix, re-stage and run vcs commit again, never amend; amend only your own unpushed commit and never rebase -i, reset --hard or amend published or others' commits without approval; check named paths for secrets (.env, keys, tokens) before committing and ask; read git status and git diff of the paths before vcs commit; never edit git config except through holyagent vcs identity; run git non-interactively (no -i, no editor). For PRs: write the text from the base...HEAD diff and full commit list and use the repository's PR template when one exists. Skip S8 (commit only when asked): the workflow commits by design.",
+    "Extend the vcs-reminder hook text to name the hook-bypass and history-rewrite rules in one or two short sentences. Keep the hook additive (it denies nothing).",
+    "Instruction-writing rules: follow the holyagent:instruction-writing guidance in the repo if present (say what to do, give the reason). Keep the root text terse; it is re-read every call.",
+    "Do not edit docs/ or README.md (another writer owns them). No version-control writes, no edits under .git/ or .holyagent/; report changed paths.",
+    "Run mise run build and mise run verify (mise may be at node_modules/.bin/mise). Keep working until done; stop and report. Report in under 350 words."
+  ],
+  "criteria": [
+    {
+      "text": "rules added: S1-S7, N2 and N3 are covered in the root instruction text with reasons",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "hook: vcs-reminder names hook bypass and history rewrite, stays additive, with a test",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "gates: mise run verify passes and dist rebuilt",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "scope limits: no edits to docs/ or README.md",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/runtime/src/cli/hook.ts",
+    "packages/runtime/tests",
+    "packages/integrations/claude"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-03T12:00:54.024Z"
+}
