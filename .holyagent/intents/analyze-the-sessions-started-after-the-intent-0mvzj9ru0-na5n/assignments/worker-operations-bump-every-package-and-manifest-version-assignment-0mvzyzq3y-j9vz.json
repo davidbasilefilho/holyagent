@@ -1,0 +1,48 @@
+{
+  "id": "assignment-0mvzyzq3y-j9vz",
+  "intentId": "intent-0mvzj9ru0-na5n",
+  "intentRevision": 9,
+  "roleTask": "Worker.operations",
+  "slug": "bump-every-package-and-manifest-version",
+  "objective": "Bump every package and manifest version from 0.1.2-3 to 0.2.0 with the repository's minor bump script and rebuild the plugin.",
+  "state": "Running",
+  "scope": [
+    "Repository /home/user/holyagent on branch claude/nifty-faraday-jinmae (main merged in). mise.toml task bump:minor runs `bun scripts/bump-version.ts minor` then the build task; mise is not installed, so run `bun scripts/bump-version.ts minor` and `bun packages/integrations/claude/build.ts` directly, then bun check, bun lint, bun fmt --check and bun test."
+  ],
+  "constraints": [
+    "Change nothing beyond what the script and the build write.",
+    "No version-control writes and no edits under .git/ or .holyagent/; report changed paths.",
+    "Respond tersely."
+  ],
+  "criteria": [
+    {
+      "text": "Bump: every manifest and package.json, bun.lock and the generated plugin.json read 0.2.0, and git diff shows only version changes and rebuilt dist",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Gates: bun check, bun lint, bun fmt --check and bun test exit 0, with counts",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "package.json",
+    "bun.lock",
+    ".claude-plugin",
+    "packages/runtime/package.json",
+    "packages/integrations/claude"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-03T00:49:12.431Z"
+  },
+  "createdAt": "2026-11-03T00:49:12.431Z"
+}
