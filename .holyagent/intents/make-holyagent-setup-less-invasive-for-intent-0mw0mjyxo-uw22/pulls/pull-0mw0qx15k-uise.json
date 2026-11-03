@@ -1,0 +1,10 @@
+{
+  "id": "pull-0mw0qx15k-uise",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "number": 52,
+  "url": "https://github.com/davidbasilefilho/holyagent/pull/52",
+  "branch": "release/0.2.0/fix/windows-tests",
+  "base": "release/0.2.0/feat/evidence-judging",
+  "created": true,
+  "recordedAt": "2026-11-03T13:50:56.024Z"
+}
