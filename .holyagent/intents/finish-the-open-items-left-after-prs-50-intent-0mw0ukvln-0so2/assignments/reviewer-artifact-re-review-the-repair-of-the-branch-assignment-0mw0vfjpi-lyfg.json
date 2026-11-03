@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "re-review-the-repair-of-the-branch",
   "objective": "Re-review the repair of the branch-deletion rule and the AGENTS.md mise note against the five findings of the previous review.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Previous findings: 1) R-BRANCH in requirements.md lacked reason and cleanup coverage; 2) version-control.md gave the classifier as the reason, not the maintainer's (branches are the user's to remove; history and references; destructive); 3) conflict with repository merge settings: the root should not pass --delete-branch and should leave a repository's auto-delete setting; 4) AGENTS.md used node_modules/.bin/mise instead of the documented bunx --no-install mise and repeated README/docs; 5) AGENTS.md lacked why each worktree needs its own install.",
     "Read the full diff at /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/repB.diff (the branch's whole uncommitted change)."
@@ -34,5 +34,10 @@
     "assignment-0mw0vf9j6-s3qn"
   ],
   "followUpOf": "assignment-0mw0v35fv-kr5k",
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-11-03T15:57:23.481Z"
+  },
   "createdAt": "2026-11-03T15:57:18.343Z"
 }
