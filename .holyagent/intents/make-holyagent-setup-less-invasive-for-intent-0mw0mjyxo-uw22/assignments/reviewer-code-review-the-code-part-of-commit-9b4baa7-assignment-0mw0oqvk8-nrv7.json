@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-the-code-part-of-commit-9b4baa7",
   "objective": "Review the code part of commit 9b4baa7: the Reviewer.artifact route change in packages/runtime/src/domain/route.ts, the R-EVIDENCE mapping in packages/integrations/claude/src/agents.ts, and the tests in route.test.ts, instructions.test.ts and plugin.test.ts.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [],
   "constraints": [
     "Check that the route change reaches the generated agent (dist/agents/reviewer-artifact.md) and dispatch output, that no other code keys on Reviewer.artifact being Haiku (e.g. warm-reuse or cache logic grouping by model), and that the tests fail without the change. Run bun test on the three test files. Read-only. Report in under 250 words, findings blocking or non-blocking with file:line; start each evidence line with the criterion label before its colon."
@@ -34,7 +34,29 @@
     "agentId": "workflow:wf_99073747-dd7/assignment-0mw0oqvk8-nrv7",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-03T12:50:13.887Z"
+    "startedAt": "2026-11-03T12:50:13.887Z",
+    "finishedAt": "2026-11-03T12:53:32.328Z"
+  },
+  "result": "result: no blockers in the code part of 9b4baa7; the route change is complete and the tests pin it. `bun test` on route, instructions and plugin tests: 73 pass, 1 skip, 0 fail.\n\nchanged: none (read-only)\n\nchecks:\n- `/code-review medium 9b4baa7~1...9b4baa7` -> ran, returned 6 findings. All sit in instruction text or the test wording; none in route.ts or agents.ts. They are rated below.\n- `bun test packages/runtime/tests/route.test.ts packages/runtime/tests/instructions.test.ts packages/integrations/claude/tests/plugin.test.ts` -> exit 0, 73 pass, 1 skip, 0 fail.\n\nblockers: none\n\nnotes (all optional):\n- /code-review finding, `plugin.test.ts:815`: `expect(sonnet).toContain(\"artifact\")` is loose. The `requirements.md` assertion and the `haiku not.toContain(\"Reviewer.artifact\")` assertion cover most of the gap. Tighten it to \"the artifact, code, testing and security reviews\".\n- /code-review findings, instruction text, outside my scope; the one I read is a real conflict and I would pass these to Reviewer.artifact:\n  - `assignments.md:12` says \"never open screenshots in the main thread\", but `visual-judging` and R-VISUAL still allow it to show the user or settle a doubt.\n  - `evidence-judging/SKILL.md:9` requires a reproduction or trace, which reviewers without a shell cannot produce.\n  - The \"three rounds\" rule is now stated in four places.\n- Not run: `mise run verify` (type-check, lint, format). I did not re-run the build to compare `dist` against a fresh build.\n\nevidence:\nroute: `route.ts:215` is now \"sonnet\". It reaches `dist/agents/reviewer-artifact.md:5` (`model: sonnet`, and the description text says sonnet) and the bundled `dist/scripts/holyagent.js:9526`, so dispatch uses it. Warm reuse in `directive.ts:66` compares the route's model, not a hard-coded Haiku. A repo-wide search for \"haiku\" found nothing else that depends on Reviewer.artifact being Haiku. Routing.md, requirements.md R-ROUTE, `docs/usage.md:13` and `docs/decisions.md:65` are updated. The `agents.ts:281` R-EVIDENCE mapping points to a phrase that exists in `evidence-judging/SKILL.md:9`.\ntests: `route.test.ts:40` asserts `routeFor(\"Reviewer.artifact\")` is sonnet/high. `plugin.test.ts:806` asserts the generated agent frontmatter, the routing.md and requirements.md text, and `instructions.test.ts` and the SKILLS list gain evidence-judging. The route and agent assertions would fail on the Haiku base, since both derive from `SPECS`. I did not run them against the base because that needs a checkout.\nfindings: none blocking; the optional notes are above.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "route complete, tests pin it, 73 pass",
+    "criteria": [
+      {
+        "criterion": "route: the change is complete and nothing depends on the old model",
+        "support": "`route.ts:215` is now \"sonnet\". It reaches `dist/agents/reviewer-artifact.md:5` (`model: sonnet`, and the description text says sonnet) and the bundled `dist/scripts/holyagent.js:9526`, so dispatch uses it. Warm reuse in `directive.ts:66` compares the route's model, not a hard-coded Haiku. A repo-wide search for \"haiku\" found nothing else that depends on Reviewer.artifact being Haiku. Routing.md, requirements.md R-ROUTE, `docs/usage.md:13` and `docs/decisions.md:65` are updated. The `agents.ts:281` R-EVIDENCE mapping points to a phrase that exists in `evidence-judging/SKILL.md:9`."
+      },
+      {
+        "criterion": "tests: the tests pin the change and pass",
+        "support": "`route.test.ts:40` asserts `routeFor(\"Reviewer.artifact\")` is sonnet/high. `plugin.test.ts:806` asserts the generated agent frontmatter, the routing.md and requirements.md text, and `instructions.test.ts` and the SKILLS list gain evidence-judging. The route and agent assertions would fail on the Haiku base, since both derive from `SPECS`. I did not run them against the base because that needs a checkout."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "none blocking; the optional notes are above."
+      }
+    ]
   },
   "createdAt": "2026-11-03T12:50:09.608Z"
 }
