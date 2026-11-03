@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mw0umspg-zqyw",
+  "intentId": "intent-0mw0ukvln-0so2",
+  "intentRevision": 2,
+  "roleTask": "Worker.operations",
+  "slug": "make-mise-which-the-repository-ships-as",
+  "objective": "Make mise, which the repository ships as a dev dependency, run the gates in this container so that mise run verify passes in the worktree /home/user/holyagent-hook-locks.",
+  "state": "Ready",
+  "scope": [
+    "Worktree /home/user/holyagent-hook-locks (branch release/0.2.0/fix/hook-lock-followups, cut from origin/main). It has no node_modules yet. The main checkout /home/user/holyagent has node_modules with node_modules/.bin/mise (version 2026.10.24) working.",
+    "mise.toml installs bun 1.4.4 and node lts; its postinstall hook runs 'bun scripts/toolchain.ts upgrade' to move that Bun to canary, because the gates need the canary-only bun check, bun lint and bun fmt. The 'toolchain' task fails on a non-canary Bun. The container's own bun is 1.4.4 stable.",
+    "Steps to try: bun install --frozen-lockfile in the worktree; node_modules/.bin/mise trust (the config may need trusting); node_modules/.bin/mise install; then node_modules/.bin/mise run verify, and also 'bun run verify' (bun puts node_modules/.bin on PATH for scripts). Outbound HTTPS goes through a proxy (see /root/.ccr/README.md) if a download fails. Find the shortest command sequence that works from a fresh session and whether mise needs anything on PATH or in the environment."
+  ],
+  "constraints": [
+    "Change no tracked file in the repository and make no version-control writes; nothing under .git/ or .holyagent/. Installing into node_modules, the mise data directories and the user's home is fine.",
+    "If a step fails, diagnose it (read the error, the proxy README) and try the reasonable fix before reporting; name anything that needs the user (for example an environment setting).",
+    "Keep working until mise run verify runs, then stop and report. Do not fix failing tests; report them with counts.",
+    "Report in under 300 words: the exact working command sequence, verify exit code and counts per gate, and anything a future session must do. Put long logs in /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/mise-verify.log."
+  ],
+  "criteria": [
+    {
+      "text": "mise run verify runs through the dev-dependency mise in the worktree, with its exit code and per-gate counts reported",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The report gives the shortest command sequence that makes the gates work from a fresh session",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "No tracked file changed",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "commands",
+    "verify"
+  ],
+  "ownershipPaths": [
+    "node_modules"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-03T15:34:56.980Z"
+}
