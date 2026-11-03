@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mw0vmbmg-wt4t",
+  "intentId": "intent-0mw0ukvln-0so2",
+  "intentRevision": 2,
+  "roleTask": "Worker.mechanical",
+  "slug": "drop-the-classifier-parenthetical-from",
+  "objective": "Drop the classifier parenthetical from the branch-deletion rule so its copies match, rebuild, and run the full gates on the merged head.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-hook-locks, branch release/0.2.0/feat/branch-deletion-rule at 465e12a (a merge of the hook-lock branch into this one). In packages/runtime/src/instructions/claude-5.5/root/version-control.md (around line 70) the branch-deletion bullet ends its reason with '(the auto-mode classifier blocks it as a consequence)'; remove that parenthetical, keeping the rest of the sentence grammatical. requirements.md R-BRANCH already lacks it. If packages/integrations/claude/tests/plugin.test.ts pins that phrase, remove only that pin.",
+    "Then rebuild with bunx --no-install mise run build (dist/agents/holyagent.md changes) and run bunx --no-install mise run verify on the result."
+  ],
+  "constraints": [
+    "Change nothing else. Make no version-control writes and no edits under .git/ or .holyagent/; report changed paths. Scratch files only under /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad.",
+    "Write the diff to /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/nit.diff as diff-file evidence.",
+    "Keep working until done, then stop and report in under 150 words with the verify exit code and test counts."
+  ],
+  "criteria": [
+    {
+      "text": "The classifier parenthetical is gone from the source and the generated agent file",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "mise run verify passes on the merged head with the change",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "diff-file",
+    "verify"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/integrations/claude/dist/agents",
+    "packages/integrations/claude/tests/plugin.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-03T16:02:34.456Z"
+  },
+  "createdAt": "2026-11-03T16:02:34.456Z"
+}
