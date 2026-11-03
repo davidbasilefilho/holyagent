@@ -1,0 +1,42 @@
+{
+  "id": "assignment-0mw0n5dbt-lx2v",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Librarian.research",
+  "slug": "research-and-calculate-the-auto-compact",
+  "objective": "Research and calculate the auto-compact window that minimizes cost for HolyAgent's Opus 5.5 root without hurting quality, and say whether a default better than 450000 tokens exists.",
+  "state": "Ready",
+  "scope": [
+    "Cost model: each root call re-reads its whole context as cache reads (Opus 5.5: $4/MTok input, cache write 1.25x for 5m and 2x for 1h TTL, cache read 0.1x? check the pricing page: https://platform.claude.com/docs/en/about-claude/pricing) plus new tokens; context grows by g tokens per call from a post-compaction base B; compaction at window W costs a summarization call (reads W, writes a summary) and a cold cache rewrite of the new prefix. Derive cost per call averaged over a compaction cycle as a function of W, B, g, and find the minimizing W analytically (it should be around sqrt-type optimum: W* = B + sqrt(2*g*C_compact/r_read)-style); compute numbers for plausible B (30k-80k: system prompt + tools + rules + summary) and g (2k-15k per call), and include compaction quality loss as a qualitative constraint.",
+    "Quality evidence: long-context degradation (context rot) studies and Anthropic/OpenAI guidance on compaction; Claude Code's default (~967K for 1M models) and its /autocompact range 100K-1M; Codex: compaction at 90% of window, GPT 6.1 Sol 500k window (derived ~450k).",
+    "The repo's own numbers: docs/decisions.md (root grew to 365-747k tokens per call; predecessor compacted 4 times discarding ~2.9M cache tokens)."
+  ],
+  "constraints": [
+    "Show the formula, the assumptions and a small table of W vs cost per call for 3-4 (B, g) scenarios; mark assumptions vs sourced prices. Conclude with a recommended default and whether it beats 450000 meaningfully; if the optimum is flat around 450k say so.",
+    "You may run arithmetic with a quick script in your scratch area outside the repository; read-only for the repo. Keep working until done; stop and report. Report in under 600 words; put the full table in a file outside the repository and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "model: cost formula with sourced prices and labeled assumptions",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "calculation: table of W vs cost for several scenarios and the optimum",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "verdict: whether a better default than 450000 exists, with quality caveats",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-03T12:05:26.586Z"
+}
