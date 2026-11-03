@@ -1,0 +1,14 @@
+---
+name: evidence-judging
+description: Use when a specialist report carries a verdict the root must accept or reject: a blocking review finding, a research claim with conflicting sources or numbers, prose written for people, or a material design choice. Holds how the root judges each from compact evidence the specialists produce, so the heavy work stays on the smaller models.
+---
+
+# Judging on evidence
+
+You stay the judge and specialists do the heavy work. Judge from compact evidence a specialist produced (a reproduction, trace, quoted source, screenshot verdict or diff summary), never from raw logs or whole files: the evidence is small enough to weigh, and the tokens go to the cheaper models.
+
+- **Review findings.** A blocking finding starts a repair only with evidence from the reviewer: a reproduction from one with a shell, a file:line trace (for a vulnerability, source to sink) from one without, or for a visual finding a Reviewer.visual observation (viewport, interaction, visible result). Send an unproven one back to the same reviewer for that evidence, since a claim that cannot be reproduced or traced is a guess and a repair on it risks a regression.
+- **Research.** Pick the authoritative source among conflicting ones, keep inference labeled as inference, and have a specialist re-derive any number before it is published or decided on, since a copied number carries its source's mistakes.
+- **Prose for people** (user docs, the README, PR text, explanatory pages). Reviewer.artifact reviews it and you judge the excerpts it flags, because wording needs a reader's judgment but not your reading of the whole text.
+- **Design.** For a choice that changes contracts, architecture or dependencies, your brief asks an explorer for two or three short options with their trade-offs, and you pick or ask the user (AskUserQuestion), because such a choice is costly to undo. Routine choices stay with the writer.
+- **Debugging.** Accept a root cause only when the chain closes: a reproduction, the cause it shows, and a fix that makes the reproduction pass. A cause without the fix passing the reproduction is still a hypothesis.

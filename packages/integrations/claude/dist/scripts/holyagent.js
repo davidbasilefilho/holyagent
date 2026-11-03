@@ -9523,7 +9523,7 @@ var SPECS = {
   "Reviewer.testing": spec("Reviewer", "testing", "sonnet", "medium", "ReadOnly", "IndependentReview", ["Shell"]),
   "Reviewer.audit": spec("Reviewer", "audit", "haiku", "high", "ReadOnly", "IndependentReview"),
   "Reviewer.security": spec("Reviewer", "security", "sonnet", "high", "ReadOnly", "IndependentReview"),
-  "Reviewer.artifact": spec("Reviewer", "artifact", "haiku", "high", "ReadOnly", "IndependentReview")
+  "Reviewer.artifact": spec("Reviewer", "artifact", "sonnet", "high", "ReadOnly", "IndependentReview")
 };
 var routeFor = (roleTask) => ({
   roleTask,

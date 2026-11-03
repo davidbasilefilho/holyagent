@@ -266,7 +266,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
   "R-CRITERIA": { section: "root/assignments.md", phrase: "constraints go in verbatim" },
   "R-ACCEPT": {
     section: "root/assignments.md",
-    phrase: "judged from the diff and the check output",
+    phrase: "judged from the diff summary and the check output",
   },
   "R-REVIEW": { section: "root/assignments.md", phrase: "gets an independent reviewer" },
   "R-FINISH": { section: "root/assignments.md", phrase: "one more repair round" },
@@ -277,6 +277,10 @@ export const REQUIREMENT_SECTIONS: Readonly<
   "R-DEVSERVER": {
     section: "root/skills.md",
     phrase: "start the one server the visual specialists share",
+  },
+  "R-EVIDENCE": {
+    section: "skills/evidence-judging/SKILL.md",
+    phrase: "starts a repair only with evidence from the reviewer",
   },
   "R-VCS": {
     section: "root/version-control.md",

@@ -34,6 +34,7 @@ const AGENTS = join("packages", "integrations", "claude", "dist", "agents")
 const SKILLS = [
   "ci-watch",
   "dev-server",
+  "evidence-judging",
   "instruction-writing",
   "state-mode",
   "user-busy",
@@ -752,12 +753,77 @@ describe("agents", () => {
     expect(read("packages/integrations/claude/dist/skills/dev-server/SKILL.md")).toBe(skill ?? "")
   })
 
+  test("the evidence-judging skill opens with the situation, gives each rule its reason, and the root points to it", () => {
+    const skill = generated.find((file) =>
+      file.path.endsWith("skills/evidence-judging/SKILL.md"),
+    )?.content
+    expect(skill).toBeDefined()
+    expect(field(skill ?? "", "name")).toBe("evidence-judging")
+    expect(field(skill ?? "", "description")).toStartWith(
+      "Use when a specialist report carries a verdict the root must accept or reject: a blocking review finding, a research claim with conflicting sources or numbers, prose written for people, or a material design choice.",
+    )
+    for (const part of [
+      "never from raw logs or whole files",
+      "starts a repair only with evidence from the reviewer",
+      "a file:line trace (for a vulnerability, source to sink) from one without",
+      "a Reviewer.visual observation (viewport, interaction, visible result)",
+      "back to the same reviewer for that evidence",
+      "have a specialist re-derive any number before it is published or decided on",
+      "keep inference labeled as inference",
+      "Reviewer.artifact reviews it and you judge the excerpts it flags",
+      "your brief asks an explorer for two or three short options with their trade-offs",
+      "Routine choices stay with the writer",
+      "a reproduction, the cause it shows, and a fix that makes the reproduction pass",
+    ])
+      expect({ part, found: skill?.includes(part) }).toEqual({ part, found: true })
+    expect(read("packages/integrations/claude/dist/skills/evidence-judging/SKILL.md")).toBe(
+      skill ?? "",
+    )
+    const root = agent("holyagent")?.content ?? ""
+    expect(root).toContain(
+      "`evidence-judging`: a specialist report carries a verdict you must accept or reject",
+    )
+  })
+
+  test("the root loads visual-judging before the first visual dispatch and points to it for the repair-round rules", () => {
+    const root = agent("holyagent")?.content ?? ""
+    for (const part of [
+      "`visual-judging`: load it before the first Worker.visual or Reviewer.visual dispatch",
+      "loaded before the first visual dispatch",
+      "starts a repair and a re-review once it carries the evidence `evidence-judging` requires",
+      "a served static or single-file build",
+    ])
+      expect({ part, found: root.includes(part) }).toEqual({ part, found: true })
+    const skill = generated.find((file) => file.path.endsWith("skills/visual-judging/SKILL.md"))
+    expect(field(skill?.content ?? "", "description")).toStartWith(
+      "Use before the first Worker.visual or Reviewer.visual dispatch",
+    )
+    const devServer = generated.find((file) => file.path.endsWith("skills/dev-server/SKILL.md"))
+    expect(field(devServer?.content ?? "", "description")).toContain("static or single-file build")
+  })
+
+  test("Reviewer.artifact is a sonnet agent, and the root lists it with the sonnet roles, not the haiku ones", () => {
+    expect(field(agent("reviewer-artifact")?.content ?? "", "model")).toBe("sonnet")
+    expect(field(agent("reviewer-artifact")?.content ?? "", "effort")).toBe("high")
+    expect(field(agent("reviewer-audit")?.content ?? "", "model")).toBe("haiku")
+    const routing = read(`${CLAUDE}/root`, "routing.md")
+    const haiku = routing.split("\n").find((line) => line.startsWith("- Haiku")) ?? ""
+    const sonnet = routing.split("\n").find((line) => line.startsWith("- Sonnet")) ?? ""
+    expect(haiku).toContain("Reviewer.audit")
+    expect(haiku).not.toContain("Reviewer.artifact")
+    expect(sonnet).toContain("the artifact, code, testing and security reviews")
+    const requirements = read("packages/runtime/src/instructions", "requirements.md")
+    expect(requirements).toContain("(Reviewer.artifact) goes to a sonnet route")
+  })
+
   test("the four moment-specific sections are root skills that open with the situation, and their text is out of the root prompt", () => {
     const root = agent("holyagent")?.content ?? ""
     const extracted: Record<string, ReadonlyArray<string>> = {
       "visual-judging": [
         "A discrepancy is material, and starts a repair whatever its size",
         "Read an image in the main thread only to show it to the user (a path is not delivery) or to settle a concrete doubt",
+        'say "round N of 3"',
+        "at most three rounds per finding",
         "after three, report the finding as a blocker",
         "`html_render`",
       ],

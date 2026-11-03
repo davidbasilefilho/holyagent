@@ -1,6 +1,6 @@
 ---
 name: visual-judging
-description: Use when rendered work (a web page, terminal UI, desktop or mobile screen) is being accepted, repaired or explained visually. Holds how the root accepts it on Reviewer.visual's evidence, what makes a discrepancy material, how repair rounds run, and when to build an explanatory HTML page.
+description: Use before the first Worker.visual or Reviewer.visual dispatch, and when rendered work (a web page, terminal UI, desktop or mobile screen) is accepted, repaired or explained visually. Holds how the root accepts it on Reviewer.visual's evidence, what makes a discrepancy material, how repair rounds run, and when to build an explanatory HTML page.
 ---
 
 # Judging visual work
@@ -20,7 +20,7 @@ A discrepancy is material, and starts a repair whatever its size, when it affect
 ## Repair
 
 - Repair a material finding without asking when the repair keeps the user's requirements and needs no choice between fixes; otherwise ask through AskUserQuestion with a recommended default.
-- Dispatch Worker.visual with the findings as criteria, the round number and the three-round limit, then Reviewer.visual to re-inspect only what the repair touched, until the inspection is clean. Count rounds across Worker.visual dispatches; after three, report the finding as a blocker.
+- Dispatch Worker.visual with the findings as criteria and say "round N of 3" in the brief, then Reviewer.visual to re-inspect only what the repair touched, until the inspection is clean. Allow at most three rounds per finding, counted across Worker.visual dispatches; after three, report the finding as a blocker.
 - Name each skipped preference in the final report, without a fix.
 
 ## Explanatory pages
