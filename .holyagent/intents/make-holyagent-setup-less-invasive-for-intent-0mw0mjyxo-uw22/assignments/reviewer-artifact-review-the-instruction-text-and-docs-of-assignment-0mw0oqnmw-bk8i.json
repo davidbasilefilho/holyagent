@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "review-the-instruction-text-and-docs-of",
   "objective": "Review the instruction text and docs of commit 9b4baa7 (evidence-judging skill, visual-judging trigger, Reviewer.artifact on Sonnet) for correctness, consistency and fit with the maintainer's decisions.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Diff: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/judging.diff (dist excluded). Files under packages/runtime/src/instructions/claude-5.5/ (root/*.md, skills/*/SKILL.md), requirements.md, docs/decisions.md, docs/usage.md"
   ],
@@ -39,5 +39,10 @@
   "independentFrom": [
     "assignment-0mw0olm2j-48i5"
   ],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-11-03T12:50:13.549Z"
+  },
   "createdAt": "2026-11-03T12:49:59.336Z"
 }
