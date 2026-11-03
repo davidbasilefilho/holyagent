@@ -1,0 +1,10 @@
+{
+  "id": "pull-0mw10leey-6xjf",
+  "intentId": "intent-0mw0wa0wv-pjlj",
+  "number": 56,
+  "url": "https://github.com/davidbasilefilho/holyagent/pull/56",
+  "branch": "release/0.2.0/fix/vcs-test-timeouts",
+  "base": "main",
+  "created": true,
+  "recordedAt": "2026-11-03T18:21:49.498Z"
+}
