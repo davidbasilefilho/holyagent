@@ -10213,7 +10213,7 @@ var withoutMarked = (lines) => lines.filter((line, index) => {
 var excludePath = (top, env) => gitText(top, env, ["rev-parse", "--path-format=absolute", "--git-path", "info/exclude"]).pipe(map4((path) => fromGitPath(path)));
 var linesOf = (text) => text === undefined || text === "" ? [] : text.replace(/\n$/, "").split(`
 `);
-var editExclude = (top, common, env, edit, done) => gen2(function* () {
+var editExclude = (top, common, env, edit, done, patience = "long") => gen2(function* () {
   const path = yield* excludePath(top, env);
   if (done?.(linesOf(yield* readText(path))) === true)
     return;
@@ -10228,9 +10228,9 @@ var editExclude = (top, common, env, edit, done) => gen2(function* () {
 `)}
 `;
     yield* commitFile(path, body);
-  }), "long");
+  }), patience);
 });
-var ensureExcluded = (top, common, env) => editExclude(top, common, env, (lines) => stateModeOf(top, env).pipe(map4((mode) => mode === "local" ? withEntry(lines) : lines)), hasEntry);
+var ensureExcluded = (top, common, env, patience) => editExclude(top, common, env, (lines) => stateModeOf(top, env).pipe(map4((mode) => mode === "local" ? withEntry(lines) : lines)), hasEntry, patience);
 var excludeState = (top, common, env) => editExclude(top, common, env, (lines) => succeed6(withEntry(lines)));
 var unexcludeState = (top, common, env) => editExclude(top, common, env, (lines) => succeed6(withoutMarked(lines)));
 var isDirectory = (path) => io(path, () => stat(path)).pipe(map4((info) => info.isDirectory()), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
@@ -10370,7 +10370,7 @@ var fetchRemoteBranch = (top, env, branch, timeout = FETCH_TIMEOUT_MS) => git(to
   `+refs/heads/${branch}:refs/remotes/origin/${branch}`
 ], timeout)), flatMap2((code) => code === 0 ? refExists(top, env, `refs/remotes/origin/${branch}`) : succeed6(false)));
 var readyMarker = (path) => `${path}.ready`;
-var ensureWorktree = (top, common, env, branch, path, options) => withFileLock(join2(common, "holyagent", "worktree.lock"), gen2(function* () {
+var ensureWorktree = (top, common, env, branch, path, options, patience = "long") => withFileLock(join2(common, "holyagent", "worktree.lock"), gen2(function* () {
   const ready = readyMarker(path);
   const again = yield* checkedOut(yield* listWorktrees(top, env), branch);
   if (again !== undefined) {
@@ -10399,7 +10399,7 @@ var ensureWorktree = (top, common, env, branch, path, options) => withFileLock(j
   yield* gitText(top, env, [...add, ...target]);
   yield* io(ready, () => Bun.write(ready, ""));
   return { kind: "ready", path, created: true };
-}), "long");
+}), patience);
 var LOCAL_FILES = new Set(["local/specialists.json", "local/vcs.json"]);
 var sameBytes = (a, b) => all2([io(a, () => Bun.file(a).bytes()), io(b, () => Bun.file(b).bytes())]).pipe(map4(([left, right]) => Buffer.from(left).equals(Buffer.from(right))));
 var fileExists = (path) => io(path, () => Bun.file(path).exists());
@@ -10479,7 +10479,7 @@ var pruneEmpty = (folder, from) => gen2(function* () {
   }
 });
 var migrationMarker = (common, top) => io(top, () => realpath(top)).pipe(map4((real) => join2(common, "holyagent", "migrated", new Bun.CryptoHasher("sha1").update(real).digest("hex").slice(0, 16))));
-var migrateWorkTree = (top, common, worktree, env, commit) => {
+var migrateWorkTree = (top, common, worktree, env, commit, patience = "short") => {
   const source = join2(top, STATE_DIRECTORY);
   const target = join2(worktree, STATE_DIRECTORY);
   return migrationMarker(common, top).pipe(flatMap2((marker) => fileExists(marker).pipe(flatMap2((done) => done ? void_3 : requireStateFolder(target).pipe(andThen2(kindAt(source)), flatMap2((kind) => kind !== undefined && kind !== "directory" ? void_3 : withStateLock(target, gen2(function* () {
@@ -10530,7 +10530,7 @@ var migrateWorkTree = (top, common, worktree, env, commit) => {
     }
     yield* io(source, () => rmdir(source)).pipe(ignore2);
     yield* io(marker, () => Bun.write(marker, ""));
-  }))))))));
+  }), patience)))))));
 };
 var STATE_FILE = /^(?:config\.json|intents\/[^/]+\/(?:intent\.json|(?:assignments|branches|pulls)\/[^/]+\.json|resume-notes\.md|notes\/(?:.+\/)?[^/]+(?<!\.tmp)))$/;
 var stageState = (worktree, env, copied) => gen2(function* () {
@@ -10599,7 +10599,7 @@ var locate = (cwd, env) => gen2(function* () {
 `).map((path) => fromGitPath(path));
   return { top, common };
 });
-var resolveState = (cwd, env, ensure, online = true) => gen2(function* () {
+var resolveState = (cwd, env, ensure, online = true, patience) => gen2(function* () {
   const repository = yield* locate(cwd, env);
   if (repository === undefined)
     return { root: cwd, directory: join2(cwd, STATE_DIRECTORY) };
@@ -10607,7 +10607,7 @@ var resolveState = (cwd, env, ensure, online = true) => gen2(function* () {
   const mode = yield* stateModeOf(top, env);
   if (mode !== "branch") {
     if (mode === "local" && ensure !== "peek")
-      yield* ensureExcluded(top, common, env);
+      yield* ensureExcluded(top, common, env, patience);
     return { root: top, directory: join2(top, STATE_DIRECTORY) };
   }
   const branch = yield* stateBranch(top, env);
@@ -10620,7 +10620,7 @@ var resolveState = (cwd, env, ensure, online = true) => gen2(function* () {
     make,
     peek: ensure === "peek",
     online
-  });
+  }, patience);
   if (ensured.kind === "deferred")
     return { root: top, directory: join2(top, STATE_DIRECTORY) };
   if (ensured.kind === "absent") {
@@ -10637,7 +10637,7 @@ var resolveState = (cwd, env, ensure, online = true) => gen2(function* () {
     ] : [top];
     for (const source of new Set(sources))
       if (source !== worktree && (yield* isDirectory(source)))
-        yield* migrateWorkTree(source, common, worktree, env, (message) => commitState(directory, env, message));
+        yield* migrateWorkTree(source, common, worktree, env, (message) => commitState(directory, env, message), patience);
   }
   return { root: top, directory };
 });
@@ -19931,7 +19931,7 @@ var HOOK_COMMANDS = [
     return gen2(function* () {
       if (agentId === undefined)
         return yield* new AgentIdMissing;
-      const { directory } = yield* resolveState(call.cwd, call.env, "ifPresent", false);
+      const { directory } = yield* resolveState(call.cwd, call.env, "ifPresent", false, "hook");
       if (!(yield* hasStateFolder(directory)))
         return yield* new StateFolderMissing;
       const type = payload.tool_input?.subagent_type;

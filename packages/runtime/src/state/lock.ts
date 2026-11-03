@@ -123,11 +123,12 @@ const release = (file: string, token: string) =>
 /**
  * Runs `use` while holding the lock file, so two processes never interleave. The lock is a file
  * created exclusively; one left by a dead process is broken, and the lock is released whatever the
- * outcome. A contender retries for up to 30 seconds (a holder keeps the lock for as long as a git
- * commit takes; a lock a live process has held longer than that fails at once), or a minute with
- * `patience: "long"` for a holder that does slow work, or 3 seconds with `patience: "hook"` for a
- * caller under a hook timeout, then fails with StateLocked. The folder of the file is made when it
- * is missing.
+ * outcome. A contender retries until its patience runs out, then fails with StateLocked: up to 30
+ * seconds with `"short"` (the default; a holder keeps the lock for as long as a git commit takes),
+ * a minute with `"long"` for a holder that does slow work, or 3 seconds with `"hook"` for a caller
+ * under a hook timeout. With `"short"` and `"hook"`, a lock a live process has held longer than the
+ * limit fails at once, since its holder is stuck; `"long"` never does and waits the whole limit.
+ * The folder of the file is made when it is missing.
  */
 export const withFileLock = <A, E, R>(
   file: string,

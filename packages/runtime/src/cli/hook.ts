@@ -329,7 +329,7 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
       // Recording is bookkeeping and authorizes nothing, so any failure only hands the step back.
       return Effect.gen(function* () {
         if (agentId === undefined) return yield* new AgentIdMissing()
-        const { directory } = yield* resolveState(call.cwd, call.env, "ifPresent", false)
+        const { directory } = yield* resolveState(call.cwd, call.env, "ifPresent", false, "hook")
         // The state folder is not made here: a project without one has no Assignment to record.
         if (!(yield* hasStateFolder(directory))) return yield* new StateFolderMissing()
         const type = payload.tool_input?.subagent_type

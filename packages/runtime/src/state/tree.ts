@@ -9,7 +9,7 @@ import { looksLikeAgent } from "../vcs/identity.ts"
 import { StateIo, StateModeRefused } from "./errors.ts"
 import { commitFile, hasCode, io, readText } from "./files.ts"
 import { CONFIG_FILE, STATE_DIRECTORY, TRACKED_STATE_PATHSPEC } from "./layout.ts"
-import { withFileLock, withStateLock } from "./lock.ts"
+import { type Patience, withFileLock, withStateLock } from "./lock.ts"
 import { parseStateMode, STATE_MODE_KEY, type StateMode } from "./mode.ts"
 
 // In the default `branch` mode the Intent state lives on one branch of its own, checked out in one
@@ -172,8 +172,9 @@ const linesOf = (text: string | undefined) =>
  * ignore file, so the repository's `.gitignore` is never touched and no PR carries the entry. The
  * file is replaced through a temporary file and a rename (removed again when either fails), so a
  * concurrent `git add` never reads it half written. The lock is waited for as long as the worktree
- * lock, since a holder that died leaves it until it is found stale. When `done` holds for the lines
- * read before the lock, the lock is not taken.
+ * lock, since a holder that died leaves it until it is found stale (`patience` says otherwise for a
+ * caller under a timeout). When `done` holds for the lines read before the lock, the lock is not
+ * taken.
  */
 const editExclude = <E, R>(
   top: string,
@@ -181,6 +182,7 @@ const editExclude = <E, R>(
   env: Environment,
   edit: (lines: ReadonlyArray<string>) => Effect.Effect<ReadonlyArray<string>, E, R>,
   done?: (lines: ReadonlyArray<string>) => boolean,
+  patience: Patience = "long",
 ) =>
   Effect.gen(function* () {
     const path = yield* excludePath(top, env)
@@ -194,7 +196,7 @@ const editExclude = <E, R>(
         const body = lines.length === 0 ? "" : `${lines.join("\n")}\n`
         yield* commitFile(path, body)
       }),
-      "long",
+      patience,
     )
   })
 
@@ -203,7 +205,7 @@ const editExclude = <E, R>(
  * unless the clone has left `local` since the command read its mode: the mode is read again under
  * the lock, so a command that waited cannot bring the entry back after a mode change removed it.
  */
-const ensureExcluded = (top: string, common: string, env: Environment) =>
+const ensureExcluded = (top: string, common: string, env: Environment, patience?: Patience) =>
   editExclude(
     top,
     common,
@@ -213,6 +215,7 @@ const ensureExcluded = (top: string, common: string, env: Environment) =>
         Effect.map((mode) => (mode === "local" ? withEntry(lines) : lines)),
       ),
     hasEntry,
+    patience,
   )
 
 /**
@@ -570,7 +573,7 @@ type Ensured =
  * `origin/<branch>` (fetched first when the clone has no such ref), else from the base branch head;
  * with none of them it is `deferred` until the base has a commit. With `make` false a missing
  * worktree is `absent`. A finished worktree gets a marker next to it, so that later commands pass
- * without the lock.
+ * without the lock. `patience` is how long the lock is waited for (see {@link withFileLock}).
  */
 const ensureWorktree = (
   top: string,
@@ -579,6 +582,7 @@ const ensureWorktree = (
   branch: string,
   path: string,
   options: { readonly make: boolean; readonly peek: boolean; readonly online: boolean },
+  patience: Patience = "long",
 ) =>
   withFileLock(
     join(common, "holyagent", "worktree.lock"),
@@ -621,7 +625,7 @@ const ensureWorktree = (
       yield* io(ready, () => Bun.write(ready, ""))
       return { kind: "ready", path, created: true } satisfies Ensured
     }),
-    "long",
+    patience,
   )
 
 interface Entry {
@@ -807,7 +811,7 @@ const migrationMarker = (common: string, top: string) =>
  * older one than the state branch holds. Copies are committed on the state branch, and then the
  * uncommitted originals are removed from the work tree (untracked ones deleted, modified ones
  * restored), so the work tree is left without uncommitted state. The per-clone files are copied
- * only when the state worktree has none.
+ * only when the state worktree has none. `patience` is how long the state lock is waited for.
  */
 const migrateWorkTree = (
   top: string,
@@ -815,6 +819,7 @@ const migrateWorkTree = (
   worktree: string,
   env: Environment,
   commit: (message: string) => Effect.Effect<boolean, StateIo>,
+  patience: Patience = "short",
 ) => {
   const source = join(top, STATE_DIRECTORY)
   const target = join(worktree, STATE_DIRECTORY)
@@ -882,6 +887,7 @@ const migrateWorkTree = (
                           yield* io(source, () => rmdir(source)).pipe(Effect.ignore)
                           yield* io(marker, () => Bun.write(marker, ""))
                         }),
+                        patience,
                       ),
                 ),
               ),
@@ -1015,13 +1021,16 @@ const locate = (cwd: string, env: Environment) =>
  * reported, so state is not silently written somewhere else. With `online` false (a hook's case)
  * nothing touches the network: a state branch that exists nowhere locally is not made, since only a
  * fetch can tell whether the remote has it, and the state counts as absent until a command that may
- * fetch makes it.
+ * fetch makes it. With `patience`, every lock it takes (exclude, worktree and migration) is waited
+ * for that long at most, so a plugin hook passes `"hook"` to give up inside the host's hook
+ * timeout; without it each lock keeps the wait its holder needs.
  */
 export const resolveState = (
   cwd: string,
   env: Environment,
   ensure: Ensure,
   online: boolean = true,
+  patience?: Patience,
 ) =>
   Effect.gen(function* () {
     const repository = yield* locate(cwd, env)
@@ -1030,7 +1039,7 @@ export const resolveState = (
     const { top, common } = repository
     const mode = yield* stateModeOf(top, env)
     if (mode !== "branch") {
-      if (mode === "local" && ensure !== "peek") yield* ensureExcluded(top, common, env)
+      if (mode === "local" && ensure !== "peek") yield* ensureExcluded(top, common, env, patience)
       return { root: top, directory: join(top, STATE_DIRECTORY) } satisfies StateTree
     }
     const branch = yield* stateBranch(top, env)
@@ -1051,11 +1060,19 @@ export const resolveState = (
         ? { kind: "ready", path: found, created: false }
         : found === undefined && !make
           ? { kind: "absent" }
-          : yield* ensureWorktree(top, common, env, branch, standard, {
-              make,
-              peek: ensure === "peek",
-              online,
-            })
+          : yield* ensureWorktree(
+              top,
+              common,
+              env,
+              branch,
+              standard,
+              {
+                make,
+                peek: ensure === "peek",
+                online,
+              },
+              patience,
+            )
     if (ensured.kind === "deferred")
       return { root: top, directory: join(top, STATE_DIRECTORY) } satisfies StateTree
     if (ensured.kind === "absent") {
@@ -1078,8 +1095,13 @@ export const resolveState = (
         : [top]
       for (const source of new Set(sources))
         if (source !== worktree && (yield* isDirectory(source)))
-          yield* migrateWorkTree(source, common, worktree, env, (message) =>
-            commitState(directory, env, message),
+          yield* migrateWorkTree(
+            source,
+            common,
+            worktree,
+            env,
+            (message) => commitState(directory, env, message),
+            patience,
           )
     }
     return { root: top, directory } satisfies StateTree
