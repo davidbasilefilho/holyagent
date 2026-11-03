@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "finish-the-agent-launch-hook-lock-work",
   "objective": "Finish the agent-launch hook lock work: bound the hook's total lock wait inside the 10s hook timeout, prove it with tests that run a real hook kill and multi-process contention, and fix the three open review notes.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-hook-locks, branch release/0.2.0/fix/hook-lock-followups (from main, which has PRs #50-#52). By the time you start, node_modules is installed and mise works there: run gates with 'bun run verify' (mise run verify through the dev dependency) or node_modules/.bin/mise run <task>; if that still fails, run the bun steps of mise.toml directly and say so.",
     "Current state: packages/runtime/src/state/lock.ts has a 'hook' patience (3s limit, 25ms poll, stuck at 3s). The agent-launch hook (packages/runtime/src/cli/hook.ts) passes 'hook' to resolveState (packages/runtime/src/state/tree.ts: exclude, worktree and migration locks) and updateState (store.ts). The bound is per lock: worst case about 9s (worktree + migration + state) against the 10s plugin hook timeout in packages/integrations/claude/dist/hooks/hooks.json. Replace it with one deadline for the whole hook invocation shared by every lock it takes (for example a deadline carried with the patience), so the total wait ends with clear margin inside 10s (aim at about 5s total), keeping CLI waits unchanged.",
@@ -70,7 +70,53 @@
     "agentId": "workflow:wf_ea167032-d36/assignment-0mw0umsxj-r8zg",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-03T15:35:02.211Z"
+    "startedAt": "2026-11-03T15:35:02.211Z",
+    "finishedAt": "2026-11-03T15:46:55.994Z"
+  },
+  "result": "result: The agent-launch hook now spends one 5s deadline on all its locks, and the new tests and `bun run verify` pass.\nchanged (worktree /home/user/holyagent-hook-locks):\n- packages/runtime/src/state/lock.ts\n- packages/runtime/src/state/tree.ts\n- packages/runtime/src/state/store.ts\n- packages/runtime/src/cli/hook.ts\n- packages/runtime/tests/state-hook-locks.test.ts\n- packages/integrations/claude/tests/hook-locks.test.ts (new)\n- packages/integrations/claude/dist/scripts/holyagent.js (rebuilt)\n\nchecks:\n- `bun run verify` -> exit 0: type-check clean, lint clean, format clean, 1051 pass, 1 skip, 0 fail. The skip is the existing Windows-only `test.skipIf`. The log is `/tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/verify.log`.\n- `mise run build` -> exit 0, before verify. No source changed after it.\n\nblockers: none\nquestions: none\nnotes:\n- The `\"hook\"` patience is gone. `Patience` is now `\"short\" | \"long\" | Deadline`. `within(HOOK_WAIT_MS)` (5s) is made once in the agent-launch hook and passed to `resolveState` and `updateState`.\n- Waits for `\"short\"` and `\"long\"` are unchanged. A lock held by a live process for longer than 5s counts as stuck and fails at once.\n- The worst case is now about 5s plus one 25ms poll, down from about 9s. Git work and the commit while the lock is held are not bounded by the deadline.\n- Patience defaults now live in `STATE_PATIENCE` (\"short\") and `WORKTREE_PATIENCE` (\"long\") in lock.ts. `editExclude`, `ensureWorktree`, `migrateWorkTree`, `updateState`, `withFileLock`, `withStateLock` and `setStateMode` read them.\n- The lock test now uses `Bun.write` and `Bun.file().delete()`. The migration test removes only its marker file.\n- The real-hook test passes on base for the kill boundary, since base also exited before 10s. It failed on base only on its lower bound: the hook gave up at about 3s instead of waiting out the deadline.\n- The shared-deadline unit test is the main proof that the waits add up to the deadline. Its red came from a per-lock mutant, not from base.\n- The real-hook kill test spawns with `Bun.spawn` and its `timeout`, because the Bun Shell cannot kill on a timeout.\n- The existing hooks.test.ts bound of `< 8000` on a held state lock could be tightened. I left it.\n\nevidence:\n- The agent-launch hook's total lock wait across all locks ends inside the 10s hook timeout with margin, and CLI waits are unchanged: `lock.ts` (`Deadline`, `within`, `HOOK_WAIT_MS`, `acquire`) and `hook.ts`. Test \"spends one wait on all its locks, not one for each\" passes (both locks held, 1.5s deadline, ended before 2.2s). The CLI path still uses `WAITS.short` and `WAITS.long` unchanged.\n- A test runs several processes contending for the state lock and checks bounds and state integrity: `hook-locks.test.ts`, \"each finishes or fails with StateLocked inside its wait, and the state stays whole\". It runs 3 real `intent create` and 3 real hooks against a lock held for 2s. It checks exit codes and bounds, the 3 intents listed, the assignment readable with an agent recorded, and the state worktree clean. It passes.\n- A test runs the real hook under a 10s kill with the hook-path locks held and shows it exits by itself first: `hook-locks.test.ts`, \"the agent-launch hook under the host's kill\", in branch mode (worktree and state locks) and local mode (exclude and state locks). It spawns the `hooks.json` command with its 10s timeout and `SIGKILL`. It asserts not killed, exit 0, a `(StateLocked)` hand-back, and an exit between 4s and 8s. It passes.\n- The three review notes are fixed: Bun APIs in the lock test, marker-only removal, patience defaults in one place: the diff file, `state-hook-locks.test.ts` and `lock.ts`.\n- mise run verify passes and dist is rebuilt: `bun run verify` exit 0 (counts above). `mise run build` ran and `holyagent.js` is regenerated.\n- No test weakened or skipped, and the change stays within these items: the three existing hook-lock tests keep their assertions and now pass a deadline. No skips were added. Changes touch only the ownership paths.\n- diff-file: `/tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/hook-followups.diff`\n- verify: `bun run verify` -> exit 0, 1051 pass, 1 skip, 0 fail.\n- red-green: the shared-deadline test failed against a per-lock mutant (`Expected: < 2200`, `Received: 2601`) and passes now. `hook-locks.test.ts` run against the base sources failed 2 of 3 on `>= 4000` (`Received: 3028` and `3016`) and passes now.\n",
+  "acceptance": {
+    "revision": 2,
+    "rationale": "One 5s deadline across hook locks with red-green tests, real hook-kill and contention tests, review notes fixed; bun run verify (mise run verify) exit 0.",
+    "criteria": [
+      {
+        "criterion": "The agent-launch hook's total lock wait across all locks ends inside the 10s hook timeout with margin, and CLI waits are unchanged",
+        "support": "`lock.ts` (`Deadline`, `within`, `HOOK_WAIT_MS`, `acquire`) and `hook.ts`. Test \"spends one wait on all its locks, not one for each\" passes (both locks held, 1.5s deadline, ended before 2.2s). The CLI path still uses `WAITS.short` and `WAITS.long` unchanged."
+      },
+      {
+        "criterion": "A test runs several processes contending for the state lock and checks bounds and state integrity",
+        "support": "`hook-locks.test.ts`, \"each finishes or fails with StateLocked inside its wait, and the state stays whole\". It runs 3 real `intent create` and 3 real hooks against a lock held for 2s. It checks exit codes and bounds, the 3 intents listed, the assignment readable with an agent recorded, and the state worktree clean. It passes."
+      },
+      {
+        "criterion": "A test runs the real hook under a 10s kill with the hook-path locks held and shows it exits by itself first",
+        "support": "`hook-locks.test.ts`, \"the agent-launch hook under the host's kill\", in branch mode (worktree and state locks) and local mode (exclude and state locks). It spawns the `hooks.json` command with its 10s timeout and `SIGKILL`. It asserts not killed, exit 0, a `(StateLocked)` hand-back, and an exit between 4s and 8s. It passes."
+      },
+      {
+        "criterion": "The three review notes are fixed: Bun APIs in the lock test, marker-only removal, patience defaults in one place",
+        "support": "the diff file, `state-hook-locks.test.ts` and `lock.ts`."
+      },
+      {
+        "criterion": "mise run verify passes and dist is rebuilt",
+        "support": "`bun run verify` exit 0 (counts above). `mise run build` ran and `holyagent.js` is regenerated."
+      },
+      {
+        "criterion": "No test weakened or skipped, and the change stays within these items",
+        "support": "the three existing hook-lock tests keep their assertions and now pass a deadline. No skips were added. Changes touch only the ownership paths."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff-file",
+        "support": "`/tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/hook-followups.diff`"
+      },
+      {
+        "label": "verify",
+        "support": "`bun run verify` -> exit 0, 1051 pass, 1 skip, 0 fail."
+      },
+      {
+        "label": "red-green",
+        "support": "the shared-deadline test failed against a per-lock mutant (`Expected: < 2200`, `Received: 2601`) and passes now. `hook-locks.test.ts` run against the base sources failed 2 of 3 on `>= 4000` (`Received: 3028` and `3016`) and passes now."
+      }
+    ]
   },
   "createdAt": "2026-11-03T15:34:57.271Z"
 }
