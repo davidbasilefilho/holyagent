@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mw0ob8qh-h5n9",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.artifact",
+  "slug": "re-review-the-docs-repair-285c8b6",
+  "objective": "Re-review the docs repair (285c8b6..6d9f949, docs/ and README.md) against the six blockers of the previous docs review.",
+  "state": "Ready",
+  "scope": [
+    "Repair diff: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/repair-docs2.diff. Previous findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw0nltyh-0rau.md. CLI behavior: packages/runtime/src/setup/check.ts, scope.ts, record.ts, packages/runtime/src/cli/hook.ts (VCS_REMINDER)"
+  ],
+  "constraints": [
+    "Judge whether each previous blocker is closed and whether the repair introduced a new inaccuracy; do not re-open settled items. Read-only. Report in under 300 words, each finding blocking or non-blocking with file:line; start each evidence line with the criterion label before its colon."
+  ],
+  "criteria": [
+    {
+      "text": "blockers closed: the six previous blockers are resolved",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "no new inaccuracy: repair text matches the code and sources",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw0nz2t6-6lgz",
+    "assignment-0mw0o58oc-ygen",
+    "assignment-0mw0oa7k3-g28o"
+  ],
+  "createdAt": "2026-11-03T12:38:00.186Z"
+}
