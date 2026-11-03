@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mw0mpn0w-v4vg",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Librarian.research",
+  "slug": "verify-with-authoritative-sources-the",
+  "objective": "Verify, with authoritative sources, the maintainer's stated reasons for HolyAgent's opinionated setup defaults, separating sourced facts from inference.",
+  "state": "Ready",
+  "scope": [
+    "Claim 1 (web tools): the Exa search/fetch connector gives better search quality and uses fewer tokens than Claude Code's built-in WebSearch/WebFetch, and one web route keeps behavior predictable. Find what WebFetch actually returns into context (it runs a small model over the page and returns its output; check current docs) and what Exa web_search/web_fetch return (highlights, size limits).",
+    "Claim 2 (long context cost): the cost of a call grows with the tokens re-read each call, so a session at 700k tokens costs more per call than one at 450k even at the same price per token; check Anthropic pricing for long context (is there a >200k price tier for current Opus/Sonnet 5.x?), cache read pricing, and Claude Code's default auto-compact threshold and window for Opus 5.5 (1M context?).",
+    "Claim 3: the default auto-compaction window of GPT 6.1 Sol in OpenAI Codex is about 450k tokens. Find the Codex config key (e.g. model_auto_compact_token_limit) and its default for that model; if the fact cannot be confirmed say so and give what the sources do say.",
+    "Claim 4 (git instructions): Claude Code's built-in git instructions (includeGitInstructions) add commit/PR guidance including Co-Authored-By / 'Generated with Claude Code' attribution and a git status snapshot; and claude.ai cloud (Claude Code on the web) sessions commit as Claude. Find current docs on includeGitInstructions, attribution settings and cloud-session commit authorship.",
+    "Claim 5: Claude Code ignores an agent's `effort` frontmatter when that agent is the main thread (anthropics/claude-code issues 81677 and 97829), and a plugin's settings.json honors only `agent` and `subagentStatusLine`."
+  ],
+  "constraints": [
+    "Use primary sources: Anthropic and OpenAI docs, pricing pages, official GitHub repos/issues, Exa docs. Cite URL and the exact relevant sentence or number for each fact. Mark each claim Confirmed / Partly / Not confirmed / Contradicted.",
+    "Also read docs/decisions.md and docs/usage.md in this repo for the project's own stated evidence and say where they agree or disagree with sources.",
+    "Read-only. Keep working until every claim is assessed; stop and report. Report in under 700 words; you may write a longer source dump to a file outside the repository and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "claims assessed: each of the five claims has a verdict with cited primary sources",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "fact vs inference: sourced facts and inference are labeled separately",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-03T11:53:12.656Z"
+}
