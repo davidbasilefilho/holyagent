@@ -10,6 +10,7 @@ import { claimRulesDelivery, isSessionId, markRulesDelivered } from "../state/de
 import { hasCode, io } from "../state/files.ts"
 import { STATE_DIRECTORY } from "../state/layout.ts"
 import { legacyFoldersWithState } from "../state/legacy.ts"
+import { deadlineIn, HOOK_WAIT_MS } from "../state/lock.ts"
 import { readOpenState, updateState } from "../state/store.ts"
 import { resolveState } from "../state/tree.ts"
 import { MessageRefused } from "../vcs/errors.ts"
@@ -329,12 +330,14 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
       // Recording is bookkeeping and authorizes nothing, so any failure only hands the step back.
       return Effect.gen(function* () {
         if (agentId === undefined) return yield* new AgentIdMissing()
-        const { directory } = yield* resolveState(call.cwd, call.env, "ifPresent", false, "hook")
+        // One deadline for every lock this hook takes, so the waits add up to less than the host's timeout.
+        const patience = yield* deadlineIn(HOOK_WAIT_MS)
+        const { directory } = yield* resolveState(call.cwd, call.env, "ifPresent", false, patience)
         // The state folder is not made here: a project without one has no Assignment to record.
         if (!(yield* hasStateFolder(directory))) return yield* new StateFolderMissing()
         const type = payload.tool_input?.subagent_type
         yield* recordLaunch(
-          (transition) => updateState(directory, transition, call.env, "hook"),
+          (transition) => updateState(directory, transition, call.env, patience),
           id,
           agentId,
           {

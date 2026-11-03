@@ -10119,26 +10119,37 @@ var claim = (file) => gen2(function* () {
   yield* io(file, () => handle.writeFile(content)).pipe(tapError2(() => io(file, () => rm2(file, { force: true })).pipe(ignore2)), ensuring2(io(file, () => handle.close()).pipe(ignore2)));
   return owner.token;
 });
+var HOOK_WAIT_MS = 5000;
+var deadlineIn = (ms) => map4(currentTimeMillis2, (now) => ({ until: now + ms }));
+var STATE_PATIENCE = "short";
+var WORKTREE_PATIENCE = "long";
 var WAITS = {
   short: { delay: 25, limit: 30000, stuck: true },
-  long: { delay: 50, limit: 60000, stuck: false },
-  hook: { delay: 25, limit: 3000, stuck: true }
+  long: { delay: 50, limit: 60000, stuck: false }
 };
+var DEADLINE_WAIT = { delay: 25, limit: HOOK_WAIT_MS, stuck: true };
 var holderBusy = (file, limit) => gen2(function* () {
   const owner = yield* readOwner(file);
   return owner === undefined || (yield* currentTimeMillis2) - owner.acquiredAt < limit;
 });
-var acquire = (file, patience = "short") => {
-  const { delay, limit, stuck } = WAITS[patience];
+var acquire = (file, patience) => {
+  const named = typeof patience === "string";
+  const { delay, limit, stuck } = named ? WAITS[patience] : DEADLINE_WAIT;
   return claim(file).pipe(catchTag2("StateLocked", (locked) => breakIfStale(file).pipe(andThen2(fail5(locked)))), retry2({
     schedule: spaced(delay),
-    times: limit / delay,
-    while: (error) => error._tag === "StateLocked" && stuck ? holderBusy(file, limit) : error._tag === "StateLocked"
+    ...named ? { times: limit / delay } : {},
+    while: (error) => gen2(function* () {
+      if (error._tag !== "StateLocked")
+        return false;
+      if (!named && (yield* currentTimeMillis2) >= patience.until)
+        return false;
+      return stuck ? yield* holderBusy(file, limit) : true;
+    })
   }));
 };
 var release = (file, token) => readOwner(file).pipe(flatMap2((owner) => owner?.token === token ? io(file, () => rm2(file, { force: true })) : void_3), ignore2);
-var withFileLock = (file, use, patience = "short") => acquireUseRelease2(io(file, () => mkdir(dirname(file), { recursive: true })).pipe(andThen2(acquire(file, patience))), () => use, (token) => release(file, token));
-var withStateLock = (directory, use, patience = "short") => acquireUseRelease2(ensureLocalDirectory(directory).pipe(andThen2(acquire(localFile(directory, "lock"), patience))), () => use, (token) => release(localFile(directory, "lock"), token));
+var withFileLock = (file, use, patience = STATE_PATIENCE) => acquireUseRelease2(io(file, () => mkdir(dirname(file), { recursive: true })).pipe(andThen2(acquire(file, patience))), () => use, (token) => release(file, token));
+var withStateLock = (directory, use, patience = STATE_PATIENCE) => acquireUseRelease2(ensureLocalDirectory(directory).pipe(andThen2(acquire(localFile(directory, "lock"), patience))), () => use, (token) => release(localFile(directory, "lock"), token));
 
 import { lstat, mkdir as mkdir2, readdir, realpath, rename as rename2, rm as rm3, rmdir, stat } from "fs/promises";
 import { basename, dirname as dirname2, join as join2, relative, sep as sep2 } from "path";
@@ -10213,7 +10224,7 @@ var withoutMarked = (lines) => lines.filter((line, index) => {
 var excludePath = (top, env) => gitText(top, env, ["rev-parse", "--path-format=absolute", "--git-path", "info/exclude"]).pipe(map4((path) => fromGitPath(path)));
 var linesOf = (text) => text === undefined || text === "" ? [] : text.replace(/\n$/, "").split(`
 `);
-var editExclude = (top, common, env, edit, done, patience = "long") => gen2(function* () {
+var editExclude = (top, common, env, edit, done, patience = WORKTREE_PATIENCE) => gen2(function* () {
   const path = yield* excludePath(top, env);
   if (done?.(linesOf(yield* readText(path))) === true)
     return;
@@ -10370,7 +10381,7 @@ var fetchRemoteBranch = (top, env, branch, timeout = FETCH_TIMEOUT_MS) => git(to
   `+refs/heads/${branch}:refs/remotes/origin/${branch}`
 ], timeout)), flatMap2((code) => code === 0 ? refExists(top, env, `refs/remotes/origin/${branch}`) : succeed6(false)));
 var readyMarker = (path) => `${path}.ready`;
-var ensureWorktree = (top, common, env, branch, path, options, patience = "long") => withFileLock(join2(common, "holyagent", "worktree.lock"), gen2(function* () {
+var ensureWorktree = (top, common, env, branch, path, options, patience = WORKTREE_PATIENCE) => withFileLock(join2(common, "holyagent", "worktree.lock"), gen2(function* () {
   const ready = readyMarker(path);
   const again = yield* checkedOut(yield* listWorktrees(top, env), branch);
   if (again !== undefined) {
@@ -10479,7 +10490,7 @@ var pruneEmpty = (folder, from) => gen2(function* () {
   }
 });
 var migrationMarker = (common, top) => io(top, () => realpath(top)).pipe(map4((real) => join2(common, "holyagent", "migrated", new Bun.CryptoHasher("sha1").update(real).digest("hex").slice(0, 16))));
-var migrateWorkTree = (top, common, worktree, env, commit, patience = "short") => {
+var migrateWorkTree = (top, common, worktree, env, commit, patience = STATE_PATIENCE) => {
   const source = join2(top, STATE_DIRECTORY);
   const target = join2(worktree, STATE_DIRECTORY);
   return migrationMarker(common, top).pipe(flatMap2((marker) => fileExists(marker).pipe(flatMap2((done) => done ? void_3 : requireStateFolder(target).pipe(andThen2(kindAt(source)), flatMap2((kind) => kind !== undefined && kind !== "directory" ? void_3 : withStateLock(target, gen2(function* () {
@@ -10685,7 +10696,7 @@ var setStateMode = (cwd, env, mode) => gen2(function* () {
         }))
       }))));
     return { previous, mode };
-  }), "long");
+  }), WORKTREE_PATIENCE);
 });
 
 var globBelow = (folder, pattern, separator = sep3) => `${toPosix(folder, separator)}/${pattern}`;
@@ -10838,7 +10849,7 @@ var describe = (change) => {
   const more = records.length - MAX_LISTED;
   return `chore(state): record ${records.length === 0 ? "state" : shown}${more > 0 ? ` and ${more} more` : ""}`;
 };
-var updateState = (directory, transition, env = {}, patience = "short") => withStateLock(directory, gen2(function* () {
+var updateState = (directory, transition, env = {}, patience = STATE_PATIENCE) => withStateLock(directory, gen2(function* () {
   const snapshot = yield* readSnapshot(directory);
   const result = yield* transition(snapshot);
   yield* persist(directory, snapshot.project, result);
@@ -19931,11 +19942,12 @@ var HOOK_COMMANDS = [
     return gen2(function* () {
       if (agentId === undefined)
         return yield* new AgentIdMissing;
-      const { directory } = yield* resolveState(call.cwd, call.env, "ifPresent", false, "hook");
+      const patience = yield* deadlineIn(HOOK_WAIT_MS);
+      const { directory } = yield* resolveState(call.cwd, call.env, "ifPresent", false, patience);
       if (!(yield* hasStateFolder(directory)))
         return yield* new StateFolderMissing;
       const type = payload.tool_input?.subagent_type;
-      yield* recordLaunch((transition) => updateState(directory, transition, call.env, "hook"), id, agentId, {
+      yield* recordLaunch((transition) => updateState(directory, transition, call.env, patience), id, agentId, {
         type: typeof type === "string" ? type : undefined
       });
       return postToolUse(`holyagent: recorded agent ${agentId} for ${id}.`);
