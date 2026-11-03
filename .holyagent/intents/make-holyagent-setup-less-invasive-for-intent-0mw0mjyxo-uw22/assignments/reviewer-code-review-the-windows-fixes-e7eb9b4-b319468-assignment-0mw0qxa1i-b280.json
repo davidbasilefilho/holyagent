@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mw0qxa1i-b280",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-windows-fixes-e7eb9b4-b319468",
+  "objective": "Review the Windows fixes e7eb9b4..b319468 on release/0.2.0/fix/windows-tests for correctness and test integrity.",
+  "state": "Running",
+  "scope": [
+    "git diff e7eb9b4..HEAD (diff file /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/win-fix.diff). Source changes: packages/runtime/src/state/lock.ts (30s patience for a live holder) and tree.ts (fromGitPath, killGroup platform arg and taskkill on win32); the rest are tests."
+  ],
+  "constraints": [
+    "Check: the lock change cannot hang a command for long on Linux or hide a real deadlock; taskkill use is safe (only the child's tree, argument quoting); no test was weakened, skipped or made to assert less except the one documented skipIf(win32); Windows-only branches are covered by Linux tests through an injected platform. Verify each blocking finding with a reproduction or trace. Read-only. Report in under 350 words, findings blocking or non-blocking with file:line; start each evidence line with the criterion label before its colon."
+  ],
+  "criteria": [
+    {
+      "text": "correctness: source changes are correct on Linux and Windows",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "test integrity: no test weakened beyond the documented skip",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw0q6fwb-l63l",
+    "assignment-0mw0q6gl9-2ngx",
+    "assignment-0mw0qoc6q-rjua"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T13:51:07.543Z"
+  },
+  "createdAt": "2026-11-03T13:51:07.543Z"
+}
