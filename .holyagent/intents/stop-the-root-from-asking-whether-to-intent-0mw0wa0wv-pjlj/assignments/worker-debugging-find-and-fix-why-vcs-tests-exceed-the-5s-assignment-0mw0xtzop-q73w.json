@@ -1,0 +1,57 @@
+{
+  "id": "assignment-0mw0xtzop-q73w",
+  "intentId": "intent-0mw0wa0wv-pjlj",
+  "intentRevision": 3,
+  "roleTask": "Worker.debugging",
+  "slug": "find-and-fix-why-vcs-tests-exceed-the-5s",
+  "objective": "Find and fix why vcs tests exceed the 5s default timeout under a full mise run verify in this container (a different test each run; each passes alone), so the local gates pass reliably.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-hook-locks, branch release/0.2.0/fix/vcs-test-timeouts at origin/main (which includes the hook lock deadline change of PR #53). Observed today on a branch based on main: two full 'bunx --no-install mise run verify' runs failed with vcs tests timing out at 5s, for example 'vcs pr > a body file inside .git or ignored by git is not published' and 'recording branches and pull requests on the Intent > vcs commit records its branch and commit, and vcs pr the pull request, in versioned state' (4 failures in one run); the files pass alone and the suite passes with --timeout 60000; later full runs passed. Earlier, on Windows CI, one vcs-commit test hit 5042ms and got a 60s timeout.",
+    "Reproduce first: run the full suite several times (and with the test files' concurrency as configured), time the vcs tests, and compare against main before #53 (git show/git archive of 29cd4a5 into the scratchpad, never checkout) to see whether the lock change, shared machine load, or the tests' own spawn count drives it. Fix the cause. If the cause is inherent spawn cost (many git and CLI starts per test), give those tests or files an explicit timeout with Windows headroom the way the suite does elsewhere (per-test timeout or setDefaultTimeout in the file), with a comment naming the measured cost; say why that is the cause and not a symptom."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md and AGENTS.md. Make no version-control writes and no edits under .git/ or .holyagent/; do not move HEAD of any checkout. Report changed paths. Scratch files only under /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad.",
+    "Do not skip or weaken tests.",
+    "Rebuild with bunx --no-install mise run build if sources change; finish with at least two consecutive full bunx --no-install mise run verify passes and report their counts and the slowest vcs test times.",
+    "Keep working until done; stop to ask only when you cannot go on. When done and checked, stop and report, naming unrequested changes instead of making them, and launch no reviewers.",
+    "Write the diff to /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/vto.diff as diff-file evidence. Report in under 350 words with the root cause in one line and timing evidence."
+  ],
+  "criteria": [
+    {
+      "text": "The root cause of the vcs test timeouts is identified with timing evidence",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The fix addresses that cause, and two consecutive full verify runs pass",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "No test is skipped or weakened",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "diff-file",
+    "verify",
+    "root-cause"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/tests",
+    "packages/runtime/src/vcs",
+    "packages/runtime/src/state",
+    "packages/integrations/claude/tests",
+    "packages/integrations/claude/dist/scripts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T17:04:31.465Z"
+  },
+  "createdAt": "2026-11-03T17:04:31.465Z"
+}
