@@ -212,7 +212,7 @@ const SPECS: Readonly<Record<RoleTask, Spec>> = {
   "Reviewer.artifact": spec(
     "Reviewer",
     "artifact",
-    "haiku",
+    "sonnet",
     "high",
     "ReadOnly",
     "IndependentReview",

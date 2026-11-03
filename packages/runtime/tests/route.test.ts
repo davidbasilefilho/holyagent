@@ -37,6 +37,11 @@ describe("route table", () => {
       expect(routeFor(roleTask)).toMatchObject({ model: "sonnet", effort: "high" })
   })
 
+  test("Reviewer.artifact runs on sonnet at high effort, Reviewer.audit stays on haiku", () => {
+    expect(routeFor("Reviewer.artifact")).toMatchObject({ model: "sonnet", effort: "high" })
+    expect(routeFor("Reviewer.audit")).toMatchObject({ model: "haiku", effort: "high" })
+  })
+
   test("only workers write, and every Reviewer reviews", () => {
     for (const route of ROUTES) {
       expect(isWriter(route.roleTask)).toBe(route.mutability === "ScopedWrite")

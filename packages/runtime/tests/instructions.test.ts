@@ -53,6 +53,7 @@ describe("instruction sources", () => {
     expect(skills.toSorted()).toEqual([
       "ci-watch",
       "dev-server",
+      "evidence-judging",
       "instruction-writing",
       "state-mode",
       "user-busy",

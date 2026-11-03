@@ -278,6 +278,10 @@ export const REQUIREMENT_SECTIONS: Readonly<
     section: "root/skills.md",
     phrase: "start the one server the visual specialists share",
   },
+  "R-EVIDENCE": {
+    section: "skills/evidence-judging/SKILL.md",
+    phrase: "starts a repair only with a reproduction or a source-to-sink trace",
+  },
   "R-VCS": {
     section: "root/version-control.md",
     phrase: "Version control and state records are yours alone",
