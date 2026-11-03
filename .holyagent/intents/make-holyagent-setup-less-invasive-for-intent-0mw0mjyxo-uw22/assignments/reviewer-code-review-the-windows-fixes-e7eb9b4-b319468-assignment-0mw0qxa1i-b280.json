@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-the-windows-fixes-e7eb9b4-b319468",
   "objective": "Review the Windows fixes e7eb9b4..b319468 on release/0.2.0/fix/windows-tests for correctness and test integrity.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "git diff e7eb9b4..HEAD (diff file /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/win-fix.diff). Source changes: packages/runtime/src/state/lock.ts (30s patience for a live holder) and tree.ts (fromGitPath, killGroup platform arg and taskkill on win32); the rest are tests."
   ],
@@ -38,7 +38,29 @@
     "agentId": "workflow:wf_00cf415a-8e9/assignment-0mw0qxa1i-b280",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-03T13:51:07.543Z"
+    "startedAt": "2026-11-03T13:51:07.543Z",
+    "finishedAt": "2026-11-03T13:56:51.194Z"
+  },
+  "result": "result: Merge-ready on Linux, with no blockers. I found four non-blocking items, all optional.\n\nThe built-in `/code-review` ran on `e7eb9b4...b319468`. I classified its findings below.\n\nblockers: none\n\nnotes (non-blocking, optional):\n1. `packages/runtime/src/state/lock.ts:74-105`: the default wait on a live holder is now 30s, but the plugin hooks have a 10s timeout (`dist/hooks/hooks.json`).\n   - The `agent-launch` hook (`packages/runtime/src/cli/hook.ts:337`) calls `updateState`. While another process holds the lock, it can now be killed by its 10s timeout instead of failing with StateLocked after about 1s and handing the step back.\n   - The wait is bounded, so it is not a hang. A holder older than 30s is refused at once, and `long` is unchanged. I did not reproduce the hook kill.\n   - A shorter `limit` or a hook-specific patience would avoid it.\n2. `lock.ts:100`: `holderBusy` re-reads the lock file on every tick. This is cheap and correct, so it needs no change.\n3. `packages/runtime/src/state/tree.ts:458`: `taskkill /pid <pid> /T /F` has the same pid-reuse race that the POSIX branch already had, but it kills a whole tree. The pid is checked as an integer greater than 1 and passed as a Bun Shell argument, so quoting is safe. Failures are ignored.\n4. `packages/integrations/claude/tests/hooks.test.ts:1714`: `brokenGit` replaces a fake `git` that failed every call with a broken global config.\n   - Git calls that never read config would no longer fail, so these tests catch slightly fewer regressions. That is mild, because `rev-parse` and the hook calls do read config.\n   - The new assertion on the English text \"bad config line\" would fail under a localized git. `LC_ALL=C` would fix that.\n\nOther claims checked:\n- `packages/runtime/tests/state-branch.test.ts:29`: the `afterAll` resets the timeout to a literal 5000. This is harmless unless a run sets another default.\n- The `host.ts` `searchPath` and `isExecutable` helpers have their Windows branch tested through the `platform` parameter in `host.test.ts`. The Windows PATH inheriting the parent PATH is by design.\n\nTest integrity: the only skip is `skipIf(win32)` on \"a marker folder open to other users is not used\", and it is documented. The `win32` guard on the 0o700 mode assertion is also documented. The other test edits are real-path, POSIX-path, `cp`, timeout and platform-parameter changes that keep the same assertions. The one weakening I found is item 4. The new lock test needs a 1.5s wait, which the old ~1s wait could not give, and the stuck-lock test still holds (`acquiredAt: 1`). The Windows `killGroup` test goes through `platform=\"win32\"` and checks that the child is killed and no group is signalled. It does not check the `taskkill` arguments.\n\nOnly read, not run: the Windows behavior of `taskkill` and the Windows `isExecutable` path.\n\nevidence:\ncorrectness: `packages/runtime/tests/store.test.ts`, `windows-paths.test.ts` and `state-branch.test.ts` pass: 79 pass, 0 fail. `bun check` reports no type errors in 126 files. `plugin.test.ts` and `host.test.ts` pass: 66 pass, 1 skip. `mise` is not installed here, so `mise run verify` did not run, and lint and format were not checked. The lock logic and `taskkill` use were traced by reading `lock.ts` and `tree.ts`.\ntest integrity: I read the full diff of all 11 test files. The only skip is the documented `skipIf(win32)`. The one weakening is `brokenGit` (item 4), which is non-blocking.\nfindings: items 1-4 above; the full `/code-review` output was not saved to a file.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Independent code review of the Windows fixes found no blockers; optional notes go to a repair round.",
+    "criteria": [
+      {
+        "criterion": "correctness: source changes are correct on Linux and Windows",
+        "support": "`packages/runtime/tests/store.test.ts`, `windows-paths.test.ts` and `state-branch.test.ts` pass: 79 pass, 0 fail. `bun check` reports no type errors in 126 files. `plugin.test.ts` and `host.test.ts` pass: 66 pass, 1 skip. `mise` is not installed here, so `mise run verify` did not run, and lint and format were not checked. The lock logic and `taskkill` use were traced by reading `lock.ts` and `tree.ts`."
+      },
+      {
+        "criterion": "test integrity: no test weakened beyond the documented skip",
+        "support": "I read the full diff of all 11 test files. The only skip is the documented `skipIf(win32)`. The one weakening is `brokenGit` (item 4), which is non-blocking."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "items 1-4 above; the full `/code-review` output was not saved to a file."
+      }
+    ]
   },
   "createdAt": "2026-11-03T13:51:07.543Z"
 }
