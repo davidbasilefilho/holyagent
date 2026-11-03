@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "make-mise-which-the-repository-ships-as",
   "objective": "Make mise, which the repository ships as a dev dependency, run the gates in this container so that mise run verify passes in the worktree /home/user/holyagent-hook-locks.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree /home/user/holyagent-hook-locks (branch release/0.2.0/fix/hook-lock-followups, cut from origin/main). It has no node_modules yet. The main checkout /home/user/holyagent has node_modules with node_modules/.bin/mise (version 2026.10.24) working.",
     "mise.toml installs bun 1.4.4 and node lts; its postinstall hook runs 'bun scripts/toolchain.ts upgrade' to move that Bun to canary, because the gates need the canary-only bun check, bun lint and bun fmt. The 'toolchain' task fails on a non-canary Bun. The container's own bun is 1.4.4 stable.",
@@ -43,5 +43,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-03T15:35:01.908Z"
+  },
   "createdAt": "2026-11-03T15:34:56.980Z"
 }
