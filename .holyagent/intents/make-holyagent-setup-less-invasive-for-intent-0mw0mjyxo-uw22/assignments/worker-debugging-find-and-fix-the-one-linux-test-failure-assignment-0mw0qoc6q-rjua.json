@@ -5,7 +5,7 @@
   "roleTask": "Worker.debugging",
   "slug": "find-and-fix-the-one-linux-test-failure",
   "objective": "Find and fix the one Linux test failure in mise run verify on head 0948e70 of release/0.2.0/fix/windows-tests, introduced by the Windows fixes in e69a3f0 and 0948e70.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Verify log: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/verify-win.log (1041 pass, 1 fail). Commits: git show e69a3f0 0948e70."
   ],
@@ -38,7 +38,33 @@
     "agentId": "workflow:wf_71c76334-972/assignment-0mw0qoc6q-rjua",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-03T13:44:10.419Z"
+    "startedAt": "2026-11-03T13:44:10.419Z",
+    "finishedAt": "2026-11-03T13:50:48.138Z"
+  },
+  "result": "result: The failure was a timeout in a test that the two Windows commits did not touch. It passes on this tree and `mise run verify` exits 0.\n\nThe failing test is \"claude plugin validate > the built plugin passes strict validation\" in `packages/integrations/claude/tests/plugin.test.ts`. It spawns the external `claude plugin validate --strict` and timed out at the 5 s default.\n\nReproduction: I could not reproduce the failure. On head 0948e70, `bun test` on the file passed three times in about 2 s, and the full `bun test` and an unmodified `mise run verify` each passed once. A single `claude plugin validate` takes about 0.7 s when idle.\n\nCause (hypothesis, not confirmed): the run in `verify-win.log` was slow enough that the spawn exceeded 5 s. The log shows 104 s for the tests; I did not measure the load behind the 104 s. Nothing in e69a3f0 or 0948e70 touches the validate path, so I am treating it as flaky rather than caused by the Windows fixes.\n\nFix: both validate tests now take an explicit 30 s timeout (`VALIDATE_TIMEOUT`). The assertions are unchanged, and the Windows fixes are left as they were. I also ran `bun fmt` on the file.\n\nnotes: The timeout is the only change I made, and I cannot prove it covers the original slow run. If the timeout recurs at 30 s, look at the load on the machine during the run.\n\nchanged: /home/user/holyagent/packages/integrations/claude/tests/plugin.test.ts\n\nchecks: `node_modules/.bin/mise run verify` exited 0. Type-check found no errors in 126 files, lint found no problems in 127 files, format check passed on 247 files, and tests were 1042 pass, 0 fail, 1 skip.\n\nblockers: none\nquestions: none\n\nevidence:\ncause: The failing test is \"claude plugin validate > the built plugin passes strict validation\" in `packages/integrations/claude/tests/plugin.test.ts`. It timed out at 5 s on a slow run and passes in about 2 s alone. The cause is the 5 s default timeout on a test that spawns the external `claude` CLI; I did not confirm the machine load behind it.\nverify: `node_modules/.bin/mise run verify` exited 0 with 1042 pass and 0 fail. No assertions were changed. Log: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/verify3.log\nchecks-run: `bun test` on plugin.test.ts, 3 runs, all pass. Full `bun test` passed (1042 pass). `mise run verify` exited 0 before the fix and again after it.\nchanged-paths: /home/user/holyagent/packages/integrations/claude/tests/plugin.test.ts\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "verify exit 0; failure was a 5s timeout on an external CLI spawn under load",
+    "criteria": [
+      {
+        "criterion": "cause: the failing test, its reproduction and cause are named",
+        "support": "The failing test is \"claude plugin validate > the built plugin passes strict validation\" in `packages/integrations/claude/tests/plugin.test.ts`. It timed out at 5 s on a slow run and passes in about 2 s alone. The cause is the 5 s default timeout on a test that spawns the external `claude` CLI; I did not confirm the machine load behind it."
+      },
+      {
+        "criterion": "verify: mise run verify exits 0 with no test weakened",
+        "support": "`node_modules/.bin/mise run verify` exited 0 with 1042 pass and 0 fail. No assertions were changed. Log: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/verify3.log"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bun test` on plugin.test.ts, 3 runs, all pass. Full `bun test` passed (1042 pass). `mise run verify` exited 0 before the fix and again after it."
+      },
+      {
+        "label": "changed-paths",
+        "support": "/home/user/holyagent/packages/integrations/claude/tests/plugin.test.ts"
+      }
+    ]
   },
   "createdAt": "2026-11-03T13:44:10.419Z"
 }
