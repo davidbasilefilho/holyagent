@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-non-blocking-code-and",
   "objective": "Repair the non-blocking code and security findings on the setup and reminder changes.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw0nltgp-she3.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw0nltpu-mlxp.md; doc review finding 4 and the last note in /home/user/holyagent/.git/holyagent/reports/assignment-0mw0nltyh-0rau.md",
     "packages/runtime/src/setup, packages/runtime/src/cli/setup.ts, packages/runtime/src/cli/hook.ts, packages/integrations/claude/src/setup-command.md, their tests"
@@ -44,5 +44,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mw0na54f-t4ud",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T12:28:36.190Z"
+  },
   "createdAt": "2026-11-03T12:28:32.333Z"
 }
