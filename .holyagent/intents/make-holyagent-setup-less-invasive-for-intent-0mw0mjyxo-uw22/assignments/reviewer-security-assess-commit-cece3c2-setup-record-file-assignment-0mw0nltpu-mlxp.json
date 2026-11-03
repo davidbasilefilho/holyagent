@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "assess-commit-cece3c2-setup-record-file",
   "objective": "Assess commit cece3c2 (setup record file, scope path guards, symlink refusal) and the hook text change in c3039b3 for security issues.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Diff file: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/hardening.diff; earlier findings this repairs: .git/holyagent/reports/assignment-0mw0myvut-d9g3.md items 1-3"
   ],
@@ -32,5 +32,10 @@
     "assignment-0mw0na5ia-7ldi",
     "assignment-0mw0mzj7r-jf9p"
   ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T12:18:19.481Z"
+  },
   "createdAt": "2026-11-03T12:18:14.322Z"
 }
