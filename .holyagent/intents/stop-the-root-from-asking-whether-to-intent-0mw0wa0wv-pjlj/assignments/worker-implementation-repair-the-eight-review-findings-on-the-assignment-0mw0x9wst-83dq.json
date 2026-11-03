@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-eight-review-findings-on-the",
   "objective": "Repair the eight review findings on the uncommitted asking, merge and specialist-HEAD instruction changes in /home/user/holyagent-hook-locks.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-hook-locks, branch release/0.2.0/fix/no-merge-question, uncommitted. The full review with exact excerpts is at /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/review-q.md; fix all eight findings as follows.",
     "1) The test must not make every AskUserQuestion fail: settling defaults are only those holyagent's rules or the repository define, not the root's own recommendation for the question; drop the 'choice between options when one is the recommended default' illustration. Keep the deliberate asks (for example the push-refusal question) consistent with the test.",
@@ -52,7 +52,33 @@
     "agentId": "workflow:wf_b9dc13e9-fdb/assignment-0mw0x9wst-83dq",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-03T16:48:59.613Z"
+    "startedAt": "2026-11-03T16:48:59.613Z",
+    "finishedAt": "2026-11-03T17:00:31.782Z"
+  },
+  "result": "result: all eight findings fixed. `mise run build` passed, and `mise run verify` passed on its latest run (exit 0, 1055 pass, 1 skip, 0 fail).\nchanged: all under /home/user/holyagent-hook-locks/packages/\n- runtime/src/instructions/claude-5.5/root/asking.md, task-list.md, version-control.md and stack-plan.md\n- runtime/src/instructions/claude-5.5/specialist/state-changes.md\n- runtime/src/instructions/claude-5.5/roles/reviewer-code/range.md\n- runtime/src/instructions/requirements.md\n- integrations/claude/src/agents.ts\n- integrations/claude/tests/plugin.test.ts\n- integrations/claude/dist/ (rebuilt)\n\nFixes by finding:\n1. The test now counts only defaults that holyagent's rules or the repository define, not the root's own recommendation. The \"recommended default\" illustration is gone, and the push-refusal ask stays consistent with the test.\n2. and 4. The merge method order (convention, earlier answer, default) lives only in version-control.md \"Merging\". asking.md says only \"Version control sets the method\" and no longer has \"Check in that order\". R-MERGEWAIT points to version control. Squash is stated once, in \"Commits and merges\", plus a \"(squash, as above)\" pointer in \"Merging\".\n3. The `-s ours` procedure is removed from version-control.md and R-MERGEWAIT. It is now stated once in stack-plan.md, with the corrected condition: retarget, then `-s ours` if the base's tree equals the merged PR's head tree, otherwise merge the base normally.\n5. task-list.md now reads \"(the Asking section lists what does)\". The source list is only in asking.md.\n6. The rule now covers any change to HEAD, a branch, the index or the working tree, naming checkout, switch, stash, reset, restore, clean, add, commit, merge, rebase and cherry-pick. `worktree add` is dropped and the read-only alternatives stay. range.md is down to a pointer; method.md was not touched in this round.\n7. The two leftover assertions are removed from plugin.test.ts.\n8. The text now reads \"confirmation of a plan the user did not ask for\".\n\nI also updated a pre-existing test phrase in plugin.test.ts to the new stack-plan wording (\"After a lower PR squash-merges, retarget the next PR to the base\").\n\nchecks:\n- `bunx --no-install mise run build` -> exit 0\n- `mise run verify`, first two runs -> exit 1. Only vcs tests timed out at 5 s, a different one each run: \"vcs pr > a body file inside .git or ignored by git is not published\", and \"recording branches and pull requests on the Intent > vcs commit records its branch and commit, and vcs pr the pull request, in versioned state\" (4 failures in the first run).\n- Those tests are untouched by this change. They pass in isolation, and the full suite with `--timeout 60000` passed.\n- `mise run verify`, latest run -> exit 0, 1055 pass, 1 skip, 0 fail. Logs: verify.log, verify2.log and test60.log in the scratchpad.\nblockers: none\nquestions: none\nnotes: the vcs tests above time out intermittently at about 5 s and may be worth a longer timeout.\n\nevidence:\n- All eight review findings are fixed as specified: see the per-finding lines above, and the diff at /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/branch2.diff.\n- mise run verify passes and dist is rebuilt: build exit 0, and the latest verify exit 0 with 0 failures (/tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/verify2.log).\n- diff-file: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/branch2.diff\n- verify: `bunx --no-install mise run verify` exit 0, 1055 pass, 1 skip, 0 fail (verify2.log).\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "All eight findings fixed, confirmed closed by the independent re-review; build passes.",
+    "criteria": [
+      {
+        "criterion": "All eight review findings are fixed as specified",
+        "support": "see the per-finding lines above, and the diff at /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/branch2.diff."
+      },
+      {
+        "criterion": "mise run verify passes and dist is rebuilt",
+        "support": "build exit 0, and the latest verify exit 0 with 0 failures (/tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/verify2.log)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/branch2.diff"
+      },
+      {
+        "label": "verify",
+        "support": "`bunx --no-install mise run verify` exit 0, 1055 pass, 1 skip, 0 fail (verify2.log)."
+      }
+    ]
   },
   "createdAt": "2026-11-03T16:48:54.605Z"
 }
