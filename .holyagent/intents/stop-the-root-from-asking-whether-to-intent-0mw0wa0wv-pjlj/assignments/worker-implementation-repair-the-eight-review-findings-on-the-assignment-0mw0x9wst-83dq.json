@@ -1,0 +1,52 @@
+{
+  "id": "assignment-0mw0x9wst-83dq",
+  "intentId": "intent-0mw0wa0wv-pjlj",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-eight-review-findings-on-the",
+  "objective": "Repair the eight review findings on the uncommitted asking, merge and specialist-HEAD instruction changes in /home/user/holyagent-hook-locks.",
+  "state": "Ready",
+  "scope": [
+    "Worktree /home/user/holyagent-hook-locks, branch release/0.2.0/fix/no-merge-question, uncommitted. The full review with exact excerpts is at /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/review-q.md; fix all eight findings as follows.",
+    "1) The test must not make every AskUserQuestion fail: settling defaults are only those holyagent's rules or the repository define, not the root's own recommendation for the question; drop the 'choice between options when one is the recommended default' illustration. Keep the deliberate asks (for example the push-refusal question) consistent with the test.",
+    "2) and 4) One owner for the merge method order (repository convention, then the user's earlier answer, then holyagent's squash default): keep it in version-control.md 'Merging' (and its requirement); asking.md only points there and does not state a conflicting order or 'Check in that order'. Avoid restating squash-as-default beyond 'Commits and merges'.",
+    "3) Keep stacked-PR merging workable without a question but state it once, in stack-plan.md where merge-forward lives, and correct its condition: after a lower PR is squash-merged, retarget the next PR to the base; if the base's tree equals the merged PR's head tree, reconcile the next branch with 'git merge -s ours <base>' (no content change), otherwise merge the base normally and resolve as for any merge-forward. Remove the procedure text from version-control.md and R-MERGEWAIT except a pointer.",
+    "5) The settling-sources list lives in asking.md; task-list.md keeps the shortest stand-alone wording its session-context test requires and points to Asking.",
+    "6) Specialist rule: say it covers any command that changes HEAD, a branch, the index or the working tree of a shared checkout (checkout, switch, stash, reset, restore, clean, add, commit, merge, rebase, cherry-pick); drop 'worktree add' from that list or explain it accurately; keep the read-only alternatives; keep the reviewer role texts to a pointer rather than a third full copy.",
+    "7) Remove the leftover plugin.test.ts assertions about strings from a discarded draft ('Apply, without asking, a choice the target repository's convention settles' and '- R-DEFAULTS:').",
+    "8) Change 'confirmation of a plan before doing it' to a plan the user did not ask for, so it agrees with user-messages.md."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md and AGENTS.md. Make no version-control writes and no edits under .git/ or .holyagent/; do not move HEAD of any checkout. Report changed paths. Scratch files only under /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad.",
+    "Follow /root/.claude/plugins/synced/03eb801d-6ff6-4373-b5b1-f94edf359a3e_0f3e6ee9-af2e-4c2c-8d3c-9be25ca27713/holyagent~g2/skills/instruction-writing/SKILL.md. Keep the change to these findings.",
+    "Rebuild with bunx --no-install mise run build and run bunx --no-install mise run verify in /home/user/holyagent-hook-locks; if a run fails, capture its output to the scratchpad and fix the cause rather than rerunning.",
+    "Keep working until done; when done and checked, stop and report, launching no reviewers.",
+    "Write the full diff of all uncommitted changes to /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/branch2.diff and list it as diff-file evidence. Report in under 300 words, with one line per finding saying how it was fixed."
+  ],
+  "criteria": [
+    {
+      "text": "All eight review findings are fixed as specified",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify passes and dist is rebuilt",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "diff-file",
+    "verify"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/integrations/claude/dist",
+    "packages/integrations/claude/tests",
+    "packages/integrations/claude/src"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw0wvsd2-3png",
+  "createdAt": "2026-11-03T16:48:54.605Z"
+}
