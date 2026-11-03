@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-the-repair-commit-6aee9b0",
   "objective": "Re-review the repair commit 6aee9b0 against the earlier non-blocking findings it addresses.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Repair diff: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/repair-code.diff (git show 6aee9b0). Earlier findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw0nltgp-she3.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw0nltpu-mlxp.md; fixes asked: (a) reminder wording matches version-control.md, (b) doctor prints the rejected-top-level notice, (c) record mode 0o600, (d) setup notice counts project/local settings of the session folder, (e) fallback outside a repository reported, (f) top-level trusted only when cwd/ancestor and holding .git"
   ],
@@ -28,5 +28,10 @@
   "independentFrom": [
     "assignment-0mw0nz2ks-iqrt"
   ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T12:33:23.945Z"
+  },
   "createdAt": "2026-11-03T12:33:19.902Z"
 }
