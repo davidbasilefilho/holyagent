@@ -5,7 +5,8 @@
   "requirements": [
     "The root does not ask (AskUserQuestion or text) whether to merge reviewed, green PRs; it states in the final report that they are ready to merge and waits for the user to say merge",
     "When the user says merge, the root merges at once and asks nothing about the method: the repository convention comes first (its merge settings, CONTRIBUTING, PR history), else an earlier answer, else the holyagent default (squash, bottom-up for a stack, reconciling stacked branches with a no-content merge)",
-    "General rule (user, verbatim intent): use the holyagent default or recommended option, but prioritize the repository convention; a choice either settles is applied and recorded, never asked",
+    "General rule (user): use the holyagent default or recommended option, but prioritize the repository convention; a choice either settles is applied and recorded, never asked",
+    "General rule (user): unnecessary questions are never asked. A question is necessary only when its answer materially changes the result and nothing (the request, earlier answers, repository convention, holyagent defaults, the code) settles it; confirmations, offers, permission for a named or already-settled action, and choices with a recommended default are not asked",
     "Merging still needs the user to name it; this removes only the question",
     "Specialists, reviewers included, never change HEAD, branches or the index of a shared checkout (no checkout, switch, stash, reset); to read a commit they use git show, git diff or git archive into the scratchpad, because a reviewer once left the main checkout detached at the commit it reviewed",
     "Artifacts in English; follow .claude/CLAUDE.md and AGENTS.md; mise run verify passes; conventional branch with atomic Conventional Commits; PR merges by squash"
