@@ -1,0 +1,71 @@
+{
+  "id": "assignment-0mw0r596u-3zna",
+  "intentId": "intent-0mw0mjyxo-uw22",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-two-non-blocking-review-notes-on",
+  "objective": "Repair two non-blocking review notes on the Windows fixes: keep hook-time state-lock waits inside the 10s plugin hook timeout, and make the brokenGit hooks-test assertion locale-independent.",
+  "state": "Ready",
+  "scope": [
+    "Branch release/0.2.0/fix/windows-tests, checked out in /home/user/holyagent (head b319468). Review range was e7eb9b4..b319468.",
+    "Note 1: packages/runtime/src/state/lock.ts now waits up to 30s (polling every 25ms) on a live lock holder. Plugin hooks run under a 10s timeout (packages/integrations/claude/dist/hooks/hooks.json, source under packages/integrations/claude/src). The agent-launch hook (packages/runtime/src/cli/hook.ts around line 337) calls updateState, so a hook waiting on a busy lock can be killed by the hook timeout instead of failing cleanly with StateLocked. Make hook-time state updates use a patience that ends well inside the hook timeout (for example a hook-specific limit of a few seconds), keeping the 30s default for CLI commands, which Windows CI needs. Use the existing lock options rather than a new mechanism.",
+    "Note 4: packages/integrations/claude/tests/hooks.test.ts around line 1714 (brokenGit) asserts the English git message 'bad config line', which fails under a localized git. Run that git with LC_ALL=C (and LANGUAGE unset or C) in the test so the assertion holds in any locale."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md and AGENTS.md: Effect for effects and tagged errors, no try/catch/new Promise/async in runtime and CLI source, JSDoc on exported items, Bun APIs.",
+    "Make no version-control writes (no git add/commit/checkout/stash) and no edits under .git/ or .holyagent/; report changed paths. Write scratch files only under /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad.",
+    "Rebuild the generated plugin with `mise run build` if plugin sources change; if mise is missing, run the build task that mise.toml names directly and say so.",
+    "Add a test that fails without the hook-patience change (for example the hook path gives up within the hook budget on a held live lock). Do not weaken or skip existing tests.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report: name unrequested features, tests, files or refactors instead of adding them, and launch no reviewers. A summary that announces a next step or an offer to wait is not a stop; nothing-can-move-without-the-user is.",
+    "Run real checks before reporting: the changed test files and `mise run verify` (or its type-check, lint, format and test steps directly if mise is missing, naming that). Write the full diff of your change to /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/win-repair.diff and list it as diff-file evidence.",
+    "Report in under 400 words; put long logs in the scratchpad and give their paths."
+  ],
+  "criteria": [
+    {
+      "text": "Hook-time state updates give up on a held live lock well inside the 10s hook timeout, while CLI commands keep the 30s default",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A new test fails without the hook-patience change and passes with it",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The brokenGit assertion holds under a non-English git locale",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Existing tests still pass and none are weakened or skipped",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "mise run verify passes, and the dist is rebuilt if plugin sources changed",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "The change stays within the two notes",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "diff-file",
+    "verify",
+    "new-test"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/state/lock.ts",
+    "packages/runtime/src/cli/hook.ts",
+    "packages/runtime/src/state",
+    "packages/runtime/tests",
+    "packages/integrations/claude/tests/hooks.test.ts",
+    "packages/integrations/claude/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-03T13:57:19.686Z"
+}
