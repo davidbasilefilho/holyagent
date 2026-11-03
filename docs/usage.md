@@ -158,7 +158,7 @@ Codex compacts at [90% of the window](https://github.com/openai/codex/issues/103
 
 **Specialists stay warm: `subagentPromptCacheTtl: "1h"`.** Specialists stay warm for the reuse window, so a repair or follow-up continues a cached agent instead of paying a fresh start ([cache-and-workflows.md](cache-and-workflows.md)). The trade-off is price: on the [pricing page](https://platform.claude.com/docs/en/about-claude/pricing) a 1h cache write for Opus 5.5 costs $8 per million tokens against $5 for the 5m write, so `1h` pays more at each write and saves a cold rewrite when a specialist is reused after more than five minutes. To change it, edit `subagentPromptCacheTtl` in the settings file to `5m`. `--subagent-cache-ttl 5m` sets the value only when setup finds the key missing (a first run); an existing value is kept and reported with `~`.
 
-**The marketplace and plugin keys.** `extraKnownMarketplaces.holyagent` and `enabledPlugins["holyagent@holyagent"]` declare the marketplace and turn the plugin on in the settings file, so a reinstall, or another machine that reads the same file, finds both in place. Remove them, or run `--undo`, to stop that.
+**The marketplace and plugin keys.** `extraKnownMarketplaces.holyagent` and `enabledPlugins["holyagent@holyagent"]` declare the marketplace and turn the plugin on in the settings file, so a reinstall, or another machine that reads the same file, finds both in place. Remove them to stop that. `--undo` removes `enabledPlugins["holyagent@holyagent"]` only when setup recorded adding it; otherwise it keeps the key and reports `~`, so disable or uninstall the plugin at that scope instead.
 
 ## Migrate legacy state
 
