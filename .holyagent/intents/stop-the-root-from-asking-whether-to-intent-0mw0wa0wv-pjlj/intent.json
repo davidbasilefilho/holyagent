@@ -4,11 +4,12 @@
   "objective": "Stop the root from asking whether to merge once PRs are reviewed and green, and stop specialists from moving HEAD in the shared checkout.",
   "requirements": [
     "The root does not ask (AskUserQuestion or text) whether to merge reviewed, green PRs; it states in the final report that they are ready to merge and waits for the user to say merge",
-    "When the user says merge, the root merges at once and asks nothing about the method: the repository convention comes first (its merge settings, CONTRIBUTING, PR history), else an earlier answer, else the holyagent default (squash, bottom-up for a stack, reconciling stacked branches with a no-content merge)",
+    "When the user says merge, the root merges at once and asks nothing about the method: the repository convention comes first, else an earlier answer, else the holyagent default",
     "General rule (user): use the holyagent default or recommended option, but prioritize the repository convention; a choice either settles is applied and recorded, never asked",
-    "General rule (user): unnecessary questions are never asked, and the instructions define generically what unnecessary means: a single test that applies to any question (its answer would not change what the root does, or something already settles it: the request, an earlier answer, repository convention, a holyagent default or recommendation, the code or a fact a specialist can establish). Examples (merge confirmation, method choice, branch cleanup, permission for a named action, an offer to continue) only illustrate the test and are not the rule",
+    "General rule (user): unnecessary questions are never asked, with a generic definition of unnecessary; examples only illustrate",
     "Merging still needs the user to name it; this removes only the question",
-    "Specialists, reviewers included, never change HEAD, branches or the index of a shared checkout (no checkout, switch, stash, reset); to read a commit they use git show, git diff or git archive into the scratchpad, because a reviewer once left the main checkout detached at the commit it reviewed",
+    "Specialists never change HEAD, branches or the index of a shared checkout",
+    "The local gates pass reliably: vcs tests that exceeded the 5s default timeout under a full mise run verify (a different one each run, passing alone) get their root cause found and fixed",
     "Artifacts in English; follow .claude/CLAUDE.md and AGENTS.md; mise run verify passes; conventional branch with atomic Conventional Commits; PR merges by squash"
   ],
   "revision": 3,
