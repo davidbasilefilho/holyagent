@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "make-mise-which-the-repository-ships-as",
   "objective": "Make mise, which the repository ships as a dev dependency, run the gates in this container so that mise run verify passes in the worktree /home/user/holyagent-hook-locks.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-hook-locks (branch release/0.2.0/fix/hook-lock-followups, cut from origin/main). It has no node_modules yet. The main checkout /home/user/holyagent has node_modules with node_modules/.bin/mise (version 2026.10.24) working.",
     "mise.toml installs bun 1.4.4 and node lts; its postinstall hook runs 'bun scripts/toolchain.ts upgrade' to move that Bun to canary, because the gates need the canary-only bun check, bun lint and bun fmt. The 'toolchain' task fails on a non-canary Bun. The container's own bun is 1.4.4 stable.",
@@ -47,7 +47,37 @@
     "agentId": "workflow:wf_ea167032-d36/assignment-0mw0umspg-zqyw",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-03T15:35:01.908Z"
+    "startedAt": "2026-11-03T15:35:01.908Z",
+    "finishedAt": "2026-11-03T15:46:46.606Z"
+  },
+  "result": "result: `mise run verify` passes in /home/user/holyagent-hook-locks (exit 0), and `bun run verify` also passes (exit 0). The gates work with `bun install --frozen-lockfile` alone, because the mise-managed Bun is already canary. The `prepare` script wrote hook shims into the shared `.git/hooks`, which violates the no-`.git/` rule; the report flags it.\n\nchanged: none tracked. `node_modules/` created in the worktree (ignored). `.git/hooks/commit-msg` and `.git/hooks/pre-commit` rewritten at 15:35 by `lefthook install` (via the `prepare` script, shared git dir). Not reverted, because that would itself be a `.git/` write.\n\nchecks:\n- `bun install --frozen-lockfile` -> exit 0, 125 packages installed; the prepare script synced hooks.\n- `node_modules/.bin/mise trust` -> exit 0, no untrusted config.\n- `node_modules/.bin/mise install` -> exit 0, node lts and bun 1.4.4 already installed.\n- `node_modules/.bin/mise run toolchain` -> exit 0; mise's Bun is `1.4.4-canary.1+3bf1a0646`. The container's `bun` on PATH is stable `1.4.4+38afee6c8`.\n- `node_modules/.bin/mise run verify` -> exit 0; log at /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/mise-verify.log\n  - check: no type errors in 127 files.\n  - lint: no problems in 128 files.\n  - fmt:check: 248 files formatted.\n  - test: 1047 pass, 1 skip, 0 fail (1048 tests, 37 files).\n- `bun run verify` -> exit 0; same counts; log at /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/bun-run-verify.log\n\nblockers: none.\n\nquestions: none.\n\nnotes:\n- Shortest fresh-session sequence: `cd /home/user/holyagent-hook-locks && bun install --frozen-lockfile && node_modules/.bin/mise run verify`. `mise trust` was not needed; mise reported no untrusted config.\n- Future sessions should check `mise run toolchain` first. The postinstall canary upgrade ran earlier in this environment, so it did not run again here.\n- The worktree's `bun install` modifies `.git/hooks` in the shared clone; that is a side effect to note for the root.\n\nblockers: none\nquestions: none\n\nevidence:\ncommands: `bun install --frozen-lockfile` exit 0; `node_modules/.bin/mise trust` exit 0; `node_modules/.bin/mise install` exit 0; `node_modules/.bin/mise run verify` exit 0 (log above); `bun run verify` exit 0 (log above)\nverify: `node_modules/.bin/mise run verify` exit 0; check 127 files no errors, lint 128 files no problems, fmt 248 formatted, test 1047 pass/1 skip/0 fail\n[blocking] mise run verify runs through the dev-dependency mise in the worktree, with its exit code and per-gate counts reported: exit 0, counts above, mise at /home/user/holyagent-hook-locks/node_modules/.bin/mise\n[blocking] The report gives the shortest command sequence that makes the gates work from a fresh session: `cd /home/user/holyagent-hook-locks && bun install --frozen-lockfile && node_modules/.bin/mise run verify`\n[blocking] No tracked file changed: `git status --short` empty and `git diff --stat` empty after all runs\n",
+  "acceptance": {
+    "revision": 2,
+    "rationale": "mise run verify exit 0 through node_modules/.bin/mise with per-gate counts; no tracked change; the .git/hooks rewrite is the repository's own lefthook install from prepare.",
+    "criteria": [
+      {
+        "criterion": "mise run verify runs through the dev-dependency mise in the worktree, with its exit code and per-gate counts reported",
+        "support": "exit 0, counts above, mise at /home/user/holyagent-hook-locks/node_modules/.bin/mise"
+      },
+      {
+        "criterion": "The report gives the shortest command sequence that makes the gates work from a fresh session",
+        "support": "`cd /home/user/holyagent-hook-locks && bun install --frozen-lockfile && node_modules/.bin/mise run verify`"
+      },
+      {
+        "criterion": "No tracked file changed",
+        "support": "`git status --short` empty and `git diff --stat` empty after all runs"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "commands",
+        "support": "`bun install --frozen-lockfile` exit 0; `node_modules/.bin/mise trust` exit 0; `node_modules/.bin/mise install` exit 0; `node_modules/.bin/mise run verify` exit 0 (log above); `bun run verify` exit 0 (log above)"
+      },
+      {
+        "label": "verify",
+        "support": "`node_modules/.bin/mise run verify` exit 0; check 127 files no errors, lint 128 files no problems, fmt 248 formatted, test 1047 pass/1 skip/0 fail"
+      }
+    ]
   },
   "createdAt": "2026-11-03T15:34:56.980Z"
 }
