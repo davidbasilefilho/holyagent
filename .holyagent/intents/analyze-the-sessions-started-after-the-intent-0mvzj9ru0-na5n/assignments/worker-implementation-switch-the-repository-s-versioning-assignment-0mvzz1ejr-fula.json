@@ -58,5 +58,34 @@
     "finishedAt": "2026-11-03T00:53:21.073Z"
   },
   "result": "result: Versioning is now ZeroVer 0.X.Y only: the hotfix mode, task, script and `0.X.Y-Z` wording are removed, and every version reads 0.2.0.\n\nchanged:\n- /home/user/holyagent/scripts/bump-version.ts\n- /home/user/holyagent/scripts/bump-version.test.ts\n- /home/user/holyagent/mise.toml\n- /home/user/holyagent/package.json\n- /home/user/holyagent/docs/development.md\n- /home/user/holyagent/.claude-plugin/marketplace.json (0.2.0)\n- /home/user/holyagent/bun.lock (0.2.0)\n- /home/user/holyagent/packages/runtime/package.json (0.2.0)\n- /home/user/holyagent/packages/integrations/claude/package.json (0.2.0)\n- /home/user/holyagent/packages/integrations/claude/dist/.claude-plugin/plugin.json (0.2.0)\n- /home/user/holyagent/packages/integrations/claude/dist/scripts/holyagent.js (rebuilt)\n\nchecks:\n- `bun check --no-script` -> 0, no type errors in 121 files.\n- `bun lint --no-script` -> 0, no problems in 122 files.\n- `bun fmt --no-script --check` -> 0, 241 files formatted.\n  - The first run failed on `scripts/bump-version.ts` and `scripts/bump-version.test.ts`; I ran `bun fmt` and the check then passed.\n  - The full test run was before that formatting pass, so only `scripts/bump-version.test.ts` was re-run afterwards: 37 pass.\n- `bun test` -> 0, 994 pass, 1 skip, 0 fail.\n- `bun packages/integrations/claude/build.ts` -> 0, built 34 files.\n\nblockers: none\nquestions: none\nnotes:\n- `parseVersion` still accepts a legacy `-Z` suffix on input and drops it, so a suffixed current version bumps to `0.(X+1).0` or `0.X.(Y+1)`. The suffix is never written. Passing `hotfix` on the command line now fails with `Usage`.\n- The word \"hotfix\" remains only in a test that checks `hotfix` is rejected as a command-line argument, and in the legacy-suffix wording above.\n- Diff for review: /tmp/claude-0/-home-user-holyagent/4ed813b5-dc1d-5f26-9e40-d77f95591930/scratchpad/zerover.diff (tracked files only).\n\nevidence:\nScheme: `rg -i \"hotfix|0\\.X\\.Y-Z\"` found only `mise.toml`, `package.json`, `docs/development.md`, `scripts/bump-version.ts` and `scripts/bump-version.test.ts` before the edit, and I edited all five. The `bump:hotfix` task and script are gone. The tests cover minor and patch, including from `0.3.2-1`, in `bumpVersion` and `bumpVersions`. `bun test scripts/bump-version.test.ts` -> 37 pass.\nVersion: the grep of `package.json` files, `.claude-plugin/marketplace.json`, `dist/.claude-plugin/plugin.json` and `bun.lock` shows 0.2.0 in all. The \"repository's versions\" test passes in the full run.\nGates: `bun check --no-script` 0, `bun lint --no-script` 0, `bun fmt --no-script --check` 0, `bun test` 0, all after the dist rebuild.\nchanged-paths: listed under changed above.\nchecks-run: listed under checks above.\n",
+  "acceptance": {
+    "revision": 11,
+    "carriedFrom": 10,
+    "rationale": "Revision 11 only records the merge approval; hotfix scheme removed, tests cover suffixed input (37 pass), all manifests 0.2.0, full gates exit 0.",
+    "criteria": [
+      {
+        "criterion": "Scheme: no hotfix mode, task, script or 0.X.Y-Z wording remains outside history; bump-version tests cover minor and patch, including from a suffixed current version, and pass",
+        "support": "`rg -i \"hotfix|0\\.X\\.Y-Z\"` found only `mise.toml`, `package.json`, `docs/development.md`, `scripts/bump-version.ts` and `scripts/bump-version.test.ts` before the edit, and I edited all five. The `bump:hotfix` task and script are gone. The tests cover minor and patch, including from `0.3.2-1`, in `bumpVersion` and `bumpVersions`. `bun test scripts/bump-version.test.ts` -> 37 pass."
+      },
+      {
+        "criterion": "Version: every manifest, package.json, bun.lock and generated plugin.json read 0.2.0",
+        "support": "the grep of `package.json` files, `.claude-plugin/marketplace.json`, `dist/.claude-plugin/plugin.json` and `bun.lock` shows 0.2.0 in all. The \"repository's versions\" test passes in the full run."
+      },
+      {
+        "criterion": "Gates: bun check, bun lint, bun fmt --check and bun test exit 0 after rebuilding dist",
+        "support": "`bun check --no-script` 0, `bun lint --no-script` 0, `bun fmt --no-script --check` 0, `bun test` 0, all after the dist rebuild."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "listed under changed above."
+      },
+      {
+        "label": "checks-run",
+        "support": "listed under checks above."
+      }
+    ]
+  },
   "createdAt": "2026-11-03T00:50:30.760Z"
 }
