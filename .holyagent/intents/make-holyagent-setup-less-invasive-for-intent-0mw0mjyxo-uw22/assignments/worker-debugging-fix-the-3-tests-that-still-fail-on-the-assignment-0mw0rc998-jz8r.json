@@ -5,7 +5,7 @@
   "roleTask": "Worker.debugging",
   "slug": "fix-the-3-tests-that-still-fail-on-the",
   "objective": "Fix the 3 tests that still fail on the windows-latest CI job of release/0.2.0/fix/windows-tests so the job passes, without skipping or weakening them.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Checkout: /home/user/holyagent on branch release/0.2.0/fix/windows-tests (head b1dec34). The CI job log for b319468 is at /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/job-125958444273.log (1028 pass, 12 skip, 3 fail; search for '(fail)' and the error text above each).",
     "Failing tests: (a) 'agents > agent files sit where the plugin expects them'; (b) 'hook session-start, after a resume or compaction > keeps the static text first and the whole within the context budget for a large state' (hit the 5000ms default timeout on Windows); (c) 'whether a file of the repository can be run > is its execute bit where the file system has one'.",
@@ -56,5 +56,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T14:02:50.123Z"
+  },
   "createdAt": "2026-11-03T14:02:46.364Z"
 }
