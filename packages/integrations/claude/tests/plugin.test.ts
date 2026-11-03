@@ -410,6 +410,72 @@ describe("agents", () => {
       expect({ part, found: requirement?.includes(part) }).toEqual({ part, found: true })
   })
 
+  test("the root never asks whether or how to merge reviewed green PRs: it reports them ready, and merges on the user's word by convention, earlier answer, then default", () => {
+    const content = (agent("holyagent")?.content ?? "").replace(/\s+/g, " ")
+    for (const part of [
+      "do not ask whether to merge or how; report them in the final report as ready to merge and wait",
+      "merging needs the user to name it",
+      "merge at once without asking the method",
+      "the repository's convention (merge settings, CONTRIBUTING, the history of merged PRs)",
+      "else the method the user chose earlier, else the holyagent default",
+      "retarget the next PR to the base, since its commits are no longer in the base's history: if the base's tree equals the merged PR's head tree, reconcile the next branch with `git merge -s ours <base>`",
+      "the reviewed green PRs that are ready to merge and wait for the user to say so (asking nothing about merging)",
+    ])
+      expect({ part, found: content.includes(part) }).toEqual({ part, found: true })
+    const ciWatch = generated.find((file) =>
+      file.path.endsWith("skills/ci-watch/SKILL.md"),
+    )?.content
+    expect(ciWatch).toContain("report the PR as ready to merge and do not ask whether to merge")
+    expect(ciWatch).not.toContain("merging still needs the user's approval")
+    const requirements = read("packages/runtime/src/instructions", "requirements.md")
+    for (const id of ["R-NOASK", "R-MERGEWAIT"])
+      expect({ id, found: requirements.includes(`- ${id}:`) }).toEqual({ id, found: true })
+  })
+
+  test("the root asks only a question that passes one general test, with the common unnecessary questions as illustrations and the rules that say when to ask agreeing", () => {
+    const content = (agent("holyagent")?.content ?? "").replace(/\s+/g, " ")
+    for (const part of [
+      "A question is unnecessary when its answer would not change what you do, or when something already settles it",
+      "the target repository's conventions",
+      "a default that holyagent's rules or the repository define",
+      "a fact a specialist can establish",
+      "Ask only a question that passes this test",
+      "These common questions fail the test",
+      "whether to merge reviewed green PRs, or by which method",
+      "whether to delete branches",
+      "confirmation of a plan the user did not ask for",
+      "whether to continue or to wait",
+      "Ask only when the answer would change what you do",
+    ])
+      expect({ part, found: content.includes(part) }).toEqual({ part, found: true })
+    expect(content).not.toContain("Ask only when the answer materially changes the result")
+    const requirement = read("packages/runtime/src/instructions", "requirements.md")
+    expect(requirement).toContain("- R-NOASK:")
+  })
+
+  test("every specialist, reviewers included, is told never to change HEAD, a branch, the index or the working tree of a shared checkout", () => {
+    const rule =
+      "Never change HEAD, a branch, the index or the working tree of a checkout other workers share with git commands (`switch`, `restore`, `clean`, `add`, `rebase`, `cherry-pick`)"
+    const alternatives =
+      "`git show <sha>:<path>`, `git diff`, or `git archive <sha>` extracted into the scratchpad"
+    for (const route of ROUTES) {
+      const text = agent(route.agent)?.content ?? ""
+      expect({ agent: route.agent, rule: text.includes(rule) }).toEqual({
+        agent: route.agent,
+        rule: true,
+      })
+      expect({ agent: route.agent, alternatives: text.includes(alternatives) }).toEqual({
+        agent: route.agent,
+        alternatives: true,
+      })
+    }
+    expect(agent("reviewer-code")?.content).toContain("never `git checkout`")
+    expect(agent("reviewer-testing")?.content).toContain(
+      "never `git checkout` in the shared checkout",
+    )
+    expect(agent("holyagent")?.content).not.toContain(rule)
+  })
+
   test("the static root text holds no cloud identity guidance: the session-start hook adds it in a cloud session", () => {
     const content = agent("holyagent")?.content ?? ""
     for (const part of ["get_me", "vcs identity", "users.noreply.github.com"])
@@ -664,7 +730,7 @@ describe("agents", () => {
       "a Conventional Commit",
       "PRs merge by squash by default, with the PR title as the Conventional summary",
       "The repository's conventions, branch protection and merge settings come first",
-      "After a lower PR squash-merges, merge the base into the next branch",
+      "After a lower PR squash-merges, retarget the next PR to the base",
     ])
       expect({ part, found: text.includes(part) }).toEqual({ part, found: true })
     for (const part of [

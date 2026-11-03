@@ -302,7 +302,15 @@ export const REQUIREMENT_SECTIONS: Readonly<
     section: "skills/ci-watch/SKILL.md",
     phrase: "Watch with Monitor running `gh pr checks <n> --watch`",
   },
+  "R-NOASK": {
+    section: "root/asking.md",
+    phrase: "A question is unnecessary when its answer would not change what you do",
+  },
   "R-ASK": { section: "root/asking.md", phrase: "Ask one decision at a time" },
+  "R-MERGEWAIT": {
+    section: "root/version-control.md",
+    phrase: "do not ask whether to merge or how",
+  },
   "R-GUIDE": { section: "skills/instruction-writing/SKILL.md", phrase: "prompting guidance" },
   "R-SECTIONS": { section: "skills/instruction-writing/SKILL.md", phrase: "in its own file" },
   "R-CONTEXT": {
@@ -330,6 +338,11 @@ export const REQUIREMENT_SECTIONS: Readonly<
   "R-S-LANG": { section: "specialist/scope.md", phrase: "in English unless" },
   "R-S-INDEP": { section: "specialist/scope.md", phrase: "independence rule" },
   "R-S-VCS": { section: "specialist/state-changes.md", phrase: "Leave to the root every command" },
+  "R-S-HEAD": {
+    section: "specialist/state-changes.md",
+    phrase:
+      "Never change HEAD, a branch, the index or the working tree of a checkout other workers share",
+  },
   "R-S-CHECK": {
     section: "specialist/working.md",
     phrase: "run the ones that exercise your change now",
