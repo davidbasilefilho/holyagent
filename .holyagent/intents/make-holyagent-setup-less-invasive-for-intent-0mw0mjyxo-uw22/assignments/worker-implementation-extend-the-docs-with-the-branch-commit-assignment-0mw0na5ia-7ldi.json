@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "extend-the-docs-with-the-branch-commit",
   "objective": "Extend the docs with the branch, commit and merge defaults, what claude.ai can and cannot be configured to do about branch pushes, the compaction-window calculation, record-based undo, and the updated commit/push reminder.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "docs/usage.md (Opinionated by design, Scope and undo, claude.ai section), docs/decisions.md, docs/hooks.md (vcs-reminder description is stale: it now names --no-verify, --no-gpg-sign, --amend, rebase -i and reset --hard), docs/commit-authorship.md if it mentions the assigned branch"
   ],
@@ -54,5 +54,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T12:09:15.322Z"
+  },
   "createdAt": "2026-11-03T12:09:09.730Z"
 }
