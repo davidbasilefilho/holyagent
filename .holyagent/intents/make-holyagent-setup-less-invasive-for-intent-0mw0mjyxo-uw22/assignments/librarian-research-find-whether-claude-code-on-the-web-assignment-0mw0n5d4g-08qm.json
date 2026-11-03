@@ -5,7 +5,7 @@
   "roleTask": "Librarian.research",
   "slug": "find-whether-claude-code-on-the-web",
   "objective": "Find whether Claude Code on the web (claude.ai cloud sessions) restricts git pushes to the session's assigned claude/<name> branch, and which setting or environment option lets a session push branches with other names.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Official docs: https://code.claude.com/docs/en/claude-code-on-the-web and related pages (environments, network, GitHub proxy, branch/push permissions), the claude.ai environment settings, anthropics/claude-code issues about branch push restrictions in web sessions"
   ],
@@ -31,5 +31,10 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-03T12:05:30.262Z"
+  },
   "createdAt": "2026-11-03T12:05:26.320Z"
 }
