@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-four-blocking-gaps-and-the",
   "objective": "Repair the four blocking gaps and the notes from the review of the evidence-judging commit so the instruction text is complete and consistent.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw0oqnmw-bk8i.md (blockers 1-4 and notes) and the notes in /home/user/holyagent/.git/holyagent/reports/assignment-0mw0oqvk8-nrv7.md",
     "packages/runtime/src/instructions/claude-5.5/ (root/assignments.md, skills/evidence-judging, skills/visual-judging, roles/reviewer-artifact, roles/explorer-*), requirements.md, the tests that pin them, docs/decisions.md, docs/usage.md"
@@ -48,7 +48,37 @@
     "agentId": "workflow:wf_8af33913-49a/assignment-0mw0ov8hq-p408",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-03T12:53:32.991Z"
+    "startedAt": "2026-11-03T12:53:32.991Z",
+    "finishedAt": "2026-11-03T12:57:23.515Z"
+  },
+  "result": "result: Blockers 1-4 and the notes are fixed in the instruction text. `mise run build` and `mise run verify` both pass.\n\nchanged (all under /home/user/holyagent):\n- docs/decisions.md, docs/usage.md\n- packages/integrations/claude/src/agents.ts, packages/integrations/claude/tests/plugin.test.ts\n- packages/integrations/claude/dist/ (rebuilt): agents/{explorer-lookup,explorer-map,explorer-trace,holyagent,reviewer-artifact}.md, skills/{evidence-judging,visual-judging}/SKILL.md\n- packages/runtime/src/instructions/requirements.md\n- packages/runtime/src/instructions/claude-5.5/: roles/{explorer-lookup,explorer-map,explorer-trace,reviewer-artifact}/method.md, root/assignments.md, skills/{evidence-judging,visual-judging}/SKILL.md\n\nchecks:\n- `node_modules/.bin/mise run build` -> exit 0, 35 files built.\n- `node_modules/.bin/mise run verify` -> exit 0. Type-check clean (124 files), lint clean (125 files), format clean (245 files), tests 1035 pass, 1 skip, 0 fail.\n\nblockers: none\nquestions: none\n\nnotes:\n- The explorer options line went into all three explorer methods (lookup, map, trace), since the review named all three. Say if lookup should drop it.\n- I edited the `R-ACCEPT` and `R-EVIDENCE` phrases in agents.ts to follow the new wording.\n- I edited the files with a python script instead of the Edit tool. Each replacement was asserted to match exactly once.\n- Full diff: /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/repair.diff (tracked files only; no new files were created).\n\nevidence:\nblockers:\n- 1: roles/reviewer-artifact/method.md now sets the prose bar (audience, claims against sources, tone, what a skeptical reader needs) and tells it to quote each excerpt it flags. `R-RA` in requirements.md says the same.\n- 2: evidence-judging says the root's brief asks an explorer for two or three short options with trade-offs. Each explorer method.md has one added line to return options short with trade-offs.\n- 3: assignments.md no longer repeats the visual rules. It points to `visual-judging`, where \"round N of 3\" and the three-round limit now live. The plugin test no longer pins \"never open screenshots in the main thread\" and instead pins the pointer text. docs/decisions.md describes the exception.\n- 4: evidence-judging names the three kinds of evidence: a reproduction from a reviewer with a shell, a file:line trace from one without, and a Reviewer.visual observation (viewport, interaction, visible result). assignments.md and `R-EVIDENCE` point to it.\nnotes: assignments.md now says \"diff summary\". The three-round rule is stated in `visual-judging`, with pointers from assignments.md and `R-VISUAL`. docs/usage.md drops the incomplete parenthetical and keeps the full seven-skill list. plugin.test.ts now asserts \"the artifact, code, testing and security reviews\" for the sonnet line.\ngates: `mise run verify` exit 0 after `mise run build`, with 1035 pass, 0 fail.\nchecks-run: `mise run build` exit 0; `mise run verify` exit 0.\nchanged-paths: listed under changed above.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "blockers 1-4 and notes fixed; verify exit 0 (1035 pass)",
+    "criteria": [
+      {
+        "criterion": "blockers: review blockers 1-4 resolved",
+        "support": "1: roles/reviewer-artifact/method.md now sets the prose bar (audience, claims against sources, tone, what a skeptical reader needs) and tells it to quote each excerpt it flags. `R-RA` in requirements.md says the same.; 2: evidence-judging says the root's brief asks an explorer for two or three short options with trade-offs. Each explorer method.md has one added line to return options short with trade-offs.; 3: assignments.md no longer repeats the visual rules. It points to `visual-judging`, where \"round N of 3\" and the three-round limit now live. The plugin test no longer pins \"never open screenshots in the main thread\" and instead pins the pointer text. docs/decisions.md describes the exception.; 4: evidence-judging names the three kinds of evidence: a reproduction from a reviewer with a shell, a file:line trace from one without, and a Reviewer.visual observation (viewport, interaction, visible result). assignments.md and `R-EVIDENCE` point to it."
+      },
+      {
+        "criterion": "notes: review notes addressed",
+        "support": "assignments.md now says \"diff summary\". The three-round rule is stated in `visual-judging`, with pointers from assignments.md and `R-VISUAL`. docs/usage.md drops the incomplete parenthetical and keeps the full seven-skill list. plugin.test.ts now asserts \"the artifact, code, testing and security reviews\" for the sonnet line."
+      },
+      {
+        "criterion": "gates: mise run verify passes with dist rebuilt",
+        "support": "`mise run verify` exit 0 after `mise run build`, with 1035 pass, 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`mise run build` exit 0; `mise run verify` exit 0."
+      },
+      {
+        "label": "changed-paths",
+        "support": "listed under changed above."
+      }
+    ]
   },
   "createdAt": "2026-11-03T12:53:32.991Z"
 }
