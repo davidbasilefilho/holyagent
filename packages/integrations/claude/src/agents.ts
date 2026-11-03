@@ -286,7 +286,10 @@ export const REQUIREMENT_SECTIONS: Readonly<
     section: "root/identity.md",
     phrase: "Never force-push, and never push to the base, default or a protected branch",
   },
-  "R-BRANCH": { section: "root/version-control.md", phrase: "When the platform assigns a branch" },
+  "R-BRANCH": {
+    section: "root/version-control.md",
+    phrase: "Never work on a branch the platform assigns",
+  },
   "R-STATE": {
     section: "skills/state-mode/SKILL.md",
     phrase: "set the mode with `holyagent state mode <mode>`",
