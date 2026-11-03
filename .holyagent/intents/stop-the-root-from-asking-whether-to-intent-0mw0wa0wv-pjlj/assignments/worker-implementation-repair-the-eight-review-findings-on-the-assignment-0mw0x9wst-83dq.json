@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-eight-review-findings-on-the",
   "objective": "Repair the eight review findings on the uncommitted asking, merge and specialist-HEAD instruction changes in /home/user/holyagent-hook-locks.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree /home/user/holyagent-hook-locks, branch release/0.2.0/fix/no-merge-question, uncommitted. The full review with exact excerpts is at /tmp/claude-0/-home-user-holyagent/b1af37dd-2976-516b-9354-81a5e7eae819/scratchpad/review-q.md; fix all eight findings as follows.",
     "1) The test must not make every AskUserQuestion fail: settling defaults are only those holyagent's rules or the repository define, not the root's own recommendation for the question; drop the 'choice between options when one is the recommended default' illustration. Keep the deliberate asks (for example the push-refusal question) consistent with the test.",
@@ -48,5 +48,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mw0wvsd2-3png",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T16:48:59.613Z"
+  },
   "createdAt": "2026-11-03T16:48:54.605Z"
 }
