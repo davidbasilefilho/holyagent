@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "add-the-git-safety-rules-holyagent-lost",
   "objective": "Add the git safety rules HolyAgent lost when setup turned off Claude Code's built-in git instructions to the root's version-control instruction text and to the vcs-reminder hook.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Gap analysis to work from: /home/user/holyagent/.git/holyagent/reports/assignment-0mw0mpn8a-yva8.md (items S1-S7, N2, N3)",
     "packages/runtime/src/instructions/claude-5.5/root/version-control.md (and pr-text.md for N2/N3)",
@@ -53,5 +53,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-03T12:00:58.664Z"
+  },
   "createdAt": "2026-11-03T12:00:54.024Z"
 }
