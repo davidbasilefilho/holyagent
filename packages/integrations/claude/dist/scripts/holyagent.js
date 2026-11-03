@@ -10120,7 +10120,7 @@ var claim = (file) => gen2(function* () {
   return owner.token;
 });
 var HOOK_WAIT_MS = 5000;
-var within = (ms) => map4(currentTimeMillis2, (now) => ({ until: now + ms }));
+var deadlineIn = (ms) => map4(currentTimeMillis2, (now) => ({ until: now + ms }));
 var STATE_PATIENCE = "short";
 var WORKTREE_PATIENCE = "long";
 var WAITS = {
@@ -12646,7 +12646,7 @@ class Shell extends Service()("holyagent/Shell") {
 }
 
 var SCOPES = ["user", "project", "local"];
-var within2 = (parent, child) => {
+var within = (parent, child) => {
   const path = relative4(parent, child);
   return path === "" || path !== ".." && !path.startsWith(`..${sep6}`) && !isAbsolute2(path);
 };
@@ -12667,7 +12667,7 @@ var settingsFile = fn2("settingsFile")(function* (env, scope, cwd) {
   const named = top.exitCode === 0 && line !== "" ? resolve5(line) : undefined;
   const realTop = named === undefined ? undefined : yield* real(named);
   const realCwd = yield* real(cwd);
-  const trusted = named !== undefined && realTop !== undefined && realCwd !== undefined && within2(realTop, realCwd) && (yield* present2(join11(named, ".git")));
+  const trusted = named !== undefined && realTop !== undefined && realCwd !== undefined && within(realTop, realCwd) && (yield* present2(join11(named, ".git")));
   const root = trusted ? named : cwd;
   const notice = trusted ? undefined : named === undefined ? `not inside a git repository; using ${cwd}` : `git names ${named} as the top-level, which is not the current directory or an ancestor holding a .git entry; using ${cwd}`;
   const folder = join11(root, ".claude");
@@ -19942,7 +19942,7 @@ var HOOK_COMMANDS = [
     return gen2(function* () {
       if (agentId === undefined)
         return yield* new AgentIdMissing;
-      const patience = yield* within(HOOK_WAIT_MS);
+      const patience = yield* deadlineIn(HOOK_WAIT_MS);
       const { directory } = yield* resolveState(call.cwd, call.env, "ifPresent", false, patience);
       if (!(yield* hasStateFolder(directory)))
         return yield* new StateFolderMissing;
