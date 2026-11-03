@@ -42,9 +42,10 @@
     "Decision: the instruction-writing guidance tells agents writing or editing context files (AGENTS.md, CLAUDE.md and similar) to leave out information that changes, such as code paths and documentation paths, because it hurts agent performance (arXiv 2601.20404); the repository convention comes first, and an existing file that departs from this is changed only when the user asks.",
     "Decision (user chose): bump the version to 0.2.0 (minor) in a new PR from main after #48, and merge it once CI is green.",
     "User (verbatim, pt-BR): quero que mude o versioning scheme a partir de agora antes de dar merge no mesmo pr / só zerover mesmo 0.X.Y",
-    "Decision: from now on versions follow ZeroVer 0.X.Y only, with no -Z hotfix suffix: remove the hotfix bump (script mode, mise task, package.json script, tests, docs); this change ships in the same PR as the 0.2.0 bump."
+    "Decision: from now on versions follow ZeroVer 0.X.Y only, with no -Z hotfix suffix: remove the hotfix bump (script mode, mise task, package.json script, tests, docs); this change ships in the same PR as the 0.2.0 bump.",
+    "User (verbatim, pt-BR): depois pode dar merge — the root merges the ZeroVer and 0.2.0 PR once review accepts and CI is green."
   ],
-  "revision": 10,
+  "revision": 11,
   "state": "Open",
   "createdAt": "2026-11-02T17:29:07.369Z"
 }
