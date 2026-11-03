@@ -996,6 +996,9 @@ describe("agents", () => {
 const available = (await $`claude --version`.quiet().nothrow()).exitCode === 0
 
 describe("claude plugin validate", () => {
+  // The external claude CLI starts a fresh process per check; on a loaded machine (the parallel
+  // verify gates, other workers) that can outlast the 5 s default, so the checks get a longer one.
+  const VALIDATE_TIMEOUT = 30_000
   const check = async (directory: string) => {
     const result = await $`claude plugin validate --strict ${directory}`.quiet().nothrow()
     return { code: result.exitCode, text: `${result.stdout.toString()}${result.stderr.toString()}` }
@@ -1011,17 +1014,25 @@ describe("claude plugin validate", () => {
     expect(own).not.toMatch(/×|Found \d+ (?:error|warning)/)
   }
 
-  test.skipIf(!available)("the built plugin passes strict validation", async () => {
-    const { code, text } = await check(PLUGIN)
-    expect(code).toBe(0)
-    clean(text)
-  })
+  test.skipIf(!available)(
+    "the built plugin passes strict validation",
+    async () => {
+      const { code, text } = await check(PLUGIN)
+      expect(code).toBe(0)
+      clean(text)
+    },
+    VALIDATE_TIMEOUT,
+  )
 
-  test.skipIf(!available)("the repository root marketplace passes strict validation", async () => {
-    const { code, text } = await check(ROOT)
-    expect(code).toBe(0)
-    clean(text)
-  })
+  test.skipIf(!available)(
+    "the repository root marketplace passes strict validation",
+    async () => {
+      const { code, text } = await check(ROOT)
+      expect(code).toBe(0)
+      clean(text)
+    },
+    VALIDATE_TIMEOUT,
+  )
 
   test.skipIf(available)("is skipped because the claude CLI is not installed", () => {
     console.warn("claude is not on PATH: plugin validation did not run")
