@@ -1,0 +1,42 @@
+{
+  "id": "assignment-0mw283y4r-pb2r",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Worker.mechanical",
+  "slug": "reword-two-stale-mentions-of-the-removed",
+  "objective": "Reword two stale mentions of the removed same-repository command in /home/user/holyagent-ci-release-flow/docs/development.md.",
+  "state": "Running",
+  "scope": [
+    "In /home/user/holyagent-ci-release-flow/docs/development.md, the branch-model table row (about line 115) and the paragraph below the table (about line 118) name `same-repository`, a pr-checks.ts command that no longer exists. The fork guard is now an inline shell step that runs first in the branch-model and version jobs, before checkout, comparing the head repository with this repository case-insensitively. Reword both mentions to say that, keeping the rest of the text and the table alignment (run 'bunx --no-install mise run fmt' in the worktree afterwards)."
+  ],
+  "constraints": [
+    "Change only that file. Make no version-control writes. Run 'bunx --no-install mise run fmt:check' in /home/user/holyagent-ci-release-flow after formatting.",
+    "Report in under 150 words."
+  ],
+  "criteria": [
+    {
+      "text": "No mention of same-repository remains and the text describes the inline guard",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "fmt:check exits 0",
+      "blocking": true,
+      "dimension": "style"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "docs/development.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-04T14:39:58.347Z"
+  },
+  "createdAt": "2026-11-04T14:39:58.347Z"
+}
