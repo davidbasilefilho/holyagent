@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-review-findings-on-release-0",
   "objective": "Repair the review findings on release/0.2.1/feat/holyagent-rules in the worktree /home/user/holyagent-feat-holyagent-rules (commit a79b22a).",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Context: /home/user/holyagent-work/spec-0.2.1.md Part B and /home/user/holyagent-work/b2-transcript.md. The reviews are at /home/user/holyagent/.git/holyagent/reports/assignment-0mw26gwko-bxr4.md (artifact) and assignment-0mw26gwa9-jdwx.md (code).",
     "Blocking (artifact 1, B1 no-duplication): the precedence bullet is copied in root/identity.md and specialist/scope.md. Put it in one shared source file that the generator embeds into the root core and into the specialist text (the way specialist/state-changes.md is shared); replace the drift test with a test that both prompts carry it once; drop the near-copy in requirements.md if it restates rather than requires.",
@@ -71,7 +71,45 @@
     "agentId": "workflow:wf_11752da1-871/assignment-0mw27auxg-42ic",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-04T14:17:21.173Z"
+    "startedAt": "2026-11-04T14:17:21.173Z",
+    "finishedAt": "2026-11-04T14:32:42.192Z"
+  },
+  "result": "result: all listed review findings are fixed; the plugin is rebuilt and `bunx --no-install mise run verify` exits 0.\n\nchanged (worktree /home/user/holyagent-feat-holyagent-rules, uncommitted; the diff is `/tmp/claude-0/-home-user-holyagent/70184bfa-8a56-57cb-a6cf-d92f87c7692b/scratchpad/repair.diff`):\n- Sources, all under `packages/runtime/src/instructions/`:\n  - New `claude-5.5/shared/precedence.md`.\n  - `claude-5.5/root-core.ts`.\n  - `claude-5.5/root/{identity,stack-plan,version-control,assignments}.md`.\n  - `claude-5.5/specialist/{scope,code-quality,merge-ready}.md`.\n  - `claude-5.5/roles/reviewer-code/{range,builtin-review}.md`.\n  - `requirements.md`.\n  - `requirements/mergeability.md`.\n- Code and docs: new `packages/runtime/src/cli/git-push.ts`, plus `packages/runtime/src/cli/hook.ts`, `packages/integrations/claude/src/agents.ts`, `docs/hooks.md`, `docs/requirements.md`.\n- Tests: `packages/runtime/tests/sessioncontext.test.ts`, `packages/integrations/claude/tests/{plugin,hooks}.test.ts`.\n- Generated: `packages/integrations/claude/dist/**`.\n- Outside my ownership paths: `packages/integrations/claude/src/generate.ts`. `hooks.json` is generated from it, so the new `Bash(*vcs*commit*)` and `Bash(*vcs*pr*)` rules (finding 4) could only go in there.\n\nchecks:\n- `bunx --no-install mise run build` -> exit 0.\n- `bunx --no-install mise run verify` -> exit 0: type-check clean, 1070 pass, 1 skip, 0 fail. Log: `/home/user/holyagent-work/logs/verify-repair2.log`.\n- I did not rerun the new tests against the base, so \"fails without the change\" is by reasoning only.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- The `Bash(*vcs*commit*)` and `Bash(*vcs*pr*)` glob rules are not probed against Claude Code; `hooks.md` says so. The hook itself matches `vcs commit` or `vcs pr` as whole words, so `vcs prune` gets nothing.\n- I edited files with small bun scripts as well as Edit; the diff is what matters.\n- `docs/usage.md` still says a cloud session \"starts on\" `claude/<name>`; it is outside my paths.\n- Findings 1, 4 and 6 are fixed as the brief listed. Sources were my call: 1 and 3 are folded into the new `shared/precedence.md`. Findings 8 and 9 and the code findings follow the brief too.\n- Finding 3: `code-quality.md` now says a writer extracts inside its ownership paths and reports duplication elsewhere under `notes:`. Duplication and performance findings block only when they also break something a blocking rule names. I removed the severity text from `merge-ready.md`, `mergeability.md` and `assignments.md`, which now point to `code-quality.md`.\n\nevidence:\nThe precedence text has one source embedded in the root core and the specialist text, with a test: `shared/precedence.md` is embedded via `PRECEDENCE_FILE` in `ROOT_CORE_FILES` and `SPECIALIST_SECTIONS`. The `plugin.test.ts` test \"the precedence has one source file…\" asserts 1 copy in the root and in every specialist, and no other source in `root/` or `specialist/` states it. The copy in `requirements.md` is removed (`R-S-PRECEDENCE`).\nEach listed review finding is fixed or explained: artifact 1-9 and code 1, 2 and 4 as listed in the brief, with notes above. Tests: `plugin.test.ts` (code-quality ownership, branch rule, base definition, `<base>` removed from `reviewer-code`, stack-plan wording) and `sessioncontext.test.ts`.\nThe hook's push and vcs-command detection is tested, including the commit-message false positive: `hooks.test.ts` has `git commit -m 'fix: push claude/foo handling'`, `git push origin feat && cat claude/notes.md` and six other negatives. It also covers push spellings through `sudo`, `-C`, `-c`, `-o`, `bash -c` and env assignments, and `vcs commit` and `vcs pr` on `claude/*` and on other branches. The glob rules are tested in `plugin.test.ts`.\nThe plugin is rebuilt and mise run verify passes: build exit 0; verify exit 0, 1070 pass, 0 fail.\nchecks-run: `bunx --no-install mise run fmt` (clean), `build` (exit 0), `verify` (exit 0, 1070 pass, 1 skip, 0 fail).\nchanged-paths: listed under changed above.\nsession-start-size: `ROOT_CORE` is 5997 characters. The fixed cloud parts total 7681. The cap is 9300, and the \"leaves room\" test passes at the cap minus 1000.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Verify exit 0 (1070 pass); single precedence source with test; hook detection tests incl. false positives.",
+    "criteria": [
+      {
+        "criterion": "The precedence text has one source embedded in the root core and the specialist text, with a test",
+        "support": "`shared/precedence.md` is embedded via `PRECEDENCE_FILE` in `ROOT_CORE_FILES` and `SPECIALIST_SECTIONS`. The `plugin.test.ts` test \"the precedence has one source file…\" asserts 1 copy in the root and in every specialist, and no other source in `root/` or `specialist/` states it. The copy in `requirements.md` is removed (`R-S-PRECEDENCE`)."
+      },
+      {
+        "criterion": "Each listed review finding is fixed or explained",
+        "support": "artifact 1-9 and code 1, 2 and 4 as listed in the brief, with notes above. Tests: `plugin.test.ts` (code-quality ownership, branch rule, base definition, `<base>` removed from `reviewer-code`, stack-plan wording) and `sessioncontext.test.ts`."
+      },
+      {
+        "criterion": "The hook's push and vcs-command detection is tested, including the commit-message false positive",
+        "support": "`hooks.test.ts` has `git commit -m 'fix: push claude/foo handling'`, `git push origin feat && cat claude/notes.md` and six other negatives. It also covers push spellings through `sudo`, `-C`, `-c`, `-o`, `bash -c` and env assignments, and `vcs commit` and `vcs pr` on `claude/*` and on other branches. The glob rules are tested in `plugin.test.ts`."
+      },
+      {
+        "criterion": "The plugin is rebuilt and mise run verify passes",
+        "support": "build exit 0; verify exit 0, 1070 pass, 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bunx --no-install mise run fmt` (clean), `build` (exit 0), `verify` (exit 0, 1070 pass, 1 skip, 0 fail)."
+      },
+      {
+        "label": "changed-paths",
+        "support": "listed under changed above."
+      },
+      {
+        "label": "session-start-size",
+        "support": "`ROOT_CORE` is 5997 characters. The fixed cloud parts total 7681. The cap is 9300, and the \"leaves room\" test passes at the cap minus 1000."
+      }
+    ]
   },
   "createdAt": "2026-11-04T14:17:21.173Z"
 }
