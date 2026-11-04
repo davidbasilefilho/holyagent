@@ -110,12 +110,19 @@ const strict = { onExcessProperty: "error" } as const
 // place and every other byte stays. A workspace entry is the only place a "name" line is directly
 // followed by a "version" line; the root workspace carries no version and the package entries are
 // arrays.
-const WORKSPACE_VERSION = /("name": "[^"]+",\n\s+"version": ")[^"]*(")/g
+const WORKSPACE_VERSION = /("name": "[^"]+",\r?\n\s+"version": ")[^"]*(")/g
 
 const failWith = (file: string) =>
   Effect.mapError((cause: unknown) => new ManifestError({ file, cause }))
 
-const load = (root: string, file: string) => {
+interface Loaded {
+  readonly file: string
+  readonly path: string
+  readonly manifest: Manifest
+  readonly version: string
+}
+
+const load = (root: string, file: string): Effect.Effect<Loaded, ManifestError> => {
   const path = join(root, file)
   return Effect.gen(function* () {
     const text = yield* Effect.tryPromise(() => Bun.file(path).text())
@@ -144,15 +151,10 @@ const lockfileWithVersion = (text: string, version: string) =>
 
 const CommandArgument = Schema.Literals(["minor", "patch", "sync"])
 
-const writeManifest = (root: string, file: string, version: string) =>
-  Effect.gen(function* () {
-    const loaded = yield* load(root, file)
-    if (loaded.version === version) return false
-    yield* Effect.tryPromise(() =>
-      Bun.write(loaded.path, `${JSON.stringify({ ...loaded.manifest, version }, null, 2)}\n`),
-    ).pipe(failWith(file))
-    return true
-  })
+const writeLoaded = ({ file, path, manifest }: Loaded, version: string) =>
+  Effect.tryPromise(() =>
+    Bun.write(path, `${JSON.stringify({ ...manifest, version }, null, 2)}\n`),
+  ).pipe(failWith(file))
 
 /**
  * Reads the version of the root manifest under `root` and writes the next one back to it, nothing
@@ -163,28 +165,34 @@ export const bumpVersions = (
   kind: BumpKind,
 ): Effect.Effect<{ readonly from: string; readonly to: string }, ManifestError | InvalidVersion> =>
   Effect.gen(function* () {
-    const from = yield* readVersion(root, VERSION_SOURCE)
+    const source = yield* load(root, VERSION_SOURCE)
+    const from = source.version
     const to = formatVersion(bumpVersion(yield* parseVersion(from), kind))
-    yield* writeManifest(root, VERSION_SOURCE, to)
+    yield* writeLoaded(source, to)
     return { from, to }
   })
 
 /**
  * Writes the version of the root manifest under `root` into every workspace manifest and every
  * workspace entry of `bun.lock`, leaving every other byte alone, and returns that version. A file
- * that already carries it is not written. Nothing is written when the source is not `0.X.Y` or the
- * lockfile has no workspace version.
+ * that already carries it is not written. Every file is read and checked before the first write, so
+ * nothing is written when the source is not `0.X.Y`, a copy is unreadable or the lockfile has no
+ * workspace version.
  */
 export const syncVersions = (root: string): Effect.Effect<string, ManifestError | InvalidVersion> =>
   Effect.gen(function* () {
-    const version = yield* readVersion(root, VERSION_SOURCE)
+    const { version } = yield* load(root, VERSION_SOURCE)
     yield* parseVersion(version)
     const lockPath = join(root, LOCKFILE)
     const lockText = yield* Effect.tryPromise(() => Bun.file(lockPath).text()).pipe(
       failWith(LOCKFILE),
     )
     const synced = yield* lockfileWithVersion(lockText, version)
-    yield* Effect.forEach(VERSION_COPIES, (file) => writeManifest(root, file, version))
+    const copies = yield* Effect.forEach(VERSION_COPIES, (file) => load(root, file))
+    yield* Effect.forEach(
+      copies.filter((copy) => copy.version !== version),
+      (copy) => writeLoaded(copy, version),
+    )
     if (synced !== lockText)
       yield* Effect.tryPromise(() => Bun.write(lockPath, synced)).pipe(failWith(LOCKFILE))
     return version

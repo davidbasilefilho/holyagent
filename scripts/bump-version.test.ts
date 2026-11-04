@@ -1,7 +1,15 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
-import { dirname, join } from "node:path"
+import { dirname, join, relative } from "node:path"
 
 import { $ } from "bun"
 import { Effect } from "effect"
@@ -257,11 +265,22 @@ describe("syncVersions", () => {
     expect(state()).toEqual(before)
   })
 
-  test("fails with ManifestError naming a copy that is missing", async () => {
+  test("fails with ManifestError naming a copy that is missing, writing nothing", async () => {
+    write(VERSION_SOURCE, manifest(VERSION_SOURCE, "0.4.0"))
     rmSync(join(root, "packages/integrations/claude/package.json"))
+    const written = [VERSION_SOURCE, "packages/runtime/package.json", LOCKFILE]
+    const before = written.map(read)
     const error = await Effect.runPromise(Effect.flip(syncVersions(root)))
     expect(error).toBeInstanceOf(ManifestError)
     expect(error.message).toContain("packages/integrations/claude/package.json")
+    expect(written.map(read)).toEqual(before)
+  })
+
+  test("syncs a lockfile with CRLF line endings, keeping them", async () => {
+    write(VERSION_SOURCE, manifest(VERSION_SOURCE, "0.4.0"))
+    write(LOCKFILE, lockfile("0.3.2-1").replaceAll("\n", "\r\n"))
+    await Effect.runPromise(syncVersions(root))
+    expect(read(LOCKFILE)).toBe(lockfile("0.4.0").replaceAll("\n", "\r\n"))
   })
 
   test.each([
@@ -321,6 +340,61 @@ describe("the command line", () => {
       expect(err).toContain("error: Usage")
     },
   )
+})
+
+describe("a bump followed by one build", () => {
+  // The build bundles the repository it sits in, so the test runs it in a copy of the sources. The
+  // installed dependencies are linked, not copied, and the built plugin is left out: the build
+  // makes it again.
+  const SKIPPED = ["node_modules", ".git", ".holyagent"]
+  const PLUGIN_DIST = join(repository, "packages/integrations/claude/dist")
+
+  test("leaves every copy, the plugin and marketplace manifests included, at the new version", async () => {
+    const copy = mkdtempSync(join(tmpdir(), "holyagent-build-bump-"))
+    try {
+      cpSync(repository, copy, {
+        recursive: true,
+        filter: (path) =>
+          path !== PLUGIN_DIST && !SKIPPED.includes(relative(repository, path).split("/").at(-1)!),
+      })
+      for (const link of ["node_modules", "packages/runtime/node_modules"])
+        symlinkSync(join(repository, link), join(copy, link))
+      const { to } = await Effect.runPromise(bumpVersions(copy, "minor"))
+      const build =
+        await $`${process.execPath} ${join(copy, "packages/integrations/claude/build.ts")}`
+          .nothrow()
+          .quiet()
+      expect(build.stderr.toString()).toBe("")
+      expect(build.exitCode).toBe(0)
+      const versionOf = async (file: string) =>
+        ((await Bun.file(join(copy, file)).json()) as { version?: string }).version
+      const marketplace = (await Bun.file(
+        join(copy, ".claude-plugin/marketplace.json"),
+      ).json()) as {
+        plugins: Versioned[]
+      }
+      const lock = Bun.JSONC.parse(await Bun.file(join(copy, LOCKFILE)).text()) as {
+        workspaces: Record<string, { version?: string }>
+      }
+      expect({
+        files: await Promise.all(
+          [
+            VERSION_SOURCE,
+            ...VERSION_COPIES,
+            "packages/integrations/claude/dist/.claude-plugin/plugin.json",
+          ].map(versionOf),
+        ),
+        marketplace: marketplace.plugins.map(({ version }) => version),
+        lockfile: Object.values(lock.workspaces).flatMap(({ version }) => version ?? []),
+      }).toEqual({
+        files: [to, to, to, to],
+        marketplace: [to],
+        lockfile: [to, to],
+      })
+    } finally {
+      rmSync(copy, { recursive: true, force: true })
+    }
+  }, 60_000)
 })
 
 describe("the repository's versions", () => {
