@@ -1,0 +1,18 @@
+{
+  "id": "intent-0mw24z6jk-m5ot",
+  "slug": "ship-holyagent-0-2-1-the-release-branch",
+  "objective": "Ship HolyAgent 0.2.1: the release-branch model with enforced validation and publish workflows, one version source, caret dependency ranges with a pin updater, HolyAgent precedence and code rules with the two 0.2.0 session bugs fixed, four stack-agnostic platform design skills with a platform-wide dev-server and a root final visual pass, and a whole-project audit.",
+  "requirements": [
+    "The maintainer's full request is binding and is stored verbatim at /home/user/holyagent-work/spec-0.2.1.md; every Assignment reads the parts it names there and adds no limits or behavior it does not name.",
+    "Parts A to C are approved as written; stop and ask only when a choice changes the result and nothing in the request settles it (for example renaming dev-server or changing what the visual agents embed), or when an audit fix would materially change HolyAgent's behavior.",
+    "Re-map the repository before editing; the request's facts were read on main at bd31cf7 and each is confirmed on the current main.",
+    "Do not change .claude/CLAUDE.md; repository rules go in AGENTS.md, HolyAgent rules go in the plugin's instructions; keep the README's fixed section structure and update docs/ wherever behavior changes.",
+    "Follow .claude/CLAUDE.md code rules: Effect for effects and tagged errors, Effect Schema at data boundaries with onExcessProperty error, Bun APIs, Bun Shell for processes, JSDoc on every exported item, skill descriptions start with the situation.",
+    "Work in the A1 model: release/0.2.1/integration cut from main, one release/0.2.1/<type>/<change> branch and PR per reviewable change targeting the integration branch, validation changes landing first, bump to 0.2.1 on the integration branch with mise run bump:patch.",
+    "Done means mise run verify passes with the build in sync, CI green on every PR including Windows, rulesets applied or reported as a blocker with the exact JSON, and the integration to main PR open and not merged.",
+    "Docs, commits and PRs are in English."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-04T13:12:17.120Z"
+}
