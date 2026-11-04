@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-review-findings-on-release-0",
   "objective": "Repair the review findings on release/0.2.1/ci/release-flow in the worktree /home/user/holyagent-ci-release-flow (commits 848a3be and 678d527).",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Context: /home/user/holyagent-work/spec-0.2.1.md Part A1 and A2. The reviews are at /home/user/holyagent/.git/holyagent/reports/assignment-0mw26gvpj-v7vu.md (code) and assignment-0mw26gw00-d5fp.md (security).",
     "Blocking: scripts/workflows.test.ts builds paths with node:path join/relative, which gives backslashes on Windows, so the required windows job fails; normalize to forward slashes (code finding 1). Verify by also running the test with paths forced to backslashes if practical.",
@@ -72,7 +72,45 @@
     "agentId": "workflow:wf_11752da1-871/assignment-0mw27aup7-onwc",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-04T14:17:20.875Z"
+    "startedAt": "2026-11-04T14:17:20.875Z",
+    "finishedAt": "2026-11-04T14:32:41.839Z"
+  },
+  "result": "result: All listed review findings fixed; `mise run verify` passes in the worktree. Nothing was run on a real Windows runner or in GitHub Actions, so the workflows and the tag-release shell script are untested.\n\nchanged (in /home/user/holyagent-ci-release-flow):\n- `.github/actions/tag-release/action.yml`\n- `.github/workflows/{dev,publish,stable,validation}.yml`\n- `scripts/pr-checks.ts`, `scripts/pr-checks.test.ts`, `scripts/workflows.test.ts`\n- `docs/decisions.md`, `docs/development.md`, `AGENTS.md`\n\nOutside the repo, new: `/home/user/holyagent-work/rulesets/tags.json`\n\nThe diff for review is at `/tmp/claude-0/-home-user-holyagent/70184bfa-8a56-57cb-a6cf-d92f87c7692b/scratchpad/ci-fix.diff`.\n\nchecks:\n- `bunx --no-install mise run verify` -> exit 0. Type-check, lint and format are clean; 1121 pass, 1 skip, 0 fail. Log: `/home/user/holyagent-work/logs/verify-ci-fix.log`.\n- `bun test --preload /tmp/claude-0/winpath.ts scripts/workflows.test.ts` -> 19 pass. The preload forces backslashes in `relative()`. The base version of the test under the same preload gives 13 fail.\n\nFindings:\n- **Code 1:** `files()` now replaces `\\` with `/` after `relative(...)`.\n- **Code 2:** `publish.yml` uses `branches-ignore: [holyagent/state]`, and a test pins it.\n- **Code 3:** `docs/decisions.md` now names `validation.yml`.\n- **Code 4:** I removed the dead guard step and its `if` from `stable.yml`. The version read and its regex now live only in the `tag-release` action. It takes `prerelease` and `notes` and builds the tag and title itself. I did not use a bun call, because the write-token jobs run no bun.\n- **Code 5:** a stable release with empty notes passes `--notes-start-tag` set to the newest older stable `holyagent-0.X.Y` release. I checked that `sort -V` selection with sample tag lists only.\n- **Code 7:** the `if` guards of `branch-model` and `version` are pinned in `workflows.test.ts`.\n- **Code 8:** `checkBranchModel` now compares parsed versions (`parseVersion`, `compareVersions`).\n  - An unparsable release segment is a `branch-version` violation.\n  - A malformed head `package.json` version fails with `InvalidVersion`, but only for `release/...` heads.\n- **Security C:** new command `pr-checks.ts same-repository <head-repo> <repo>`, compared case-insensitively; an empty head repository fails. It runs as a step in the `branch-model` and `version` jobs and is unit and CLI tested. The workflow test asserts the step is present.\n- **Security notes:** `validation.yml` sets `cancel-in-progress: ${{ github.event_name == 'pull_request' }}`. A test pins it, and pull_request runs still cancel older pull_request runs. The `edited` type is kept.\n- **Security A:** `rulesets/tags.json` covers `refs/tags/holyagent-*` with `update` and `deletion`. `main.json` and `integration.json` already had `deletion`, so I left them unchanged, and the check contexts are unchanged. `AGENTS.md` and `docs/development.md` now mention the tag ruleset.\n\nblockers: none\nquestions: none\nnotes:\n- GitHub still lets a third queued push replace a pending run in `publish.yml`'s group. A rapid third push to `main` could leave the middle commit untagged. This is a platform limit.\n- I added no test for the `tag-release` shell logic.\n\nevidence:\nworkflows.test.ts passes with Windows path separators: preloaded backslash `relative()` run, 19 pass, 0 fail; base version of the test fails 13 under the same preload.\npublish.yml skips holyagent/state, with a test: `branches-ignore: [holyagent/state]` in `publish.yml`, asserted in `scripts/workflows.test.ts` (\"skips holyagent/state, ...\").\nEach listed review finding is fixed or explained: see Findings above, with tests in `scripts/pr-checks.test.ts` and `scripts/workflows.test.ts`.\nRuleset JSON files cover main, integration and holyagent-* tags: `/home/user/holyagent-work/rulesets/{main,integration,tags}.json`; `main.json` and `integration.json` already carry the `deletion` rule, `tags.json` has `update` and `deletion`.\nmise run verify passes in the worktree: `bunx --no-install mise run verify` -> exit 0, 1121 pass, 0 fail.\nchecks-run: `bunx --no-install mise run verify` -> exit 0; the winpath preload test run, 19 pass.\nchanged-paths: the list under `changed` above.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Verify exit 0 (1121 pass); Windows-path test proven with backslash preload (base fails 13); each finding fixed.",
+    "criteria": [
+      {
+        "criterion": "workflows.test.ts passes with Windows path separators",
+        "support": "preloaded backslash `relative()` run, 19 pass, 0 fail; base version of the test fails 13 under the same preload."
+      },
+      {
+        "criterion": "publish.yml skips holyagent/state, with a test",
+        "support": "`branches-ignore: [holyagent/state]` in `publish.yml`, asserted in `scripts/workflows.test.ts` (\"skips holyagent/state, ...\")."
+      },
+      {
+        "criterion": "Each listed review finding is fixed or explained",
+        "support": "see Findings above, with tests in `scripts/pr-checks.test.ts` and `scripts/workflows.test.ts`."
+      },
+      {
+        "criterion": "Ruleset JSON files cover main, integration and holyagent-* tags",
+        "support": "`/home/user/holyagent-work/rulesets/{main,integration,tags}.json`; `main.json` and `integration.json` already carry the `deletion` rule, `tags.json` has `update` and `deletion`."
+      },
+      {
+        "criterion": "mise run verify passes in the worktree",
+        "support": "`bunx --no-install mise run verify` -> exit 0, 1121 pass, 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bunx --no-install mise run verify` -> exit 0; the winpath preload test run, 19 pass."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the list under `changed` above."
+      }
+    ]
   },
   "createdAt": "2026-11-04T14:17:20.875Z"
 }
