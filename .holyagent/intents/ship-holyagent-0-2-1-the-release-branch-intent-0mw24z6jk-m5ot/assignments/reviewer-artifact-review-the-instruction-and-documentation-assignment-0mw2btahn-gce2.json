@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mw2btahn-gce2",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-the-instruction-and-documentation",
+  "objective": "Review the instruction and documentation changes of the audit commit 3569104 on release/0.2.1/fix/audit against Part D's instruction audit and docs-drift items.",
+  "state": "Running",
+  "scope": [
+    "The writers' reports: /home/user/holyagent/.git/holyagent/reports/assignment-0mw2afimd-f9om.md (state and domain), assignment-0mw2afix2-jge2.md (CLI, vcs, setup) and assignment-0mw2afj6o-q863.md (instructions and docs), same folder. The findings they address: /home/user/holyagent-work/audit-code.md and /home/user/holyagent-work/audit-docs.md. Part D of /home/user/holyagent-work/spec-0.2.1.md and the maintainer decisions in the Intent (workflow hook refuses unbounded loops and large or computed repeat counts; keep the root-rules fallback; keep the legacy converter; ownership overlap per worktree) are binding.",
+    "Read /home/user/holyagent-work/diffs/audit-text-3569104.diff and the generated files it touches under /home/user/holyagent-fix-audit/packages/integrations/claude/dist/. Use the instruction-writing guidance at /root/.claude/plugins/synced/03eb801d-6ff6-4373-b5b1-f94edf359a3e_0f3e6ee9-af2e-4c2c-8d3c-9be25ca27713/holyagent/skills/instruction-writing/SKILL.md.",
+    "Check that each listed instruction fix removes the contradiction, repeated text or unclear trigger it names without adding one; that the precedence, code-quality, branch, design-skill, dev-server and visual-judging text (Parts B and C) still agree with each other; that docs agree with the code on versions (the tested Claude Code version is the bun.lock one), counts and hook behavior; that README keeps its fixed sections; and judge the writer's open question: instruction-guidelines.md has the root put keep-working and real-check text in every brief while specialist conduct.md says the Assignment does not restate holyagent rules."
+  ],
+  "constraints": [
+    "Keep working until the review is done; stop to ask only when you cannot go on. When done, stop and report; name anything unrequested instead of doing it. Read-only.",
+    "Report in under 450 words, findings ranked with file:line, blocking or non-blocking, and the smallest fix."
+  ],
+  "criteria": [
+    {
+      "text": "The instruction audit fixes and docs drift fixes hold, with no new contradiction, repeated text or unclear trigger",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw2afj6o-q863"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T16:23:39.612Z"
+  },
+  "createdAt": "2026-11-04T16:23:39.612Z"
+}
