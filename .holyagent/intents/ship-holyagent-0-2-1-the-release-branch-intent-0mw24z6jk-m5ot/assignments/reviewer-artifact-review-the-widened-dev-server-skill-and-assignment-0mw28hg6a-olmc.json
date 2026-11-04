@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mw28hg6a-olmc",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-the-widened-dev-server-skill-and",
+  "objective": "Review the widened dev-server skill and the matching role text (commit 979e5c5 on release/0.2.1/feat/dev-server-targets) against Part C of the 0.2.1 request.",
+  "state": "Running",
+  "scope": [
+    "Read /home/user/holyagent-work/spec-0.2.1.md Part C: 'dev-server: one running target per platform', 'dev-server today', binding requirement 1 and deliverable 3.",
+    "Read /home/user/holyagent-work/diffs/dev-server.diff and the generated files under /home/user/holyagent-feat-dev-server-targets/packages/integrations/claude/dist/ (skills/dev-server/SKILL.md, agents/worker-operations.md, worker-visual.md, reviewer-visual.md, holyagent.md).",
+    "Check every spec bullet is present (detection with signal; the full target record field list; unique names; owner-only stop; each platform with tools as interchangeable examples and [verify] notes; environment matrix; blocked report with reason and unblock; closest honest substitute, web build is not native render), that the roles read the record and report blocked without one, that Reviewer.visual has no shell and judges captures others produce, and contradictions with untouched text (visual-judging still says start the shared server first; docs/development.md and docs/pi/claude-parity.md). Apply the instruction-writing rules at /home/user/holyagent-feat-dev-server-targets/packages/runtime/src/instructions/claude-5.5/skills/instruction-writing/SKILL.md."
+  ],
+  "constraints": [
+    "Keep working until the review is done; stop to ask only when you cannot go on. When done, stop and report; name anything unrequested instead of doing it. Read-only: change no repository files and make no git writes.",
+    "Each finding: file:line, the requirement it misses, blocking or not, smallest fix. Report in under 500 words."
+  ],
+  "criteria": [
+    {
+      "text": "Each dev-server spec bullet and the role-text requirement has a verdict",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Every gap names file:line and a fix",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw286100-xnuy"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T14:50:28.258Z"
+  },
+  "createdAt": "2026-11-04T14:50:28.258Z"
+}
