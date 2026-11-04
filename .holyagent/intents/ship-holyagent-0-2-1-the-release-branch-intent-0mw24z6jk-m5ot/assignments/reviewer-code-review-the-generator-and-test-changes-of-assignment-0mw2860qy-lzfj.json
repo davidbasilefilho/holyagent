@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-the-generator-and-test-changes-of",
   "objective": "Review the generator and test changes of commit b5d21e1 on release/0.2.1/feat/design-skills (worktree /home/user/holyagent-feat-design-skills): the shared-core embedding and the design-skill tests.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read /home/user/holyagent-work/spec-0.2.1.md Part C binding requirement 7 and deliverable 4.",
     "Review 'git -C /home/user/holyagent-feat-design-skills show b5d21e1 -- packages/integrations/claude/src packages/integrations/claude/tests packages/runtime/tests' and run those tests there.",
@@ -40,7 +40,33 @@
     "agentId": "workflow:wf_e6f70ca4-313/assignment-0mw2860qy-lzfj",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-04T14:41:35.050Z"
+    "startedAt": "2026-11-04T14:41:35.050Z",
+    "finishedAt": "2026-11-04T14:46:30.110Z"
+  },
+  "result": "result: Embedding is correct and the tests catch a stale core, a missing core and a banned term; no blockers.\n\nchanged: none (mutations ran on a `git archive` copy in the scratchpad).\n\nchecks:\n- `bunx --no-install mise run verify` in `/home/user/holyagent-feat-design-skills` -> exit 0. Type-check clean on 131 files, lint clean on 132, format clean on 259, tests 1075 pass / 1 skip / 0 fail.\n- `/code-review medium b5d21e1^...b5d21e1` ran; the built-in loaded. I triaged its 10 findings below.\n- Mutations on the archive copy, running `design-skills.test.ts` (run in the archive copy with `bun test`, not `mise`):\n  - Generator drops the core, or leaves the marker unreplaced: 2 tests fail.\n  - `tui-design` removed from `DESIGN_SKILLS`: 1 fails.\n  - \"React\" appended to `web-design/SKILL.md`, \"Tailwind\" appended to `core.md`, or `Next.js`/`SwiftUI-based` appended to `core.md`: the framework-name test fails.\n  - `### Spend boldness in one place` repeated in a skill source: 1 fails.\n  - CRLF in a skill source: `generate()` throws \"must hold the line … exactly once\".\n  - Core edited without a rebuild: `plugin.test.ts` \"every committed generated file equals a fresh build\" fails. `design-skills.test.ts` does not catch this on its own, because it compares in-memory output against the same file.\n\nblockers: none\n\nfindings (all optional):\n1. `generate.ts:189-205`: the marker is enforced only for names in the hand-kept `DESIGN_SKILLS`. A new design skill left out of the list would ship a literal `<!-- design-core -->` line with no error. The smallest fix is to embed the core wherever the marker line appears, or fail the build if a `SKILL.md` outside the list holds the marker.\n2. `design-skills.test.ts:40-76`: the banned-term check is case-sensitive, so lowercase `react` passes. Capitalised ordinary words (`Compose`, `Textual`, `Blessed`, `Qt`) would fail on plain prose. This is acceptable because the check is documented as whole-word and case-sensitive.\n3. Windows: `.gitattributes` forces `eol=lf`, so the CRLF failure above is unlikely. `listFiles` already returns POSIX paths (`toPosix`), so the `split(\"/\")` and `endsWith(\"skills/<n>/SKILL.md\")` lookups work. The tests build paths with `join(ROOT, …)`.\n\nCode-review findings I rejected:\n- Bare `Error`, `async` and `Promise.all` in `generate.ts`: `bundle()` and the rest of the file already do this, and lint passes. The Effect rule is for runtime and CLI source.\n- The 80-140 line test: Part C deliverable 1 asks for about that range, so the test follows the spec.\n- Attribution license wording, `(default)` markers, macOS text scale and Windows title-bar content: these are skill content, not the generator or tests I was asked to review.\n- Missing root integration (`visual-judging`, `root/skills.md`, role references): this is Part C deliverable 2, outside this commit's scope. The root should confirm a later commit covers it.\n\nDuplication (non-blocking criterion): `withDesignCore` is a marker-line swap, and `frontendDesign` in `agents.ts:503` is a different job (heading shift on a vendored file). They share no logic. Spec requirement 7 is met: one source file, embedded per skill, and a test that checks the core in every skill. Not run: a real Windows run.\n\nevidence:\nThe embedding is correct and the tests fail on a stale core or a banned term: mise verify exit 0 (1075 pass). The mutation runs above all fail as expected. A stale `dist` is caught by `plugin.test.ts`, and generator or core omission is caught by `design-skills.test.ts`.\nNo duplicated generator logic is introduced: `generate.ts:189-205` is a distinct marker mechanism, separate from `agents.ts:503` `frontendDesign`.\nchecks-run: `mise run verify` exit 0; `/code-review` run; 8 mutation runs as listed.\nfindings: items 1-3 above, all optional, no blockers.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Findings carry file:line and fixes; verdicts per requirement.",
+    "criteria": [
+      {
+        "criterion": "The embedding is correct and the tests fail on a stale core or a banned term",
+        "support": "mise verify exit 0 (1075 pass). The mutation runs above all fail as expected. A stale `dist` is caught by `plugin.test.ts`, and generator or core omission is caught by `design-skills.test.ts`."
+      },
+      {
+        "criterion": "No duplicated generator logic is introduced",
+        "support": "`generate.ts:189-205` is a distinct marker mechanism, separate from `agents.ts:503` `frontendDesign`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`mise run verify` exit 0; `/code-review` run; 8 mutation runs as listed."
+      },
+      {
+        "label": "findings",
+        "support": "items 1-3 above, all optional, no blockers."
+      }
+    ]
   },
   "createdAt": "2026-11-04T14:41:35.050Z"
 }
