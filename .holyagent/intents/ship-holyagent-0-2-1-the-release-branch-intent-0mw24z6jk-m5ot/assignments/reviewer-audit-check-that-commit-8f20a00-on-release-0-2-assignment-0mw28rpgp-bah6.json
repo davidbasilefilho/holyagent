@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.audit",
   "slug": "check-that-commit-8f20a00-on-release-0-2",
   "objective": "Check that commit 8f20a00 on release/0.2.1/feat/dev-server-targets closes the six findings of the dev-server review.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw28hg6a-olmc.md. Repair diff (dist excluded): /home/user/holyagent-work/diffs/devserver-repair.diff. Generated files: /home/user/holyagent-feat-dev-server-targets/packages/integrations/claude/dist/skills/{visual-judging,dev-server}/SKILL.md and dist/agents/{holyagent,worker-operations}.md.",
     "For each finding say closed or open with file:line, and report any new contradiction the repair introduces."
@@ -38,7 +38,9 @@
     "agentId": "workflow:wf_f92173b3-7b8/assignment-0mw28rpgp-bah6",
     "model": "haiku",
     "effort": "high",
-    "startedAt": "2026-11-04T14:58:26.858Z"
+    "startedAt": "2026-11-04T14:58:26.858Z",
+    "finishedAt": "2026-11-04T15:01:01.647Z"
   },
+  "result": "result: Finding 1 is closed. Findings 2, 3, 4 and 6 are closed. Finding 5 is reworded but introduces a new contradiction, so the no-regression criterion fails.\n\nchanged: none\nchecks: none run. No shell, so `mise run verify` and the plugin tests were not run. I read `packages/integrations/claude/tests/plugin.test.ts:989-1080` and the substrings it asserts are still present in dist.\nblockers: finding 5 contradiction below.\nquestions: none\nnotes: `refs/heads/release/0.2.1/feat/dev-server-targets` is now 001a77df, a merge of `release/0.2.1/feat/design-skills` made after 8f20a00 (`.git/logs/refs/heads/release/0.2.1/feat/dev-server-targets`). I read the worktree at that state, not the commit object. Unrequested: none. Stale \"two skills\" count at `docs/pi/claude-parity.md:113` is pre-existing and was left alone.\n\nfinding-status:\n1. `dist/skills/visual-judging/SKILL.md:15` (src :14): closed, now \"Start the render target first, per platform\".\n2. `dist/agents/holyagent.md:113`: closed, now \"render target\".\n3. `dist/skills/dev-server/SKILL.md:31`: closed, web clause added.\n4. `dist/skills/dev-server/SKILL.md:35`: closed, duplicate removed (`:9` keeps \"interchangeable example\").\n5. `dist/agents/worker-operations.md:19`: open. \"in the fields the brief lists\" conflicts with `dist/skills/dev-server/SKILL.md:30`, which says the brief names only the file path. Worker.operations has Skill and TaskGet/TaskList disallowed, so it can read the path but gets no field list unless the root adds one. Fix: restore a pointer to the skill's fields at that path.\n6. `docs/pi/claude-parity.md:49`: closed, now \"a running render target\".\n\nevidence:\nFinding 1 is closed: `packages/integrations/claude/dist/skills/visual-judging/SKILL.md:15` reads \"Start the render target first, per platform (the `dev-server` skill).\" Source `packages/runtime/src/instructions/claude-5.5/skills/visual-judging/SKILL.md:14` matches. Grep finds no \"shared server\" left in the worktree.\nNo new contradiction is introduced: FAILED, `dist/agents/worker-operations.md:19` vs `dist/skills/dev-server/SKILL.md:30` (finding 5).\nfinding-status: per-finding lines above, from Read of the dist and source files and the repair diff `/home/user/holyagent-work/diffs/devserver-repair.diff`.\n",
   "createdAt": "2026-11-04T14:58:26.858Z"
 }
