@@ -1,0 +1,78 @@
+{
+  "id": "assignment-0mw2afimd-f9om",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "fix-the-state-domain-and-assignment",
+  "objective": "Fix the state, domain and Assignment-record findings of the Part D code audit in /home/user/holyagent-fix-audit (branch release/0.2.1/fix/audit).",
+  "state": "Running",
+  "scope": [
+    "Findings: /home/user/holyagent-work/audit-code.md, read at main bd31cf7; confirm each still holds on this branch before fixing it. Part D of /home/user/holyagent-work/spec-0.2.1.md is binding.",
+    "Your items: B1 (state commits pass every state file on the command line; argv grows with history) [blocking]; B8 (stale-lock break read/remove window); D2 (stateDirectory helper vs open-coded joins, within your paths); D3 (SpecialistEntry.domains: stop writing, keep it optional in the schema); D4 (dead Vcs / vcs.json read and write; tolerate an existing file); P1, P3, P4 and P7 where the fix stays inside your paths; T2 (store.test.ts toBeDefined); U5 (writeBrief/writeReport); and the maintainer decision that the ownership-overlap check applies per worktree (find where dispatch refuses an overlapping Running writer and scope it to the same worktree, with a test that two worktrees may own the same relative path and one worktree still may not).",
+    "Diff file: /home/user/holyagent-work/diffs/audit-state.diff."
+  ],
+  "constraints": [
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report: name unrequested features, tests, files or refactors in the report instead of adding them, and start no extra review rounds. Do not stop early with a summary that announces a next step or an offer to wait.",
+    "A fix that would materially change HolyAgent's behavior beyond what the item and the maintainer decisions below state is not yours to make: leave it and report it under questions with the smallest options. The maintainer decided: the workflow hook auto-allow refuses unbounded loops (while/do, for without a literal bound) and repeat/padStart/padEnd with a large or computed count; keep the root-rules PreToolUse fallback registration; keep the legacy .holyclaude/.holycodex converter; the CLI ownership-overlap check applies per worktree (writers in different worktrees may own the same relative paths).",
+    "Other writers work in the same worktree at the same time on disjoint paths: edit only your ownership paths; if a fix needs a file outside them, report it instead. Never skip, disable or weaken a test to get green; a test that cannot fail gets a real assertion.",
+    "Make no version-control writes (no commit, checkout, switch, branch, stash, reset, push) and no edits under .git/ or .holyagent/; the root commits. Report every changed path and save 'git diff -- <your paths>' to the diff file named in the scope.",
+    "Work only inside /home/user/holyagent-fix-audit. Follow .claude/CLAUDE.md (Effect, tagged errors, Schema with onExcessProperty error, Bun APIs and Bun Shell, JSDoc on exports). Gate: 'bunx --no-install mise run build' then 'bunx --no-install mise run verify'; a failure in another writer's paths that you did not cause is reported, not fixed.",
+    "Report in under 450 words: one line per item (fixed with the test that fails without it, explained, or left with the reason); put long logs in /home/user/holyagent-work/logs/."
+  ],
+  "criteria": [
+    {
+      "text": "B1 is fixed with a test that fails without the fix",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The ownership-overlap check applies per worktree, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Each other item is fixed or explained",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/state",
+    "packages/runtime/src/domain",
+    "packages/runtime/src/cli/assignment.ts",
+    "packages/runtime/src/cli/brief.ts",
+    "packages/runtime/src/cli/state.ts",
+    "packages/runtime/tests/store.test.ts",
+    "packages/runtime/tests/state-branch.test.ts",
+    "packages/runtime/tests/state-mode.test.ts",
+    "packages/runtime/tests/state-hook-locks.test.ts",
+    "packages/runtime/tests/migrate.test.ts",
+    "packages/runtime/tests/assignment.test.ts",
+    "packages/runtime/tests/intent.test.ts",
+    "packages/runtime/tests/lifecycle.test.ts",
+    "packages/runtime/tests/reports.test.ts",
+    "packages/runtime/tests/route.test.ts",
+    "packages/runtime/tests/primitives.test.ts",
+    "packages/runtime/tests/directive.test.ts",
+    "packages/runtime/tests/input.test.ts",
+    "packages/runtime/tests/paths.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T15:44:57.349Z"
+  },
+  "createdAt": "2026-11-04T15:44:57.349Z"
+}
