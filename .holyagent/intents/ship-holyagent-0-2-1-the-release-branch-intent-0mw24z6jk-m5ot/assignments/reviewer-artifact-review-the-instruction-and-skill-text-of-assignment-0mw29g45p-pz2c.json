@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mw29g45p-pz2c",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-the-instruction-and-skill-text-of",
+  "objective": "Review the instruction and skill text of commit ca1d774 on release/0.2.1/feat/visual-root-pass (worktree /home/user/holyagent-feat-visual-root-pass) against Part C deliverable 2 and the materiality item of the 0.2.1 request.",
+  "state": "Running",
+  "scope": [
+    "Read /home/user/holyagent-work/spec-0.2.1.md Part C: binding requirement 2, 'How the pieces connect' (the Skill-denied visual roles, the resolved path, Materiality) and deliverables 1 and 2. B1 (no duplicated text) applies.",
+    "Read /home/user/holyagent-work/diffs/root-pass.diff and the generated files it touches under /home/user/holyagent-feat-visual-root-pass/packages/integrations/claude/dist/ (agents/holyagent.md, worker-visual.md, reviewer-visual.md; skills/visual-judging, web-design, tui-design, mobile-design, desktop-design).",
+    "Check: the root picks the platform skill for every visual Assignment and puts its absolute installed path (resolved like the CLI path, never a literal ${CLAUDE_PLUGIN_ROOT}) in both visual specialists' criteria; visual-judging makes the root's own final pass, bounded to the reviewer's final captures at the listed sizes and variants, decide acceptance, with reviewer evidence as input; materiality has one source and no generated file restates or contradicts it; root/skills.md lists the four skills with when to load them; R-VISUAL, R-WVI-DESIGN, R-RV-DESIGN and R-MATERIAL match the text; the tui-design (default) and web-design (preference) markers are in place; frontend-design is still embedded unchanged.",
+    "Also judge the session-start core line 'Briefs hold literal absolute paths.': is it enough for a root that has not read visual-judging yet, and is any trigger unclear."
+  ],
+  "constraints": [
+    "Keep working until the review is done; stop to ask only when you cannot go on. When done, stop and report; name anything unrequested instead of doing it. Read-only.",
+    "Report in under 400 words, findings ranked, each with file:line, blocking or non-blocking, and the smallest fix."
+  ],
+  "criteria": [
+    {
+      "text": "Deliverable 2 and the materiality item are met in the text",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No new contradiction, repeated text or unclear trigger is introduced",
+      "blocking": true,
+      "dimension": "style"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw28rpqg-35mw"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T15:17:25.645Z"
+  },
+  "createdAt": "2026-11-04T15:17:25.645Z"
+}
