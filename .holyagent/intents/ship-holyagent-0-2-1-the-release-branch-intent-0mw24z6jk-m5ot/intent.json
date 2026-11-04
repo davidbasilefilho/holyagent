@@ -16,9 +16,14 @@
     "Default: the branch-version rule applies to every PR whose head is a release/<v>/ branch, so the first PR of a release (the validation PR for 0.2.1) carries the bump to <v> as its own commit, made with mise run bump:patch.",
     "Default: publish.yml triggers on branch pushes only and calls validation.yml as a reusable workflow, then stable.yml or dev.yml with needs, so publishing runs only after validation passes for that commit; validation.yml runs directly on pull_request.",
     "Default: the rulesets are reported as a blocker with their exact JSON, because this session may use gh only for search.",
-    "Finding: claude.ai cloud sessions ignore the plugin settings agent key (this session has the synced plugin with agent holyagent and its main thread is the default agent), so the session-start context must carry what the root follows before its first action."
+    "Finding: claude.ai cloud sessions ignore the plugin settings agent key (this session has the synced plugin with agent holyagent and its main thread is the default agent), so the session-start context must carry what the root follows before its first action.",
+    "Decision (maintainer): the workflow hook auto-allow refuses unbounded loops (while/do, for without a literal bound) and repeat/padStart/padEnd with a large or computed count.",
+    "Decision (maintainer): keep the root-rules PreToolUse fallback registration.",
+    "Decision (maintainer): keep the legacy .holyclaude/.holycodex converter.",
+    "Decision (maintainer): the CLI ownership-overlap check applies per worktree; writers in different worktrees may own the same relative paths.",
+    "Default: publish.yml ignores the holyagent/state branch, which carries no package.json."
   ],
-  "revision": 2,
+  "revision": 3,
   "state": "Open",
   "createdAt": "2026-11-04T13:12:17.120Z"
 }
