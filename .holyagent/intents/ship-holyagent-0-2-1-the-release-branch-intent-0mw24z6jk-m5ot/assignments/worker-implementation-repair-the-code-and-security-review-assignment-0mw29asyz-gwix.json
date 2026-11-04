@@ -1,0 +1,68 @@
+{
+  "id": "assignment-0mw29asyz-gwix",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-code-and-security-review",
+  "objective": "Repair the code and security review findings on the dependency updater in the worktree /home/user/holyagent-build-dependency-updater (branch release/0.2.1/build/dependency-updater).",
+  "state": "Ready",
+  "scope": [
+    "Reviews: /home/user/holyagent/.git/holyagent/reports/assignment-0mw293a4v-cfsz.md (code) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw293aev-dslj.md (security). Part A4 of /home/user/holyagent-work/spec-0.2.1.md stays binding.",
+    "Code blocking 1: make the survey injectable into main (for example main(args, surveyFn = survey)) and add a hermetic test, with no network, that asserts '--check' fails with PinsBehind when a pin is behind and passes when none is, and that '--dry-run' never writes or calls applySurvey.",
+    "Security 1 and 3: verify every downloaded vendored archive against an independent published checksum before pinning it: ripgrep's published '<asset>.sha256', and for assets without one (fd) the GitHub release asset 'digest' field when the API returns it; fail with a tagged error on a mismatch, decoding the API response with Effect Schema. Reword the vendor.ts comment and docs/development.md so they say how each hash is checked. Then confirm the current fd 10.5.1 pins against the GitHub 'digest' of those assets (for example curl https://api.github.com/repos/sharkdp/fd/releases/tags/v10.5.1) and the mise-action pin with 'git ls-remote https://github.com/jdx/mise-action refs/tags/v5.2.6 refs/tags/v5.2.6^{}'; report each as matched or not.",
+    "Security 2: run the updater's installs with '--ignore-scripts', choose a package's newest version no higher than its registry dist-tags.latest, and skip versions marked deprecated. A minimum publish age is not requested; name it in the report instead.",
+    "Non-blocking, fix alongside: (2) compute every hash and fetch before the first file write, so a failed download leaves the tree unchanged; (4) report a 'uses:' line whose comment is not '# vX.Y.Z' under skipped instead of passing silently; (5) reuse the existing download and archive helpers instead of the copies, hash each archive once, and export the dependency-field constant the test repeats; (6) find package.json files from the workspace globs, not '**/package.json' through node_modules."
+  ],
+  "constraints": [
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report: name unrequested features, tests, files or refactors in the report instead of adding them, and start no extra review rounds. Do not stop early with a summary that announces a next step or an offer to wait.",
+    "Make no version-control writes (no commit, checkout, switch, branch, stash, reset, push) and no edits under .git/ or .holyagent/; the root commits. Report every changed path.",
+    "Work only inside /home/user/holyagent-build-dependency-updater. Follow .claude/CLAUDE.md (Effect, tagged errors, Schema with onExcessProperty error, Bun Shell, JSDoc).",
+    "Do not run the real updater in write mode; '--dry-run' and '--check' are fine. Gate: 'bunx --no-install mise run build' then 'bunx --no-install mise run verify' must pass.",
+    "Report in under 400 words; put long logs in /home/user/holyagent-work/logs/."
+  ],
+  "criteria": [
+    {
+      "text": "--dry-run and --check have a hermetic test that fails without the change",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Every vendored archive hash is checked against an independent published checksum, and the fd and mise-action pins are confirmed",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The updater installs without scripts and never picks a version above dist-tags.latest or a deprecated one",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Non-blocking findings 2, 4, 5 and 6 are fixed or explained",
+      "blocking": false,
+      "dimension": "style"
+    },
+    {
+      "text": "mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "pin-confirmation"
+  ],
+  "ownershipPaths": [
+    "scripts/update-dependencies.ts",
+    "scripts/update-dependencies.test.ts",
+    "scripts/dependency-pins.ts",
+    "scripts/dependency-pins.test.ts",
+    "scripts/dependency-ranges.test.ts",
+    "scripts/vendor.ts",
+    "packages/integrations/claude/vendor.ts",
+    "docs/development.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-04T15:13:17.867Z"
+}
