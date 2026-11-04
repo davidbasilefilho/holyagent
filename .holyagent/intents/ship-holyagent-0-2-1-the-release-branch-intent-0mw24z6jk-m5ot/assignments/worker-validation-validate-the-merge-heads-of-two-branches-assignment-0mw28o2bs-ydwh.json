@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mw28o2bs-ydwh",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Worker.validation",
+  "slug": "validate-the-merge-heads-of-two-branches",
+  "objective": "Validate the merge heads of two branches after merging release/0.2.1/integration forward: release/0.2.1/feat/holyagent-rules (worktree /home/user/holyagent-feat-holyagent-rules, head 56c2b52) and release/0.2.1/feat/design-skills (worktree /home/user/holyagent-feat-design-skills, head 1431ce7).",
+  "state": "Running",
+  "scope": [
+    "In each worktree run 'bun install --frozen-lockfile' then 'bunx --no-install mise run verify' (the plugin test includes a byte-for-byte check that the committed generated plugin equals a fresh build).",
+    "In each worktree also run 'git diff --stat HEAD^2 HEAD -- packages/integrations/claude/dist' and confirm the version reads 0.2.1 in package.json and packages/integrations/claude/dist/.claude-plugin/plugin.json."
+  ],
+  "constraints": [
+    "Change no files and make no git writes. If verify fails, report the failing test names and the first error lines; do not fix anything.",
+    "Report in under 150 words: per worktree, each command with exit code and test counts."
+  ],
+  "criteria": [
+    {
+      "text": "mise run verify exits 0 in both worktrees",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Both heads read version 0.2.1",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-04T14:55:36.904Z"
+  },
+  "createdAt": "2026-11-04T14:55:36.904Z"
+}
