@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mw2fob2m-oc9p",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.security",
+  "slug": "re-review-the-security-relevant-parts-of",
+  "objective": "Re-review the security-relevant parts of the final audit repair d9356d2 on release/0.2.1/fix/audit against the previous security findings.",
+  "state": "Running",
+  "scope": [
+    "Previous findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw2emvdm-8ade.md. The writer's report: /home/user/holyagent/.git/holyagent/reports/assignment-0mw2ezazb-hwhk.md. Read the diff /home/user/holyagent-work/diffs/rr2-final.diff and the current /home/user/holyagent-fix-audit/packages/runtime/src/cli/workflow-check.ts, state/lock.ts, vcs/identity.ts and lefthook.yml.",
+    "Binding scope (Intent default): the workflow hook auto-allow guards against accidental runaway scripts the root writes; the maintainer decision is that it refuses unbounded loops and large or computed repeat/padStart/padEnd counts; past that it refuses the growth patterns the reviews found where a small rule closes them; a refused script falls back to the permission prompt. For each previous finding say closed or open with a concrete script that still passes. Report new misses only when they are a shape a root could plausibly write by accident, and rank crafted-only shapes as low. Judge the lefthook.yml versions job (a privileged surface: it runs on every commit) for what it stages and runs."
+  ],
+  "constraints": [
+    "Read-only: no repository edits and no git writes.",
+    "Keep working until the review is done; stop and report. Report in under 350 words, findings ranked by severity with file:line, each previous finding closed or open, and the smallest fix."
+  ],
+  "criteria": [
+    {
+      "text": "The previous security findings are closed or reduced to crafted-only shapes, and the repair adds no new path around the maintainer decisions",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw2ezazb-hwhk"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T18:11:45.550Z"
+  },
+  "createdAt": "2026-11-04T18:11:45.550Z"
+}
