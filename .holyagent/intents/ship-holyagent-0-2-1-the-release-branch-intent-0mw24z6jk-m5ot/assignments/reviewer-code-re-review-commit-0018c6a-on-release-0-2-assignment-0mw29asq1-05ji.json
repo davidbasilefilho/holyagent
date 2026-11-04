@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-commit-0018c6a-on-release-0-2",
   "objective": "Re-review commit 0018c6a on release/0.2.1/build/version-source (worktree /home/user/holyagent-build-version-source) against the findings it repairs.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "The findings are in /home/user/holyagent/.git/holyagent/reports/assignment-0mw28pe6t-fwpu.md (blocking 1: the first build after a bump writes the manifests at the old version; non-blocking 2 to 5). Review 'git -C /home/user/holyagent-build-version-source show 0018c6a' only, and run 'bun test scripts/bump-version.test.ts' and 'bunx --no-install mise run verify' there.",
     "Say whether each finding is closed, and whether the dynamic import in build.ts, the read-all-then-write sync, the CRLF lockfile pattern and the version-only import in program.ts introduce a regression (for example a build that runs generate.ts without the sync, or a stale dist after 'mise run build')."
@@ -34,5 +34,10 @@
   "independentFrom": [
     "assignment-0mw2939u0-lqsl"
   ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T15:13:34.371Z"
+  },
   "createdAt": "2026-11-04T15:13:17.545Z"
 }
