@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mw28605z-86i0",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-commit-0f52c9d-on-release-0-2",
+  "objective": "Re-review commit 0f52c9d on release/0.2.1/ci/release-flow (worktree /home/user/holyagent-ci-release-flow) against the three findings it repairs.",
+  "state": "Running",
+  "scope": [
+    "The findings are under 'New findings' in /home/user/holyagent/.git/holyagent/reports/assignment-0mw27v06y-1ugp.md. Review 'git -C /home/user/holyagent-ci-release-flow show 0f52c9d' and run 'bun test scripts/' there plus 'bunx --no-install mise run verify'.",
+    "Say whether each finding is closed and whether the inline fork guard (shell quoting, empty values, case-insensitivity, placement before checkout), the release-list failure handling and the version regex introduce a regression."
+  ],
+  "constraints": [
+    "Keep working until the review is done; stop to ask only when you cannot go on. When done, stop and report; name anything unrequested instead of doing it. Read-only: change no repository files and make no git writes.",
+    "Report in under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "The three findings are closed",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No regression and mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw27z4tu-lvxi"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T14:41:34.295Z"
+  },
+  "createdAt": "2026-11-04T14:41:34.295Z"
+}
