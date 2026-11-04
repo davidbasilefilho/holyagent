@@ -1,0 +1,48 @@
+{
+  "id": "assignment-0mw2a25ta-yksh",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Worker.mechanical",
+  "slug": "resolve-the-two-merge-conflicts-left-by",
+  "objective": "Resolve the two merge conflicts left by merging release/0.2.1/build/version-source into release/0.2.1/build/dependency-updater in the worktree /home/user/holyagent-build-dependency-updater.",
+  "state": "Running",
+  "scope": [
+    "The merge is in progress (git status shows UU mise.toml and UU packages/integrations/claude/dist/scripts/holyagent.js). Do not commit, abort or restart it; the root commits the merge.",
+    "mise.toml: keep both sides. The version-source side rewrote the bump task descriptions and the comment that says a bump edits the root package.json and the build syncs the copies; the dependency-updater side added the deps:update and deps:check tasks. Keep every task and the newer wording, with no conflict markers left.",
+    "packages/integrations/claude/dist/scripts/holyagent.js is generated: resolve it by running 'bunx --no-install mise run build' after mise.toml is resolved, so the file is rebuilt from the merged sources (do not hand-merge it).",
+    "Then run 'bunx --no-install mise run verify'. Stage nothing yourself unless git requires it to mark resolution; report the final git status."
+  ],
+  "constraints": [
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done, stop and report; name anything unrequested instead of doing it.",
+    "Make no commits, no checkout, reset, stash or merge --abort, and no edits under .git/ or .holyagent/. Edit only mise.toml by hand; the build regenerates the dist file.",
+    "Work only inside /home/user/holyagent-build-dependency-updater.",
+    "Report in under 150 words."
+  ],
+  "criteria": [
+    {
+      "text": "mise.toml keeps both sides with no conflict markers and the dist bundle is rebuilt",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "git-status"
+  ],
+  "ownershipPaths": [
+    "mise.toml"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-04T15:34:34.222Z"
+  },
+  "createdAt": "2026-11-04T15:34:34.222Z"
+}
