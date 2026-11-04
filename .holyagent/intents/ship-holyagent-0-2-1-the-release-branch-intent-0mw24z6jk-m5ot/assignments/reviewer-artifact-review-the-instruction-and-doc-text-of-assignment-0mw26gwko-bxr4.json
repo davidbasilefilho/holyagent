@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mw26gwko-bxr4",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 2,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-the-instruction-and-doc-text-of",
+  "objective": "Review the instruction and doc text of commit a79b22a (release/0.2.1/feat/holyagent-rules) against Part B and the A1 convention-pickup bullet of the 0.2.1 request.",
+  "state": "Running",
+  "scope": [
+    "Read /home/user/holyagent-work/spec-0.2.1.md Part A1 (the bullet on picking up a repository's own branch conventions) and Part B, /home/user/holyagent-work/branch-conventions.md (the nine ambiguities) and /home/user/holyagent-work/b2-transcript.md.",
+    "Read /home/user/holyagent-work/diffs/rules-a79b22a.diff and the changed source files under /home/user/holyagent-feat-holyagent-rules/packages/runtime/src/instructions/ in full where context matters, plus the generated /home/user/holyagent-feat-holyagent-rules/packages/integrations/claude/dist/agents/holyagent.md.",
+    "Judge with the rules in /home/user/holyagent-feat-holyagent-rules/packages/runtime/src/instructions/claude-5.5/skills/instruction-writing/SKILL.md: ambiguity, contradictions with untouched files, unclear triggers, repeated text, and whether each rule reaches the roles it names.",
+    "Check: the precedence order is exactly the spec's three levels; the code-quality rules match the spec's wording and reach workers and reviewers by role; the nine ambiguities are resolved with no repository convention hardcoded; the platform-branch rule is settled before the first commit, is in the session-start core, and cannot be read as allowing the assigned branch as a default; docs/requirements.md and docs/hooks.md match the code."
+  ],
+  "constraints": [
+    "Keep working until the review is done; stop to ask only when you cannot go on. When done, stop and report; name anything unrequested instead of doing it. Do not stop early with a summary that announces a next step. Read-only: change no repository files and make no git writes.",
+    "Each finding: file:line, what is wrong, the evidence or a concrete failure scenario, blocking or non-blocking with the reason, and the smallest fix. Report in under 600 words."
+  ],
+  "criteria": [
+    {
+      "text": "Each Part B requirement and the nine ambiguities are met in the text, with file:line for each gap",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No new contradiction, repeated text or unclear trigger is introduced",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw25gfwm-5dlj"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T13:54:03.625Z"
+  },
+  "createdAt": "2026-11-04T13:54:03.625Z"
+}
