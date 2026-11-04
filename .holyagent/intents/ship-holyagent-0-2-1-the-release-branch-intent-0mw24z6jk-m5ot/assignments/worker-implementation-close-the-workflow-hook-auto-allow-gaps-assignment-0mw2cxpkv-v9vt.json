@@ -1,0 +1,56 @@
+{
+  "id": "assignment-0mw2cxpkv-v9vt",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "close-the-workflow-hook-auto-allow-gaps",
+  "objective": "Close the workflow-hook auto-allow gaps that the security review of the audit commit found, so the hook meets the maintainer decision, in /home/user/holyagent-fix-audit (branch release/0.2.1/fix/audit).",
+  "state": "Running",
+  "scope": [
+    "Binding: Part D of /home/user/holyagent-work/spec-0.2.1.md and the maintainer decision that the workflow hook auto-allow refuses unbounded loops (while/do, for without a literal bound) and repeat/padStart/padEnd with a large or computed count. A refused script is not blocked: it falls back to the normal permission prompt, so refusing is the safe direction; the cost of over-refusing is an extra prompt for a legitimate root script.",
+    "The findings to close are gaps 1-6 in the security report /home/user/holyagent/.git/holyagent/reports/assignment-0mw2bta5g-lw9w.md (recursion through script-declared functions, Array.from({length}) and sparse arrays or .length writes, doubling growth inside loops or functions, the for-of growth check bypasses (non-name roots, aliases, helpers), uncounted nested data iteration and chained repeat/padStart/padEnd, and Promise.race([])), plus item 5 of /home/user/holyagent/.git/holyagent/reports/assignment-0mw2bt9ug-84dv.md. Read the code in packages/runtime/src/cli/workflow-check.ts and the hook wiring in packages/runtime/src/cli/hook.ts first; the reports give the smallest fix for each gap, which you may improve on.",
+    "Scripts the root writes must keep auto-allowing: the shape in packages/runtime/src/instructions (root/workflows.md: a literal export const meta, agent() calls with string-literal agentType holyagent specialists and the model/effort/label/phase options, pipeline(), parallel(), arrays of Assignment ids mapped to agent calls, a return of { done: [ids] }). Keep every existing workflow-check test in packages/runtime/tests/cli.test.ts passing unchanged.",
+    "Put the new tests in a new file packages/runtime/tests/workflow-check.test.ts: one refused case per gap, each failing without its change, and at least two root-shaped scripts that stay allowed.",
+    "A second writer works in the same worktree at the same time on other files (state, vcs, CLI, package.json, dist). Do not run mise run build and do not edit files outside your ownership paths; run 'bun test packages/runtime/tests/workflow-check.test.ts packages/runtime/tests/cli.test.ts' plus 'bun check', 'bun lint' and 'bun fmt --check' through mise where possible ('bunx --no-install mise run <task>'; see docs/development.md). A failure confined to the other writer's files is not yours; name it."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md: Effect for effects and tagged errors, no try/catch, new Promise, Promise statics or async functions in runtime source, JSDoc on every exported item, Bun APIs.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report; name unrequested features, tests, files or refactors instead of adding them. Do not stop at a summary that announces the next step.",
+    "Make no commits, branch switches, stashes, resets or merges, and no edits under .git/ or .holyagent/; the root commits.",
+    "Work only inside /home/user/holyagent-fix-audit.",
+    "Report in under 400 words; list each gap with its fix and test name; put long logs in /home/user/holyagent-work/logs/ and give the path."
+  ],
+  "criteria": [
+    {
+      "text": "Each security-review gap 1-6 is refused by the workflow hook auto-allow, with a test per gap that fails without its change",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Root-shaped workflow scripts still auto-allow and the existing workflow-check tests pass unchanged",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The change stays inside workflow-check.ts and the new test file and follows the repository code rules",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli/workflow-check.ts",
+    "packages/runtime/tests/workflow-check.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T16:55:05.407Z"
+  },
+  "createdAt": "2026-11-04T16:55:05.407Z"
+}
