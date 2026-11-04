@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-commit-5c98d8e-on-release-0-2-1",
   "objective": "Review commit 5c98d8e on release/0.2.1/build/version-source (worktree /home/user/holyagent-build-version-source) against Part A3 of the 0.2.1 request.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read /home/user/holyagent-work/spec-0.2.1.md Part A3. Review 'git -C /home/user/holyagent-build-version-source show 5c98d8e' (diff without dist at /home/user/holyagent-work/diffs/version-source.diff) and run 'bun test scripts/ packages/runtime/tests/version.test.ts' and 'bunx --no-install mise run verify' there.",
     "Check: the root package.json is the only hand-edited copy; build.ts sync runs before generation and is idempotent; bump edits only the source; the copy test catches each copy (try a mutation); program.ts importing the root package.json works in the bundled CLI from the installed plugin (dist/scripts/holyagent.js must not read a file outside the plugin at run time); CRLF lockfiles on Windows (audit finding B7 in /home/user/holyagent-work/audit-code.md); the code rules in .claude/CLAUDE.md and B1 no duplication."
@@ -39,7 +39,33 @@
     "agentId": "workflow:wf_ffc88f16-058/assignment-0mw28pe6t-fwpu",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-04T14:56:38.933Z"
+    "startedAt": "2026-11-04T14:56:38.933Z",
+    "finishedAt": "2026-11-04T15:01:17.583Z"
+  },
+  "result": "result: Changes needed. One blocking defect: the first build after a bump generates `plugin.json` and `marketplace.json` at the old version. The bundled CLI is fine.\n\nchanged: none (read-only). I ran the build experiment in a scratch copy at `/tmp/claude-0/-home-user-holyagent/70184bfa-8a56-57cb-a6cf-d92f87c7692b/scratchpad/wt`.\n\nchecks:\n- `bun test scripts/ packages/runtime/tests/version.test.ts` -> exit 0, 116 pass, 0 fail.\n- `bunx --no-install mise run verify` -> exit 0. Check, lint and format are clean; the tests give 1125 pass, 1 skip, 0 fail.\n- `/code-review` on `0f52c9d...5c98d8e` ran with the built-in skill. I classified its 7 findings below.\n\nfindings:\n1. **Blocking.** `packages/integrations/claude/build.ts:40`: the sync runs too late.\n   - `build.ts` statically imports `src/generate.ts`, which does `import packageJson from \"../package.json\"`. Bun evaluates that import before the `import.meta.main` body, so `generate.ts` has the old version cached before `syncVersions` rewrites the file.\n   - Reproduced in the scratch copy: `bump-version.ts patch` then `bun build.ts` left `.claude-plugin/marketplace.json` and `dist/.claude-plugin/plugin.json` at 0.2.1 while every other copy was 0.2.2. The copy-equality test then failed. A second build fixed it.\n   - So `mise run bump:patch` or `bump:minor` ships stale manifests, which breaks the \"build keeps every copy equal\" requirement.\n   - Smallest fix: make the sync its own step, `run = [\"bun scripts/bump-version.ts sync\", \"bun packages/integrations/claude/build.ts\"]` in the mise `build` task, and drop the call from `build.ts`. Alternatively, import `generate.ts` dynamically after the sync. Add a test that bumps and builds a temp tree once and checks the manifests.\n2. Non-blocking. `scripts/bump-version.ts:128`: `WORKSPACE_VERSION` still matches only `\\n`, so audit B7 (CRLF lockfile) is not fixed. `.gitattributes` has `* text=auto eol=lf`, so git checkouts are LF and the practical risk is low. Fix: use `\\r?\\n`.\n3. Non-blocking. `scripts/bump-version.ts:~190`: `syncVersions` writes the copies one at a time, so a failure part-way leaves a half-synced tree. The sync is idempotent, so re-running it repairs the tree. Load every copy first, then write.\n4. Non-blocking. `mise.toml:70-80`: the comment (\"The script rewrites the package.json files and bun.lock\") and the descriptions (\"everywhere\") are stale. Fix the wording.\n5. Optional. `packages/runtime/src/cli/program.ts:6`: importing the whole root `package.json` embeds its `devDependencies`, scripts and the rest in `dist/scripts/holyagent.js`. Any later root-manifest change therefore alters the generated bundle. It works, but a build-time define of the version would avoid that.\n6. Rejected.\n   - `writeManifest` re-reading the source file: harmless.\n   - The bundle-version test depending on a rebuilt dist: that is intended drift detection.\n   - The sync living in the `import.meta.main` block: this duplicates finding 1.\n\nChecked and fine:\n- The root `package.json` is the only hand-edited copy.\n- `bump` edits only the root file.\n- `sync` is idempotent: a file already at the version is not written, and the lockfile is written only if its text changed.\n- The copy test compares the root against two workspace manifests, the lockfile workspaces, `plugin.json` and `marketplace.json`, so a drifted copy fails it.\n- `dist/scripts/holyagent.js` has the root manifest inlined and has no run-time read of `package.json`, so it does not depend on files outside the plugin. I confirmed this by reading the bundle, not by running it from an installed plugin.\n- No try/catch, `new Promise` or async functions in the new code beyond `build.ts`, which was already async; the new code uses Effect and Schema.\n\nevidence:\n- The version has one source and every copy derives from it, with tests that fail on drift: Not met. The single source and the drift test are correct (`scripts/bump-version.test.ts:327`), but the build leaves `plugin.json` and `marketplace.json` stale after a bump; reproduced in the scratch copy (finding 1).\n- The bundled CLI does not depend on files outside the installed plugin: Met. `grep package.json dist/scripts/holyagent.js` finds no run-time read, and `--version` printed the bumped version in the scratch copy.\n- checks-run: the tests exit 0 (116 pass); `mise run verify` exit 0 (1125 pass); `/code-review` ran; scratch bump-then-build reproduction.\n- findings: see the list above.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Blocking build-order defect reproduced in a scratch copy; findings with fixes.",
+    "criteria": [
+      {
+        "criterion": "The version has one source and every copy derives from it, with tests that fail on drift",
+        "support": "Not met. The single source and the drift test are correct (`scripts/bump-version.test.ts:327`), but the build leaves `plugin.json` and `marketplace.json` stale after a bump; reproduced in the scratch copy (finding 1)."
+      },
+      {
+        "criterion": "The bundled CLI does not depend on files outside the installed plugin",
+        "support": "Met. `grep package.json dist/scripts/holyagent.js` finds no run-time read, and `--version` printed the bumped version in the scratch copy."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "the tests exit 0 (116 pass); `mise run verify` exit 0 (1125 pass); `/code-review` ran; scratch bump-then-build reproduction."
+      },
+      {
+        "label": "findings",
+        "support": "see the list above."
+      }
+    ]
   },
   "createdAt": "2026-11-04T14:56:38.933Z"
 }
