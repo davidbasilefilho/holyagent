@@ -52,12 +52,16 @@ describe("instruction sources", () => {
     const skills = readdirSync(join(CLAUDE, "skills"))
     expect(skills.toSorted()).toEqual([
       "ci-watch",
+      "desktop-design",
       "dev-server",
       "evidence-judging",
       "instruction-writing",
+      "mobile-design",
       "state-mode",
+      "tui-design",
       "user-busy",
       "visual-judging",
+      "web-design",
     ])
     for (const skill of skills) {
       const text = read(join(CLAUDE, "skills", skill, "SKILL.md"))
