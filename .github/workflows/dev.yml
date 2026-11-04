@@ -1,0 +1,28 @@
+name: Dev
+
+# Called by publish.yml for a push to any branch but main. Tags the commit
+# holyagent-<version>-dev-<short-hash> and publishes a pre-release, once per commit: a re-run finds
+# the tag on the same commit and does nothing.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  prerelease:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Tag and pre-release
+        uses: ./.github/actions/tag-release
+        with:
+          notes: Development build of ${{ github.ref_name }} at ${{ github.sha }}.
+          prerelease: "true"

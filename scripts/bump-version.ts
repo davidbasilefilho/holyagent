@@ -70,6 +70,13 @@ export const parseVersion = (input: string): Effect.Effect<Version, InvalidVersi
 /** Renders a version as `0.X.Y`. */
 export const formatVersion = ({ minor, patch }: Version): string => `0.${minor}.${patch}`
 
+/**
+ * Orders two versions by minor, then patch: negative when `a` is older than `b`, zero when equal,
+ * positive when newer. The major is always 0, so it takes no part.
+ */
+export const compareVersions = (a: Version, b: Version): number =>
+  a.minor - b.minor || a.patch - b.patch
+
 /** Advances one position and resets the later one: minor clears patch. */
 export const bumpVersion = (version: Version, kind: BumpKind): Version => {
   switch (kind) {
@@ -125,6 +132,10 @@ const load = (root: string, file: string) => {
     return { file, path, manifest, version }
   }).pipe(failWith(file))
 }
+
+/** Reads the `version` field of the manifest `file` under `root` without parsing it as `0.X.Y`. */
+export const readVersion = (root: string, file: string): Effect.Effect<string, ManifestError> =>
+  load(root, file).pipe(Effect.map(({ version }) => version))
 
 const lockfileWithVersion = (text: string, version: string) =>
   text.search(WORKSPACE_VERSION) < 0
