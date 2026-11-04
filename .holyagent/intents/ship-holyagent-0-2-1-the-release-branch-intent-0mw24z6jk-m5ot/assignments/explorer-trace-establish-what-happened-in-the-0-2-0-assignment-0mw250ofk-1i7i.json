@@ -5,7 +5,7 @@
   "roleTask": "Explorer.trace",
   "slug": "establish-what-happened-in-the-0-2-0",
   "objective": "Establish what happened in the 0.2.0 claude.ai session 'React and Bun project preferences' (repository davidbasilefilho/skills) about the root rules loading and the platform-assigned branch claude/confident-mayer-4aznof.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Read /home/user/holyagent-work/spec-0.2.1.md Part B2 for the questions.",
     "Find the session with the claude-code-remote MCP tools (load them with ToolSearch: mcp__claude-code-remote__list_sessions, list_events with kinds filters). If it cannot be reached, say so and stop that part.",
@@ -37,5 +37,10 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-04T13:13:34.682Z"
+  },
   "createdAt": "2026-11-04T13:13:26.960Z"
 }
