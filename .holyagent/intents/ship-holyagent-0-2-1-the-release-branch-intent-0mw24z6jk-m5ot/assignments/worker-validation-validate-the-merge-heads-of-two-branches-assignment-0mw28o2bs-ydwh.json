@@ -5,7 +5,7 @@
   "roleTask": "Worker.validation",
   "slug": "validate-the-merge-heads-of-two-branches",
   "objective": "Validate the merge heads of two branches after merging release/0.2.1/integration forward: release/0.2.1/feat/holyagent-rules (worktree /home/user/holyagent-feat-holyagent-rules, head 56c2b52) and release/0.2.1/feat/design-skills (worktree /home/user/holyagent-feat-design-skills, head 1431ce7).",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "In each worktree run 'bun install --frozen-lockfile' then 'bunx --no-install mise run verify' (the plugin test includes a byte-for-byte check that the committed generated plugin equals a fresh build).",
     "In each worktree also run 'git diff --stat HEAD^2 HEAD -- packages/integrations/claude/dist' and confirm the version reads 0.2.1 in package.json and packages/integrations/claude/dist/.claude-plugin/plugin.json."
@@ -36,7 +36,29 @@
     "agentId": "workflow:wf_8eb4ade1-24b/assignment-0mw28o2bs-ydwh",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-04T14:55:36.904Z"
+    "startedAt": "2026-11-04T14:55:36.904Z",
+    "finishedAt": "2026-11-04T15:00:31.417Z"
+  },
+  "result": "result: Both merge heads pass `mise run verify` (exit 0) and both read version 0.2.1. No files changed and no git writes.\n\nchanged: none\n\nchecks:\n- worktree holyagent-feat-holyagent-rules (56c2b52): `bun install --frozen-lockfile` → 0 (\"Checked 129 installs\"); `bunx --no-install mise run verify` → 0; fmt 260 files formatted; check no type errors in 133 files; lint no problems in 134 files; test 1130 pass, 1 skip, 0 fail, 1131 tests in 41 files.\n- worktree holyagent-feat-design-skills (1431ce7): `bun install --frozen-lockfile` → 0; `bunx --no-install mise run verify` → 0; fmt 266 files; check no type errors in 134 files; lint no problems in 135 files; test 1136 pass, 1 skip, 0 fail, 1137 tests in 42 files.\n- both: `git diff --stat HEAD^2 HEAD -- packages/integrations/claude/dist` → 0. Rules: 21 files, +328/−39. Skills: 4 new SKILL.md files, +398.\n- both: package.json and dist plugin.json `\"version\": \"0.2.1\"`.\n\nblockers: none\nquestions: none\nnotes: none\n\nevidence:\nmise run verify exits 0 in both worktrees (regressions): holyagent-feat-holyagent-rules → exit 0, 1130 pass / 0 fail; holyagent-feat-design-skills → exit 0, 1136 pass / 0 fail. Logs at /tmp/claude-0/verify-rules.log and /tmp/claude-0/verify-skills.log.\nBoth heads read version 0.2.1 (behavior): package.json:3 and packages/integrations/claude/dist/.claude-plugin/plugin.json:3 read \"0.2.1\" in both worktrees.\nchecks-run: install, verify, diff-stat and version grep run in both worktrees, as listed above.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Verify exit 0 on both merge heads; 0.2.1 in both.",
+    "criteria": [
+      {
+        "criterion": "mise run verify exits 0 in both worktrees",
+        "support": "holyagent-feat-holyagent-rules → exit 0, 1130 pass / 0 fail; holyagent-feat-design-skills → exit 0, 1136 pass / 0 fail. Logs at /tmp/claude-0/verify-rules.log and /tmp/claude-0/verify-skills.log."
+      },
+      {
+        "criterion": "Both heads read version 0.2.1",
+        "support": "package.json:3 and packages/integrations/claude/dist/.claude-plugin/plugin.json:3 read \"0.2.1\" in both worktrees."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "install, verify, diff-stat and version grep run in both worktrees, as listed above."
+      }
+    ]
   },
   "createdAt": "2026-11-04T14:55:36.904Z"
 }
