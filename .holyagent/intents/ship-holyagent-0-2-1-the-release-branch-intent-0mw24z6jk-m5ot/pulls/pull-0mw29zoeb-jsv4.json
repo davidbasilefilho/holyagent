@@ -1,0 +1,10 @@
+{
+  "id": "pull-0mw29zoeb-jsv4",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "number": 59,
+  "url": "https://github.com/davidbasilefilho/holyagent/pull/59",
+  "branch": "release/0.2.1/fix/windows-test-races",
+  "base": "release/0.2.1/integration",
+  "created": true,
+  "recordedAt": "2026-11-04T15:32:38.340Z"
+}
