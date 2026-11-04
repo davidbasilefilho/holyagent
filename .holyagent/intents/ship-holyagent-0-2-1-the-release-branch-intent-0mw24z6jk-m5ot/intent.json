@@ -25,7 +25,8 @@
     "Decision (maintainer): vcs commit refuses only the exact agent identity (email noreply@anthropic.com, or a name exactly \"Claude\" or \"Claude Code\"); a person whose name merely contains Claude may commit.",
     "Decision (maintainer): an Assignment's brief and report stay while its Intent is open, so later briefs can cite them, and are removed when the Intent is completed or closed.",
     "Decision (maintainer): remove the undocumented holyagent-runtime bin from packages/runtime/package.json; the plugin's holyagent command is the only program.",
-    "Default: the shared flag parser's tightening (an unknown single-dash flag and a repeated string flag are errors) stays; it is reversible and the docs describe the flags."
+    "Default: the shared flag parser's tightening (an unknown single-dash flag and a repeated string flag are errors) stays; it is reversible and the docs describe the flags.",
+    "Default: the workflow hook auto-allow guards against accidental runaway scripts the root writes; past the maintainer's loop and repeat-count rule it refuses the growth patterns the reviews found and that a small rule closes, a crafted script it misses still only exhausts the local session, and the remaining limits are reported."
   ],
   "revision": 4,
   "state": "Open",
