@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "make-the-root-package-json-version-the",
   "objective": "Make the root package.json version the single version source that reaches every other copy automatically (Part A3), in the worktree /home/user/holyagent-build-version-source (branch release/0.2.1/build/version-source, stacked on release/0.2.1/ci/release-flow).",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read /home/user/holyagent-work/spec-0.2.1.md Part A3 (binding) and the 'Version locations' section of /home/user/holyagent-work/map.md. Default recorded in the Intent: the single source is the root package.json version field.",
     "Every other copy derives from it: packages/runtime/package.json, packages/integrations/claude/package.json, the bun.lock workspace entries, dist/.claude-plugin/plugin.json and .claude-plugin/marketplace.json (generate.ts reads the integration package today), the bundled CLI (runtime/src/cli/program.ts reads the runtime package), and anything else found (check scripts/pr-checks.ts and the tag-release action, which read the root package.json already).",
@@ -72,7 +72,45 @@
     "agentId": "workflow:wf_e1774a9a-c74/assignment-0mw28hfwe-js99",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-04T14:50:27.902Z"
+    "startedAt": "2026-11-04T14:50:27.902Z",
+    "finishedAt": "2026-11-04T14:56:08.582Z"
+  },
+  "result": "result: The root `package.json` is now the only hand-edited version. `bump:*` edits only it, and `mise run build` syncs the other copies. `bunx --no-install mise run verify` exits 0 (1125 pass, 1 skip, 0 fail; check, lint and fmt clean). The version is still 0.2.1 everywhere.\n\nPropagation: I chose a build-time sync over dropping `version` from the workspace packages. The existing `packages/integrations/claude/tests/plugin.test.ts` imports `version` from the integration `package.json` (lines 13, 169, 188) and I may not edit it. Dropping the field would break it, and Bun workspaces and `generate.ts` read each package's own field.\n\nThe build step runs `bump-version.ts sync` from `build.ts` before generating. `sync` writes `packages/runtime/package.json`, `packages/integrations/claude/package.json` and the `bun.lock` workspace entries from the root version. `plugin.json` and `marketplace.json` still come from the integration copy.\n\nOther changes:\n- `scripts/bump-version.ts`: `bumpVersions` writes only the root file. `VersionMismatch` and `VERSION_FILES` are removed, since there is nothing to compare against. `syncVersions` and the `sync` CLI command are new.\n- `program.ts` now imports the root `package.json`, so the bundled CLI reads the source directly. That changed `dist/scripts/holyagent.js`.\n\nchanged:\n- `/home/user/holyagent-build-version-source/AGENTS.md`\n- `/home/user/holyagent-build-version-source/docs/development.md`\n- `/home/user/holyagent-build-version-source/packages/integrations/claude/build.ts`\n- `/home/user/holyagent-build-version-source/packages/integrations/claude/dist/scripts/holyagent.js`\n- `/home/user/holyagent-build-version-source/packages/runtime/src/cli/program.ts`\n- `/home/user/holyagent-build-version-source/scripts/bump-version.ts`\n- `/home/user/holyagent-build-version-source/scripts/bump-version.test.ts`\n- `/home/user/holyagent-build-version-source/packages/runtime/tests/version.test.ts` (new)\n\nThe diff is at `/tmp/claude-0/-home-user-holyagent/70184bfa-8a56-57cb-a6cf-d92f87c7692b/scratchpad/version-source.diff`.\n\nchecks:\n- `bunx --no-install mise run build` -> exit 0, 35 files built\n- `bunx --no-install mise run verify` -> exit 0\n\nblockers: none\nquestions: none\nnotes (not done, outside my ownership paths):\n- `mise.toml` lines 70-72 still say the bump script \"rewrites the package.json files and bun.lock\". That comment is now stale.\n- `.github/workflows/validation.yml` stale-build check and the `lefthook.yml` pre-commit hook only look at `GENERATED_PATHS`. A stale workspace `package.json` or `bun.lock` is caught by the test, not by those two.\n\nevidence:\nThe root package.json version is the only hand-edited copy and every other copy derives from it: `bump-version.ts` `syncVersions` is called from `build.ts`; `program.ts` imports the root `package.json`; `plugin.json` and `marketplace.json` come from the synced integration copy.\nbump:patch and bump:minor edit only the source, with tests: `scripts/bump-version.test.ts` (\"a %s bump writes %s to the source only\", and the CLI test where a bump leaves the copies and the lockfile untouched).\nA test fails when any copy differs from the source: `scripts/bump-version.test.ts` \"every copy equals the version in the root package.json\" (workspace manifests, `bun.lock` workspaces, `plugin.json`, `marketplace.json`) and \"the bundled plugin CLI reports the version in the root package.json\". Also `packages/runtime/tests/version.test.ts`.\nAGENTS.md and docs/development.md state the rule: new \"The version\" section in `AGENTS.md`; the \"Versioning\" and \"The generated plugin\" lines in `docs/development.md`.\nmise run verify passes: exit 0, 1125 pass, 0 fail.\nchecks-run: `bunx --no-install mise run build` -> exit 0; `bunx --no-install mise run verify` -> exit 0.\nchanged-paths: the eight paths listed under changed.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Verify exit 0 (1125 pass); bump edits root only; sync test covers every copy.",
+    "criteria": [
+      {
+        "criterion": "The root package.json version is the only hand-edited copy and every other copy derives from it",
+        "support": "`bump-version.ts` `syncVersions` is called from `build.ts`; `program.ts` imports the root `package.json`; `plugin.json` and `marketplace.json` come from the synced integration copy."
+      },
+      {
+        "criterion": "bump:patch and bump:minor edit only the source, with tests",
+        "support": "`scripts/bump-version.test.ts` (\"a %s bump writes %s to the source only\", and the CLI test where a bump leaves the copies and the lockfile untouched)."
+      },
+      {
+        "criterion": "A test fails when any copy differs from the source",
+        "support": "`scripts/bump-version.test.ts` \"every copy equals the version in the root package.json\" (workspace manifests, `bun.lock` workspaces, `plugin.json`, `marketplace.json`) and \"the bundled plugin CLI reports the version in the root package.json\". Also `packages/runtime/tests/version.test.ts`."
+      },
+      {
+        "criterion": "AGENTS.md and docs/development.md state the rule",
+        "support": "new \"The version\" section in `AGENTS.md`; the \"Versioning\" and \"The generated plugin\" lines in `docs/development.md`."
+      },
+      {
+        "criterion": "mise run verify passes",
+        "support": "exit 0, 1125 pass, 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bunx --no-install mise run build` -> exit 0; `bunx --no-install mise run verify` -> exit 0."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the eight paths listed under changed."
+      }
+    ]
   },
   "createdAt": "2026-11-04T14:50:27.902Z"
 }
