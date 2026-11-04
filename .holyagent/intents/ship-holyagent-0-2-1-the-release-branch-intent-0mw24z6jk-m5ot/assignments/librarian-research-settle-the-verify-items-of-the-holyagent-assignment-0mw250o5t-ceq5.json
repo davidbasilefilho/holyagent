@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mw250o5t-ceq5",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 1,
+  "roleTask": "Librarian.research",
+  "slug": "settle-the-verify-items-of-the-holyagent",
+  "objective": "Settle the [verify] items of the HolyAgent 0.2.1 request from authoritative sources so the root can write the workflows, the B2 fix and the design skills.",
+  "state": "Ready",
+  "scope": [
+    "Read /home/user/holyagent-work/spec-0.2.1.md for context; do not redo its research beyond these items.",
+    "1. Claude Code: does a plugin's settings.json 'agent' key (or any other mechanism) make a plugin agent the main-thread agent, and do claude.ai cloud sessions (Claude Code on the web) honor it? Cite code.claude.com docs.",
+    "2. Claude Code: is ${CLAUDE_PLUGIN_ROOT} expanded inside agent markdown bodies, skill bodies, or text passed as a subagent prompt? Which contexts expand it?",
+    "3. Claude Code: can a plugin be installed from a specific git tag or ref (marketplace source ref, /plugin install syntax)? Give the exact documented syntax.",
+    "4. Material 3: the type scale, color roles, dark theme and motion pages (m3.material.io): the facts a stack-agnostic skill would state; and whether Material 3 Expressive no longer recommends the navigation drawer in favor of the expanded navigation rail.",
+    "5. Apple: what iOS 27 changed in Liquid Glass relative to iOS 26 (official HIG or WWDC pages).",
+    "6. GitHub: the rulesets REST API body for a branch ruleset that requires PRs, required status checks (how the check context is named for a workflow job in a workflow named X: job name vs 'workflow / job'), and blocks force pushes, with fnmatch ref patterns like refs/heads/release/*/integration. Also: the documented way to run a workflow only after another workflow passes for the same commit (workflow_run with conclusion check vs a single workflow with needs), and whether workflow_call reusable workflows can be triggered from such a run."
+  ],
+  "constraints": [
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done, stop and report; name anything unrequested instead of doing it. Do not end early with a summary that announces a next step or an offer to wait. Read-only: change no files, make no git writes.",
+    "Use authoritative sources (vendor docs, official repos); give the URL for each fact and separate sourced facts from inference; say plainly when something could not be found.",
+    "Report in under 900 words, one section per numbered item."
+  ],
+  "criteria": [
+    {
+      "text": "Each of the six items has an answer with a cited source or an explicit not-found",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Sourced facts are separated from inference",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "item-1",
+    "item-2",
+    "item-3",
+    "item-4",
+    "item-5",
+    "item-6"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-04T13:13:26.609Z"
+}
