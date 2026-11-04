@@ -5,7 +5,7 @@
   "roleTask": "Explorer.map",
   "slug": "re-map-the-holyagent-repository-at-home",
   "objective": "Re-map the holyagent repository at /home/user/holyagent (main at bd31cf7) for the 0.2.1 release so the root can plan branches and Assignments with disjoint ownership paths.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Read /home/user/holyagent-work/spec-0.2.1.md first: it is the binding request. Confirm or correct each repository fact it states (Part C 'How the pieces connect', Part A file names, Part D example) on the current tree.",
     "Part A: .github/workflows (names, jobs, check names, action pins), scripts/bump-version.ts (its ZeroVer parser and what files it edits), every place the version string appears (package.json files, plugin.json, marketplace.json, bundled CLI, anything else), mise.toml tasks and tools, every package.json dependency field and its current range or pin, the trusted preinstall and toolchain checks that rely on exact pins of @anthropic-ai/claude-code and mise (docs/development.md), the vendored ripgrep and fd (where, how vendored, checksums), whether the vendored frontend-design skill is pinned (to what), and any other pinned dependency.",
@@ -43,5 +43,10 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-04T13:13:33.982Z"
+  },
   "createdAt": "2026-11-04T13:13:26.257Z"
 }
