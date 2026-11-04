@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "widen-the-dev-server-skill-into-a",
   "objective": "Widen the dev-server skill into a platform-wide render-target skill and update the matching Worker.operations, Worker.visual and Reviewer.visual text, in the worktree /home/user/holyagent-feat-dev-server-targets (branch release/0.2.1/feat/dev-server-targets, stacked on design-skills).",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read /home/user/holyagent-work/spec-0.2.1.md Part C: 'dev-server: one running target per platform', the 'dev-server today' bullets, binding requirement 1 (dev-server may name platform tooling only as interchangeable examples) and deliverable 3. Approved as written; keep the skill name dev-server.",
     "Sources: packages/runtime/src/instructions/claude-5.5/skills/dev-server/SKILL.md, roles/worker-operations/dev-server.md, the Worker.visual and Reviewer.visual role files under roles/worker-visual and roles/reviewer-visual (purpose, captures), and the target text in specialist/interface-inspection.md (only the part that names how the visual specialists find the target; another branch will change its materiality text and visual-judging).",
@@ -65,7 +65,41 @@
     "agentId": "workflow:wf_667a6658-b24/assignment-0mw286100-xnuy",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-04T14:41:35.376Z"
+    "startedAt": "2026-11-04T14:41:35.376Z",
+    "finishedAt": "2026-11-04T14:49:56.226Z"
+  },
+  "result": "result: dev-server is now a platform-wide render-target skill, and the Worker.operations, Worker.visual and Reviewer.visual text reads the target record. The build was rebuilt and `mise run verify` passes.\n\nchanged (all under /home/user/holyagent-feat-dev-server-targets):\n- packages/runtime/src/instructions/claude-5.5/skills/dev-server/SKILL.md\n- packages/runtime/src/instructions/claude-5.5/roles/worker-operations/dev-server.md\n- packages/runtime/src/instructions/claude-5.5/roles/worker-visual/purpose.md\n- packages/runtime/src/instructions/claude-5.5/roles/worker-visual/method.md\n- packages/runtime/src/instructions/claude-5.5/roles/reviewer-visual/captures.md\n- packages/runtime/src/instructions/claude-5.5/specialist/interface-inspection.md (target lines only)\n- packages/runtime/src/instructions/claude-5.5/root/skills.md (dev-server line only)\n- packages/runtime/src/instructions/requirements.md (R-DEVSERVER, R-RV, R-WO-DEV, R-WVI)\n- packages/integrations/claude/src/agents.ts (phrases for R-DEVSERVER, R-WO-DEV, R-RV)\n- packages/integrations/claude/tests/plugin.test.ts\n- packages/integrations/claude/dist/agents/{holyagent,reviewer-visual,worker-operations,worker-visual}.md\n- packages/integrations/claude/dist/skills/dev-server/SKILL.md\n- docs/usage.md\n- docs/decisions.md\n\nchecks:\n- `bunx --no-install mise run build` -> exit 0, 39 files.\n- `bunx --no-install mise run verify` -> exit 0, 1075 pass, 1 skip, 0 fail. The log is /home/user/holyagent-work/logs/dev-server-verify.log.\n- An earlier run failed on the format check and on the R-RV phrase pin. I fixed both and reran.\n\nblockers: none\nquestions: none\n\nnotes:\n- The skill tells the root to name its own absolute path in the Worker.operations brief, because that role cannot call Skill. How the root resolves that path is left to the other branch.\n- I did not edit `visual-judging`, which still says \"start the shared server first\". `docs/pi/claude-parity.md` (lines 49, 113) and `docs/development.md` still describe dev-server as a web server. Both are outside my ownership paths.\n- The diff is saved at /tmp/claude-0/-home-user-holyagent/70184bfa-8a56-57cb-a6cf-d92f87c7692b/scratchpad/dev-server-targets.diff.\n\nevidence:\n- The dev-server skill covers detection, the full target record, unique names, owner-only stop, every platform, the environment matrix and the blocked report as the spec states: SKILL.md has the sections Detect, Target record, Start and share, Platforms (web, terminal UI, Linux desktop, Android, iOS, macOS and Windows desktop), Environment and blocked targets, and Stop. The updated dev-server test in `plugin.test.ts` pins these sections and fields, and it passes.\n- Worker.operations, Worker.visual and Reviewer.visual text read the target record and report blocked without one: worker-operations/dev-server.md, worker-visual/purpose.md and reviewer-visual/captures.md. The role-text assertions added to the dev-server test in `plugin.test.ts` pass.\n- Tooling appears only as interchangeable examples: SKILL.md states that every tool named is an interchangeable example and marks flags [verify]. Tools are named only in the Platforms section.\n- Requirement entries, tests and docs match, the plugin is rebuilt and mise run verify passes: `mise run build` exit 0, `mise run verify` exit 0 (1075 pass, 0 fail). `requirements.md`, `agents.ts`, `plugin.test.ts`, `docs/usage.md` and `docs/decisions.md` are updated.\n- checks-run: `bunx --no-install mise run build` -> 0; `bunx --no-install mise run verify` -> 0. No other checks were run.\n- changed-paths: the list under `changed` above.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Verify exit 0 (1075 pass); tests pin skill sections and role text; committed.",
+    "criteria": [
+      {
+        "criterion": "The dev-server skill covers detection, the full target record, unique names, owner-only stop, every platform, the environment matrix and the blocked report as the spec states",
+        "support": "SKILL.md has the sections Detect, Target record, Start and share, Platforms (web, terminal UI, Linux desktop, Android, iOS, macOS and Windows desktop), Environment and blocked targets, and Stop. The updated dev-server test in `plugin.test.ts` pins these sections and fields, and it passes."
+      },
+      {
+        "criterion": "Worker.operations, Worker.visual and Reviewer.visual text read the target record and report blocked without one",
+        "support": "worker-operations/dev-server.md, worker-visual/purpose.md and reviewer-visual/captures.md. The role-text assertions added to the dev-server test in `plugin.test.ts` pass."
+      },
+      {
+        "criterion": "Tooling appears only as interchangeable examples",
+        "support": "SKILL.md states that every tool named is an interchangeable example and marks flags [verify]. Tools are named only in the Platforms section."
+      },
+      {
+        "criterion": "Requirement entries, tests and docs match, the plugin is rebuilt and mise run verify passes",
+        "support": "`mise run build` exit 0, `mise run verify` exit 0 (1075 pass, 0 fail). `requirements.md`, `agents.ts`, `plugin.test.ts`, `docs/usage.md` and `docs/decisions.md` are updated."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bunx --no-install mise run build` -> 0; `bunx --no-install mise run verify` -> 0. No other checks were run."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the list under `changed` above."
+      }
+    ]
   },
   "createdAt": "2026-11-04T14:41:35.376Z"
 }
