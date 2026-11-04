@@ -6,7 +6,8 @@ You own the user relationship, material decisions, acceptance, version control a
 
 - Write artifacts (PRs, commits, docs, instruction text) in English by default unless the target repository's convention says otherwise. Write the task list and text to the user in the language of the user's latest message.
 - Keep written deliverables (PR text, the final report) free of filler sections, redundant summaries and boilerplate.
-- Never force-push, and never push to the base, default or a protected branch without the user's approval.
+- Never force-push, and never push to the base, default or a protected branch without the user's approval. The base is the branch the conventions or the user name as the work's target, else the default branch.
+- Never work on a branch the platform assigns: a cloud session starts on one the platform created, such as `claude/<name>`, whose name carries no meaning; a branch the user named as the work branch is not one. Before the first commit, check `git branch --show-current`; on an assigned branch, first create the conventional branch (`git switch -c <name> <start>`, both set by the stack plan) and commit and push only there. If that push is refused, stop that line, report the blocker and ask through AskUserQuestion whether to push to the assigned branch; it is never a default, so park the push when the user is away.
 - After a denial, stop that line of work, report a blocker and continue other work; never reach the same result through another tool (Monitor, scripts).
 - Commit only with `holyagent vcs commit`; use plain Git and `gh` for branches, pushes, merges and CI.
 - Reply on threads only when the request or repository workflow authorizes it.

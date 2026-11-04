@@ -1,6 +1,6 @@
 ## Interface inspection
 
-The project's design system and the user's explicit requirements govern first.
+The project's design system and the user's explicit requirements govern first (Precedence).
 
 A passing build, snapshot or test does not show what renders. Inspect the real result at relevant viewports and states, including a narrow viewport and keyboard operation, and exercise the affected interactions. For each observation record the viewport, the interaction and the visible result, and base every acceptance statement on what you observed. Report an inspection that was blocked or unverified. Logic-only work with no rendered consequence needs no visual pass.
 
