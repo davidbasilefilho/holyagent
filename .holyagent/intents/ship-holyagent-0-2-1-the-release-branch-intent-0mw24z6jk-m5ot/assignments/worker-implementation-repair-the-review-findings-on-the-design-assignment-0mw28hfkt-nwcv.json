@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-review-findings-on-the-design",
   "objective": "Repair the review findings on the design skills in the worktree /home/user/holyagent-feat-design-skills (release/0.2.1/feat/design-skills, head b5d21e1).",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Context: /home/user/holyagent-work/spec-0.2.1.md Part C. Reviews: /home/user/holyagent/.git/holyagent/reports/assignment-0mw2860hc-17f2.md (artifact) and assignment-0mw2860qy-lzfj.md (code).",
     "Blocking artifact 1: mark the taste and process rules of the core (one signature detail and remove one accessory; the gray placeholder) as (preference), and say in the core legend that the direction rules are checked as a plan in the worker's report or DESIGN.md, not on a render.",
@@ -60,7 +60,37 @@
     "agentId": "workflow:wf_c99222de-d54/assignment-0mw28hfkt-nwcv",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-04T14:50:27.486Z"
+    "startedAt": "2026-11-04T14:50:27.486Z",
+    "finishedAt": "2026-11-04T14:54:10.954Z"
+  },
+  "result": "result: Both blocking artifact findings, non-blocking artifact findings 4 to 9 and code finding 1 are fixed. The plugin is rebuilt and `mise run verify` passes.\n\nchanged (all under /home/user/holyagent-feat-design-skills):\n- packages/runtime/src/instructions/claude-5.5/design-core/core.md\n- packages/runtime/src/instructions/claude-5.5/skills/web-design/SKILL.md\n- packages/runtime/src/instructions/claude-5.5/skills/mobile-design/SKILL.md\n- packages/runtime/src/instructions/claude-5.5/skills/desktop-design/SKILL.md\n- packages/integrations/claude/src/generate.ts\n- packages/integrations/claude/tests/design-skills.test.ts\n- packages/integrations/claude/dist/skills/{web,mobile,desktop,tui}-design/SKILL.md\n\nchecks:\n- `bunx --no-install mise run build` -> exit 0, 39 files built.\n- `bunx --no-install mise run verify` -> exit 0. It ran type-check, lint, format check and tests: 1076 pass, 1 skip, 0 fail. The first run failed the format check on the test file. I ran `bun fmt` on it and re-ran verify.\n- The built skills are 100, 94, 95 and 109 lines (web, mobile, desktop, tui), within 80 to 140.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- Artifact finding 3 is untouched, as the brief says. The core's materiality list is still the third copy.\n- Core legend: it now says the Direction rules are checked as a plan in the worker's report or `DESIGN.md`, not on a render. It defines `(default)` as the marker for overridable numbers.\n- Code 1: I added an exported `skillBody` to `generate.ts`. It embeds the core for the four design skills and throws when any other `SKILL.md` holds the marker line. The new test covers the throw, a plain skill passing through unchanged, and a listed skill getting the core.\n- I made the file edits with short Python and sed scripts rather than the Edit tool.\n- A reviewer without a shell can read the full diff at /tmp/claude-0/-home-user-holyagent/70184bfa-8a56-57cb-a6cf-d92f87c7692b/scratchpad/design-repair.diff.\n\nevidence:\nThe two blocking findings are fixed:\n- `core.md` marks the signature-detail bullet and the gray-placeholder bullet `(preference)`.\n- `core.md` says in the legend that the Direction rules are checked as a plan, not on a render.\n- `mobile-design` color is split: the light, dark and increased-contrast variants are a plain bullet, and `(preference)` covers only the 7:1 aim and the appearance switch.\n\nNon-blocking findings 4 to 9 and code 1 are fixed or explained:\n- Findings 4 to 9 are applied as written in `mobile-design`, `desktop-design`, `web-design` and `core.md`.\n- Code 1 is fixed in `generate.ts` (`skillBody`) and tested in `design-skills.test.ts`.\n\nThe plugin is rebuilt and mise run verify passes: build exit 0, verify exit 0 with 1076 pass, 0 fail.\n\nchecks-run: `bunx --no-install mise run build` exit 0; `bunx --no-install mise run verify` exit 0.\n\nchanged-paths: the paths listed under `changed` above.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Verify exit 0 (1076 pass); blocking fixes applied; marker guard tested.",
+    "criteria": [
+      {
+        "criterion": "The two blocking findings are fixed",
+        "support": "`core.md` marks the signature-detail bullet and the gray-placeholder bullet `(preference)`.; `core.md` says in the legend that the Direction rules are checked as a plan, not on a render.; `mobile-design` color is split: the light, dark and increased-contrast variants are a plain bullet, and `(preference)` covers only the 7:1 aim and the appearance switch."
+      },
+      {
+        "criterion": "Non-blocking findings 4 to 9 and code 1 are fixed or explained",
+        "support": "Findings 4 to 9 are applied as written in `mobile-design`, `desktop-design`, `web-design` and `core.md`.; Code 1 is fixed in `generate.ts` (`skillBody`) and tested in `design-skills.test.ts`."
+      },
+      {
+        "criterion": "The plugin is rebuilt and mise run verify passes",
+        "support": "build exit 0, verify exit 0 with 1076 pass, 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bunx --no-install mise run build` exit 0; `bunx --no-install mise run verify` exit 0."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the paths listed under `changed` above."
+      }
+    ]
   },
   "createdAt": "2026-11-04T14:50:27.486Z"
 }
