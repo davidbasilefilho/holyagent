@@ -1,0 +1,77 @@
+{
+  "id": "assignment-0mw27aup7-onwc",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-review-findings-on-release-0",
+  "objective": "Repair the review findings on release/0.2.1/ci/release-flow in the worktree /home/user/holyagent-ci-release-flow (commits 848a3be and 678d527).",
+  "state": "Running",
+  "scope": [
+    "Context: /home/user/holyagent-work/spec-0.2.1.md Part A1 and A2. The reviews are at /home/user/holyagent/.git/holyagent/reports/assignment-0mw26gvpj-v7vu.md (code) and assignment-0mw26gw00-d5fp.md (security).",
+    "Blocking: scripts/workflows.test.ts builds paths with node:path join/relative, which gives backslashes on Windows, so the required windows job fails; normalize to forward slashes (code finding 1). Verify by also running the test with paths forced to backslashes if practical.",
+    "Fix: publish.yml must not run on the holyagent/state branch, which has no package.json (branches-ignore or equivalent), with a test assertion (code 2).",
+    "Fix: docs/decisions.md still names ci.yml (code 3).",
+    "Fix: remove the dead main-branch guard step and if in stable.yml, and move the duplicated version-read logic into one place (the tag-release action or a bun call reusing parseVersion) (code 4).",
+    "Fix: stable release notes start from the previous stable holyagent-<v> tag, never a -dev- tag (code 5).",
+    "Fix: pin the if guards of the branch-model and version jobs in scripts/workflows.test.ts (code 7), and make checkBranchModel compare parsed versions (code 8).",
+    "Fix: the branch-model and version jobs fail a PR whose head repository is not this repository (security C), with a test if the logic is in the script.",
+    "Fix: concurrency so a push's validation called from publish.yml is never cancelled by a later push or pull_request run in a way that leaves the commit untagged (security notes); keep pull_request runs cancelling older pull_request runs.",
+    "Keep the pull_request 'edited' type (it re-runs branch-model on a retarget).",
+    "Rulesets (outside the repo): update /home/user/holyagent-work/rulesets/ so main and integration rulesets also block deletion, and add /home/user/holyagent-work/rulesets/tags.json: a tag ruleset on holyagent-* tags blocking update and deletion (security A). Keep check contexts equal to the job ids."
+  ],
+  "constraints": [
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report: name unrequested features, tests, files or refactors in the report instead of adding them, and start no extra review rounds. Do not stop early with a summary that announces a next step or an offer to wait.",
+    "Make no version-control writes (no commit, checkout, switch, branch, stash, reset, push) and no edits under .git/ or .holyagent/; the root commits. Report every changed path.",
+    "Work only inside /home/user/holyagent-ci-release-flow. Follow .claude/CLAUDE.md and AGENTS.md. Do not touch the version (already 0.2.1).",
+    "Gate: 'bunx --no-install mise run verify' must pass in the worktree.",
+    "Report in under 400 words; long logs in /home/user/holyagent-work/logs/."
+  ],
+  "criteria": [
+    {
+      "text": "workflows.test.ts passes with Windows path separators",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "publish.yml skips holyagent/state, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Each listed review finding is fixed or explained",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Ruleset JSON files cover main, integration and holyagent-* tags",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify passes in the worktree",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    ".github",
+    "scripts",
+    "docs/decisions.md",
+    "AGENTS.md",
+    "docs/development.md",
+    "docs/usage.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw25gfld-iik9",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T14:17:20.875Z"
+  },
+  "createdAt": "2026-11-04T14:17:20.875Z"
+}
