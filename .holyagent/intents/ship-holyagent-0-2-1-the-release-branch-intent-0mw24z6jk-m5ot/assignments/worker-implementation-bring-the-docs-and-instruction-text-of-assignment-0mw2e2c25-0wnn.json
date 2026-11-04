@@ -1,0 +1,74 @@
+{
+  "id": "assignment-0mw2e2c25-0wnn",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "bring-the-docs-and-instruction-text-of",
+  "objective": "Bring the docs and instruction text of release/0.2.1/fix/audit (worktree /home/user/holyagent-fix-audit, head 0907b72) in line with the audit repairs and close the open documentation findings.",
+  "state": "Running",
+  "scope": [
+    "Binding: Part D of /home/user/holyagent-work/spec-0.2.1.md, and these maintainer decisions now implemented in commit ec37855: (a) vcs commit refuses only the exact agent identity (email noreply@anthropic.com, or a name exactly \"Claude\" or \"Claude Code\"); (b) an Assignment's brief and report stay while its Intent is open and are removed when the Intent is completed or closed; (c) the holyagent-runtime bin is removed. ec37855 also moved the work-tree key into a local per-clone file local/work-trees.json, and the workflow hook now refuses recursion and functions used as values, sized or sparse arrays, a value doubled into a bigger one that feeds back, for-of loops that grow what they walk, deep nested passes over data, repeat/padStart/padEnd on anything but a short literal, and Promise.race (a refused script falls back to the permission prompt). Read 'git -C /home/user/holyagent-fix-audit show ec37855 --stat' and the code to confirm each before writing it.",
+    "Fix, after confirming each against the current text: (1) stale docs the code writer listed: docs/commit-authorship.md:17, docs/requirements.md:9, README.md:26 (wording only; keep the README's fixed sections), the brief and report lifetime in docs/usage.md and wherever briefs and reports are described, and local/work-trees.json wherever local state files are listed. (2) The new workflow-hook refusals in docs/hooks.md and in the plain-script rules of packages/runtime/src/instructions/claude-5.5/root/workflows.md, by category, without restating the code's limits twice. (3) The artifact review findings in /home/user/holyagent/.git/holyagent/reports/assignment-0mw2btahn-gce2.md: finding 1 (AGENTS.md:28 says vcs has two commands; docs/development.md says seven skills, says dependencies are pinned exactly and tells the reader to edit vendor.ts by hand, and lacks the bump tasks and the CLI list; this branch now carries the dependency-updater and version-source work, so describe what mise.toml and scripts/ really do) and findings 2-7. (4) Leftovers in /home/user/holyagent-work/root-notes.md that still hold on this head: the visual-judging line-20 'leaves no captures' wording; dev-server SKILL.md saying Reviewer.visual lists the saved captures; the stale comment near plugin.test.ts:1113; worker-operations.md versus dev-server SKILL.md on what the brief carries for the target record; docs/pi/claude-parity.md vcs globs; the deps doc overstatements (docs/development.md and the newestAllowedRelease doc comment in scripts/ say more about the latest-tag cap than the code does). (5) The description field of each packages/*/package.json and the root package.json, if it is missing or no longer matches what the package does (audit item A15 in /home/user/holyagent-work/audit-docs.md).",
+    "Instruction text is model-facing: follow the instruction-writing rules embedded in the plugin (packages/integrations/claude/dist/skills/instruction-writing/SKILL.md) and the tests that pin instruction wording (packages/integrations/claude/tests); update a pinned phrase in the test and requirements.md together when you change it. AGENTS.md is a repository rules file: edit only line 28 and what the deps work makes stale; do not change .claude/CLAUDE.md.",
+    "A second writer edits packages/runtime/src/cli/workflow-check.ts and test files under packages/runtime/tests at the same time; leave those alone. Finish with 'bunx --no-install mise run build' and 'bunx --no-install mise run verify'; a failure confined to the other writer's files is not yours, name it."
+  ],
+  "constraints": [
+    "Docs and instruction text in English. Keep the README to its fixed sections.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report; name unrequested features, tests, files or refactors instead of adding them. Do not stop at a summary that announces the next step.",
+    "Make no commits or other git writes and no edits under .git/ or .holyagent/; the root commits.",
+    "Work only inside /home/user/holyagent-fix-audit.",
+    "Report in under 450 words, each item fixed or not with file:line; write the diff to /home/user/holyagent-work/diffs/audit-text2.diff."
+  ],
+  "criteria": [
+    {
+      "text": "Docs and instruction text state decisions (a), (b), (c), the local work-tree file and the new hook refusals correctly, once each",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Artifact finding 1 is fixed and findings 2-7 are fixed or named with the reason",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "The listed leftovers and package descriptions are fixed where they still hold",
+      "blocking": false,
+      "dimension": "scope"
+    },
+    {
+      "text": "mise run build leaves dist in sync and mise run verify passes, apart from failures confined to the other writer's files",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "README sections, .claude/CLAUDE.md and the instruction-writing rules are respected",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "docs",
+    "README.md",
+    "AGENTS.md",
+    "packages/runtime/src/instructions",
+    "packages/integrations/claude/src",
+    "packages/integrations/claude/tests",
+    "packages/integrations/claude/dist",
+    "packages/runtime/package.json",
+    "packages/integrations/claude/package.json",
+    "package.json",
+    "scripts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T17:26:40.781Z"
+  },
+  "createdAt": "2026-11-04T17:26:40.781Z"
+}
