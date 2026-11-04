@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mw25ggnl-csmo",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 2,
+  "roleTask": "Reviewer.artifact",
+  "slug": "audit-the-holyagent-repository-s",
+  "objective": "Audit the holyagent repository's documentation at /home/user/holyagent (main, bd31cf7) for Part D of the 0.2.1 request: docs that drift from the code or from each other, and duplicated text.",
+  "state": "Running",
+  "scope": [
+    "Read /home/user/holyagent-work/spec-0.2.1.md Part D and /home/user/holyagent-work/map.md.",
+    "Cover README.md, AGENTS.md, docs/*.md (not docs/pi), the plugin manifests and package.json descriptions, against the code and each other. Example the maintainer gave: the README's minimum Claude Code version (2.1.295), docs/requirements.md (developed and tested against 2.1.310) and the @anthropic-ai/claude-code devDependency (2.1.300) disagree.",
+    "Check the README keeps exactly the fixed sections AGENTS.md lists, and that docs link instead of repeating.",
+    "Do not audit the agent, skill and hook instruction sources (a later pass does that). Release flow, versions, dependencies, hooks and visual docs are changing on other branches: still list drift you find there, marked with the area."
+  ],
+  "constraints": [
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done, stop and report; name anything unrequested instead of doing it. Do not stop early with a summary that announces a next step or an offer to wait. Read-only: change no files in the repository and make no git writes.",
+    "Each finding: file:line, the conflicting source with file:line, and the fix. Mark any fix that needs a maintainer decision (for example which Claude Code version is the real minimum).",
+    "Write the full list to /home/user/holyagent-work/audit-docs.md (outside the repository) and report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "Every drift finding names both sides with file:line and a fix",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The full list is written to /home/user/holyagent-work/audit-docs.md",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings-file"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T13:25:43.377Z"
+  },
+  "createdAt": "2026-11-04T13:25:43.377Z"
+}
