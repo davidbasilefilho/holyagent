@@ -39,12 +39,16 @@ const AGENTS = join("packages", "integrations", "claude", "dist", "agents")
 /** The skills of the plugin, which only the root loads. */
 const SKILLS = [
   "ci-watch",
+  "desktop-design",
   "dev-server",
   "evidence-judging",
   "instruction-writing",
+  "mobile-design",
   "state-mode",
+  "tui-design",
   "user-busy",
   "visual-judging",
+  "web-design",
 ]
 
 /** The paths of every file below a path of the repository, relative to the repository. */

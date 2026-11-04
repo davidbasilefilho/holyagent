@@ -160,16 +160,48 @@ const commands = async (): Promise<ReadonlyArray<GeneratedFile>> => {
   ]
 }
 
+/**
+ * The one source of the shared design core, relative to the repository root. The generator embeds
+ * its text into each of the {@link DESIGN_SKILLS}, so every one of them is self-contained and the
+ * core still has a single source.
+ */
+export const DESIGN_CORE_FILE = `${INSTRUCTIONS_DIRECTORY}/design-core/core.md`
+
+/** The line of a design skill's source that the generator replaces with the shared design core. */
+export const DESIGN_CORE_MARKER = "<!-- design-core -->"
+
+/** The platform design skills, which carry the shared design core. */
+export const DESIGN_SKILLS: ReadonlyArray<string> = [
+  "web-design",
+  "mobile-design",
+  "desktop-design",
+  "tui-design",
+]
+
+/**
+ * A design skill's source with the marker line replaced by the shared design core. A source without
+ * exactly one marker line is an error, because the skill would ship without its core.
+ */
+const withDesignCore = (text: string, core: string, source: string): string => {
+  const lines = text.split("\n")
+  const at = lines.indexOf(DESIGN_CORE_MARKER)
+  if (at === -1 || lines.indexOf(DESIGN_CORE_MARKER, at + 1) !== -1)
+    throw new Error(`${source} must hold the line ${DESIGN_CORE_MARKER} exactly once`)
+  return [...lines.slice(0, at), core.trim(), ...lines.slice(at + 1)].join("\n")
+}
+
 const skills = async (): Promise<ReadonlyArray<GeneratedFile>> => {
   const root = `${INSTRUCTIONS_DIRECTORY}/skills`
+  const core = await readSource(DESIGN_CORE_FILE)
   return Promise.all(
     (await listFiles(root)).map(async (path) => {
       const source = `${root}/${path}`
       const text = await readSource(source)
-      return {
-        path: inPlugin(`skills/${path}`),
-        content: path.endsWith("SKILL.md") ? noteInFrontmatter(text, source) : text,
-      }
+      if (!path.endsWith("SKILL.md")) return { path: inPlugin(`skills/${path}`), content: text }
+      const body = DESIGN_SKILLS.includes(path.split("/")[0] ?? "")
+        ? withDesignCore(text, core, source)
+        : text
+      return { path: inPlugin(`skills/${path}`), content: noteInFrontmatter(body, source) }
     }),
   )
 }
