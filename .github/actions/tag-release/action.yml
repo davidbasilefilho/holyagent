@@ -34,14 +34,16 @@ runs:
       run: |
         set -euo pipefail
 
-        # The one place the version of a release is read; scripts/bump-version.ts parses the same
-        # shape. The anchored match also keeps a newline out of the tag name.
+        # The one place the version of a release is read. It takes the shape parseVersion in
+        # scripts/bump-version.ts takes: 0.X.Y, with the legacy -Z suffix dropped, so the tag never
+        # carries it. The anchored match also keeps a newline out of the tag name.
         number='(0|[1-9][0-9]*)'
         version="$(jq -r .version package.json)"
-        if ! [[ "$version" =~ ^0\.${number}\.${number}$ ]]; then
+        if ! [[ "$version" =~ ^(0\.${number}\.${number})(-[1-9][0-9]*)?$ ]]; then
           echo "::error::The version ${version} in package.json is not 0.X.Y."
           exit 1
         fi
+        version="${BASH_REMATCH[1]}"
         TAG="holyagent-${version}"
         TITLE="HolyAgent ${version}"
         if [ "$PRERELEASE" = "true" ]; then
@@ -78,11 +80,17 @@ runs:
         else
           args+=(--generate-notes)
           # Without a start tag GitHub picks the previous tag by date, which can be a development
-          # tag and would cut the notes short. Start from the newest older stable release instead.
-          previous="$(
-            { gh release list --exclude-pre-releases --exclude-drafts --limit 200 --json tagName --jq '.[].tagName' || true; echo "$TAG"; } |
-              grep -E "^holyagent-0\.${number}\.${number}\$" | sort -uV | grep -x -B1 -- "$TAG" | head -n1
-          )"
-          if [ -n "$previous" ] && [ "$previous" != "$TAG" ]; then args+=(--notes-start-tag "$previous"); fi
+          # tag and would cut the notes short. For a stable release start from the newest older
+          # stable release instead. A pre-release keeps GitHub's choice: its own tag is not stable,
+          # so there is no stable tag to place it after. A failed listing fails the step rather
+          # than silently falling back to date-picked notes.
+          if [ "$PRERELEASE" != "true" ]; then
+            stable="$(gh release list --exclude-pre-releases --exclude-drafts --limit 200 --json tagName --jq '.[].tagName')"
+            previous="$(
+              { printf '%s\n' "$stable"; echo "$TAG"; } |
+                grep -E "^holyagent-0\.${number}\.${number}\$" | sort -uV | grep -x -B1 -- "$TAG" | head -n1
+            )"
+            if [ -n "$previous" ] && [ "$previous" != "$TAG" ]; then args+=(--notes-start-tag "$previous"); fi
+          fi
         fi
         gh release create "$TAG" "${args[@]}"

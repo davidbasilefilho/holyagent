@@ -27,6 +27,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      # First, before anything from the head is checked out or run: a fork controls its own files.
+      # An empty name (a deleted fork) fails too.
+      - name: Require a head in this repository
+        env:
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          if [ -z "$HEAD_REPOSITORY" ] || [ "${HEAD_REPOSITORY,,}" != "${GITHUB_REPOSITORY,,}" ]; then
+            echo "::error::The head repository \"$HEAD_REPOSITORY\" is not $GITHUB_REPOSITORY; open the pull request from a branch of this repository."
+            exit 1
+          fi
+
       # The head commit, not the merge commit: its package.json is the version the head carries.
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -40,11 +51,6 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
 
-      - name: Require a head in this repository
-        env:
-          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
-        run: bun scripts/pr-checks.ts same-repository "$HEAD_REPOSITORY" "$GITHUB_REPOSITORY"
-
       - name: Check the branch model
         env:
           BASE_REF: ${{ github.base_ref }}
@@ -57,6 +63,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      # First, before anything from the head is checked out or run: a fork controls its own files.
+      # An empty name (a deleted fork) fails too.
+      - name: Require a head in this repository
+        env:
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          if [ -z "$HEAD_REPOSITORY" ] || [ "${HEAD_REPOSITORY,,}" != "${GITHUB_REPOSITORY,,}" ]; then
+            echo "::error::The head repository \"$HEAD_REPOSITORY\" is not $GITHUB_REPOSITORY; open the pull request from a branch of this repository."
+            exit 1
+          fi
+
       - name: Check out the head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -75,11 +92,6 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
-
-      - name: Require a head in this repository
-        env:
-          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
-        run: bun scripts/pr-checks.ts same-repository "$HEAD_REPOSITORY" "$GITHUB_REPOSITORY"
 
       - name: Check the version
         run: bun scripts/pr-checks.ts version main .

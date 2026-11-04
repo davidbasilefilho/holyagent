@@ -123,7 +123,13 @@ describe("validation.yml", () => {
   const validation = parse(".github/workflows/validation.yml") as {
     on: Record<string, unknown>
     concurrency: { group: string; "cancel-in-progress": unknown }
-    jobs: Record<string, { if?: string; steps?: Array<{ run?: string }> }>
+    jobs: Record<
+      string,
+      {
+        if?: string
+        steps?: Array<{ name?: string; uses?: string; run?: string; env?: Record<string, string> }>
+      }
+    >
   }
 
   test("runs on pull requests and when called, with the jobs the rulesets require", () => {
@@ -144,12 +150,17 @@ describe("validation.yml", () => {
     )
   })
 
-  test("branch-model and version fail a pull request from another repository", () => {
+  test("branch-model and version fail a pull request from another repository before checkout", () => {
     for (const id of ["branch-model", "version"]) {
-      const runs = (validation.jobs[id]?.steps ?? []).map((step) => step.run ?? "")
-      expect(runs).toContain(
-        'bun scripts/pr-checks.ts same-repository "$HEAD_REPOSITORY" "$GITHUB_REPOSITORY"',
-      )
+      const steps = validation.jobs[id]?.steps ?? []
+      const guard = steps.findIndex((step) => step.name === "Require a head in this repository")
+      const checkout = steps.findIndex((step) => step.uses?.startsWith("actions/checkout@"))
+      expect(guard).toBe(0)
+      expect(guard).toBeLessThan(checkout)
+      expect(steps[guard]?.env).toEqual({
+        HEAD_REPOSITORY: "${{ github.event.pull_request.head.repo.full_name }}",
+      })
+      expect(steps[guard]?.run).toContain('"${HEAD_REPOSITORY,,}" != "${GITHUB_REPOSITORY,,}"')
     }
   })
 

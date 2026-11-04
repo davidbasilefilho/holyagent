@@ -10,9 +10,7 @@ import { InvalidVersion } from "./bump-version.ts"
 import {
   BranchModelViolation,
   checkBranchModel,
-  checkSameRepository,
   checkVersionNewer,
-  ForeignHead,
   type PullRequest,
   VersionNotNewer,
 } from "./pr-checks.ts"
@@ -98,26 +96,6 @@ describe("checkBranchModel", () => {
   })
 })
 
-describe("checkSameRepository", () => {
-  const outcome = (head: string, repository: string) =>
-    Effect.runSync(Effect.exit(checkSameRepository(head, repository)))._tag
-
-  test("accepts the repository itself, whatever the case of its name", () => {
-    expect(outcome("owner/holyagent", "owner/holyagent")).toBe("Success")
-    expect(outcome("Owner/HolyAgent", "owner/holyagent")).toBe("Success")
-  })
-
-  test.each([["fork-owner/holyagent"], ["owner/holyagent-fork"], [""]])(
-    "rejects the head repository %p",
-    (head) => {
-      expect(outcome(head, "owner/holyagent")).toBe("Failure")
-      expect(
-        Effect.runSync(Effect.flip(checkSameRepository(head, "owner/holyagent"))),
-      ).toBeInstanceOf(ForeignHead)
-    },
-  )
-})
-
 describe("checkVersionNewer", () => {
   const outcome = (main: string, head: string) =>
     Effect.runSync(Effect.exit(checkVersionNewer(main, head)))
@@ -180,12 +158,6 @@ describe("the command line", () => {
     expect(await run("version", "main", "head")).toBe(0)
     expect(await run("version", "head", "head")).toBe(1)
     expect(await run("version", "head", "main")).toBe(1)
-  })
-
-  test("same-repository exits 0 only for the repository itself", async () => {
-    expect(await run("same-repository", "owner/holyagent", "owner/holyagent")).toBe(0)
-    expect(await run("same-repository", "fork/holyagent", "owner/holyagent")).toBe(1)
-    expect(await run("same-repository", "", "owner/holyagent")).toBe(1)
   })
 
   test("an unknown command exits 1", async () => {

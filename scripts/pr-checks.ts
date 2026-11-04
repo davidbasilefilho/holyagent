@@ -32,22 +32,11 @@ export class VersionNotNewer extends Data.TaggedError("VersionNotNewer")<{
   }
 }
 
-/** The head of a pull request lives in another repository, so its branch name proves nothing. */
-export class ForeignHead extends Data.TaggedError("ForeignHead")<{
-  readonly headRepository: string
-  readonly repository: string
-}> {
-  /** The description shown to the user. */
-  override get message() {
-    return `The head repository ${JSON.stringify(this.headRepository)} is not ${this.repository}; open the pull request from a branch of this repository`
-  }
-}
-
 /** The command line arguments are not one of the commands. */
 export class Usage extends Data.TaggedError("Usage")<{ readonly args: ReadonlyArray<string> }> {
   /** The description shown to the user. */
   override get message() {
-    return `Expected "same-repository <head-repository> <repository>", "branch-model <base> <head> [root]" or "version <main-root> <head-root>"; got ${this.args.join(" ") || "nothing"}`
+    return `Expected "branch-model <base> <head> [root]" or "version <main-root> <head-root>"; got ${this.args.join(" ") || "nothing"}`
   }
 }
 
@@ -101,19 +90,6 @@ export const checkBranchModel = ({
   })
 }
 
-/**
- * Fails unless the pull request's head repository is `repository` (compared case-insensitively, as
- * GitHub names are). The branch-model rules read branch names, which a fork can choose freely, and
- * a deleted fork has no repository at all, so an empty name fails too.
- */
-export const checkSameRepository = (
-  headRepository: string,
-  repository: string,
-): Effect.Effect<void, ForeignHead> =>
-  headRepository.toLowerCase() === repository.toLowerCase() && repository !== ""
-    ? Effect.void
-    : Effect.fail(new ForeignHead({ headRepository, repository }))
-
 /** Fails unless `head` is strictly greater than `main` (ZeroVer: compared by minor, then patch). */
 export const checkVersionNewer = (
   main: string,
@@ -126,16 +102,14 @@ export const checkVersionNewer = (
   })
 
 /**
- * Runs `same-repository <head-repository> <repository>`, `branch-model <base> <head> [root]` (the
- * head's version is read from the root `package.json` under `root`, the current directory by
- * default) or `version <main-root> <head-root>`, prints the failure and sets a failing exit code.
+ * Runs `branch-model <base> <head> [root]` (the head's version is read from the root `package.json`
+ * under `root`, the current directory by default) or `version <main-root> <head-root>`, prints the
+ * failure and sets a failing exit code.
  */
 export const main = (args: ReadonlyArray<string>) =>
   Effect.gen(function* () {
     const [command, first, second, third] = args
-    if (command === "same-repository" && first !== undefined && second !== undefined) {
-      yield* checkSameRepository(first, second)
-    } else if (command === "branch-model" && first !== undefined && second !== undefined) {
+    if (command === "branch-model" && first !== undefined && second !== undefined) {
       const version = yield* readVersion(third ?? ".", "package.json")
       yield* checkBranchModel({ base: first, head: second, version })
     } else if (command === "version" && first !== undefined && second !== undefined) {
@@ -148,15 +122,7 @@ export const main = (args: ReadonlyArray<string>) =>
     yield* Console.log("ok")
   }).pipe(
     Effect.catch(
-      (
-        error:
-          | BranchModelViolation
-          | ForeignHead
-          | VersionNotNewer
-          | InvalidVersion
-          | ManifestError
-          | Usage,
-      ) =>
+      (error: BranchModelViolation | VersionNotNewer | InvalidVersion | ManifestError | Usage) =>
         Console.error(`error: ${error._tag}: ${error.message}`).pipe(
           Effect.andThen(
             Effect.sync(() => {
