@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-the-generator-and-test-changes-of",
   "objective": "Review the generator and test changes of commit ca1d774 on release/0.2.1/feat/visual-root-pass (worktree /home/user/holyagent-feat-visual-root-pass) against Part C deliverables 2 and 4 of the 0.2.1 request.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read /home/user/holyagent-work/spec-0.2.1.md Part C deliverables 2 and 4 and B1. Review 'git -C /home/user/holyagent-feat-visual-root-pass show ca1d774 -- packages/integrations/claude/src packages/integrations/claude/tests packages/runtime/tests packages/runtime/src/instructions/requirements.md'.",
     "Check embedMateriality (marker handling, duplicate and missing markers, no marker left in any generated file, failure as a tagged error or a build failure), the skill-path resolution in the generated root text, and that each new test fails without the change (run them against the parent 001a77d in a scratch copy outside the repository).",
@@ -41,7 +41,33 @@
     "agentId": "workflow:wf_bc4f8f04-eb9/assignment-0mw29g4f8-oswm",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-04T15:17:25.989Z"
+    "startedAt": "2026-11-04T15:17:25.989Z",
+    "finishedAt": "2026-11-04T15:24:25.258Z"
+  },
+  "result": "result: Deliverables 2 and 4 are met and I found no blockers. `mise run verify` passes, dist is in sync, and every new test fails without its change.\n\nchanged: none\n\nchecks:\n- `bunx --no-install mise run verify` in the worktree -> exit 0. Type-check clean, lint clean (135 files), fmt clean (267 files), tests 1140 pass, 1 skip, 0 fail.\n- `bunx --no-install mise run build` on a `git archive ca1d774` copy with `node_modules` symlinked -> `diff -rq` against the worktree's `packages/integrations/claude/dist` shows no difference. `plugin.test.ts` also has a byte-for-byte dist check.\n- Parent run: I copied the three changed test files onto a `001a77d` archive.\n  - `design-skills.test.ts` and `plugin.test.ts` fail to load, because `embedMateriality` and `MATERIALITY_FILE` do not exist there.\n  - `sessioncontext.test.ts` fails on \"Briefs hold literal absolute paths.\".\n- Mutation runs on the ca1d774 copy, each caught by a test:\n  - a restated definition phrase in a root source fails \"restated by no other source\";\n  - a marker with trailing whitespace fails \"carries whole\", \"no marker line\" and the requirements-reach test;\n  - a removed marker fails \"carries whole\";\n  - an extra marker in another source fails \"no marker line\";\n  - a removed dispatch sentence fails the sessioncontext and visual-judging tests.\n\nNot run: whether the host expands `${CLAUDE_PLUGIN_ROOT}` in agent text and in the session-start hook. I read `hook.ts:220-229`, which does the substitution for hook context, so the root sees a real path to put in briefs. Only instruction text and tests cover this.\n\nblockers: none\n\nfindings (ranked, all non-blocking):\n1. `packages/integrations/claude/src/agents.ts:188-193`: `embedMateriality` matches the marker only as an exact whole line.\n   - A marker with whitespace or a typo, in a new source, ships as an inert comment with no build failure.\n   - The three current sources are covered by the tests: the mutation run above confirmed the trailing-space case.\n   - The error is a plain `Error`, but `vendor.ts` does the same, so this matches the build code around it.\n   - Smallest fix: match with `line.trim()`.\n2. `packages/runtime/src/instructions/claude-5.5/roles/reviewer-visual/captures.md:1`: the \"list the paths of the final captures\" sentence sits in a paragraph about targets other than a web page.\n   - A live-inspected web page may leave the root's final pass nothing to read.\n   - Smallest fix: one clause saying that a web page inspected live is covered by Worker.visual or Worker.operations saving captures.\n3. `docs/pi/claude-parity.md:49` still says visual work is accepted on Reviewer.visual's evidence. The commit reverses that.\n   - Smallest fix: update the row.\n\nnotes:\n- Budget: `ROOT_CORE` is 6033 characters. The fixed parts (`ROOT_CORE`, `ROOT_TAKEOVER`, `CLOUD_IDENTITY`, `SESSION_REMINDER`) total 7717 against the test cap of 8300, which is `CONTEXT_BUDGET` minus 1000. That leaves 583 characters of headroom in that test. This commit adds about 36 characters to the core (the dispatch sentence). The guard test is passing and the cap works as designed, so the headroom is not a defect. I could not reproduce your \"41 characters\" figure, so it may come from a different test.\n- The code-review findings on `visual-judging` (unbounded root image reading, absolute plugin path) are design choices for the artifact reviewer; the `tui-design` \"(default)\" marks follow the shared-core number rule.\n\nevidence:\nThe generator and tests implement deliverables 2 and 4, and each new test fails without the change: the parent run and the mutation runs above. The generator is `agents.ts:170-193` and `generate.ts:203-221`. The tests are `design-skills.test.ts` (the materiality describe) and `plugin.test.ts`/`sessioncontext.test.ts` for the root integration.\nNo regression, dist in sync and mise run verify passes: `mise run verify` exit 0 (1140 pass, 0 fail); `mise run build` in a scratch copy gives no diff in `dist`.\nchecks-run: `mise run verify` -> 0; `mise run build` in a scratch copy plus `diff -rq` -> no difference; parent-test run -> 2 suites fail to load and 1 test fails; 6 mutation runs, all caught.\nfindings: the three non-blocking items above.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "verify, scratch build diff, parent and mutation runs",
+    "criteria": [
+      {
+        "criterion": "The generator and tests implement deliverables 2 and 4, and each new test fails without the change",
+        "support": "the parent run and the mutation runs above. The generator is `agents.ts:170-193` and `generate.ts:203-221`. The tests are `design-skills.test.ts` (the materiality describe) and `plugin.test.ts`/`sessioncontext.test.ts` for the root integration."
+      },
+      {
+        "criterion": "No regression, dist in sync and mise run verify passes",
+        "support": "`mise run verify` exit 0 (1140 pass, 0 fail); `mise run build` in a scratch copy gives no diff in `dist`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`mise run verify` -> 0; `mise run build` in a scratch copy plus `diff -rq` -> no difference; parent-test run -> 2 suites fail to load and 1 test fails; 6 mutation runs, all caught."
+      },
+      {
+        "label": "findings",
+        "support": "the three non-blocking items above."
+      }
+    ]
   },
   "createdAt": "2026-11-04T15:17:25.989Z"
 }
