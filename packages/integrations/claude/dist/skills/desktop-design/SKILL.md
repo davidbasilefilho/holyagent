@@ -10,7 +10,7 @@ Rules for desktop apps, judged on what renders. Apply the shared part and the se
 
 ## Shared core
 
-Judge every rule on the rendered result, from the captures. `(behavior check)` marks a rule no capture can show (a file, a process, an input sequence): Worker.operations runs it and reports it, and nobody infers it from a still. `(preference)` marks taste: list it, do not repair it. A violation of any other rule is material: it harms acceptance, hierarchy or composition, legibility, responsiveness, correct text and numbers, accessibility, interaction or production quality. A number is binding only where a platform guideline fixes it; every other number is a default the design may override with a stated reason.
+Judge every rule on the rendered result, from the captures; the rules under Direction before code are the exception, checked as a plan in the worker's report or `DESIGN.md`, not on a render. `(behavior check)` marks a rule no capture can show (a file, a process, an input sequence): Worker.operations runs it and reports it, and nobody infers it from a still. `(preference)` marks taste: list it, do not repair it. A violation of any other rule is material: it harms acceptance, hierarchy or composition, legibility, responsiveness, correct text and numbers, accessibility, interaction or production quality. A number is binding only where a platform guideline fixes it; every other number is a default, marked `(default)`, that the design may override with a stated reason.
 
 ### Direction before code
 
@@ -30,14 +30,14 @@ Judge every rule on the rendered result, from the captures. `(behavior check)` m
 
 ### Spend boldness in one place
 
-- One signature detail per screen, and remove one accessory before finishing. Replace removed ornament with scale, real content or a real image, so the screen is not left thin.
-- A labeled gray placeholder beats drawn art or emoji used as icons.
+- One signature detail per screen, and remove one accessory before finishing. Replace removed ornament with scale, real content or a real image, so the screen is not left thin. (preference)
+- A labeled gray placeholder beats drawn art or emoji used as icons. (preference)
 
 ### Quality floor, unannounced
 
 - Text contrast is at least 4.5:1 and non-text control contrast at least 3:1. Color is never the only signal.
 - Every state exists and is captured where reachable: hover or press, focus, disabled, loading, empty, error and long content.
-- The system's reduced-motion, larger-text and high-contrast settings change the render.
+- The system's reduced-motion, larger-text and high-contrast settings, where the platform has them, change the render.
 - Copy uses the user's words, specific verbs and one name per action, and an error says how to fix it.
 
 ## Shared desktop rules
@@ -90,6 +90,6 @@ Unless the brief asks for it:
 
 ## Capture checklist
 
-Capture narrow, default and wide window widths, each in light, dark and high contrast, and at 150% or 200% text scale. Add a keyboard-only focus traversal, the open menus, an inactive window and a dialog or sheet. Show the native window chrome in every capture.
+Capture narrow, default and wide window widths, each in light, dark and high contrast, and, where the platform has a text scale, at 150% or 200%. Add a keyboard-only focus traversal, the open menus, an inactive window and a dialog or sheet. Show the native window chrome in every capture.
 
 Apply it on the final captures: the worker before reporting, the reviewer in its findings and the root in its own final pass. Report only checks actually run, and name each check not run.

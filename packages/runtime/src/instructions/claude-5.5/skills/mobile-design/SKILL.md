@@ -29,8 +29,9 @@ Rules for phone and tablet apps, judged on what renders. Apply the shared part a
 - A visible Back button stays, and the edge swipe is a shortcut. On iPad prefer the tab bar, which may become a sidebar of at most two levels.
 - A sheet holds one scoped task at a time. Cancel goes leading and Done trailing, never Cancel, Done and Back together, and a swipe-dismiss that would lose changes asks first. (behavior check)
 - Liquid Glass (iOS 26 and later): glass is the control and navigation layer, never the content layer, and custom glass is not stacked on glass. Use the regular variant by default and the clear variant only over rich media. Tint only the primary action's background, and strip custom bar backgrounds and borders. Corners are concentric: inner radius equals outer radius minus padding.
-- Apple's iOS 27 notes list updated guidance for scroll edge effects, sidebars, tab bars, menus, search fields and app icons without detail this skill can state. Judge those on a render of the target OS and rely on no remembered rule.
-- Color is semantic. Every custom color has light, dark and increased-contrast variants; aim for 7:1 on small text. No in-app appearance switch. (preference)
+- iOS 27 guidance on scroll edges, sidebars, tab bars, menus, search and icons is not encoded here; judge those on a render of the target OS.
+- Color is semantic. Every custom color has light, dark and increased-contrast variants.
+- Aim for 7:1 on small text, and offer no in-app appearance switch. (preference)
 - Common actions use system symbols matched to the text weight.
 - Motion is purposeful, optional and cancelable; under Reduce Motion movement becomes a fade. Capture with the setting on.
 
@@ -42,7 +43,7 @@ Rules for phone and tablet apps, judged on what renders. Apply the shared part a
 - Edge to edge is enforced from Android 15: content draws behind the system bars, bar icons keep contrast, interactive content is inset, and a scrim sits where content scrolls under a bar.
 - Predictive back is on by default: the back swipe previews the destination and lands where the preview showed. Custom back behavior goes through the platform's back handling. (behavior check)
 - Color and type use Material roles, never raw values. Type roles are Display, Headline, Title, Body and Label in large, medium and small; adjust line height and tracking before sizes. An "on" color sits on its paired fill, and container colors are fills, not text colors. Light and dark use the same roles. Contrast levels are standard, medium and high, and each is judged in light and dark.
-- Choose components by behavior. Expressive motion is for a few moments and the rest stays calm. (preference)
+- Choose components by behavior. Expressive motion is for a few moments and the rest stays calm (preference).
 
 ## Refuse list
 

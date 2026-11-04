@@ -59,6 +59,6 @@ Unless the brief asks for it:
 
 ## Capture checklist
 
-Capture narrow, default and wide window widths, each in light, dark and high contrast, and at 150% or 200% text scale. Add a keyboard-only focus traversal, the open menus, an inactive window and a dialog or sheet. Show the native window chrome in every capture.
+Capture narrow, default and wide window widths, each in light, dark and high contrast, and, where the platform has a text scale, at 150% or 200%. Add a keyboard-only focus traversal, the open menus, an inactive window and a dialog or sheet. Show the native window chrome in every capture.
 
 Apply it on the final captures: the worker before reporting, the reviewer in its findings and the root in its own final pass. Report only checks actually run, and name each check not run.

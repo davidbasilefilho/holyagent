@@ -3,7 +3,13 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { INSTRUCTIONS_DIRECTORY } from "../src/files.ts"
-import { DESIGN_CORE_FILE, DESIGN_CORE_MARKER, DESIGN_SKILLS, generate } from "../src/generate.ts"
+import {
+  DESIGN_CORE_FILE,
+  DESIGN_CORE_MARKER,
+  DESIGN_SKILLS,
+  generate,
+  skillBody,
+} from "../src/generate.ts"
 import { ROOT } from "./built.ts"
 
 const read = (path: string) => readFileSync(join(ROOT, path), "utf8")
@@ -104,6 +110,15 @@ describe("the platform design skills", () => {
       .filter((file) => file.content.includes("### Spend boldness in one place"))
       .map((file) => file.path.split("/").at(-2) ?? "")
     expect(holders.toSorted()).toEqual([...DESIGN_SKILLS].toSorted())
+  })
+
+  test("fail the build when a skill outside the design list holds the core marker", () => {
+    const text = `---\nname: other\n---\n${DESIGN_CORE_MARKER}\n`
+    expect(() => skillBody("other/SKILL.md", text, core, "other")).toThrow("DESIGN_SKILLS")
+    expect(skillBody("other/SKILL.md", "---\nname: other\n---\nbody\n", core, "other")).toContain(
+      "body",
+    )
+    expect(skillBody("web-design/SKILL.md", text, core, "web")).toContain("### Spend boldness")
   })
 
   test("name no framework, library, component kit or API", () => {

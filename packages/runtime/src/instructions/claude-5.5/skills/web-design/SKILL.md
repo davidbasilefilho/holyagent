@@ -12,13 +12,13 @@ Rules for pages and web apps, judged on what renders. Pair this with the embedde
 ## Web rules
 
 - Name the mode in the plan. An expressive page (marketing, editorial) is judged on point of view and composition; a task-oriented product UI is judged on familiarity and speed of use.
-- A product UI earns familiarity: one type family, motion of about 150 to 250 ms only as feedback to an action, no page-load choreography, and a modal only as a last resort. (defaults)
+- A product UI earns familiarity: one type family, motion of about 150 to 250 ms only as feedback to an action, no page-load choreography, and a modal only as a last resort. (default)
 
 ### Systems, not values
 
-- Space, type size, shadow and opacity come from small scales. For space, for example 4, 8, 12, 16, 24, 32, 48, 64 and 96, with no adjacent steps closer than about 25%. Symptom: near-identical gaps or one-off sizes in the capture. (defaults)
+- Space, type size, shadow and opacity come from small scales. For space, for example 4, 8, 12, 16, 24, 32, 48, 64 and 96, with no adjacent steps closer than about 25%. Symptom: near-identical gaps or one-off sizes in the capture. (default)
 - More space surrounds a group than sits inside it, so groups read at a glance.
-- Two font weights. Hierarchy comes from weight and color before size, with at most three text colors. (defaults)
+- Two font weights. Hierarchy comes from weight and color before size, with at most three text colors. (default)
 - The layout holds its hierarchy in grayscale before color is added. (preference)
 - Body text measure is 65 to 75 characters, and a line never spans a wide screen. (default)
 
@@ -31,7 +31,7 @@ Rules for pages and web apps, judged on what renders. Pair this with the embedde
 ### Semantics and input
 
 - Buttons act and links navigate. A control that navigates is a link and one that acts is a button. (behavior check)
-- Icon-only buttons have a label, shown as a tooltip on hover and focus.
+- Icon-only buttons have an accessible label, and a tooltip on hover and focus where a pointer exists.
 - Focus is visible on every interactive element in a keyboard traversal. An outline is never removed without a visible replacement.
 - Forms accept paste, use the input type and autofill hint that fit each field, and never block the user. (behavior check)
 - After a failed submit, each error sits inline beside its field and focus moves to the first one. Capture that frame.
@@ -43,7 +43,7 @@ Rules for pages and web apps, judged on what renders. Pair this with the embedde
 
 ### Motion
 
-- Only position-like transforms and opacity animate, never a blanket "all properties" transition. (behavior check)
+- Only transform and opacity animate, never a blanket "all properties" transition. (behavior check)
 - Animations can be interrupted, and under reduced motion movement is replaced by a fade or nothing. Capture with the setting on.
 
 ### Themed browser surfaces
