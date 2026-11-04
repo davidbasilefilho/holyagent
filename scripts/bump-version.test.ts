@@ -1,7 +1,15 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
-import { dirname, join } from "node:path"
+import { basename, dirname, join } from "node:path"
 
 import { $ } from "bun"
 import { Effect } from "effect"
@@ -16,8 +24,9 @@ import {
   LOCKFILE,
   ManifestError,
   parseVersion,
-  VERSION_FILES,
-  VersionMismatch,
+  syncVersions,
+  VERSION_COPIES,
+  VERSION_SOURCE,
 } from "./bump-version.ts"
 
 const repository = join(import.meta.dir, "..")
@@ -138,11 +147,13 @@ const write = (file: string, text: string) => {
   mkdirSync(dirname(join(root, file)), { recursive: true })
   writeFileSync(join(root, file), text)
 }
-const state = () => [...VERSION_FILES, LOCKFILE].map(read)
+const FILES = [VERSION_SOURCE, ...VERSION_COPIES, LOCKFILE]
+const state = () => FILES.map(read)
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "holyagent-bump-"))
-  for (const file of VERSION_FILES) write(file, manifest(file, "0.3.2-1"))
+  write(VERSION_SOURCE, manifest(VERSION_SOURCE, "0.3.2-1"))
+  for (const file of VERSION_COPIES) write(file, manifest(file, "0.3.2-1"))
   write(LOCKFILE, lockfile("0.3.2-1"))
 })
 afterEach(() => {
@@ -153,79 +164,137 @@ describe("bumpVersions", () => {
   test.each([
     ["minor", "0.4.0"],
     ["patch", "0.3.3"],
-  ] as const)("a %s bump writes %s to every file and changes nothing else", async (kind, to) => {
-    const before = VERSION_FILES.map(read)
+  ] as const)("a %s bump writes %s to the source only", async (kind, to) => {
+    const before = state()
     expect(await Effect.runPromise(bumpVersions(root, kind))).toEqual({ from: "0.3.2-1", to })
-    VERSION_FILES.forEach((file, index) => {
-      expect(read(file)).toBe(before[index]!.replace(`"version": "0.3.2-1"`, `"version": "${to}"`))
-    })
-    expect(read(LOCKFILE)).toBe(lockfile(to))
+    expect(read(VERSION_SOURCE)).toBe(
+      before[0]!.replace(`"version": "0.3.2-1"`, `"version": "${to}"`),
+    )
+    expect(state().slice(1)).toEqual(before.slice(1))
   })
 
-  test("rewrites the repository's own manifests keeping their formatting", async () => {
-    for (const file of [...VERSION_FILES, LOCKFILE]) {
-      mkdirSync(dirname(join(root, file)), { recursive: true })
-      cpSync(join(repository, file), join(root, file))
-    }
-    const before = state()
+  test("rewrites the repository's own root manifest keeping its formatting", async () => {
+    cpSync(join(repository, VERSION_SOURCE), join(root, VERSION_SOURCE))
+    const before = read(VERSION_SOURCE)
     const { from, to } = await Effect.runPromise(bumpVersions(root, "patch"))
     expect(to).toBe(bump(from, "patch"))
-    const after = state()
-    before.forEach((text, index) => {
-      expect(after[index]).toBe(
-        text.replace(new RegExp(`("version": ")${from}(")`, "g"), `$1${to}$2`),
-      )
-    })
-    expect(after.join()).toContain(`"version": "${to}"`)
+    expect(read(VERSION_SOURCE)).toBe(
+      before.replace(new RegExp(`("version": ")${from}(")`), `$1${to}$2`),
+    )
   })
 
-  test("refuses disagreeing versions, names each file and writes nothing", async () => {
+  test("bumps a source whose copies are behind, without reading them", async () => {
     write("packages/runtime/package.json", manifest("runtime", "0.3.1"))
-    const before = state()
-    const error = await Effect.runPromise(Effect.flip(bumpVersions(root, "minor")))
-    expect(error).toBeInstanceOf(VersionMismatch)
-    for (const file of VERSION_FILES) expect(error.message).toContain(file)
-    expect(error.message).toContain("packages/runtime/package.json 0.3.1")
-    expect(state()).toEqual(before)
+    expect((await Effect.runPromise(bumpVersions(root, "patch"))).to).toBe("0.3.3")
   })
 
-  test("fails with InvalidVersion when all files agree on a malformed version", async () => {
-    for (const file of VERSION_FILES) write(file, manifest(file, "1.0"))
+  test("fails with InvalidVersion when the source is malformed", async () => {
+    write(VERSION_SOURCE, manifest(VERSION_SOURCE, "1.0"))
     const before = state()
     const error = await Effect.runPromise(Effect.flip(bumpVersions(root, "patch")))
     expect(error).toBeInstanceOf(InvalidVersion)
     expect(state()).toEqual(before)
   })
 
-  test("fails with ManifestError naming a file that is missing", async () => {
-    rmSync(join(root, "packages/integrations/claude/package.json"))
-    const error = await Effect.runPromise(Effect.flip(bumpVersions(root, "patch")))
-    expect(error).toBeInstanceOf(ManifestError)
-    expect(error.message).toContain("packages/integrations/claude/package.json")
-  })
-
   test.each([
+    ["is missing", undefined],
     ["has no version", `{ "name": "x" }\n`],
     ["has a non-string version", `{ "version": 1 }\n`],
     ["is not JSON", "nope"],
-  ])("fails with ManifestError when a file %s", async (_name, text) => {
-    write("packages/integrations/claude/package.json", text)
+  ])("fails with ManifestError when the source %s", async (_name, text) => {
+    if (text === undefined) rmSync(join(root, VERSION_SOURCE))
+    else write(VERSION_SOURCE, text)
     const error = await Effect.runPromise(Effect.flip(bumpVersions(root, "patch")))
     expect(error).toBeInstanceOf(ManifestError)
+    expect(error.message).toContain(VERSION_SOURCE)
+  })
+})
+
+describe("syncVersions", () => {
+  test("writes the source version to every copy and workspace entry and nothing else", async () => {
+    write(VERSION_SOURCE, manifest(VERSION_SOURCE, "0.4.0"))
+    const before = state()
+    expect(await Effect.runPromise(syncVersions(root))).toBe("0.4.0")
+    VERSION_COPIES.forEach((file, index) => {
+      expect(read(file)).toBe(
+        before[index + 1]!.replace(`"version": "0.3.2-1"`, `"version": "0.4.0"`),
+      )
+    })
+    expect(read(VERSION_SOURCE)).toBe(before[0]!)
+    expect(read(LOCKFILE)).toBe(lockfile("0.4.0"))
+  })
+
+  test("a bump followed by a sync leaves one version in every file", async () => {
+    await Effect.runPromise(bumpVersions(root, "minor"))
+    await Effect.runPromise(syncVersions(root))
+    for (const file of [VERSION_SOURCE, ...VERSION_COPIES])
+      expect(read(file)).toContain(`"version": "0.4.0"`)
+    expect(read(LOCKFILE)).toBe(lockfile("0.4.0"))
+  })
+
+  test("is a no-op on files that already agree", async () => {
+    write(VERSION_SOURCE, manifest(VERSION_SOURCE, "0.3.2"))
+    await Effect.runPromise(syncVersions(root))
+    const synced = state()
+    await Effect.runPromise(syncVersions(root))
+    expect(state()).toEqual(synced)
+  })
+
+  test("rewrites the repository's own manifests keeping their formatting", async () => {
+    for (const file of FILES) {
+      mkdirSync(dirname(join(root, file)), { recursive: true })
+      cpSync(join(repository, file), join(root, file))
+    }
+    const before = state()
+    const { to } = await Effect.runPromise(bumpVersions(root, "minor"))
+    await Effect.runPromise(syncVersions(root))
+    const after = state()
+    const from = (await readJson<Versioned>(VERSION_SOURCE)).version
+    before.forEach((text, index) => {
+      expect(after[index]).toBe(
+        text.replace(new RegExp(`("version": ")${from}(")`, "g"), `$1${to}$2`),
+      )
+    })
+  })
+
+  test("fails with InvalidVersion and writes nothing when the source is malformed", async () => {
+    write(VERSION_SOURCE, manifest(VERSION_SOURCE, "1.0"))
+    const before = state()
+    const error = await Effect.runPromise(Effect.flip(syncVersions(root)))
+    expect(error).toBeInstanceOf(InvalidVersion)
+    expect(state()).toEqual(before)
+  })
+
+  test("fails with ManifestError naming a copy that is missing, writing nothing", async () => {
+    write(VERSION_SOURCE, manifest(VERSION_SOURCE, "0.4.0"))
+    rmSync(join(root, "packages/integrations/claude/package.json"))
+    const written = [VERSION_SOURCE, "packages/runtime/package.json", LOCKFILE]
+    const before = written.map(read)
+    const error = await Effect.runPromise(Effect.flip(syncVersions(root)))
+    expect(error).toBeInstanceOf(ManifestError)
     expect(error.message).toContain("packages/integrations/claude/package.json")
+    expect(written.map(read)).toEqual(before)
+  })
+
+  test("syncs a lockfile with CRLF line endings, keeping them", async () => {
+    write(VERSION_SOURCE, manifest(VERSION_SOURCE, "0.4.0"))
+    write(LOCKFILE, lockfile("0.3.2-1").replaceAll("\n", "\r\n"))
+    await Effect.runPromise(syncVersions(root))
+    expect(read(LOCKFILE)).toBe(lockfile("0.4.0").replaceAll("\n", "\r\n"))
   })
 
   test.each([
     ["is missing", undefined],
     ["has no workspace version", `{ "workspaces": { "": { "name": "root" } } }\n`],
   ])("fails with ManifestError and writes nothing when bun.lock %s", async (_name, text) => {
+    write(VERSION_SOURCE, manifest(VERSION_SOURCE, "0.4.0"))
     if (text === undefined) rmSync(join(root, LOCKFILE))
     else write(LOCKFILE, text)
-    const before = VERSION_FILES.map(read)
-    const error = await Effect.runPromise(Effect.flip(bumpVersions(root, "patch")))
+    const before = [VERSION_SOURCE, ...VERSION_COPIES].map(read)
+    const error = await Effect.runPromise(Effect.flip(syncVersions(root)))
     expect(error).toBeInstanceOf(ManifestError)
     expect(error.message).toContain(LOCKFILE)
-    expect(VERSION_FILES.map(read)).toEqual(before)
+    expect([VERSION_SOURCE, ...VERSION_COPIES].map(read)).toEqual(before)
   })
 })
 
@@ -237,19 +306,30 @@ describe("the command line", () => {
     return { code: result.exitCode, out: result.stdout.toString(), err: result.stderr.toString() }
   }
 
-  test("prints the old and new version and exits 0", async () => {
+  test("a bump prints the old and new version, exits 0 and edits only the source", async () => {
     const { code, out } = await run("patch", root)
     expect(code).toBe(0)
     expect(out.trim()).toBe("0.3.2-1 -> 0.3.3")
-    expect(read("package.json")).toContain(`"version": "0.3.3"`)
+    expect(read(VERSION_SOURCE)).toContain(`"version": "0.3.3"`)
+    for (const file of VERSION_COPIES) expect(read(file)).toContain(`"version": "0.3.2-1"`)
+    expect(read(LOCKFILE)).toBe(lockfile("0.3.2-1"))
   })
 
-  test("prints the tagged error and exits 1 on disagreement", async () => {
-    write("packages/integrations/claude/package.json", manifest("claude", "0.3.1"))
+  test("sync prints the version, exits 0 and writes the copies", async () => {
+    await run("minor", root)
+    const { code, out } = await run("sync", root)
+    expect(code).toBe(0)
+    expect(out.trim()).toBe("0.4.0")
+    for (const file of VERSION_COPIES) expect(read(file)).toContain(`"version": "0.4.0"`)
+    expect(read(LOCKFILE)).toBe(lockfile("0.4.0"))
+  })
+
+  test("prints the tagged error and exits 1 when the source is unreadable", async () => {
+    write(VERSION_SOURCE, "nope")
     const { code, err } = await run("patch", root)
     expect(code).toBe(1)
-    expect(err).toContain("error: VersionMismatch")
-    expect(err).toContain("packages/integrations/claude/package.json 0.3.1")
+    expect(err).toContain("error: ManifestError")
+    expect(err).toContain(VERSION_SOURCE)
   })
 
   test.each(["major", "hotfix"])(
@@ -262,8 +342,64 @@ describe("the command line", () => {
   )
 })
 
+describe("a bump followed by one build", () => {
+  // The build bundles the repository it sits in, so the test runs it in a copy of the sources. The
+  // installed dependencies are linked, not copied, and the built plugin is left out: the build
+  // makes it again.
+  const SKIPPED = ["node_modules", ".git", ".holyagent"]
+  const PLUGIN_DIST = join(repository, "packages/integrations/claude/dist")
+
+  test("leaves every copy, the plugin and marketplace manifests included, at the new version", async () => {
+    const copy = mkdtempSync(join(tmpdir(), "holyagent-build-bump-"))
+    try {
+      cpSync(repository, copy, {
+        recursive: true,
+        filter: (path) => path !== PLUGIN_DIST && !SKIPPED.includes(basename(path)),
+      })
+      for (const link of ["node_modules", "packages/runtime/node_modules"])
+        symlinkSync(join(repository, link), join(copy, link))
+      const { to } = await Effect.runPromise(bumpVersions(copy, "minor"))
+      const build =
+        await $`${process.execPath} ${join(copy, "packages/integrations/claude/build.ts")}`
+          .nothrow()
+          .quiet()
+      expect(build.stderr.toString()).toBe("")
+      expect(build.exitCode).toBe(0)
+      const versionOf = async (file: string) =>
+        ((await Bun.file(join(copy, file)).json()) as { version?: string }).version
+      const marketplace = (await Bun.file(
+        join(copy, ".claude-plugin/marketplace.json"),
+      ).json()) as {
+        plugins: Versioned[]
+      }
+      const lock = Bun.JSONC.parse(await Bun.file(join(copy, LOCKFILE)).text()) as {
+        workspaces: Record<string, { version?: string }>
+      }
+      expect({
+        files: await Promise.all(
+          [
+            VERSION_SOURCE,
+            ...VERSION_COPIES,
+            "packages/integrations/claude/dist/.claude-plugin/plugin.json",
+          ].map(versionOf),
+        ),
+        marketplace: marketplace.plugins.map(({ version }) => version),
+        lockfile: Object.values(lock.workspaces).flatMap(({ version }) => version ?? []),
+      }).toEqual({
+        files: [to, to, to, to],
+        marketplace: [to],
+        lockfile: [to, to],
+      })
+    } finally {
+      rmSync(copy, { recursive: true, force: true })
+    }
+  }, 60_000)
+})
+
 describe("the repository's versions", () => {
-  test("every package, the generated manifests and the lockfile carry one valid version", async () => {
+  test("every copy equals the version in the root package.json", async () => {
+    const source = (await readJson<Versioned>(VERSION_SOURCE)).version
+    expect(() => Effect.runSync(parseVersion(source))).not.toThrow()
     const lock = Bun.JSONC.parse(await Bun.file(join(repository, LOCKFILE)).text()) as {
       workspaces: Record<string, { version?: string }>
     }
@@ -271,15 +407,33 @@ describe("the repository's versions", () => {
     const plugin = await readJson<Versioned>(
       "packages/integrations/claude/dist/.claude-plugin/plugin.json",
     )
-    const versions = new Set<string | undefined>([
-      ...(await Promise.all(
-        VERSION_FILES.map(async (file) => (await readJson<Versioned>(file)).version),
-      )),
-      plugin.version,
-      ...marketplace.plugins.map(({ version }) => version),
-      ...Object.values(lock.workspaces).flatMap(({ version }) => (version ? [version] : [])),
-    ])
-    expect(versions.size).toBe(1)
-    expect(() => Effect.runSync(parseVersion([...versions][0]!))).not.toThrow()
+    const copyVersions = await Promise.all(
+      VERSION_COPIES.map(
+        async (file) => [file, (await readJson<Versioned>(file)).version] as const,
+      ),
+    )
+    const copies: Record<string, string | ReadonlyArray<string | undefined>> = {
+      ...Object.fromEntries(copyVersions),
+      "bun.lock workspaces": [
+        ...new Set(
+          Object.values(lock.workspaces).flatMap(({ version }) => (version ? [version] : [])),
+        ),
+      ],
+      "plugin.json": plugin.version,
+      "marketplace.json": marketplace.plugins.map(({ version }) => version),
+    }
+    const expected: typeof copies = {
+      ...Object.fromEntries(VERSION_COPIES.map((file) => [file, source])),
+      "bun.lock workspaces": [source],
+      "plugin.json": source,
+      "marketplace.json": [source],
+    }
+    expect(copies).toEqual(expected)
+  })
+
+  test("the bundled plugin CLI reports the version in the root package.json", async () => {
+    const source = (await readJson<Versioned>(VERSION_SOURCE)).version
+    const bundle = join(repository, "packages/integrations/claude/dist/scripts/holyagent.js")
+    expect((await $`${process.execPath} ${bundle} --version`.quiet()).text()).toBe(`${source}\n`)
   })
 })

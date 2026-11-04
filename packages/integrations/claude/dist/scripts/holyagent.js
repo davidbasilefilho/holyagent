@@ -9421,24 +9421,7 @@ function resolveOptions(options) {
     replacer: options?.replacer
   };
 }
-var package_default = {
-  name: "@holyagent/runtime",
-  version: "0.2.1",
-  description: "The holyagent runtime: instructions and the shared command surface.",
-  license: "Apache-2.0",
-  bin: {
-    "holyagent-runtime": "./src/cli/main.ts"
-  },
-  type: "module",
-  exports: {
-    ".": "./src/index.ts"
-  },
-  dependencies: {
-    "@toon-format/toon": "^4.0.0",
-    acorn: "8.19.0",
-    effect: "^4.0.0"
-  }
-};
+var version = "0.2.1";
 
 import { join } from "path";
 
@@ -19276,10 +19259,10 @@ pp.readWord = function() {
   }
   return this.finishToken(type, word);
 };
-var version = "8.19.0";
+var version2 = "8.19.0";
 Parser.acorn = {
   Parser,
-  version,
+  version: version2,
   defaultOptions,
   Position,
   SourceLocation,
@@ -20636,7 +20619,7 @@ var execute = (given, host) => gen2(function* () {
     return { stdout: `${topHelp()}
 `, stderr: "", code: 0 };
   if (first === "--version")
-    return { stdout: `${package_default.version}
+    return { stdout: `${version}
 `, stderr: "", code: 0 };
   const command = COMMANDS.find((candidate) => candidate.path.every((word, index) => argv[index] === word));
   if (command === undefined) {
