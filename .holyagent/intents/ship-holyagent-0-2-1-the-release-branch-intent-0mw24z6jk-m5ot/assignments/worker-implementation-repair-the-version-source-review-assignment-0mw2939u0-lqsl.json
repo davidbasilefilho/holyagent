@@ -1,0 +1,60 @@
+{
+  "id": "assignment-0mw2939u0-lqsl",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-version-source-review",
+  "objective": "Repair the version-source review findings in the worktree /home/user/holyagent-build-version-source (release/0.2.1/build/version-source).",
+  "state": "Running",
+  "scope": [
+    "Review: /home/user/holyagent/.git/holyagent/reports/assignment-0mw28pe6t-fwpu.md.",
+    "Blocking 1: the first build after a bump writes plugin.json and marketplace.json at the old version, because build.ts imports generate.ts (which imports the integration package.json) before the sync runs. Make the sync run before generation reads any version (a separate step in the mise build task, or a dynamic import after the sync), and add a test that bumps a temporary copy and builds once, then checks every copy, including the manifests.",
+    "Non-blocking 2: WORKSPACE_VERSION accepts CRLF line endings, with a test. 3: syncVersions reads every copy first, then writes. 4: fix the stale mise.toml comment and task descriptions for bump. 5: have the bundled CLI embed only the version (a build-time define or importing just the version), not the whole root package.json, if it is small; else explain."
+  ],
+  "constraints": [
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report: name unrequested features, tests, files or refactors in the report instead of adding them, and start no extra review rounds. Do not stop early with a summary that announces a next step or an offer to wait.",
+    "Make no version-control writes (no commit, checkout, switch, branch, stash, reset, push) and no edits under .git/ or .holyagent/; the root commits. Report every changed path.",
+    "Work only inside /home/user/holyagent-build-version-source. Follow .claude/CLAUDE.md.",
+    "Gate: 'bunx --no-install mise run verify' must pass; run 'bunx --no-install mise run build' first.",
+    "Report in under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "A bump followed by one build leaves every copy, including the manifests, at the new version, with a test",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Findings 2 to 5 are fixed or explained",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "scripts/bump-version.ts",
+    "scripts/bump-version.test.ts",
+    "packages/integrations/claude/build.ts",
+    "mise.toml",
+    "packages/runtime/src/cli/program.ts",
+    "packages/runtime/tests/version.test.ts",
+    "packages/integrations/claude/dist/scripts/holyagent.js"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw28hfwe-js99",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T15:07:26.472Z"
+  },
+  "createdAt": "2026-11-04T15:07:26.472Z"
+}
