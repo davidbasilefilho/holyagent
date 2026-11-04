@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "correct-the-trigger-of-the-versions-item",
   "objective": "Correct the trigger of the versions item in the Git hooks list of docs/development.md in /home/user/holyagent-fix-audit.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "The item you added says the versions job runs 'when a package.json is staged'. The lefthook glob 'package.json' matches only the root package.json (a review ran lefthook and confirmed that staging packages/runtime/package.json skips the job). Change that phrase to say the job runs when the root package.json is staged. Change nothing else."
   ],
@@ -33,7 +33,9 @@
     "agentId": "workflow:wf_da62d460-4f3/assignment-0mw2fvi86-jnvz",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-04T18:17:21.414Z"
+    "startedAt": "2026-11-04T18:17:21.414Z",
+    "finishedAt": "2026-11-04T18:17:48.998Z"
   },
+  "result": "result: Changed the versions item trigger in docs/development.md line 99 to \"when the root `package.json` is staged\"; nothing else touched.\nchanged: docs/development.md\nchecks: none run (docs-only phrase change; no relevant gate)\nblockers: none\nquestions: none\nnotes: none\nevidence:\n[blocking] The versions item names the root package.json as its trigger: line 99 now reads \"4. `versions`: when the root `package.json` is staged, ...\"; rg confirms the old \"when a `package.json` is staged\" is gone.\ngit-status: `git status --short` shows only ` M docs/development.md`; `git diff --stat` shows 1 insertion, 1 deletion-free line change.\n",
   "createdAt": "2026-11-04T18:17:21.414Z"
 }
