@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mw2emvoc-cadi",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.artifact",
+  "slug": "re-review-the-docs-and-instruction-text",
+  "objective": "Re-review the docs and instruction text changed in 475b947 on release/0.2.1/fix/audit against the previous artifact findings and the code they describe.",
+  "state": "Running",
+  "scope": [
+    "Previous findings to close: /home/user/holyagent/.git/holyagent/reports/assignment-0mw2btahn-gce2.md (finding 1 blocking, 2-7 non-blocking). The writer's report: /home/user/holyagent/.git/holyagent/reports/assignment-0mw2e2c25-0wnn.md. Read the diff /home/user/holyagent-work/diffs/rr-475b947-text.diff and the current files in /home/user/holyagent-fix-audit (docs/, README.md, AGENTS.md, packages/runtime/src/instructions/, the generated packages/integrations/claude/dist/agents/holyagent.md).",
+    "Check each claim against the code: the exact agent identity check (packages/runtime/src/vcs/identity.ts), brief and report removal at intent close (cli/intent.ts, cli/brief.ts), local/work-trees.json (state/local.ts), the workflow hook refusals (cli/workflow-check.ts), the hook globs (packages/integrations/claude/src/generate.ts or hooks.json), the vcs commands, the bump and dependency tasks (mise.toml, scripts/). Binding: Part D of /home/user/holyagent-work/spec-0.2.1.md; keep README.md to its fixed sections (AGENTS.md); .claude/CLAUDE.md unchanged. Judge model-facing text by packages/integrations/claude/dist/skills/instruction-writing/SKILL.md."
+  ],
+  "constraints": [
+    "Read-only: no repository edits and no git writes.",
+    "Keep working until the review is done; stop and report. Report in under 400 words, findings ranked with file:line, blocking or non-blocking, each previous finding closed or open, and the smallest fix."
+  ],
+  "criteria": [
+    {
+      "text": "The docs and instruction text state the audit changes correctly and once, and the previous artifact findings are closed",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No new contradiction, drift from the code, or repeated text",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw2e2c25-0wnn"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T17:42:39.324Z"
+  },
+  "createdAt": "2026-11-04T17:42:39.324Z"
+}
