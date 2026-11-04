@@ -5,7 +5,7 @@
   "roleTask": "Librarian.research",
   "slug": "settle-the-verify-items-of-the-holyagent",
   "objective": "Settle the [verify] items of the HolyAgent 0.2.1 request from authoritative sources so the root can write the workflows, the B2 fix and the design skills.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Read /home/user/holyagent-work/spec-0.2.1.md for context; do not redo its research beyond these items.",
     "1. Claude Code: does a plugin's settings.json 'agent' key (or any other mechanism) make a plugin agent the main-thread agent, and do claude.ai cloud sessions (Claude Code on the web) honor it? Cite code.claude.com docs.",
@@ -43,5 +43,10 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-04T13:13:34.334Z"
+  },
   "createdAt": "2026-11-04T13:13:26.609Z"
 }
