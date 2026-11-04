@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mw28mltm-gn9f",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.artifact",
+  "slug": "re-review-the-design-skills-repair",
+  "objective": "Re-review the design-skills repair commit c7c1c1a against the previous artifact and code findings.",
+  "state": "Running",
+  "scope": [
+    "Previous findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw2860hc-17f2.md (artifact) and assignment-0mw2860qy-lzfj.md (code finding 1). Repair diff without dist: /home/user/holyagent-work/diffs/design-repair.diff; generated skills at /home/user/holyagent-feat-design-skills/packages/integrations/claude/dist/skills/*-design/SKILL.md.",
+    "Say for each previous finding (except artifact 3, deferred) whether it is closed, and report any new contradiction, unmarked taste rule, or requirement of /home/user/holyagent-work/spec-0.2.1.md Part C the repair breaks."
+  ],
+  "constraints": [
+    "Keep working until the review is done; stop to ask only when you cannot go on. When done, stop and report; name anything unrequested instead of doing it. Read-only: change no repository files and make no git writes.",
+    "Report in under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "The two previous blocking findings are closed",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The repair introduces no new gap",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "finding-status"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw28hfkt-nwcv"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T14:54:28.858Z"
+  },
+  "createdAt": "2026-11-04T14:54:28.858Z"
+}
