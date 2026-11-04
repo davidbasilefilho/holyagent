@@ -9423,7 +9423,7 @@ function resolveOptions(options) {
 }
 var package_default = {
   name: "@holyagent/runtime",
-  version: "0.2.0",
+  version: "0.2.1",
   description: "The holyagent runtime: instructions and the shared command surface.",
   license: "Apache-2.0",
   bin: {

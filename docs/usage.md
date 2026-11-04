@@ -27,6 +27,15 @@ claude plugin install holyagent@holyagent
 
 Inside Claude Code the same steps are `/plugin marketplace add davidbasilefilho/holyagent` and `/plugin install holyagent@holyagent`. The plugin has no dependencies. The Search specialists get their web tools from the Exa connector (see **Web search** below). The plugin's own `settings.json` makes the main thread the root agent (`agent: holyagent`) while the plugin is enabled.
 
+**A specific release.** Every push to `main` publishes the tag `holyagent-<version>` (for example `holyagent-0.2.1`) and a GitHub Release, and every other branch push publishes a pre-release tagged `holyagent-<version>-dev-<short-hash>`. Claude Code takes a Git ref after `#` on a marketplace source, so adding the marketplace at a tag installs the plugin as built at that tag, because the built plugin is committed:
+
+```sh
+claude plugin marketplace add davidbasilefilho/holyagent#holyagent-0.2.1
+claude plugin install holyagent@holyagent
+```
+
+Inside Claude Code: `/plugin marketplace add davidbasilefilho/holyagent#holyagent-0.2.1`, then `/plugin install holyagent@holyagent`. The CLI reference also accepts `owner/repo@ref`. There is no `name@tag` form on `plugin install`: the tag pins the marketplace, not the plugin name. This follows the Claude Code [install](https://code.claude.com/docs/en/plugins/install) and [CLI](https://code.claude.com/docs/en/plugins/cli-reference) pages; this repository's tag names have not been run through it yet.
+
 **First launch: `/holyagent:setup`.** The plugin can only set `agent` and `subagentStatusLine`, so on the first launch run `/holyagent:setup` in a session. It runs `holyagent setup`, which installs ctx7 with its Context7 skill, then merges the recommended keys into your user settings (`~/.claude/settings.json`, or `CLAUDE_CONFIG_DIR`; see [User settings](#user-settings)), or into one project's settings with `--scope project|local`, and `--undo` backs them out ([Scope and undo](#scope-and-undo)). The choices behind the keys are explained under [Opinionated by design](#opinionated-by-design). Until it has run, the session-start hook adds one line suggesting `/holyagent:setup` whenever `ctx7` is missing or a key is missing from the user settings and from the project and local settings of the session folder alike, so the line also stops once a `--scope project|local` setup ran there; it never appears in a claude.ai cloud session, where setup skips `ctx7` ([hooks.md](hooks.md)). The command takes these flags, which `/holyagent:setup` passes through:
 
 ```sh
