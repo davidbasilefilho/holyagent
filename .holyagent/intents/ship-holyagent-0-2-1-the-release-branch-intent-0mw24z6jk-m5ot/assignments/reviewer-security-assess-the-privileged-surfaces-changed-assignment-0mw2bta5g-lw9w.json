@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mw2bta5g-lw9w",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.security",
+  "slug": "assess-the-privileged-surfaces-changed",
+  "objective": "Assess the privileged surfaces changed by the audit commit 3569104 on release/0.2.1/fix/audit.",
+  "state": "Running",
+  "scope": [
+    "The writers' reports: /home/user/holyagent/.git/holyagent/reports/assignment-0mw2afimd-f9om.md (state and domain), assignment-0mw2afix2-jge2.md (CLI, vcs, setup) and assignment-0mw2afj6o-q863.md (instructions and docs), same folder. The findings they address: /home/user/holyagent-work/audit-code.md and /home/user/holyagent-work/audit-docs.md. Part D of /home/user/holyagent-work/spec-0.2.1.md and the maintainer decisions in the Intent (workflow hook refuses unbounded loops and large or computed repeat counts; keep the root-rules fallback; keep the legacy converter; ownership overlap per worktree) are binding.",
+    "Read /home/user/holyagent-work/diffs/audit-code-3569104.diff and the current files under /home/user/holyagent-fix-audit/packages/runtime/src. Trace: the workflow hook auto-allow (packages/runtime/src/cli/workflow-check.ts) for a script that still runs unbounded or exhausts memory and is allowed without a prompt (the writer names recursion, Array.from({length: n}), doubling inside a bounded loop and an aliased array grown in a for-of as gaps); the hook globs and the vcs-reminder push-target parsing (git-push.ts, hooks.json); the state commit that now reads pathspecs from stdin; the stale-lock rename; and the shared flag parser in the vcs commands. Say which gaps let an auto-allowed workflow run unbounded and what the smallest refusal is."
+  ],
+  "constraints": [
+    "Keep working until the review is done; stop to ask only when you cannot go on. When done, stop and report; name anything unrequested instead of doing it. Read-only.",
+    "Report in under 400 words, findings ranked by severity with file:line and the smallest fix."
+  ],
+  "criteria": [
+    {
+      "text": "Each changed privileged surface is traced with a verdict",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No new path lets an auto-allowed workflow, a hook or a vcs command do what the maintainer decisions refuse",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw2afix2-jge2",
+    "assignment-0mw2afimd-f9om"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T16:23:39.172Z"
+  },
+  "createdAt": "2026-11-04T16:23:39.172Z"
+}
