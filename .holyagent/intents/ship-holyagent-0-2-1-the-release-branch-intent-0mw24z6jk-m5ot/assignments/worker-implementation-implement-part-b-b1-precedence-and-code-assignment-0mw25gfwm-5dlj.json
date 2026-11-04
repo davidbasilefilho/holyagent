@@ -1,0 +1,88 @@
+{
+  "id": "assignment-0mw25gfwm-5dlj",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 2,
+  "roleTask": "Worker.implementation",
+  "slug": "implement-part-b-b1-precedence-and-code",
+  "objective": "Implement Part B (B1 precedence and code rules, B2 root-rules loading and platform-branch fixes) and the generic branch-convention fixes of A1 in HolyAgent's plugin instructions, in the worktree /home/user/holyagent-feat-holyagent-rules (branch release/0.2.1/feat/holyagent-rules).",
+  "state": "Running",
+  "scope": [
+    "Read /home/user/holyagent-work/spec-0.2.1.md Part B and the A1 bullet 'Check that the root's stack and PR rules really pick up a repository's own branch conventions' (binding). Then read /home/user/holyagent-work/map.md (instruction layout), /home/user/holyagent-work/branch-conventions.md (nine ambiguities with generic fixes), /home/user/holyagent-work/b2-transcript.md and /home/user/holyagent-work/research.md item 1 and 2.",
+    "Instruction sources are under packages/runtime/src/instructions/claude-5.5/ (root/, specialist/, roles/, skills/, root-core.ts, session-*.md) and packages/runtime/src/instructions/requirements*; the generator is packages/integrations/claude/src/agents.ts; mise run build regenerates packages/integrations/claude/dist and .claude-plugin/marketplace.json.",
+    "B1: state the precedence once, in the shared source where the instructions set precedence (root identity, and the shared specialist text): 1. mergeability in the target repository (its CI, branch protection, review bar and conventions) before every HolyAgent default; 2. the project's own patterns before HolyAgent's; 3. HolyAgent's defaults last. Other places that set precedence cite it instead of restating it. Add the no-duplication, performance and readability rules as the spec words them, once in the shared source, and give each role the part that applies: workers follow them; Reviewer.code and Reviewer.artifact flag duplication as a finding; reviewers flag performance problems with evidence; no speculative micro-optimization. Adjust the review dimensions, the blocking/non-blocking guidance and the root's brief rules as needed so these reach the right roles.",
+    "A1 generic: apply the nine fixes in branch-conventions.md so the root reads 'the base' (start point and PR target of a delivery's first PR, the CI-first exception, squash-merge retargets, merge-from-base, PR text diff base, state-mode) as the branch the repository's conventions or the user name as the target for this work, else the default branch; and so conventions also decide any non-work branch the plan needs and which branches may open PRs into which. Hardcode no repository's convention.",
+    "B2 root rules: claude.ai cloud sessions ignore the plugin settings agent key (evidence: the current claude.ai session has the synced plugin whose settings.json sets agent holyagent, yet its main thread is the default agent), and research found no other mechanism. So make the session-start context carry everything the root must follow before its first action, kept small, with holyagent.md read for the rest: in particular the branch rule (settle the conventional branch before the first commit; never commit to or push the platform-assigned branch) is today outside ROOT_CORE_FILES. The session-start core text and holyagent.md must come from the same source files (no hand-copied condensed text); add or keep a test that proves it, and keep the session-start output within its existing size budget (packages/runtime/src/cli/sessioncontext.ts).",
+    "B2 branch: the transcript shows the platform created and checked out the local branch claude/confident-mayer-4aznof before any session command, and the root itself then chose to commit and push there with no refusal first; in the current session the platform also pushed the assigned branch to the remote before any session command. Fix the rule's wording and placement so it is settled before the first commit and cannot be read as allowing a 'default' of the assigned branch without a refused push and the user's answer (in user-busy mode it is parked, not defaulted). Add a context-only reminder to the existing vcs-reminder hook (packages/runtime/src/cli/hook.ts) when a git commit or push runs while the current branch, or the push target, is claude/*: no blocking guard, no permission decision. Test it. Document in docs/requirements.md (claude.ai row) that the platform creates and checks out claude/<name> at session start and may push it, and that the root's work lands only on its own branch; update docs/hooks.md for the hook change.",
+    "Run 'bunx --no-install mise run build' after source changes so the generated plugin is in sync."
+  ],
+  "constraints": [
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report: name unrequested features, tests, files or refactors in the report instead of adding them, and start no extra review rounds. Do not stop early with a summary that announces a next step or an offer to wait.",
+    "Make no version-control writes (no commit, checkout, switch, branch, stash, reset, push) and no edits under .git/ or .holyagent/; the root commits. Report every changed path.",
+    "Work only inside /home/user/holyagent-feat-holyagent-rules; run 'bun install --frozen-lockfile' there first. Do not change .claude/CLAUDE.md or AGENTS.md: HolyAgent rules go in the plugin's instructions.",
+    "Load the instruction-writing skill's text by reading packages/runtime/src/instructions/claude-5.5/skills/instruction-writing/SKILL.md and apply it to every instruction you write. Keep new text short; reuse existing sections rather than adding parallel ones.",
+    "Follow .claude/CLAUDE.md code rules (Effect, Schema, Bun, Bun Shell, JSDoc on exports). Do not add design skills, dev-server or visual-judging changes: other branches own them.",
+    "Gate: 'bunx --no-install mise run verify' must pass in the worktree.",
+    "Report in under 500 words; put long logs in /home/user/holyagent-work/logs/."
+  ],
+  "criteria": [
+    {
+      "text": "The three-level precedence is stated once in the shared source and cited where instructions set precedence",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No-duplication, performance and readability rules reach workers and reviewers by role, with duplication and evidence-backed performance problems as review findings",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The base, PR target and branch rules follow the repository's conventions generically, covering the nine ambiguities",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The session-start context carries the branch rule and the other rules needed before the first action, generated from the same source as holyagent.md, within the size budget, with a test",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The vcs-reminder hook adds a context-only reminder for commits and pushes on claude/* branches, with a test",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "docs/requirements.md and docs/hooks.md describe the platform branch behavior and the hook change",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "The generated plugin is rebuilt and mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "session-start-size"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/runtime/src/cli",
+    "packages/runtime/tests",
+    "packages/integrations/claude/src/agents.ts",
+    "packages/integrations/claude/tests",
+    "packages/integrations/claude/dist",
+    "docs/requirements.md",
+    "docs/hooks.md",
+    ".claude-plugin"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T13:25:42.406Z"
+  },
+  "createdAt": "2026-11-04T13:25:42.406Z"
+}
