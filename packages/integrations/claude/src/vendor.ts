@@ -34,11 +34,11 @@ export interface Asset {
 const RIPGREP_VERSION = "15.2.0"
 
 /**
- * Fd 10.5.0, from https://github.com/sharkdp/fd/releases/tag/v10.5.0. The release publishes no
+ * Fd 10.5.1, from https://github.com/sharkdp/fd/releases/tag/v10.5.1. The release publishes no
  * checksum file, so the archive hashes were taken from the downloaded files and are trusted on
  * first use; a changed archive fails the build.
  */
-const FD_VERSION = "10.5.0"
+const FD_VERSION = "10.5.1"
 
 const target = (id: string): Target => {
   const found = TARGETS.find((candidate) => candidate.id === id)
@@ -115,22 +115,22 @@ export const ASSETS: ReadonlyArray<Asset> = [
     "darwin-arm64",
     "aarch64-apple-darwin",
     "tar.gz",
-    "b67e1836c468e42e411984b56e52fa7abec08c2bd22c867398e7cc134aac5e12",
-    "cf3bde435da174f41cf9589a2efeaf03804df7c250fc15e8b8a1e9bfc66ebc9a",
+    "2d336895ed27b14c5cc9fc5eb22df03b3ee842b5dce80060e99d9cdc1b1b9fc7",
+    "96eb610125107448e6e442647745ddd81ed26fed3b2936583ef7e4ebe52b880e",
   ),
   fd(
     "linux-x64",
     "x86_64-unknown-linux-musl",
     "tar.gz",
-    "761c72dc8e120d85b22292063be8a796e2eeb20eb3e4f38b8fa2343ccf3514a7",
-    "e79642a479d2816c887047476bbe6ad229465f30de031033574dee2a095e0037",
+    "f6c95edb190c241df6fddc815a5bab4051444993ac5d92ddc6eec0e0dc2342c7",
+    "86102b09f45e4f63cf1f67f98e8d2f7fd6e9420a9c7d1f77401a1b979004b8b1",
   ),
   fd(
     "windows-x64",
     "x86_64-pc-windows-msvc",
     "zip",
-    "a227701b8551c35a9931d9f6da75503cf86d88e182d71fb849a70864c5d57cd7",
-    "d67d27a8e375ed7e9bca2b506a9dd5082bc24547aeba908b863f6f8b8ab0c3b9",
+    "e52306a600e60b7ba92019c81dc753e6ea6665379d005867d38215ffd14cf5c2",
+    "6d89badd1939553fc849913d047e83db5db001ae748e99ba888d150dd12cd784",
   ),
 ]
 

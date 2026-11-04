@@ -67,9 +67,9 @@ run = "bun packages/integrations/claude/build.ts"
 description = "Run every read-only gate: check, lint, fmt:check and test"
 depends = ["check", "lint", "fmt:check", "test"]
 
-# One version for every package and manifest (ZeroVer, 0.X.Y). The script
-# rewrites the package.json files and bun.lock, and the build regenerates the plugin manifests from
-# them, so commit the result of the task as a whole.
+# One version for the repository (ZeroVer, 0.X.Y), kept in the root package.json. The bump edits
+# only that file; the build copies the version into the workspace manifests and bun.lock and
+# regenerates the plugin manifests, so commit the result of the task as a whole.
 
 [tasks."bump:minor"]
 description = "Bump the minor version (0.X.Y to 0.(X+1).0) everywhere and rebuild the plugin"
@@ -78,3 +78,14 @@ run = ["bun scripts/bump-version.ts minor", { task = "build" }]
 [tasks."bump:patch"]
 description = "Bump the patch version (0.X.Y to 0.X.(Y+1)) everywhere and rebuild the plugin"
 run = ["bun scripts/bump-version.ts patch", { task = "build" }]
+
+# Dependencies move only through the updater (see AGENTS.md): it keeps every pin on the newest
+# stable release line, never a prerelease.
+
+[tasks."deps:update"]
+description = "Move every pinned dependency to its newest stable release and refresh the lockfile (--dry-run prints current -> next and writes nothing)"
+run = "bun scripts/update-dependencies.ts"
+
+[tasks."deps:check"]
+description = "Fail when a pinned dependency is behind its newest stable release"
+run = "bun scripts/update-dependencies.ts --check"
