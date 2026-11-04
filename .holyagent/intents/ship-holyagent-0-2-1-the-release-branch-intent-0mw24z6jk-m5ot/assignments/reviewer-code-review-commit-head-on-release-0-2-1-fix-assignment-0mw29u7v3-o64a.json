@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mw29u7v3-o64a",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.code",
+  "slug": "review-commit-head-on-release-0-2-1-fix",
+  "objective": "Review commit HEAD on release/0.2.1/fix/windows-test-races (worktree /home/user/holyagent-fix-windows-test-races): the state-lock fix for delete-pending lock files on Windows and the CLI test timeout.",
+  "state": "Running",
+  "scope": [
+    "Diagnosis: /home/user/holyagent/.git/holyagent/reports/assignment-0mw29itzs-dass.md; CI logs it cites are in /home/user/holyagent-work/logs/job-126661094760-full.txt and job-126655020996-full.txt.",
+    "Review 'git -C /home/user/holyagent-fix-windows-test-races show HEAD -- packages/runtime'. Check packages/runtime/src/state/lock.ts: that EPERM, EACCES and EBUSY count as a held lock only while a file is in the way, that a genuine permission error (for example a read-only folder with no lock file) still fails promptly instead of spinning until the lock timeout, that stale-lock recovery and the timeout path still behave, and that nothing loops unbounded. Check the new tests fail on the parent and are not weakened; run 'bunx --no-install mise run verify' and the two new lock tests with --rerun-each 20."
+  ],
+  "constraints": [
+    "Keep working until the review is done; stop to ask only when you cannot go on. When done, stop and report; name anything unrequested instead of doing it. Read-only in the worktree; run experiments in a scratch copy outside the repository.",
+    "Report in under 300 words, findings ranked with file:line, blocking or non-blocking, and the smallest fix."
+  ],
+  "criteria": [
+    {
+      "text": "The lock fix removes the Windows race with no regression, and the tests fail without it",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw29itzs-dass"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T15:28:23.632Z"
+  },
+  "createdAt": "2026-11-04T15:28:23.632Z"
+}
