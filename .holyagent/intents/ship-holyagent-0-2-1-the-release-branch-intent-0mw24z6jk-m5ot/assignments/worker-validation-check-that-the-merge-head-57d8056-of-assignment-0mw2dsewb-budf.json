@@ -5,7 +5,7 @@
   "roleTask": "Worker.validation",
   "slug": "check-that-the-merge-head-57d8056-of",
   "objective": "Check that the merge head 57d8056 of release/0.2.1/feat/visual-root-pass in /home/user/holyagent-feat-visual-root-pass builds in sync and passes the gates.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Run in /home/user/holyagent-feat-visual-root-pass: 'bun install --frozen-lockfile', 'bunx --no-install mise run build', then 'git status --short' (it must be empty: dist in sync), then 'bunx --no-install mise run verify'. See docs/development.md."
   ],
@@ -30,7 +30,9 @@
     "agentId": "workflow:wf_4275502a-44a/assignment-0mw2dsewb-budf",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-04T17:18:57.899Z"
+    "startedAt": "2026-11-04T17:18:57.899Z",
+    "finishedAt": "2026-11-04T17:27:03.878Z"
   },
+  "result": "result: FAIL on the sync criterion. The merge head 57d8056 builds, but the build rewrites a tracked file, so dist is not in sync. `mise run verify` passes.\nchanged: packages/integrations/claude/dist/scripts/holyagent.js (modified by the build, left as found; 203 insertions, 86 deletions)\nchecks:\n- `bun install --frozen-lockfile` -> exit 0, 22 packages installed\n- `bunx --no-install mise run build` -> exit 0, \"built 39 files\"\n- `git status --short` -> exit 0, ` M packages/integrations/claude/dist/scripts/holyagent.js` (not empty)\n- `bunx --no-install mise run verify` -> exit 0; type check 140 files clean; lint 141 files clean; fmt 273 files formatted; tests 1244 pass, 1 skip, 0 fail, 1245 tests across 46 files\nblockers: dist out of sync after build; root must decide whether the committed dist is stale\nquestions: none\nnotes: none\nlogs: /home/user/holyagent-work/logs/install.log, build.log, status.log, dist-diff-stat.log, verify.log\nevidence:\n[blocking] The merge head builds with dist in sync and passes mise run verify (regressions): not met. Build exit 0; git status shows dist/scripts/holyagent.js modified; verify exit 0 with 0 fail. Logs in /home/user/holyagent-work/logs/.\nchecks-run: install, build, git status, verify all run with exit codes above; logs in /home/user/holyagent-work/logs/.\n",
   "createdAt": "2026-11-04T17:18:57.899Z"
 }
