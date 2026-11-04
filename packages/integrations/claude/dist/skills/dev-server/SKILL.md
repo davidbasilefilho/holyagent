@@ -28,11 +28,11 @@ Give every socket, session, display, device and port a name unique to this work,
 
 1. Check the task list for a target for this work. If one is there, run its readiness probe and reuse it; start a second only after the first is confirmed gone.
 2. Dispatch Worker.operations to start the target in the background per the record and wait for the probe. It cannot call Skill, so name this file's absolute path in its brief. Its report carries the completed record and says whether it started the target or reused one. Record that in the task list.
-3. Tell every visual specialist, as a constraint, to use that target and start none of its own. Worker.visual and Worker.operations produce the captures; Reviewer.visual has no shell and judges those captures. A specialist that finds the target down, or no record in its criteria, reports the inspection as blocked; have Worker.operations restart it.
+3. Tell every visual specialist, as a constraint, to use that target and start none of its own. Worker.visual and Worker.operations produce the captures; Reviewer.visual has no shell and judges those captures, or for web inspects the URL through its browser tools. A specialist that finds the target down, or no record in its criteria, reports the inspection as blocked; have Worker.operations restart it.
 
 ## Platforms
 
-Tools are examples; flags change between versions, so [verify] each against the installed one before relying on it.
+Flags change between versions, so [verify] each against the installed one before relying on it.
 
 - Web: the documented dev command, or for a static or single-file build a static file server over its output folder, answering at a URL. A headless browser varies the viewport, color scheme, reduced motion and forced colors, and takes screenshots.
 - Terminal UI: run it in a terminal multiplexer session at a fixed size and send keys. Capture text frames with and without escape sequences, and render image frames through a scripted terminal recorder. Vary the environment for color tiers, `NO_COLOR` and locale.
