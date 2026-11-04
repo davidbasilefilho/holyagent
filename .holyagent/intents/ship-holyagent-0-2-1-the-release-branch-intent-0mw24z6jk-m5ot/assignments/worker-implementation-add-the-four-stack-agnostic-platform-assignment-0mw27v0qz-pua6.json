@@ -1,0 +1,91 @@
+{
+  "id": "assignment-0mw27v0qz-pua6",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "add-the-four-stack-agnostic-platform",
+  "objective": "Add the four stack-agnostic platform design skills (web-design, mobile-design, desktop-design, tui-design) with one shared-core source embedded by the generator, their tests and credits, in the worktree /home/user/holyagent-feat-design-skills (branch release/0.2.1/feat/design-skills, stacked on release/0.2.1/feat/holyagent-rules).",
+  "state": "Running",
+  "scope": [
+    "Read /home/user/holyagent-work/spec-0.2.1.md Part C: Objective, Binding requirements 1-7, Shared core, web-design, mobile-design, desktop-design, tui-design and Part C deliverables 1, 4 (skill lists, shared-core embedding, banned-term check) and 5 (credits). These are binding and approved as written; the research is done, do not redo it.",
+    "Use /home/user/holyagent-work/research.md item 4 (Material 3: the drawer is confirmed no longer recommended in Material 3 Expressive in favor of the expanded rail; type roles, color roles and pairing, contrast levels; dark theme beyond role tones was not found, so state nothing more) and item 5 (iOS 27 Liquid Glass: only Apple-sourced facts may be stated; press-only or blog-only claims are left out; do not state that glass on glass is now allowed).",
+    "Skill sources go in packages/runtime/src/instructions/claude-5.5/skills/<name>/SKILL.md with frontmatter name and description; the description starts with 'Use when ...' (the situation) then what it holds. The shared core lives in one source file, and the generator (packages/integrations/claude/src/generate.ts, the same way frontend-design is embedded) embeds it into each generated skill so each generated skill is self-contained. Each generated skill is about 80 to 140 lines, modeled on Anthropic's frontend-design shape (prose, no scripts); read packages/integrations/claude/vendor/frontend-design/SKILL.md for that shape. Ideas only, no copied text from any source.",
+    "Every rule must be checkable on the rendered result; behavioral rules are phrased as their visible symptom; rules no capture can show are marked as behavior checks that Worker.operations runs and reports; taste-only advice is marked as preference. Each skill ends with its capture checklist (sizes, theme variants, text scale, motion setting) applied by the worker, the reviewer and the root, and 'report only checks actually run'.",
+    "Each rule's violation should map to one of visual-judging's material effects (acceptance, hierarchy or composition, legibility, responsiveness at a listed size, correct text and numbers, accessibility, interaction, adherence to a reference, obvious production quality); read packages/runtime/src/instructions/claude-5.5/skills/visual-judging/SKILL.md for the current text but do not edit it (another branch owns it).",
+    "Tests: add the four names to the exact skill lists (packages/integrations/claude/tests/plugin.test.ts SKILLS and the other lists map.md names; packages/runtime/tests/instructions.test.ts), a test that every generated design skill carries the current shared core, a test that no design skill names a banned framework, library, component kit or API term (React, Tailwind, SwiftUI, Compose, Flutter, Bubble Tea, Ratatui, Lip Gloss, WinUI, libadwaita and similar), and keep the description tests passing. Run 'bunx --no-install mise run build' so dist/skills gains the four skills.",
+    "Credits: add the sources listed in deliverable 5 to docs/attributions.md with owner/repo or URL and license, saying which skill each inspired and that no text was copied.",
+    "The branch now contains the holyagent-rules work: specialist/code-quality.md and shared/precedence.md exist; reuse the generator patterns they use for embedding a shared file."
+  ],
+  "constraints": [
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report: name unrequested features, tests, files or refactors in the report instead of adding them, and start no extra review rounds. Do not stop early with a summary that announces a next step or an offer to wait.",
+    "Make no version-control writes (no commit, checkout, switch, branch, stash, reset, push) and no edits under .git/ or .holyagent/; the root commits. Report every changed path.",
+    "Work only inside /home/user/holyagent-feat-design-skills; run 'bun install --frozen-lockfile' there first. Do not change .claude/CLAUDE.md or AGENTS.md. Leave frontendDesign() and the embedded frontend-design in the visual agents exactly as they are; there is no skills/frontend-design output.",
+    "Do not edit dev-server, visual-judging, root/skills.md, root/assignments.md, specialist/interface-inspection.md or the visual role files: later branches own the root integration and dev-server. If a test forces a root/skills.md entry, add only the list entries and say so.",
+    "Follow .claude/CLAUDE.md code rules for generator and test code (Effect, Bun, JSDoc on exports). Keep the core text in exactly one source file.",
+    "Gate: 'bunx --no-install mise run verify' must pass in the worktree.",
+    "Report in under 500 words with each generated skill's line count; put long logs in /home/user/holyagent-work/logs/."
+  ],
+  "criteria": [
+    {
+      "text": "Four skill sources exist with Use-when descriptions, each generated skill self-contained at about 80 to 140 lines with the shared core, platform rules, refuse list and capture checklist",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The shared core has a single source file embedded by the generator, with a test that every generated design skill carries the current core",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "No design skill names a framework, library, component kit or API, with a test",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Every rule is checkable on a render or marked as a behavior check, taste items are marked as preference, and numbers appear only where a platform guideline fixes them or as overridable defaults",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Only Apple- or Material-sourced facts are stated for the [verify] items, per research.md",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "docs/attributions.md credits every listed source with owner/repo or URL and license",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "The exact skill-list tests include the four names, the plugin is rebuilt, and mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "line-counts"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions/claude-5.5/skills/web-design",
+    "packages/runtime/src/instructions/claude-5.5/skills/mobile-design",
+    "packages/runtime/src/instructions/claude-5.5/skills/desktop-design",
+    "packages/runtime/src/instructions/claude-5.5/skills/tui-design",
+    "packages/runtime/src/instructions/claude-5.5/design-core",
+    "packages/integrations/claude/src/generate.ts",
+    "docs/attributions.md",
+    "packages/integrations/claude/tests",
+    "packages/runtime/tests/instructions.test.ts",
+    "packages/integrations/claude/dist",
+    ".claude-plugin"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T14:33:01.835Z"
+  },
+  "createdAt": "2026-11-04T14:33:01.835Z"
+}
