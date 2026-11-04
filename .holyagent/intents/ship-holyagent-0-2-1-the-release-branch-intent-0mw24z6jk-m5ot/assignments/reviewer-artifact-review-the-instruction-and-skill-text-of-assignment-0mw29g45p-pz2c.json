@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "review-the-instruction-and-skill-text-of",
   "objective": "Review the instruction and skill text of commit ca1d774 on release/0.2.1/feat/visual-root-pass (worktree /home/user/holyagent-feat-visual-root-pass) against Part C deliverable 2 and the materiality item of the 0.2.1 request.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read /home/user/holyagent-work/spec-0.2.1.md Part C: binding requirement 2, 'How the pieces connect' (the Skill-denied visual roles, the resolved path, Materiality) and deliverables 1 and 2. B1 (no duplicated text) applies.",
     "Read /home/user/holyagent-work/diffs/root-pass.diff and the generated files it touches under /home/user/holyagent-feat-visual-root-pass/packages/integrations/claude/dist/ (agents/holyagent.md, worker-visual.md, reviewer-visual.md; skills/visual-judging, web-design, tui-design, mobile-design, desktop-design).",
@@ -40,7 +40,29 @@
     "agentId": "workflow:wf_bc4f8f04-eb9/assignment-0mw29g45p-pz2c",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-04T15:17:25.645Z"
+    "startedAt": "2026-11-04T15:17:25.645Z",
+    "finishedAt": "2026-11-04T15:24:24.900Z"
+  },
+  "result": "result: 1 blocking gap (deliverable 2 and the materiality item are otherwise met) and 1 blocking contradiction (criterion 2). Nothing was run: I have no shell, so I judged by reading.\n\n**Findings, ranked**\n\n1. **Blocking, new contradiction.**\n   - `skills/evidence-judging/SKILL.md:10` and R-EVIDENCE (`requirements.md:46`) start a visual repair only on \"a Reviewer.visual observation\".\n   - `skills/visual-judging/SKILL.md:21` now says a finding of the root's own pass starts a repair \"whether or not the reviewer reported it\". A root that follows evidence-judging has no evidence to repair on.\n   - Smallest fix: add \"or a finding of your own final pass, citing the capture path and what shows\" to both evidence-judging and R-EVIDENCE.\n\n2. **Blocking, unclear trigger for web.**\n   - The final pass reads the \"final captures Reviewer.visual lists\" (`visual-judging/SKILL.md:18`).\n   - For web, Reviewer.visual inspects the URL live with browser tools (`dev-server/SKILL.md:31`, R-RV), so it may produce no captures.\n   - The new \"List the paths of the final captures\" sentence sits in `roles/reviewer-visual/captures.md:1`, in the paragraph about targets other than a web page. Nothing says what a live web inspection hands the root.\n   - Smallest fix, either of these:\n     - Have Worker.visual save captures at the listed sizes and variants for web too, and the reviewer list those paths.\n     - State in `visual-judging` Accept and `captures.md` that a live-inspected web page gets its captures from Worker.visual or Worker.operations before the pass.\n\n3. **Non-blocking: `Briefs hold literal absolute paths.` (`root/dispatch.md:3`, also in the session-start core).**\n   - It is a bare fact inside the dispatch-output step. It does not tell the root to write plugin file paths that way, or where to take the plugin folder from.\n   - It works only because the core's CLI path is already expanded (`hook.ts:222-229` replaces `${CLAUDE_PLUGIN_ROOT}`) and `visual-judging:12` explains the skill path. A root that has not loaded `visual-judging` has no trigger.\n   - The variable name cannot appear in the rule, because the host or hook would expand it.\n   - Smallest fix: \"Write every path you put in a brief's criteria as a literal absolute path, taking the plugin folder from the CLI path above.\" The test string in `sessioncontext.test.ts:70` and `plugin.test.ts:1114` would need to follow.\n\n4. **Non-blocking, B1.**\n   - `root/skills.md:5` repeats \"Pick each one … and name its file in the Worker.visual and Reviewer.visual criteria\". The same rule is in `visual-judging:12` and R-VISUAL.\n   - Smallest fix: end the bullet with \"`visual-judging` says how to pick and name them; load the skill yourself for the final pass\".\n\n5. **Non-blocking.**\n   - The root loads `visual-judging` and then the platform skill, so the materiality text reaches its context twice.\n   - A worker reads it in its inspection rules and again in the platform skill.\n   - Accepted by requirement 7 (self-contained skills) and guarded by the new test.\n\n**Criteria**\n- Pick and path: met. `visual-judging:12`, `root/skills.md:4-5`, R-VISUAL and both specialist files agree on the literal path, with no `${...}`.\n- Final pass bounded to the reviewer's captures at the listed sizes and variants, reviewer evidence as input: met in text (`visual-judging:18-21`, `captures.md:1`), apart from finding 2.\n- Materiality has one source: met. `shared/materiality.md` is embedded in the core, `visual-judging` and `interface-inspection`; `merge-ready.md` and `purpose.md` only refer to it. The new test guards the single source.\n- R-VISUAL, R-WVI-DESIGN, R-RV-DESIGN, R-MATERIAL: phrases match the text.\n- Markers: `(default)` on the tui-design color count and the 100 ms rule; `(preference)` on the web-design mode rule.\n- frontend-design: only the intro paragraph changed; the embedded body is untouched.\n- `docs/usage.md` and `docs/decisions.md` agree with the text.\n\nevidence:\nDeliverable 2 and the materiality item are met in the text: met except finding 2 (web captures), which is blocking; see `visual-judging/SKILL.md:12-26` and `captures.md:1`.\nNo new contradiction, repeated text or unclear trigger is introduced: gap, findings 1 and 2 (`evidence-judging/SKILL.md:10` against `visual-judging/SKILL.md:21`; `captures.md:1`).\nfindings: the five items above.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Findings cite file:line; the evidence-judging contradiction and web-capture gap are verifiable in text",
+    "criteria": [
+      {
+        "criterion": "Deliverable 2 and the materiality item are met in the text",
+        "support": "met except finding 2 (web captures), which is blocking; see `visual-judging/SKILL.md:12-26` and `captures.md:1`."
+      },
+      {
+        "criterion": "No new contradiction, repeated text or unclear trigger is introduced",
+        "support": "gap, findings 1 and 2 (`evidence-judging/SKILL.md:10` against `visual-judging/SKILL.md:21`; `captures.md:1`)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "the five items above."
+      }
+    ]
   },
   "createdAt": "2026-11-04T15:17:25.645Z"
 }
