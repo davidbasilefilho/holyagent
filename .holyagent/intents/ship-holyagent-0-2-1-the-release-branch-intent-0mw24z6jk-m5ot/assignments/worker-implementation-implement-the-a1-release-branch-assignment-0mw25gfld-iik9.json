@@ -1,0 +1,91 @@
+{
+  "id": "assignment-0mw25gfld-iik9",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 2,
+  "roleTask": "Worker.implementation",
+  "slug": "implement-the-a1-release-branch",
+  "objective": "Implement the A1 release-branch enforcement and the A2 workflows of the 0.2.1 request in the worktree /home/user/holyagent-ci-release-flow (branch release/0.2.1/ci/release-flow, cut from release/0.2.1/integration).",
+  "state": "Running",
+  "scope": [
+    "Read /home/user/holyagent-work/spec-0.2.1.md Part A1 and A2 (binding), then /home/user/holyagent-work/map.md and /home/user/holyagent-work/research.md item 3 and item 6.",
+    "Rename .github/workflows/ci.yml to validation.yml keeping its jobs (check, windows, installers) and their behavior. validation.yml runs on pull_request and is also callable (workflow_call) so publish.yml can run it; it no longer needs its own push trigger.",
+    "Add a branch-model job to validation.yml for pull_request events that fails when: the base is main and the head is not release/<v>/integration; <v> in a release/<v>/... head branch differs from the version in the head (the root package.json version field, which is becoming the single version source); the base is a release/<v>/... branch and the head is not a branch of the same release. Implement the logic as a Bun script under scripts/ with unit tests, run from the job with the base and head refs.",
+    "Add a version job, run on pull_request into main: the head's root package.json version must be strictly greater than main's, ZeroVer, reusing parseVersion from scripts/bump-version.ts (add an exported comparator there or beside it, with tests). Equal or lower fails.",
+    "Add publish.yml: on push to branches only (never tags), it calls validation.yml (workflow_call), then with needs calls stable.yml on main and dev.yml on every other branch. stable.yml creates tag holyagent-<version> and a GitHub Release from the version on main, and fails loudly when that tag exists on another commit (re-running on the same commit is a no-op). dev.yml creates tag holyagent-<version>-dev-<short-hash> and a GitHub pre-release, idempotent per commit. Grant contents: write only to the jobs that tag and release; everything else stays read-only.",
+    "Every action pinned to a full commit SHA with a '# vX.Y.Z' comment (the existing pins already follow this). Add a test under scripts/ (Bun, parse YAML with Bun's YAML support) that checks every workflow 'uses:' of an external action is a 40-hex SHA with a '# v' comment, and that only tag/release jobs hold contents: write.",
+    "AGENTS.md: add a section for this repository's release-branch model (A1), including that the first PR of a release carries the version bump as its own commit (made with mise run bump:patch), that only release/<v>/integration opens a PR into main, and the required checks. Keep AGENTS.md's style: each rule with the reason it exists. docs/development.md: update the branch, CI and release text (it names ci.yml and release/<version>/<type>/<change> today). docs/usage.md: document installing a specific release by tag with the documented marketplace ref syntax (research.md item 3), using the holyagent-<version> tag names.",
+    "Write the exact GitHub ruleset JSON bodies (POST /repos/davidbasilefilho/holyagent/rulesets) for main and for refs matching release/*/integration: pull requests only, required status checks with the exact check context names the new jobs produce on pull_request events, no force push (non_fast_forward), no deletion. Save them as /home/user/holyagent-work/rulesets/main.json and /home/user/holyagent-work/rulesets/integration.json (outside the repository). Do not call the GitHub API."
+  ],
+  "constraints": [
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report: name unrequested features, tests, files or refactors in the report instead of adding them, and start no extra review rounds. Do not stop early with a summary that announces a next step or an offer to wait.",
+    "Make no version-control writes (no commit, checkout, switch, branch, stash, reset, push) and no edits under .git/ or .holyagent/; the root commits. Report every changed path.",
+    "Work only inside /home/user/holyagent-ci-release-flow; run 'bun install --frozen-lockfile' there first (node_modules is not shared between worktrees). Do not bump the version yourself; a later step does it.",
+    "Follow /home/user/holyagent-ci-release-flow/.claude/CLAUDE.md (Effect and tagged errors, Effect Schema with onExcessProperty error at data boundaries, Bun APIs, Bun Shell, JSDoc on every export) and AGENTS.md. Do not change .claude/CLAUDE.md. Reuse existing helpers in scripts/ instead of repeating them.",
+    "Gate: 'bunx --no-install mise run verify' must pass in the worktree. Workflows cannot run locally: check them with the YAML test and by reading; name what could not be run.",
+    "Report in under 500 words; put long logs in /home/user/holyagent-work/logs/."
+  ],
+  "criteria": [
+    {
+      "text": "validation.yml replaces ci.yml with the existing jobs unchanged in behavior plus branch-model and version jobs",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The branch-model script fails each of the three cases in the spec and passes valid release PRs, with unit tests for each case",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The version check passes only when the head version is strictly greater than main's, reuses parseVersion, and is unit-tested for greater, equal and lower",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "publish.yml runs on branch pushes only, after validation, calling stable.yml on main and dev.yml elsewhere with the tag names, idempotency and loud failure the spec requires",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Every external action is SHA-pinned with a version comment, contents: write is only on tagging jobs, and a test checks both",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "AGENTS.md, docs/development.md and docs/usage.md describe the new model, checks and tag install",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Ruleset JSON for main and release/*/integration is written with the exact required check contexts",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify passes in the worktree",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "check-names"
+  ],
+  "ownershipPaths": [
+    ".github",
+    "scripts",
+    "AGENTS.md",
+    "docs/development.md",
+    "docs/usage.md",
+    "package.json",
+    "mise.toml"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T13:25:42.001Z"
+  },
+  "createdAt": "2026-11-04T13:25:42.001Z"
+}
