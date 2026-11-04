@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mw2coyg7-yy3r",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "resolve-the-lock-ts-merge-conflict-left",
+  "objective": "Resolve the lock.ts merge conflict left by merging release/0.2.1/feat/visual-root-pass into release/0.2.1/fix/audit in /home/user/holyagent-fix-audit, keeping both lock fixes.",
+  "state": "Running",
+  "scope": [
+    "The merge is in progress (UU packages/runtime/src/state/lock.ts and UU packages/integrations/claude/dist/scripts/holyagent.js). Do not commit, abort or restart it; the root commits the merge.",
+    "Side one (from integration, commit c6de12f 'fix(state): treat a delete-pending lock file on Windows as held'): an exclusive create that fails with EPERM, EACCES or EBUSY counts as a held lock while a file is still in the way; with no file in the way it retries once, then reports StateIo. Side two (audit commit 3569104, finding B8): a stale lock is broken by renaming it to a unique name and re-checking its token, linking it back when another owner's lock was caught. Keep both behaviors; read 'git -C /home/user/holyagent-fix-audit show c6de12f -- packages/runtime/src/state/lock.ts' and 'git show 3569104 -- packages/runtime/src/state/lock.ts' for the two intents.",
+    "Resolve only the conflict; make no other change in this step. Then run 'bunx --no-install mise run build' (it regenerates dist/scripts/holyagent.js, which resolves that file) and 'bunx --no-install mise run verify', and run 'bun test packages/runtime/tests/state-branch.test.ts packages/runtime/tests/store.test.ts --rerun-each 5'."
+  ],
+  "constraints": [
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done, stop and report; name anything unrequested instead of doing it.",
+    "Make no commits, no checkout, reset, stash or merge --abort, and no edits under .git/ or .holyagent/. Edit only lock.ts by hand.",
+    "Work only inside /home/user/holyagent-fix-audit.",
+    "Report in under 200 words, with the final git status."
+  ],
+  "criteria": [
+    {
+      "text": "lock.ts keeps both the delete-pending handling and the rename-based stale break, with no conflict markers",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify passes and the state tests pass repeatedly",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "git-status"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/state/lock.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T16:48:17.000Z"
+  },
+  "createdAt": "2026-11-04T16:48:17.000Z"
+}
