@@ -176,6 +176,123 @@ describe("the workflow check refuses a value used twice to build a bigger one", 
   })
 })
 
+describe("the workflow check separates a value used twice from a value that grows", () => {
+  const ASSIGNMENT = "assignment-0mw2000aa-test"
+  const call = (prompt: string, type: string) =>
+    `  () => agent(${prompt}, { agentType: "holyagent:${type}", model: "sonnet", effort: "high", label: "${ASSIGNMENT}" }).then(() => done.push("${ASSIGNMENT}")),`
+  /** A script as the root writes it: a prompt builder that names its argument twice, then agents. */
+  const rootScript = (builder: string, calls: ReadonlyArray<string>) =>
+    [META, builder, "const done = []", "await parallel([", ...calls, "])", "return { done }"].join(
+      "\n",
+    )
+  const ONE =
+    'const p = (id) => "Assignment: " + id + ".\\nRead the brief at /briefs/" + id + ".md now."'
+  const TWO =
+    'const p = (role, id) => "Role: " + role + ". Assignment: " + id + ".\\nRead the brief at /briefs/" + id + ".md now."'
+  const worker = (prompt: string) => call(prompt, "worker-implementation")
+  const reviewer = (prompt: string) => call(prompt, "reviewer-code")
+
+  // The shapes of the scripts the root writes: a builder that names its argument in the text twice,
+  // called once for each Assignment, and a push that records which agent finished.
+  test.each<readonly [string, string]>([
+    ["one builder argument, one agent", rootScript(ONE, [worker(`p("${ASSIGNMENT}")`)])],
+    [
+      "one builder argument, two agents",
+      rootScript(ONE, [worker('p("assignment-a")'), worker('p("assignment-b")')]),
+    ],
+    [
+      "a role and an id, two agents",
+      rootScript(TWO, [
+        reviewer('p("Reviewer.code", "assignment-a")'),
+        reviewer('p("Reviewer.code", "assignment-b")'),
+      ]),
+    ],
+    [
+      "a role and an id, four agents",
+      rootScript(TWO, [
+        worker('p("Worker.implementation", "assignment-a")'),
+        worker('p("Worker.implementation", "assignment-b")'),
+        reviewer('p("Reviewer.code", "assignment-c")'),
+        reviewer('p("Reviewer.code", "assignment-d")'),
+      ]),
+    ],
+    [
+      "a role and an id, five agents",
+      rootScript(TWO, [
+        worker('p("Worker.operations", "assignment-a")'),
+        reviewer('p("Reviewer.code", "assignment-b")'),
+        reviewer('p("Reviewer.code", "assignment-c")'),
+        reviewer('p("Reviewer.code", "assignment-d")'),
+        reviewer('p("Reviewer.code", "assignment-e")'),
+      ]),
+    ],
+    [
+      "a builder called for each id of a list",
+      [
+        META,
+        ONE,
+        'const ids = ["assignment-a", "assignment-b"]',
+        "const done = []",
+        "await parallel(ids.map((id) => () => agent(p(id), { agentType: 'holyagent:worker-implementation', label: id }).then(() => done.push(id))))",
+        "return { done }",
+      ].join("\n"),
+    ],
+    [
+      "an argument used three times in one expression",
+      "const t = (id) => id + ': ' + id + ' / ' + id\nawait agent(t('a'), { agentType: 'holyagent:worker-implementation' })",
+    ],
+    [
+      "two builder results joined",
+      `${ONE}\nawait agent(p('a') + p('b'), { agentType: 'holyagent:worker-implementation' })`,
+    ],
+    [
+      "a doubled text used once",
+      "const id = args.id\nconst text = id + id\nawait agent(text, { agentType: 'holyagent:worker-implementation' })",
+    ],
+  ])("allows %s", async (_label, script) => {
+    expect(await refusalOf(script)).toBeUndefined()
+  })
+
+  // A value built by doubling that is doubled again grows by a factor each time, however the
+  // doublings are arranged: in a chain of statements, nested in one expression, handed through a
+  // function or a callback, or fed back around a loop through another name.
+  test.each<readonly [string, string]>([
+    ["a chain of sums", "const a = args.id\nconst b = a + a\nconst c = b + b\nconst d = c + c"],
+    ["a chain of arrays", "const a = [1]\nconst b = [a, a]\nconst c = [b, b]"],
+    ["a chain of spreads", "const a = [1]\nconst b = [...a, ...a]\nconst c = [...b, ...b]"],
+    ["a chain of templates", "const a = 'x'\nconst b = `${a}${a}`\nconst c = `${b}${b}`"],
+    ["a sum assigned twice", "let s = 'x'\ns += s\ns += s"],
+    [
+      "a doubled value copied, then doubled",
+      "const a = 'x'\nconst b = a + a\nconst c = b\nlog(c + c)",
+    ],
+    ["a doubling inside a doubling", "const a = args.id\nconst b = a + a + a + a\nlog(b + b)"],
+    [
+      "a builder applied to its own result",
+      "const d = (v) => v + v\nconst x = d('a')\nconst y = d(x)",
+    ],
+    ["a builder nested in itself", "const d = (v) => v + v\nlog(d(d(d('a'))))"],
+    [
+      "a function that hands back a grown value",
+      "const a = args.id\nconst t = a + a\nconst g = () => t\nconst u = g()\nlog(u + u)",
+    ],
+    [
+      "a callback that doubles the result of a callback that doubles",
+      "const a = ['x']\nconst b = a.map((x) => x + x)\nconst c = b.map((x) => x + x)",
+    ],
+    [
+      "a loop that doubles through a second name",
+      "let a = 'x'\nlet b = 'y'\nfor (let i = 0; i < 40; i++) { a = a + b; b = a + a }",
+    ],
+    [
+      "a loop that doubles what it walks into a new array",
+      "let a = ['x']\nfor (let i = 0; i < 40; i++) { const b = []\nfor (const x of a) { b.push(x, x) }\na = b }",
+    ],
+  ])("refuses %s", async (_label, text) => {
+    expect(await refusal(text)).toBeString()
+  })
+})
+
 describe("the workflow check refuses a for-of loop that adds to what it walks", () => {
   test.each<readonly [string, string]>([
     ["a sorted copy walked", "const a = [1]\nfor (const x of a.sort()) { a.push(x) }"],

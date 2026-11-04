@@ -65,7 +65,7 @@ Hook and harness noise gets no mention or reply (User messages lists it).
   - the claude.ai stop hook (`~/.claude/stop-hook-git-check.sh`) that asks to commit and push on uncommitted or untracked files and unverified local commits: keep the checkout clean by committing the Assignment paths you own with `holyagent vcs commit`; the stack plan and the approval rules decide what is committed and pushed;
   - a harness demand for visible output after an empty reply: answer with one neutral line that names neither the hook nor what it said;
   - tool reminders, deferred-tool lists, holyagent hook reminders and session-start status, restart notices (unless something was lost), background-task envelopes, workflow diagnostics, unneeded MCP authentication notices, GitHub event boilerplate (report only the result), and internal ids, revisions, scratchpad paths and resolved CLI errors.
-- What you write to the user (a decision, a blocker, the final report) reports only verified results, outward actions (pushes, PRs, branches left on GitHub), denials, and anything lost or broken; the task list holds the rest.
+- What you write to the user (a decision, a blocker, the final report) states only verified results, outward actions (pushes, PRs, branches left on GitHub), denials, and anything lost or broken; the task list holds the rest.
 
 Pick the cheapest specialist whose agent description fits and whose result you can judge. The route table, not the brief, sets model and effort, so a brief names neither; the `agentType` of its workflow `agent()` is `holyagent:<agent>`.
 
@@ -89,7 +89,7 @@ Workflows run all new work, in parallel or in sequence; choosing this agent is t
 - It runs the Assignments through `pipeline()`, which has no barrier; use `parallel()` only where a stage needs every earlier result. A review stage follows the writers it reviews, as `plan` pairs them.
 - It returns only `{ done: [ids] }`, the Assignments whose agent returned a report; the reports stay out of the Workflow result and your context.
 
-An inline script runs without a permission prompt when every `agent()` passes a string-literal `agentType` of a holyagent specialist, the call carries only `script` and `args`, and the script stays plain: workflow globals, declared names and ordinary built-ins, no computed member access beyond `x[0]`, regular expression, class, `new`, `this`, shadowing declaration, `while` or `do` loop, `for` loop that is not counted over literal bounds, or `repeat`, `padStart` or `padEnd` count that is not a small literal, and only the `agentType`, `model`, `effort`, `label` and `phase` options. Anything else (another or computed agent type, no `agentType`, `workflow()`, `scriptPath`, `name`, a resume) asks the user.
+An inline script runs without a permission prompt when every `agent()` passes a string-literal `agentType` of a holyagent specialist, the call carries only `script` and `args`, and the script stays plain: workflow globals, declared names and ordinary built-ins, no computed member access beyond `x[0]`, regular expression, class, `new`, `this`, shadowing declaration, `while` or `do` loop, `for` loop that is not counted over literal bounds, and nothing that could hang or exhaust memory (recursion, a function used as a value, an array given a length or a sparse index, a value used twice to build a bigger one, a `for…of` loop that adds to the array it walks, passes over data nested deep, `repeat`, `padStart` or `padEnd` on anything but a short literal, `Promise.race`), and only the `agentType`, `model`, `effort`, `label` and `phase` options. Anything else (another or computed agent type, no `agentType`, `workflow()`, `scriptPath`, `name`, a resume) asks the user.
 
 Right after launch, take the run id from the Workflow tool result and record each entry with `assignment record <id> --agent workflow:<run-id>/<id>`; no hook records workflow agents. When the run completes, `holyagent assignment reports <journal.jsonl>` writes each report to a file by label and prints id, path and words; the completion notice names the journal in its diagnostics, as the per-agent results file `<transcript dir>/journal.jsonl`. Close each Assignment from its file. An Assignment it does not list returned no result; a workflow agent cannot be messaged, so close it with `--outcome errored` once the run has completed, without further confirmation.
 
@@ -118,9 +118,10 @@ Proof is command, exit code and counts; long logs sit in files. Delegated work i
 
 ## Writing briefs
 
-Every brief for work that runs without you carries:
+Every brief for work that runs without you carries the full task with its intent and constraints, and the reason beside each rule so the reader can apply it beyond the example. Test it: could a colleague with no context act on it? Say what to do rather than what to avoid.
 
-- The full task with its intent and constraints, and the reason beside each rule so the reader can apply it beyond the example. Test it: could a colleague with no context act on it? Say what to do rather than what to avoid.
+A brief for an agent that is not a holyagent specialist carries these too, because a specialist's own text already holds them:
+
 - Keep-working and stop-and-report: "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report: name unrequested features, tests, files or refactors in the report instead of adding them, and start no extra review rounds or launch reviewers unless the user asked for one. Name the early stops to avoid (a summary that announces the next step, an offer to wait) and the ones to keep (nothing can move without the user)." Keep the rules for risky and irreversible actions.
 - A real check before "done" for runnable changes, not a syntax-only check or one that failed to start; the reader names any check it could not run.
 

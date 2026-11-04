@@ -426,16 +426,45 @@ interface Reference {
   readonly within: ReadonlyArray<JsNode>
   /** The iterations the loops and passes around the use run together. */
   readonly factor: number
+  /** Where the name stands in the script, to tell which uses a stretch of it holds. */
+  readonly start: number
 }
 
 /** A value used as more than one part of the value built from it (`[a, a]`, `a.concat(a)`). */
 interface Combination {
+  /** The construct that builds the value (`a + a`, `[a, a]`, `a.concat(a)`). */
+  readonly at: JsNode
   readonly operands: ReadonlyArray<JsNode>
   readonly scope: Scope
   /** Set for a call by name: it counts only when the name is a function of the script. */
   readonly callee?: string | undefined
   /** True when the operands are merged into one value, so a copy of one is the one. */
   readonly merging?: boolean
+}
+
+/**
+ * Where names are set or changed to something built from `value` (a declaration, an assignment, a
+ * write into a member, a push), so that a value built by doubling is followed to the names that
+ * hold it.
+ */
+interface Store {
+  readonly names: ReadonlyArray<string>
+  readonly scope: Scope
+  readonly value: JsNode
+}
+
+/** A value handed to the names that take it as a parameter or a loop variable. */
+interface Flow {
+  readonly inputs: ReadonlyArray<JsNode>
+  readonly takers: () => ReadonlyArray<Binding>
+}
+
+/** A call of a name, with the expressions it is given. */
+interface Applied {
+  readonly node: JsNode
+  readonly name: string
+  readonly scope: Scope
+  readonly inputs: ReadonlyArray<JsNode>
 }
 
 /** Where a name is read, as the path of fields under it (`a.b.c` is `a` and `["b", "c"]`). */
@@ -460,6 +489,10 @@ const varScope = (scope: Scope): Scope =>
 /** The name at the root of `a.b.c`, which decides what an assignment into it changes. */
 const rootName = (node: JsNode | undefined): string | undefined =>
   node?.type === "MemberExpression" ? rootName(nodeAt(node, "object")) : nameOf(node)
+
+/** Where a node starts and ends in the script. */
+const startOf = (node: JsNode): number => (typeof node["start"] === "number" ? node["start"] : 0)
+const endOf = (node: JsNode): number => (typeof node["end"] === "number" ? node["end"] : 0)
 
 /** The value of an integer literal that a number can hold exactly, or undefined for anything else. */
 const integerLiteral = (node: JsNode | undefined): number | undefined => {
@@ -752,6 +785,16 @@ const inspect = (script: string): string | undefined => {
   const everyWalk: Array<Walk> = []
   const growths: Array<GrowthSite> = []
   const combinations: Array<Combination> = []
+  const combine = (at: JsNode, combination: Omit<Combination, "at">) => {
+    combinations.push({ ...combination, at })
+  }
+  // Where a value built by doubling goes: the names it is stored in, the parameters and loop
+  // variables it is handed to, the calls of named functions, and the parameters of each function.
+  const stores: Array<Store> = []
+  const flows: Array<Flow> = []
+  const applications: Array<Applied> = []
+  const functionNodes: Array<JsNode> = []
+  const parametersOf = new Map<JsNode, ReadonlyArray<Binding>>()
   // The functions that call something the script cannot see into, by where the call stands.
   const dynamicIn: Array<ReadonlyArray<JsNode>> = []
   // Function values: where one may stand, the functions that are bound to a name, and the
@@ -797,6 +840,7 @@ const inspect = (script: string): string | undefined => {
       use,
       within: functionsAround,
       factor: loopWork,
+      start: startOf(node),
     }
     references.push(reference)
     if (use !== "callee") return
@@ -922,9 +966,13 @@ const inspect = (script: string): string | undefined => {
           allowedFunctions.add(init)
           namedFunctions.add(init)
           target.names.get(nameOf(id) ?? "")?.functions.add(init)
-        } else
+        } else {
           for (const name of copiedNames(id))
             target.names.get(name)?.sources.push({ node: init, scope })
+          const names = new Set<string>()
+          assignedNames(id, names)
+          stores.push({ names: [...names], scope, value: init })
+        }
       }
       expression(init, scope, depth + 1)
     }
@@ -940,6 +988,13 @@ const inspect = (script: string): string | undefined => {
     }
     for (const parameter of nodesAt(node, "params"))
       declarePattern(parameter, inner, inner, depth + 1, "unsafe")
+    const parameterNames = new Set<string>()
+    for (const parameter of nodesAt(node, "params")) assignedNames(parameter, parameterNames)
+    functionNodes.push(node)
+    parametersOf.set(
+      node,
+      [...parameterNames].flatMap((name) => inner.names.get(name) ?? []),
+    )
     // A function bound to a name does its own work whenever it is called: it starts from one
     // iteration and is priced where it is called. Any other runs where it stands.
     const outerWork = loopWork
@@ -1062,6 +1117,15 @@ const inspect = (script: string): string | undefined => {
     if (node["optional"] === true) return refuse("makes an optional call")
     const given = nodesAt(node, "arguments")
     const values = definedNodes(given.map(unspread))
+    const receiver = callee?.type === "MemberExpression" ? nodeAt(callee, "object") : undefined
+    // What a callback written in place is handed: the receiver and the arguments that are no callback.
+    const handed = [
+      ...(receiver === undefined ? [] : [receiver]),
+      ...values.filter((argument) => !isFunctionLiteral(argument)),
+    ]
+    const nameCalled = nameOf(callee)
+    if (nameCalled !== undefined)
+      applications.push({ node, name: nameCalled, scope, inputs: values })
     // The arguments the call hands a function to run, and how many times it runs it.
     let callbacks: ReadonlyArray<JsNode | undefined> = []
     let passes = 1
@@ -1078,7 +1142,7 @@ const inspect = (script: string): string | undefined => {
         callbacks = given.flatMap((argument) =>
           argument?.type === "ArrayExpression" ? nodesAt(argument, "elements") : [],
         )
-      if (values.length > 1) combinations.push({ operands: values, scope, callee: name })
+      if (values.length > 1) combine(node, { operands: values, scope, callee: name })
     } else if (callee?.type === "MemberExpression") {
       memberExpression(callee, scope, depth + 1, true)
       const computed = callee["computed"] === true
@@ -1121,8 +1185,8 @@ const inspect = (script: string): string | undefined => {
         if (ITERATING_METHODS.has(method)) passes = DATA_ITERATIONS
       }
       if (COMBINING_METHODS.has(method) && object !== undefined)
-        combinations.push({ operands: [object, ...values], scope, merging: true })
-      else if (owner === "Array" && method === "of") combinations.push({ operands: values, scope })
+        combine(node, { operands: [object, ...values], scope, merging: true })
+      else if (owner === "Array" && method === "of") combine(node, { operands: values, scope })
       if (GROWING_METHODS.has(method) && object !== undefined) {
         const site: GrowthSite = {
           names: identifiersIn(object),
@@ -1132,11 +1196,17 @@ const inspect = (script: string): string | undefined => {
         }
         growths.push(site)
         for (const walk of walks) walk.sites.push(site)
+        stores.push({ names: identifiersIn(object), scope, value: node })
       }
     } else if (isFunctionLiteral(callee)) functionNode(callee, scope, depth + 1)
     else return refuse("calls something it cannot vet")
     for (const argument of callbacks)
-      if (isFunctionLiteral(argument)) allowedFunctions.add(argument)
+      if (isFunctionLiteral(argument)) {
+        allowedFunctions.add(argument)
+        flows.push({ inputs: handed, takers: () => parametersOf.get(argument) ?? [] })
+      }
+    if (isFunctionLiteral(callee))
+      flows.push({ inputs: values, takers: () => parametersOf.get(callee) ?? [] })
     const outerWork = loopWork
     for (const argument of given) {
       if (passes > 1 && callbacks.includes(argument)) setWork(outerWork * passes)
@@ -1189,7 +1259,7 @@ const inspect = (script: string): string | undefined => {
         if ("regex" in node || "bigint" in node) refuse("uses a regular expression or a bigint")
         return
       case "TemplateLiteral":
-        combinations.push({
+        combine(node, {
           operands: definedNodes(nodesAt(node, "expressions")),
           scope,
           merging: true,
@@ -1198,7 +1268,7 @@ const inspect = (script: string): string | undefined => {
         return
       case "ArrayExpression":
         if (!freshResults.has(node))
-          combinations.push({
+          combine(node, {
             operands: definedNodes(nodesAt(node, "elements").map(unspread)),
             scope,
             merging: nodesAt(node, "elements").some((element) => element?.type === "SpreadElement"),
@@ -1212,7 +1282,7 @@ const inspect = (script: string): string | undefined => {
         return
       case "ObjectExpression":
         if (!freshResults.has(node))
-          combinations.push({
+          combine(node, {
             operands: definedNodes(
               nodesAt(node, "properties").map((property) =>
                 property?.type === "SpreadElement"
@@ -1242,7 +1312,7 @@ const inspect = (script: string): string | undefined => {
       case "BinaryExpression":
       case "LogicalExpression":
         if (node["operator"] === "+")
-          combinations.push({
+          combine(node, {
             operands: definedNodes([nodeAt(node, "left"), nodeAt(node, "right")]),
             scope,
             merging: true,
@@ -1259,13 +1329,20 @@ const inspect = (script: string): string | undefined => {
           functionAssignments.push({ name: nameOf(left) ?? "", scope, node: right })
         }
         if (operator === "+=")
-          combinations.push({ operands: definedNodes([left, right]), scope, merging: true })
+          combine(node, { operands: definedNodes([left, right]), scope, merging: true })
         if (
           (operator === "=" || operator === "+=") &&
           (functionsAround.length > 0 || loopDepth > 0) &&
           replacesWithMore(right, left)
         )
           refuse("replaces text with longer text again and again")
+        if (!isFunctionLiteral(right)) {
+          const names = new Set<string>()
+          assignedNames(left, names)
+          const root = rootName(left)
+          if (root !== undefined) names.add(root)
+          stores.push({ names: [...names], scope, value: node })
+        }
         writeTarget(
           left,
           scope,
@@ -1377,6 +1454,21 @@ const inspect = (script: string): string | undefined => {
         // is checked once every name is known (see the end of the walk).
         const right = nodeAt(node, "right")
         expression(right, loop, depth + 1)
+        if (right !== undefined) {
+          const taken = new Set<string>()
+          assignedNames(
+            left?.type === "VariableDeclaration"
+              ? nodeAt(nodesAt(left, "declarations")[0] ?? left, "id")
+              : left,
+            taken,
+          )
+          const root = rootName(left)
+          if (root !== undefined) taken.add(root)
+          flows.push({
+            inputs: [right],
+            takers: () => [...taken].flatMap((name) => binding(loop, name) ?? []),
+          })
+        }
         const walk: Walk = { walked: identifiersIn(right), scope, sites: [], calls: [] }
         const outerWork = loopWork
         const outerWalks = walks
@@ -1611,7 +1703,13 @@ const inspect = (script: string): string | undefined => {
     }
 
     // Values used twice to build a bigger one: two operands of a construct that read the same
-    // value, directly or through a name that was copied from it.
+    // value, directly or through a name that was copied from it. Using a name twice in one
+    // expression is bounded by the size of the script, however the result is used. What grows
+    // without bound is a value that is itself built that way and used twice again: it doubles on
+    // each round of a loop or call, or on each of a chain of statements. So a use twice is refused
+    // when the value used is "grown": a name that is set from a doubled value, from a call of a
+    // function that doubles, or from another grown name, whether directly, through a copy, a
+    // member, a push, a loop variable or a parameter it is handed to.
     const ids = new Map<Binding | string, number>()
     const idOf = (key: Binding | string) => {
       const known = ids.get(key)
@@ -1619,12 +1717,16 @@ const inspect = (script: string): string | undefined => {
       ids.set(key, ids.size)
       return ids.size - 1
     }
-    const readings = (operand: JsNode, scope: Scope, deep: boolean): Set<string> => {
-      const found = new Set<string>()
+    const readings = (
+      operand: JsNode,
+      scope: Scope,
+      deep: boolean,
+    ): Map<string, Binding | string> => {
+      const found = new Map<string, Binding | string>()
       const visit = (name: string, at: Scope, path: ReadonlyArray<string>, seen: Set<Binding>) => {
         const key = keyOf(name, at)
         if (key === undefined || !spend()) return
-        found.add(`${idOf(key)}:${path.join(".")}`)
+        found.set(`${idOf(key)}:${path.join(".")}`, key)
         if (typeof key === "string" || seen.has(key)) return
         seen.add(key)
         for (const source of key.sources) {
@@ -1637,6 +1739,8 @@ const inspect = (script: string): string | undefined => {
         visit(origin.name, origin.scope, origin.path, new Set())
       return found
     }
+    // The constructs that use a value twice, and the values they use twice.
+    const doublings: Array<{ readonly at: JsNode; readonly shared: Array<Binding | string> }> = []
     for (const combination of combinations) {
       if (
         combination.callee !== undefined &&
@@ -1644,14 +1748,130 @@ const inspect = (script: string): string | undefined => {
       )
         continue
       const owners = new Map<string, number>()
+      const shared = new Set<Binding | string>()
       for (const [index, operand] of combination.operands.entries())
-        for (const reading of readings(operand, combination.scope, combination.merging === true)) {
+        for (const [reading, key] of readings(
+          operand,
+          combination.scope,
+          combination.merging === true,
+        )) {
           const owner = owners.get(reading)
-          if (owner !== undefined && owner !== index)
-            return refuse("uses one value twice to build a bigger one")
+          if (owner !== undefined && owner !== index) shared.add(key)
           owners.set(reading, index)
         }
+      if (shared.size > 0) doublings.push({ at: combination.at, shared: [...shared] })
     }
+
+    // What a stretch of the script holds: a construct that doubles, the names it reads and the
+    // calls of named functions in it.
+    const byStart = <T>(list: ReadonlyArray<T>, start: (item: T) => number): Array<T> =>
+      [...list].sort((left, right) => start(left) - start(right))
+    const firstFrom = <T>(list: ReadonlyArray<T>, start: (item: T) => number, at: number) => {
+      let low = 0
+      let high = list.length
+      while (low < high) {
+        const middle = (low + high) >> 1
+        if (start(list[middle] as T) < at) low = middle + 1
+        else high = middle
+      }
+      return low
+    }
+    const sites = byStart(
+      doublings.map((doubling) => doubling.at),
+      startOf,
+    )
+    const uses = byStart(
+      references.flatMap((reference) => {
+        const held = binding(reference.scope, reference.name)
+        return held === undefined ? [] : [{ held, start: reference.start }]
+      }),
+      (use) => use.start,
+    )
+    const applied = byStart(applications, (call) => startOf(call.node))
+    interface Reads {
+      doubles: boolean
+      readonly held: Set<Binding>
+      readonly calls: Array<Applied>
+    }
+    const readsCache = new Map<JsNode, Reads>()
+    const readsOf = (node: JsNode): Reads => {
+      const known = readsCache.get(node)
+      if (known !== undefined) return known
+      const start = startOf(node)
+      const end = endOf(node)
+      const reads: Reads = { doubles: false, held: new Set(), calls: [] }
+      readsCache.set(node, reads)
+      for (let at = firstFrom(sites, startOf, start); at < sites.length && spend(); at++) {
+        const site = sites[at] as JsNode
+        if (startOf(site) >= end) break
+        if (endOf(site) <= end) reads.doubles = true
+      }
+      for (let at = firstFrom(uses, (use) => use.start, start); at < uses.length && spend(); at++) {
+        const use = uses[at]
+        if (use === undefined || use.start >= end) break
+        reads.held.add(use.held)
+      }
+      for (
+        let at = firstFrom(applied, (call) => startOf(call.node), start);
+        at < applied.length;
+        at++
+      ) {
+        const call = applied[at]
+        if (call === undefined || startOf(call.node) >= end || !spend()) break
+        if (endOf(call.node) <= end) reads.calls.push(call)
+      }
+      return reads
+    }
+
+    // The names that hold a grown value, and the functions that hand one back, found by following
+    // the value until nothing new is reached.
+    const grown = new Set<Binding>()
+    const handingBack = new Set<JsNode>()
+    const callsGrown = (call: Applied) =>
+      [...(binding(call.scope, call.name)?.functions ?? [])].some((callee) =>
+        handingBack.has(callee),
+      )
+    const isGrown = (node: JsNode) => {
+      const reads = readsOf(node)
+      return (
+        reads.doubles ||
+        [...reads.held].some((held) => grown.has(held)) ||
+        reads.calls.some(callsGrown)
+      )
+    }
+    const handedTo: Array<Flow> = [
+      ...flows,
+      ...applications.map((call): Flow => ({
+        inputs: call.inputs,
+        takers: () =>
+          [...(binding(call.scope, call.name)?.functions ?? [])].flatMap(
+            (callee) => parametersOf.get(callee) ?? [],
+          ),
+      })),
+    ]
+    for (let changed = true; changed && spend();) {
+      changed = false
+      for (const store of stores) {
+        const targets = store.names.flatMap((name) => binding(store.scope, name) ?? [])
+        if (targets.every((target) => grown.has(target)) || !isGrown(store.value)) continue
+        for (const target of targets) grown.add(target)
+        changed = true
+      }
+      for (const flow of handedTo) {
+        const takers = flow.takers()
+        if (takers.every((taker) => grown.has(taker)) || !flow.inputs.some(isGrown)) continue
+        for (const taker of takers) grown.add(taker)
+        changed = true
+      }
+      for (const callee of functionNodes)
+        if (!handingBack.has(callee) && isGrown(callee)) {
+          handingBack.add(callee)
+          changed = true
+        }
+    }
+    for (const doubling of doublings)
+      if (doubling.shared.some((key) => typeof key !== "string" && grown.has(key)))
+        return refuse("uses one value twice to build a bigger one")
     if (analysisSteps > MAX_ANALYSIS_STEPS) refuse("is too tangled to check")
   }
 

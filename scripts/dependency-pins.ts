@@ -94,9 +94,11 @@ export const parseTags = (output: string): ReadonlyArray<Tag> => {
 /**
  * The release a package should move to: the newest stable version that is not deprecated and is no
  * higher than the registry's `latest` dist-tag. The tag is the publisher's own statement of the
- * current release, so a version published above it (a canary, or a malicious publish) is never
- * picked; a `latest` that is not a stable release gives `undefined`, as does no eligible version.
- * `versions` maps each published version to its metadata, where a truthy `deprecated` marks it.
+ * current release, so a version published above it (a canary, say) is not chosen as the range. It
+ * caps only that range: `bun update` resolves the lockfile within the range by its own rules and
+ * can reach a release above the tag. A `latest` that is not a stable release gives `undefined`, as
+ * does no eligible version. `versions` maps each published version to its metadata, where a truthy
+ * `deprecated` marks it.
  */
 export const newestAllowedRelease = (
   versions: Readonly<Record<string, { readonly deprecated?: unknown }>>,

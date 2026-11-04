@@ -1,7 +1,12 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterAll, afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 
 import { looksLikeAgent } from "../src/vcs/identity.ts"
 import { cleanup, fakeGitHub, initRepo, put, seed, sh, toon, vcs } from "./vcs-fixtures.ts"
+
+// Tests that run git processes: process creation on Windows is slow enough on the CI runner to pass
+// Bun's 5 second default, and a slow test there is not a hung one. Linux and macOS keep the default.
+if (process.platform === "win32") setDefaultTimeout(60_000)
+afterAll(() => setDefaultTimeout(5_000))
 
 afterEach(cleanup)
 

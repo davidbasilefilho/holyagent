@@ -14,7 +14,7 @@ An earlier design also detected how to commit and then committed through GitHub'
 holyagent vcs commit -m <headline> [-m <body>] -- <paths…>
 ```
 
-- Refuses an identity that looks like an agent's (`noreply@anthropic.com`, or a name starting with `Claude`) with `AgentIdentity`: set the user's own with `git config user.name <name>` and `git config user.email <email>` in the repository. In a claude.ai cloud session it checks the author instead (below).
+- Refuses exactly the agent's identity with `AgentIdentity`: the email `noreply@anthropic.com`, or the name `Claude` or `Claude Code` in any letter case. A person whose name only contains Claude passes. Set the user's own with `git config user.name <name>` and `git config user.email <email>` in the repository. In a claude.ai cloud session it checks the author instead (below).
 - Stages exactly the named paths and, in the `branch` and `local` state modes, refuses any path under `.holyagent/`: Intent state is committed on the state branch by the holyagent commands, or by nothing, never on a work branch. In the `work` mode it stages the changed state files (`.holyagent/local/` excepted, which git ignores) with the named paths. If something else is already staged the command refuses (`StagedOutsideScope`), and with nothing changed it refuses (`NothingToCommit`).
 - Cleans and checks the message (below), then runs `git commit`, so the repository's own hooks run, a `commit-msg` hook included.
 
@@ -26,8 +26,8 @@ A claude.ai cloud session (`CLAUDE_CODE_REMOTE=true`) configures git with `user.
 
 1. The session-start hook adds the steps to the context, in a cloud session only. Locally nothing about them is in the context or the root rules.
 2. The root calls the GitHub connector's `get_me` (`mcp__github__get_me`) and runs `holyagent vcs identity --name <name> --email <id>+<login>@users.noreply.github.com`, with the name from `get_me` (the login when it has none) and the noreply address built from its id and login, since `get_me` returns no email.
-3. `vcs identity` writes `author.name` and `author.email` to the clone's local git config (`.git/config`, shared by its worktrees), which git uses for the author without touching the committer. No value goes into a file of the repository, so the user's name and address are never committed or tracked. It refuses an identity that looks like an agent's, an email that is not an address, and a name with angle brackets or control characters.
-4. `vcs commit` in a cloud session requires an author that git resolves (`GIT_AUTHOR_*`, else `author.*`, else `user.*`) and that does not look like an agent's, and leaves the committer alone. A missing or agent-looking author is refused with `CloudAuthor` (exit 3), whose hint names the `get_me` and `vcs identity` steps. Outside a cloud session the check on `user.name` and `user.email` above is unchanged.
+3. `vcs identity` writes `author.name` and `author.email` to the clone's local git config (`.git/config`, shared by its worktrees), which git uses for the author without touching the committer. No value goes into a file of the repository, so the user's name and address are never committed or tracked. It refuses the agent's identity (see above), an email that is not an address, and a name with angle brackets or control characters.
+4. `vcs commit` in a cloud session requires an author that git resolves (`GIT_AUTHOR_*`, else `author.*`, else `user.*`) and that is not the agent's identity, and leaves the committer alone. A missing or agent author is refused with `CloudAuthor` (exit 3), whose hint names the `get_me` and `vcs identity` steps. Outside a cloud session the check on `user.name` and `user.email` above is unchanged.
 
 The no-attribution rule covers the author and the commit text; the Claude committer of a cloud session is its documented exception. The `commit-msg` hook, the message cleaning and the committer's signature are unaffected.
 
@@ -37,7 +37,7 @@ The no-attribution rule covers the author and the commit text; the Claude commit
 
 - `Claude-Session:` trailers and claude.ai links,
 - the "Generated with … Claude Code" footer line,
-- `Co-authored-by:` trailers that name the agent (`Claude…` or an `anthropic.com` address); human co-authors stay.
+- `Co-authored-by:` trailers that name the agent (the name `Claude` or `Claude Code`, or an `anthropic.com` address); human co-authors stay.
 
 If the cleaned text still contains one of these phrases as whole words, case-insensitively, the command refuses with `MessageRefused` (exit 3): `the user`, `user asked`, `as requested`, `the assistant`, `this session`, `subagent`, `Claude Code`, `Claude Opus`, `Claude Sonnet`, `Claude Haiku`, `Claude Fable`. A project whose domain uses a phrase legitimately lists it in `.holyagent/config.json`:
 

@@ -1,7 +1,7 @@
 {
   "name": "@holyagent/runtime",
   "version": "0.2.1",
-  "description": "The holyagent runtime: instructions and the shared command surface.",
+  "description": "The holyagent runtime shared by every harness: the domain, the state, the vcs commands, the instruction text and the command line.",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {

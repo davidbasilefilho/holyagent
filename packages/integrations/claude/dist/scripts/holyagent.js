@@ -139,6 +139,14 @@ var getAllObjectKeys = (obj) => {
 };
 var byReferenceInstances = /* @__PURE__ */ new WeakSet;
 var viewBytes = (view) => new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
+var isArrayBufferLike = (u) => u instanceof ArrayBuffer || typeof SharedArrayBuffer !== "undefined" && u instanceof SharedArrayBuffer;
+var bufferBytes = (buffer) => {
+  try {
+    return new Uint8Array(buffer);
+  } catch {
+    return;
+  }
+};
 
 var backEdges = 0;
 var addBackEdge = () => {
@@ -217,10 +225,13 @@ var hash = (self) => {
         const seen = backEdges;
         let h;
         try {
-          if (symbol in self) {
+          if (isHash(self)) {
             h = self[symbol]();
           } else if (typeof self === "function") {
             h = random(self);
+          } else if (isArrayBufferLike(self)) {
+            const bytes = bufferBytes(self);
+            h = bytes === undefined ? random(self) : array(bytes);
           } else if (self instanceof DataView) {
             h = array(viewBytes(self));
           } else if (Array.isArray(self) || ArrayBuffer.isView(self)) {
@@ -259,6 +270,7 @@ var mix = (h) => {
 };
 var combine = /* @__PURE__ */ dual(2, (self, b) => mix(Math.imul(self, 2654435761) + Math.imul(b, 2246822507)));
 var optimize = (n) => n & 3221225471 | n >>> 1 & 1073741824;
+var isHash = (u) => hasProperty(u, symbol) && typeof u[symbol] === "function";
 var float64 = /* @__PURE__ */ new DataView(/* @__PURE__ */ new ArrayBuffer(8));
 var number = (n) => {
   const h = n | 0;
@@ -382,6 +394,13 @@ function compareStructure(self, that) {
       return false;
     }
     return compareArrays(self, that);
+  } else if (isArrayBufferLike(self)) {
+    if (!isArrayBufferLike(that) || self instanceof ArrayBuffer !== that instanceof ArrayBuffer) {
+      return false;
+    }
+    const selfBytes = bufferBytes(self);
+    const thatBytes = bufferBytes(that);
+    return selfBytes !== undefined && thatBytes !== undefined && compareTypedArrays(selfBytes, thatBytes);
   } else if (ArrayBuffer.isView(self)) {
     const selfIsDataView = self instanceof DataView;
     if (!ArrayBuffer.isView(that) || self.byteLength !== that.byteLength || selfIsDataView !== that instanceof DataView) {
@@ -467,7 +486,7 @@ function compareHashed(self, that, hashOf, equivalent) {
 }
 var entryHash = (entry) => hash(entry[0]);
 var equalEntries = (self, that) => compareBoth(self[0], that[0]) && compareBoth(self[1], that[1]);
-var isEqual = (u) => hasProperty(u, symbol2);
+var isEqual = (u) => hasProperty(u, symbol2) && typeof u[symbol2] === "function";
 
 var symbolRedactable = /* @__PURE__ */ Symbol.for("~effect/Redactable");
 var isRedactable = (u) => hasProperty(u, symbolRedactable);
@@ -593,8 +612,9 @@ function safeGet(input, key) {
 }
 function formatJson(input, options) {
   const ancestors = [];
+  const sources = new WeakMap;
   return JSON.stringify(input, function(key, value) {
-    const original = Object.getOwnPropertyDescriptor(this, key)?.value;
+    const original = Object.getOwnPropertyDescriptor(sources.get(this) ?? this, key)?.value;
     const redacted = hasProperty(original, symbolRedactable) ? redact(original) : redact(value);
     if (typeof redacted === "bigint") {
       return format(redacted);
@@ -620,14 +640,10 @@ function formatJson(input, options) {
     if (!hasGetter(current) || isJsonPrimitiveWrapper(current)) {
       return current;
     }
-    const serialized = new Proxy(current, {
-      get(target, key) {
-        const value = Reflect.get(target, key, target);
-        return Object.getOwnPropertyDescriptor(target, key)?.get !== undefined ? redact(value) : value;
-      }
-    });
-    ancestors.push(serialized);
-    return serialized;
+    const view = redactingView(current);
+    sources.set(view, current);
+    ancestors.push(view);
+    return view;
   }, options?.space) ?? "null";
 }
 function hasGetter(object) {
@@ -637,6 +653,22 @@ function hasGetter(object) {
     }
   }
   return false;
+}
+function redactingView(object) {
+  const view = Array.isArray(object) ? [] : {};
+  const keys = Array.isArray(object) ? Array.from({
+    length: object.length
+  }, (_, i) => String(i)) : Object.keys(object);
+  for (const key of keys) {
+    Object.defineProperty(view, key, {
+      enumerable: true,
+      get: () => {
+        const value = Reflect.get(object, key);
+        return Object.getOwnPropertyDescriptor(object, key)?.get !== undefined ? redact(value) : value;
+      }
+    });
+  }
+  return view;
 }
 function isJsonPrimitiveWrapper(object) {
   for (const valueOf of [Number.prototype.valueOf, Boolean.prototype.valueOf, String.prototype.valueOf]) {
@@ -893,6 +925,8 @@ class ReasonBase {
         return;
       newAnnotations.set(key, value);
     });
+    if (options?.overwrite !== true && newAnnotations.size === this.annotations.size)
+      return this;
     const self = Object.assign(Object.create(Object.getPrototypeOf(this)), this);
     self.annotations = newAnnotations;
     return self;
@@ -1400,9 +1434,8 @@ var ServiceProto = {
 var cacheKeys = /* @__PURE__ */ new Set;
 var ReferenceTypeId = "~effect/Context/Reference";
 var TypeId3 = "~effect/Context";
-var MaxDepth = 8;
 var FlattenAfterBaseHits = 8;
-var makeImpl = (cacheRoot, base, overlay, depth) => {
+var makeImpl = (cacheRoot, base, overlay, depth, maxDepth) => {
   const self = Object.create(Proto);
   self.cacheRoot = cacheRoot ?? self;
   self.base = base;
@@ -1410,6 +1443,7 @@ var makeImpl = (cacheRoot, base, overlay, depth) => {
   self.depth = depth;
   self._flat = undefined;
   self.baseHits = 0;
+  self.maxDepth = maxDepth;
   return self;
 };
 var applyOverlays = (map, overlay) => {
@@ -1430,7 +1464,7 @@ var flatten = (self) => {
 var withFlat = (self, f) => {
   const map = new Map(self.mapUnsafe);
   f(map);
-  return makeUnsafe(map);
+  return makeImpl(undefined, map, undefined, 0, self.maxDepth);
 };
 var notFound = /* @__PURE__ */ Symbol();
 var lookup = (self, key) => {
@@ -1449,7 +1483,10 @@ var lookup = (self, key) => {
   }
   return value;
 };
-var makeUnsafe = (mapUnsafe) => makeImpl(undefined, mapUnsafe, undefined, 0);
+var makeUnsafe = (mapUnsafe, options) => {
+  const maxDepth = options?.maxDepth;
+  return makeImpl(undefined, mapUnsafe, undefined, 0, Number.isInteger(maxDepth) && maxDepth >= 0 ? maxDepth : 8);
+};
 var Proto = {
   get mapUnsafe() {
     return flatten(this);
@@ -1494,18 +1531,18 @@ var add = /* @__PURE__ */ dual(3, (self, key, service) => addUnsafe(self, key.ke
 var addUnsafe = (self, key, service) => {
   const impl = self;
   const cacheRoot = cacheKeys.has(key) ? undefined : impl.cacheRoot;
-  if (impl.depth >= MaxDepth) {
+  if (impl.depth >= impl.maxDepth) {
     const map = new Map(impl._flat ?? impl.base);
     if (!impl._flat)
       applyOverlays(map, impl.overlay);
     map.set(key, service);
-    return makeImpl(cacheRoot, map, undefined, 0);
+    return makeImpl(cacheRoot, map, undefined, 0, impl.maxDepth);
   }
   return makeImpl(cacheRoot, impl.base, {
     key,
     value: service,
     parent: impl.overlay
-  }, impl.depth + 1);
+  }, impl.depth + 1, impl.maxDepth);
 };
 var getOrUndefined2 = /* @__PURE__ */ dual(2, (self, key) => getOrUndefinedUnsafe(self, key.key));
 var getOrUndefinedUnsafe = (self, key) => {
@@ -2119,6 +2156,8 @@ class NativeSpan {
     return this._events ??= [];
   }
   end(endTime, exit) {
+    if (this.status._tag === "Ended")
+      return;
     this.status = {
       _tag: "Ended",
       endTime,
@@ -2127,12 +2166,18 @@ class NativeSpan {
     };
   }
   attribute(key, value) {
+    if (this.status._tag === "Ended")
+      return;
     this.attributes.set(key, value);
   }
   event(name, startTime, attributes) {
+    if (this.status._tag === "Ended")
+      return;
     this.events.push([name, startTime, attributes ?? {}]);
   }
   addLinks(links) {
+    if (this.status._tag === "Ended")
+      return;
     this.links.push(...links);
   }
 }
@@ -2166,6 +2211,9 @@ var CurrentLogLevel = /* @__PURE__ */ Reference("effect/References/CurrentLogLev
 var MinimumLogLevel = /* @__PURE__ */ Reference("effect/References/MinimumLogLevel", {
   fiberCached: true,
   defaultValue: () => "Info"
+});
+var UnhandledLogLevel = /* @__PURE__ */ Reference("effect/References/UnhandledLogLevel", {
+  defaultValue: () => "Error"
 });
 var CurrentLogSpans = /* @__PURE__ */ Reference("effect/References/CurrentLogSpans", {
   defaultValue: () => []
@@ -2539,6 +2587,14 @@ class FiberImpl {
     this._stack.length = 0;
     this._children = undefined;
     this.context = empty();
+    const cache = this.cache;
+    if (cache.span !== undefined || cache.stackFrame !== undefined) {
+      this.cache = {
+        ...cache,
+        span: undefined,
+        stackFrame: undefined
+      };
+    }
   }
   runLoop(effect) {
     const prevFiber = globalThis[currentFiberTypeId];
@@ -2716,7 +2772,8 @@ var fail3 = exitFail;
 var sync = /* @__PURE__ */ makePrimitive({
   op: "Sync",
   [evaluate](fiber) {
-    const value = this[args]();
+    const thunk = this[args];
+    const value = thunk();
     const cont = fiber.getCont(contA);
     return cont ? cont[contA](value, fiber) : fiber.yieldWith(exitSucceed(value));
   }
@@ -2724,7 +2781,8 @@ var sync = /* @__PURE__ */ makePrimitive({
 var suspend = /* @__PURE__ */ makePrimitive({
   op: "Suspend",
   [evaluate](_fiber) {
-    return this[args]();
+    const thunk = this[args];
+    return thunk();
   }
 });
 var fromResult = /* @__PURE__ */ match({
@@ -2846,7 +2904,9 @@ var gen = (...args) => {
   const [options, body] = args;
   return suspend(() => fromIteratorUnsafe(body.call(options.self)));
 };
-var fnUntraced = (body, ...pipeables) => {
+var fnBody = (bodyOrOptions, pipeables) => typeof bodyOrOptions === "function" ? bodyOrOptions : pipeables.shift().bind(bodyOrOptions.self);
+var fnUntraced = (bodyOrOptions, ...pipeables) => {
+  const body = fnBody(bodyOrOptions, pipeables);
   const fn = pipeables.length === 0 ? function() {
     return suspend(() => fromIteratorUnsafe(body.apply(this, arguments)));
   } : function() {
@@ -2880,9 +2940,18 @@ var fn = function() {
   return makeFn(name, arguments[0], defError, Array.prototype.slice.call(arguments, 1), nameFirst, spanOptions);
 };
 var makeFn = (name, bodyOrOptions, defError, pipeables, addSpan, spanOptions) => {
-  const body = typeof bodyOrOptions === "function" ? bodyOrOptions : pipeables.shift().bind(bodyOrOptions.self);
+  const body = fnBody(bodyOrOptions, pipeables);
   const definitionName = `${name} (definition)`;
   const definitionStack = defError ? fnStackCleaner(() => defError.stack) : constUndefined;
+  const makeCallFrame = (callError) => (prev) => ({
+    name,
+    stack: callError ? fnStackCleaner(() => callError.stack) : constUndefined,
+    parent: {
+      name: definitionName,
+      stack: definitionStack,
+      parent: prev
+    }
+  });
   return defineFunctionLength(body.length, function(...args) {
     let result = suspend(() => {
       const iter = body.apply(this, arguments);
@@ -2901,26 +2970,21 @@ var makeFn = (name, bodyOrOptions, defError, pipeables, addSpan, spanOptions) =>
       callError = new globalThis.Error;
       setStackTraceLimit(prevLimit);
     }
-    return updateService(addSpan ? useSpan(name, spanOptions, (span) => provideParentSpan(result, span)) : result, CurrentStackFrame, (prev) => ({
-      name,
-      stack: callError ? fnStackCleaner(() => callError.stack) : constUndefined,
-      parent: {
-        name: definitionName,
-        stack: definitionStack,
-        parent: prev
-      }
-    }));
+    return updateService(addSpan ? useSpan(name, spanOptions, (span) => provideParentSpan(result, span)) : result, CurrentStackFrame, makeCallFrame(callError));
   });
 };
-var fnUntracedEager = (body, ...pipeables) => defineFunctionLength(body.length, pipeables.length === 0 ? function() {
-  return fromIteratorEagerUnsafe(() => body.apply(this, arguments));
-} : function() {
-  let effect = fromIteratorEagerUnsafe(() => body.apply(this, arguments));
-  for (const pipeable of pipeables) {
-    effect = pipeable(effect, ...arguments);
-  }
-  return effect;
-});
+var fnUntracedEager = (bodyOrOptions, ...pipeables) => {
+  const body = fnBody(bodyOrOptions, pipeables);
+  return defineFunctionLength(body.length, pipeables.length === 0 ? function() {
+    return fromIteratorEagerUnsafe(() => body.apply(this, arguments));
+  } : function() {
+    let effect = fromIteratorEagerUnsafe(() => body.apply(this, arguments));
+    for (const pipeable of pipeables) {
+      effect = pipeable(effect, ...arguments);
+    }
+    return effect;
+  });
+};
 var fromIteratorEagerUnsafe = (evaluate) => {
   try {
     const iterator = evaluate();
@@ -3168,6 +3232,10 @@ var catchTag = /* @__PURE__ */ dual((args) => isEffect(args[0]), (self, k, f, or
 var mapError = /* @__PURE__ */ dual(2, (self, f) => catchCause(self, (cause) => failCause(causeMap(cause, f))));
 var orDie = (self) => catch_(self, die);
 var orElseSucceed = /* @__PURE__ */ dual(2, (self, f) => catch_(self, (error) => sync(() => f(error))));
+var ignoreCauseLogger = (log) => log === "Unhandled" ? (...message) => withFiber((fiber) => {
+  const level = fiber.getRef(UnhandledLogLevel);
+  return level === undefined ? void_ : logWithLevel(level)(...message);
+}) : logWithLevel(log === true ? undefined : log);
 var ignore = /* @__PURE__ */ dual((args) => isEffect(args[0]), (self, options) => {
   if (!options?.log) {
     return matchEffect(self, {
@@ -3175,7 +3243,7 @@ var ignore = /* @__PURE__ */ dual((args) => isEffect(args[0]), (self, options) =
       onSuccess: (_) => void_
     });
   }
-  const logEffect = logWithLevel(options.log === true ? undefined : options.log);
+  const logEffect = ignoreCauseLogger(options.log);
   return matchCauseEffect(self, {
     onFailure(cause) {
       const error = findRecoverableError(cause);
@@ -4078,7 +4146,7 @@ var tracerLogger = /* @__PURE__ */ loggerMake(({
   const clock = fiber.getRef(ClockRef);
   const annotations = fiber.getRef(CurrentLogAnnotations);
   const span = fiber.cache.span;
-  if (span === undefined || span._tag === "ExternalSpan")
+  if (span === undefined || span._tag === "ExternalSpan" || span.status._tag === "Ended")
     return;
   const attributes = {};
   for (const [key, value] of Object.entries(annotations)) {
@@ -4544,6 +4612,13 @@ var decode = (str) => {
 };
 var encodeBytes = (bytes) => {
   const length = bytes.length;
+  const toBase64 = Uint8Array.prototype.toBase64;
+  if (length >= 32 && typeof toBase64 === "function")
+    return toBase64.call(bytes);
+  return length < 128 ? encodeShort(bytes) : encodeLong(bytes);
+};
+var encodeShort = (bytes) => {
+  const length = bytes.length;
   let result = "";
   let i;
   for (i = 2;i < length; i += 3) {
@@ -4565,9 +4640,37 @@ var encodeBytes = (bytes) => {
   }
   return result;
 };
+var encodeLong = (bytes) => {
+  const length = bytes.length;
+  const result = new Uint8Array(Math.ceil(length / 3) * 4);
+  let i;
+  let j = 0;
+  for (i = 2;i < length; i += 3, j += 4) {
+    result[j] = alphabetCodes[bytes[i - 2] >> 2];
+    result[j + 1] = alphabetCodes[(bytes[i - 2] & 3) << 4 | bytes[i - 1] >> 4];
+    result[j + 2] = alphabetCodes[(bytes[i - 1] & 15) << 2 | bytes[i] >> 6];
+    result[j + 3] = alphabetCodes[bytes[i] & 63];
+  }
+  if (i === length + 1) {
+    result[j] = alphabetCodes[bytes[i - 2] >> 2];
+    result[j + 1] = alphabetCodes[(bytes[i - 2] & 3) << 4];
+    result[j + 2] = paddingCode;
+    result[j + 3] = paddingCode;
+  }
+  if (i === length) {
+    result[j] = alphabetCodes[bytes[i - 2] >> 2];
+    result[j + 1] = alphabetCodes[(bytes[i - 2] & 3) << 4 | bytes[i - 1] >> 4];
+    result[j + 2] = alphabetCodes[(bytes[i - 1] & 15) << 2];
+    result[j + 3] = paddingCode;
+  }
+  return decoder.decode(result);
+};
 var encoder = /* @__PURE__ */ new TextEncoder;
+var decoder = /* @__PURE__ */ new TextDecoder;
 var stripCrlf = (str) => str.replace(/[\n\r]/g, "");
 var alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+var alphabetCodes = /* @__PURE__ */ encoder.encode(alphabet);
+var paddingCode = 61;
 var codes = /* @__PURE__ */ new Uint8Array(123).fill(255);
 for (let i = 0;i < alphabet.length; i++)
   codes[/* @__PURE__ */ alphabet.charCodeAt(i)] = i;
@@ -4934,6 +5037,14 @@ function decodeBase64() {
   }, input, options)));
 }
 
+var ContentTypeId = /* @__PURE__ */ Symbol.for("~effect/Schema/content");
+function setContent(operation, content) {
+  Object.defineProperty(operation, ContentTypeId, {
+    value: content
+  });
+  return operation;
+}
+
 var TypeId9 = "~effect/SchemaTransformation/Transformation";
 var Transformation = class extends Class {
   [TypeId9] = TypeId9;
@@ -4977,7 +5088,10 @@ var urlFromString = /* @__PURE__ */ transformEffect2({
 });
 var uint8ArrayFromBase64String = /* @__PURE__ */ new Transformation(/* @__PURE__ */ decodeBase64(), /* @__PURE__ */ encodeBase64());
 function fromJsonString(options) {
-  return new Transformation(parseJson(options ?? {}), stringifyJson(options));
+  return new Transformation(parseJson(options ?? {}), setContent(stringifyJson(options), {
+    mediaType: "application/json",
+    preserveSchema: options?.reviver === undefined && options?.replacer === undefined
+  }));
 }
 
 function makeGuard(tag) {
@@ -5438,8 +5552,8 @@ var IndexSignature = class {
     }
     this.parameter = parameter;
     this.type = type;
-    if (isOptional(type) && !containsUndefined(type)) {
-      throw new Error("Cannot use `Schema.optionalKey` with index signatures, use `Schema.optional` instead.");
+    if (isOptional(type) || type.encoding !== undefined && isOptional(toEncoded(type))) {
+      throw new Error("Cannot use `Schema.optionalKey` or `Schema.optional` with index signatures. Index signatures already allow keys to be absent; use `Schema.UndefinedOr` to allow `undefined` values.");
     }
   }
 };
@@ -6390,16 +6504,24 @@ function decodeTo(from, to, transformation) {
 function parseParameter(ast) {
   const literals = [];
   const parameters = [];
+  function addLiteral(literal) {
+    if (!literals.includes(literal)) {
+      literals.push(literal);
+    }
+  }
   function go(ast) {
     switch (ast._tag) {
       case "Literal":
-        if (isPropertyKey(ast.literal) && !literals.includes(ast.literal)) {
-          literals.push(ast.literal);
+        if (isPropertyKey(ast.literal)) {
+          addLiteral(ast.literal);
         }
         return;
       case "UniqueSymbol":
-        if (!literals.includes(ast.symbol)) {
-          literals.push(ast.symbol);
+        addLiteral(ast.symbol);
+        return;
+      case "Enum":
+        for (const [, value] of ast.enums) {
+          addLiteral(value);
         }
         return;
       case "Never":
@@ -6498,16 +6620,6 @@ var flip2 = /* @__PURE__ */ memoize((ast) => {
   }
   return "flip" in ast ? ast.flip(flip2) : ("recur" in ast) ? ast.recur(flip2) : ast;
 });
-function containsUndefined(ast) {
-  switch (ast._tag) {
-    case "Undefined":
-      return true;
-    case "Union":
-      return ast.types.some(containsUndefined);
-    default:
-      return false;
-  }
-}
 function fromConst(ast, value) {
   const succeed = value === 0 ? sameExit : succeed7(value);
   return (input, options) => {
@@ -6816,6 +6928,9 @@ class CompilerEntry extends InterpretedEntry {
   get make() {
     return this.save("make", this.operation("make"));
   }
+  get compiledMakeEffect() {
+    return this.save("compiledMakeEffect", this.operation("makeEffect"));
+  }
   get decodeEffect() {
     return this.save("decodeEffect", this.operation("decodeEffect") ?? compile(this.ast, (ast) => lazyParser(this.resolve, ast, "parser")));
   }
@@ -6824,7 +6939,7 @@ class CompilerEntry extends InterpretedEntry {
     return decode === undefined ? this.decodeEffect : this.save("parser", withDecode(decode, () => this.decodeEffect));
   }
   get makeEffect() {
-    const makeEffect = this.operation("makeEffect");
+    const makeEffect = this.compiledMakeEffect;
     if (makeEffect !== undefined)
       return this.save("makeEffect", makeEffect);
     const child = (ast) => lazyParser(this.resolve, ast, "makeEffect");
@@ -6990,32 +7105,35 @@ function runSync2(effect, message) {
     cause: issue
   });
 }
+var constructorDefectMessage = "Constructor adapter can only throw schema issues";
+function throwConstructorDefect(error) {
+  throw new Error(constructorDefectMessage, {
+    cause: die2(error)
+  });
+}
 function makeConstructorSync(ast) {
   let entry;
-  let parser;
-  return (input, options) => {
-    entry ??= resolve2(ast);
-    const parseOptions = options?.disableChecks ? options.parseOptions ? {
-      ...options.parseOptions,
-      disableChecks: true
-    } : {
-      disableChecks: true
-    } : options?.parseOptions ?? defaultParseOptions;
-    const make = entry.make;
-    if (make !== undefined && input !== missing) {
-      let output;
-      try {
-        output = make(input, parseOptions);
-      } catch (error) {
-        getSchemaIssueOrThrow(die2(error), "Constructor adapter can only throw schema issues");
-        throw error;
-      }
-      if (output !== invalid2 && output !== missing)
-        return output;
+  return (input, options) => constructSync(entry ??= resolve2(ast), input, options);
+}
+function constructSync(entry, input, options) {
+  const parseOptions = options?.disableChecks ? options.parseOptions ? {
+    ...options.parseOptions,
+    disableChecks: true
+  } : {
+    disableChecks: true
+  } : options?.parseOptions ?? defaultParseOptions;
+  const make = entry.make;
+  if (make !== undefined && input !== missing) {
+    let output;
+    try {
+      output = make(input, parseOptions);
+    } catch (error) {
+      throwConstructorDefect(error);
     }
-    const result = (parser ??= entry.makeEffect)(input, parseOptions);
-    return runSync2(parserResult(result, input), "Constructor adapter can only throw schema issues");
-  };
+    if (output !== invalid2 && output !== missing)
+      return output;
+  }
+  return runSync2(parserResult(entry.makeEffect(input, parseOptions), input), constructorDefectMessage);
 }
 var normalCompiler = (ast) => resolve2(ast).parser;
 var constructorCompiler = (ast) => resolve2(ast).makeEffect;
@@ -7262,7 +7380,7 @@ function isPattern2(regExp, annotations) {
   const source = regExp.source;
   const flags = regExp.flags;
   const canExport = /^[dg]*uy?$/.test(flags);
-  const runtimeRegExp = flags === "" ? `new RegExp(${format(source)})` : `new RegExp(${format(source)}, ${format(flags)})`;
+  const runtimeRegExp = flags === "" ? `new globalThis.RegExp(${format(source)})` : `new globalThis.RegExp(${format(source)}, ${format(flags)})`;
   return isPattern(regExp, {
     toJsonSchema: () => canExport ? {
       pattern: flags.endsWith("y") ? `^(?:${source})` : source
@@ -7400,8 +7518,7 @@ var URL2 = /* @__PURE__ */ instanceOf(globalThis.URL, {
   toCodecJson: () => link()(URLString, urlFromString)
 });
 var JsonString = /* @__PURE__ */ String4.annotate({
-  expected: "a string that will be decoded as JSON",
-  contentMediaType: "application/json"
+  expected: "a string that will be decoded as JSON"
 });
 function fromJsonString2(schema, options) {
   return JsonString.pipe(decodeTo2(schema, fromJsonString(options)));
@@ -13857,7 +13974,7 @@ var OVERVIEW_COMMANDS = [
   }
 ];
 
-var session_cloud_identity_default = "This session runs on claude.ai. Its git committer is the platform's Claude, and the signature that makes branch commits Verified belongs to that committer, so leave the committer alone. Commits still need the user as author, set once per clone from the GitHub connector: call `get_me` (`mcp__github__get_me`), then run `holyagent vcs identity --name '<name>' --email \"<id>+<login>@users.noreply.github.com\"` with the name, id and login it returns (the login when the name is empty). Single-quote the name and write each single quote inside it as `'\\''`: a name with `$`, a backtick or a double quote breaks double quotes. The command writes `author.name` and `author.email` to the clone's local git config, never to a file of the repository. `holyagent vcs commit` refuses a commit whose author is missing or looks like an agent's. The no-attribution rule covers the author and the commit text; the Claude committer is the one exception.\n";
+var session_cloud_identity_default = "This session runs on claude.ai. Its git committer is the platform's Claude, and the signature that makes branch commits Verified belongs to that committer, so leave the committer alone. Commits still need the user as author, set once per clone from the GitHub connector: call `get_me` (`mcp__github__get_me`), then run `holyagent vcs identity --name '<name>' --email \"<id>+<login>@users.noreply.github.com\"` with the name, id and login it returns (the login when the name is empty). Single-quote the name and write each single quote inside it as `'\\''`: a name with `$`, a backtick or a double quote breaks double quotes. The command writes `author.name` and `author.email` to the clone's local git config, never to a file of the repository. `holyagent vcs commit` refuses a commit whose author is missing or is the agent's. The no-attribution rule covers the author and the commit text; the Claude committer is the one exception.\n";
 
 var session_reminder_default = `Rules most often missed that the core root rules leave out, restated at every session start:
 
@@ -19621,6 +19738,8 @@ var childScope = (parent, isFunction) => ({
 var binding = (scope, name) => scope === undefined ? undefined : scope.names.get(name) ?? binding(scope.parent, name);
 var varScope = (scope) => scope.isFunction || scope.parent === undefined ? scope : varScope(scope.parent);
 var rootName = (node) => node?.type === "MemberExpression" ? rootName(nodeAt(node, "object")) : nameOf(node);
+var startOf = (node) => typeof node["start"] === "number" ? node["start"] : 0;
+var endOf = (node) => typeof node["end"] === "number" ? node["end"] : 0;
 var integerLiteral = (node) => {
   const value = node?.type === "Literal" ? node["value"] : undefined;
   return typeof value === "number" && Number.isSafeInteger(value) ? value : undefined;
@@ -19815,6 +19934,14 @@ var inspect = (script) => {
   const everyWalk = [];
   const growths = [];
   const combinations = [];
+  const combine = (at, combination) => {
+    combinations.push({ ...combination, at });
+  };
+  const stores = [];
+  const flows = [];
+  const applications = [];
+  const functionNodes = [];
+  const parametersOf = new Map;
   const dynamicIn = [];
   const allowedFunctions = new Set;
   const namedFunctions = new Set;
@@ -19852,7 +19979,8 @@ var inspect = (script) => {
       scope,
       use,
       within: functionsAround,
-      factor: loopWork
+      factor: loopWork,
+      start: startOf(node)
     };
     references.push(reference);
     if (use !== "callee")
@@ -19951,9 +20079,13 @@ var inspect = (script) => {
           allowedFunctions.add(init);
           namedFunctions.add(init);
           target.names.get(nameOf(id) ?? "")?.functions.add(init);
-        } else
+        } else {
           for (const name of copiedNames(id))
             target.names.get(name)?.sources.push({ node: init, scope });
+          const names = new Set;
+          assignedNames(id, names);
+          stores.push({ names: [...names], scope, value: init });
+        }
       }
       expression(init, scope, depth + 1);
     }
@@ -19969,6 +20101,11 @@ var inspect = (script) => {
     }
     for (const parameter of nodesAt(node, "params"))
       declarePattern(parameter, inner, inner, depth + 1, "unsafe");
+    const parameterNames = new Set;
+    for (const parameter of nodesAt(node, "params"))
+      assignedNames(parameter, parameterNames);
+    functionNodes.push(node);
+    parametersOf.set(node, [...parameterNames].flatMap((name) => inner.names.get(name) ?? []));
     const outerWork = loopWork;
     const outerContext = context;
     if (node.type === "FunctionDeclaration" || namedFunctions.has(node)) {
@@ -20061,6 +20198,14 @@ var inspect = (script) => {
       return refuse("makes an optional call");
     const given = nodesAt(node, "arguments");
     const values = definedNodes(given.map(unspread));
+    const receiver = callee?.type === "MemberExpression" ? nodeAt(callee, "object") : undefined;
+    const handed = [
+      ...receiver === undefined ? [] : [receiver],
+      ...values.filter((argument) => !isFunctionLiteral(argument))
+    ];
+    const nameCalled = nameOf(callee);
+    if (nameCalled !== undefined)
+      applications.push({ node, name: nameCalled, scope, inputs: values });
     let callbacks = [];
     let passes = 1;
     if (callee?.type === "Identifier") {
@@ -20078,7 +20223,7 @@ var inspect = (script) => {
       if (name === "parallel")
         callbacks = given.flatMap((argument) => argument?.type === "ArrayExpression" ? nodesAt(argument, "elements") : []);
       if (values.length > 1)
-        combinations.push({ operands: values, scope, callee: name });
+        combine(node, { operands: values, scope, callee: name });
     } else if (callee?.type === "MemberExpression") {
       memberExpression(callee, scope, depth + 1, true);
       const computed = callee["computed"] === true;
@@ -20113,9 +20258,9 @@ var inspect = (script) => {
           passes = DATA_ITERATIONS;
       }
       if (COMBINING_METHODS.has(method) && object !== undefined)
-        combinations.push({ operands: [object, ...values], scope, merging: true });
+        combine(node, { operands: [object, ...values], scope, merging: true });
       else if (owner === "Array" && method === "of")
-        combinations.push({ operands: values, scope });
+        combine(node, { operands: values, scope });
       if (GROWING_METHODS.has(method) && object !== undefined) {
         const site = {
           names: identifiersIn(object),
@@ -20126,14 +20271,19 @@ var inspect = (script) => {
         growths.push(site);
         for (const walk of walks)
           walk.sites.push(site);
+        stores.push({ names: identifiersIn(object), scope, value: node });
       }
     } else if (isFunctionLiteral(callee))
       functionNode(callee, scope, depth + 1);
     else
       return refuse("calls something it cannot vet");
     for (const argument of callbacks)
-      if (isFunctionLiteral(argument))
+      if (isFunctionLiteral(argument)) {
         allowedFunctions.add(argument);
+        flows.push({ inputs: handed, takers: () => parametersOf.get(argument) ?? [] });
+      }
+    if (isFunctionLiteral(callee))
+      flows.push({ inputs: values, takers: () => parametersOf.get(callee) ?? [] });
     const outerWork = loopWork;
     for (const argument of given) {
       if (passes > 1 && callbacks.includes(argument))
@@ -20171,7 +20321,7 @@ var inspect = (script) => {
           refuse("uses a regular expression or a bigint");
         return;
       case "TemplateLiteral":
-        combinations.push({
+        combine(node, {
           operands: definedNodes(nodesAt(node, "expressions")),
           scope,
           merging: true
@@ -20181,7 +20331,7 @@ var inspect = (script) => {
         return;
       case "ArrayExpression":
         if (!freshResults.has(node))
-          combinations.push({
+          combine(node, {
             operands: definedNodes(nodesAt(node, "elements").map(unspread)),
             scope,
             merging: nodesAt(node, "elements").some((element) => element?.type === "SpreadElement")
@@ -20191,7 +20341,7 @@ var inspect = (script) => {
         return;
       case "ObjectExpression":
         if (!freshResults.has(node))
-          combinations.push({
+          combine(node, {
             operands: definedNodes(nodesAt(node, "properties").map((property) => property?.type === "SpreadElement" ? nodeAt(property, "argument") : nodeAt(property ?? node, "value"))),
             scope,
             merging: nodesAt(node, "properties").some((property) => property?.type === "SpreadElement")
@@ -20213,7 +20363,7 @@ var inspect = (script) => {
       case "BinaryExpression":
       case "LogicalExpression":
         if (node["operator"] === "+")
-          combinations.push({
+          combine(node, {
             operands: definedNodes([nodeAt(node, "left"), nodeAt(node, "right")]),
             scope,
             merging: true
@@ -20230,9 +20380,17 @@ var inspect = (script) => {
           functionAssignments.push({ name: nameOf(left) ?? "", scope, node: right });
         }
         if (operator === "+=")
-          combinations.push({ operands: definedNodes([left, right]), scope, merging: true });
+          combine(node, { operands: definedNodes([left, right]), scope, merging: true });
         if ((operator === "=" || operator === "+=") && (functionsAround.length > 0 || loopDepth > 0) && replacesWithMore(right, left))
           refuse("replaces text with longer text again and again");
+        if (!isFunctionLiteral(right)) {
+          const names = new Set;
+          assignedNames(left, names);
+          const root = rootName(left);
+          if (root !== undefined)
+            names.add(root);
+          stores.push({ names: [...names], scope, value: node });
+        }
         writeTarget(left, scope, depth, operator === "=" ? () => builtHere(right, scope) : () => true, operator === "=" && !isFunctionLiteral(right) ? right : undefined);
         return expression(right, scope, depth + 1);
       }
@@ -20323,6 +20481,17 @@ var inspect = (script) => {
           writeTarget(left, loop, depth + 1, () => false);
         const right = nodeAt(node, "right");
         expression(right, loop, depth + 1);
+        if (right !== undefined) {
+          const taken = new Set;
+          assignedNames(left?.type === "VariableDeclaration" ? nodeAt(nodesAt(left, "declarations")[0] ?? left, "id") : left, taken);
+          const root = rootName(left);
+          if (root !== undefined)
+            taken.add(root);
+          flows.push({
+            inputs: [right],
+            takers: () => [...taken].flatMap((name) => binding(loop, name) ?? [])
+          });
+        }
         const walk = { walked: identifiersIn(right), scope, sites: [], calls: [] };
         const outerWork = loopWork;
         const outerWalks = walks;
@@ -20544,12 +20713,12 @@ var inspect = (script) => {
       return ids.size - 1;
     };
     const readings = (operand, scope, deep) => {
-      const found = new Set;
+      const found = new Map;
       const visit = (name, at, path, seen) => {
         const key = keyOf(name, at);
         if (key === undefined || !spend())
           return;
-        found.add(`${idOf(key)}:${path.join(".")}`);
+        found.set(`${idOf(key)}:${path.join(".")}`, key);
         if (typeof key === "string" || seen.has(key))
           return;
         seen.add(key);
@@ -20563,18 +20732,113 @@ var inspect = (script) => {
         visit(origin.name, origin.scope, origin.path, new Set);
       return found;
     };
+    const doublings = [];
     for (const combination of combinations) {
       if (combination.callee !== undefined && (binding(combination.scope, combination.callee)?.functions.size ?? 0) === 0)
         continue;
       const owners = new Map;
+      const shared = new Set;
       for (const [index, operand] of combination.operands.entries())
-        for (const reading of readings(operand, combination.scope, combination.merging === true)) {
+        for (const [reading, key] of readings(operand, combination.scope, combination.merging === true)) {
           const owner = owners.get(reading);
           if (owner !== undefined && owner !== index)
-            return refuse("uses one value twice to build a bigger one");
+            shared.add(key);
           owners.set(reading, index);
         }
+      if (shared.size > 0)
+        doublings.push({ at: combination.at, shared: [...shared] });
     }
+    const byStart = (list, start) => [...list].sort((left, right) => start(left) - start(right));
+    const firstFrom = (list, start, at) => {
+      let low = 0;
+      let high = list.length;
+      while (low < high) {
+        const middle = low + high >> 1;
+        if (start(list[middle]) < at)
+          low = middle + 1;
+        else
+          high = middle;
+      }
+      return low;
+    };
+    const sites = byStart(doublings.map((doubling) => doubling.at), startOf);
+    const uses = byStart(references.flatMap((reference) => {
+      const held = binding(reference.scope, reference.name);
+      return held === undefined ? [] : [{ held, start: reference.start }];
+    }), (use) => use.start);
+    const applied = byStart(applications, (call) => startOf(call.node));
+    const readsCache = new Map;
+    const readsOf = (node) => {
+      const known = readsCache.get(node);
+      if (known !== undefined)
+        return known;
+      const start = startOf(node);
+      const end = endOf(node);
+      const reads = { doubles: false, held: new Set, calls: [] };
+      readsCache.set(node, reads);
+      for (let at = firstFrom(sites, startOf, start);at < sites.length && spend(); at++) {
+        const site = sites[at];
+        if (startOf(site) >= end)
+          break;
+        if (endOf(site) <= end)
+          reads.doubles = true;
+      }
+      for (let at = firstFrom(uses, (use) => use.start, start);at < uses.length && spend(); at++) {
+        const use = uses[at];
+        if (use === undefined || use.start >= end)
+          break;
+        reads.held.add(use.held);
+      }
+      for (let at = firstFrom(applied, (call) => startOf(call.node), start);at < applied.length; at++) {
+        const call = applied[at];
+        if (call === undefined || startOf(call.node) >= end || !spend())
+          break;
+        if (endOf(call.node) <= end)
+          reads.calls.push(call);
+      }
+      return reads;
+    };
+    const grown = new Set;
+    const handingBack = new Set;
+    const callsGrown = (call) => [...binding(call.scope, call.name)?.functions ?? []].some((callee) => handingBack.has(callee));
+    const isGrown = (node) => {
+      const reads = readsOf(node);
+      return reads.doubles || [...reads.held].some((held) => grown.has(held)) || reads.calls.some(callsGrown);
+    };
+    const handedTo = [
+      ...flows,
+      ...applications.map((call) => ({
+        inputs: call.inputs,
+        takers: () => [...binding(call.scope, call.name)?.functions ?? []].flatMap((callee) => parametersOf.get(callee) ?? [])
+      }))
+    ];
+    for (let changed = true;changed && spend(); ) {
+      changed = false;
+      for (const store of stores) {
+        const targets = store.names.flatMap((name) => binding(store.scope, name) ?? []);
+        if (targets.every((target) => grown.has(target)) || !isGrown(store.value))
+          continue;
+        for (const target of targets)
+          grown.add(target);
+        changed = true;
+      }
+      for (const flow of handedTo) {
+        const takers = flow.takers();
+        if (takers.every((taker) => grown.has(taker)) || !flow.inputs.some(isGrown))
+          continue;
+        for (const taker of takers)
+          grown.add(taker);
+        changed = true;
+      }
+      for (const callee of functionNodes)
+        if (!handingBack.has(callee) && isGrown(callee)) {
+          handingBack.add(callee);
+          changed = true;
+        }
+    }
+    for (const doubling of doublings)
+      if (doubling.shared.some((key) => typeof key !== "string" && grown.has(key)))
+        return refuse("uses one value twice to build a bigger one");
     if (analysisSteps > MAX_ANALYSIS_STEPS)
       refuse("is too tangled to check");
   }
