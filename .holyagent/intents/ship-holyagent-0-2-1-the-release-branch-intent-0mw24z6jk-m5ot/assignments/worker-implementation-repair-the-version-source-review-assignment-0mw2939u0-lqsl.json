@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-version-source-review",
   "objective": "Repair the version-source review findings in the worktree /home/user/holyagent-build-version-source (release/0.2.1/build/version-source).",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Review: /home/user/holyagent/.git/holyagent/reports/assignment-0mw28pe6t-fwpu.md.",
     "Blocking 1: the first build after a bump writes plugin.json and marketplace.json at the old version, because build.ts imports generate.ts (which imports the integration package.json) before the sync runs. Make the sync run before generation reads any version (a separate step in the mise build task, or a dynamic import after the sync), and add a test that bumps a temporary copy and builds once, then checks every copy, including the manifests.",
@@ -55,7 +55,37 @@
     "agentId": "workflow:wf_4c25f666-aa7/assignment-0mw2939u0-lqsl",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-04T15:07:26.472Z"
+    "startedAt": "2026-11-04T15:07:26.472Z",
+    "finishedAt": "2026-11-04T15:12:32.601Z"
+  },
+  "result": "result: Blocking 1 and findings 2-5 are fixed. `mise run verify` passes.\n\nchanged (all under /home/user/holyagent-build-version-source):\n- scripts/bump-version.ts\n- scripts/bump-version.test.ts\n- packages/integrations/claude/build.ts\n- mise.toml\n- packages/runtime/src/cli/program.ts\n- packages/integrations/claude/dist/scripts/holyagent.js (rebuilt)\n\nDiff file: /tmp/claude-0/-home-user-holyagent/70184bfa-8a56-57cb-a6cf-d92f87c7692b/scratchpad/version-source-repair.diff\n\nchecks:\n- `bunx --no-install mise run build` -> exit 0, 35 files built.\n- `bunx --no-install mise run verify` -> exit 0. Type-check, lint and format check are clean. Tests: 1127 pass, 1 skip, 0 fail. The suite took 126s.\n- `bun test scripts/bump-version.test.ts` -> 55 pass.\n- With the old static import restored in `build.ts`, the new test failed (manifests stayed at 0.2.1, expected 0.3.0). The fix was put back and the test passes again.\n\nblockers: none\nquestions: none\nnotes: Finding 5 was done with a named import of `version` from the root `package.json`. Bun tree-shakes the rest, so the bundle now holds `var version = \"0.2.1\"` and not the manifest. `bun dist/scripts/holyagent.js --version` prints 0.2.1.\n\nevidence:\n- A bump followed by one build leaves every copy, including the manifests, at the new version, with a test: `build.ts` now loads `generate.ts` by dynamic import inside `build()`, after `main` runs `syncVersions`. The new test in `scripts/bump-version.test.ts` (\"a bump followed by one build\") copies the sources to a temp dir with the dependencies linked, bumps minor, runs `build.ts` once, then checks the root, both workspace manifests, `plugin.json`, `marketplace.json` and the `bun.lock` workspaces. It fails on the old static import and passes now.\n- Findings 2 to 5 are fixed or explained: (2) `WORKSPACE_VERSION` accepts `\\r?\\n`, with a CRLF lockfile test. (3) `syncVersions` loads and checks every file before the first write, and the missing-copy test asserts nothing was written. (4) The `mise.toml` comment and both bump task descriptions now say a bump edits the root `package.json` and the build syncs the copies. (5) The version-only import in `program.ts`, as described in the note above.\n- mise run verify passes: exit 0, 1127 pass, 0 fail.\n- checks-run: the build, verify, and test commands above, plus the failure check against the old `build.ts`.\n- changed-paths: the six paths listed under `changed`.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Repair fixes blocking 1 with a test that fails on the old static import; verify exit 0",
+    "criteria": [
+      {
+        "criterion": "A bump followed by one build leaves every copy, including the manifests, at the new version, with a test",
+        "support": "`build.ts` now loads `generate.ts` by dynamic import inside `build()`, after `main` runs `syncVersions`. The new test in `scripts/bump-version.test.ts` (\"a bump followed by one build\") copies the sources to a temp dir with the dependencies linked, bumps minor, runs `build.ts` once, then checks the root, both workspace manifests, `plugin.json`, `marketplace.json` and the `bun.lock` workspaces. It fails on the old static import and passes now."
+      },
+      {
+        "criterion": "Findings 2 to 5 are fixed or explained",
+        "support": "(2) `WORKSPACE_VERSION` accepts `\\r?\\n`, with a CRLF lockfile test. (3) `syncVersions` loads and checks every file before the first write, and the missing-copy test asserts nothing was written. (4) The `mise.toml` comment and both bump task descriptions now say a bump edits the root `package.json` and the build syncs the copies. (5) The version-only import in `program.ts`, as described in the note above."
+      },
+      {
+        "criterion": "mise run verify passes",
+        "support": "exit 0, 1127 pass, 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "the build, verify, and test commands above, plus the failure check against the old `build.ts`."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the six paths listed under `changed`."
+      }
+    ]
   },
   "createdAt": "2026-11-04T15:07:26.472Z"
 }
