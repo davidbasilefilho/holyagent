@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mw293a4v-cfsz",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.code",
+  "slug": "review-commit-e265f2a-on-release-0-2-1",
+  "objective": "Review commit e265f2a on release/0.2.1/build/dependency-updater (worktree /home/user/holyagent-build-dependency-updater) against Part A4 of the 0.2.1 request.",
+  "state": "Running",
+  "scope": [
+    "Read /home/user/holyagent-work/spec-0.2.1.md Part A4. Diff without dist and bun.lock: /home/user/holyagent-work/diffs/deps.diff; run 'bun test scripts/' and 'bunx --no-install mise run deps:update -- --dry-run' and 'bunx --no-install mise run deps:check' there (network reads are fine; write nothing).",
+    "Check: the range test covers every dependency field in every package.json and the boundary rule exactly as specified (including ^0.0.X and workspace:*); line selection (major, minor for 0.x) and prerelease filtering; action tag to full SHA and version comment; vendored tools re-vendored with both checksums recomputed for every target; mise tools; package ranges and lockfile refresh; --dry-run writes nothing; check mode exits non-zero when behind; error handling (Effect tagged errors, Schema on every network response with onExcessProperty error); Windows behavior; duplication with scripts/vendor.ts and other helpers (B1); slow paths (redundant downloads or spawns)."
+  ],
+  "constraints": [
+    "Keep working until the review is done; stop to ask only when you cannot go on. When done, stop and report; name anything unrequested instead of doing it. Read-only: change no repository files and make no git writes.",
+    "Each finding: file:line, evidence, blocking or not, smallest fix. Report in under 500 words."
+  ],
+  "criteria": [
+    {
+      "text": "The range test and the updater implement A4 as specified, with tests that fail without the change",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The updater follows the repository code rules",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw28pegd-hygf"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T15:07:26.863Z"
+  },
+  "createdAt": "2026-11-04T15:07:26.863Z"
+}
