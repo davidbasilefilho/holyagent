@@ -1,0 +1,62 @@
+{
+  "id": "assignment-0mw2e2brx-3vld",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "narrow-the-workflow-hook-s-uses-one",
+  "objective": "Narrow the workflow hook's 'uses one value twice to build a bigger one' refusal so real root scripts auto-allow again while unbounded growth stays refused, in /home/user/holyagent-fix-audit (branch release/0.2.1/fix/audit, head 0907b72).",
+  "state": "Running",
+  "scope": [
+    "Your previous report is /home/user/holyagent/.git/holyagent/reports/assignment-0mw2cxpkv-v9vt.md; the change is committed in ec37855. Running every real workflow script of this session (/root/.claude/projects/-home-user-holyagent/70184bfa-8a56-57cb-a6cf-d92f87c7692b/workflows/scripts/*.js) through the check refused 6 of 41 (phase12-deps-reviews, phase2-writers-and-audit, phase3-bump-and-reviews, phase4-repairs, phase5-rereviews, phase7-skill-reviews) with 'uses one value twice to build a bigger one'. Their shape is 'const p = (id) => \"... Assignment: \" + id + \".\\nRead the brief at .../briefs/\" + id + \".md ...\"', called once per Assignment, plus '.then(() => done.push(\"...\"))'. A scratch runner that calls the check is at /home/user/holyagent-work/check-workflow-scripts.ts (results in workflow-check-results.txt); reuse it.",
+    "Growth is only unbounded when a doubled value feeds back into itself: it is stored back into a binding it came from (directly, through a copy, or into a collection that is then doubled again) inside a loop or a function that runs more than once, or straight-line chains double an already doubled value (for example 'const b = a + a; const c = b + b; ...', which grows exponentially within the script-size limit). Using a parameter or an untouched binding twice in one expression whose result is not fed back is bounded by the script's own size. Refine the rule along these lines (for example, mark a binding as grown when it is built from a value used twice, and refuse using a grown value twice or storing a doubled value back into its source in a loop or repeated function); keep every existing refusal test for gap 3 refusing.",
+    "Add tests: the six real script shapes stay allowed (inline minimal copies in packages/runtime/tests/workflow-check.test.ts, not file reads of the session folder), and a straight-line doubling chain is refused. Re-run the scratch runner over all 41 real scripts; all must be allowed.",
+    "Also give the git-spawning test files the longer Windows timeout: on PR CI, packages/runtime/tests/vcs-commit.test.ts timed out twice at Bun's default 5000 ms on windows-latest ('Intent state never rides along...' and 'a path under .holyagent is refused, so a work branch never carries Intent state'). packages/runtime/tests/cli.test.ts and the state tests already raise the timeout on Windows with setDefaultTimeout; apply the same value and condition to vcs-commit.test.ts and every other test file under packages/runtime/tests that spawns git and lacks it. Change no test bodies.",
+    "A docs writer edits instruction text, docs and generated dist in the same worktree at the same time. Do not run mise run build and do not edit files outside your ownership paths. Run 'bun test' on the touched test files and 'bunx --no-install mise run check', 'lint' and 'fmt:check' (see docs/development.md); a failure confined to the docs writer's files is not yours."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md: Effect for effects and tagged errors, no try/catch, new Promise, Promise statics or async functions in runtime source, JSDoc on every exported item.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report; name unrequested features, tests, files or refactors instead of adding them. Do not stop at a summary that announces the next step.",
+    "Make no commits or other git writes and no edits under .git/ or .holyagent/; the root commits.",
+    "Work only inside /home/user/holyagent-fix-audit; scratch files go in /home/user/holyagent-work/.",
+    "Report in under 350 words; diff to /home/user/holyagent-work/diffs/audit-hook2.diff."
+  ],
+  "criteria": [
+    {
+      "text": "All 41 real root workflow scripts auto-allow and the six refused shapes have allow tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Every gap 1-6 refusal test still refuses and a straight-line doubling chain is refused with a test",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Every git-spawning test file under packages/runtime/tests uses the shared Windows timeout with no test body changed",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The change stays in the owned files and follows the repository code rules",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli/workflow-check.ts",
+    "packages/runtime/tests"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw2cxpkv-v9vt",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T17:26:40.414Z"
+  },
+  "createdAt": "2026-11-04T17:26:40.414Z"
+}
