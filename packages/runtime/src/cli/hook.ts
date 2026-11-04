@@ -1,5 +1,4 @@
 import { stat } from "node:fs/promises"
-import { join } from "node:path"
 
 import { Effect, Schema } from "effect"
 
@@ -9,7 +8,7 @@ import stateChanges from "../instructions/claude-5.5/specialist/state-changes.md
 import { setupNotice } from "../setup/check.ts"
 import { claimRulesDelivery, isSessionId, markRulesDelivered } from "../state/delivery.ts"
 import { hasCode, io } from "../state/files.ts"
-import { STATE_DIRECTORY } from "../state/layout.ts"
+import { stateDirectory } from "../state/layout.ts"
 import { legacyFoldersWithState } from "../state/legacy.ts"
 import { deadlineIn, HOOK_WAIT_MS } from "../state/lock.ts"
 import { readOpenState, updateState } from "../state/store.ts"
@@ -155,7 +154,7 @@ const postToolUse = (additionalContext: string) =>
  * of every holyagent specialist at its start; the text is the specialist section itself, so the
  * rule has one owner.
  */
-export const SPECIALIST_RULES: string = stateChanges.trim()
+const SPECIALIST_RULES: string = stateChanges.trim()
 
 /**
  * The sentences on hooks, signing and history rewrites that the root prompt and the
@@ -173,7 +172,7 @@ const HISTORY_RULES: string = historyRules
  * identity rules and of the specialist state-change rule; the rest is the {@link HISTORY_RULES} the
  * root prompt holds in the same words.
  */
-export const VCS_REMINDER = `Version control is the root's: it commits with \`holyagent vcs commit\`, never force-pushes and pushes to a protected branch only with the user's approval; a specialist makes no version-control writes. ${HISTORY_RULES}`
+const VCS_REMINDER = `Version control is the root's: it commits with \`holyagent vcs commit\`, never force-pushes and pushes to a protected branch only with the user's approval; a specialist makes no version-control writes. ${HISTORY_RULES}`
 
 /**
  * The sentence the reminder gains when a commit, push or PR concerns a branch the platform assigned
@@ -363,12 +362,18 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
         if (agentId === undefined) return yield* new AgentIdMissing()
         // One deadline for every lock this hook takes, so the waits add up to less than the host's timeout.
         const patience = yield* deadlineIn(HOOK_WAIT_MS)
-        const { directory } = yield* resolveState(call.cwd, call.env, "ifPresent", false, patience)
+        const { directory, resolved } = yield* resolveState(
+          call.cwd,
+          call.env,
+          "ifPresent",
+          false,
+          patience,
+        )
         // The state folder is not made here: a project without one has no Assignment to record.
         if (!(yield* hasStateFolder(directory))) return yield* new StateFolderMissing()
         const type = payload.tool_input?.subagent_type
         yield* recordLaunch(
-          (transition) => updateState(directory, transition, call.env, patience),
+          (transition) => updateState(directory, transition, call.env, patience, resolved),
           id,
           agentId,
           {
@@ -465,7 +470,7 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
           .join("\n")
         const phrases = forbiddenPhrases(
           message,
-          (yield* readSettings([join(call.root, STATE_DIRECTORY)])).allowWords,
+          (yield* readSettings([stateDirectory(call.root)])).allowWords,
         )
         if (phrases.length > 0) return yield* new MessageRefused({ phrases })
         if (cleaned !== above.trim() || cleanedBelow !== below.trim())

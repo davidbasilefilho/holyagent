@@ -1,12 +1,10 @@
-import { join } from "node:path"
-
 import { Effect } from "effect"
 
 import { type FlagShape, readFlags } from "../cli/args.ts"
 import { Usage } from "../cli/errors.ts"
 import { type Call, type Command } from "../cli/types.ts"
 import { present } from "../cli/views.ts"
-import { STATE_DIRECTORY } from "../state/layout.ts"
+import { stateDirectory } from "../state/layout.ts"
 import { requiredValue, valueOf } from "./arguments.ts"
 import { IDENTITY_USAGE, setAuthor } from "./author.ts"
 import { commit } from "./commit.ts"
@@ -20,7 +18,7 @@ import { readSettings } from "./settings.ts"
  * The folder that holds the config file: `.holyagent` of the work tree. The config file is the
  * project's settings, not state, so it is never read from the state worktree.
  */
-const settingsFolders = (call: Call) => [join(call.root, STATE_DIRECTORY)]
+const settingsFolders = (call: Call) => [stateDirectory(call.root)]
 
 /** Reads the raw arguments of a command against its flags, refusing more positionals than it takes. */
 const arguments_ = (

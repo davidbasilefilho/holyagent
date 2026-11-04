@@ -12,8 +12,11 @@ import { PLUGIN_NAMESPACE } from "./assignment.ts"
 // does (a node outside the set, a name that resolves to nothing known, a computed member access,
 // a parse error, a script too large or too deep) is a refusal, and a refusal only means the normal
 // permission flow. A script that could hang or exhaust memory is not plain either: a loop must be a
-// counted `for` over literal bounds, and `repeat`, `padStart` and `padEnd` take a small literal
-// count. Nothing here runs the script.
+// counted `for` over literal bounds, `repeat` repeats a short literal a small literal number of
+// times and `padStart` and `padEnd` take a small literal count, no function calls itself (directly,
+// through other functions or through a function value), a value is not built from itself twice
+// (`[...a, ...a]`, `a.concat(a)`), an array is not given a length or a far index, and what loops,
+// data iteration and calls multiply stays under a total. Nothing here runs the script.
 
 /** A node of the syntax tree, read loosely: the walk checks every type before it reads a field. */
 interface JsNode {
@@ -56,11 +59,83 @@ const MAX_LOOP_COUNT = 1_000
 const MAX_NESTED_ITERATIONS = 10_000
 const MAX_TEXT_COUNT = 1_000
 
+/** The longest literal `repeat` may repeat, and the highest index a script may write into an array. */
+const MAX_REPEATED_TEXT = 8
+const MAX_WRITE_INDEX = 1_000
+
+/**
+ * The iterations a pass over data (a for-of or for-in loop, a callback method, a pipeline stage) is
+ * counted as, since its length is not known: two nested passes fit the total, three do not.
+ */
+const DATA_ITERATIONS = 100
+
+/** The most steps the alias and duplicate checks take; a script that needs more is refused. */
+const MAX_ANALYSIS_STEPS = 200_000
+
 /** The string methods whose first argument is a length or a count. */
 const TEXT_COUNTS: ReadonlySet<string> = new Set(["repeat", "padStart", "padEnd"])
 
 /** The array methods that add elements to the array they are called on. */
 const GROWING_METHODS: ReadonlySet<string> = new Set(["push", "unshift", "splice"])
+
+/**
+ * The methods that run a callback, and which arguments are callbacks (`all` for every argument):
+ * the only calls that may be given a function value, which they run at once and do not keep.
+ */
+const CALLBACK_ARGUMENTS: ReadonlyMap<string, number | "all"> = new Map<string, number | "all">([
+  ["map", 0],
+  ["filter", 0],
+  ["flatMap", 0],
+  ["forEach", 0],
+  ["reduce", 0],
+  ["find", 0],
+  ["findIndex", 0],
+  ["some", 0],
+  ["every", 0],
+  ["sort", 0],
+  ["from", 1],
+  ["then", "all"],
+  ["catch", "all"],
+  ["finally", "all"],
+])
+
+/** The callback methods whose callback hands back one fresh value for each element or promise. */
+const RESULT_METHODS: ReadonlySet<string> = new Set(["map", "then", "catch", "finally", "from"])
+
+/** The callback methods that pass over data, one call of the callback for each element. */
+const ITERATING_METHODS: ReadonlySet<string> = new Set([
+  "map",
+  "filter",
+  "flatMap",
+  "forEach",
+  "reduce",
+  "find",
+  "findIndex",
+  "some",
+  "every",
+  "sort",
+  "from",
+])
+
+/** The methods whose result holds the elements of their receiver, a copy to the eyes of a check. */
+const COPYING_METHODS: ReadonlySet<string> = new Set([
+  "slice",
+  "concat",
+  "flat",
+  "sort",
+  "reverse",
+  "filter",
+])
+
+/** The methods that put their arguments into their receiver or into the value they return. */
+const COMBINING_METHODS: ReadonlySet<string> = new Set([
+  "concat",
+  "push",
+  "unshift",
+  "splice",
+  "replace",
+  "replaceAll",
+])
 
 /** The globals of the workflow runtime and the plain built-ins a script may use, free. */
 const GLOBALS: ReadonlySet<string> = new Set([
@@ -207,14 +282,18 @@ const CALLABLE_PROPERTIES: ReadonlySet<string> = new Set([
   "toString",
 ])
 
-/** The methods of a global object a script may call; any other member of it is refused. */
+/**
+ * The methods of a global object a script may call; any other member of it is refused. `race` is
+ * not among them: given nothing to race it never settles, and a script cannot tell that from its
+ * source.
+ */
 const GLOBAL_CALLS: Readonly<Record<string, ReadonlySet<string>>> = {
   Object: new Set(["keys", "values", "entries", "fromEntries"]),
   Array: new Set(["isArray", "from", "of"]),
   JSON: new Set(["stringify", "parse"]),
   Math: new Set(["max", "min", "abs", "floor", "ceil", "round", "trunc", "sqrt", "pow", "sign"]),
   Number: new Set(["isInteger", "isFinite", "isNaN", "parseFloat", "parseInt"]),
-  Promise: new Set(["all", "allSettled", "race", "resolve", "reject"]),
+  Promise: new Set(["all", "allSettled", "resolve", "reject"]),
   budget: new Set(["spent", "remaining"]),
 }
 
@@ -290,7 +369,18 @@ interface Binding {
   unsafe: boolean
   /** Every value the name is set to, as a test of whether the script built it; run after the walk. */
   readonly inits: Array<() => boolean>
+  /** The functions of the script the name is bound to. */
+  readonly functions: Set<JsNode>
+  /** Every expression the name is set to, to follow a value through the names that alias it. */
+  readonly sources: Array<{ readonly node: JsNode; readonly scope: Scope }>
 }
+
+const newBinding = (): Binding => ({
+  unsafe: false,
+  inits: [],
+  functions: new Set(),
+  sources: [],
+})
 
 /** The names a scope holds, and the scope around it. */
 interface Scope {
@@ -303,11 +393,56 @@ interface Scope {
 /** How a name is used: as a value, called, read from (`name.x`) or written to. */
 type Use = "value" | "callee" | "object" | "write"
 
+/** The work a function of the script does once, as the iterations its loops and calls multiply to. */
+interface WorkContext {
+  max: number
+  /** The calls of script functions in it, each with the iterations around the call. */
+  readonly calls: Array<Reference>
+}
+
+/** A for-of loop, the names it walks and what its body does that could lengthen what it walks. */
+interface Walk {
+  readonly walked: ReadonlyArray<string>
+  readonly scope: Scope
+  readonly sites: Array<GrowthSite>
+  readonly calls: Array<Reference>
+}
+
+/** A call of `push`, `unshift` or `splice`: the names its receiver is made of, and where it stands. */
+interface GrowthSite {
+  readonly names: ReadonlyArray<string>
+  /** True when the receiver is not a name or a member of one, so no name says what grows. */
+  readonly opaque: boolean
+  readonly scope: Scope
+  readonly within: ReadonlyArray<JsNode>
+}
+
 /** A use of a name, resolved against the scopes once the whole script has been walked. */
 interface Reference {
   readonly name: string
   readonly scope: Scope
   readonly use: Use
+  /** The functions of the script the use stands in, outermost first. */
+  readonly within: ReadonlyArray<JsNode>
+  /** The iterations the loops and passes around the use run together. */
+  readonly factor: number
+}
+
+/** A value used as more than one part of the value built from it (`[a, a]`, `a.concat(a)`). */
+interface Combination {
+  readonly operands: ReadonlyArray<JsNode>
+  readonly scope: Scope
+  /** Set for a call by name: it counts only when the name is a function of the script. */
+  readonly callee?: string | undefined
+  /** True when the operands are merged into one value, so a copy of one is the one. */
+  readonly merging?: boolean
+}
+
+/** Where a name is read, as the path of fields under it (`a.b.c` is `a` and `["b", "c"]`). */
+interface Occurrence {
+  readonly name: string
+  readonly scope: Scope
+  readonly path: ReadonlyArray<string>
 }
 
 const childScope = (parent: Scope, isFunction: boolean): Scope => ({
@@ -436,26 +571,144 @@ const setsName = (body: unknown, name: string): boolean =>
     return names.has(name)
   })
 
-/** Whether the body adds elements to, or writes into, the value rooted at the name. */
-const growsName = (body: unknown, name: string): boolean =>
-  anyNode(body, (node) => {
-    if (node.type === "CallExpression") {
-      const callee = nodeAt(node, "callee")
-      return (
-        callee?.type === "MemberExpression" &&
-        callee["computed"] !== true &&
-        GROWING_METHODS.has(nameOf(nodeAt(callee, "property")) ?? "") &&
-        rootName(nodeAt(callee, "object")) === name
-      )
-    }
-    const target =
-      node.type === "AssignmentExpression"
-        ? nodeAt(node, "left")
-        : node.type === "UpdateExpression"
-          ? nodeAt(node, "argument")
-          : undefined
-    return target?.type === "MemberExpression" && rootName(target) === name
+/** Whether the node is a function written in place: an arrow function or a function expression. */
+const isFunctionLiteral = (node: JsNode | undefined): node is JsNode =>
+  node?.type === "ArrowFunctionExpression" || node?.type === "FunctionExpression"
+
+/**
+ * The names a declaration sets to the whole value, not a part of it: a plain name, or the rest of a
+ * pattern (`const [first, ...others] = list` sets `others` to a copy of the list less one).
+ */
+const copiedNames = (pattern: JsNode | undefined): ReadonlyArray<string> => {
+  if (pattern?.type === "Identifier") return [nameOf(pattern) ?? ""]
+  const entries = nodesAt(
+    pattern ?? { type: "" },
+    pattern?.type === "ArrayPattern" ? "elements" : "properties",
+  )
+  return entries.flatMap((entry) => {
+    const into = new Set<string>()
+    if (entry?.type === "RestElement") assignedNames(entry, into)
+    return [...into]
   })
+}
+
+/** The node a spread element spreads, or the node itself. */
+const unspread = (node: JsNode | undefined): JsNode | undefined =>
+  node?.type === "SpreadElement" ? nodeAt(node, "argument") : node
+
+/** The nodes of the list that are there; a hole in an array is not. */
+const definedNodes = (list: ReadonlyArray<JsNode | undefined>): ReadonlyArray<JsNode> =>
+  list.filter((node): node is JsNode => node !== undefined)
+
+/**
+ * Whether the value replaces a literal in the text of the target with a longer literal (`s =
+ * s.replaceAll("a", "bb")`), which done over and over grows the text by a factor each time.
+ */
+const replacesWithMore = (value: JsNode | undefined, target: JsNode | undefined): boolean => {
+  const roots = identifiersIn(target)
+  return anyNode(value, (node) => {
+    const callee = node.type === "CallExpression" ? nodeAt(node, "callee") : undefined
+    const method =
+      callee?.type === "MemberExpression" ? nameOf(nodeAt(callee, "property")) : undefined
+    if (method !== "replace" && method !== "replaceAll") return false
+    const [pattern, replacement] = nodesAt(node, "arguments")
+    const from = pattern?.type === "Literal" ? pattern["value"] : undefined
+    const to = replacement?.type === "Literal" ? replacement["value"] : undefined
+    return (
+      typeof from === "string" &&
+      typeof to === "string" &&
+      to.length > from.length &&
+      identifiersIn(nodeAt(callee ?? node, "object")).some((name) => roots.includes(name))
+    )
+  })
+}
+
+/** Whether the node is a name or fields of one (`a`, `a.b`, `a[0]`), nothing computed. */
+const isChain = (node: JsNode | undefined): boolean =>
+  node?.type === "Identifier" ||
+  (node?.type === "MemberExpression" && isChain(nodeAt(node, "object")))
+
+/** The field a member reads, as text. */
+const fieldOf = (member: JsNode): string => {
+  const property = nodeAt(member, "property")
+  return member["computed"] === true && property?.type === "Literal"
+    ? String(property["value"])
+    : (nameOf(property) ?? "?")
+}
+
+/**
+ * The names read anywhere under the node. The field of a member and the key of an object are not
+ * names; every other identifier is, parameters of a function written in it included.
+ */
+const identifiersIn = (node: unknown, into: Array<string> = [], depth = 0): Array<string> => {
+  if (depth > MAX_DEPTH) return into
+  if (Array.isArray(node)) {
+    for (const item of node) identifiersIn(item, into, depth + 1)
+    return into
+  }
+  if (!isNode(node)) return into
+  if (node.type === "Identifier") {
+    into.push(nameOf(node) ?? "")
+    return into
+  }
+  const skipped =
+    node.type === "MemberExpression" && node["computed"] !== true
+      ? "property"
+      : node.type === "Property" && node["computed"] !== true
+        ? "key"
+        : undefined
+  for (const [field, value] of Object.entries(node))
+    if (field !== skipped && typeof value === "object") identifiersIn(value, into, depth + 1)
+  return into
+}
+
+/**
+ * Where names are read under the node, with the fields under them: `a.b.c` reads `a` at `b.c`, and
+ * `a.slice()` reads `a` at nothing, since a method is not a field. A function written in place is
+ * left out; the walk checks its own body.
+ */
+const occurrencesIn = (
+  node: unknown,
+  scope: Scope,
+  into: Array<Occurrence>,
+  depth = 0,
+): Array<Occurrence> => {
+  if (depth > MAX_DEPTH) return into
+  if (Array.isArray(node)) {
+    for (const item of node) occurrencesIn(item, scope, into, depth + 1)
+    return into
+  }
+  if (!isNode(node)) return into
+  if (node.type === "ArrowFunctionExpression" || node.type === "FunctionExpression") return into
+  if (node.type === "Identifier") {
+    into.push({ name: nameOf(node) ?? "", scope, path: [] })
+    return into
+  }
+  if (node.type === "MemberExpression") {
+    const path: Array<string> = []
+    let at: JsNode | undefined = node
+    while (at?.type === "MemberExpression") {
+      path.unshift(fieldOf(at))
+      at = nodeAt(at, "object")
+    }
+    if (at?.type === "Identifier") into.push({ name: nameOf(at) ?? "", scope, path })
+    else occurrencesIn(at, scope, into, depth + 1)
+    return into
+  }
+  if (node.type === "CallExpression") {
+    const callee = nodeAt(node, "callee")
+    // The name of a function called is no value of the call; a method is no field of its receiver.
+    if (callee?.type === "MemberExpression")
+      occurrencesIn(nodeAt(callee, "object"), scope, into, depth + 1)
+    else if (callee?.type !== "Identifier") occurrencesIn(callee, scope, into, depth + 1)
+    occurrencesIn(node["arguments"], scope, into, depth + 1)
+    return into
+  }
+  const skipped = node.type === "Property" && node["computed"] !== true ? "key" : undefined
+  for (const [field, value] of Object.entries(node))
+    if (field !== skipped && typeof value === "object") occurrencesIn(value, scope, into, depth + 1)
+  return into
+}
 
 /**
  * Why a script is not plain (the first reason found), or undefined when it is: the script parsed as
@@ -477,11 +730,50 @@ const inspect = (script: string): string | undefined => {
   }
   const references: Array<Reference> = []
   // Assignments to a name and writes into a member, checked once every name is known.
-  const assignments: Array<{ name: string; scope: Scope; builtHere: () => boolean }> = []
+  const assignments: Array<{
+    name: string
+    scope: Scope
+    right: JsNode | undefined
+    builtHere: () => boolean
+  }> = []
   const memberWrites: Array<{ root: string | undefined; scope: Scope }> = []
   let agentCalls = 0
-  // The iterations the counted loops around the statement being walked run together.
+  // The iterations the loops and passes over data around the statement being walked run together,
+  // counted from the start of the function of the script it stands in.
   let loopWork = 1
+  const rootContext: WorkContext = { max: 1, calls: [] }
+  let context = rootContext
+  const contexts = new Map<JsNode, WorkContext>()
+  // The functions of the script around the statement being walked, outermost first, and the loops
+  // over data (for-of) whose body it stands in.
+  let functionsAround: ReadonlyArray<JsNode> = []
+  let walks: ReadonlyArray<Walk> = []
+  let loopDepth = 0
+  const everyWalk: Array<Walk> = []
+  const growths: Array<GrowthSite> = []
+  const combinations: Array<Combination> = []
+  // The functions that call something the script cannot see into, by where the call stands.
+  const dynamicIn: Array<ReadonlyArray<JsNode>> = []
+  // Function values: where one may stand, the functions that are bound to a name, and the
+  // callbacks that may hand back a function (a stage that builds the thunks of `parallel()`).
+  const allowedFunctions = new Set<JsNode>()
+  const namedFunctions = new Set<JsNode>()
+  const functionMakers = new Set<JsNode>()
+  // The values a callback hands back to the method that runs it: built fresh for each element, so
+  // holding one value twice in them (`(x) => [x, x]`) does not compound.
+  const resultCallbacks = new Set<JsNode>()
+  const freshResults = new Set<JsNode>()
+  const functionAssignments: Array<{ name: string; scope: Scope; node: JsNode }> = []
+  let analysisSteps = 0
+  const spend = () => {
+    analysisSteps += 1
+    return analysisSteps <= MAX_ANALYSIS_STEPS
+  }
+  const setWork = (next: number) => {
+    loopWork = next
+    context.max = Math.max(context.max, next)
+    if (next > MAX_NESTED_ITERATIONS) refuse("nests loops that run too many iterations")
+  }
 
   /**
    * Declares a name; `origin` tests whether the script built its value, and `undefined` is none
@@ -490,7 +782,7 @@ const inspect = (script: string): string | undefined => {
   const declare = (scope: Scope, name: string, origin?: (() => boolean) | "unsafe") => {
     if (GLOBALS.has(name) || HOST_GLOBALS.has(name) || DENIED_NAMES.has(name) || name === "agent")
       refuse(`declares ${name}, a name of the host`)
-    const held: Binding = scope.names.get(name) ?? { unsafe: false, inits: [] }
+    const held: Binding = scope.names.get(name) ?? newBinding()
     if (origin === "unsafe") held.unsafe = true
     else if (origin !== undefined) held.inits.push(origin)
     scope.names.set(name, held)
@@ -498,8 +790,23 @@ const inspect = (script: string): string | undefined => {
 
   const refer = (node: JsNode, scope: Scope, use: Use) => {
     const name = nameOf(node)
-    if (name === undefined) refuse("reads a name it cannot read")
-    else references.push({ name, scope, use })
+    if (name === undefined) return refuse("reads a name it cannot read")
+    const reference: Reference = {
+      name,
+      scope,
+      use,
+      within: functionsAround,
+      factor: loopWork,
+    }
+    references.push(reference)
+    if (use !== "callee") return
+    context.calls.push(reference)
+    for (const walk of walks) walk.calls.push(reference)
+  }
+
+  /** Notes that a call stands here whose callee the check cannot follow. */
+  const callsBlind = () => {
+    dynamicIn.push(functionsAround)
   }
 
   // Whether a script built the value of an expression itself, or took it from `args` or an agent:
@@ -601,13 +908,24 @@ const inspect = (script: string): string | undefined => {
     for (const declarator of nodesAt(node, "declarations")) {
       if (declarator?.type !== "VariableDeclarator") return refuse("declares oddly")
       const init = nodeAt(declarator, "init")
+      const id = nodeAt(declarator, "id")
+      const target = kind === "var" ? varScope(scope) : scope
       declarePattern(
-        nodeAt(declarator, "id"),
+        id,
         scope,
-        kind === "var" ? varScope(scope) : scope,
+        target,
         depth + 1,
         loop ?? (init === undefined ? undefined : () => builtHere(init, scope)),
       )
+      if (init !== undefined && loop === undefined) {
+        if (isFunctionLiteral(init) && id?.type === "Identifier") {
+          allowedFunctions.add(init)
+          namedFunctions.add(init)
+          target.names.get(nameOf(id) ?? "")?.functions.add(init)
+        } else
+          for (const name of copiedNames(id))
+            target.names.get(name)?.sources.push({ node: init, scope })
+      }
       expression(init, scope, depth + 1)
     }
   }
@@ -616,12 +934,36 @@ const inspect = (script: string): string | undefined => {
     if (node["generator"] === true) return refuse("uses a generator")
     const inner = childScope(scope, true)
     const own = nameOf(nodeAt(node, "id"))
-    if (node.type === "FunctionExpression" && own !== undefined) declare(inner, own, "unsafe")
+    if (node.type === "FunctionExpression" && own !== undefined) {
+      declare(inner, own, "unsafe")
+      inner.names.get(own)?.functions.add(node)
+    }
     for (const parameter of nodesAt(node, "params"))
       declarePattern(parameter, inner, inner, depth + 1, "unsafe")
+    // A function bound to a name does its own work whenever it is called: it starts from one
+    // iteration and is priced where it is called. Any other runs where it stands.
+    const outerWork = loopWork
+    const outerContext = context
+    if (node.type === "FunctionDeclaration" || namedFunctions.has(node)) {
+      loopWork = 1
+      context = { max: 1, calls: [] }
+      contexts.set(node, context)
+    }
+    const outerFunctions = functionsAround
+    functionsAround = [...functionsAround, node]
     const body = nodeAt(node, "body")
     if (body?.type === "BlockStatement") statements(nodesAt(body, "body"), inner, depth + 1)
-    else expression(body, inner, depth + 1)
+    else {
+      if (isFunctionLiteral(body) && functionMakers.has(node)) {
+        allowedFunctions.add(body)
+        functionMakers.add(body)
+      }
+      if (body !== undefined && resultCallbacks.has(node)) freshResults.add(body)
+      expression(body, inner, depth + 1)
+    }
+    functionsAround = outerFunctions
+    loopWork = outerWork
+    context = outerContext
   }
 
   const objectProperty = (property: JsNode | undefined, scope: Scope, depth: number) => {
@@ -639,6 +981,7 @@ const inspect = (script: string): string | undefined => {
       property["kind"] !== "init" ||
       property["method"] === true ||
       keyName === undefined ||
+      keyName === "length" ||
       DENIED_NAMES.has(keyName)
     )
       return refuse("builds an object with a key it cannot vet")
@@ -717,51 +1060,119 @@ const inspect = (script: string): string | undefined => {
     const callee = nodeAt(node, "callee")
     if (nameOf(callee) === "agent") return agentCall(node, scope, depth)
     if (node["optional"] === true) return refuse("makes an optional call")
-    if (callee?.type === "Identifier") refer(callee, scope, "callee")
-    else if (callee?.type === "MemberExpression") {
+    const given = nodesAt(node, "arguments")
+    const values = definedNodes(given.map(unspread))
+    // The arguments the call hands a function to run, and how many times it runs it.
+    let callbacks: ReadonlyArray<JsNode | undefined> = []
+    let passes = 1
+    if (callee?.type === "Identifier") {
+      refer(callee, scope, "callee")
+      const name = nameOf(callee)
+      if (name === "parallel" || name === "pipeline") callsBlind()
+      if (name === "pipeline") {
+        callbacks = given.slice(1)
+        passes = DATA_ITERATIONS
+        for (const stage of callbacks) if (isFunctionLiteral(stage)) resultCallbacks.add(stage)
+      }
+      if (name === "parallel")
+        callbacks = given.flatMap((argument) =>
+          argument?.type === "ArrayExpression" ? nodesAt(argument, "elements") : [],
+        )
+      if (values.length > 1) combinations.push({ operands: values, scope, callee: name })
+    } else if (callee?.type === "MemberExpression") {
       memberExpression(callee, scope, depth + 1, true)
-      const limit = MAX_ARGUMENTS[nameOf(nodeAt(callee, "property")) ?? ""]
-      const given = nodesAt(node, "arguments")
+      const computed = callee["computed"] === true
+      const method = computed ? "" : (nameOf(nodeAt(callee, "property")) ?? "")
+      const object = nodeAt(callee, "object")
+      const owner = nameOf(object)
+      if (computed) callsBlind()
+      const limit = MAX_ARGUMENTS[method]
       if (
-        callee["computed"] !== true &&
+        !computed &&
         limit !== undefined &&
         (given.length > limit || given.some((argument) => argument?.type === "SpreadElement"))
       )
         refuse("passes a method more arguments than its callback (a this value)")
-      const method = nameOf(nodeAt(callee, "property")) ?? ""
       const count = integerLiteral(given[0])
       if (
-        callee["computed"] !== true &&
         TEXT_COUNTS.has(method) &&
         given.length > 0 &&
         (count === undefined || count < 0 || count > MAX_TEXT_COUNT)
       )
         refuse(`calls .${method} with a count that is not a literal of at most ${MAX_TEXT_COUNT}`)
-    } else if (callee?.type === "ArrowFunctionExpression" || callee?.type === "FunctionExpression")
-      functionNode(callee, scope, depth + 1)
+      const repeated = object?.type === "Literal" ? object["value"] : undefined
+      if (
+        method === "repeat" &&
+        (typeof repeated !== "string" || repeated.length > MAX_REPEATED_TEXT)
+      )
+        refuse(`repeats something that is not a literal of at most ${MAX_REPEATED_TEXT} characters`)
+      if (owner === "Array" && method === "from" && given[0]?.type === "ObjectExpression")
+        refuse("builds an array from an object, whose length it could set")
+      const position = CALLBACK_ARGUMENTS.get(method)
+      if (position !== undefined) {
+        callbacks = position === "all" ? given : given.slice(position, position + 1)
+        // A function that is not written here may be one that calls back into the script.
+        if (callbacks.some((argument) => !isFunctionLiteral(argument))) callsBlind()
+        for (const argument of callbacks)
+          if (isFunctionLiteral(argument)) {
+            functionMakers.add(argument)
+            if (RESULT_METHODS.has(method)) resultCallbacks.add(argument)
+          }
+        if (ITERATING_METHODS.has(method)) passes = DATA_ITERATIONS
+      }
+      if (COMBINING_METHODS.has(method) && object !== undefined)
+        combinations.push({ operands: [object, ...values], scope, merging: true })
+      else if (owner === "Array" && method === "of") combinations.push({ operands: values, scope })
+      if (GROWING_METHODS.has(method) && object !== undefined) {
+        const site: GrowthSite = {
+          names: identifiersIn(object),
+          opaque: !isChain(object),
+          scope,
+          within: functionsAround,
+        }
+        growths.push(site)
+        for (const walk of walks) walk.sites.push(site)
+      }
+    } else if (isFunctionLiteral(callee)) functionNode(callee, scope, depth + 1)
     else return refuse("calls something it cannot vet")
-    for (const argument of nodesAt(node, "arguments"))
+    for (const argument of callbacks)
+      if (isFunctionLiteral(argument)) allowedFunctions.add(argument)
+    const outerWork = loopWork
+    for (const argument of given) {
+      if (passes > 1 && callbacks.includes(argument)) setWork(outerWork * passes)
       expression(
         argument?.type === "SpreadElement" ? nodeAt(argument, "argument") : argument,
         scope,
         depth + 1,
       )
+      loopWork = outerWork
+    }
   }
 
   // The target of an assignment or an update: a name, or a member of data the script built (checked
-  // once every name is known). `builtHere` tests whether the value assigned is the script's own.
+  // once every name is known). `builtHere` tests whether the value assigned is the script's own, and
+  // `right` is the value, for the names an alias leads back to.
   const writeTarget = (
     node: JsNode | undefined,
     scope: Scope,
     depth: number,
     builtValue: () => boolean,
+    right?: JsNode,
   ) => {
     if (node?.type === "Identifier") {
       refer(node, scope, "write")
-      assignments.push({ name: nameOf(node) ?? "", scope, builtHere: builtValue })
+      assignments.push({ name: nameOf(node) ?? "", scope, right, builtHere: builtValue })
       return
     }
     if (node?.type === "MemberExpression") {
+      // A length or a far index would make a sparse array of any size, for a loop to walk.
+      const property = nodeAt(node, "property")
+      const index = property?.type === "Literal" ? property["value"] : undefined
+      if (
+        (node["computed"] !== true && nameOf(property) === "length") ||
+        (typeof index === "number" && index > MAX_WRITE_INDEX)
+      )
+        refuse(`writes a length or an index above ${MAX_WRITE_INDEX} into an array`)
       memberWrites.push({ root: rootName(node), scope })
       return memberExpression(node, scope, depth + 1, false)
     }
@@ -778,9 +1189,20 @@ const inspect = (script: string): string | undefined => {
         if ("regex" in node || "bigint" in node) refuse("uses a regular expression or a bigint")
         return
       case "TemplateLiteral":
+        combinations.push({
+          operands: definedNodes(nodesAt(node, "expressions")),
+          scope,
+          merging: true,
+        })
         for (const part of nodesAt(node, "expressions")) expression(part, scope, depth + 1)
         return
       case "ArrayExpression":
+        if (!freshResults.has(node))
+          combinations.push({
+            operands: definedNodes(nodesAt(node, "elements").map(unspread)),
+            scope,
+            merging: nodesAt(node, "elements").some((element) => element?.type === "SpreadElement"),
+          })
         for (const element of nodesAt(node, "elements"))
           expression(
             element?.type === "SpreadElement" ? nodeAt(element, "argument") : element,
@@ -789,10 +1211,28 @@ const inspect = (script: string): string | undefined => {
           )
         return
       case "ObjectExpression":
+        if (!freshResults.has(node))
+          combinations.push({
+            operands: definedNodes(
+              nodesAt(node, "properties").map((property) =>
+                property?.type === "SpreadElement"
+                  ? nodeAt(property, "argument")
+                  : nodeAt(property ?? node, "value"),
+              ),
+            ),
+            scope,
+            merging: nodesAt(node, "properties").some(
+              (property) => property?.type === "SpreadElement",
+            ),
+          })
         for (const property of nodesAt(node, "properties")) objectProperty(property, scope, depth)
         return
       case "ArrowFunctionExpression":
       case "FunctionExpression":
+        // A function value may stand only where it is run at once, by a method or an operator of
+        // the workflow, or where it is bound to a name; held anywhere else it could be called back.
+        if (!allowedFunctions.has(node))
+          return refuse("holds a function where only a callback may be")
         return functionNode(node, scope, depth)
       case "UnaryExpression":
         if (!UNARY.has(String(node["operator"]))) return refuse("uses delete")
@@ -801,15 +1241,37 @@ const inspect = (script: string): string | undefined => {
         return writeTarget(nodeAt(node, "argument"), scope, depth, () => true)
       case "BinaryExpression":
       case "LogicalExpression":
+        if (node["operator"] === "+")
+          combinations.push({
+            operands: definedNodes([nodeAt(node, "left"), nodeAt(node, "right")]),
+            scope,
+            merging: true,
+          })
         expression(nodeAt(node, "left"), scope, depth + 1)
         return expression(nodeAt(node, "right"), scope, depth + 1)
       case "AssignmentExpression": {
+        const left = nodeAt(node, "left")
         const right = nodeAt(node, "right")
+        const operator = node["operator"]
+        if (operator === "=" && left?.type === "Identifier" && isFunctionLiteral(right)) {
+          allowedFunctions.add(right)
+          namedFunctions.add(right)
+          functionAssignments.push({ name: nameOf(left) ?? "", scope, node: right })
+        }
+        if (operator === "+=")
+          combinations.push({ operands: definedNodes([left, right]), scope, merging: true })
+        if (
+          (operator === "=" || operator === "+=") &&
+          (functionsAround.length > 0 || loopDepth > 0) &&
+          replacesWithMore(right, left)
+        )
+          refuse("replaces text with longer text again and again")
         writeTarget(
-          nodeAt(node, "left"),
+          left,
           scope,
           depth,
-          node["operator"] === "=" ? () => builtHere(right, scope) : () => true,
+          operator === "=" ? () => builtHere(right, scope) : () => true,
+          operator === "=" && !isFunctionLiteral(right) ? right : undefined,
         )
         return expression(right, scope, depth + 1)
       }
@@ -845,12 +1307,35 @@ const inspect = (script: string): string | undefined => {
         return expression(nodeAt(node, "expression"), scope, depth + 1)
       case "VariableDeclaration":
         return variableDeclaration(node, scope, depth)
-      case "FunctionDeclaration":
-        declare(scope, nameOf(nodeAt(node, "id")) ?? "", "unsafe")
+      case "FunctionDeclaration": {
+        const name = nameOf(nodeAt(node, "id")) ?? ""
+        declare(scope, name, "unsafe")
+        scope.names.get(name)?.functions.add(node)
         return functionNode(node, scope, depth)
+      }
       case "ReturnStatement":
-      case "ThrowStatement":
-        return expression(nodeAt(node, "argument"), scope, depth + 1)
+      case "ThrowStatement": {
+        // A callback that builds thunks may return one.
+        const result = nodeAt(node, "argument")
+        const maker = functionsAround[functionsAround.length - 1]
+        if (
+          node.type === "ReturnStatement" &&
+          isFunctionLiteral(result) &&
+          maker !== undefined &&
+          functionMakers.has(maker)
+        ) {
+          allowedFunctions.add(result)
+          functionMakers.add(result)
+        }
+        if (
+          node.type === "ReturnStatement" &&
+          result !== undefined &&
+          maker !== undefined &&
+          resultCallbacks.has(maker)
+        )
+          freshResults.add(result)
+        return expression(result, scope, depth + 1)
+      }
       case "IfStatement":
         expression(nodeAt(node, "test"), scope, depth + 1)
         statement(nodeAt(node, "consequent"), scope, depth + 1)
@@ -869,14 +1354,15 @@ const inspect = (script: string): string | undefined => {
             `runs a for loop that is not a counted loop of at most ${MAX_LOOP_COUNT} iterations (for (let i = 0; i < 10; i++))`,
           )
         const outerWork = loopWork
-        loopWork *= Math.max(counted?.count ?? 1, 1)
-        if (loopWork > MAX_NESTED_ITERATIONS) refuse("nests loops that run too many iterations")
+        setWork(loopWork * Math.max(counted?.count ?? 1, 1))
         const init = nodeAt(node, "init")
         if (init?.type === "VariableDeclaration") variableDeclaration(init, loop, depth + 1)
         else expression(init, loop, depth + 1)
         expression(nodeAt(node, "test"), loop, depth + 1)
         expression(nodeAt(node, "update"), loop, depth + 1)
+        loopDepth += 1
         statement(nodeAt(node, "body"), loop, depth + 1)
+        loopDepth -= 1
         loopWork = outerWork
         return
       }
@@ -887,16 +1373,24 @@ const inspect = (script: string): string | undefined => {
         if (left?.type === "VariableDeclaration")
           variableDeclaration(left, loop, depth + 1, "unsafe")
         else writeTarget(left, loop, depth + 1, () => false)
-        // A loop over data ends with the data, unless its body keeps adding to what it walks.
-        const walked = rootName(nodeAt(node, "right"))
-        if (
-          node.type === "ForOfStatement" &&
-          walked !== undefined &&
-          growsName(nodeAt(node, "body"), walked)
-        )
-          refuse("grows the array a for-of loop walks")
-        expression(nodeAt(node, "right"), loop, depth + 1)
-        return statement(nodeAt(node, "body"), loop, depth + 1)
+        // A loop over data ends with the data, unless its body keeps adding to what it walks; that
+        // is checked once every name is known (see the end of the walk).
+        const right = nodeAt(node, "right")
+        expression(right, loop, depth + 1)
+        const walk: Walk = { walked: identifiersIn(right), scope, sites: [], calls: [] }
+        const outerWork = loopWork
+        const outerWalks = walks
+        if (node.type === "ForOfStatement") {
+          everyWalk.push(walk)
+          walks = [...walks, walk]
+        }
+        setWork(outerWork * DATA_ITERATIONS)
+        loopDepth += 1
+        statement(nodeAt(node, "body"), loop, depth + 1)
+        loopDepth -= 1
+        walks = outerWalks
+        loopWork = outerWork
+        return
       }
       case "WhileStatement":
       case "DoWhileStatement":
@@ -954,6 +1448,213 @@ const inspect = (script: string): string | undefined => {
     })
   }
 
+  /**
+   * The checks that need every name resolved: what calls what, what a loop walks and its body
+   * grows, which values are used twice to build a bigger one, and what the loops and calls multiply
+   * to.
+   */
+  function analyse() {
+    // What a name stands for: its binding, or "args"; any other global of the workflow is no value.
+    const keyOf = (name: string, scope: Scope): Binding | string | undefined =>
+      binding(scope, name) ?? (name === "args" ? "args" : undefined)
+
+    // Calls: the functions each function calls by name, and the functions that call through
+    // something the check cannot see (a parameter, a computed member, a callback not written in
+    // place). Recursion, or a call into a function that calls blindly from inside any function,
+    // could call back around to itself.
+    const dynamic = new Set<JsNode>()
+    for (const within of dynamicIn) for (const caller of within) dynamic.add(caller)
+    const edges = new Map<JsNode, Set<JsNode>>()
+    const calls = references.filter((reference) => reference.use === "callee")
+    for (const call of calls) {
+      const held = binding(call.scope, call.name)
+      if (held === undefined) continue
+      if (held.functions.size === 0) {
+        for (const caller of call.within) dynamic.add(caller)
+        continue
+      }
+      for (const caller of call.within) {
+        const callees = edges.get(caller) ?? new Set<JsNode>()
+        for (const callee of held.functions) callees.add(callee)
+        edges.set(caller, callees)
+      }
+    }
+    for (const call of calls) {
+      const held = binding(call.scope, call.name)
+      if (
+        call.within.length > 0 &&
+        held !== undefined &&
+        [...held.functions].some((callee) => dynamic.has(callee))
+      )
+        refuse(`calls ${call.name} from a function, and ${call.name} calls what it cannot see`)
+    }
+    const visiting = new Map<JsNode, "open" | "done">()
+    const loops = (caller: JsNode): boolean => {
+      const seen = visiting.get(caller)
+      if (seen !== undefined) return seen === "open"
+      visiting.set(caller, "open")
+      const found = [...(edges.get(caller) ?? [])].some(loops)
+      visiting.set(caller, "done")
+      return found
+    }
+    if ([...edges.keys()].some(loops)) return refuse("has a function that calls itself")
+
+    // Work: what loops, passes over data and the calls of functions multiply to.
+    const costs = new Map<WorkContext, number>()
+    const cost = (work: WorkContext): number => {
+      const known = costs.get(work)
+      if (known !== undefined) return known
+      costs.set(work, work.max)
+      let total = work.max
+      for (const call of work.calls)
+        for (const callee of binding(call.scope, call.name)?.functions ?? []) {
+          const inner = contexts.get(callee)
+          if (inner !== undefined) total = Math.max(total, call.factor * cost(inner))
+        }
+      costs.set(work, total)
+      return total
+    }
+    if (cost(rootContext) > MAX_NESTED_ITERATIONS)
+      refuse("calls functions that run too many iterations from its loops")
+
+    // What a value was copied from: a name or fields of one, a copy of it (`[...a]`, `a.slice()`),
+    // or either of two choices.
+    const copiedFrom = (node: JsNode | undefined, scope: Scope, deep = true): Array<Occurrence> => {
+      if (node === undefined) return []
+      if (isChain(node)) return occurrencesIn(node, scope, [])
+      if (!deep) return []
+      switch (node.type) {
+        case "AwaitExpression":
+          return copiedFrom(nodeAt(node, "argument"), scope)
+        case "ChainExpression":
+          return copiedFrom(nodeAt(node, "expression"), scope)
+        case "LogicalExpression":
+          return [
+            ...copiedFrom(nodeAt(node, "left"), scope),
+            ...copiedFrom(nodeAt(node, "right"), scope),
+          ]
+        case "ConditionalExpression":
+          return [
+            ...copiedFrom(nodeAt(node, "consequent"), scope),
+            ...copiedFrom(nodeAt(node, "alternate"), scope),
+          ]
+        case "ArrayExpression":
+          return nodesAt(node, "elements").flatMap((element) =>
+            element?.type === "SpreadElement" ? copiedFrom(nodeAt(element, "argument"), scope) : [],
+          )
+        case "CallExpression": {
+          const callee = nodeAt(node, "callee")
+          if (callee?.type !== "MemberExpression" || callee["computed"] === true) return []
+          return COPYING_METHODS.has(nameOf(nodeAt(callee, "property")) ?? "")
+            ? [
+                ...copiedFrom(nodeAt(callee, "object"), scope),
+                ...nodesAt(node, "arguments").flatMap((argument) =>
+                  copiedFrom(unspread(argument), scope),
+                ),
+              ]
+            : []
+        }
+        default:
+          return []
+      }
+    }
+
+    // Loops over data: the names a for-of walks, and every name its value was copied from.
+    const UNSAFE = "a parameter or a loop variable"
+    const reaching = (names: ReadonlyArray<string>, scope: Scope): Set<Binding | string> => {
+      const seen = new Set<Binding | string>()
+      const visit = (name: string, at: Scope) => {
+        const key = keyOf(name, at)
+        if (key === undefined || seen.has(key) || !spend()) return
+        seen.add(key)
+        if (typeof key === "string") return
+        if (key.unsafe) seen.add(UNSAFE)
+        for (const source of key.sources)
+          for (const origin of copiedFrom(source.node, source.scope))
+            visit(origin.name, source.scope)
+      }
+      for (const name of names) visit(name, scope)
+      return seen
+    }
+    const shares = (left: Set<Binding | string>, right: Set<Binding | string>) =>
+      [...left].some((key) => right.has(key))
+    const reachable = (from: Iterable<JsNode>): Set<JsNode> => {
+      const found = new Set<JsNode>()
+      const visit = (node: JsNode) => {
+        if (found.has(node)) return
+        found.add(node)
+        for (const next of edges.get(node) ?? []) visit(next)
+      }
+      for (const node of from) visit(node)
+      return found
+    }
+    for (const walk of everyWalk) {
+      const walked = reaching(walk.walked, walk.scope)
+      // A loop over what a function returns walks something no name says.
+      const viaFunction = [...walked].some(
+        (key) => typeof key !== "string" && key.functions.size > 0,
+      )
+      for (const site of walk.sites)
+        if (site.opaque || viaFunction || shares(reaching(site.names, site.scope), walked))
+          return refuse("adds to the array a for-of loop walks")
+      for (const call of walk.calls) {
+        const callees = reachable(binding(call.scope, call.name)?.functions ?? [])
+        if ([...callees].some((callee) => dynamic.has(callee)))
+          return refuse("calls, in a for-of loop, a function that calls what it cannot see")
+        for (const site of growths) {
+          if (!site.within.some((caller) => callees.has(caller))) continue
+          const grown = reaching(site.names, site.scope)
+          if (site.opaque || viaFunction || grown.has(UNSAFE) || shares(grown, walked))
+            return refuse("calls, in a for-of loop, a function that adds to an array")
+        }
+      }
+    }
+
+    // Values used twice to build a bigger one: two operands of a construct that read the same
+    // value, directly or through a name that was copied from it.
+    const ids = new Map<Binding | string, number>()
+    const idOf = (key: Binding | string) => {
+      const known = ids.get(key)
+      if (known !== undefined) return known
+      ids.set(key, ids.size)
+      return ids.size - 1
+    }
+    const readings = (operand: JsNode, scope: Scope, deep: boolean): Set<string> => {
+      const found = new Set<string>()
+      const visit = (name: string, at: Scope, path: ReadonlyArray<string>, seen: Set<Binding>) => {
+        const key = keyOf(name, at)
+        if (key === undefined || !spend()) return
+        found.add(`${idOf(key)}:${path.join(".")}`)
+        if (typeof key === "string" || seen.has(key)) return
+        seen.add(key)
+        for (const source of key.sources) {
+          const plain = isChain(source.node)
+          for (const origin of copiedFrom(source.node, source.scope, deep))
+            visit(origin.name, origin.scope, plain ? [...origin.path, ...path] : origin.path, seen)
+        }
+      }
+      for (const origin of occurrencesIn(operand, scope, []))
+        visit(origin.name, origin.scope, origin.path, new Set())
+      return found
+    }
+    for (const combination of combinations) {
+      if (
+        combination.callee !== undefined &&
+        (binding(combination.scope, combination.callee)?.functions.size ?? 0) === 0
+      )
+        continue
+      const owners = new Map<string, number>()
+      for (const [index, operand] of combination.operands.entries())
+        for (const reading of readings(operand, combination.scope, combination.merging === true)) {
+          const owner = owners.get(reading)
+          if (owner !== undefined && owner !== index)
+            return refuse("uses one value twice to build a bigger one")
+          owners.set(reading, index)
+        }
+    }
+    if (analysisSteps > MAX_ANALYSIS_STEPS) refuse("is too tangled to check")
+  }
+
   const moduleScope: Scope = { parent: undefined, names: new Map(), isFunction: true }
   let exported = 0
   for (const node of nodesAt(program, "body")) {
@@ -975,25 +1676,37 @@ const inspect = (script: string): string | undefined => {
       !literalOnly(nodeAt(meta ?? node, "init"), 1)
     )
       refuse("exports anything but `export const meta = { … }` of literals")
-    moduleScope.names.set("meta", { unsafe: true, inits: [] })
+    moduleScope.names.set("meta", { ...newBinding(), unsafe: true })
   }
 
   for (const reference of references) {
-    if (binding(reference.scope, reference.name) !== undefined) continue
+    const held = binding(reference.scope, reference.name)
     const { name, use } = reference
+    if (held !== undefined) {
+      if (held.functions.size > 0 && (use === "value" || use === "object"))
+        refuse(`uses the function ${name} as a value; a function is only called`)
+      continue
+    }
     if (use === "write") refuse(`assigns to ${name}, which it did not declare`)
     else if (!GLOBALS.has(name)) refuse(`uses ${name}, which it did not declare`)
     else if (use === "value" && !VALUE_GLOBALS.has(name))
       refuse(`uses ${name} as a value; a global is only called or read from`)
     else if (use === "callee" && !GLOBAL_FUNCTIONS.has(name)) refuse(`calls ${name}`)
   }
-  for (const assignment of assignments)
-    binding(assignment.scope, assignment.name)?.inits.push(assignment.builtHere)
+  for (const entry of functionAssignments)
+    binding(entry.scope, entry.name)?.functions.add(entry.node)
+  for (const assignment of assignments) {
+    const held = binding(assignment.scope, assignment.name)
+    held?.inits.push(assignment.builtHere)
+    if (assignment.right !== undefined)
+      held?.sources.push({ node: assignment.right, scope: assignment.scope })
+  }
   for (const write of memberWrites) {
     const held = write.root === undefined ? undefined : binding(write.scope, write.root)
     if (held === undefined || !builtBinding(held))
       refuse("writes into something the script did not build")
   }
+  if (refusal === undefined) analyse()
   if (refusal === undefined && agentCalls === 0) refuse("starts no agent")
   return refusal
 }

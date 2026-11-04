@@ -2223,6 +2223,10 @@ var findError = (self) => {
 var hasDies = (self) => self.reasons.some(isDieReason);
 var causeElectDefects = (self) => hasDies(self) && hasFails(self) ? causeFromReasons(self.reasons.map((reason) => reason._tag === "Fail" && !isDone(reason.error) ? new Die(reason.error, reason.annotations) : reason)) : self;
 var findRecoverableError = (self) => hasDies(self) ? fail2(causeElectDefects(self)) : findError(self);
+var findDefect = (self) => {
+  const reason = self.reasons.find(isDieReason);
+  return reason ? succeed2(reason.defect) : fail2(self);
+};
 var hasInterrupts = (self) => self.reasons.some(isInterruptReason);
 var causeMap = /* @__PURE__ */ dual(2, (self, f) => {
   let hasFail = false;
@@ -3139,6 +3143,7 @@ var catchCauseFilter = /* @__PURE__ */ dual(3, (self, filter, f) => catchCause(s
   return isFailure2(eb) ? failCause(eb.failure) : f(eb.success, cause);
 }));
 var catch_ = /* @__PURE__ */ dual(2, (self, f) => catchCauseFilter(self, findRecoverableError, (e) => f(e)));
+var catchDefect = /* @__PURE__ */ dual(2, (self, f) => catchCauseFilter(self, findDefect, f));
 var tapCauseFilter = /* @__PURE__ */ dual(3, (self, filter, f) => catchCause(self, (cause) => {
   const result = filter(cause);
   if (isFailure2(result)) {
@@ -4461,6 +4466,7 @@ var asVoid2 = asVoid;
 var catch_2 = catch_;
 var catchTag2 = catchTag;
 var catchCause2 = catchCause;
+var catchDefect2 = catchDefect;
 var catchIf2 = catchIf;
 var mapError2 = mapError;
 var orDie2 = orDie;
@@ -7697,8 +7703,6 @@ var describeFailure = (error) => {
   };
 };
 
-import { join as join20 } from "path";
-
 var NULL_LITERAL = "null";
 var DELIMITERS = {
   comma: ",",
@@ -9426,9 +9430,6 @@ var package_default = {
   version: "0.2.1",
   description: "The holyagent runtime: instructions and the shared command surface.",
   license: "Apache-2.0",
-  bin: {
-    "holyagent-runtime": "./src/cli/main.ts"
-  },
   type: "module",
   exports: {
     ".": "./src/index.ts"
@@ -9569,6 +9570,20 @@ var newId = (kind) => gen2(function* () {
   return `${kind}-${time}-${digits.map((digit) => digit.toString(36)).join("")}`;
 });
 
+var Text = String4.check(isPattern2(/\S/));
+var Revision = Int.check(isGreaterThanOrEqualTo2(1));
+var INSTANT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?Z$/;
+var isInstant = (text) => {
+  const match = INSTANT.exec(text);
+  if (match === null || Number.isNaN(Date.parse(text)))
+    return false;
+  const [year, month, day, hour, minute, second] = match.slice(1).map(Number);
+  const date = new Date(text);
+  return date.getUTCFullYear() === year && date.getUTCMonth() + 1 === month && date.getUTCDate() === day && date.getUTCHours() === hour && date.getUTCMinutes() === minute && date.getUTCSeconds() === second;
+};
+var Timestamp = String4.check(makeFilter2((text) => isInstant(text) || "a real UTC instant such as 2026-01-02T03:04:05Z"));
+var TextList = ArraySchema(Text);
+
 class UnknownRecord extends TaggedError2("UnknownRecord") {
   get message() {
     return `Unknown ${this.kind} ${this.id}`;
@@ -9678,20 +9693,6 @@ var pathsOverlap = (a, b) => {
 var firstOverlap = (a, b) => a.find((left) => b.some((right) => pathsOverlap(left, right)));
 var toPosix = (path, separator = sep) => separator === "/" ? path : path.replaceAll(separator, "/");
 var fromGitPath = (path, separator = sep) => separator === "/" ? path : path.replaceAll("/", separator);
-
-var Text = String4.check(isPattern2(/\S/));
-var Revision = Int.check(isGreaterThanOrEqualTo2(1));
-var INSTANT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?Z$/;
-var isInstant = (text) => {
-  const match = INSTANT.exec(text);
-  if (match === null || Number.isNaN(Date.parse(text)))
-    return false;
-  const [year, month, day, hour, minute, second] = match.slice(1).map(Number);
-  const date = new Date(text);
-  return date.getUTCFullYear() === year && date.getUTCMonth() + 1 === month && date.getUTCDate() === day && date.getUTCHours() === hour && date.getUTCMinutes() === minute && date.getUTCSeconds() === second;
-};
-var Timestamp = String4.check(makeFilter2((text) => isInstant(text) || "a real UTC instant such as 2026-01-02T03:04:05Z"));
-var TextList = ArraySchema(Text);
 
 var findIntent = (project, id) => {
   const found = project.intents.find((intent) => intent.id === id);
@@ -9912,6 +9913,7 @@ var bindSpecialist = (registry, assignment, launch) => gen2(function* () {
 
 var ActiveIntentFile = Struct({ intentId: IntentId });
 var SpecialistsFile = Struct({ specialists: ArraySchema(SpecialistEntry) });
+var WorkTreesFile = Struct({ workTrees: Record(AssignmentId, Text) });
 var WorkTree = Reference("holyagent/state/WorkTree", {
   defaultValue: () => {
     return;
@@ -9930,9 +9932,11 @@ var readLocal = (directory) => gen2(function* () {
   const own = workTree === undefined ? undefined : yield* readJson(ActiveIntentFile, activeIntentFile(directory, workTree));
   const active = own ?? (yield* readJson(ActiveIntentFile, localFile(directory, LEGACY_ACTIVE_INTENT)));
   const specialists = yield* readJson(SpecialistsFile, localFile(directory, "specialists.json"));
+  const workTrees = yield* readJson(WorkTreesFile, localFile(directory, "work-trees.json"));
   return {
     ...active === undefined ? {} : { activeIntent: active.intentId },
-    specialists: specialists?.specialists ?? []
+    specialists: specialists?.specialists ?? [],
+    workTrees: workTrees?.workTrees ?? {}
   };
 });
 var encodeLocal = (directory, change) => gen2(function* () {
@@ -9954,10 +9958,15 @@ var encodeLocal = (directory, change) => gen2(function* () {
       path: localFile(directory, "specialists.json"),
       content: yield* encodeJson(SpecialistsFile, { specialists: change.specialists })
     });
+  if (change.workTrees !== undefined)
+    files.push({
+      path: localFile(directory, "work-trees.json"),
+      content: yield* encodeJson(WorkTreesFile, { workTrees: change.workTrees })
+    });
   return files;
 });
 
-import { join as join3, relative as relative2, sep as sep3 } from "path";
+import { join as join4, relative as relative2, sep as sep3 } from "path";
 
 var IntentState = Literals(["Open", "Closed"]);
 var Intent = Struct({
@@ -10078,7 +10087,7 @@ var pullsOf = (links, intentId) => {
   return [...latest.values()].toSorted((a, b) => a.number - b.number);
 };
 
-import { link as link2, lstat, mkdir, open, rename as rename2, rm as rm2 } from "fs/promises";
+import { lstat, mkdir, open, rename as rename2, rm as rm2 } from "fs/promises";
 import { dirname } from "path";
 var LockOwner = Struct({
   pid: Int,
@@ -10090,6 +10099,7 @@ var readOwner = (file) => readJson(LockOwner, file).pipe(orElseSucceed2(() => {
   return;
 }));
 var processAlive = (pid) => try_2({ try: () => process.kill(pid, 0), catch: (cause) => cause }).pipe(as2(true), catch_2((cause) => succeed6(!hasCode(cause, "ESRCH"))));
+var inTheWay = (file) => tryPromise2({ try: () => lstat(file), catch: (cause) => cause }).pipe(as2(true), catch_2((cause) => succeed6(!hasCode(cause, "ENOENT"))));
 var breakIfStale = (file) => gen2(function* () {
   const owner = yield* readOwner(file);
   const stale = owner ? !(yield* processAlive(owner.pid)) : (yield* currentTimeMillis2) - Bun.file(file).lastModified > UNREADABLE_STALE_MS;
@@ -10099,12 +10109,12 @@ var breakIfStale = (file) => gen2(function* () {
   const moved = yield* io(file, () => rename2(file, taken)).pipe(as2(true), catch_2(() => succeed6(false)));
   if (!moved)
     return;
-  if ((yield* readOwner(taken))?.token !== owner?.token)
-    yield* io(file, () => link2(taken, file)).pipe(ignore2);
+  const claimedMeanwhile = (yield* readOwner(taken))?.token !== owner?.token;
+  if (claimedMeanwhile && !(yield* inTheWay(file)))
+    yield* io(file, () => rename2(taken, file)).pipe(ignore2);
   yield* io(taken, () => rm2(taken, { force: true }));
 }).pipe(ignore2);
 var BLOCKED_CODES = ["EPERM", "EACCES", "EBUSY"];
-var inTheWay = (file) => tryPromise2({ try: () => lstat(file), catch: (cause) => cause }).pipe(as2(true), catch_2((cause) => succeed6(!hasCode(cause, "ENOENT"))));
 var create = (file, retry = true) => tryPromise2({ try: () => open(file, "wx"), catch: (cause) => cause }).pipe(catch_2((cause) => {
   if (hasCode(cause, "EEXIST"))
     return fail5(new StateLocked({ lockFile: file }));
@@ -10156,15 +10166,43 @@ var withFileLock = (file, use, patience = STATE_PATIENCE) => acquireUseRelease2(
 var withStateLock = (directory, use, patience = STATE_PATIENCE) => acquireUseRelease2(ensureLocalDirectory(directory).pipe(andThen2(acquire(localFile(directory, "lock"), patience))), () => use, (token) => release(localFile(directory, "lock"), token));
 
 import { lstat as lstat2, mkdir as mkdir2, readdir, realpath, rename as rename3, rm as rm3, rmdir, stat } from "fs/promises";
-import { basename, dirname as dirname2, join as join2, relative, sep as sep2 } from "path";
-var {$ } = globalThis.Bun;
+import { basename, dirname as dirname2, join as join3, relative, sep as sep2 } from "path";
+var {$: $2 } = globalThis.Bun;
 
-var looksLikeAgent = (identity) => identity.email.toLowerCase() === "noreply@anthropic.com" || /^claude\b/i.test(identity.name.trim());
+import { homedir } from "os";
+import { join as join2 } from "path";
+var firstNonEmpty = (...values) => values.find((value) => value !== undefined && value !== "");
+var definedEnv = (env, omit = new Set) => Object.fromEntries(Object.entries(env).filter((entry) => entry[1] !== undefined && !omit.has(entry[0])));
+var homeDirectory = (env, fallback = homedir) => firstNonEmpty(env.HOME, env.USERPROFILE) ?? fallback();
+var claudeConfigDirectory = (env, home = homedir) => firstNonEmpty(env.CLAUDE_CONFIG_DIR) ?? join2(homeDirectory(env, home), ".claude");
+var userFiles = (env) => {
+  const home = homeDirectory(env);
+  const claudeDir = claudeConfigDirectory(env, () => home);
+  return {
+    claudeDir,
+    settings: join2(claudeDir, "settings.json"),
+    ctx7Credentials: join2(home, ".config", "context7", "credentials.json")
+  };
+};
+
+var AGENT_EMAIL = "noreply@anthropic.com";
+var AGENT_NAMES = ["claude", "claude code"];
+var looksLikeAgent = (identity) => identity.email.trim().toLowerCase() === AGENT_EMAIL || AGENT_NAMES.includes(identity.name.trim().toLowerCase());
 var inCloudSession = (env) => env["CLAUDE_CODE_REMOTE"] === "true";
 var parseIdent = (line) => {
   const match = /^(.*) <([^<>]*)> \d+ [+-]\d{4}$/.exec(line.trim());
   return match === null ? undefined : { name: match[1] ?? "", email: match[2] ?? "" };
 };
+
+var {$ } = globalThis.Bun;
+var spawn = (program, args, options) => promise2(() => {
+  const command = options.stdin === undefined ? $`${program} ${args}` : $`${program} ${args} < ${new Response(options.stdin)}`;
+  return command.cwd(options.cwd).env(definedEnv(options.env)).quiet().nothrow();
+}).pipe(map4((output) => ({
+  code: output.exitCode,
+  stdout: output.stdout,
+  stderr: output.stderr.toString()
+})));
 
 var StateMode = Literals(["branch", "work", "local"]);
 var DEFAULT_STATE_MODE = "branch";
@@ -10187,14 +10225,11 @@ var REPOSITORY_VARIABLES = new Set([
   "GIT_NAMESPACE",
   "GIT_QUARANTINE_PATH"
 ]);
-var gitEnvironment = (env) => Object.fromEntries(Object.entries({ ...process.env, ...env }).filter((entry) => entry[1] !== undefined && !REPOSITORY_VARIABLES.has(entry[0])));
-var git = (cwd, env, args, input) => tryPromise2({
-  try: () => (input === undefined ? $`git ${args}` : $`git ${args} < ${new Response(input)}`).cwd(cwd).env(gitEnvironment(env)).quiet().nothrow(),
-  catch: (cause) => new StateIo({ path: cwd, cause })
-}).pipe(map4((output) => ({
-  code: output.exitCode,
-  stdout: output.stdout.toString(),
-  stderr: output.stderr.toString()
+var gitEnvironment = (env) => definedEnv({ ...process.env, ...env }, REPOSITORY_VARIABLES);
+var git = (cwd, env, args, input) => spawn("git", args, { cwd, env: gitEnvironment(env), stdin: input }).pipe(catchDefect2((cause) => fail5(new StateIo({ path: cwd, cause }))), map4((output) => ({
+  code: output.code,
+  stdout: new TextDecoder("utf-8", { ignoreBOM: true }).decode(output.stdout),
+  stderr: output.stderr
 })));
 var failed = (cwd, args, ran) => new StateIo({
   path: cwd,
@@ -10232,7 +10267,7 @@ var editExclude = (top, common, env, edit, done, patience = WORKTREE_PATIENCE) =
   const path = yield* excludePath(top, env);
   if (done?.(linesOf(yield* readText(path))) === true)
     return;
-  yield* withFileLock(join2(common, "holyagent", "exclude.lock"), gen2(function* () {
+  yield* withFileLock(join3(common, "holyagent", "exclude.lock"), gen2(function* () {
     const before = linesOf(yield* readText(path));
     const lines = yield* edit(before);
     if (lines.join(`
@@ -10355,7 +10390,7 @@ var fetchEnvironment = (env, configured) => {
 };
 var killGroup = (child, platform = process.platform) => {
   const real = Number.isInteger(child.pid) && child.pid > 1;
-  return platform === "win32" ? (real ? tryPromise2(() => $`taskkill /pid ${child.pid} /T /F`.quiet().nothrow()).pipe(ignore2) : void_3).pipe(andThen2(try_2(() => child.kill("SIGKILL"))), ignore2) : try_2(() => {
+  return platform === "win32" ? (real ? tryPromise2(() => $2`taskkill /pid ${child.pid} /T /F`.quiet().nothrow()).pipe(ignore2) : void_3).pipe(andThen2(try_2(() => child.kill("SIGKILL"))), ignore2) : try_2(() => {
     if (real)
       process.kill(-child.pid, "SIGKILL");
   }).pipe(ignore2);
@@ -10385,7 +10420,7 @@ var fetchRemoteBranch = (top, env, branch, timeout = FETCH_TIMEOUT_MS) => git(to
   `+refs/heads/${branch}:refs/remotes/origin/${branch}`
 ], timeout)), flatMap2((code) => code === 0 ? refExists(top, env, `refs/remotes/origin/${branch}`) : succeed6(false)));
 var readyMarker = (path) => `${path}.ready`;
-var ensureWorktree = (top, common, env, branch, path, options, patience = WORKTREE_PATIENCE) => withFileLock(join2(common, "holyagent", "worktree.lock"), gen2(function* () {
+var ensureWorktree = (top, common, env, branch, path, options, patience = WORKTREE_PATIENCE) => withFileLock(join3(common, "holyagent", "worktree.lock"), gen2(function* () {
   const ready = readyMarker(path);
   const again = yield* checkedOut(yield* listWorktrees(top, env), branch);
   if (again !== undefined) {
@@ -10419,24 +10454,24 @@ var LOCAL_FILES = new Set(["local/specialists.json"]);
 var sameBytes = (a, b) => all2([io(a, () => Bun.file(a).bytes()), io(b, () => Bun.file(b).bytes())]).pipe(map4(([left, right]) => Buffer.from(left).equals(Buffer.from(right))));
 var fileExists = (path) => io(path, () => Bun.file(path).exists());
 var kindAt = (path) => io(path, () => lstat2(path)).pipe(map4((info) => info.isSymbolicLink() ? "link" : info.isFile() ? "file" : info.isDirectory() ? "directory" : "other"), catchIf2((error) => hasCode(error.cause, "ENOENT") || hasCode(error.cause, "ENOTDIR"), () => succeed6(undefined)));
-var realStateFolder = (root) => canonical(dirname2(root)).pipe(map4((parent) => join2(parent, basename(root))));
+var realStateFolder = (root) => canonical(dirname2(root)).pipe(map4((parent) => join3(parent, basename(root))));
 var requireStateFolder = (root) => kindAt(root).pipe(flatMap2((kind) => kind === undefined || kind === "directory" ? void_3 : fail5(new StateIo({
   path: root,
   cause: `a ${kind} stands where the state folder is to be; the state worktree must hold a real folder, so remove it`
 }))));
 var isPlainFile = (root, relative) => gen2(function* () {
-  const path = join2(root, relative);
+  const path = join3(root, relative);
   if ((yield* kindAt(root)) !== "directory" || (yield* kindAt(path)) !== "file")
     return false;
   const [real, base] = yield* all2([canonical(path), realStateFolder(root)]);
-  return real === join2(base, relative);
+  return real === join3(base, relative);
 });
 var requirePlainTarget = (root, relative) => gen2(function* () {
   yield* requireStateFolder(root);
   const parts = relative.split("/");
   let current = root;
   for (const [index, part] of parts.entries()) {
-    current = join2(current, part);
+    current = join3(current, part);
     const kind = yield* kindAt(current);
     if (kind === undefined)
       return;
@@ -10449,7 +10484,7 @@ var requirePlainTarget = (root, relative) => gen2(function* () {
 });
 var copyInto = (root, relative, from) => gen2(function* () {
   yield* requirePlainTarget(root, relative);
-  const to = join2(root, relative);
+  const to = join3(root, relative);
   yield* io(to, () => mkdir2(dirname2(to), { recursive: true }));
   const [folder, base] = yield* all2([canonical(dirname2(to)), realStateFolder(root)]);
   if (folder !== base && !folder.startsWith(`${base}${sep2}`))
@@ -10493,7 +10528,7 @@ var pruneEmpty = (folder, from) => gen2(function* () {
     current = dirname2(current);
   }
 });
-var migrationMarker = (common, top) => io(top, () => realpath(top)).pipe(map4((real) => join2(common, "holyagent", "migrated", new Bun.CryptoHasher("sha1").update(real).digest("hex").slice(0, 16))));
+var migrationMarker = (common, top) => io(top, () => realpath(top)).pipe(map4((real) => join3(common, "holyagent", "migrated", new Bun.CryptoHasher("sha1").update(real).digest("hex").slice(0, 16))));
 var migrateWorkTree = (top, common, worktree, env, commit, patience = STATE_PATIENCE) => {
   const source = stateDirectory(top);
   const target = stateDirectory(worktree);
@@ -10505,20 +10540,20 @@ var migrateWorkTree = (top, common, worktree, env, commit, patience = STATE_PATI
     for (const entry of entries) {
       if (!(yield* isPlainFile(source, entry.path)))
         continue;
-      const to = join2(target, entry.path);
+      const to = join3(target, entry.path);
       yield* requirePlainTarget(target, entry.path);
       const dirty = entry.status !== undefined && !entry.status.includes("D");
       const there = (yield* kindAt(to)) !== undefined;
-      const wanted = !there || dirty && !(yield* sameBytes(join2(source, entry.path), to));
+      const wanted = !there || dirty && !(yield* sameBytes(join3(source, entry.path), to));
       if (wanted)
-        yield* copyInto(target, entry.path, join2(source, entry.path));
+        yield* copyInto(target, entry.path, join3(source, entry.path));
       if (dirty && !entry.path.startsWith("local/"))
         moved.push(entry);
     }
     yield* commit("chore(state): migrate the state found in a work tree");
     for (const entry of moved) {
-      const from = join2(source, entry.path);
-      if (!(yield* sameBytes(from, join2(target, entry.path))))
+      const from = join3(source, entry.path);
+      if (!(yield* sameBytes(from, join3(target, entry.path))))
         continue;
       const status = entry.status ?? "";
       if (status === "??")
@@ -10564,7 +10599,7 @@ var stageState = (worktree, env, copied) => gen2(function* () {
   if (wanted.length > 0)
     yield* gitText(worktree, env, ["--literal-pathspecs", "add", "-f", "--pathspec-from-file=-", "--pathspec-file-nul"], wanted.map((path) => `${path}\x00`).join(""));
 });
-var commitState = (directory, env, message, copied = []) => gen2(function* () {
+var commitState = (directory, env, message, copied = [], resolved) => gen2(function* () {
   const worktree = dirname2(directory);
   if (!(yield* isDirectory(worktree)))
     return false;
@@ -10577,10 +10612,14 @@ var commitState = (directory, env, message, copied = []) => gen2(function* () {
   ]).pipe(map4(([a, b]) => a === b));
   if (!own)
     return false;
-  if ((yield* stateModeOf(worktree, env)) !== "branch")
+  const known = resolved ?? {
+    mode: yield* stateModeOf(worktree, env)
+  };
+  if (known.mode !== "branch")
     return false;
   const current = yield* git(worktree, env, ["symbolic-ref", "--short", "-q", "HEAD"]);
-  if (current.code !== 0 || current.stdout.trim() !== (yield* stateBranch(worktree, env)))
+  const branch = "branch" in known ? known.branch : yield* stateBranch(worktree, env);
+  if (current.code !== 0 || current.stdout.trim() !== branch)
     return false;
   yield* stageState(worktree, env, copied);
   if (yield* gitSucceeds(worktree, env, ["diff", "--cached", "--quiet", "--", STATE_DIRECTORY]))
@@ -10610,7 +10649,7 @@ var locate = (cwd, env) => gen2(function* () {
       return;
     return yield* new StateIo({ path: cwd, cause: `git: ${complaint}` });
   }
-  const [top = cwd, common = join2(cwd, ".git")] = located.stdout.trim().split(`
+  const [top = cwd, common = join3(cwd, ".git")] = located.stdout.trim().split(`
 `).map((path) => fromGitPath(path));
   return { top, common };
 });
@@ -10623,12 +10662,13 @@ var resolveState = (cwd, env, ensure, online = true, patience) => gen2(function*
   if (mode !== "branch") {
     if (mode === "local" && ensure !== "peek")
       yield* ensureExcluded(top, common, env, patience);
-    return { root: top, directory: stateDirectory(top) };
+    return { root: top, directory: stateDirectory(top), resolved: { mode } };
   }
   const branch = yield* stateBranch(top, env);
+  const resolved = { mode, branch };
   const listed = yield* listWorktrees(top, env);
   const found = yield* checkedOut(listed, branch);
-  const standard = join2(common, "holyagent", worktreeFolder(branch));
+  const standard = join3(common, "holyagent", worktreeFolder(branch));
   const settled = found !== undefined && (!(yield* samePath(found, standard)) || (yield* fileExists(readyMarker(standard))));
   const make = ensure === "create" || ensure === "ifPresent" && (yield* keepsState(top, env, branch, listed));
   const ensured = found !== undefined && settled ? { kind: "ready", path: found, created: false } : found === undefined && !make ? { kind: "absent" } : yield* ensureWorktree(top, common, env, branch, standard, {
@@ -10637,24 +10677,24 @@ var resolveState = (cwd, env, ensure, online = true, patience) => gen2(function*
     online
   }, patience);
   if (ensured.kind === "deferred")
-    return { root: top, directory: stateDirectory(top) };
+    return { root: top, directory: stateDirectory(top), resolved };
   if (ensured.kind === "absent") {
     yield* requireFree(listed, standard, branch);
-    return { root: top, directory: stateDirectory(standard) };
+    return { root: top, directory: stateDirectory(standard), resolved };
   }
   const worktree = ensured.path;
   const directory = stateDirectory(worktree);
   if (ensure !== "peek") {
-    const own = join2(common, "holyagent");
+    const own = join3(common, "holyagent");
     const sources = ensured.created ? [
       top,
       ...listed.filter((entry) => !entry.prunable && !entry.path.startsWith(`${own}${sep2}`)).map((entry) => entry.path)
     ] : [top];
     for (const source of new Set(sources))
       if (source !== worktree && (yield* isDirectory(source)))
-        yield* migrateWorkTree(source, common, worktree, env, (message) => commitState(directory, env, message), patience);
+        yield* migrateWorkTree(source, common, worktree, env, (message) => commitState(directory, env, message, [], resolved), patience);
   }
-  return { root: top, directory };
+  return { root: top, directory, resolved };
 });
 var requireRepository = (cwd, env) => locate(cwd, env).pipe(flatMap2((repository) => repository === undefined ? fail5(new StateIo({
   path: cwd,
@@ -10670,7 +10710,7 @@ var readStateMode = (cwd, env) => gen2(function* () {
 var modeRestore = (top, env, previous) => gitSucceeds(top, env, ["config", "--local", "--get", STATE_MODE_KEY]).pipe(map4((configured) => configured ? gitText(top, env, ["config", "--local", STATE_MODE_KEY, previous]) : gitText(top, env, ["config", "--local", "--unset", STATE_MODE_KEY])));
 var setStateMode = (cwd, env, mode) => gen2(function* () {
   const { top, common } = yield* requireRepository(cwd, env);
-  return yield* withFileLock(join2(common, "holyagent", "worktree.lock"), gen2(function* () {
+  return yield* withFileLock(join3(common, "holyagent", "worktree.lock"), gen2(function* () {
     const previous = yield* stateModeOf(top, env);
     if (previous === "branch" && mode !== "branch") {
       const branch = yield* stateBranch(top, env);
@@ -10709,7 +10749,7 @@ var requireLocation = (path, expected) => path === expected ? void_3 : fail5(new
 var READ_CONCURRENCY = 16;
 var loadIntents = (directory) => gen2(function* () {
   const read = yield* forEach2(yield* scan(directory, "intents/*/intent.json"), (file) => gen2(function* () {
-    const path = join3(directory, file);
+    const path = join4(directory, file);
     const intent = yield* readJson(Intent, path);
     if (intent === undefined)
       return [];
@@ -10720,7 +10760,7 @@ var loadIntents = (directory) => gen2(function* () {
 });
 var loadAssignments = (directory, relatives, intents) => gen2(function* () {
   const read = yield* forEach2(relatives, (file) => gen2(function* () {
-    const path = join3(directory, file);
+    const path = join4(directory, file);
     const assignment = yield* readJson(Assignment, path);
     if (assignment === undefined)
       return [];
@@ -10742,7 +10782,7 @@ var loadLinks = (directory, intents) => gen2(function* () {
     const folder = intentFolder(directory, intent);
     const prefix = relative2(directory, folder);
     for (const file of yield* scan(directory, globBelow(prefix, "branches/*.json"))) {
-      const path = join3(directory, file);
+      const path = join4(directory, file);
       const record = yield* readJson(BranchRecord, path);
       if (record === undefined)
         continue;
@@ -10752,7 +10792,7 @@ var loadLinks = (directory, intents) => gen2(function* () {
       branches.push(record);
     }
     for (const file of yield* scan(directory, globBelow(prefix, "pulls/*.json"))) {
-      const path = join3(directory, file);
+      const path = join4(directory, file);
       const record = yield* readJson(PullRecord, path);
       if (record === undefined)
         continue;
@@ -10775,11 +10815,33 @@ var loadOpenProject = (directory) => gen2(function* () {
   const assignments = yield* loadAssignments(directory, relatives.flat(), intents);
   return { intents, assignments };
 });
+var withWorkTrees = (project, workTrees) => ({
+  ...project,
+  assignments: project.assignments.map((row) => {
+    const workTree = workTrees[row.id];
+    return row.state === "Running" && row.specialist !== undefined && workTree !== undefined ? { ...row, specialist: { ...row.specialist, workTree } } : row;
+  })
+});
+var withoutWorkTree = (row) => {
+  if (row.specialist?.workTree === undefined)
+    return row;
+  const { workTree: _workTree, ...specialist } = row.specialist;
+  return { ...row, specialist };
+};
+var nextWorkTrees = (current, changed) => {
+  const touched = new Map(changed.map((row) => [row.id, row.state === "Running" ? row.specialist?.workTree : undefined]));
+  const kept = Object.entries(current).flatMap(([id, workTree]) => {
+    const now = touched.has(id) ? touched.get(id) : workTree;
+    return now === undefined ? [] : [[id, now]];
+  });
+  const added = [...touched].filter(([id, workTree]) => workTree !== undefined && !(id in current));
+  return Object.fromEntries([...kept, ...added]);
+};
 var readSnapshot = (directory, load = loadProject) => gen2(function* () {
-  const project = yield* load(directory);
-  const links = yield* loadLinks(directory, project.intents);
+  const loaded = yield* load(directory);
+  const links = yield* loadLinks(directory, loaded.intents);
   const local = yield* readLocal(directory);
-  return { ...local, project, links };
+  return { ...local, project: withWorkTrees(loaded, local.workTrees), links };
 });
 var retryCorrupt = {
   schedule: spaced("25 millis"),
@@ -10788,7 +10850,8 @@ var retryCorrupt = {
 };
 var readState = (directory) => readSnapshot(directory).pipe(retry2(retryCorrupt));
 var readOpenState = (directory) => readSnapshot(directory, loadOpenProject).pipe(retry2(retryCorrupt));
-var persist = (directory, project, change) => gen2(function* () {
+var persist = (directory, snapshot, change) => gen2(function* () {
+  const { project } = snapshot;
   const intents = [...change.intents ?? [], ...project.intents];
   const files = [];
   for (const intent of change.intents ?? [])
@@ -10805,7 +10868,7 @@ var persist = (directory, project, change) => gen2(function* () {
       });
     files.push({
       path: assignmentFile(intentFolder(directory, intent), assignment),
-      content: yield* encodeJson(Assignment, assignment)
+      content: yield* encodeJson(Assignment, withoutWorkTree(assignment))
     });
   }
   for (const record of change.branches ?? []) {
@@ -10832,9 +10895,11 @@ var persist = (directory, project, change) => gen2(function* () {
       content: yield* encodeJson(PullRecord, record)
     });
   }
+  const workTrees = nextWorkTrees(snapshot.workTrees, change.assignments ?? []);
   files.push(...yield* encodeLocal(directory, {
     ...change.activeIntent === undefined ? {} : { activeIntent: change.activeIntent },
-    ...change.registry === undefined ? {} : { specialists: change.registry }
+    ...change.registry === undefined ? {} : { specialists: change.registry },
+    ...JSON.stringify(workTrees) === JSON.stringify(snapshot.workTrees) ? {} : { workTrees }
   }));
   for (const file of files)
     yield* commitFile(file.path, file.content);
@@ -10851,41 +10916,14 @@ var describe = (change) => {
   const more = records.length - MAX_LISTED;
   return `chore(state): record ${records.length === 0 ? "state" : shown}${more > 0 ? ` and ${more} more` : ""}`;
 };
-var updateState = (directory, transition, env = {}, patience = STATE_PATIENCE) => withStateLock(directory, gen2(function* () {
+var updateState = (directory, transition, env = {}, patience = STATE_PATIENCE, resolved) => withStateLock(directory, gen2(function* () {
   const snapshot = yield* readSnapshot(directory);
   const result = yield* transition(snapshot);
-  yield* persist(directory, snapshot.project, result);
+  yield* persist(directory, snapshot, result);
   if (result.intents !== undefined || result.assignments !== undefined || result.branches !== undefined || result.pulls !== undefined)
-    yield* commitState(directory, env, describe(result));
+    yield* commitState(directory, env, describe(result), [], resolved);
   return result;
 }), patience);
-
-var {$: $2 } = globalThis.Bun;
-
-import { homedir } from "os";
-import { join as join4 } from "path";
-var firstNonEmpty = (...values) => values.find((value) => value !== undefined && value !== "");
-var definedEnv = (env, omit = new Set) => Object.fromEntries(Object.entries(env).filter((entry) => entry[1] !== undefined && !omit.has(entry[0])));
-var homeDirectory = (env, fallback = homedir) => firstNonEmpty(env.HOME, env.USERPROFILE) ?? fallback();
-var claudeConfigDirectory = (env, home = homedir) => firstNonEmpty(env.CLAUDE_CONFIG_DIR) ?? join4(homeDirectory(env, home), ".claude");
-var userFiles = (env) => {
-  const home = homeDirectory(env);
-  const claudeDir = claudeConfigDirectory(env, () => home);
-  return {
-    claudeDir,
-    settings: join4(claudeDir, "settings.json"),
-    ctx7Credentials: join4(home, ".config", "context7", "credentials.json")
-  };
-};
-
-var spawn = (program, args, options) => promise2(() => {
-  const command = options.stdin === undefined ? $2`${program} ${args}` : $2`${program} ${args} < ${new Response(options.stdin)}`;
-  return command.cwd(options.cwd).env(definedEnv(options.env)).quiet().nothrow();
-}).pipe(map4((output) => ({
-  code: output.exitCode,
-  stdout: output.stdout,
-  stderr: output.stderr.toString()
-})));
 
 class Git extends Service()("holyagent/vcs/Git") {
 }
@@ -10971,7 +11009,7 @@ var readFlags = (args, spec, usage) => gen2(function* () {
   const positionals = [];
   const values = {};
   const switches = new Set;
-  const lookup = (flag) => Object.entries(spec).find(([name, shape]) => flag.startsWith("--") ? flag.slice(2) === name : flag === `-${shape.short}`);
+  const lookup = (flag) => Object.entries(spec).find(([name, shape]) => flag.startsWith("--") ? flag.slice(2) === name : shape.short !== undefined && flag === `-${shape.short}`);
   for (let index = 0;index < args.length; index += 1) {
     const arg = args[index] ?? "";
     if (arg === "--") {
@@ -11029,8 +11067,6 @@ var choiceFlag = (schema, name, value, usage) => decodeUnknownEffect2(schema)(va
   message: `Invalid value for --${name}: ${String(value)}`,
   hint: `Usage: holyagent ${usage}`
 })));
-
-import { join as join7 } from "path";
 
 var present = (record) => Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined && !(Array.isArray(value) && value.length === 0)));
 var oneLine = (text) => text.replace(/\s+/g, " ").trim();
@@ -11242,7 +11278,7 @@ var SESSION_TRAILER = /^\s*claude-session\s*:/i;
 var GENERATED_FOOTER = /^\s*(?:[^\p{L}\p{N}\s]\s*)*generated\s+with\b.*\bclaude\s+code\b/iu;
 var CO_AUTHOR = /^\s*co-authored-by\s*:\s*(.*)$/i;
 var SESSION_LINK = /https?:\/\/claude\.ai\/\S*/gi;
-var namesAgent = (coAuthor) => /^claude\b/i.test(coAuthor.trim()) || /@(?:[\w-]+\.)*anthropic\.com\b/i.test(coAuthor);
+var namesAgent = (coAuthor) => looksLikeAgent({ name: coAuthor.replace(/<.*$/, ""), email: "" }) || /@(?:[\w-]+\.)*anthropic\.com\b/i.test(coAuthor);
 var isAttribution = (line) => {
   if (SESSION_TRAILER.test(line) || GENERATED_FOOTER.test(line))
     return true;
@@ -11295,7 +11331,7 @@ var prepareMessage = (parts, allowed) => checkedText(parts.join(`
 
 import { constants } from "fs";
 import { open as open2, realpath as realpath2 } from "fs/promises";
-import { join as join5, relative as relative3, sep as sep5 } from "path";
+import { join as join6, relative as relative3, sep as sep5 } from "path";
 
 var nowIso = currentTimeMillis2.pipe(map4((millis) => new Date(millis).toISOString()));
 var readReport = (host) => host.stdin.pipe(filterOrFail2((text) => text.trim() !== "", () => new StdinMissing({ reason: "stdin was empty" })));
@@ -11321,6 +11357,19 @@ var readInputBy = (host, pick, inline) => gen2(function* () {
   return yield* decodeUnknownEffect2(pick(raw), { onExcessProperty: "error" })(raw).pipe(mapError2(invalid));
 });
 var readInput = (host, schema, inline) => readInputBy(host, () => schema, inline);
+
+import { rm as rm4 } from "fs/promises";
+import { isAbsolute, join as join5, resolve as resolve3 } from "path";
+var folderFor = (call, name) => gitMaybe(["rev-parse", "--path-format=absolute", "--git-common-dir"]).pipe(provide3(call.vcs), map4((common) => common !== undefined && isAbsolute(common) ? join5(resolve3(common), "holyagent", name) : localFile(call.directory, name)));
+var writeNamed = (call, name, assignmentId, text) => gen2(function* () {
+  const path = join5(yield* folderFor(call, name), `${assignmentId}.md`);
+  yield* io(path, () => Bun.write(path, `${text}
+`));
+  return path;
+});
+var writeBrief = (call, assignmentId, brief) => writeNamed(call, "briefs", assignmentId, brief);
+var writeReport = (call, assignmentId, report) => writeNamed(call, "reports", assignmentId, report);
+var removeFiles = (call, assignmentIds) => forEach2(["briefs", "reports"], (name) => folderFor(call, name)).pipe(flatMap2((folders) => forEach2(folders.flatMap((folder) => assignmentIds.map((id) => join5(folder, `${id}.md`))), (path) => io(path, () => rm4(path, { force: true })).pipe(as2(undefined), catch_2((error) => succeed6(error.message))))), map4((lines) => lines.filter((line) => line !== undefined)));
 
 var openIntents = (snapshot) => byId(snapshot.project.intents.filter((intent) => intent.state === "Open"));
 var chosenIntent = (snapshot) => {
@@ -11415,14 +11464,20 @@ var INTENT_COMMANDS = [
     notes: ["pull before closing: another clone may hold work this one cannot see"],
     flags: { reason: "string", drop: "string" },
     positionals: 0,
-    run: ({ update, args }) => gen2(function* () {
+    run: (call) => gen2(function* () {
+      const { update, args } = call;
       const reason = yield* requiredFlag(args, "reason", "intent close --reason <text>");
       const drop = stringFlag(args, "drop");
       const now = yield* nowIso;
-      const closed = yield* update((snapshot) => resolveIntent(snapshot).pipe(flatMap2((current) => closeIntent(snapshot.project, snapshot.specialists, current.id, { reason, ...drop === undefined ? {} : { drop } }, now))));
+      const closed = yield* update((snapshot) => resolveIntent(snapshot).pipe(flatMap2((current) => closeIntent(snapshot.project, snapshot.specialists, current.id, { reason, ...drop === undefined ? {} : { drop } }, now).pipe(map4((change) => ({
+        ...change,
+        owned: snapshot.project.assignments.filter((row) => row.intentId === current.id).map((row) => row.id)
+      }))))));
+      const unremoved = yield* removeFiles(call, closed.owned);
       return present({
         ...intentView(closed.intent),
-        dropped: closed.assignments.map((assignment) => assignment.id)
+        dropped: closed.assignments.map((assignment) => assignment.id),
+        unremoved
       });
     })
   },
@@ -11511,7 +11566,7 @@ var readBodyFile = (root, file) => {
       return yield* refuse(`is not a project path (${problem})`);
     if (hasGitSegment(file))
       return yield* refuse("is inside .git");
-    const path = join5(root, toPosix(file));
+    const path = join6(root, toPosix(file));
     const resolve = io(path, () => realpath2(path));
     const real = yield* resolve.pipe(catchIf2((error) => hasCode(error.cause, "ENOENT"), () => fail5(refuse("does not exist"))));
     const base = yield* io(root, () => realpath2(root));
@@ -11590,7 +11645,7 @@ var pullRequest = (request) => gen2(function* () {
   };
 });
 
-import { join as join6 } from "path";
+import { join as join7 } from "path";
 var VcsSettings = Struct({
   api: optionalKey2(Boolean3),
   allowWords: optionalKey2(ArraySchema(String4)),
@@ -11599,7 +11654,7 @@ var VcsSettings = Struct({
 var File2 = fromJsonString2(Record(String4, Unknown2));
 var readSettings = (directories) => gen2(function* () {
   for (const directory of directories) {
-    const path = join6(directory, "config.json");
+    const path = join7(directory, "config.json");
     const text = yield* readText(path);
     if (text === undefined)
       continue;
@@ -11611,7 +11666,7 @@ var readSettings = (directories) => gen2(function* () {
   return defaults;
 });
 
-var settingsFolders = (call) => [join7(call.root, STATE_DIRECTORY)];
+var settingsFolders = (call) => [stateDirectory(call.root)];
 var arguments_ = (call, usage, spec, positionals) => readFlags(call.args.positionals, spec, usage).pipe(filterOrFail2((args) => positionals === "any" || args.positionals.length === positionals, (args) => new Usage({
   message: `Expected ${positionals} argument(s), got ${args.positionals.length}`,
   hint: `Usage: holyagent ${usage}`
@@ -12006,22 +12061,6 @@ var closeAssignment = (project, registry, assignmentId, input, now) => gen2(func
     ...agentId === undefined ? {} : { registry: releaseSpecialist(registry, agentId, { finishedAt: now }) }
   };
 });
-
-import { rm as rm4 } from "fs/promises";
-import { isAbsolute, join as join8, resolve as resolve3 } from "path";
-var folderFor = (call, name) => gitMaybe(["rev-parse", "--path-format=absolute", "--git-common-dir"]).pipe(provide3(call.vcs), map4((common) => common !== undefined && isAbsolute(common) ? join8(resolve3(common), "holyagent", name) : localFile(call.directory, name)));
-var writeNamed = (call, name, assignmentId, text) => gen2(function* () {
-  const path = join8(yield* folderFor(call, name), `${assignmentId}.md`);
-  yield* io(path, () => Bun.write(path, `${text}
-`));
-  return path;
-});
-var writeBrief = (call, assignmentId, brief) => writeNamed(call, "briefs", assignmentId, brief);
-var writeReport = (call, assignmentId, report) => writeNamed(call, "reports", assignmentId, report);
-var removeFiles = (call, assignmentId) => forEach2(["briefs", "reports"], (name) => folderFor(call, name).pipe(flatMap2((folder) => {
-  const path = join8(folder, `${assignmentId}.md`);
-  return io(path, () => rm4(path, { force: true }));
-})), { discard: true }).pipe(ignore2);
 
 var REPORT_FIELDS = Struct({
   status: Literals(["done", "partial", "blocked"]),
@@ -12436,8 +12475,6 @@ var ASSIGNMENT_COMMANDS = [
         const accept = rationale === undefined ? undefined : yield* acceptanceFrom(yield* findAssignment(snapshot.project, id), result, rationale, false);
         return yield* closeAssignment(snapshot.project, snapshot.specialists, id, { outcome, result, ...accept === undefined ? {} : { accept } }, now);
       }));
-      if (assignment.acceptance !== undefined)
-        yield* removeFiles(call, id);
       return { id, state: assignment.state, accepted: assignment.acceptance !== undefined };
     })
   },
@@ -12463,7 +12500,6 @@ var ASSIGNMENT_COMMANDS = [
         const acceptance = yield* acceptanceFrom(found, corrected ?? found.result ?? "", rationale, booleanFlag(args, "carry-forward"));
         return corrected === undefined ? yield* accept(snapshot.project, id, acceptance) : yield* closeAssignment(snapshot.project, snapshot.specialists, id, { outcome: "Succeeded", result: corrected, accept: acceptance }, now);
       }));
-      yield* removeFiles(call, id);
       return present({
         id,
         state: assignment.state,
@@ -12480,7 +12516,7 @@ var ASSIGNMENT_COMMANDS = [
     output: "TOON: `reports` rows of id, path and words, one per Assignment id, and `notAssignmentIds` rows of label and agentId for results whose label is not an Assignment id (not written)",
     notes: [
       "the journal is the run's journal.jsonl: `started` entries (key, agentId, label) and `result` entries (key, agentId, result) joined by key; label each agent() with its Assignment id so its report lands in <id>.md",
-      "reports go to holyagent/reports in the git common directory (local/reports of the state folder outside git), beside the briefs; a repeated label keeps its last result; accepting an Assignment removes its brief and report files. Read a report there, or close from it: `assignment close <id> --outcome success --accept <rationale> < <report-file>`",
+      "reports go to holyagent/reports in the git common directory (local/reports of the state folder outside git), beside the briefs; a repeated label keeps its last result; closing the Intent removes the brief and report files of its Assignments. Read a report there, or close from it: `assignment close <id> --outcome success --accept <rationale> < <report-file>`",
       "a journal line that is not JSON, or a started or result entry without its fields, refuses the whole journal and writes nothing"
     ],
     flags: {},
@@ -12530,7 +12566,6 @@ var ASSIGNMENT_COMMANDS = [
 ];
 
 import { stat as stat2 } from "fs/promises";
-import { join as join15 } from "path";
 
 var delegating_default = "## Delegating\n\nEdits, runs, checks, reviews, research and investigation go to specialists. Read only what a decision needs; your Bash is for the holyagent CLI, Git and `gh`. If a `holyagent:*` agent type does not resolve, stop and report it; general-purpose agents are no stand-in. If the user forbids subagents, work to the same criteria and name each waived review.\n";
 
@@ -12577,12 +12612,12 @@ var history_rules_default = "- Never bypass hooks or signing (`--no-verify`, `--
 var state_changes_default = "## Leave state changes to the root\n\nLeave to the root every command that changes git, GitHub or holyagent state (`git commit`, `branch`, `push`, `checkout`, `stash`, `merge`, `reset`, `gh` writes, and `holyagent vcs`, `assignment` and `intent` commands) and anything under `.git/` or `.holyagent/`. The root owns the branch, PR and state records and records your changed paths from the report; a stray write corrupts the shared tree, and nothing blocks one, so it rests on you. When you need such a change, say so in the report. Read-only commands are open: `git status`, `diff`, `log`, `show`, `blame`, `fetch`, and `holyagent status`, `plan`, `assignment show` and `assignment list`. Never change HEAD, a branch, the index or the working tree of a checkout other workers share with git commands (`switch`, `restore`, `clean`, `add`, `rebase`, `cherry-pick`): they would find their tree changed under them. To read or test a commit, use `git show <sha>:<path>`, `git diff`, or `git archive <sha>` extracted into the scratchpad. To undo your own edit, edit the file back.\n";
 
 import { lstat as lstat3, realpath as realpath3 } from "fs/promises";
-import { dirname as dirname3, isAbsolute as isAbsolute2, join as join10, relative as relative4, resolve as resolve5, sep as sep6 } from "path";
+import { dirname as dirname3, isAbsolute as isAbsolute2, join as join9, relative as relative4, resolve as resolve5, sep as sep6 } from "path";
 
 class SetupFailure extends TaggedError2("SetupFailure") {
 }
 
-import { delimiter, join as join9 } from "path";
+import { delimiter, join as join8 } from "path";
 var {$: $3 } = globalThis.Bun;
 var pathKey = (env, insensitive = process.platform === "win32") => {
   if (!insensitive || env.PATH !== undefined)
@@ -12591,8 +12626,8 @@ var pathKey = (env, insensitive = process.platform === "win32") => {
 };
 var pathWithBunBin = (env, options) => {
   const key = pathKey(env, options.insensitive);
-  const root = options.bunInstall ? options.bunInstall : join9(options.home, ".bun");
-  const bunBin = join9(root, "bin");
+  const root = options.bunInstall ? options.bunInstall : join8(options.home, ".bun");
+  const bunBin = join8(root, "bin");
   return { key, value: `${env[key] ?? ""}${options.delimiter ?? delimiter}${bunBin}`, bunBin };
 };
 var findCommand = (env, command, options) => {
@@ -12601,7 +12636,7 @@ var findCommand = (env, command, options) => {
     PATH: options?.includeBunBin ? bunBin.value : env[bunBin.key] ?? ""
   }));
 };
-var EMPTY_BUNFIG = join9(import.meta.dir, "empty-bunfig.toml");
+var EMPTY_BUNFIG = join8(import.meta.dir, "empty-bunfig.toml");
 
 class Shell extends Service()("holyagent/Shell") {
   static live = (env) => {
@@ -12642,11 +12677,11 @@ var settingsFile = fn2("settingsFile")(function* (env, scope, cwd) {
   const named = top.exitCode === 0 && line !== "" ? resolve5(line) : undefined;
   const realTop = named === undefined ? undefined : yield* real(named);
   const realCwd = yield* real(cwd);
-  const trusted = named !== undefined && realTop !== undefined && realCwd !== undefined && within(realTop, realCwd) && (yield* present2(join10(named, ".git")));
+  const trusted = named !== undefined && realTop !== undefined && realCwd !== undefined && within(realTop, realCwd) && (yield* present2(join9(named, ".git")));
   const root = trusted ? named : cwd;
   const notice = trusted ? undefined : named === undefined ? `not inside a git repository; using ${cwd}` : `git names ${named} as the top-level, which is not the current directory or an ancestor holding a .git entry; using ${cwd}`;
-  const folder = join10(root, ".claude");
-  const file = join10(folder, scope === "project" ? "settings.json" : "settings.local.json");
+  const folder = join9(root, ".claude");
+  const file = join9(folder, scope === "project" ? "settings.json" : "settings.local.json");
   for (const path of [folder, file]) {
     if (yield* isSymlink(path)) {
       return yield* new SetupFailure({
@@ -12659,7 +12694,7 @@ var settingsFile = fn2("settingsFile")(function* (env, scope, cwd) {
 var projectSettingsFiles = fn2("projectSettingsFiles")(function* (cwd) {
   const roots = [resolve5(cwd)];
   for (let folder = resolve5(cwd);; folder = dirname3(folder)) {
-    if (yield* present2(join10(folder, ".git"))) {
+    if (yield* present2(join9(folder, ".git"))) {
       if (folder !== roots[0])
         roots.push(folder);
       break;
@@ -12668,13 +12703,13 @@ var projectSettingsFiles = fn2("projectSettingsFiles")(function* (cwd) {
       break;
   }
   return roots.flatMap((root) => [
-    join10(root, ".claude", "settings.json"),
-    join10(root, ".claude", "settings.local.json")
+    join9(root, ".claude", "settings.json"),
+    join9(root, ".claude", "settings.local.json")
   ]);
 });
 
 import { chmod, mkdir as mkdir3, realpath as realpath4, rename as rename4, rm as rm5, writeFile } from "fs/promises";
-import { basename as basename2, dirname as dirname4, join as join11 } from "path";
+import { basename as basename2, dirname as dirname4, join as join10 } from "path";
 var JsonObjectText = fromJsonString2(Record(String4, Unknown2), {
   space: 2
 });
@@ -12706,7 +12741,7 @@ var replaceJsonObject = (path, value, options, unchangedSince) => gen2(function*
   const mode = options?.mode ?? (exists ? (yield* fileOperation(target, "write", () => Bun.file(target).stat())).mode & 511 : undefined);
   const text = (yield* encodeEffect(JsonObjectText)(value, strict2).pipe(mapError2((error) => new SetupFailure({ message: `cannot encode ${path}: ${error.message}` })))) + `
 `;
-  const temporary = join11(dirname4(target), `.${basename2(target)}.${process.pid}.tmp`);
+  const temporary = join10(dirname4(target), `.${basename2(target)}.${process.pid}.tmp`);
   yield* fileOperation(dirname4(target), "write", () => mkdir3(dirname4(target), { recursive: true }));
   yield* tryPromise2({
     try: () => writeFile(temporary, text, { flag: "wx", ...mode === undefined ? {} : { mode } }),
@@ -12757,7 +12792,7 @@ var applyDefaults = (existing, defaults) => {
   return { merged, entries: [...entries.values()] };
 };
 
-import { join as join12, resolve as resolve6 } from "path";
+import { join as join11, resolve as resolve6 } from "path";
 var RecordedKey = Struct({
   path: NonEmptyArray(String4),
   value: Unknown2
@@ -12765,7 +12800,7 @@ var RecordedKey = Struct({
 var RecordFile = Struct({
   files: Record(String4, Struct({ keys: ArraySchema(RecordedKey) }))
 });
-var recordPath = (env) => join12(userFiles(env).claudeDir, "holyagent", "setup-records.json");
+var recordPath = (env) => join11(userFiles(env).claudeDir, "holyagent", "setup-records.json");
 var keyOf = (file) => resolve6(file);
 var load = (env) => gen2(function* () {
   const path = recordPath(env);
@@ -12981,11 +13016,11 @@ var setupNotice = (env, cwd) => {
 
 import { lstat as lstat4, mkdir as mkdir4, open as open3 } from "fs/promises";
 import { tmpdir, userInfo } from "os";
-import { join as join13 } from "path";
+import { join as join12 } from "path";
 var SAFE_SESSION = /^[\w.-]{1,80}$/;
 var isSessionId = (id) => id !== undefined && SAFE_SESSION.test(id) && !/^\.+$/.test(id);
-var markers = () => join13(tmpdir(), `holyagent-sessions-${(process.getuid?.() ?? userInfo().username).toString().replace(/[^\w.-]/g, "_")}`);
-var markerOf = (sessionId) => join13(markers(), sessionId);
+var markers = () => join12(tmpdir(), `holyagent-sessions-${(process.getuid?.() ?? userInfo().username).toString().replace(/[^\w.-]/g, "_")}`);
+var markerOf = (sessionId) => join12(markers(), sessionId);
 var ensureMarkers = () => {
   const folder = markers();
   const uid = process.getuid?.();
@@ -12998,7 +13033,7 @@ var create2 = (sessionId) => ensureMarkers().pipe(andThen2(io(markerOf(sessionId
 var markRulesDelivered = (sessionId) => create2(sessionId).pipe(asVoid2);
 var claimRulesDelivery = create2;
 
-import { join as join14 } from "path";
+import { join as join13 } from "path";
 var LEGACY_FOLDERS = {
   holyclaude: ".holyclaude",
   holycodex: ".holycodex"
@@ -13154,7 +13189,7 @@ var byFolder = (paths) => {
   return folders;
 };
 var convertibleFolders = (source, files) => byFolder(source === "holyclaude" ? files.filter((path) => path.startsWith("intents/")).map((path) => path.slice(8)) : files.filter((path) => !path.startsWith(".")));
-var legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join14(root, LEGACY_FOLDERS[source])).pipe(map4((files) => convertibleFolders(source, files).size > 0))).pipe(map4((sources) => sources.map((source) => LEGACY_FOLDERS[source])));
+var legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join13(root, LEGACY_FOLDERS[source])).pipe(map4((files) => convertibleFolders(source, files).size > 0))).pipe(map4((sources) => sources.map((source) => LEGACY_FOLDERS[source])));
 var isoOf = (millis) => {
   const date = new Date(millis);
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
@@ -13275,13 +13310,13 @@ var holyclaudeAssignment = (legacy, roleTask, siblings) => {
 };
 var gatherHolyclaude = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holyclaude;
-  const legacy = join14(root, folderName);
+  const legacy = join13(root, folderName);
   const intents = convertibleFolders("holyclaude", yield* listFiles(legacy));
   if (intents.size === 0)
     return;
   const state = collector("holyclaude");
   for (const [folder, inside] of intents) {
-    const base = join14(legacy, "intents", folder);
+    const base = join13(legacy, "intents", folder);
     const shown = (relative) => `${folderName}/intents/${folder}/${relative}`;
     if (!inside.includes("intent.json")) {
       unconvertible(state, shown("").slice(0, -1), "the folder has no intent.json");
@@ -13289,7 +13324,7 @@ var gatherHolyclaude = (root, directory) => gen2(function* () {
     }
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.json$/.test(path));
     const notes = inside.filter((path) => path !== "intent.json" && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join14(base, "intent.json"));
+    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join13(base, "intent.json"));
     const intent = yield* intentRecord(directory, shown("intent.json"), "problem" in read ? read : holyclaudeIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.json"), intent.problem);
@@ -13300,10 +13335,10 @@ var gatherHolyclaude = (root, directory) => gen2(function* () {
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join14(base, path), to: join14(target, path) });
+      state.notes.push({ from: join13(base, path), to: join13(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join14(base, path));
+      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join13(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (assignment.value.intent_id !== intent.value.intent.id)
@@ -13405,13 +13440,13 @@ var holycodexAssignment = (legacy, roleTask, intent, siblings) => {
 var TRANSACTION_FILE = ".holycodex-transaction.toon";
 var gatherHolycodex = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holycodex;
-  const legacy = join14(root, folderName);
+  const legacy = join13(root, folderName);
   const folders = convertibleFolders("holycodex", yield* listFiles(legacy));
   if (folders.size === 0)
     return;
   const state = collector("holycodex");
   for (const [folder, inside] of folders) {
-    const base = join14(legacy, folder);
+    const base = join13(legacy, folder);
     const shown = (relative) => `${folderName}/${folder}/${relative}`;
     if (!inside.includes("intent.toon")) {
       unconvertible(state, `${folderName}/${folder}`, "the folder has no intent.toon");
@@ -13425,7 +13460,7 @@ var gatherHolycodex = (root, directory) => gen2(function* () {
       });
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.toon$/.test(path));
     const notes = inside.filter((path) => path !== "intent.toon" && path !== TRANSACTION_FILE && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join14(base, "intent.toon"));
+    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join13(base, "intent.toon"));
     const intent = yield* intentRecord(directory, shown("intent.toon"), "problem" in read ? read : holycodexIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.toon"), intent.problem);
@@ -13436,10 +13471,10 @@ var gatherHolycodex = (root, directory) => gen2(function* () {
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join14(base, path), to: join14(target, path) });
+      state.notes.push({ from: join13(base, path), to: join13(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join14(base, path));
+      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join13(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (mapId("intent", assignment.value.intent_id) !== intent.value.intent.id)
@@ -13636,13 +13671,18 @@ var awaited = (project, review) => isReviewer(review.roleTask) ? review.independ
   const state = project.assignments.find((row) => row.id === id)?.state;
   return state === "Ready" || state === "Running";
 }) : [];
-var reviewedWriters = ({ project, dispatchable, ready }) => {
+var reviewedWriters = ({
+  project,
+  dispatchable,
+  ready,
+  workTree
+}) => {
   const pairs = [];
   const writers = [];
   for (const writer of dispatchable.filter((row) => isWriter(row.roleTask))) {
     if (!writers.every((other) => independent(other, writer)))
       continue;
-    const review = ready.find((row) => !pairs.includes(row) && isReviewer(row.roleTask) && row.independentFrom.includes(writer.id) && awaited(project, row).every((id) => id === writer.id) && dispatchBlock(project, row) === undefined);
+    const review = ready.find((row) => !pairs.includes(row) && isReviewer(row.roleTask) && row.independentFrom.includes(writer.id) && awaited(project, row).every((id) => id === writer.id) && dispatchBlock(project, row, undefined, workTree) === undefined);
     if (review === undefined)
       continue;
     writers.push(writer);
@@ -13662,15 +13702,16 @@ var continuations = (rows, beside, registry, now, config) => parallelSet(rows.fi
   const directive = directiveFor(row, registry, now, config);
   return directive.action === "continue" ? [{ assignmentId: row.id, agentId: directive.agentId }] : [];
 });
-var recommend = (project, registry, now, config) => {
+var recommend = (project, registry, now, config, workTree) => {
   const ready = project.assignments.filter((row) => row.state === "Ready");
-  const dispatchable = ready.filter((row) => dispatchBlock(project, row) === undefined && awaited(project, row).length === 0);
+  const dispatchable = ready.filter((row) => dispatchBlock(project, row, undefined, workTree) === undefined && awaited(project, row).length === 0);
   if (config.workflowsAvailable) {
     const spawns = (row) => directiveFor(row, registry, now, config).action === "spawn";
     const pool = {
       project,
       dispatchable: dispatchable.filter(spawns),
-      ready: ready.filter(spawns)
+      ready: ready.filter(spawns),
+      workTree
     };
     for (const [reason, pick, paired] of SHAPES) {
       const chosen = pick(pool);
@@ -13770,9 +13811,8 @@ var resumeOf = (directory) => readOpenState(directory).pipe(map4((snapshot) => (
   reconcile: reconcileFrom(snapshot)
 })));
 var PLAN_NOTES = [
-  "workflow first: `assignment dispatch` each id for its agent, model, effort and prompt, then write the inline script yourself and run it with the Workflow tool; an entry is {id, agent, model, effort, prompt}, where the prompt is the short one `assignment dispatch` printed, passed as it is. A single Assignment is a one-entry workflow, and `continues` lists work that continues a warm specialist by SendMessage beside it. `fallback` is for a session where the Workflow tool is disabled or unavailable: its writers launch together, and `afterwards` launch once the writers they depend on are terminal",
-  "the script opens with a literal `export const meta = {name, description}` and has one agent() per entry, every one with agentType holyagent:<agent> and the entry's model and effort. Run the entries through pipeline() and put a review stage after its writers; return only `{ done: [ids] }`, the Assignments whose agent returned a report. An inline script whose every agent() names a holyagent specialist runs without a permission prompt; any other agent type, a scriptPath or a resume goes through the normal flow",
-  "after the run, record each entry with `assignment record <id> --agent workflow:<run-id>/<id>`, write the reports with `assignment reports <journal.jsonl>` and close each Assignment from its report file, verbatim, as `assignment close <id> --outcome <o> [--accept <rationale>] < <report-file>`. An Assignment that `assignment reports` does not list follows the closing rule in the root workflow text"
+  "`workflow` first: `assignments` are the ids in run order, a writer followed by the review of its work; `assignment dispatch` each for its agent, model, effort and prompt, then write the inline script as the root workflow text says. A single Assignment is a one-entry workflow",
+  "`continues` lists Ready work that continues a warm specialist, by SendMessage beside the workflow. `fallback` is the same work as direct subagents, for a session where the Workflow tool is disabled or unavailable: its writers launch together, and the `afterwards` reviews launch once the writers they depend on are terminal"
 ];
 var OVERVIEW_COMMANDS = [
   {
@@ -13782,7 +13822,7 @@ var OVERVIEW_COMMANDS = [
     notes: PLAN_NOTES,
     flags: {},
     positionals: 0,
-    run: ({ directory, config }) => gen2(function* () {
+    run: ({ directory, config, root }) => gen2(function* () {
       const settings = yield* config;
       const snapshot = yield* readOpenState(directory);
       const intent = yield* resolveIntent(snapshot);
@@ -13790,7 +13830,7 @@ var OVERVIEW_COMMANDS = [
       const recommendation = recommend({
         intents: [intent],
         assignments: snapshot.project.assignments.filter((row) => row.intentId === intent.id)
-      }, snapshot.specialists, now, settings);
+      }, snapshot.specialists, now, settings, workTreeKey(root));
       if (recommendation === undefined)
         return { action: "none", reason: "no Ready Assignment can start now" };
       return present({
@@ -19339,8 +19379,58 @@ var MAX_DEPTH = 120;
 var MAX_LOOP_COUNT = 1000;
 var MAX_NESTED_ITERATIONS = 1e4;
 var MAX_TEXT_COUNT = 1000;
+var MAX_REPEATED_TEXT = 8;
+var MAX_WRITE_INDEX = 1000;
+var DATA_ITERATIONS = 100;
+var MAX_ANALYSIS_STEPS = 200000;
 var TEXT_COUNTS = new Set(["repeat", "padStart", "padEnd"]);
 var GROWING_METHODS = new Set(["push", "unshift", "splice"]);
+var CALLBACK_ARGUMENTS = new Map([
+  ["map", 0],
+  ["filter", 0],
+  ["flatMap", 0],
+  ["forEach", 0],
+  ["reduce", 0],
+  ["find", 0],
+  ["findIndex", 0],
+  ["some", 0],
+  ["every", 0],
+  ["sort", 0],
+  ["from", 1],
+  ["then", "all"],
+  ["catch", "all"],
+  ["finally", "all"]
+]);
+var RESULT_METHODS = new Set(["map", "then", "catch", "finally", "from"]);
+var ITERATING_METHODS = new Set([
+  "map",
+  "filter",
+  "flatMap",
+  "forEach",
+  "reduce",
+  "find",
+  "findIndex",
+  "some",
+  "every",
+  "sort",
+  "from"
+]);
+var COPYING_METHODS = new Set([
+  "slice",
+  "concat",
+  "flat",
+  "sort",
+  "reverse",
+  "filter"
+]);
+var COMBINING_METHODS = new Set([
+  "concat",
+  "push",
+  "unshift",
+  "splice",
+  "replace",
+  "replaceAll"
+]);
 var GLOBALS = new Set([
   "parallel",
   "pipeline",
@@ -19479,7 +19569,7 @@ var GLOBAL_CALLS = {
   JSON: new Set(["stringify", "parse"]),
   Math: new Set(["max", "min", "abs", "floor", "ceil", "round", "trunc", "sqrt", "pow", "sign"]),
   Number: new Set(["isInteger", "isFinite", "isNaN", "parseFloat", "parseInt"]),
-  Promise: new Set(["all", "allSettled", "race", "resolve", "reject"]),
+  Promise: new Set(["all", "allSettled", "resolve", "reject"]),
   budget: new Set(["spent", "remaining"])
 };
 var GLOBAL_FIELDS = {
@@ -19531,6 +19621,12 @@ var AGENT_OPTIONS = new Set([
 ]);
 var SPECIALISTS = new Set(ROUTES.map((route) => `${PLUGIN_NAMESPACE}:${route.agent}`));
 var UNARY = new Set(["!", "-", "+", "~", "typeof", "void"]);
+var newBinding = () => ({
+  unsafe: false,
+  inits: [],
+  functions: new Set,
+  sources: []
+});
 var childScope = (parent, isFunction) => ({
   parent,
   names: new Map,
@@ -19610,14 +19706,102 @@ var setsName = (body, name) => anyNode(body, (node) => {
   assignedNames(target, names);
   return names.has(name);
 });
-var growsName = (body, name) => anyNode(body, (node) => {
+var isFunctionLiteral = (node) => node?.type === "ArrowFunctionExpression" || node?.type === "FunctionExpression";
+var copiedNames = (pattern) => {
+  if (pattern?.type === "Identifier")
+    return [nameOf(pattern) ?? ""];
+  const entries = nodesAt(pattern ?? { type: "" }, pattern?.type === "ArrayPattern" ? "elements" : "properties");
+  return entries.flatMap((entry) => {
+    const into = new Set;
+    if (entry?.type === "RestElement")
+      assignedNames(entry, into);
+    return [...into];
+  });
+};
+var unspread = (node) => node?.type === "SpreadElement" ? nodeAt(node, "argument") : node;
+var definedNodes = (list) => list.filter((node) => node !== undefined);
+var replacesWithMore = (value, target) => {
+  const roots = identifiersIn(target);
+  return anyNode(value, (node) => {
+    const callee = node.type === "CallExpression" ? nodeAt(node, "callee") : undefined;
+    const method = callee?.type === "MemberExpression" ? nameOf(nodeAt(callee, "property")) : undefined;
+    if (method !== "replace" && method !== "replaceAll")
+      return false;
+    const [pattern, replacement] = nodesAt(node, "arguments");
+    const from = pattern?.type === "Literal" ? pattern["value"] : undefined;
+    const to = replacement?.type === "Literal" ? replacement["value"] : undefined;
+    return typeof from === "string" && typeof to === "string" && to.length > from.length && identifiersIn(nodeAt(callee ?? node, "object")).some((name) => roots.includes(name));
+  });
+};
+var isChain = (node) => node?.type === "Identifier" || node?.type === "MemberExpression" && isChain(nodeAt(node, "object"));
+var fieldOf = (member) => {
+  const property = nodeAt(member, "property");
+  return member["computed"] === true && property?.type === "Literal" ? String(property["value"]) : nameOf(property) ?? "?";
+};
+var identifiersIn = (node, into = [], depth = 0) => {
+  if (depth > MAX_DEPTH)
+    return into;
+  if (Array.isArray(node)) {
+    for (const item of node)
+      identifiersIn(item, into, depth + 1);
+    return into;
+  }
+  if (!isNode(node))
+    return into;
+  if (node.type === "Identifier") {
+    into.push(nameOf(node) ?? "");
+    return into;
+  }
+  const skipped = node.type === "MemberExpression" && node["computed"] !== true ? "property" : node.type === "Property" && node["computed"] !== true ? "key" : undefined;
+  for (const [field, value] of Object.entries(node))
+    if (field !== skipped && typeof value === "object")
+      identifiersIn(value, into, depth + 1);
+  return into;
+};
+var occurrencesIn = (node, scope, into, depth = 0) => {
+  if (depth > MAX_DEPTH)
+    return into;
+  if (Array.isArray(node)) {
+    for (const item of node)
+      occurrencesIn(item, scope, into, depth + 1);
+    return into;
+  }
+  if (!isNode(node))
+    return into;
+  if (node.type === "ArrowFunctionExpression" || node.type === "FunctionExpression")
+    return into;
+  if (node.type === "Identifier") {
+    into.push({ name: nameOf(node) ?? "", scope, path: [] });
+    return into;
+  }
+  if (node.type === "MemberExpression") {
+    const path = [];
+    let at = node;
+    while (at?.type === "MemberExpression") {
+      path.unshift(fieldOf(at));
+      at = nodeAt(at, "object");
+    }
+    if (at?.type === "Identifier")
+      into.push({ name: nameOf(at) ?? "", scope, path });
+    else
+      occurrencesIn(at, scope, into, depth + 1);
+    return into;
+  }
   if (node.type === "CallExpression") {
     const callee = nodeAt(node, "callee");
-    return callee?.type === "MemberExpression" && callee["computed"] !== true && GROWING_METHODS.has(nameOf(nodeAt(callee, "property")) ?? "") && rootName(nodeAt(callee, "object")) === name;
+    if (callee?.type === "MemberExpression")
+      occurrencesIn(nodeAt(callee, "object"), scope, into, depth + 1);
+    else if (callee?.type !== "Identifier")
+      occurrencesIn(callee, scope, into, depth + 1);
+    occurrencesIn(node["arguments"], scope, into, depth + 1);
+    return into;
   }
-  const target = node.type === "AssignmentExpression" ? nodeAt(node, "left") : node.type === "UpdateExpression" ? nodeAt(node, "argument") : undefined;
-  return target?.type === "MemberExpression" && rootName(target) === name;
-});
+  const skipped = node.type === "Property" && node["computed"] !== true ? "key" : undefined;
+  for (const [field, value] of Object.entries(node))
+    if (field !== skipped && typeof value === "object")
+      occurrencesIn(value, scope, into, depth + 1);
+  return into;
+};
 var inspect = (script) => {
   if (script.length > MAX_WORKFLOW_SCRIPT)
     return "the script is too large";
@@ -19636,10 +19820,37 @@ var inspect = (script) => {
   const memberWrites = [];
   let agentCalls = 0;
   let loopWork = 1;
+  const rootContext = { max: 1, calls: [] };
+  let context = rootContext;
+  const contexts = new Map;
+  let functionsAround = [];
+  let walks = [];
+  let loopDepth = 0;
+  const everyWalk = [];
+  const growths = [];
+  const combinations = [];
+  const dynamicIn = [];
+  const allowedFunctions = new Set;
+  const namedFunctions = new Set;
+  const functionMakers = new Set;
+  const resultCallbacks = new Set;
+  const freshResults = new Set;
+  const functionAssignments = [];
+  let analysisSteps = 0;
+  const spend = () => {
+    analysisSteps += 1;
+    return analysisSteps <= MAX_ANALYSIS_STEPS;
+  };
+  const setWork = (next) => {
+    loopWork = next;
+    context.max = Math.max(context.max, next);
+    if (next > MAX_NESTED_ITERATIONS)
+      refuse("nests loops that run too many iterations");
+  };
   const declare = (scope, name, origin) => {
     if (GLOBALS.has(name) || HOST_GLOBALS.has(name) || DENIED_NAMES.has(name) || name === "agent")
       refuse(`declares ${name}, a name of the host`);
-    const held = scope.names.get(name) ?? { unsafe: false, inits: [] };
+    const held = scope.names.get(name) ?? newBinding();
     if (origin === "unsafe")
       held.unsafe = true;
     else if (origin !== undefined)
@@ -19649,9 +19860,23 @@ var inspect = (script) => {
   const refer = (node, scope, use) => {
     const name = nameOf(node);
     if (name === undefined)
-      refuse("reads a name it cannot read");
-    else
-      references.push({ name, scope, use });
+      return refuse("reads a name it cannot read");
+    const reference = {
+      name,
+      scope,
+      use,
+      within: functionsAround,
+      factor: loopWork
+    };
+    references.push(reference);
+    if (use !== "callee")
+      return;
+    context.calls.push(reference);
+    for (const walk of walks)
+      walk.calls.push(reference);
+  };
+  const callsBlind = () => {
+    dynamicIn.push(functionsAround);
   };
   const evaluating = new Set;
   const builtBinding = (held) => {
@@ -19732,7 +19957,18 @@ var inspect = (script) => {
       if (declarator?.type !== "VariableDeclarator")
         return refuse("declares oddly");
       const init = nodeAt(declarator, "init");
-      declarePattern(nodeAt(declarator, "id"), scope, kind === "var" ? varScope(scope) : scope, depth + 1, loop ?? (init === undefined ? undefined : () => builtHere(init, scope)));
+      const id = nodeAt(declarator, "id");
+      const target = kind === "var" ? varScope(scope) : scope;
+      declarePattern(id, scope, target, depth + 1, loop ?? (init === undefined ? undefined : () => builtHere(init, scope)));
+      if (init !== undefined && loop === undefined) {
+        if (isFunctionLiteral(init) && id?.type === "Identifier") {
+          allowedFunctions.add(init);
+          namedFunctions.add(init);
+          target.names.get(nameOf(id) ?? "")?.functions.add(init);
+        } else
+          for (const name of copiedNames(id))
+            target.names.get(name)?.sources.push({ node: init, scope });
+      }
       expression(init, scope, depth + 1);
     }
   };
@@ -19741,22 +19977,43 @@ var inspect = (script) => {
       return refuse("uses a generator");
     const inner = childScope(scope, true);
     const own = nameOf(nodeAt(node, "id"));
-    if (node.type === "FunctionExpression" && own !== undefined)
+    if (node.type === "FunctionExpression" && own !== undefined) {
       declare(inner, own, "unsafe");
+      inner.names.get(own)?.functions.add(node);
+    }
     for (const parameter of nodesAt(node, "params"))
       declarePattern(parameter, inner, inner, depth + 1, "unsafe");
+    const outerWork = loopWork;
+    const outerContext = context;
+    if (node.type === "FunctionDeclaration" || namedFunctions.has(node)) {
+      loopWork = 1;
+      context = { max: 1, calls: [] };
+      contexts.set(node, context);
+    }
+    const outerFunctions = functionsAround;
+    functionsAround = [...functionsAround, node];
     const body = nodeAt(node, "body");
     if (body?.type === "BlockStatement")
       statements(nodesAt(body, "body"), inner, depth + 1);
-    else
+    else {
+      if (isFunctionLiteral(body) && functionMakers.has(node)) {
+        allowedFunctions.add(body);
+        functionMakers.add(body);
+      }
+      if (body !== undefined && resultCallbacks.has(node))
+        freshResults.add(body);
       expression(body, inner, depth + 1);
+    }
+    functionsAround = outerFunctions;
+    loopWork = outerWork;
+    context = outerContext;
   };
   const objectProperty = (property, scope, depth) => {
     if (property?.type === "SpreadElement")
       return expression(nodeAt(property, "argument"), scope, depth + 1);
     const key = nodeAt(property ?? { type: "" }, "key");
     const keyName = key?.type === "Literal" && (typeof key["value"] === "string" || typeof key["value"] === "number") ? String(key["value"]) : nameOf(key);
-    if (property?.type !== "Property" || property["computed"] !== false || property["kind"] !== "init" || property["method"] === true || keyName === undefined || DENIED_NAMES.has(keyName))
+    if (property?.type !== "Property" || property["computed"] !== false || property["kind"] !== "init" || property["method"] === true || keyName === undefined || keyName === "length" || DENIED_NAMES.has(keyName))
       return refuse("builds an object with a key it cannot vet");
     expression(nodeAt(property, "value"), scope, depth + 1);
   };
@@ -19816,32 +20073,100 @@ var inspect = (script) => {
       return agentCall(node, scope, depth);
     if (node["optional"] === true)
       return refuse("makes an optional call");
-    if (callee?.type === "Identifier")
+    const given = nodesAt(node, "arguments");
+    const values = definedNodes(given.map(unspread));
+    let callbacks = [];
+    let passes = 1;
+    if (callee?.type === "Identifier") {
       refer(callee, scope, "callee");
-    else if (callee?.type === "MemberExpression") {
+      const name = nameOf(callee);
+      if (name === "parallel" || name === "pipeline")
+        callsBlind();
+      if (name === "pipeline") {
+        callbacks = given.slice(1);
+        passes = DATA_ITERATIONS;
+        for (const stage of callbacks)
+          if (isFunctionLiteral(stage))
+            resultCallbacks.add(stage);
+      }
+      if (name === "parallel")
+        callbacks = given.flatMap((argument) => argument?.type === "ArrayExpression" ? nodesAt(argument, "elements") : []);
+      if (values.length > 1)
+        combinations.push({ operands: values, scope, callee: name });
+    } else if (callee?.type === "MemberExpression") {
       memberExpression(callee, scope, depth + 1, true);
-      const limit = MAX_ARGUMENTS[nameOf(nodeAt(callee, "property")) ?? ""];
-      const given = nodesAt(node, "arguments");
-      if (callee["computed"] !== true && limit !== undefined && (given.length > limit || given.some((argument) => argument?.type === "SpreadElement")))
+      const computed = callee["computed"] === true;
+      const method = computed ? "" : nameOf(nodeAt(callee, "property")) ?? "";
+      const object = nodeAt(callee, "object");
+      const owner = nameOf(object);
+      if (computed)
+        callsBlind();
+      const limit = MAX_ARGUMENTS[method];
+      if (!computed && limit !== undefined && (given.length > limit || given.some((argument) => argument?.type === "SpreadElement")))
         refuse("passes a method more arguments than its callback (a this value)");
-      const method = nameOf(nodeAt(callee, "property")) ?? "";
       const count = integerLiteral(given[0]);
-      if (callee["computed"] !== true && TEXT_COUNTS.has(method) && given.length > 0 && (count === undefined || count < 0 || count > MAX_TEXT_COUNT))
+      if (TEXT_COUNTS.has(method) && given.length > 0 && (count === undefined || count < 0 || count > MAX_TEXT_COUNT))
         refuse(`calls .${method} with a count that is not a literal of at most ${MAX_TEXT_COUNT}`);
-    } else if (callee?.type === "ArrowFunctionExpression" || callee?.type === "FunctionExpression")
+      const repeated = object?.type === "Literal" ? object["value"] : undefined;
+      if (method === "repeat" && (typeof repeated !== "string" || repeated.length > MAX_REPEATED_TEXT))
+        refuse(`repeats something that is not a literal of at most ${MAX_REPEATED_TEXT} characters`);
+      if (owner === "Array" && method === "from" && given[0]?.type === "ObjectExpression")
+        refuse("builds an array from an object, whose length it could set");
+      const position = CALLBACK_ARGUMENTS.get(method);
+      if (position !== undefined) {
+        callbacks = position === "all" ? given : given.slice(position, position + 1);
+        if (callbacks.some((argument) => !isFunctionLiteral(argument)))
+          callsBlind();
+        for (const argument of callbacks)
+          if (isFunctionLiteral(argument)) {
+            functionMakers.add(argument);
+            if (RESULT_METHODS.has(method))
+              resultCallbacks.add(argument);
+          }
+        if (ITERATING_METHODS.has(method))
+          passes = DATA_ITERATIONS;
+      }
+      if (COMBINING_METHODS.has(method) && object !== undefined)
+        combinations.push({ operands: [object, ...values], scope, merging: true });
+      else if (owner === "Array" && method === "of")
+        combinations.push({ operands: values, scope });
+      if (GROWING_METHODS.has(method) && object !== undefined) {
+        const site = {
+          names: identifiersIn(object),
+          opaque: !isChain(object),
+          scope,
+          within: functionsAround
+        };
+        growths.push(site);
+        for (const walk of walks)
+          walk.sites.push(site);
+      }
+    } else if (isFunctionLiteral(callee))
       functionNode(callee, scope, depth + 1);
     else
       return refuse("calls something it cannot vet");
-    for (const argument of nodesAt(node, "arguments"))
+    for (const argument of callbacks)
+      if (isFunctionLiteral(argument))
+        allowedFunctions.add(argument);
+    const outerWork = loopWork;
+    for (const argument of given) {
+      if (passes > 1 && callbacks.includes(argument))
+        setWork(outerWork * passes);
       expression(argument?.type === "SpreadElement" ? nodeAt(argument, "argument") : argument, scope, depth + 1);
+      loopWork = outerWork;
+    }
   };
-  const writeTarget = (node, scope, depth, builtValue) => {
+  const writeTarget = (node, scope, depth, builtValue, right) => {
     if (node?.type === "Identifier") {
       refer(node, scope, "write");
-      assignments.push({ name: nameOf(node) ?? "", scope, builtHere: builtValue });
+      assignments.push({ name: nameOf(node) ?? "", scope, right, builtHere: builtValue });
       return;
     }
     if (node?.type === "MemberExpression") {
+      const property = nodeAt(node, "property");
+      const index = property?.type === "Literal" ? property["value"] : undefined;
+      if (node["computed"] !== true && nameOf(property) === "length" || typeof index === "number" && index > MAX_WRITE_INDEX)
+        refuse(`writes a length or an index above ${MAX_WRITE_INDEX} into an array`);
       memberWrites.push({ root: rootName(node), scope });
       return memberExpression(node, scope, depth + 1, false);
     }
@@ -19860,19 +20185,38 @@ var inspect = (script) => {
           refuse("uses a regular expression or a bigint");
         return;
       case "TemplateLiteral":
+        combinations.push({
+          operands: definedNodes(nodesAt(node, "expressions")),
+          scope,
+          merging: true
+        });
         for (const part of nodesAt(node, "expressions"))
           expression(part, scope, depth + 1);
         return;
       case "ArrayExpression":
+        if (!freshResults.has(node))
+          combinations.push({
+            operands: definedNodes(nodesAt(node, "elements").map(unspread)),
+            scope,
+            merging: nodesAt(node, "elements").some((element) => element?.type === "SpreadElement")
+          });
         for (const element of nodesAt(node, "elements"))
           expression(element?.type === "SpreadElement" ? nodeAt(element, "argument") : element, scope, depth + 1);
         return;
       case "ObjectExpression":
+        if (!freshResults.has(node))
+          combinations.push({
+            operands: definedNodes(nodesAt(node, "properties").map((property) => property?.type === "SpreadElement" ? nodeAt(property, "argument") : nodeAt(property ?? node, "value"))),
+            scope,
+            merging: nodesAt(node, "properties").some((property) => property?.type === "SpreadElement")
+          });
         for (const property of nodesAt(node, "properties"))
           objectProperty(property, scope, depth);
         return;
       case "ArrowFunctionExpression":
       case "FunctionExpression":
+        if (!allowedFunctions.has(node))
+          return refuse("holds a function where only a callback may be");
         return functionNode(node, scope, depth);
       case "UnaryExpression":
         if (!UNARY.has(String(node["operator"])))
@@ -19882,11 +20226,28 @@ var inspect = (script) => {
         return writeTarget(nodeAt(node, "argument"), scope, depth, () => true);
       case "BinaryExpression":
       case "LogicalExpression":
+        if (node["operator"] === "+")
+          combinations.push({
+            operands: definedNodes([nodeAt(node, "left"), nodeAt(node, "right")]),
+            scope,
+            merging: true
+          });
         expression(nodeAt(node, "left"), scope, depth + 1);
         return expression(nodeAt(node, "right"), scope, depth + 1);
       case "AssignmentExpression": {
+        const left = nodeAt(node, "left");
         const right = nodeAt(node, "right");
-        writeTarget(nodeAt(node, "left"), scope, depth, node["operator"] === "=" ? () => builtHere(right, scope) : () => true);
+        const operator = node["operator"];
+        if (operator === "=" && left?.type === "Identifier" && isFunctionLiteral(right)) {
+          allowedFunctions.add(right);
+          namedFunctions.add(right);
+          functionAssignments.push({ name: nameOf(left) ?? "", scope, node: right });
+        }
+        if (operator === "+=")
+          combinations.push({ operands: definedNodes([left, right]), scope, merging: true });
+        if ((operator === "=" || operator === "+=") && (functionsAround.length > 0 || loopDepth > 0) && replacesWithMore(right, left))
+          refuse("replaces text with longer text again and again");
+        writeTarget(left, scope, depth, operator === "=" ? () => builtHere(right, scope) : () => true, operator === "=" && !isFunctionLiteral(right) ? right : undefined);
         return expression(right, scope, depth + 1);
       }
       case "ConditionalExpression":
@@ -19922,12 +20283,24 @@ var inspect = (script) => {
         return expression(nodeAt(node, "expression"), scope, depth + 1);
       case "VariableDeclaration":
         return variableDeclaration(node, scope, depth);
-      case "FunctionDeclaration":
-        declare(scope, nameOf(nodeAt(node, "id")) ?? "", "unsafe");
+      case "FunctionDeclaration": {
+        const name = nameOf(nodeAt(node, "id")) ?? "";
+        declare(scope, name, "unsafe");
+        scope.names.get(name)?.functions.add(node);
         return functionNode(node, scope, depth);
+      }
       case "ReturnStatement":
-      case "ThrowStatement":
-        return expression(nodeAt(node, "argument"), scope, depth + 1);
+      case "ThrowStatement": {
+        const result = nodeAt(node, "argument");
+        const maker = functionsAround[functionsAround.length - 1];
+        if (node.type === "ReturnStatement" && isFunctionLiteral(result) && maker !== undefined && functionMakers.has(maker)) {
+          allowedFunctions.add(result);
+          functionMakers.add(result);
+        }
+        if (node.type === "ReturnStatement" && result !== undefined && maker !== undefined && resultCallbacks.has(maker))
+          freshResults.add(result);
+        return expression(result, scope, depth + 1);
+      }
       case "IfStatement":
         expression(nodeAt(node, "test"), scope, depth + 1);
         statement(nodeAt(node, "consequent"), scope, depth + 1);
@@ -19940,9 +20313,7 @@ var inspect = (script) => {
         if (counted === undefined || counted.count > MAX_LOOP_COUNT || setsName(nodeAt(node, "body"), counted.counter))
           refuse(`runs a for loop that is not a counted loop of at most ${MAX_LOOP_COUNT} iterations (for (let i = 0; i < 10; i++))`);
         const outerWork = loopWork;
-        loopWork *= Math.max(counted?.count ?? 1, 1);
-        if (loopWork > MAX_NESTED_ITERATIONS)
-          refuse("nests loops that run too many iterations");
+        setWork(loopWork * Math.max(counted?.count ?? 1, 1));
         const init = nodeAt(node, "init");
         if (init?.type === "VariableDeclaration")
           variableDeclaration(init, loop, depth + 1);
@@ -19950,7 +20321,9 @@ var inspect = (script) => {
           expression(init, loop, depth + 1);
         expression(nodeAt(node, "test"), loop, depth + 1);
         expression(nodeAt(node, "update"), loop, depth + 1);
+        loopDepth += 1;
         statement(nodeAt(node, "body"), loop, depth + 1);
+        loopDepth -= 1;
         loopWork = outerWork;
         return;
       }
@@ -19962,11 +20335,22 @@ var inspect = (script) => {
           variableDeclaration(left, loop, depth + 1, "unsafe");
         else
           writeTarget(left, loop, depth + 1, () => false);
-        const walked = rootName(nodeAt(node, "right"));
-        if (node.type === "ForOfStatement" && walked !== undefined && growsName(nodeAt(node, "body"), walked))
-          refuse("grows the array a for-of loop walks");
-        expression(nodeAt(node, "right"), loop, depth + 1);
-        return statement(nodeAt(node, "body"), loop, depth + 1);
+        const right = nodeAt(node, "right");
+        expression(right, loop, depth + 1);
+        const walk = { walked: identifiersIn(right), scope, sites: [], calls: [] };
+        const outerWork = loopWork;
+        const outerWalks = walks;
+        if (node.type === "ForOfStatement") {
+          everyWalk.push(walk);
+          walks = [...walks, walk];
+        }
+        setWork(outerWork * DATA_ITERATIONS);
+        loopDepth += 1;
+        statement(nodeAt(node, "body"), loop, depth + 1);
+        loopDepth -= 1;
+        walks = outerWalks;
+        loopWork = outerWork;
+        return;
       }
       case "WhileStatement":
       case "DoWhileStatement":
@@ -20016,6 +20400,198 @@ var inspect = (script) => {
       return property?.type === "Property" && property["computed"] === false && property["kind"] === "init" && property["method"] !== true && name !== undefined && !DENIED_NAMES.has(name) && literalOnly(nodeAt(property, "value"), depth + 1);
     });
   };
+  function analyse() {
+    const keyOf = (name, scope) => binding(scope, name) ?? (name === "args" ? "args" : undefined);
+    const dynamic = new Set;
+    for (const within of dynamicIn)
+      for (const caller of within)
+        dynamic.add(caller);
+    const edges = new Map;
+    const calls = references.filter((reference) => reference.use === "callee");
+    for (const call of calls) {
+      const held = binding(call.scope, call.name);
+      if (held === undefined)
+        continue;
+      if (held.functions.size === 0) {
+        for (const caller of call.within)
+          dynamic.add(caller);
+        continue;
+      }
+      for (const caller of call.within) {
+        const callees = edges.get(caller) ?? new Set;
+        for (const callee of held.functions)
+          callees.add(callee);
+        edges.set(caller, callees);
+      }
+    }
+    for (const call of calls) {
+      const held = binding(call.scope, call.name);
+      if (call.within.length > 0 && held !== undefined && [...held.functions].some((callee) => dynamic.has(callee)))
+        refuse(`calls ${call.name} from a function, and ${call.name} calls what it cannot see`);
+    }
+    const visiting = new Map;
+    const loops = (caller) => {
+      const seen = visiting.get(caller);
+      if (seen !== undefined)
+        return seen === "open";
+      visiting.set(caller, "open");
+      const found = [...edges.get(caller) ?? []].some(loops);
+      visiting.set(caller, "done");
+      return found;
+    };
+    if ([...edges.keys()].some(loops))
+      return refuse("has a function that calls itself");
+    const costs = new Map;
+    const cost = (work) => {
+      const known = costs.get(work);
+      if (known !== undefined)
+        return known;
+      costs.set(work, work.max);
+      let total = work.max;
+      for (const call of work.calls)
+        for (const callee of binding(call.scope, call.name)?.functions ?? []) {
+          const inner = contexts.get(callee);
+          if (inner !== undefined)
+            total = Math.max(total, call.factor * cost(inner));
+        }
+      costs.set(work, total);
+      return total;
+    };
+    if (cost(rootContext) > MAX_NESTED_ITERATIONS)
+      refuse("calls functions that run too many iterations from its loops");
+    const copiedFrom = (node, scope, deep = true) => {
+      if (node === undefined)
+        return [];
+      if (isChain(node))
+        return occurrencesIn(node, scope, []);
+      if (!deep)
+        return [];
+      switch (node.type) {
+        case "AwaitExpression":
+          return copiedFrom(nodeAt(node, "argument"), scope);
+        case "ChainExpression":
+          return copiedFrom(nodeAt(node, "expression"), scope);
+        case "LogicalExpression":
+          return [
+            ...copiedFrom(nodeAt(node, "left"), scope),
+            ...copiedFrom(nodeAt(node, "right"), scope)
+          ];
+        case "ConditionalExpression":
+          return [
+            ...copiedFrom(nodeAt(node, "consequent"), scope),
+            ...copiedFrom(nodeAt(node, "alternate"), scope)
+          ];
+        case "ArrayExpression":
+          return nodesAt(node, "elements").flatMap((element) => element?.type === "SpreadElement" ? copiedFrom(nodeAt(element, "argument"), scope) : []);
+        case "CallExpression": {
+          const callee = nodeAt(node, "callee");
+          if (callee?.type !== "MemberExpression" || callee["computed"] === true)
+            return [];
+          return COPYING_METHODS.has(nameOf(nodeAt(callee, "property")) ?? "") ? [
+            ...copiedFrom(nodeAt(callee, "object"), scope),
+            ...nodesAt(node, "arguments").flatMap((argument) => copiedFrom(unspread(argument), scope))
+          ] : [];
+        }
+        default:
+          return [];
+      }
+    };
+    const UNSAFE = "a parameter or a loop variable";
+    const reaching = (names, scope) => {
+      const seen = new Set;
+      const visit = (name, at) => {
+        const key = keyOf(name, at);
+        if (key === undefined || seen.has(key) || !spend())
+          return;
+        seen.add(key);
+        if (typeof key === "string")
+          return;
+        if (key.unsafe)
+          seen.add(UNSAFE);
+        for (const source of key.sources)
+          for (const origin of copiedFrom(source.node, source.scope))
+            visit(origin.name, source.scope);
+      };
+      for (const name of names)
+        visit(name, scope);
+      return seen;
+    };
+    const shares = (left, right) => [...left].some((key) => right.has(key));
+    const reachable = (from) => {
+      const found = new Set;
+      const visit = (node) => {
+        if (found.has(node))
+          return;
+        found.add(node);
+        for (const next of edges.get(node) ?? [])
+          visit(next);
+      };
+      for (const node of from)
+        visit(node);
+      return found;
+    };
+    for (const walk of everyWalk) {
+      const walked = reaching(walk.walked, walk.scope);
+      const viaFunction = [...walked].some((key) => typeof key !== "string" && key.functions.size > 0);
+      for (const site of walk.sites)
+        if (site.opaque || viaFunction || shares(reaching(site.names, site.scope), walked))
+          return refuse("adds to the array a for-of loop walks");
+      for (const call of walk.calls) {
+        const callees = reachable(binding(call.scope, call.name)?.functions ?? []);
+        if ([...callees].some((callee) => dynamic.has(callee)))
+          return refuse("calls, in a for-of loop, a function that calls what it cannot see");
+        for (const site of growths) {
+          if (!site.within.some((caller) => callees.has(caller)))
+            continue;
+          const grown = reaching(site.names, site.scope);
+          if (site.opaque || viaFunction || grown.has(UNSAFE) || shares(grown, walked))
+            return refuse("calls, in a for-of loop, a function that adds to an array");
+        }
+      }
+    }
+    const ids = new Map;
+    const idOf = (key) => {
+      const known = ids.get(key);
+      if (known !== undefined)
+        return known;
+      ids.set(key, ids.size);
+      return ids.size - 1;
+    };
+    const readings = (operand, scope, deep) => {
+      const found = new Set;
+      const visit = (name, at, path, seen) => {
+        const key = keyOf(name, at);
+        if (key === undefined || !spend())
+          return;
+        found.add(`${idOf(key)}:${path.join(".")}`);
+        if (typeof key === "string" || seen.has(key))
+          return;
+        seen.add(key);
+        for (const source of key.sources) {
+          const plain = isChain(source.node);
+          for (const origin of copiedFrom(source.node, source.scope, deep))
+            visit(origin.name, origin.scope, plain ? [...origin.path, ...path] : origin.path, seen);
+        }
+      };
+      for (const origin of occurrencesIn(operand, scope, []))
+        visit(origin.name, origin.scope, origin.path, new Set);
+      return found;
+    };
+    for (const combination of combinations) {
+      if (combination.callee !== undefined && (binding(combination.scope, combination.callee)?.functions.size ?? 0) === 0)
+        continue;
+      const owners = new Map;
+      for (const [index, operand] of combination.operands.entries())
+        for (const reading of readings(operand, combination.scope, combination.merging === true)) {
+          const owner = owners.get(reading);
+          if (owner !== undefined && owner !== index)
+            return refuse("uses one value twice to build a bigger one");
+          owners.set(reading, index);
+        }
+    }
+    if (analysisSteps > MAX_ANALYSIS_STEPS)
+      refuse("is too tangled to check");
+  }
   const moduleScope = { parent: undefined, names: new Map, isFunction: true };
   let exported = 0;
   for (const node of nodesAt(program, "body")) {
@@ -20029,12 +20605,16 @@ var inspect = (script) => {
     const meta = declarators[0];
     if (exported > 1 || declaration?.type !== "VariableDeclaration" || declaration["kind"] !== "const" || declarators.length !== 1 || nameOf(nodeAt(meta ?? node, "id")) !== "meta" || nodeAt(meta ?? node, "init")?.type !== "ObjectExpression" || !literalOnly(nodeAt(meta ?? node, "init"), 1))
       refuse("exports anything but `export const meta = { \u2026 }` of literals");
-    moduleScope.names.set("meta", { unsafe: true, inits: [] });
+    moduleScope.names.set("meta", { ...newBinding(), unsafe: true });
   }
   for (const reference of references) {
-    if (binding(reference.scope, reference.name) !== undefined)
-      continue;
+    const held = binding(reference.scope, reference.name);
     const { name, use } = reference;
+    if (held !== undefined) {
+      if (held.functions.size > 0 && (use === "value" || use === "object"))
+        refuse(`uses the function ${name} as a value; a function is only called`);
+      continue;
+    }
     if (use === "write")
       refuse(`assigns to ${name}, which it did not declare`);
     else if (!GLOBALS.has(name))
@@ -20044,13 +20624,21 @@ var inspect = (script) => {
     else if (use === "callee" && !GLOBAL_FUNCTIONS.has(name))
       refuse(`calls ${name}`);
   }
-  for (const assignment of assignments)
-    binding(assignment.scope, assignment.name)?.inits.push(assignment.builtHere);
+  for (const entry of functionAssignments)
+    binding(entry.scope, entry.name)?.functions.add(entry.node);
+  for (const assignment of assignments) {
+    const held = binding(assignment.scope, assignment.name);
+    held?.inits.push(assignment.builtHere);
+    if (assignment.right !== undefined)
+      held?.sources.push({ node: assignment.right, scope: assignment.scope });
+  }
   for (const write of memberWrites) {
     const held = write.root === undefined ? undefined : binding(write.scope, write.root);
     if (held === undefined || !builtBinding(held))
       refuse("writes into something the script did not build");
   }
+  if (refusal === undefined)
+    analyse();
   if (refusal === undefined && agentCalls === 0)
     refuse("starts no agent");
   return refusal;
@@ -20180,11 +20768,11 @@ var HOOK_COMMANDS = [
       if (agentId === undefined)
         return yield* new AgentIdMissing;
       const patience = yield* deadlineIn(HOOK_WAIT_MS);
-      const { directory } = yield* resolveState(call.cwd, call.env, "ifPresent", false, patience);
+      const { directory, resolved } = yield* resolveState(call.cwd, call.env, "ifPresent", false, patience);
       if (!(yield* hasStateFolder(directory)))
         return yield* new StateFolderMissing;
       const type = payload.tool_input?.subagent_type;
-      yield* recordLaunch((transition) => updateState(directory, transition, call.env, patience), id, agentId, {
+      yield* recordLaunch((transition) => updateState(directory, transition, call.env, patience, resolved), id, agentId, {
         type: typeof type === "string" ? type : undefined
       });
       return postToolUse(`holyagent: recorded agent ${agentId} for ${id}.`);
@@ -20242,7 +20830,7 @@ var HOOK_COMMANDS = [
       const message = cleaned.split(`
 `).filter((line) => !line.startsWith(comment)).join(`
 `);
-      const phrases = forbiddenPhrases(message, (yield* readSettings([join15(call.root, STATE_DIRECTORY)])).allowWords);
+      const phrases = forbiddenPhrases(message, (yield* readSettings([stateDirectory(call.root)])).allowWords);
       if (phrases.length > 0)
         return yield* new MessageRefused({ phrases });
       if (cleaned !== above.trim() || cleanedBelow !== below.trim())
@@ -20263,7 +20851,7 @@ ${cleanedBelow}
   }, true)
 ];
 
-import { join as join16, relative as relative5 } from "path";
+import { join as join14, relative as relative5 } from "path";
 var {$: $4 } = globalThis.Bun;
 class NothingToMigrate extends TaggedError2("NothingToMigrate") {
   get message() {
@@ -20352,7 +20940,7 @@ var mentionsOf = (root, folders) => gen2(function* () {
   const names = yield* io(root, () => Array.fromAsync(new Bun.Glob("*").scan({ cwd: root, dot: true, onlyFiles: true })));
   const hits = [];
   for (const name of names.toSorted()) {
-    const text = yield* readText(join16(root, name));
+    const text = yield* readText(join14(root, name));
     if (text !== undefined && folders.some((folder) => text.includes(folder)))
       hits.push(name);
   }
@@ -20426,7 +21014,7 @@ var MIGRATE_COMMANDS = [
   }
 ];
 
-import { join as join17 } from "path";
+import { join as join15 } from "path";
 var CLOUD_SKIP = "skipped in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true), which has no machine of yours to install it on";
 var neutralDirectory = (env) => homeDirectory(env);
 var ensureGlobal = fn2("ensureGlobal")(function* (env, command, packageName, dryRun) {
@@ -20457,7 +21045,7 @@ var installCtx7 = fn2("installCtx7")(function* (env, dryRun) {
   const global = yield* ensureGlobal(env, "ctx7", "ctx7", dryRun);
   if (!global.usable)
     return global.lines;
-  const skillReady = (yield* fileExists2(join17(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join17(files.claudeDir, "rules", "context7.md")));
+  const skillReady = (yield* fileExists2(join15(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join15(files.claudeDir, "rules", "context7.md")));
   if (skillReady)
     return [...global.lines, present3("ctx7 skill: already installed")];
   const apiKey = env.CONTEXT7_API_KEY === "" ? undefined : env.CONTEXT7_API_KEY;
@@ -20641,14 +21229,14 @@ var STATE_COMMANDS = [
   }
 ];
 
-import { join as join18 } from "path";
+import { join as join16 } from "path";
 var {$: $5 } = globalThis.Bun;
 var TARGETS = [
   { id: "darwin-arm64", platform: "darwin", arch: "arm64", suffix: "" },
   { id: "linux-x64", platform: "linux", arch: "x64", suffix: "" },
   { id: "windows-x64", platform: "win32", arch: "x64", suffix: ".exe" }
 ];
-var BUNDLED_TOOLS = join18(import.meta.dir, "vendor");
+var BUNDLED_TOOLS = join16(import.meta.dir, "vendor");
 
 class UnsupportedPlatform extends TaggedError2("UnsupportedPlatform") {
   get message() {
@@ -20665,7 +21253,7 @@ var selectTarget = (platform, arch) => {
   const target = TARGETS.find((candidate) => candidate.platform === platform && candidate.arch === arch);
   return target === undefined ? fail5(new UnsupportedPlatform({ platform, arch })) : succeed6(target);
 };
-var toolPath = (directory, tool, target) => join18(directory, target.id, `${tool}${target.suffix}`);
+var toolPath = (directory, tool, target) => join16(directory, target.id, `${tool}${target.suffix}`);
 var runTool = (options) => gen2(function* () {
   const path = toolPath(options.directory, options.tool, options.target);
   if (!(yield* promise2(() => Bun.file(path).exists())))
@@ -20716,7 +21304,7 @@ var COMMANDS = [
   ...HOOK_COMMANDS
 ];
 
-import { join as join19 } from "path";
+import { join as join17 } from "path";
 var TTL_VARIABLE = "HOLYAGENT_REUSE_TTL_MINUTES";
 var Minutes = NumberFromString.check(isFinite2(), isGreaterThanOrEqualTo2(0));
 var reuseTtl = (env) => {
@@ -20735,9 +21323,9 @@ var workflowsAvailable = (env, root) => {
   if (env.CLAUDE_CODE_DISABLE_WORKFLOWS === "1")
     return succeed6(false);
   const files = [
-    join19(claudeConfigDirectory(env), "settings.json"),
-    join19(root, ".claude", "settings.json"),
-    join19(root, ".claude", "settings.local.json")
+    join17(claudeConfigDirectory(env), "settings.json"),
+    join17(root, ".claude", "settings.json"),
+    join17(root, ".claude", "settings.local.json")
   ];
   return forEach2(files, disablesWorkflows).pipe(map4((disabled) => !disabled.includes(true)));
 };
@@ -20760,7 +21348,7 @@ var topHelp = () => [
 ].join(`
 `);
 var callFor = (args, host, emit, command) => gen2(function* () {
-  const { root, directory } = command.stateless === true ? { root: host.cwd, directory: join20(host.cwd, STATE_DIRECTORY) } : yield* resolveState(host.cwd, host.env, typeof command.state === "function" ? command.state(args) : command.state ?? "ifPresent", command.path[0] !== "hook");
+  const { root, directory, resolved } = command.stateless === true ? { root: host.cwd, directory: stateDirectory(host.cwd), resolved: undefined } : yield* resolveState(host.cwd, host.env, typeof command.state === "function" ? command.state(args) : command.state ?? "ifPresent", command.path[0] !== "hook");
   const inline = stringFlag(args, INPUT_FLAG);
   return {
     args,
@@ -20768,7 +21356,7 @@ var callFor = (args, host, emit, command) => gen2(function* () {
     env: host.env,
     root,
     directory,
-    update: (transition) => updateState(directory, transition, host.env),
+    update: (transition) => updateState(directory, transition, host.env, undefined, resolved),
     config: loadConfig(host.env, root),
     text: readReport(host),
     emit,

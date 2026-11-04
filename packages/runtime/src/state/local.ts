@@ -1,6 +1,7 @@
 import { Context, Effect, Schema } from "effect"
 
-import { IntentId } from "../domain/ids.ts"
+import { AssignmentId, IntentId } from "../domain/ids.ts"
+import { Text } from "../domain/primitives.ts"
 import { type Registry, SpecialistEntry } from "../domain/specialists.ts"
 import { StateIo } from "./errors.ts"
 import { commitFile, encodeJson, type File, io, readJson } from "./files.ts"
@@ -11,6 +12,7 @@ import { localFile } from "./layout.ts"
 
 const ActiveIntentFile = Schema.Struct({ intentId: IntentId })
 const SpecialistsFile = Schema.Struct({ specialists: Schema.Array(SpecialistEntry) })
+const WorkTreesFile = Schema.Struct({ workTrees: Schema.Record(AssignmentId, Text) })
 
 /**
  * The top-level folder of the work tree a command runs in. The Intent in use is kept per work tree,
@@ -45,6 +47,12 @@ export interface Local {
    */
   readonly activeIntent?: string
   readonly specialists: Registry
+  /**
+   * The key of the work tree each Running Assignment was dispatched from (see {@link workTreeKey}),
+   * by Assignment id. It lives here and not in the Assignment record, because an older plugin
+   * refuses a record with a key it does not know, and a work tree means nothing on another clone.
+   */
+  readonly workTrees: Readonly<Record<string, string>>
 }
 
 /**
@@ -73,9 +81,11 @@ export const readLocal = (directory: string) =>
     const active =
       own ?? (yield* readJson(ActiveIntentFile, localFile(directory, LEGACY_ACTIVE_INTENT)))
     const specialists = yield* readJson(SpecialistsFile, localFile(directory, "specialists.json"))
+    const workTrees = yield* readJson(WorkTreesFile, localFile(directory, "work-trees.json"))
     return {
       ...(active === undefined ? {} : { activeIntent: active.intentId }),
       specialists: specialists?.specialists ?? [],
+      workTrees: workTrees?.workTrees ?? {},
     } satisfies Local
   })
 
@@ -86,6 +96,7 @@ export const readLocal = (directory: string) =>
 export interface LocalChange {
   readonly activeIntent?: string
   readonly specialists?: Registry
+  readonly workTrees?: Readonly<Record<string, string>>
 }
 
 /** Encodes the per-clone files named in the change, without writing anything. */
@@ -108,6 +119,11 @@ export const encodeLocal = (directory: string, change: LocalChange) =>
       files.push({
         path: localFile(directory, "specialists.json"),
         content: yield* encodeJson(SpecialistsFile, { specialists: change.specialists }),
+      })
+    if (change.workTrees !== undefined)
+      files.push({
+        path: localFile(directory, "work-trees.json"),
+        content: yield* encodeJson(WorkTreesFile, { workTrees: change.workTrees }),
       })
     return files
   })

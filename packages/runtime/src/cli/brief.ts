@@ -49,19 +49,22 @@ export const writeReport = (call: Call, assignmentId: string, report: string) =>
   writeNamed(call, "reports", assignmentId, report)
 
 /**
- * Removes the brief and the report files of an Assignment, once it is accepted and nothing reads
- * them again; the stored record keeps its result. A file that is missing or cannot be removed is
- * left, since the cleanup must not fail a transition that already committed.
+ * Removes the brief and the report files of the given Assignments, once their Intent is closed and
+ * nothing reads them again; the stored records keep their results. A missing file is fine. Returns
+ * a line for each file that could not be removed, which the caller reports: the Intent already
+ * closed, so a leftover file must not fail the command.
  */
-export const removeFiles = (call: Call, assignmentId: string) =>
-  Effect.forEach(
-    ["briefs", "reports"],
-    (name) =>
-      folderFor(call, name).pipe(
-        Effect.flatMap((folder) => {
-          const path = join(folder, `${assignmentId}.md`)
-          return io(path, () => rm(path, { force: true }))
-        }),
+export const removeFiles = (call: Call, assignmentIds: ReadonlyArray<string>) =>
+  Effect.forEach(["briefs", "reports"], (name) => folderFor(call, name)).pipe(
+    Effect.flatMap((folders) =>
+      Effect.forEach(
+        folders.flatMap((folder) => assignmentIds.map((id) => join(folder, `${id}.md`))),
+        (path) =>
+          io(path, () => rm(path, { force: true })).pipe(
+            Effect.as(undefined),
+            Effect.catch((error) => Effect.succeed(error.message)),
+          ),
       ),
-    { discard: true },
-  ).pipe(Effect.ignore)
+    ),
+    Effect.map((lines) => lines.filter((line) => line !== undefined)),
+  )

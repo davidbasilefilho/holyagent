@@ -1,5 +1,5 @@
 import type { FileHandle } from "node:fs/promises"
-import { link, lstat, mkdir, open, rename, rm } from "node:fs/promises"
+import { lstat, mkdir, open, rename, rm } from "node:fs/promises"
 import { dirname } from "node:path"
 
 import { Clock, Effect, Schedule, Schema } from "effect"
@@ -29,13 +29,21 @@ const processAlive = (pid: number) =>
     Effect.catch((cause) => Effect.succeed(!hasCode(cause, "ESRCH"))),
   )
 
+/** True unless `file` is certainly absent: a file that cannot even be examined is in the way. */
+const inTheWay = (file: string) =>
+  Effect.tryPromise({ try: () => lstat(file), catch: (cause) => cause }).pipe(
+    Effect.as(true),
+    Effect.catch((cause) => Effect.succeed(!hasCode(cause, "ENOENT"))),
+  )
+
 /**
  * Removes the lock when its process is gone, or when it is unreadable and old. The lock is first
- * renamed to a name of its own, which takes it from every other contender in one step, and the
- * renamed file is checked: if it carries a different owner than the one judged stale (another
- * process claimed the lock between the read and the rename), it is linked back unless the lock was
- * claimed again meanwhile. A plain read followed by a removal could delete a live owner's lock.
- * Never fails.
+ * renamed to a name of its own, and the renamed file is checked: if it carries a different owner
+ * than the one judged stale (another process claimed the lock between the read and the rename), it
+ * is renamed back, unless the lock was claimed again meanwhile. Between the two renames no lock
+ * file exists, so a process that claims it in that moment keeps its claim and the moved owner loses
+ * its lock; a plain read followed by a removal left that open for the whole gap between the two. A
+ * rename needs no hard links, which not every file system has. Never fails.
  */
 const breakIfStale = (file: string) =>
   Effect.gen(function* () {
@@ -50,8 +58,9 @@ const breakIfStale = (file: string) =>
       Effect.catch(() => Effect.succeed(false)),
     )
     if (!moved) return
-    if ((yield* readOwner(taken))?.token !== owner?.token)
-      yield* io(file, () => link(taken, file)).pipe(Effect.ignore)
+    const claimedMeanwhile = (yield* readOwner(taken))?.token !== owner?.token
+    if (claimedMeanwhile && !(yield* inTheWay(file)))
+      yield* io(file, () => rename(taken, file)).pipe(Effect.ignore)
     yield* io(taken, () => rm(taken, { force: true }))
   }).pipe(Effect.ignore)
 
@@ -62,13 +71,6 @@ const breakIfStale = (file: string) =>
  * or EACCES or EBUSY, until the last handle closes.
  */
 const BLOCKED_CODES = ["EPERM", "EACCES", "EBUSY"] as const
-
-/** True unless `file` is certainly absent: a file that cannot even be examined is in the way. */
-const inTheWay = (file: string) =>
-  Effect.tryPromise({ try: () => lstat(file), catch: (cause) => cause }).pipe(
-    Effect.as(true),
-    Effect.catch((cause) => Effect.succeed(!hasCode(cause, "ENOENT"))),
-  )
 
 /**
  * Opens the lock file for writing, which must not exist yet. A file in the way, even a

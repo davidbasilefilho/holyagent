@@ -1051,18 +1051,11 @@ describe("command line", () => {
     expect(await help("intent", "update")).toContain("--material")
     const plan = await help("plan")
     for (const part of [
-      "write the inline script yourself",
-      "{id, agent, model, effort, prompt}",
-      "one agent() per entry",
-      "agentType holyagent:<agent>",
-      "runs without a permission prompt",
-      "fallback",
+      "a writer followed by the review of its work",
+      "as the root workflow text says",
+      "`continues` lists Ready work that continues a warm specialist",
       "Workflow tool is disabled or unavailable",
-      "workflow:<run-id>/<id>",
-      "verbatim",
-      "{ done: [ids] }",
-      "`assignment reports <journal.jsonl>`",
-      "does not list follows the closing rule in the root workflow text",
+      "`afterwards` reviews launch once the writers they depend on are terminal",
     ])
       expect(plan).toContain(part)
     for (const gone of [
@@ -1537,6 +1530,7 @@ describe("one flag parser for every command", () => {
   test.each<readonly [string, ReadonlyArray<string>, string]>([
     ["an unknown flag", ["--nope"], "Unknown flag --nope"],
     ["an unknown short flag", ["-x"], "Unknown flag -x"],
+    ["the text -undefined, which no flag spells", ["-undefined", "v"], "Unknown flag -undefined"],
     ["a switch given a value", ["--force=yes"], "Flag --force takes no value"],
     ["a missing value", ["--title"], "Flag --title needs a value"],
     ["a value that looks like a flag", ["--title", "--force"], "Flag --title needs a value"],
@@ -1552,6 +1546,14 @@ describe("one flag parser for every command", () => {
     )
     expect(parsed.values).toEqual({ message: ["a", "b"] })
     expect(parsed.positionals).toEqual(["-"])
+  })
+})
+
+describe("the runtime package", () => {
+  test("ships no program of its own: the plugin's holyagent command is the only one", async () => {
+    const manifest = (await Bun.file(join(import.meta.dir, "..", "package.json")).json()) as object
+
+    expect(manifest).not.toHaveProperty("bin")
   })
 })
 

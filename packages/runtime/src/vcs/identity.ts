@@ -1,7 +1,17 @@
-/** True for the identity an agent runtime configures, which never belongs to the user. */
+/** The email the agent runtime configures for its commits. */
+const AGENT_EMAIL = "noreply@anthropic.com"
+
+/** The names the agent runtime configures; a person whose name merely contains one is not it. */
+const AGENT_NAMES: ReadonlyArray<string> = ["claude", "claude code"]
+
+/**
+ * True for exactly the identity an agent runtime configures, which never belongs to the user: the
+ * email `noreply@anthropic.com`, or the name "Claude" or "Claude Code" (any letter case). A person
+ * whose name only contains Claude, such as "Claude Dupont", is not an agent.
+ */
 export const looksLikeAgent = (identity: { readonly name: string; readonly email: string }) =>
-  identity.email.toLowerCase() === "noreply@anthropic.com" ||
-  /^claude\b/i.test(identity.name.trim())
+  identity.email.trim().toLowerCase() === AGENT_EMAIL ||
+  AGENT_NAMES.includes(identity.name.trim().toLowerCase())
 
 /**
  * True when the process runs in a claude.ai cloud session (`CLAUDE_CODE_REMOTE=true`), where git's

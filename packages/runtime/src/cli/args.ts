@@ -50,7 +50,9 @@ export const readFlags = (
     const switches = new Set<string>()
     const lookup = (flag: string) =>
       Object.entries(spec).find(([name, shape]) =>
-        flag.startsWith("--") ? flag.slice(2) === name : flag === `-${shape.short}`,
+        flag.startsWith("--")
+          ? flag.slice(2) === name
+          : shape.short !== undefined && flag === `-${shape.short}`,
       )
     for (let index = 0; index < args.length; index += 1) {
       const arg = args[index] ?? ""

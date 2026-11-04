@@ -20,7 +20,7 @@ import { io } from "../state/files.ts"
 import { workTreeKey } from "../state/local.ts"
 import { readState, type Snapshot } from "../state/store.ts"
 import { booleanFlag, choiceFlag, requiredFlag, stringFlag } from "./args.ts"
-import { removeFiles, writeBrief, writeReport } from "./brief.ts"
+import { writeBrief, writeReport } from "./brief.ts"
 import { nowIso } from "./context.ts"
 import { AgentMismatch, Usage } from "./errors.ts"
 import { resolveIntent } from "./intent.ts"
@@ -341,7 +341,6 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
             )
           }),
         )
-        if (assignment.acceptance !== undefined) yield* removeFiles(call, id)
         return { id, state: assignment.state, accepted: assignment.acceptance !== undefined }
       }),
   },
@@ -388,7 +387,6 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
                 )
           }),
         )
-        yield* removeFiles(call, id)
         return present({
           id,
           state: assignment.state,
@@ -407,7 +405,7 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
       "TOON: `reports` rows of id, path and words, one per Assignment id, and `notAssignmentIds` rows of label and agentId for results whose label is not an Assignment id (not written)",
     notes: [
       "the journal is the run's journal.jsonl: `started` entries (key, agentId, label) and `result` entries (key, agentId, result) joined by key; label each agent() with its Assignment id so its report lands in <id>.md",
-      "reports go to holyagent/reports in the git common directory (local/reports of the state folder outside git), beside the briefs; a repeated label keeps its last result; accepting an Assignment removes its brief and report files. Read a report there, or close from it: `assignment close <id> --outcome success --accept <rationale> < <report-file>`",
+      "reports go to holyagent/reports in the git common directory (local/reports of the state folder outside git), beside the briefs; a repeated label keeps its last result; closing the Intent removes the brief and report files of its Assignments. Read a report there, or close from it: `assignment close <id> --outcome success --accept <rationale> < <report-file>`",
       "a journal line that is not JSON, or a started or result entry without its fields, refuses the whole journal and writes nothing",
     ],
     flags: {},
