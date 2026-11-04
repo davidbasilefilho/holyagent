@@ -6,12 +6,13 @@ const AGENT_NAMES: ReadonlyArray<string> = ["claude", "claude code"]
 
 /**
  * True for exactly the identity an agent runtime configures, which never belongs to the user: the
- * email `noreply@anthropic.com`, or the name "Claude" or "Claude Code" (any letter case). A person
- * whose name only contains Claude, such as "Claude Dupont", is not an agent.
+ * email `noreply@anthropic.com`, or the name "Claude" or "Claude Code" (any letter case, any run of
+ * spaces, tabs or non-breaking spaces between the words counting as one space). A person whose name
+ * only contains Claude, such as "Claude Dupont", is not an agent.
  */
 export const looksLikeAgent = (identity: { readonly name: string; readonly email: string }) =>
   identity.email.trim().toLowerCase() === AGENT_EMAIL ||
-  AGENT_NAMES.includes(identity.name.trim().toLowerCase())
+  AGENT_NAMES.includes(identity.name.replace(/\s+/g, " ").trim().toLowerCase())
 
 /**
  * True when the process runs in a claude.ai cloud session (`CLAUDE_CODE_REMOTE=true`), where git's

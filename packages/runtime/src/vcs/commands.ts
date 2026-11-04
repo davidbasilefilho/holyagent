@@ -55,7 +55,7 @@ export const VCS_COMMANDS: ReadonlyArray<Command> = [
       "Commit exactly the named paths with the configured git identity (in a claude.ai cloud session, with the user as author and the platform's committer), after the message check, and record the branch and commit on the Intent in use",
     notes: [
       "state mode (holyagent state mode): in branch, the default, Intent state is committed on the state branch as it changes and a path under .holyagent/ is refused; in local it is in no commit and such a path is refused; in work the changed state files (not config.json unless named) are staged with the named paths",
-      "the message is cleaned of agent attribution and refused when it talks about the user or the agent; an identity that looks like an agent's is refused; in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) it is the author that is checked, and the committer is left as the platform set it",
+      "the message is cleaned of agent attribution and refused when it talks about the user or the agent; an identity that is exactly the agent's own (the email noreply@anthropic.com, or the name Claude or Claude Code) is refused; in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) it is the author that is checked, and the committer is left as the platform set it",
       "the repository's own hooks run, a commit-msg hook that runs `holyagent hook commit-msg` included",
     ],
     flags: {},
@@ -98,7 +98,7 @@ export const VCS_COMMANDS: ReadonlyArray<Command> = [
       "Set the commit author of this clone in its local git config (author.name and author.email), so a commit has the user as author and keeps the committer",
     notes: [
       "for a claude.ai cloud session: take the name, id and login from the GitHub connector's get_me, and pass the email as <id>+<login>@users.noreply.github.com",
-      "it writes only those two keys of .git/config, never a file of the repository, and refuses an identity that looks like an agent's",
+      "it writes only those two keys of .git/config, never a file of the repository, and refuses an identity that is exactly the agent's own (the email noreply@anthropic.com, or the name Claude or Claude Code)",
     ],
     flags: {},
     raw: true,

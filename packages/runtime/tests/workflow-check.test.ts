@@ -293,6 +293,247 @@ describe("the workflow check separates a value used twice from a value that grow
   })
 })
 
+describe("the workflow check refuses a value doubled by a callback", () => {
+  test.each<readonly [string, string]>([
+    ["a reduce that doubles text", "log(args.items.reduce((s) => s + s, 'a'))"],
+    [
+      "a reduce that concats the accumulator with itself",
+      "log(args.items.reduce((acc) => acc.concat(acc), ['a']))",
+    ],
+    [
+      "a reduce that spreads the accumulator twice",
+      "log(args.items.reduce((a) => ({ ...a, ...a }), {}))",
+    ],
+    [
+      "a reduce with a block body and more parameters",
+      "log(args.items.reduce((a, x) => { return [...a, ...a, x] }, []))",
+    ],
+    [
+      "a reduce with a function expression",
+      "log(args.items.reduce(function (a) { return [...a, ...a] }, []))",
+    ],
+    [
+      "a map in a loop that doubles each element",
+      "let a = [[1]]\nfor (let i = 0; i < 40; i++) { a = a.map((v) => [...v, ...v]) }",
+    ],
+    [
+      "a map in a loop that holds each element twice",
+      "let a = [{}]\nfor (let i = 0; i < 40; i++) { a = a.map((v) => ({ left: v, right: v })) }",
+    ],
+  ])("refuses %s", async (_label, text) => {
+    expect(await refusal(text)).toBeString()
+  })
+
+  test.each<readonly [string, string]>([
+    ["a reduce that sums fields", "log(args.items.reduce((s, x) => s + x.id + ',', ''))"],
+    ["a reduce that uses the item twice", "log(args.items.reduce((s, x) => s + x + x, ''))"],
+    ["a reduce that appends", "log(args.items.reduce((acc, x) => acc.concat([x]), []))"],
+    ["a map that pairs each element with itself", "log(args.items.map((x) => [x, x]))"],
+    [
+      "a map of a copy that pairs each element with itself",
+      "const a = args.items.slice()\nconst pairs = a.map((x) => ({ id: x, again: x }))\nlog(pairs)",
+    ],
+  ])("allows %s", async (_label, text) => {
+    expect(await refusal(text)).toBeUndefined()
+  })
+})
+
+describe("the workflow check refuses doubling split over statements", () => {
+  test.each<readonly [string, string]>([
+    [
+      "two pushes of an array into one that is assigned back",
+      "let a = [1]\nfor (let i = 0; i < 40; i++) { const p = []\np.push(...a)\np.push(...a)\na = p.map((x) => x) }",
+    ],
+    [
+      "two pushes into an array declared outside the loop",
+      "let a = [1]\nconst p = []\nfor (let i = 0; i < 40; i++) { p.push(...a)\np.push(...a)\na = p.map((x) => x) }",
+    ],
+    [
+      "two writes of an object into the fields of another",
+      "let a = {}\nfor (let i = 0; i < 40; i++) { const o = {}\no.x = a\no.y = a\na = o }",
+    ],
+    [
+      "two writes of an array into the indexes of another",
+      "let a = [1]\nfor (let i = 0; i < 40; i++) { const p = []\np[0] = a\np[1] = a\na = p }",
+    ],
+    [
+      "two appends of the text to another",
+      "let a = 'x'\nfor (let i = 0; i < 40; i++) { let t = ''\nt += a\nt += a\na = t.trim() }",
+    ],
+    [
+      "two sums of the text with another",
+      "let a = 'x'\nfor (let i = 0; i < 40; i++) { let t = ''\nt = t + a\nt = t + a\na = t.trim() }",
+    ],
+  ])("refuses %s", async (_label, text) => {
+    expect(await refusal(text)).toBeString()
+  })
+
+  test.each<readonly [string, string]>([
+    [
+      "two pushes of different fields of one entry",
+      "const out = []\nfor (const e of args.entries) { out.push(e.id)\nout.push(e.prompt) }",
+    ],
+    [
+      "two pushes of one value that is not fed back",
+      "const out = []\nconst id = args.id\nout.push(id)\nout.push(id)\nlog(out)",
+    ],
+    [
+      "two writes of fields of one entry",
+      "const e = args.entries[0]\nconst o = {}\no.id = e.id\no.prompt = e.prompt\nlog(o)",
+    ],
+  ])("allows %s", async (_label, text) => {
+    expect(await refusal(text)).toBeUndefined()
+  })
+})
+
+describe("the workflow check refuses text that grows by replacement or joining", () => {
+  test.each<readonly [string, string]>([
+    [
+      "a split into characters joined with a separator",
+      "let s = 'abc'\nfor (let i = 0; i < 40; i++) { s = s.split('').join('--') }",
+    ],
+    [
+      "a split on a word joined with a longer one",
+      "let s = 'a b'\nfor (let i = 0; i < 40; i++) { s = s.split(' ').join('--') }",
+    ],
+    [
+      "a split joined with the default comma",
+      "let s = 'a b'\nfor (let i = 0; i < 40; i++) { s = s.split('').join() }",
+    ],
+    [
+      "a replacement that pastes the match twice",
+      "let s = 'abcd'\nfor (let i = 0; i < 40; i++) { s = s.replaceAll('abcd', '$&$&') }",
+    ],
+    [
+      "a replacement with a dollar in a template",
+      "let s = 'abcd'\nfor (let i = 0; i < 40; i++) { s = s.replaceAll('abcd', `$&$&`) }",
+    ],
+    [
+      "a template replacement that is longer",
+      "let s = 'a'\nfor (let i = 0; i < 40; i++) { s = s.replaceAll('a', `bb`) }",
+    ],
+  ])("refuses %s", async (_label, text) => {
+    expect(await refusal(text)).toBeString()
+  })
+
+  test.each<readonly [string, string]>([
+    [
+      "a split and join with the same separator",
+      "let s = 'a b'\nfor (let i = 0; i < 3; i++) { s = s.split(' ').join(' ') }",
+    ],
+    ["a join of mapped ids", "log(args.items.map((x) => x.id).join(', '))"],
+    [
+      "a replacement without a dollar of the same length",
+      "let s = 'abcd'\nfor (let i = 0; i < 3; i++) { s = s.replaceAll('abcd', 'wxyz') }",
+    ],
+  ])("allows %s", async (_label, text) => {
+    expect(await refusal(text)).toBeUndefined()
+  })
+})
+
+describe("the workflow check lets Array.from take only an array", () => {
+  test.each<readonly [string, string]>([
+    ["parsed text", "log(Array.from(JSON.parse('{\"length\":100000000}'), (x, i) => i))"],
+    ["a parameter", "const f = (list) => Array.from(list)\nlog(f([1]))"],
+    ["an object built here", "const o = { length: 5 }\nlog(Array.from(o))"],
+    ["a name set from parsed text", "const o = JSON.parse('{}')\nlog(Array.from(o))"],
+    [
+      "a name set from an array and parsed text",
+      "let o = [1]\no = JSON.parse('{}')\nlog(Array.from(o))",
+    ],
+    ["the args object", "log(Array.from(args))"],
+  ])("refuses %s", async (_label, text) => {
+    expect(await refusal(text)).toBeString()
+  })
+
+  test.each<readonly [string, string]>([
+    ["an array literal", "log(Array.from([1, 2], (x) => x * 2))"],
+    ["a field of args", "log(Array.from(args.items))"],
+    ["the keys of an object", "log(Array.from(Object.keys(args)))"],
+    ["the result of an array method", "log(Array.from(args.items.map((x) => x.id)))"],
+    ["a declared array", "const list = [1, 2]\nlog(Array.from(list))"],
+    [
+      "the settled results of agents",
+      "const r = await Promise.all([agent('p', { agentType: 'holyagent:explorer-map' })])\nlog(Array.from(r))",
+    ],
+  ])("allows %s", async (_label, text) => {
+    expect(await refusal(text)).toBeUndefined()
+  })
+})
+
+describe("the workflow check refuses a for-of loop that grows what may alias it", () => {
+  test.each<readonly [string, string]>([
+    [
+      "a destructured container",
+      "const a = [1]\nconst [b] = [a]\nfor (const x of a) { b.push(x) }",
+    ],
+    [
+      "an element of a container",
+      "const a = [1]\nconst b = [a][0]\nfor (const x of a) { b.push(x) }",
+    ],
+    [
+      "a field of a container",
+      "const a = [1]\nconst o = { b: a }\nfor (const x of a) { o.b.push(x) }",
+    ],
+    [
+      "an awaited promise",
+      "const a = [1]\nconst b = await Promise.resolve(a)\nfor (const x of a) { b.push(x) }",
+    ],
+    [
+      "a field the array was stored in",
+      "const s = {}\nconst a = [1]\ns.k = a\nfor (const x of a) { s.k.push(x) }",
+    ],
+    [
+      "an element the array was pushed into",
+      "const rows = []\nconst a = [[1]]\nrows.push(a)\nfor (const x of a) { rows[0].push(x) }",
+    ],
+    [
+      "a name a loop sets",
+      "let b = []\nconst a = [1]\nfor (b of [a]) {}\nfor (const x of a) { b.push(x) }",
+    ],
+    [
+      "a function that grows a container",
+      "const a = [1]\nconst o = { b: a }\nfunction g() { o.b.push(1) }\nfor (const x of a) { g() }",
+    ],
+  ])("refuses %s", async (_label, text) => {
+    expect(await refusal(text)).toBeString()
+  })
+
+  test.each<readonly [string, string]>([
+    [
+      "an array made in the body",
+      "for (const e of args.entries) { const parts = []\nparts.push(e.id)\nlog(parts) }",
+    ],
+    [
+      "a field of an object of literals",
+      "const state = { seen: [] }\nfor (const e of args.entries) { state.seen.push(e) }",
+    ],
+  ])("allows %s", async (_label, text) => {
+    expect(await refusal(text)).toBeUndefined()
+  })
+})
+
+describe("the workflow check adds up what calls cost", () => {
+  /** A chain of functions of which each calls the one before it twice. */
+  const chain = (length: number) =>
+    [
+      "const f0 = () => 1",
+      ...Array.from({ length }, (_, at) => `const f${at + 1} = () => { f${at}()\nf${at}() }`),
+      `f${length}()`,
+    ].join("\n")
+
+  test("refuses a chain whose calls multiply past the total", async () => {
+    expect(await refusal(chain(15))).toBeString()
+  })
+
+  test("allows a short chain and a function called a few times", async () => {
+    expect(await refusal(chain(3))).toBeUndefined()
+    expect(
+      await refusal("const f = (n) => n + 1\nlog(f(1), f(2), f(3), f(4), f(5))"),
+    ).toBeUndefined()
+  })
+})
+
 describe("the workflow check refuses a for-of loop that adds to what it walks", () => {
   test.each<readonly [string, string]>([
     ["a sorted copy walked", "const a = [1]\nfor (const x of a.sort()) { a.push(x) }"],

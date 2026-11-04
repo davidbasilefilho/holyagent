@@ -7663,13 +7663,13 @@ class GitHubFailed extends TaggedError2("GitHubFailed") {
 
 class AgentIdentity extends TaggedError2("AgentIdentity") {
   get message() {
-    return `The git identity ${this.identity} looks like an agent's, so the commit would not be the user's`;
+    return `The git identity ${this.identity} is the agent's own, so the commit would not be the user's`;
   }
 }
 
 class CloudAuthor extends TaggedError2("CloudAuthor") {
   get message() {
-    return `The commit author ${this.author} is missing or looks like an agent's, so the commit would not be the user's`;
+    return `The commit author ${this.author} is missing or is the agent's own identity, so the commit would not be the user's`;
   }
 }
 
@@ -10190,7 +10190,7 @@ var pullsOf = (links, intentId) => {
   return [...latest.values()].toSorted((a, b) => a.number - b.number);
 };
 
-import { lstat, mkdir, open, rename as rename2, rm as rm2 } from "fs/promises";
+import { link as link2, lstat, mkdir, open, rename as rename2, rm as rm2 } from "fs/promises";
 import { dirname } from "path";
 var LockOwner = Struct({
   pid: Int,
@@ -10203,6 +10203,7 @@ var readOwner = (file) => readJson(LockOwner, file).pipe(orElseSucceed2(() => {
 }));
 var processAlive = (pid) => try_2({ try: () => process.kill(pid, 0), catch: (cause) => cause }).pipe(as2(true), catch_2((cause) => succeed6(!hasCode(cause, "ESRCH"))));
 var inTheWay = (file) => tryPromise2({ try: () => lstat(file), catch: (cause) => cause }).pipe(as2(true), catch_2((cause) => succeed6(!hasCode(cause, "ENOENT"))));
+var putBack = (taken, file) => io(file, () => link2(taken, file)).pipe(catch_2((error) => hasCode(error.cause, "EEXIST") ? void_3 : inTheWay(file).pipe(flatMap2((present) => present ? void_3 : io(file, () => rename2(taken, file))))), ignore2);
 var breakIfStale = (file) => gen2(function* () {
   const owner = yield* readOwner(file);
   const stale = owner ? !(yield* processAlive(owner.pid)) : (yield* currentTimeMillis2) - Bun.file(file).lastModified > UNREADABLE_STALE_MS;
@@ -10213,8 +10214,8 @@ var breakIfStale = (file) => gen2(function* () {
   if (!moved)
     return;
   const claimedMeanwhile = (yield* readOwner(taken))?.token !== owner?.token;
-  if (claimedMeanwhile && !(yield* inTheWay(file)))
-    yield* io(file, () => rename2(taken, file)).pipe(ignore2);
+  if (claimedMeanwhile)
+    yield* putBack(taken, file);
   yield* io(taken, () => rm2(taken, { force: true }));
 }).pipe(ignore2);
 var BLOCKED_CODES = ["EPERM", "EACCES", "EBUSY"];
@@ -10290,7 +10291,7 @@ var userFiles = (env) => {
 
 var AGENT_EMAIL = "noreply@anthropic.com";
 var AGENT_NAMES = ["claude", "claude code"];
-var looksLikeAgent = (identity) => identity.email.trim().toLowerCase() === AGENT_EMAIL || AGENT_NAMES.includes(identity.name.trim().toLowerCase());
+var looksLikeAgent = (identity) => identity.email.trim().toLowerCase() === AGENT_EMAIL || AGENT_NAMES.includes(identity.name.replace(/\s+/g, " ").trim().toLowerCase());
 var inCloudSession = (env) => env["CLAUDE_CODE_REMOTE"] === "true";
 var parseIdent = (line) => {
   const match = /^(.*) <([^<>]*)> \d+ [+-]\d{4}$/.exec(line.trim());
@@ -11248,7 +11249,7 @@ var setAuthor = (request) => gen2(function* () {
   if (!/^[^\s<>@]+@[^\s<>@]+$/.test(email) || !plain(email))
     return yield* refuse("--email needs an email address such as 1234+login@users.noreply.github.com");
   if (looksLikeAgent({ name, email }))
-    return yield* refuse(`${name} <${email}> looks like an agent's identity, not the user's`);
+    return yield* refuse(`${name} <${email}> is the agent's own identity, not the user's`);
   yield* git2(["config", "--local", "author.name", name]);
   yield* git2(["config", "--local", "author.email", email]);
   return { name, email };
@@ -11784,7 +11785,7 @@ var VCS_COMMANDS = [
     summary: "Commit exactly the named paths with the configured git identity (in a claude.ai cloud session, with the user as author and the platform's committer), after the message check, and record the branch and commit on the Intent in use",
     notes: [
       "state mode (holyagent state mode): in branch, the default, Intent state is committed on the state branch as it changes and a path under .holyagent/ is refused; in local it is in no commit and such a path is refused; in work the changed state files (not config.json unless named) are staged with the named paths",
-      "the message is cleaned of agent attribution and refused when it talks about the user or the agent; an identity that looks like an agent's is refused; in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) it is the author that is checked, and the committer is left as the platform set it",
+      "the message is cleaned of agent attribution and refused when it talks about the user or the agent; an identity that is exactly the agent's own (the email noreply@anthropic.com, or the name Claude or Claude Code) is refused; in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) it is the author that is checked, and the committer is left as the platform set it",
       "the repository's own hooks run, a commit-msg hook that runs `holyagent hook commit-msg` included"
     ],
     flags: {},
@@ -11819,7 +11820,7 @@ var VCS_COMMANDS = [
     summary: "Set the commit author of this clone in its local git config (author.name and author.email), so a commit has the user as author and keeps the committer",
     notes: [
       "for a claude.ai cloud session: take the name, id and login from the GitHub connector's get_me, and pass the email as <id>+<login>@users.noreply.github.com",
-      "it writes only those two keys of .git/config, never a file of the repository, and refuses an identity that looks like an agent's"
+      "it writes only those two keys of .git/config, never a file of the repository, and refuses an identity that is exactly the agent's own (the email noreply@anthropic.com, or the name Claude or Claude Code)"
     ],
     flags: {},
     raw: true,
@@ -19504,7 +19505,6 @@ var CALLBACK_ARGUMENTS = new Map([
   ["catch", "all"],
   ["finally", "all"]
 ]);
-var RESULT_METHODS = new Set(["map", "then", "catch", "finally", "from"]);
 var ITERATING_METHODS = new Set([
   "map",
   "filter",
@@ -19525,6 +19525,17 @@ var COPYING_METHODS = new Set([
   "sort",
   "reverse",
   "filter"
+]);
+var ARRAY_RESULTS = new Set([
+  "map",
+  "filter",
+  "flatMap",
+  "flat",
+  "slice",
+  "concat",
+  "sort",
+  "reverse",
+  "split"
 ]);
 var COMBINING_METHODS = new Set([
   "concat",
@@ -19728,7 +19739,8 @@ var newBinding = () => ({
   unsafe: false,
   inits: [],
   functions: new Set,
-  sources: []
+  sources: [],
+  stored: []
 });
 var childScope = (parent, isFunction) => ({
   parent,
@@ -19825,19 +19837,36 @@ var copiedNames = (pattern) => {
 };
 var unspread = (node) => node?.type === "SpreadElement" ? nodeAt(node, "argument") : node;
 var definedNodes = (list) => list.filter((node) => node !== undefined);
+var literalText = (node) => {
+  if (node?.type === "Literal")
+    return typeof node["value"] === "string" ? node["value"] : undefined;
+  const [quasi, ...more] = nodesAt(node ?? { type: "" }, "quasis");
+  const value = quasi?.["value"];
+  const cooked = typeof value === "object" && value !== null ? value.cooked : undefined;
+  return node?.type === "TemplateLiteral" && more.length === 0 && nodesAt(node, "expressions").length === 0 && typeof cooked === "string" ? cooked : undefined;
+};
 var replacesWithMore = (value, target) => {
   const roots = identifiersIn(target);
   return anyNode(value, (node) => {
     const callee = node.type === "CallExpression" ? nodeAt(node, "callee") : undefined;
     const method = callee?.type === "MemberExpression" ? nameOf(nodeAt(callee, "property")) : undefined;
-    if (method !== "replace" && method !== "replaceAll")
+    if (method !== "replace" && method !== "replaceAll" && method !== "join")
       return false;
-    const [pattern, replacement] = nodesAt(node, "arguments");
-    const from = pattern?.type === "Literal" ? pattern["value"] : undefined;
-    const to = replacement?.type === "Literal" ? replacement["value"] : undefined;
-    return typeof from === "string" && typeof to === "string" && to.length > from.length && identifiersIn(nodeAt(callee ?? node, "object")).some((name) => roots.includes(name));
+    const [first, second] = nodesAt(node, "arguments");
+    const receiver = nodeAt(callee ?? node, "object");
+    if (method === "join") {
+      const splitCall = receiver?.type === "CallExpression" ? receiver : undefined;
+      const splitter = nodeAt(splitCall ?? node, "callee");
+      const splitOn = splitCall !== undefined && splitter?.type === "MemberExpression" && nameOf(nodeAt(splitter, "property")) === "split" ? literalText(nodesAt(splitCall, "arguments")[0]) : undefined;
+      const joinWith = first === undefined ? "," : literalText(first);
+      return splitOn !== undefined && joinWith !== undefined && joinWith.length > splitOn.length && identifiersIn(receiver).some((name) => roots.includes(name));
+    }
+    const from = literalText(first);
+    const to = literalText(second);
+    return from !== undefined && to !== undefined && (to.length > from.length || to.includes("$")) && identifiersIn(receiver).some((name) => roots.includes(name));
   });
 };
+var isPlainChain = (node) => node?.type === "Identifier" || node?.type === "MemberExpression" && node["computed"] !== true && isPlainChain(nodeAt(node, "object"));
 var isChain = (node) => node?.type === "Identifier" || node?.type === "MemberExpression" && isChain(nodeAt(node, "object"));
 var fieldOf = (member) => {
   const property = nodeAt(member, "property");
@@ -19923,6 +19952,7 @@ var inspect = (script) => {
   const references = [];
   const assignments = [];
   const memberWrites = [];
+  const arraysFrom = [];
   let agentCalls = 0;
   let loopWork = 1;
   const rootContext = { max: 1, calls: [] };
@@ -19942,12 +19972,11 @@ var inspect = (script) => {
   const applications = [];
   const functionNodes = [];
   const parametersOf = new Map;
+  const firstParameterOf = new Map;
   const dynamicIn = [];
   const allowedFunctions = new Set;
   const namedFunctions = new Set;
   const functionMakers = new Set;
-  const resultCallbacks = new Set;
-  const freshResults = new Set;
   const functionAssignments = [];
   let analysisSteps = 0;
   const spend = () => {
@@ -20084,7 +20113,7 @@ var inspect = (script) => {
             target.names.get(name)?.sources.push({ node: init, scope });
           const names = new Set;
           assignedNames(id, names);
-          stores.push({ names: [...names], scope, value: init });
+          stores.push({ names: [...names], scope, value: init, adds: false });
         }
       }
       expression(init, scope, depth + 1);
@@ -20104,8 +20133,11 @@ var inspect = (script) => {
     const parameterNames = new Set;
     for (const parameter of nodesAt(node, "params"))
       assignedNames(parameter, parameterNames);
+    const firstNames = new Set;
+    assignedNames(nodesAt(node, "params")[0], firstNames);
     functionNodes.push(node);
     parametersOf.set(node, [...parameterNames].flatMap((name) => inner.names.get(name) ?? []));
+    firstParameterOf.set(node, [...firstNames].flatMap((name) => inner.names.get(name) ?? []));
     const outerWork = loopWork;
     const outerContext = context;
     if (node.type === "FunctionDeclaration" || namedFunctions.has(node)) {
@@ -20123,8 +20155,6 @@ var inspect = (script) => {
         allowedFunctions.add(body);
         functionMakers.add(body);
       }
-      if (body !== undefined && resultCallbacks.has(node))
-        freshResults.add(body);
       expression(body, inner, depth + 1);
     }
     functionsAround = outerFunctions;
@@ -20208,6 +20238,7 @@ var inspect = (script) => {
       applications.push({ node, name: nameCalled, scope, inputs: values });
     let callbacks = [];
     let passes = 1;
+    let method = "";
     if (callee?.type === "Identifier") {
       refer(callee, scope, "callee");
       const name = nameOf(callee);
@@ -20216,9 +20247,6 @@ var inspect = (script) => {
       if (name === "pipeline") {
         callbacks = given.slice(1);
         passes = DATA_ITERATIONS;
-        for (const stage of callbacks)
-          if (isFunctionLiteral(stage))
-            resultCallbacks.add(stage);
       }
       if (name === "parallel")
         callbacks = given.flatMap((argument) => argument?.type === "ArrayExpression" ? nodesAt(argument, "elements") : []);
@@ -20227,7 +20255,7 @@ var inspect = (script) => {
     } else if (callee?.type === "MemberExpression") {
       memberExpression(callee, scope, depth + 1, true);
       const computed = callee["computed"] === true;
-      const method = computed ? "" : nameOf(nodeAt(callee, "property")) ?? "";
+      method = computed ? "" : nameOf(nodeAt(callee, "property")) ?? "";
       const object = nodeAt(callee, "object");
       const owner = nameOf(object);
       if (computed)
@@ -20241,8 +20269,8 @@ var inspect = (script) => {
       const repeated = object?.type === "Literal" ? object["value"] : undefined;
       if (method === "repeat" && (typeof repeated !== "string" || repeated.length > MAX_REPEATED_TEXT))
         refuse(`repeats something that is not a literal of at most ${MAX_REPEATED_TEXT} characters`);
-      if (owner === "Array" && method === "from" && given[0]?.type === "ObjectExpression")
-        refuse("builds an array from an object, whose length it could set");
+      if (owner === "Array" && method === "from" && given[0] !== undefined)
+        arraysFrom.push({ source: given[0], scope });
       const position = CALLBACK_ARGUMENTS.get(method);
       if (position !== undefined) {
         callbacks = position === "all" ? given : given.slice(position, position + 1);
@@ -20251,8 +20279,6 @@ var inspect = (script) => {
         for (const argument of callbacks)
           if (isFunctionLiteral(argument)) {
             functionMakers.add(argument);
-            if (RESULT_METHODS.has(method))
-              resultCallbacks.add(argument);
           }
         if (ITERATING_METHODS.has(method))
           passes = DATA_ITERATIONS;
@@ -20264,14 +20290,14 @@ var inspect = (script) => {
       if (GROWING_METHODS.has(method) && object !== undefined) {
         const site = {
           names: identifiersIn(object),
-          opaque: !isChain(object),
+          opaque: !isPlainChain(object),
           scope,
           within: functionsAround
         };
         growths.push(site);
         for (const walk of walks)
           walk.sites.push(site);
-        stores.push({ names: identifiersIn(object), scope, value: node });
+        stores.push({ names: identifiersIn(object), scope, value: node, adds: true });
       }
     } else if (isFunctionLiteral(callee))
       functionNode(callee, scope, depth + 1);
@@ -20281,6 +20307,8 @@ var inspect = (script) => {
       if (isFunctionLiteral(argument)) {
         allowedFunctions.add(argument);
         flows.push({ inputs: handed, takers: () => parametersOf.get(argument) ?? [] });
+        if (method === "reduce")
+          flows.push({ inputs: [argument], takers: () => firstParameterOf.get(argument) ?? [] });
       }
     if (isFunctionLiteral(callee))
       flows.push({ inputs: values, takers: () => parametersOf.get(callee) ?? [] });
@@ -20303,7 +20331,7 @@ var inspect = (script) => {
       const index = property?.type === "Literal" ? property["value"] : undefined;
       if (node["computed"] !== true && nameOf(property) === "length" || typeof index === "number" && index > MAX_WRITE_INDEX)
         refuse(`writes a length or an index above ${MAX_WRITE_INDEX} into an array`);
-      memberWrites.push({ root: rootName(node), scope });
+      memberWrites.push({ root: rootName(node), scope, right });
       return memberExpression(node, scope, depth + 1, false);
     }
     refuse("assigns to something that is not a name or a member");
@@ -20330,22 +20358,20 @@ var inspect = (script) => {
           expression(part, scope, depth + 1);
         return;
       case "ArrayExpression":
-        if (!freshResults.has(node))
-          combine(node, {
-            operands: definedNodes(nodesAt(node, "elements").map(unspread)),
-            scope,
-            merging: nodesAt(node, "elements").some((element) => element?.type === "SpreadElement")
-          });
+        combine(node, {
+          operands: definedNodes(nodesAt(node, "elements").map(unspread)),
+          scope,
+          merging: nodesAt(node, "elements").some((element) => element?.type === "SpreadElement")
+        });
         for (const element of nodesAt(node, "elements"))
           expression(element?.type === "SpreadElement" ? nodeAt(element, "argument") : element, scope, depth + 1);
         return;
       case "ObjectExpression":
-        if (!freshResults.has(node))
-          combine(node, {
-            operands: definedNodes(nodesAt(node, "properties").map((property) => property?.type === "SpreadElement" ? nodeAt(property, "argument") : nodeAt(property ?? node, "value"))),
-            scope,
-            merging: nodesAt(node, "properties").some((property) => property?.type === "SpreadElement")
-          });
+        combine(node, {
+          operands: definedNodes(nodesAt(node, "properties").map((property) => property?.type === "SpreadElement" ? nodeAt(property, "argument") : nodeAt(property ?? node, "value"))),
+          scope,
+          merging: nodesAt(node, "properties").some((property) => property?.type === "SpreadElement")
+        });
         for (const property of nodesAt(node, "properties"))
           objectProperty(property, scope, depth);
         return;
@@ -20389,7 +20415,12 @@ var inspect = (script) => {
           const root = rootName(left);
           if (root !== undefined)
             names.add(root);
-          stores.push({ names: [...names], scope, value: node });
+          stores.push({
+            names: [...names],
+            scope,
+            value: node,
+            adds: operator !== "=" || left?.type === "MemberExpression"
+          });
         }
         writeTarget(left, scope, depth, operator === "=" ? () => builtHere(right, scope) : () => true, operator === "=" && !isFunctionLiteral(right) ? right : undefined);
         return expression(right, scope, depth + 1);
@@ -20441,8 +20472,6 @@ var inspect = (script) => {
           allowedFunctions.add(result);
           functionMakers.add(result);
         }
-        if (node.type === "ReturnStatement" && result !== undefined && maker !== undefined && resultCallbacks.has(maker))
-          freshResults.add(result);
         return expression(result, scope, depth + 1);
       }
       case "IfStatement":
@@ -20607,7 +20636,7 @@ var inspect = (script) => {
         for (const callee of binding(call.scope, call.name)?.functions ?? []) {
           const inner = contexts.get(callee);
           if (inner !== undefined)
-            total = Math.max(total, call.factor * cost(inner));
+            total += call.factor * cost(inner);
         }
       costs.set(work, total);
       return total;
@@ -20651,6 +20680,45 @@ var inspect = (script) => {
           return [];
       }
     };
+    const holdsArray = (node, scope, seen) => {
+      switch (node?.type) {
+        case "ArrayExpression":
+          return true;
+        case "AwaitExpression":
+        case "ChainExpression":
+          return holdsArray(nodeAt(node, node.type === "AwaitExpression" ? "argument" : "expression"), scope, seen);
+        case "ConditionalExpression":
+          return holdsArray(nodeAt(node, "consequent"), scope, seen) && holdsArray(nodeAt(node, "alternate"), scope, seen);
+        case "LogicalExpression":
+          return holdsArray(nodeAt(node, "left"), scope, seen) && holdsArray(nodeAt(node, "right"), scope, seen);
+        case "MemberExpression":
+          return rootName(node) === "args" && binding(scope, "args") === undefined;
+        case "Identifier": {
+          const held = binding(scope, nameOf(node) ?? "");
+          if (held === undefined || held.unsafe || held.sources.length === 0)
+            return false;
+          if (seen.has(held))
+            return true;
+          seen.add(held);
+          return held.sources.every((source) => holdsArray(source.node, source.scope, seen));
+        }
+        case "CallExpression": {
+          const callee = nodeAt(node, "callee");
+          if (callee?.type !== "MemberExpression" || callee["computed"] === true)
+            return false;
+          const owner = nameOf(nodeAt(callee, "object"));
+          const method = nameOf(nodeAt(callee, "property")) ?? "";
+          if (owner !== undefined && binding(scope, owner) === undefined)
+            return owner === "Object" && ["keys", "values", "entries"].includes(method) || owner === "Array" && (method === "from" || method === "of") || owner === "Promise" && (method === "all" || method === "allSettled");
+          return ARRAY_RESULTS.has(method);
+        }
+        default:
+          return false;
+      }
+    };
+    for (const entry of arraysFrom)
+      if (!holdsArray(entry.source, entry.scope, new Set))
+        return refuse("builds an array from something that is not known to be an array");
     const UNSAFE = "a parameter or a loop variable";
     const reaching = (names, scope) => {
       const seen = new Set;
@@ -20685,11 +20753,16 @@ var inspect = (script) => {
         visit(node);
       return found;
     };
+    const isFresh = (held) => !held.unsafe && held.sources.length > 0 && builtBinding(held) && [...held.sources, ...held.stored].every((entry) => identifiersIn(entry.node).length === 0);
+    const growsFresh = (site) => site.names.every((name) => {
+      const held = binding(site.scope, name);
+      return held !== undefined && isFresh(held);
+    });
     for (const walk of everyWalk) {
       const walked = reaching(walk.walked, walk.scope);
       const viaFunction = [...walked].some((key) => typeof key !== "string" && key.functions.size > 0);
       for (const site of walk.sites)
-        if (site.opaque || viaFunction || shares(reaching(site.names, site.scope), walked))
+        if (site.opaque || viaFunction || !growsFresh(site) || shares(reaching(site.names, site.scope), walked))
           return refuse("adds to the array a for-of loop walks");
       for (const call of walk.calls) {
         const callees = reachable(binding(call.scope, call.name)?.functions ?? []);
@@ -20699,7 +20772,7 @@ var inspect = (script) => {
           if (!site.within.some((caller) => callees.has(caller)))
             continue;
           const grown = reaching(site.names, site.scope);
-          if (site.opaque || viaFunction || grown.has(UNSAFE) || shares(grown, walked))
+          if (site.opaque || viaFunction || !growsFresh(site) || grown.has(UNSAFE) || shares(grown, walked))
             return refuse("calls, in a for-of loop, a function that adds to an array");
         }
       }
@@ -20747,6 +20820,32 @@ var inspect = (script) => {
         }
       if (shared.size > 0)
         doublings.push({ at: combination.at, shared: [...shared] });
+    }
+    const storesInto = new Map;
+    for (const store of stores)
+      for (const name of new Set(store.names)) {
+        const target = binding(store.scope, name);
+        if (target !== undefined)
+          storesInto.set(target, [...storesInto.get(target) ?? [], store]);
+      }
+    for (const [target, group] of storesInto) {
+      if (group.length < 2)
+        continue;
+      const owners = new Map;
+      for (const store of group) {
+        const read = readings(store.value, store.scope, true);
+        if (!store.adds && ![...read.values()].includes(target))
+          continue;
+        const shared = new Set;
+        for (const [reading, key] of read) {
+          const owner = owners.get(reading);
+          if (owner !== undefined && owner !== store && key !== target)
+            shared.add(key);
+          owners.set(reading, store);
+        }
+        if (shared.size > 0)
+          doublings.push({ at: store.value, shared: [...shared] });
+      }
     }
     const byStart = (list, start) => [...list].sort((left, right) => start(left) - start(right));
     const firstFrom = (list, start, at) => {
@@ -20886,6 +20985,8 @@ var inspect = (script) => {
     const held = write.root === undefined ? undefined : binding(write.scope, write.root);
     if (held === undefined || !builtBinding(held))
       refuse("writes into something the script did not build");
+    if (write.right !== undefined)
+      held?.stored.push({ node: write.right, scope: write.scope });
   }
   if (refusal === undefined)
     analyse();

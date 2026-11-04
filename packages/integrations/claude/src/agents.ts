@@ -602,9 +602,16 @@ const rootAgent = async (): Promise<GeneratedFile> => {
     "effort: high",
     `disallowedTools: ${denylist(ROOT_BUILTINS)}`,
   ])
+  // The history rules continue the bullet list of the version-control rules, so no blank line
+  // splits it; every other section is a paragraph of its own.
+  const body = (await readSections(source, ROOT_SECTIONS))
+    .map((text, at) =>
+      at === 0 ? text : `${ROOT_SECTIONS[at] === HISTORY_RULES_FILE ? "\n" : "\n\n"}${text}`,
+    )
+    .join("")
   return {
     path: `${DIST_DIRECTORY}/agents/${PLUGIN_NAME}.md`,
-    content: `${head}\n\n${(await readSections(source, ROOT_SECTIONS)).join("\n\n")}\n`,
+    content: `${head}\n\n${body}\n`,
   }
 }
 

@@ -1255,6 +1255,57 @@ describe("breaking a stale lock", () => {
     }
   })
 
+  test("a lock created while a moved lock is put back is not overwritten", async () => {
+    const file = join(await scratch(), "worktree.lock")
+    const child = Bun.spawn([process.execPath, "-e", ""])
+    await child.exited
+    const owner = (token: string, pid: number) =>
+      JSON.stringify({ pid, token, acquiredAt: Date.now() })
+    const [gone, live, newer] = [
+      owner("gone", child.pid),
+      owner("live", process.pid),
+      owner("newer", process.pid),
+    ]
+    await writeFile(file, gone)
+    // The contender has read the dead owner. Just before it moves the lock file, another process
+    // replaces the lock; then, just before the contender puts the moved lock back, a third process
+    // creates a lock there, as it could in the gap after the contender found the place empty.
+    let replaced = false
+    const [rename, link] = [filesystem.rename, filesystem.link]
+    const renameSpy = spyOn(filesystem, "rename").mockImplementation(
+      (...args: Parameters<typeof rename>) => {
+        if (!replaced && args[0] === file) {
+          replaced = true
+          writeFileSync(file, live)
+        }
+        if (args[1] === file) writeFileSync(file, newer)
+        return rename(...args)
+      },
+    )
+    const linkSpy = spyOn(filesystem, "link").mockImplementation(
+      (...args: Parameters<typeof link>) => {
+        if (args[1] === file) writeFileSync(file, newer)
+        return link(...args)
+      },
+    )
+    try {
+      const failure = await Effect.runPromise(
+        Effect.flip(
+          deadlineIn(400).pipe(
+            Effect.flatMap((deadline) => withFileLock(file, Effect.succeed("ran"), deadline)),
+          ),
+        ),
+      )
+
+      expect(failure._tag).toBe("StateLocked")
+      expect(await readFile(file, "utf8")).toBe(newer)
+      expect((await readdir(join(file, ".."))).filter((name) => name.includes("stale"))).toEqual([])
+    } finally {
+      renameSpy.mockRestore()
+      linkSpy.mockRestore()
+    }
+  })
+
   test("a lock of a dead process is broken and taken", async () => {
     const file = join(await scratch(), "worktree.lock")
     const child = Bun.spawn([process.execPath, "-e", ""])

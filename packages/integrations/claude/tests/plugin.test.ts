@@ -6,6 +6,7 @@ import { join, normalize, win32 } from "node:path"
 
 import { $ } from "bun"
 
+import { LOCKFILE, VERSION_COPIES } from "../../../../scripts/bump-version.ts"
 import { Dimension } from "../../../runtime/src/domain/assignment.ts"
 import { toPosix } from "../../../runtime/src/domain/paths.ts"
 import { ROUTES } from "../../../runtime/src/domain/route.ts"
@@ -139,13 +140,19 @@ describe("the generated plugin is in step with its sources", () => {
   })
 
   test("the commit hook stages exactly the generated paths", () => {
-    const stage = read("lefthook.yml").split("git add -A --")[1] ?? ""
+    const stage = (read("lefthook.yml").split("git add -A --")[1] ?? "").split("- name:")[0] ?? ""
     expect(
       stage
         .split("\n")
         .map((line) => line.trim())
-        .filter(Boolean),
+        .filter((line) => line !== "" && !line.startsWith("#")),
     ).toEqual([...GENERATED_PATHS])
+  })
+
+  test("the commit hook stages the copies of the version and the lockfile that the build rewrites", () => {
+    const job = read("lefthook.yml").split("- name: versions")[1] ?? ""
+    const staged = /git add -- (.*)/.exec(job)?.[1]?.trim().split(/\s+/)
+    expect(staged).toEqual([...VERSION_COPIES, LOCKFILE])
   })
 
   test("generated files carry the note where their format allows one", () => {
@@ -366,7 +373,11 @@ describe("agents", () => {
   })
 
   test("the root's body is the files of root/ in the fixed order", () => {
-    const body = ROOT_SECTIONS.map((name) => read(`${CLAUDE}/root`, name).trim()).join("\n\n")
+    // The history rules continue the bullet list before them; every other section is a paragraph.
+    const body = ROOT_SECTIONS.map(
+      (name, at) =>
+        `${at === 0 ? "" : name === HISTORY_RULES_FILE ? "\n" : "\n\n"}${read(`${CLAUDE}/root`, name).trim()}`,
+    ).join("")
     expect(agent("holyagent")?.content.endsWith(`\n---\n\n${body}\n`)).toBe(true)
     expect(ROOT_SECTIONS.slice(0, ROOT_CORE_FILES.length)).toEqual([...ROOT_CORE_FILES])
   })
@@ -1373,6 +1384,8 @@ describe("agents", () => {
     )
     const root = agent("holyagent")?.content ?? ""
     expect(root.split(rules).length - 1).toBe(1)
+    // They continue the bullet list of the version-control rules, with no blank line between.
+    expect(root.slice(0, root.indexOf(rules))).toMatch(/\n- [^\n]*\n$/)
     for (const route of ROUTES)
       expect({ agent: route.agent, holds: agent(route.agent)?.content.includes(rules) }).toEqual({
         agent: route.agent,

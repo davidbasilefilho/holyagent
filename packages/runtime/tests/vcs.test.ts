@@ -20,7 +20,11 @@ describe("which identity is an agent's", () => {
     ["the name Claude", "Claude", "octo@example.com", true],
     ["the name Claude Code", "Claude Code", "octo@example.com", true],
     ["the name Claude in lower case", " claude ", "octo@example.com", true],
+    ["the name Claude Code with two spaces", "Claude  Code", "octo@example.com", true],
+    ["the name Claude Code with a non-breaking space", "Claude Code", "octo@example.com", true],
+    ["the name Claude Code with a tab", "Claude\tCode", "octo@example.com", true],
     ["a person whose name starts with Claude", "Claude Dupont", "claude@dupont.example", false],
+    ["a name with Claude Code inside it", "Claude  Code Dupont", "octo@example.com", false],
     ["a person named Claudette", "Claudette Colvin", "octo@example.com", false],
     ["another anthropic.com address", "Octo", "octo@anthropic.com", false],
   ])("%s", (_label, name, email, agent) => {

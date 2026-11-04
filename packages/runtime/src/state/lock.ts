@@ -1,5 +1,5 @@
 import type { FileHandle } from "node:fs/promises"
-import { lstat, mkdir, open, rename, rm } from "node:fs/promises"
+import { link, lstat, mkdir, open, rename, rm } from "node:fs/promises"
 import { dirname } from "node:path"
 
 import { Clock, Effect, Schedule, Schema } from "effect"
@@ -37,13 +37,35 @@ const inTheWay = (file: string) =>
   )
 
 /**
+ * Puts a lock moved aside back where it was, without overwriting a lock created there since. A hard
+ * link cannot replace a file; when the file system has none (any failure but EEXIST), the lock is
+ * renamed back if nothing is in the way. Never fails.
+ */
+const putBack = (taken: string, file: string) =>
+  io(file, () => link(taken, file)).pipe(
+    Effect.catch((error) =>
+      hasCode(error.cause, "EEXIST")
+        ? Effect.void
+        : inTheWay(file).pipe(
+            Effect.flatMap((present) =>
+              present ? Effect.void : io(file, () => rename(taken, file)),
+            ),
+          ),
+    ),
+    Effect.ignore,
+  )
+
+/**
  * Removes the lock when its process is gone, or when it is unreadable and old. The lock is first
  * renamed to a name of its own, and the renamed file is checked: if it carries a different owner
  * than the one judged stale (another process claimed the lock between the read and the rename), it
- * is renamed back, unless the lock was claimed again meanwhile. Between the two renames no lock
- * file exists, so a process that claims it in that moment keeps its claim and the moved owner loses
- * its lock; a plain read followed by a removal left that open for the whole gap between the two. A
- * rename needs no hard links, which not every file system has. Never fails.
+ * is put back by a hard link, which fails when the lock was claimed again meanwhile, so that no
+ * claim is overwritten. On a file system without hard links the file is renamed back instead, when
+ * nothing is in the way; a process that claims the lock between that check and the rename loses its
+ * claim, a narrow window that only such file systems have. Between the move and the putting back no
+ * lock file exists, so a process that claims it in that moment keeps its claim and the moved owner
+ * loses its lock; a plain read followed by a removal left that open for the whole gap between the
+ * two. Never fails.
  */
 const breakIfStale = (file: string) =>
   Effect.gen(function* () {
@@ -59,8 +81,7 @@ const breakIfStale = (file: string) =>
     )
     if (!moved) return
     const claimedMeanwhile = (yield* readOwner(taken))?.token !== owner?.token
-    if (claimedMeanwhile && !(yield* inTheWay(file)))
-      yield* io(file, () => rename(taken, file)).pipe(Effect.ignore)
+    if (claimedMeanwhile) yield* putBack(taken, file)
     yield* io(taken, () => rm(taken, { force: true }))
   }).pipe(Effect.ignore)
 

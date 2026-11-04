@@ -61,6 +61,18 @@ export const caretRange = (release: string): string => {
   return `^0.0.${parsed.patch}`
 }
 
+/**
+ * The range a dependency moves to: the caret range of `release`, unless the current range is a
+ * caret range that already starts above it, which is kept. A registry whose `latest` tag points at
+ * an older line (a backport published last) must not move a dependency down.
+ */
+export const nextRange = (current: string, release: string): string => {
+  const next = caretRange(release)
+  const from = parseRelease(current.startsWith("^") ? current.slice(1) : "")
+  const to = parseRelease(next.slice(1))
+  return from !== undefined && to !== undefined && compareReleases(from, to) > 0 ? current : next
+}
+
 /** The stable release a git tag names, given the tag prefix (`v`, or `bun-v`), else `undefined`. */
 export const releaseOfTag = (tag: string, prefix: string): string | undefined => {
   if (!tag.startsWith(prefix)) return undefined
@@ -176,10 +188,10 @@ const USES_LINE = /^\s*(?:-\s+)?uses:\s*(\S+)/
  * The external `uses:` lines of a workflow or action file that `parseActionUses` cannot read: no
  * full commit SHA, or a trailing comment other than `# vX.Y.Z`. The updater cannot move these, so
  * it reports them instead of letting a stale action pass unnoticed. Local (`./`) and `docker://`
- * references are not pins and are not listed. Each line is trimmed.
+ * references are not pins and are not listed. Each line is trimmed; lines end in LF or CRLF.
  */
 export const unreadableActionUses = (text: string): ReadonlyArray<string> =>
-  text.split("\n").flatMap((line) => {
+  text.split(/\r?\n/).flatMap((line) => {
     const target = USES_LINE.exec(line)?.[1]
     return target === undefined ||
       target.startsWith("./") ||

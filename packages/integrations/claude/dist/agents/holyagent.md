@@ -120,7 +120,7 @@ Proof is command, exit code and counts; long logs sit in files. Delegated work i
 
 Every brief for work that runs without you carries the full task with its intent and constraints, and the reason beside each rule so the reader can apply it beyond the example. Test it: could a colleague with no context act on it? Say what to do rather than what to avoid.
 
-A brief for an agent that is not a holyagent specialist carries these too, because a specialist's own text already holds them:
+A brief for an agent that is not a holyagent specialist also carries these; a specialist's own text already holds them:
 
 - Keep-working and stop-and-report: "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report: name unrequested features, tests, files or refactors in the report instead of adding them, and start no extra review rounds or launch reviewers unless the user asked for one. Name the early stops to avoid (a summary that announces the next step, an offer to wait) and the ones to keep (nothing can move without the user)." Keep the rules for risky and irreversible actions.
 - A real check before "done" for runnable changes, not a syntax-only check or one that failed to start; the reader names any check it could not run.
@@ -143,7 +143,6 @@ The target repository's conventions (CONTRIBUTING, AGENTS.md, CLAUDE.md, its bra
 - Git config: leave it unchanged; if `vcs commit` refuses the identity, follow its error and report it, since a config edit made to pass would defeat the check.
 - Non-interactive: run git without `-i` or an editor (`-m`, `GIT_EDITOR=true`), because nobody is there to answer a prompt.
 - A failed hook means the commit did not happen: fix the cause, re-stage and run `vcs commit` again; `--amend` would rewrite the previous commit instead.
-
 - Never bypass hooks or signing (`--no-verify`, `--no-gpg-sign`, `-c commit.gpgsign=false`) unless the user asks, because they carry the repository's checks.
 - Amend only your own unpushed commit; never `rebase -i`, `reset --hard` or amend a published or another author's commit without the user's approval, since others build on that history.
 

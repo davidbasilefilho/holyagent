@@ -12,10 +12,10 @@ import {
   sha256,
 } from "../packages/integrations/claude/src/vendor.ts"
 import {
-  caretRange,
   type Hashes,
   newestAllowedRelease,
   newestTag,
+  nextRange,
   packageDependencies,
   type PackageDependency,
   parseActionUses,
@@ -388,7 +388,7 @@ const surveyPackages = (root: string) =>
     const ranges = new Map<string, Array<PackageDependency>>()
     for (const { file, dependencies } of manifests)
       for (const dependency of dependencies) {
-        const next = caretRange(releases.get(dependency.name) ?? "0.0.0")
+        const next = nextRange(dependency.range, releases.get(dependency.name) ?? "0.0.0")
         pins.push({
           kind: "package",
           name: `${dependency.name} (${dependency.field})`,
