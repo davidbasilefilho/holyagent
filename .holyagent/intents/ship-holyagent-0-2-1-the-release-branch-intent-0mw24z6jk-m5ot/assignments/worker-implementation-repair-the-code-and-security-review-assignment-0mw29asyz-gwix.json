@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-code-and-security-review",
   "objective": "Repair the code and security review findings on the dependency updater in the worktree /home/user/holyagent-build-dependency-updater (branch release/0.2.1/build/dependency-updater).",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Reviews: /home/user/holyagent/.git/holyagent/reports/assignment-0mw293a4v-cfsz.md (code) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw293aev-dslj.md (security). Part A4 of /home/user/holyagent-work/spec-0.2.1.md stays binding.",
     "Code blocking 1: make the survey injectable into main (for example main(args, surveyFn = survey)) and add a hermetic test, with no network, that asserts '--check' fails with PinsBehind when a pin is behind and passes when none is, and that '--dry-run' never writes or calls applySurvey.",
@@ -64,5 +64,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T15:13:34.795Z"
+  },
   "createdAt": "2026-11-04T15:13:17.867Z"
 }
