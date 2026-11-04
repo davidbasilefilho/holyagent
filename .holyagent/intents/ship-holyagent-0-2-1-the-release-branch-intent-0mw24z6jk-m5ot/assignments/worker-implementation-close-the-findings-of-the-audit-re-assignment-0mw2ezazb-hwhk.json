@@ -1,0 +1,74 @@
+{
+  "id": "assignment-0mw2ezazb-hwhk",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "close-the-findings-of-the-audit-re",
+  "objective": "Close the findings of the audit re-reviews on release/0.2.1/fix/audit (worktree /home/user/holyagent-fix-audit, head 18d6e22) in one final repair round.",
+  "state": "Running",
+  "scope": [
+    "The findings: code re-review /home/user/holyagent/.git/holyagent/reports/assignment-0mw2emv3e-9n67.md, security re-review /home/user/holyagent/.git/holyagent/reports/assignment-0mw2emvdm-8ade.md, artifact re-review /home/user/holyagent/.git/holyagent/reports/assignment-0mw2emvoc-cadi.md. Your previous reports: /home/user/holyagent/.git/holyagent/reports/assignment-0mw2cxpkv-v9vt.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw2e2brx-3vld.md.",
+    "Binding scope for the workflow hook (packages/runtime/src/cli/workflow-check.ts): it guards against accidental runaway scripts the root writes. The maintainer decision is that it refuses unbounded loops and large or computed repeat/padStart/padEnd counts; past that it refuses the growth patterns the reviews found where a small rule closes them. A refused script falls back to the permission prompt. All 44 real root scripts in /root/.claude/projects/-home-user-holyagent/70184bfa-8a56-57cb-a6cf-d92f87c7692b/workflows/scripts/ must stay allowed (runner: /home/user/holyagent-work/check-workflow-scripts-src.ts), and packages/integrations/claude/tests/hooks.test.ts must keep passing.",
+    "Fix, each with a test that fails without it: (1) blocking regression, code finding 1: a reduce callback's return value feeds its accumulator, so doubling through reduce is refused again; (2) security finding 1: the freshResults exemption lets a loop double an array through map; remove it or narrow it so a.map(x => [x, x]) on an ungrown a stays allowed; (3) security finding 2: doubling split across statements in a loop (two push(...a) into one array, or two property writes of a into one object, assigned back to a); (4) security finding 3: split('').join(sep) and a replacement string containing a dollar pattern, stored back in a loop; (5) security gap 2: Array.from whose first argument is not an array literal, an Object.keys/values/entries call or a declared array; (6) security gap 4: a growth call inside a for-of body whose receiver may alias the walked value through a container, destructuring or an awaited promise; refuse a growth call there whose receiver is not declared in that body; (7) security gap 5: sum a function's call costs instead of taking the max. Name any of (2)-(7) you skip and why.",
+    "Also fix: code finding 2 (state/lock.ts rename-back can overwrite a lock created in between: try link first and fall back to check-then-rename only when link fails with something other than EEXIST; keep the test that spies on link failing); the identity check collapses inner whitespace and non-breaking spaces before comparing (packages/runtime/src/vcs/identity.ts, with a test; still exact names only); the CLI help and error text that says 'looks like an agent' (vcs/commands.ts:58,101, errors.ts:34,47, author.ts:38) says the agent's exact identity; artifact finding 1 (root/instruction-guidelines.md:5 wording, use: 'A brief for an agent that is not a holyagent specialist also carries these; a specialist's own text already holds them:'); artifact finding 3 (the blank line that splits the version-control bullet list in the generated holyagent.md, fixed in packages/integrations/claude/src/agents.ts or the source md). Update docs/hooks.md Limits if the limits change, keeping it the only place with numbers.",
+    "Check and fix if real, each with a test: scripts/dependency-pins.ts:177 ACTION_LINE has no m flag so CRLF workflow files are unreadable; scripts/update-dependencies.ts:254 can move a dependency below its current range when the registry latest is lower; lefthook.yml:28 pre-commit build does not stage the version copies and bun.lock it rewrites (only if build.ts really rewrites them on commit; then add them to the staged paths).",
+    "Finish with 'bun install --frozen-lockfile', 'bunx --no-install mise run build' and 'bunx --no-install mise run verify' (see docs/development.md), and the real-script runner."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md code rules: Effect for effects and tagged errors, no try/catch, new Promise, Promise statics or async functions in runtime source, Effect Schema at boundaries, JSDoc on every exported item. Do not change .claude/CLAUDE.md.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report; name unrequested features, tests, files or refactors instead of adding them. Do not stop at a summary that announces the next step.",
+    "Make no commits or other git writes and no edits under .git/ or .holyagent/; the root commits.",
+    "Work only inside /home/user/holyagent-fix-audit; scratch files go in /home/user/holyagent-work/.",
+    "Report in under 450 words: each item fixed or skipped with its test; diff to /home/user/holyagent-work/diffs/audit-final.diff."
+  ],
+  "criteria": [
+    {
+      "text": "Reduce doubling is refused again with a test, and the other hook items are fixed or named with the reason",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "All 44 real root scripts stay allowed and hooks.test.ts passes",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The lock, identity, CLI text, instruction wording and blank-line items are fixed with tests where behavior changes",
+      "blocking": false,
+      "dimension": "scope"
+    },
+    {
+      "text": "The three dependency-script leftovers are fixed with a test or shown not to be real",
+      "blocking": false,
+      "dimension": "tests"
+    },
+    {
+      "text": "After a frozen install, mise run build leaves dist in sync and mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src",
+    "packages/runtime/tests",
+    "packages/integrations/claude/src",
+    "packages/integrations/claude/tests",
+    "packages/integrations/claude/dist",
+    "scripts",
+    "lefthook.yml",
+    "docs/hooks.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw2e2brx-3vld",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T17:52:19.031Z"
+  },
+  "createdAt": "2026-11-04T17:52:19.031Z"
+}
