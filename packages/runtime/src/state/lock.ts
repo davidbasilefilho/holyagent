@@ -1,4 +1,4 @@
-import { mkdir, open, rm } from "node:fs/promises"
+import { link, mkdir, open, rename, rm } from "node:fs/promises"
 import { dirname } from "node:path"
 
 import { Clock, Effect, Schedule, Schema } from "effect"
@@ -29,8 +29,12 @@ const processAlive = (pid: number) =>
   )
 
 /**
- * Removes the lock when its process is gone, or when it is unreadable and old. The file is read
- * again before the removal and left alone if another owner took it meanwhile. Never fails.
+ * Removes the lock when its process is gone, or when it is unreadable and old. The lock is first
+ * renamed to a name of its own, which takes it from every other contender in one step, and the
+ * renamed file is checked: if it carries a different owner than the one judged stale (another
+ * process claimed the lock between the read and the rename), it is linked back unless the lock was
+ * claimed again meanwhile. A plain read followed by a removal could delete a live owner's lock.
+ * Never fails.
  */
 const breakIfStale = (file: string) =>
   Effect.gen(function* () {
@@ -38,8 +42,16 @@ const breakIfStale = (file: string) =>
     const stale = owner
       ? !(yield* processAlive(owner.pid))
       : (yield* Clock.currentTimeMillis) - Bun.file(file).lastModified > UNREADABLE_STALE_MS
-    if (stale && (yield* readOwner(file))?.token === owner?.token)
-      yield* io(file, () => rm(file, { force: true }))
+    if (!stale) return
+    const taken = `${file}.stale-${crypto.randomUUID()}`
+    const moved = yield* io(file, () => rename(file, taken)).pipe(
+      Effect.as(true),
+      Effect.catch(() => Effect.succeed(false)),
+    )
+    if (!moved) return
+    if ((yield* readOwner(taken))?.token !== owner?.token)
+      yield* io(file, () => link(taken, file)).pipe(Effect.ignore)
+    yield* io(taken, () => rm(taken, { force: true }))
   }).pipe(Effect.ignore)
 
 /** Creates the lock file, which must not exist yet. Resolves to the owner's token. */

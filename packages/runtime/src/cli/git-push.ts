@@ -58,6 +58,62 @@ const SHELLS: ReadonlySet<string> = new Set(["bash", "sh", "zsh", "dash", "ksh"]
 const WRAPPER_WORD =
   /^(?:\w+=.*|sudo|env|command|exec|time|nice|nohup|xargs|timeout|stdbuf|-.*|\d+[smhd]?)$/
 
+/** The options of each wrapper that take their value as the next word (`sudo -u root git push`). */
+const WRAPPER_OPTIONS_WITH_VALUE: Readonly<Record<string, ReadonlySet<string>>> = {
+  sudo: new Set([
+    "-u",
+    "-g",
+    "-h",
+    "-p",
+    "-C",
+    "-D",
+    "-R",
+    "-T",
+    "-U",
+    "-r",
+    "-t",
+    "--user",
+    "--group",
+    "--host",
+    "--prompt",
+    "--chdir",
+  ]),
+  env: new Set(["-u", "-C", "-S", "--unset", "--chdir", "--split-string"]),
+  timeout: new Set(["-s", "-k", "--signal", "--kill-after"]),
+  nice: new Set(["-n", "--adjustment"]),
+  stdbuf: new Set(["-i", "-o", "-e", "--input", "--output", "--error"]),
+  xargs: new Set(["-I", "-n", "-P", "-d", "-E", "-L", "-s", "-a"]),
+}
+
+/** Where the program a command runs starts: after the wrappers, their options and their values. */
+const programAt = (words: ReadonlyArray<string>): number => {
+  let at = 0
+  let wrapper = ""
+  while (at < words.length && WRAPPER_WORD.test(words[at] ?? "")) {
+    const word = words[at] ?? ""
+    if (Object.hasOwn(WRAPPER_OPTIONS_WITH_VALUE, word)) wrapper = word
+    at += WRAPPER_OPTIONS_WITH_VALUE[wrapper]?.has(word) === true ? 2 : 1
+  }
+  return at
+}
+
+/**
+ * A redirection: `>`, `>>`, `<`, `2>` and the like, with the target attached (`>log`) or as the
+ * next word. Its target is a file, not an argument of the command.
+ */
+const REDIRECTION = /^(?:\d*|&)(?:>>?|<<?<?)(.*)$/
+
+/** The words of a command without its redirections and their targets. */
+const withoutRedirections = (words: ReadonlyArray<string>): ReadonlyArray<string> => {
+  const kept: Array<string> = []
+  for (let at = 0; at < words.length; at += 1) {
+    const redirection = REDIRECTION.exec(words[at] ?? "")
+    if (redirection === null) kept.push(words[at] ?? "")
+    else if (redirection[1] === "") at += 1
+  }
+  return kept
+}
+
 /** Global options of git that take their value as the next word. */
 const GIT_OPTIONS_WITH_VALUE: ReadonlySet<string> = new Set([
   "-C",
@@ -103,9 +159,10 @@ const targetsOfPush = (args: ReadonlyArray<string>): ReadonlyArray<string> => {
 }
 
 /** The refs a single simple command pushes to, when it runs `git push`. */
-const pushTargetsOf = (words: ReadonlyArray<string>): ReadonlyArray<string> => {
-  const at = words.findIndex((word) => programOf(word) === "git")
-  if (at < 0 || !words.slice(0, at).every((word) => WRAPPER_WORD.test(word))) return []
+const pushTargetsOf = (line: ReadonlyArray<string>): ReadonlyArray<string> => {
+  const words = withoutRedirections(line)
+  const at = programAt(words)
+  if (programOf(words[at] ?? "") !== "git") return []
   let next = at + 1
   while ((words[next] ?? "").startsWith("-"))
     next += GIT_OPTIONS_WITH_VALUE.has(words[next] ?? "") ? 2 : 1

@@ -135,6 +135,38 @@ describe("state store", () => {
     expect(local[2]).toMatch(/^active-intent\/[0-9a-f]{16}\.json$/)
   })
 
+  test("a registry entry with domains and a vcs.json of an earlier version are read, and not written back", async () => {
+    await Effect.runPromise(seed())
+    const entry = {
+      agentId: "agent-3",
+      roleTask: "Worker.implementation",
+      model: "sonnet",
+      effort: "high",
+      assignments: ["assignment-old"],
+      related: [],
+      paths: ["src/a.ts"],
+      domains: ["src"],
+      running: false,
+    }
+    await Bun.write(
+      join(directory, "local/specialists.json"),
+      JSON.stringify({ specialists: [entry] }),
+    )
+    await Bun.write(join(directory, "local/vcs.json"), JSON.stringify({ branch: "main" }))
+
+    const state = await Effect.runPromise(readState(directory))
+    expect(state.specialists).toMatchObject([{ agentId: "agent-3", domains: ["src"] }])
+    expect(state).not.toHaveProperty("vcs")
+
+    // A later write keeps the entry as it was and leaves the old file alone.
+    await Effect.runPromise(
+      updateState(directory, ({ project, specialists }) =>
+        dispatch(project, specialists, "assignment-bbb", NOW, DEFAULT_CONFIG),
+      ),
+    )
+    expect(await Bun.file(join(directory, "local/vcs.json")).json()).toEqual({ branch: "main" })
+  })
+
   test("dispatch and record persist the Running Assignment and the specialist registry", async () => {
     await Effect.runPromise(seed())
     await Effect.runPromise(
@@ -183,7 +215,7 @@ describe("state store", () => {
         ),
       ),
     )
-    expect(error._tag).toBeDefined()
+    expect(error._tag).toBe("SchemaError")
     expect(await snapshot()).toEqual(before)
   })
 
@@ -274,6 +306,10 @@ describe("state store", () => {
     )
     await Effect.runPromise(seed())
     expect((await Effect.runPromise(readState(directory))).project.intents).toHaveLength(1)
+    // The stale lock is gone for good: breaking it leaves no renamed copy behind.
+    expect(
+      (await files(join(directory, "local"))).filter((name) => name.startsWith("lock")),
+    ).toEqual([])
   })
 
   test("a lock held by a live process is respected", async () => {

@@ -41,17 +41,27 @@ const requireLocation = (path: string, expected: string) =>
     ? Effect.void
     : Effect.fail(new CorruptRecord({ path, reason: `the record belongs in ${expected}` }))
 
+/**
+ * How many record files are read at once. The state holds a file for every Assignment ever made, so
+ * reading them one after the other makes every command as slow as the history is long.
+ */
+const READ_CONCURRENCY = 16
+
 const loadIntents = (directory: string) =>
   Effect.gen(function* () {
-    const intents: Array<Intent> = []
-    for (const file of yield* scan(directory, "intents/*/intent.json")) {
-      const path = join(directory, file)
-      const intent = yield* readJson(Intent, path)
-      if (intent === undefined) continue
-      yield* requireLocation(path, intentFile(directory, intent))
-      intents.push(intent)
-    }
-    return intents
+    const read = yield* Effect.forEach(
+      yield* scan(directory, "intents/*/intent.json"),
+      (file) =>
+        Effect.gen(function* () {
+          const path = join(directory, file)
+          const intent = yield* readJson(Intent, path)
+          if (intent === undefined) return []
+          yield* requireLocation(path, intentFile(directory, intent))
+          return [intent]
+        }),
+      { concurrency: READ_CONCURRENCY },
+    )
+    return read.flat()
   })
 
 const loadAssignments = (
@@ -60,21 +70,25 @@ const loadAssignments = (
   intents: ReadonlyArray<Intent>,
 ) =>
   Effect.gen(function* () {
-    const assignments: Array<Assignment> = []
-    for (const file of relatives) {
-      const path = join(directory, file)
-      const assignment = yield* readJson(Assignment, path)
-      if (assignment === undefined) continue
-      const intent = intents.find((candidate) => candidate.id === assignment.intentId)
-      if (intent === undefined)
-        return yield* new CorruptRecord({
-          path,
-          reason: `Intent ${assignment.intentId} does not exist`,
-        })
-      yield* requireLocation(path, assignmentFile(intentFolder(directory, intent), assignment))
-      assignments.push(assignment)
-    }
-    return assignments
+    const read = yield* Effect.forEach(
+      relatives,
+      (file) =>
+        Effect.gen(function* () {
+          const path = join(directory, file)
+          const assignment = yield* readJson(Assignment, path)
+          if (assignment === undefined) return []
+          const intent = intents.find((candidate) => candidate.id === assignment.intentId)
+          if (intent === undefined)
+            return yield* new CorruptRecord({
+              path,
+              reason: `Intent ${assignment.intentId} does not exist`,
+            })
+          yield* requireLocation(path, assignmentFile(intentFolder(directory, intent), assignment))
+          return [assignment]
+        }),
+      { concurrency: READ_CONCURRENCY },
+    )
+    return read.flat()
   })
 
 const loadLinks = (directory: string, intents: ReadonlyArray<Intent>) =>
@@ -237,7 +251,6 @@ const persist = (directory: string, project: Project, change: StateChange) =>
       ...(yield* encodeLocal(directory, {
         ...(change.activeIntent === undefined ? {} : { activeIntent: change.activeIntent }),
         ...(change.registry === undefined ? {} : { specialists: change.registry }),
-        ...(change.vcs === undefined ? {} : { vcs: change.vcs }),
       })),
     )
     for (const file of files) yield* commitFile(file.path, file.content)

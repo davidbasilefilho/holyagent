@@ -120,6 +120,13 @@ const CODE_QUALITY: ReadonlySet<string> = new Set([...MERGE_READY, "Reviewer.art
 const WRITING_BAR: ReadonlySet<string> = new Set(["Worker.implementation", "Reviewer.artifact"])
 
 /**
+ * The bullets on hooks, signing and history rewrites, a file of `shared/` as a path relative to
+ * `root/`. The root prompt embeds it after its version-control rules and the version-control
+ * reminder hook adds the same sentences, so the rules have one source.
+ */
+export const HISTORY_RULES_FILE = "../shared/history-rules.md"
+
+/**
  * The sections of the root prompt, as files of `root/` in prompt order. The core opens it; the
  * order is fixed here so that a file's name never decides where its text lands.
  */
@@ -133,6 +140,7 @@ export const ROOT_SECTIONS: ReadonlyArray<string> = [
   "assignments.md",
   "instruction-guidelines.md",
   "version-control.md",
+  HISTORY_RULES_FILE,
   "stack-plan.md",
   "pr-text.md",
   "asking.md",
@@ -406,7 +414,8 @@ export const REQUIREMENT_SECTIONS: Readonly<
   },
   "R-QUALITY": {
     section: "specialist/code-quality.md",
-    phrase: "a finding blocks only when it also breaks something a blocking rule names",
+    phrase:
+      "a finding blocks only when the change also makes existing behavior or performance worse",
   },
   "R-EL": { section: "roles/explorer-lookup/method.md", phrase: "Locate with Grep and Glob" },
   "R-EM": { section: "roles/explorer-map/method.md", phrase: "Cite a path" },
@@ -436,7 +445,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
   },
   "R-RV": {
     section: "roles/reviewer-visual/captures.md",
-    phrase: "Report the inspection as blocked when no record is named",
+    phrase: "Report the inspection as blocked when no captures are supplied",
   },
   "R-RV-DESIGN": {
     section: "roles/reviewer-visual/frontend-design.md",

@@ -2,11 +2,12 @@ import { join } from "node:path"
 
 import { Effect } from "effect"
 
+import { type FlagShape, readFlags } from "../cli/args.ts"
 import { Usage } from "../cli/errors.ts"
 import { type Call, type Command } from "../cli/types.ts"
 import { present } from "../cli/views.ts"
 import { STATE_DIRECTORY } from "../state/layout.ts"
-import { type FlagShape, readArguments, requiredValue, valueOf } from "./arguments.ts"
+import { requiredValue, valueOf } from "./arguments.ts"
 import { IDENTITY_USAGE, setAuthor } from "./author.ts"
 import { commit } from "./commit.ts"
 import { inCloudSession } from "./identity.ts"
@@ -28,7 +29,7 @@ const arguments_ = (
   spec: Readonly<Record<string, FlagShape>>,
   positionals: number | "any",
 ) =>
-  readArguments(call.args.positionals, spec, usage).pipe(
+  readFlags(call.args.positionals, spec, usage).pipe(
     Effect.filterOrFail(
       (args) => positionals === "any" || args.positionals.length === positionals,
       (args) =>

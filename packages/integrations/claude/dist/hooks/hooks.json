@@ -96,7 +96,7 @@
               "vcs-reminder"
             ],
             "timeout": 10,
-            "if": "Bash(*vcs*commit*)"
+            "if": "Bash(*vcs commit*)"
           },
           {
             "type": "command",
@@ -109,7 +109,7 @@
               "vcs-reminder"
             ],
             "timeout": 10,
-            "if": "Bash(*vcs*pr*)"
+            "if": "Bash(*vcs pr*)"
           }
         ]
       },

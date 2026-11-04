@@ -16,6 +16,8 @@ A discrepancy is material, and starts a repair whatever its size, when it affect
 
 A number is binding only where a platform guideline fixes it; every other number is a default, marked `(default)`, that the design may override with a stated reason.
 
+Apply the skill's capture checklist on the final captures: the worker before reporting, the reviewer in its findings and the root in its own final pass. Report only checks actually run, and name each check not run.
+
 ### Direction before code
 
 - Name the subject, the audience and the main job, and propose them when the brief omits them. The brief's own words outrank every avoid list below.
@@ -95,5 +97,3 @@ Unless the brief asks for it:
 ## Capture checklist
 
 Capture narrow, default and wide window widths, each in light, dark and high contrast, and, where the platform has a text scale, at 150% or 200%. Add a keyboard-only focus traversal, the open menus, an inactive window and a dialog or sheet. Show the native window chrome in every capture.
-
-Apply it on the final captures: the worker before reporting, the reviewer in its findings and the root in its own final pass. Report only checks actually run, and name each check not run.

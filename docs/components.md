@@ -16,7 +16,7 @@ Claude Code itself is a prerequisite that none of these install; Anthropic docum
 
 ripgrep and fd ship inside the plugin rather than being installed; see [ripgrep and fd](#ripgrep-and-fd).
 
-Pi is not installed: 0.1.0 has no Pi integration ([pi/README.md](pi/README.md)).
+Pi is not installed: there is no Pi integration yet ([pi/README.md](pi/README.md)).
 
 ## mise, Node, Bun, gh
 
@@ -26,7 +26,7 @@ The Windows installer (`install/windows-install.ps1`) installs missing `git`, No
 
 mise is installed only with the development option (`--dev` for the WSL installer, `-Dev` for the Windows one), because only developing this repository needs it. The WSL installer runs mise's official installer into `~/.local/bin/mise` and activates it in `~/.bashrc`. The Windows installer installs `jdx.mise` with `winget` and activates it in your PowerShell profile (`$PROFILE.CurrentUserAllHosts`, with a one-time copy kept as `<profile>.pre-holyagent`). Without the option, neither installer installs or activates mise.
 
-The plugin needs only a stable Bun on `PATH`. Developing this repository needs a canary build ([requirements.md](requirements.md#why-bun-canary) says why), which the `postinstall` hook of `mise install` provides and the repository's `toolchain` task checks; `holyagent setup` and `holyagent doctor` do not look at the build. `holyagent setup` installs the global package below with `bun add -g`; its command lives in `$BUN_INSTALL/bin` (`~/.bun/bin`), which the installers put on `PATH`, and setup prints a hint when that directory is not on `PATH`.
+The plugin needs only a stable Bun on `PATH`; developing this repository needs a canary build ([requirements.md](requirements.md#why-bun-canary)). `holyagent setup` installs the global package below with `bun add -g`; its command lives in `$BUN_INSTALL/bin` (`~/.bun/bin`), which the installers put on `PATH`, and setup prints a hint when that directory is not on `PATH`.
 
 ## Claude Code
 
@@ -42,7 +42,7 @@ The Search specialists use the Exa connector, which you connect once at [claude.
 
 ## ripgrep and fd
 
-The plugin bundles ripgrep 15.2.0 and fd 10.5.0 for macOS on Apple silicon, Linux on x64 and Windows on x64, and runs them through `holyagent rg` and `holyagent fd` (arguments, stdin, stdout and exit code are the program's own). Every agent with a Bash tool searches with them instead of grep, find or the built-in Grep and Glob, so a search answers the same on every machine and the agents need nothing installed. The agents without Bash (the explorers, the librarians, `reviewer-audit`, `reviewer-artifact`, `reviewer-security` and `reviewer-visual`) keep the built-in Grep and Glob. Claude Code documents its Grep tool as built on ripgrep; it documents no backend for Glob. On any other platform the commands fail with `UnsupportedPlatform`, and the agents use their own search. How the programs are pinned and built is in [development.md](development.md#the-generated-plugin).
+The plugin bundles ripgrep and fd for macOS on Apple silicon, Linux on x64 and Windows on x64, and runs them through `holyagent rg` and `holyagent fd` (arguments, stdin, stdout and exit code are the program's own). Every agent with a Bash tool searches with them instead of grep, find or the built-in Grep and Glob, so a search answers the same on every machine and the agents need nothing installed. The agents without Bash (the explorers, the librarians, `reviewer-audit`, `reviewer-artifact`, `reviewer-security` and `reviewer-visual`) keep the built-in Grep and Glob. Claude Code documents its Grep tool as built on ripgrep; it documents no backend for Glob. On any other platform the commands fail with `UnsupportedPlatform`, and the agents use their own search. How the programs are pinned and built is in [development.md](development.md#the-generated-plugin).
 
 ## ctx7 and the Context7 skill
 

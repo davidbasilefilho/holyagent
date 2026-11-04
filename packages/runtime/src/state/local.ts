@@ -1,7 +1,6 @@
 import { Context, Effect, Schema } from "effect"
 
 import { IntentId } from "../domain/ids.ts"
-import { Text } from "../domain/primitives.ts"
 import { type Registry, SpecialistEntry } from "../domain/specialists.ts"
 import { StateIo } from "./errors.ts"
 import { commitFile, encodeJson, type File, io, readJson } from "./files.ts"
@@ -24,29 +23,19 @@ export const WorkTree = Context.Reference<string | undefined>("holyagent/state/W
   defaultValue: () => undefined,
 })
 
-/** The file that holds the Intent in use of a work tree, named by a hash of the work tree's path. */
+/**
+ * A short key for the top-level folder of a work tree: a hash of its path, which names the file of
+ * its Intent in use and marks the work tree an Assignment runs in.
+ */
+export const workTreeKey = (workTree: string): string =>
+  new Bun.CryptoHasher("sha1").update(workTree).digest("hex").slice(0, 16)
+
+/** The file that holds the Intent in use of a work tree, named by its {@link workTreeKey}. */
 const activeIntentFile = (directory: string, workTree: string): string =>
-  localFile(
-    directory,
-    `active-intent/${new Bun.CryptoHasher("sha1").update(workTree).digest("hex").slice(0, 16)}.json`,
-  )
+  localFile(directory, `active-intent/${workTreeKey(workTree)}.json`)
 
 /** The file the Intent in use was kept in before it was kept per work tree: one for the clone. */
 const LEGACY_ACTIVE_INTENT = "active-intent.json"
-
-/** What this clone knows of its version control, for the CLI to fill in. */
-export const Vcs = Schema.Struct({
-  branch: Schema.optionalKey(Text),
-  base: Schema.optionalKey(Text),
-  pullRequest: Schema.optionalKey(Text),
-  /**
-   * What an earlier version of the CLI kept about how commits are made. It is read as anything and
-   * kept as it was, so an older file never breaks the other commands.
-   */
-  detection: Schema.optionalKey(Schema.Unknown),
-})
-/** The version control facts of this clone. */
-export type Vcs = typeof Vcs.Type
 
 /** The per-clone state. */
 export interface Local {
@@ -56,7 +45,6 @@ export interface Local {
    */
   readonly activeIntent?: string
   readonly specialists: Registry
-  readonly vcs: Vcs
 }
 
 /**
@@ -85,11 +73,9 @@ export const readLocal = (directory: string) =>
     const active =
       own ?? (yield* readJson(ActiveIntentFile, localFile(directory, LEGACY_ACTIVE_INTENT)))
     const specialists = yield* readJson(SpecialistsFile, localFile(directory, "specialists.json"))
-    const vcs = yield* readJson(Vcs, localFile(directory, "vcs.json"))
     return {
       ...(active === undefined ? {} : { activeIntent: active.intentId }),
       specialists: specialists?.specialists ?? [],
-      vcs: vcs ?? {},
     } satisfies Local
   })
 
@@ -100,7 +86,6 @@ export const readLocal = (directory: string) =>
 export interface LocalChange {
   readonly activeIntent?: string
   readonly specialists?: Registry
-  readonly vcs?: Vcs
 }
 
 /** Encodes the per-clone files named in the change, without writing anything. */
@@ -123,11 +108,6 @@ export const encodeLocal = (directory: string, change: LocalChange) =>
       files.push({
         path: localFile(directory, "specialists.json"),
         content: yield* encodeJson(SpecialistsFile, { specialists: change.specialists }),
-      })
-    if (change.vcs !== undefined)
-      files.push({
-        path: localFile(directory, "vcs.json"),
-        content: yield* encodeJson(Vcs, change.vcs),
       })
     return files
   })

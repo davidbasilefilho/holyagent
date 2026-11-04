@@ -4,6 +4,7 @@ import { join } from "node:path"
 import { Effect, Schema } from "effect"
 
 import { ROOT_CORE } from "../instructions/claude-5.5/root-core.ts"
+import historyRules from "../instructions/claude-5.5/shared/history-rules.md" with { type: "text" }
 import stateChanges from "../instructions/claude-5.5/specialist/state-changes.md" with { type: "text" }
 import { setupNotice } from "../setup/check.ts"
 import { claimRulesDelivery, isSessionId, markRulesDelivered } from "../state/delivery.ts"
@@ -157,11 +158,22 @@ const postToolUse = (additionalContext: string) =>
 export const SPECIALIST_RULES: string = stateChanges.trim()
 
 /**
- * The one-line reminder a PreToolUse hook adds to a Bash command that mentions git commit or push,
- * or `holyagent vcs commit` or `vcs pr`.
+ * The sentences on hooks, signing and history rewrites that the root prompt and the
+ * {@link VCS_REMINDER} share, one source file, as one line.
  */
-export const VCS_REMINDER =
-  "Version control is the root's: it commits with `holyagent vcs commit`, never force-pushes and pushes to a protected branch only with the user's approval; a specialist makes no version-control writes. Bypass hooks or signing (`--no-verify`, `--no-gpg-sign`) only when the user asks. Amend only your own unpushed commit, and never `rebase -i`, `reset --hard` or amend a published or another author's commit without the user's approval."
+const HISTORY_RULES: string = historyRules
+  .trim()
+  .split("\n")
+  .map((line) => line.replace(/^- /, ""))
+  .join(" ")
+
+/**
+ * The one-line reminder a PreToolUse hook adds to a Bash command that mentions git commit or push,
+ * or `holyagent vcs commit` or `vcs pr`. Its first sentence is the short form of the root's
+ * identity rules and of the specialist state-change rule; the rest is the {@link HISTORY_RULES} the
+ * root prompt holds in the same words.
+ */
+export const VCS_REMINDER = `Version control is the root's: it commits with \`holyagent vcs commit\`, never force-pushes and pushes to a protected branch only with the user's approval; a specialist makes no version-control writes. ${HISTORY_RULES}`
 
 /**
  * The sentence the reminder gains when a commit, push or PR concerns a branch the platform assigned

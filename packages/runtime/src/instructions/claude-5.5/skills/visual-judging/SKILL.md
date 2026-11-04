@@ -9,14 +9,14 @@ Judge rendered work from what renders, not from a passing build or a report's cl
 
 ## Pick the platform skill
 
-- Pick the platform design skill for the work before the first Worker.visual or Reviewer.visual dispatch: `web-design`, `mobile-design`, `desktop-design` or `tui-design`, one for each platform of a multi-platform project. Both specialists keep Read but cannot call Skill, so name each skill's file by its literal absolute path in their criteria, `skills/<name>/SKILL.md` under the plugin folder (the directory above `scripts/` in the CLI path of the dispatch rules; the host fills plugin-path variables only in loaded agent and skill text, never in a brief), with a blocking criterion to read it and to build and inspect (Worker.visual) or judge (Reviewer.visual) against its checklist and capture list.
+- Pick the platform design skill for the work before the first Worker.visual or Reviewer.visual dispatch: `web-design`, `mobile-design`, `desktop-design` or `tui-design`, one for each platform of a multi-platform project. Both specialists keep Read but cannot call Skill, so name each skill's file in their criteria by its literal absolute path, `skills/<name>/SKILL.md` under the plugin folder (as the dispatch rules say), with a blocking criterion to read it and to build and inspect (Worker.visual) or judge (Reviewer.visual) against its checklist and capture list.
 - Worker.visual still builds with the embedded `frontend-design` guidance; the platform skill adds the systems, the platform rules and the capture checklist.
 - Start the render target first, per platform (the `dev-server` skill).
 
 ## Accept
 
 - Your own final pass, after Worker.visual and Reviewer.visual, decides acceptance. Read the final captures Reviewer.visual lists, at each size and variant the criteria and the skill's capture checklist name, against that skill's checklist (load it with Skill), and accept only when they pass. Reviewer.visual's observations (viewport, interaction and visible result for each) inform the decision and do not make it; a Worker.visual report alone, or an inspection reported as blocked, accepts nothing.
-- Keep the pass to those final captures: open none from an earlier round and take none yourself. For a missing size or variant, or a web page Reviewer.visual inspects live and so leaves no captures, have Worker.visual or Worker.operations save the final captures at the listed sizes and variants, which Reviewer.visual then lists; judge nothing you cannot see.
+- Keep the pass to those final captures: open none from an earlier round and take none yourself. For a missing size or variant, or a web page that Reviewer.visual inspected live and for which Worker.visual saved no captures, have Worker.visual or Worker.operations save the final captures at the listed sizes and variants, which Reviewer.visual then lists; judge nothing you cannot see.
 - A material finding of your pass starts a repair like any other, whether or not the reviewer reported it; say in the final report when your pass overruled the reviewer.
 - Read an image in the main thread only to show it to the user (a path is not delivery) or to settle a concrete doubt about that evidence, besides the final pass; Reviewer.visual and Worker.visual hand over captures and paths so that you do not have to.
 

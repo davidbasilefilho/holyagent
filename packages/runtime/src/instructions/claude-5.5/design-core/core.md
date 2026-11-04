@@ -6,6 +6,8 @@ Judge every rule on the rendered result, from the captures; the rules under Dire
 
 A number is binding only where a platform guideline fixes it; every other number is a default, marked `(default)`, that the design may override with a stated reason.
 
+Apply the skill's capture checklist on the final captures: the worker before reporting, the reviewer in its findings and the root in its own final pass. Report only checks actually run, and name each check not run.
+
 ### Direction before code
 
 - Name the subject, the audience and the main job, and propose them when the brief omits them. The brief's own words outrank every avoid list below.

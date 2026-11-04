@@ -123,6 +123,20 @@ describe("the platform design skills", () => {
     expect(holders.toSorted()).toEqual([...DESIGN_SKILLS].toSorted())
   })
 
+  test("say once, in the shared core, when the capture checklist applies and that only checks run are reported", () => {
+    const rule = "on the final captures: the worker before reporting"
+    expect(core.split(rule)).toHaveLength(2)
+    for (const name of DESIGN_SKILLS) {
+      expect({
+        name,
+        source: read(`${INSTRUCTIONS_DIRECTORY}/skills/${name}/SKILL.md`).includes(
+          "Report only checks actually run",
+        ),
+      }).toEqual({ name, source: false })
+      expect({ name, copies: skill(name).split(rule).length - 1 }).toEqual({ name, copies: 1 })
+    }
+  })
+
   test("fail the build when a skill outside the design list holds the core marker", () => {
     const text = `---\nname: other\n---\n${DESIGN_CORE_MARKER}\n`
     expect(() => skillBody("other/SKILL.md", text, core, "other")).toThrow("DESIGN_SKILLS")

@@ -3,7 +3,7 @@ import { delimiter, join } from "node:path"
 import { $ } from "bun"
 import { Context, Effect, Layer, Option } from "effect"
 
-import { type Env, homeDirectory } from "./environment.ts"
+import { definedEnv, type Env, homeDirectory } from "./environment.ts"
 
 /** The outcome of a finished command; a command that cannot start has exit code 127. */
 export interface ShellResult {
@@ -111,13 +111,7 @@ export class Shell extends Context.Service<
             try: () =>
               $`${command} ${args}`
                 .cwd(options.cwd)
-                .env(
-                  Object.fromEntries(
-                    Object.entries({ ...env, [bunBin.key]: bunBin.value }).filter(
-                      (entry): entry is [string, string] => entry[1] !== undefined,
-                    ),
-                  ),
-                )
+                .env(definedEnv({ ...env, [bunBin.key]: bunBin.value }))
                 .quiet()
                 .nothrow()
                 .then((result) => ({

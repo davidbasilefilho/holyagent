@@ -40,7 +40,11 @@ const holy = (dir: string, argv: ReadonlyArray<string>, stdin?: unknown) =>
     fakeGitHub({
       rest: (request) =>
         request.method === "POST" || request.method === "PATCH"
-          ? { number: 7, html_url: "https://github.com/octo/project/pull/7" }
+          ? {
+              number: 7,
+              html_url: "https://github.com/octo/project/pull/7",
+              head: { ref: "feature" },
+            }
           : undefined,
     }).layer,
     stdin,
@@ -303,6 +307,69 @@ describe("the state branch", () => {
       STATE,
     ])
     expect((await sh(second, ["git", "config", `branch.${STATE}.remote`])).trim()).toBe("origin")
+  })
+
+  test("writers in different worktrees may own the same path, and in one worktree they may not", async () => {
+    const dir = await initRepo(OWNER)
+    await seed(dir, { "a.txt": "a\n" })
+    await createIntent(dir, "Ship the parser")
+    const tree = join(await scratch("holyagent-worktree-"), "tree")
+    await sh(dir, ["git", "worktree", "add", "-q", "-b", "feature", tree])
+    const first = await planAssignment(dir, "Build the parser", "src/parser.ts")
+    const second = await planAssignment(dir, "Build the parser again", "src/parser.ts")
+    const third = await planAssignment(dir, "Build the parser once more", "src/parser.ts")
+
+    // The dispatch prints TOON fields and then the prompt, which is not TOON, so its text is read.
+    const started = await holy(dir, ["assignment", "dispatch"], { id: first })
+    expect(started.code).toBe(0)
+    expect(started.stdout).toContain("state: Running")
+    // The other worktree has its own copy of src/parser.ts.
+    const beside = await holy(tree, ["assignment", "dispatch"], { id: second })
+    expect(beside.code).toBe(0)
+    expect(beside.stdout).toContain("state: Running")
+    // Each worktree still holds its own path against a third writer.
+    for (const where of [dir, tree]) {
+      const refused = await holy(where, ["assignment", "dispatch"], { id: third })
+      expect(refused.code).not.toBe(0)
+      expect(refused.stderr).toContain("OwnershipConflict")
+    }
+  })
+
+  test("the brief and report files of an Assignment stay until it is accepted", async () => {
+    const dir = await initRepo(OWNER)
+    await seed(dir, { "a.txt": "a\n" })
+    await createIntent(dir, "Ship the parser")
+    const id = await planAssignment(dir, "Build the parser", "src/parser.ts")
+    await holy(dir, ["assignment", "dispatch"], { id })
+    await holy(dir, ["assignment", "record", id, "--agent", "agent-1"])
+    const brief = join(dir, ".git", "holyagent", "briefs", `${id}.md`)
+    const report = join(dir, ".git", "holyagent", "reports", `${id}.md`)
+    await put(join(dir, ".git", "holyagent"), { [`reports/${id}.md`]: "the report\n" })
+    expect([await Bun.file(brief).exists(), await Bun.file(report).exists()]).toEqual([true, true])
+
+    const close = (keys: ReadonlyArray<string>) =>
+      holy(
+        dir,
+        ["assignment", "close", id, "--outcome", "success", "--accept", "fine", "--report-json"],
+        {
+          status: "done",
+          changed_paths: [],
+          checks: [],
+          blockers: [],
+          notes: [],
+          evidence: keys.map((key) => ({ key, support: "checked" })),
+        },
+      )
+    // The evidence for the label is missing, so nothing is accepted and nothing is removed.
+    const short = await close(["works"])
+    expect(short.stderr).toContain("InsufficientAcceptance")
+    expect([await Bun.file(brief).exists(), await Bun.file(report).exists()]).toEqual([true, true])
+
+    expect(toon(await close(["works", "tests"]))).toMatchObject({ id, accepted: true })
+    expect([await Bun.file(brief).exists(), await Bun.file(report).exists()]).toEqual([
+      false,
+      false,
+    ])
   })
 
   test("a remote that cannot be reached leaves the state branch starting from the base", async () => {
@@ -639,6 +706,63 @@ describe("the first commit on a state branch that tracks nothing yet", () => {
     const tracked = lines(await sh(dir, ["git", "ls-tree", "-r", "--name-only", STATE]))
     expect(tracked.some((path) => path.endsWith(`${created.id}/intent.json`))).toBe(true)
   })
+})
+
+describe("staging the state files of a long history", () => {
+  // The git that counts arguments is a shell script, which Windows does not run as `git`.
+  test.skipIf(process.platform === "win32")(
+    "the command line of a state commit does not grow with the number of records",
+    async () => {
+      const dir = await initRepo(OWNER)
+      await seed(dir, { "a.txt": "a\n" })
+      await createIntent(dir, "Ship the parser")
+      for (const name of ["a", "b", "c", "d", "e", "f"])
+        await planAssignment(dir, `Build ${name}`, `src/${name}.ts`)
+      // A git that records how many arguments each `add` got, then runs the real one.
+      const bin = await scratch("holyagent-git-")
+      const log = join(bin, "add-arguments")
+      const real = Bun.which("git") ?? "git"
+      await writeFile(
+        join(bin, "git"),
+        [
+          "#!/bin/sh",
+          `for argument in "$@"; do`,
+          `  if [ "$argument" = add ]; then echo "$#" >> "${log}"; break; fi`,
+          "done",
+          `exec "${real}" "$@"`,
+          "",
+        ].join("\n"),
+        { mode: 0o755 },
+      )
+
+      const created = toon(
+        await vcs(
+          dir,
+          ["assignment", "create"],
+          fakeGitHub().layer,
+          {
+            roleTask: "Worker.implementation",
+            objective: "Build g",
+            criteria: [{ text: "works", blocking: true, dimension: "behavior" }],
+            evidence: ["tests"],
+            ownershipPaths: ["src/g.ts"],
+          },
+          { PATH: `${bin}:${process.env["PATH"] ?? ""}` },
+        ),
+      ) as { id: string }
+
+      // The state holds eight records and the settings. None of their names is on the command line,
+      // so the number of arguments does not depend on how many there are.
+      const counts = lines(await readFile(log, "utf8")).map(Number)
+      expect(counts.length).toBeGreaterThan(0)
+      expect(Math.max(...counts)).toBeLessThanOrEqual(10)
+      // The new record was still staged and committed.
+      const tracked = lines(await sh(dir, ["git", "ls-tree", "-r", "--name-only", STATE]))
+      expect(tracked.filter((path) => path.includes("/assignments/"))).toHaveLength(7)
+      expect(tracked.some((path) => path.includes(created.id))).toBe(true)
+      expect(await sh(await stateTree(dir), ["git", "status", "--porcelain"])).toBe("")
+    },
+  )
 })
 
 describe("migrating the legacy state", () => {

@@ -18,8 +18,11 @@ export const SpecialistEntry = Schema.Struct({
   related: Schema.Array(AssignmentId),
   /** Every ownership path it touched. */
   paths: Schema.Array(Text),
-  /** The top-level folders of those paths. */
-  domains: Schema.Array(Text),
+  /**
+   * The top-level folders of those paths, as earlier versions kept them. Nothing reads or writes it
+   * now; the schema accepts it so a registry file that carries it still decodes.
+   */
+  domains: Schema.optionalKey(Schema.Array(Text)),
   lastFinishedAt: Schema.optionalKey(Timestamp),
   running: Schema.Boolean,
 })
@@ -38,6 +41,22 @@ const update = (
   agentId: string,
   change: (entry: SpecialistEntry) => SpecialistEntry,
 ): Registry => registry.map((entry) => (entry.agentId === agentId ? change(entry) : entry))
+
+/**
+ * Drops the specialists that can never be continued again: an idle one that finished longer ago
+ * than `ttlMinutes` (the cache window of the continuation rules of the directive) or never
+ * finished. A running one stays, and so does one inside the window. Returns the same array when
+ * nothing is dropped.
+ */
+export const pruneRegistry = (registry: Registry, now: string, ttlMinutes: number): Registry => {
+  const kept = registry.filter(
+    (entry) =>
+      entry.running ||
+      (entry.lastFinishedAt !== undefined &&
+        Date.parse(now) - Date.parse(entry.lastFinishedAt) <= ttlMinutes * 60_000),
+  )
+  return kept.length === registry.length ? registry : kept
+}
 
 /**
  * Frees a specialist. With `finishedAt` it also stamps when its work ended, which starts the cache
@@ -70,7 +89,6 @@ export const bindSpecialist = (
   Effect.gen(function* () {
     const known = registry.find((entry) => entry.agentId === launch.agentId)
     const paths = assignment.ownershipPaths
-    const domains = paths.map((path) => path.split("/")[0] ?? path)
     if (known === undefined)
       return [
         ...registry,
@@ -82,7 +100,6 @@ export const bindSpecialist = (
           assignments: [assignment.id],
           related: relatedIds(assignment),
           paths,
-          domains: [...new Set(domains)],
           running: true,
         },
       ] satisfies Registry
@@ -106,6 +123,5 @@ export const bindSpecialist = (
       assignments: union(entry.assignments, [assignment.id]),
       related: union(entry.related, relatedIds(assignment)),
       paths: union(entry.paths, paths),
-      domains: union(entry.domains, domains),
     }))
   })

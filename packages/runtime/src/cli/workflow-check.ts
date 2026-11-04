@@ -11,7 +11,9 @@ import { PLUGIN_NAMESPACE } from "./assignment.ts"
 // `agent()` call must name one of our specialists with a string literal. Whatever else a script
 // does (a node outside the set, a name that resolves to nothing known, a computed member access,
 // a parse error, a script too large or too deep) is a refusal, and a refusal only means the normal
-// permission flow. Nothing here runs the script.
+// permission flow. A script that could hang or exhaust memory is not plain either: a loop must be a
+// counted `for` over literal bounds, and `repeat`, `padStart` and `padEnd` take a small literal
+// count. Nothing here runs the script.
 
 /** A node of the syntax tree, read loosely: the walk checks every type before it reads a field. */
 interface JsNode {
@@ -42,8 +44,23 @@ const nameOf = (node: JsNode | undefined): string | undefined =>
   node?.type === "Identifier" && typeof node["name"] === "string" ? node["name"] : undefined
 
 /** The longest script the check reads, and the deepest nesting of the tree it walks. */
-export const MAX_WORKFLOW_SCRIPT = 1_000_000
+const MAX_WORKFLOW_SCRIPT = 1_000_000
 const MAX_DEPTH = 120
+
+/**
+ * The most iterations one counted `for` loop may run, the most all nested counted loops may run
+ * together, and the largest count `repeat`, `padStart` and `padEnd` may be given. A script that
+ * needs more is refused and goes through the normal permission flow.
+ */
+const MAX_LOOP_COUNT = 1_000
+const MAX_NESTED_ITERATIONS = 10_000
+const MAX_TEXT_COUNT = 1_000
+
+/** The string methods whose first argument is a length or a count. */
+const TEXT_COUNTS: ReadonlySet<string> = new Set(["repeat", "padStart", "padEnd"])
+
+/** The array methods that add elements to the array they are called on. */
+const GROWING_METHODS: ReadonlySet<string> = new Set(["push", "unshift", "splice"])
 
 /** The globals of the workflow runtime and the plain built-ins a script may use, free. */
 const GLOBALS: ReadonlySet<string> = new Set([
@@ -309,6 +326,137 @@ const varScope = (scope: Scope): Scope =>
 const rootName = (node: JsNode | undefined): string | undefined =>
   node?.type === "MemberExpression" ? rootName(nodeAt(node, "object")) : nameOf(node)
 
+/** The value of an integer literal that a number can hold exactly, or undefined for anything else. */
+const integerLiteral = (node: JsNode | undefined): number | undefined => {
+  const value = node?.type === "Literal" ? node["value"] : undefined
+  return typeof value === "number" && Number.isSafeInteger(value) ? value : undefined
+}
+
+/**
+ * The counter and the number of iterations of a `for` loop of the form `for (let i = 0; i < 10;
+ * i++)`: a `let` counter set to an integer literal, a comparison with an integer literal and a
+ * literal step towards it (`++`, `--`, `+= n`, `-= n`). Any other loop head has no known bound and
+ * gives undefined.
+ */
+const countedLoop = (node: JsNode): { counter: string; count: number } | undefined => {
+  const init = nodeAt(node, "init")
+  const test = nodeAt(node, "test")
+  const update = nodeAt(node, "update")
+  if (init?.type !== "VariableDeclaration" || init["kind"] !== "let") return undefined
+  const [declarator, ...more] = nodesAt(init, "declarations")
+  if (declarator?.type !== "VariableDeclarator" || more.length > 0) return undefined
+  const counter = nameOf(nodeAt(declarator, "id"))
+  const start = integerLiteral(nodeAt(declarator, "init"))
+  if (counter === undefined || start === undefined) return undefined
+  if (test?.type !== "BinaryExpression" || nameOf(nodeAt(test, "left")) !== counter)
+    return undefined
+  const bound = integerLiteral(nodeAt(test, "right"))
+  if (bound === undefined) return undefined
+
+  let step: number | undefined
+  if (update?.type === "UpdateExpression" && nameOf(nodeAt(update, "argument")) === counter)
+    step = update["operator"] === "++" ? 1 : -1
+  else if (update?.type === "AssignmentExpression" && nameOf(nodeAt(update, "left")) === counter) {
+    const amount = integerLiteral(nodeAt(update, "right"))
+    if (amount !== undefined && amount > 0)
+      step =
+        update["operator"] === "+=" ? amount : update["operator"] === "-=" ? -amount : undefined
+  }
+  if (step === undefined) return undefined
+
+  // The distance to the bound, and none when the step walks away from it (a loop that never ends).
+  const operator = test["operator"]
+  const distance =
+    step > 0
+      ? operator === "<"
+        ? bound - start
+        : operator === "<="
+          ? bound - start + 1
+          : undefined
+      : operator === ">"
+        ? start - bound
+        : operator === ">="
+          ? start - bound + 1
+          : undefined
+  return distance === undefined
+    ? undefined
+    : { counter, count: Math.max(0, Math.ceil(distance / Math.abs(step))) }
+}
+
+/** The names a pattern or an assignment target sets; a member (`a[i]`) sets none. */
+const assignedNames = (node: JsNode | undefined, into: Set<string>): void => {
+  switch (node?.type) {
+    case "Identifier":
+      into.add(nameOf(node) ?? "")
+      return
+    case "RestElement":
+      return assignedNames(nodeAt(node, "argument"), into)
+    case "AssignmentPattern":
+      return assignedNames(nodeAt(node, "left"), into)
+    case "ArrayPattern":
+      for (const element of nodesAt(node, "elements")) assignedNames(element, into)
+      return
+    case "ObjectPattern":
+      for (const property of nodesAt(node, "properties"))
+        assignedNames(property?.type === "Property" ? nodeAt(property, "value") : property, into)
+      return
+    default:
+  }
+}
+
+/**
+ * Whether anything under `node` satisfies `found`, looking through every field. A tree deeper than
+ * the walk allows counts as a match, so the caller refuses it.
+ */
+const anyNode = (node: unknown, found: (node: JsNode) => boolean, depth = 0): boolean => {
+  if (depth > MAX_DEPTH) return true
+  if (Array.isArray(node)) return node.some((item) => anyNode(item, found, depth + 1))
+  if (!isNode(node)) return false
+  return (
+    found(node) ||
+    Object.values(node).some(
+      (value) => typeof value === "object" && anyNode(value, found, depth + 1),
+    )
+  )
+}
+
+/** Whether the body sets the name anywhere: an assignment, an update or a `for` target. */
+const setsName = (body: unknown, name: string): boolean =>
+  anyNode(body, (node) => {
+    const target =
+      node.type === "AssignmentExpression" ||
+      node.type === "ForInStatement" ||
+      node.type === "ForOfStatement"
+        ? nodeAt(node, "left")
+        : node.type === "UpdateExpression"
+          ? nodeAt(node, "argument")
+          : undefined
+    const names = new Set<string>()
+    assignedNames(target, names)
+    return names.has(name)
+  })
+
+/** Whether the body adds elements to, or writes into, the value rooted at the name. */
+const growsName = (body: unknown, name: string): boolean =>
+  anyNode(body, (node) => {
+    if (node.type === "CallExpression") {
+      const callee = nodeAt(node, "callee")
+      return (
+        callee?.type === "MemberExpression" &&
+        callee["computed"] !== true &&
+        GROWING_METHODS.has(nameOf(nodeAt(callee, "property")) ?? "") &&
+        rootName(nodeAt(callee, "object")) === name
+      )
+    }
+    const target =
+      node.type === "AssignmentExpression"
+        ? nodeAt(node, "left")
+        : node.type === "UpdateExpression"
+          ? nodeAt(node, "argument")
+          : undefined
+    return target?.type === "MemberExpression" && rootName(target) === name
+  })
+
 /**
  * Why a script is not plain (the first reason found), or undefined when it is: the script parsed as
  * a module with top-level await, every node of a type in the closed set, every name resolved, every
@@ -332,6 +480,8 @@ const inspect = (script: string): string | undefined => {
   const assignments: Array<{ name: string; scope: Scope; builtHere: () => boolean }> = []
   const memberWrites: Array<{ root: string | undefined; scope: Scope }> = []
   let agentCalls = 0
+  // The iterations the counted loops around the statement being walked run together.
+  let loopWork = 1
 
   /**
    * Declares a name; `origin` tests whether the script built its value, and `undefined` is none
@@ -578,6 +728,15 @@ const inspect = (script: string): string | undefined => {
         (given.length > limit || given.some((argument) => argument?.type === "SpreadElement"))
       )
         refuse("passes a method more arguments than its callback (a this value)")
+      const method = nameOf(nodeAt(callee, "property")) ?? ""
+      const count = integerLiteral(given[0])
+      if (
+        callee["computed"] !== true &&
+        TEXT_COUNTS.has(method) &&
+        given.length > 0 &&
+        (count === undefined || count < 0 || count > MAX_TEXT_COUNT)
+      )
+        refuse(`calls .${method} with a count that is not a literal of at most ${MAX_TEXT_COUNT}`)
     } else if (callee?.type === "ArrowFunctionExpression" || callee?.type === "FunctionExpression")
       functionNode(callee, scope, depth + 1)
     else return refuse("calls something it cannot vet")
@@ -700,12 +859,26 @@ const inspect = (script: string): string | undefined => {
         return statements(nodesAt(node, "body"), inner(), depth)
       case "ForStatement": {
         const loop = inner()
+        const counted = countedLoop(node)
+        if (
+          counted === undefined ||
+          counted.count > MAX_LOOP_COUNT ||
+          setsName(nodeAt(node, "body"), counted.counter)
+        )
+          refuse(
+            `runs a for loop that is not a counted loop of at most ${MAX_LOOP_COUNT} iterations (for (let i = 0; i < 10; i++))`,
+          )
+        const outerWork = loopWork
+        loopWork *= Math.max(counted?.count ?? 1, 1)
+        if (loopWork > MAX_NESTED_ITERATIONS) refuse("nests loops that run too many iterations")
         const init = nodeAt(node, "init")
         if (init?.type === "VariableDeclaration") variableDeclaration(init, loop, depth + 1)
         else expression(init, loop, depth + 1)
         expression(nodeAt(node, "test"), loop, depth + 1)
         expression(nodeAt(node, "update"), loop, depth + 1)
-        return statement(nodeAt(node, "body"), loop, depth + 1)
+        statement(nodeAt(node, "body"), loop, depth + 1)
+        loopWork = outerWork
+        return
       }
       case "ForOfStatement":
       case "ForInStatement": {
@@ -714,13 +887,20 @@ const inspect = (script: string): string | undefined => {
         if (left?.type === "VariableDeclaration")
           variableDeclaration(left, loop, depth + 1, "unsafe")
         else writeTarget(left, loop, depth + 1, () => false)
+        // A loop over data ends with the data, unless its body keeps adding to what it walks.
+        const walked = rootName(nodeAt(node, "right"))
+        if (
+          node.type === "ForOfStatement" &&
+          walked !== undefined &&
+          growsName(nodeAt(node, "body"), walked)
+        )
+          refuse("grows the array a for-of loop walks")
         expression(nodeAt(node, "right"), loop, depth + 1)
         return statement(nodeAt(node, "body"), loop, depth + 1)
       }
       case "WhileStatement":
       case "DoWhileStatement":
-        expression(nodeAt(node, "test"), scope, depth + 1)
-        return statement(nodeAt(node, "body"), scope, depth + 1)
+        return refuse("uses a while or do loop, which has no bound")
       case "BreakStatement":
       case "ContinueStatement":
         if (node["label"] !== null) refuse("uses a label")

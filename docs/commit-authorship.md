@@ -73,7 +73,7 @@ This repository wires it that way in `lefthook.yml`, through the built bundle in
 
 ## Raw git commits
 
-The rule that commits go through `holyagent vcs commit` is instruction text, not a guard: the root's and the specialists' texts state it, a `SubagentStart` hook restates it to every specialist at its start, and a `PreToolUse` hook on the Bash tool adds a one-line reminder to a command that mentions `git` and then `commit` or `push`. No hook denies or rewrites a command, so a raw `git commit` still runs; its message gets the `commit-msg` hook above where that is installed. [hooks.md](hooks.md) has the details and the reason is in [decisions.md](decisions.md).
+A raw `git commit` still runs: the rule that commits go through `holyagent vcs commit` is instruction text, delivered by the hooks in [hooks.md](hooks.md) and chosen over a guard in [decisions.md](decisions.md). Its message gets the `commit-msg` hook above where that is installed.
 
 ## Settings that `holyagent setup` writes
 

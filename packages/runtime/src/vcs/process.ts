@@ -1,6 +1,8 @@
 import { $ } from "bun"
 import { Effect } from "effect"
 
+import { definedEnv } from "../setup/environment.ts"
+
 /** What a finished process left behind. */
 export interface Spawned {
   readonly code: number
@@ -25,12 +27,7 @@ export const spawn = (
       options.stdin === undefined
         ? $`${program} ${args}`
         : $`${program} ${args} < ${new Response(options.stdin)}`
-    const env = Object.fromEntries(
-      Object.entries(options.env).filter(
-        (entry): entry is [string, string] => entry[1] !== undefined,
-      ),
-    )
-    return command.cwd(options.cwd).env(env).quiet().nothrow()
+    return command.cwd(options.cwd).env(definedEnv(options.env)).quiet().nothrow()
   }).pipe(
     Effect.map((output): Spawned => ({
       code: output.exitCode,
