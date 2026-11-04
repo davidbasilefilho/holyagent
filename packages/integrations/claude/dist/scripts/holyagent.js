@@ -12533,7 +12533,8 @@ You own the user relationship, material decisions, acceptance, version control a
 
 - Write artifacts (PRs, commits, docs, instruction text) in English by default unless the target repository's convention says otherwise. Write the task list and text to the user in the language of the user's latest message.
 - Keep written deliverables (PR text, the final report) free of filler sections, redundant summaries and boilerplate.
-- Never force-push, and never push to the base, default or a protected branch without the user's approval.
+- Never force-push, and never push to the base, default or a protected branch without the user's approval. The base is the branch the conventions or the user name as the work's target, else the default branch.
+- Never work on a branch the platform assigns: a cloud session starts on one the platform created, such as \`claude/<name>\`, whose name carries no meaning; a branch the user named as the work branch is not one. Before the first commit, check \`git branch --show-current\`; on an assigned branch, first create the conventional branch (\`git switch -c <name> <start>\`, both set by the stack plan) and commit and push only there. If that push is refused, stop that line, report the blocker and ask through AskUserQuestion whether to push to the assigned branch; it is never a default, so park the push when the user is away.
 - After a denial, stop that line of work, report a blocker and continue other work; never reach the same result through another tool (Monitor, scripts).
 - Commit only with \`holyagent vcs commit\`; use plain Git and \`gh\` for branches, pushes, merges and CI.
 - Reply on threads only when the request or repository workflow authorizes it.
@@ -12551,7 +12552,12 @@ End your turn only when the work is done, or when nothing can move until the use
 Hook and harness noise gets no mention or reply (User messages lists it).
 `;
 
-var ROOT_CORE = [identity_default, delegating_default, dispatch_default, task_list_default].map((text) => text.trim()).join(`
+var precedence_default = `## Precedence
+
+When rules conflict, after the user's instructions: 1. mergeability in the target repository (its CI, branch protection, review bar and conventions) before every HolyAgent default; 2. the project's own patterns before HolyAgent's; 3. HolyAgent's defaults last. A repository's convention does not waive a rule that needs the user's approval (force-push, a protected branch).
+`;
+
+var ROOT_CORE = [identity_default, precedence_default, delegating_default, dispatch_default, task_list_default].map((text) => text.trim()).join(`
 
 `);
 
@@ -13511,6 +13517,104 @@ var gatherLegacy = (root, directory) => gen2(function* () {
   if (holycodex !== undefined)
     found.push(holycodex);
   return found;
+});
+
+var SEPARATORS = new Set([";", "&", "|", `
+`, "(", ")", "`"]);
+var simpleCommands = (line) => {
+  const commands = [];
+  let words = [];
+  let word = "";
+  let started = false;
+  let quote;
+  const endWord = () => {
+    if (started)
+      words.push(word);
+    word = "";
+    started = false;
+  };
+  const endCommand = () => {
+    endWord();
+    if (words.length > 0)
+      commands.push(words);
+    words = [];
+  };
+  for (const char of line) {
+    if (quote !== undefined) {
+      if (char === quote)
+        quote = undefined;
+      else
+        word += char;
+    } else if (char === "'" || char === '"') {
+      quote = char;
+      started = true;
+    } else if (SEPARATORS.has(char))
+      endCommand();
+    else if (/\s/.test(char))
+      endWord();
+    else {
+      word += char;
+      started = true;
+    }
+  }
+  endCommand();
+  return commands;
+};
+var programOf = (word) => (word.split(/[\\/]/).at(-1) ?? word).replace(/\.exe$/i, "");
+var SHELLS = new Set(["bash", "sh", "zsh", "dash", "ksh"]);
+var WRAPPER_WORD = /^(?:\w+=.*|sudo|env|command|exec|time|nice|nohup|xargs|timeout|stdbuf|-.*|\d+[smhd]?)$/;
+var GIT_OPTIONS_WITH_VALUE = new Set([
+  "-C",
+  "-c",
+  "--git-dir",
+  "--work-tree",
+  "--namespace",
+  "--super-prefix",
+  "--config-env"
+]);
+var PUSH_OPTIONS_WITH_VALUE = new Set([
+  "--repo",
+  "-o",
+  "--push-option",
+  "--receive-pack",
+  "--exec"
+]);
+var targetOf = (refspec) => {
+  const spec = refspec.replace(/^\+/, "");
+  const target = spec.includes(":") ? spec.split(":").at(-1) ?? "" : spec;
+  return target.replace(/^refs\/heads\//, "");
+};
+var targetsOfPush = (args) => {
+  const positionals = [];
+  let remoteByOption = false;
+  let optionsEnded = false;
+  for (let at = 0;at < args.length; at += 1) {
+    const arg = args[at] ?? "";
+    if (optionsEnded || !arg.startsWith("-"))
+      positionals.push(arg);
+    else if (arg === "--")
+      optionsEnded = true;
+    else if (PUSH_OPTIONS_WITH_VALUE.has(arg)) {
+      remoteByOption ||= arg === "--repo";
+      at += 1;
+    } else
+      remoteByOption ||= arg.startsWith("--repo=");
+  }
+  return (remoteByOption ? positionals : positionals.slice(1)).map(targetOf);
+};
+var pushTargetsOf = (words) => {
+  const at = words.findIndex((word) => programOf(word) === "git");
+  if (at < 0 || !words.slice(0, at).every((word) => WRAPPER_WORD.test(word)))
+    return [];
+  let next = at + 1;
+  while ((words[next] ?? "").startsWith("-"))
+    next += GIT_OPTIONS_WITH_VALUE.has(words[next] ?? "") ? 2 : 1;
+  return words[next] === "push" ? targetsOfPush(words.slice(next + 1)) : [];
+};
+var pushTargets = (line) => simpleCommands(line).flatMap((words) => {
+  const flag = SHELLS.has(programOf(words[0] ?? "")) ? words.findIndex((word) => /^-\w*c$/.test(word)) : -1;
+  const script = flag < 0 ? undefined : words[flag + 1];
+  return script === undefined ? pushTargetsOf(words) : pushTargets(script);
 });
 
 var dependsOn = (a, b) => a.dependencies.includes(b.id);
@@ -19839,6 +19943,7 @@ var Payload = Struct({
   tool_input: optionalKey2(Record(String4, Unknown2)),
   agent_type: optionalKey2(String4),
   agent_id: optionalKey2(String4),
+  cwd: optionalKey2(String4),
   session_id: optionalKey2(String4),
   hook_event_name: optionalKey2(String4),
   source: optionalKey2(String4),
@@ -19878,8 +19983,10 @@ var HAND_BACK = {
 var postToolUse = (additionalContext) => output({ hookEventName: "PostToolUse", additionalContext });
 var SPECIALIST_RULES = state_changes_default.trim();
 var VCS_REMINDER = "Version control is the root's: it commits with `holyagent vcs commit`, never force-pushes and pushes to a protected branch only with the user's approval; a specialist makes no version-control writes. Bypass hooks or signing (`--no-verify`, `--no-gpg-sign`) only when the user asks. Amend only your own unpushed commit, and never `rebase -i`, `reset --hard` or amend a published or another author's commit without the user's approval.";
+var PLATFORM_BRANCH_REMINDER = "This commit, push or PR concerns a `claude/*` branch, which the platform assigns unless the user named it as the work branch: its name carries no meaning, so commit and push only on your own conventional branch, and push the assigned one only after your own push is refused and the user says so.";
+var isPlatformBranch = (name) => name?.startsWith("claude/") === true;
 var isSpecialist = (type) => type !== undefined && type.startsWith("holyagent:") && !ROOT_AGENTS.has(type);
-var MENTIONS_GIT_WRITE = /git[\s\S]*(?:commit|push)/i;
+var MENTIONS_VCS_WRITE = /git[\s\S]*(?:commit|push)|\bvcs\s+(?:commit|pr)\b/i;
 var fileSetting = (key) => gitMaybe(["config", "--show-origin", "--get", key]).pipe(map4((line) => {
   if (line === undefined)
     return;
@@ -19964,9 +20071,24 @@ var HOOK_COMMANDS = [
     }));
   }, true),
   hook("subagent-start", "SubagentStart: add the version-control rules of the specialist text to the context of a holyagent specialist at its start; nothing for the root or any other agent", (payload) => succeed6(isSpecialist(payload.agent_type) ? output({ hookEventName: "SubagentStart", additionalContext: SPECIALIST_RULES }) : NOTHING), true),
-  hook("vcs-reminder", "PreToolUse for Bash: for a command that mentions git and then commit or push, add a one-line reminder of the version-control rules as context; never a permission decision, and nothing for any other command", (payload) => {
+  hook("vcs-reminder", "PreToolUse for Bash: for a command that mentions git and then commit or push, or `vcs commit` or `vcs pr`, add a one-line reminder of the version-control rules as context, with a sentence about the platform's branches when the branch of the session folder (a `cd` or `git -C` in the command is not followed), or a target of a `git push` the command spells out, is `claude/*`; never a permission decision, and nothing for any other command", (payload, call) => {
     const command = payload.tool_name === "Bash" ? payload.tool_input?.command : undefined;
-    return succeed6(typeof command === "string" && MENTIONS_GIT_WRITE.test(command) ? output({ hookEventName: "PreToolUse", additionalContext: VCS_REMINDER }) : NOTHING);
+    if (typeof command !== "string" || !MENTIONS_VCS_WRITE.test(command))
+      return succeed6(NOTHING);
+    return gitMaybe([
+      "-C",
+      payload.cwd ?? call.cwd,
+      "symbolic-ref",
+      "--short",
+      "-q",
+      "HEAD"
+    ]).pipe(provide3(call.vcs), catchCause2(() => succeed6(undefined)), map4((branch) => {
+      const platform = isPlatformBranch(branch) || pushTargets(command).some(isPlatformBranch);
+      return output({
+        hookEventName: "PreToolUse",
+        additionalContext: platform ? `${VCS_REMINDER} ${PLATFORM_BRANCH_REMINDER}` : VCS_REMINDER
+      });
+    }));
   }, true),
   {
     path: ["hook", "commit-msg"],

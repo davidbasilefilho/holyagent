@@ -1,6 +1,6 @@
 ## Merge-ready
 
-A change is merge-ready when the repository's maintainer would merge it. A blocker in any dimension fails the change; list non-blocking findings apart, marked optional. The target project's conventions, lint, formatter and commands come first.
+A change is merge-ready when the repository's maintainer would merge it. A blocker in any dimension fails the change; list non-blocking findings apart, marked optional. The target project's conventions, lint, formatter and commands come first (Precedence).
 
 | Dimension      | Blocking                                                                                                                                               | Non-blocking                                            |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------- |
@@ -12,7 +12,7 @@ A change is merge-ready when the repository's maintainer would merge it. A block
 | style          | The project's lint, format or type-check fails                                                                                                         | Naming and comment taste                                |
 | repo-standards | A rule in CLAUDE.md, AGENTS.md or the contributing guide is broken                                                                                     | A convention the repository does not state              |
 
-Accidental complexity, speculative abstraction, duplicated logic and needless dependencies are findings; a maintainability concern stays open after tests pass.
+Accidental complexity, speculative abstraction and needless dependencies are findings, as are breaches of the code quality rules, which set their own severity; a maintainability concern stays open after tests pass.
 
 Tests in proportion:
 
