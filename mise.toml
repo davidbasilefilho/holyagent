@@ -67,14 +67,14 @@ run = "bun packages/integrations/claude/build.ts"
 description = "Run every read-only gate: check, lint, fmt:check and test"
 depends = ["check", "lint", "fmt:check", "test"]
 
-# One version for every package and manifest (ZeroVer, 0.X.Y). The script
-# rewrites the package.json files and bun.lock, and the build regenerates the plugin manifests from
-# them, so commit the result of the task as a whole.
+# One version for every package and manifest (ZeroVer, 0.X.Y). A bump edits the root package.json
+# only; the build copies it to the workspace package.json files and bun.lock, then generates the
+# plugin manifests from them, so commit the result of the task as a whole.
 
 [tasks."bump:minor"]
-description = "Bump the minor version (0.X.Y to 0.(X+1).0) everywhere and rebuild the plugin"
+description = "Bump the root package.json minor version (0.X.Y to 0.(X+1).0), then rebuild to sync every copy"
 run = ["bun scripts/bump-version.ts minor", { task = "build" }]
 
 [tasks."bump:patch"]
-description = "Bump the patch version (0.X.Y to 0.X.(Y+1)) everywhere and rebuild the plugin"
+description = "Bump the root package.json patch version (0.X.Y to 0.X.(Y+1)), then rebuild to sync every copy"
 run = ["bun scripts/bump-version.ts patch", { task = "build" }]
