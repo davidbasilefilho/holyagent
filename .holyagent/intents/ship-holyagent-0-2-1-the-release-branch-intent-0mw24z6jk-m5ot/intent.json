@@ -21,9 +21,13 @@
     "Decision (maintainer): keep the root-rules PreToolUse fallback registration.",
     "Decision (maintainer): keep the legacy .holyclaude/.holycodex converter.",
     "Decision (maintainer): the CLI ownership-overlap check applies per worktree; writers in different worktrees may own the same relative paths.",
-    "Default: publish.yml ignores the holyagent/state branch, which carries no package.json."
+    "Default: publish.yml ignores the holyagent/state branch, which carries no package.json.",
+    "Decision (maintainer): vcs commit refuses only the exact agent identity (email noreply@anthropic.com, or a name exactly \"Claude\" or \"Claude Code\"); a person whose name merely contains Claude may commit.",
+    "Decision (maintainer): an Assignment's brief and report stay while its Intent is open, so later briefs can cite them, and are removed when the Intent is completed or closed.",
+    "Decision (maintainer): remove the undocumented holyagent-runtime bin from packages/runtime/package.json; the plugin's holyagent command is the only program.",
+    "Default: the shared flag parser's tightening (an unknown single-dash flag and a repeated string flag are errors) stays; it is reversible and the docs describe the flags."
   ],
-  "revision": 3,
+  "revision": 4,
   "state": "Open",
   "createdAt": "2026-11-04T13:12:17.120Z"
 }
