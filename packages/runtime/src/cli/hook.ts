@@ -20,6 +20,7 @@ import { cleanMessage, forbiddenPhrases } from "../vcs/message.ts"
 import { readSettings } from "../vcs/settings.ts"
 import { recordLaunch } from "./assignment.ts"
 import { AgentIdMissing, describeFailure, StateFolderMissing } from "./errors.ts"
+import { pushTargets } from "./git-push.ts"
 import { resolveIntent } from "./intent.ts"
 import { resumeOf, statusOf } from "./overview.ts"
 import { dispatchedAssignment } from "./report.ts"
@@ -155,36 +156,36 @@ const postToolUse = (additionalContext: string) =>
  */
 export const SPECIALIST_RULES: string = stateChanges.trim()
 
-/** The one-line reminder a PreToolUse hook adds to a Bash command that mentions git commit or push. */
+/**
+ * The one-line reminder a PreToolUse hook adds to a Bash command that mentions git commit or push,
+ * or `holyagent vcs commit` or `vcs pr`.
+ */
 export const VCS_REMINDER =
   "Version control is the root's: it commits with `holyagent vcs commit`, never force-pushes and pushes to a protected branch only with the user's approval; a specialist makes no version-control writes. Bypass hooks or signing (`--no-verify`, `--no-gpg-sign`) only when the user asks. Amend only your own unpushed commit, and never `rebase -i`, `reset --hard` or amend a published or another author's commit without the user's approval."
 
 /**
- * The sentence the reminder gains when a commit or push concerns a branch the platform assigned (a
- * cloud session starts on `claude/<name>` and may have pushed it). The rule is the root's identity
- * rule on branches; this only points at it at the moment it matters.
+ * The sentence the reminder gains when a commit, push or PR concerns a branch the platform assigned
+ * (a cloud session starts on a local `claude/<name>` that the platform created). The rule is the
+ * root's identity rule on branches; this only points at it at the moment it matters. A user's
+ * choice of such a branch as the work branch is the rule's exception, so the sentence says so.
  */
 export const PLATFORM_BRANCH_REMINDER =
-  "This commit or push concerns a `claude/*` branch, which the platform assigns: its name carries no meaning, so commit and push only on your own conventional branch, and push the assigned one only after your own push is refused and the user says so."
+  "This commit, push or PR concerns a `claude/*` branch, which the platform assigns unless the user named it as the work branch: its name carries no meaning, so commit and push only on your own conventional branch, and push the assigned one only after your own push is refused and the user says so."
 
 /** A branch the platform assigns to a cloud session. */
 const isPlatformBranch = (name: string | undefined): boolean => name?.startsWith("claude/") === true
-
-/**
- * A `claude/*` branch that a push command spells out as its target, bare or as `HEAD:claude/x`,
- * `+claude/x` or `refs/heads/claude/x`.
- */
-const PUSH_TARGET = /(?:^|[\s:+'"])(?:refs\/heads\/)?claude\/[\w./-]+/
 
 /** The agent types of the plugin's specialists: namespaced by the plugin, the root excepted. */
 const isSpecialist = (type: string | undefined): boolean =>
   type !== undefined && type.startsWith("holyagent:") && !ROOT_AGENTS.has(type)
 
 /**
- * The text the host's `if` rules of the hook (`Bash(*git*commit*)`, `Bash(*git*push*)`) match:
- * `git` followed somewhere by `commit` or `push`. A command without it gets no reminder.
+ * The text the host's `if` rules of the hook (`Bash(*git*commit*)`, `Bash(*git*push*)`,
+ * `Bash(*vcs*commit*)`, `Bash(*vcs*pr*)`) can match: `git` followed somewhere by `commit` or
+ * `push`, or `vcs commit` or `vcs pr`, the commands of `holyagent vcs`, which commit and open PRs
+ * without the word `git` in the command line. A command without it gets no reminder.
  */
-const MENTIONS_GIT_WRITE = /git[\s\S]*(?:commit|push)/i
+const MENTIONS_VCS_WRITE = /git[\s\S]*(?:commit|push)|\bvcs\s+(?:commit|pr)\b/i
 
 /**
  * The value of a git setting from the repository's own files, not from a `-c` on the command line
@@ -390,10 +391,10 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
   ),
   hook(
     "vcs-reminder",
-    "PreToolUse for Bash: for a command that mentions git and then commit or push, add a one-line reminder of the version-control rules as context, with a sentence about the platform's branches when the current branch, or a push target the command spells out, is `claude/*`; never a permission decision, and nothing for any other command",
+    "PreToolUse for Bash: for a command that mentions git and then commit or push, or `vcs commit` or `vcs pr`, add a one-line reminder of the version-control rules as context, with a sentence about the platform's branches when the branch of the session folder (a `cd` or `git -C` in the command is not followed), or a target of a `git push` the command spells out, is `claude/*`; never a permission decision, and nothing for any other command",
     (payload, call) => {
       const command = payload.tool_name === "Bash" ? payload.tool_input?.command : undefined
-      if (typeof command !== "string" || !MENTIONS_GIT_WRITE.test(command))
+      if (typeof command !== "string" || !MENTIONS_VCS_WRITE.test(command))
         return Effect.succeed(NOTHING)
       // A git that cannot answer (no repository, a broken config) leaves the plain reminder.
       return gitMaybe([
@@ -407,8 +408,7 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
         Effect.provide(call.vcs),
         Effect.catchCause(() => Effect.succeed(undefined)),
         Effect.map((branch) => {
-          const platform =
-            isPlatformBranch(branch) || (/push/i.test(command) && PUSH_TARGET.test(command))
+          const platform = isPlatformBranch(branch) || pushTargets(command).some(isPlatformBranch)
           return output({
             hookEventName: "PreToolUse",
             additionalContext: platform

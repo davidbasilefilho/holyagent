@@ -199,6 +199,11 @@ describe("hook vcs-reminder", () => {
     "sudo git push",
     "bash -c 'git push origin main'",
     "echo $(git commit -m x)",
+    "holyagent vcs commit -m 'feat: x' src/a.ts",
+    "holyagent vcs commit 'fix: y' a b",
+    "bun --no-env-file holyagent.js vcs commit -m 'feat: x' a",
+    "holyagent vcs pr --base main --title 'feat: x'",
+    "git add a && holyagent vcs commit -m x a && holyagent vcs pr",
   ]
 
   test("adds the one-line reminder as context, with no permission decision, for a command that mentions git commit or push", async () => {
@@ -286,6 +291,68 @@ describe("hook vcs-reminder", () => {
         }).toEqual({ command, platform: true })
     })
 
+    test("adds it for a holyagent vcs commit or vcs pr made while HEAD is on claude/*", async () => {
+      const repo = await onBranch("claude/confident-mayer-4aznof")
+      for (const command of [
+        "holyagent vcs commit -m 'feat: x' a",
+        "bun --no-env-file holyagent.js vcs commit 'feat: x' a",
+        "holyagent vcs pr --base main",
+      ]) {
+        const { text } = await reminder(command, repo)
+        expect({ command, platform: text.includes(PLATFORM) }).toEqual({ command, platform: true })
+        expect(text).toContain("unless the user named it as the work branch")
+      }
+      const other = await onBranch("release/0.2.1/feat/x")
+      for (const command of ["holyagent vcs commit -m 'feat: x' a", "holyagent vcs pr"]) {
+        const { text } = await reminder(command, other)
+        expect({ command, plain: text.includes("holyagent vcs commit") }).toEqual({
+          command,
+          plain: true,
+        })
+        expect({ command, platform: text.includes(PLATFORM) }).toEqual({ command, platform: false })
+      }
+    })
+
+    test("adds it for pushes that name a claude/* target through the usual spellings of git and its wrappers", async () => {
+      const repo = await onBranch("release/0.2.1/feat/x")
+      for (const command of [
+        "git -C d push origin claude/x",
+        "git -c push.default=simple push origin claude/x",
+        "git push --force-with-lease origin HEAD:claude/x",
+        "git push -o ci.skip origin claude/x",
+        "git push --set-upstream origin HEAD:refs/heads/claude/x",
+        "git push --repo=origin claude/x",
+        "sudo git push origin claude/x",
+        "GIT_SSH_COMMAND=ssh git push origin claude/x",
+        "bash -c 'git push origin claude/x'",
+        "cd a && git add . && git push origin claude/x",
+      ])
+        expect({
+          command,
+          platform: (await reminder(command, repo)).text.includes(PLATFORM),
+        }).toEqual({ command, platform: true })
+    })
+
+    test("adds nothing when the word push or a claude/ path is not a git push to a claude/* target", async () => {
+      const repo = await onBranch("release/0.2.1/feat/x")
+      for (const command of [
+        "git commit -m 'fix: push claude/foo handling'",
+        'git commit -m "docs: run git push origin claude/x to publish"',
+        "git commit -m x && echo push claude/foo",
+        "git push origin feat && cat claude/notes.md",
+        "git push origin feat; ls claude/x",
+        "git log --grep 'git push origin claude/x'",
+        "git commit -am 'x' -- claude/x.md",
+        "echo git push origin claude/x; git commit -m x",
+        "git push origin feat claude-notes",
+        "git push -o claude/x origin feat",
+      ])
+        expect({
+          command,
+          platform: (await reminder(command, repo)).text.includes(PLATFORM),
+        }).toEqual({ command, platform: false })
+    })
+
     test("adds nothing for other branches, a claude/ word that is not a push target, or no repository", async () => {
       const repo = await onBranch("release/0.2.1/feat/x")
       for (const command of [
@@ -317,6 +384,10 @@ describe("hook vcs-reminder", () => {
       "ls -la",
       "commit push git",
       "python3 -c 'print(1)'",
+      "holyagent vcs identity",
+      "holyagent vcs --help",
+      "holyagent vcs prune",
+      "holyagent vcs status",
     ])
       expect(await hook("vcs-reminder", bash(command))).toEqual(nothing)
     expect(

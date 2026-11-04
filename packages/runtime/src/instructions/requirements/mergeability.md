@@ -6,14 +6,14 @@ An input to the instructions, not behavior. The bar for any change HolyAgent pro
 
 Six dimensions in the style of FrontierCode 1.1 mergeability grading. Each Assignment's criteria cover the ones that apply, each criterion marked blocking or non-blocking. The runtime stores them as `behavior`, `regressions`, `tests`, `scope`, `style` and `repo-standards`.
 
-| Dimension      | What it asks                                                          | Blocking when                                                                                 | Non-blocking when                       |
-| -------------- | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------- |
-| behavior       | Does the change do what was asked, including error paths?             | Wrong, incomplete or unverified behavior                                                      | Polish beyond the request               |
-| regressions    | Does everything that worked still work?                               | Existing behavior, interfaces or compatibility break; a performance problem shown by evidence | The failure already existed on the base |
-| tests          | Do tests protect the new behavior?                                    | A behavior change has no test that fails without it; a test is weakened, deleted or tailored  | Extra coverage beyond need              |
-| scope          | Is every changed line called for?                                     | Extra features, invented limits, unjustified refactors, formatting churn, generated noise     | An idea named for later                 |
-| style          | Does it pass the project's lint, format and type-check and read well? | A gate fails; logic or text duplicated that could be reused                                   | Naming and comment taste                |
-| repo-standards | Does it follow the project's stated rules and conventions?            | A rule in CLAUDE.md, AGENTS.md or the contributing guide is broken                            | An unstated convention                  |
+| Dimension      | What it asks                                                          | Blocking when                                                                                | Non-blocking when                       |
+| -------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------- |
+| behavior       | Does the change do what was asked, including error paths?             | Wrong, incomplete or unverified behavior                                                     | Polish beyond the request               |
+| regressions    | Does everything that worked still work?                               | Existing behavior, interfaces or compatibility break                                         | The failure already existed on the base |
+| tests          | Do tests protect the new behavior?                                    | A behavior change has no test that fails without it; a test is weakened, deleted or tailored | Extra coverage beyond need              |
+| scope          | Is every changed line called for?                                     | Extra features, invented limits, unjustified refactors, formatting churn, generated noise    | An idea named for later                 |
+| style          | Does it pass the project's lint, format and type-check and read well? | A gate fails                                                                                 | Naming and comment taste                |
+| repo-standards | Does it follow the project's stated rules and conventions?            | A rule in CLAUDE.md, AGENTS.md or the contributing guide is broken                           | An unstated convention                  |
 
 A blocker in any dimension fails the change. Acceptance needs support for every blocking criterion.
 

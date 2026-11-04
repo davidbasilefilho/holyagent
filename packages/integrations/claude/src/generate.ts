@@ -92,11 +92,15 @@ const hookCommand = (name: string, extra: Readonly<Record<string, unknown>> = {}
  * (or `push`) anywhere in it. Probed against Claude Code 2.1.310, these match `git -C d commit`,
  * `sudo git push`, `env X=1 git commit`, `bash -c 'git push'`, `timeout 5 git push`, `xargs git
  * commit` and the same inside `&&` lists, subshells and substitutions, and they match no command
- * without both words, so `npm test` or `git status` spawn nothing. The reminder is context only, so
- * a command that hides the words (a variable, a git alias, a script) just gets none.
+ * without both words, so `npm test` or `git status` spawn nothing. `holyagent vcs commit` and `vcs
+ * pr` commit and open pull requests without `git` in the command line, so `vcs` followed by
+ * `commit` or `pr` starts it too; the hook then checks the words itself. The reminder is context
+ * only, so a command that hides the words (a variable, a git alias, a script) just gets none.
  */
 const GIT_COMMIT = "Bash(*git*commit*)"
 const GIT_PUSH = "Bash(*git*push*)"
+const VCS_COMMIT = "Bash(*vcs*commit*)"
+const VCS_PR = "Bash(*vcs*pr*)"
 
 /**
  * The six hooks. The session hook adds the state of the project (and, after a resume or compaction,
@@ -105,10 +109,10 @@ const GIT_PUSH = "Bash(*git*push*)"
  * once; it has no matcher, so it sees every tool. The SubagentStart hook adds the version-control
  * rules to each specialist (it has no matcher, and the hook itself picks the plugin's specialists),
  * and the PreToolUse reminder adds them in one line to a Bash command that mentions git commit or
- * push; both only add context and never block. The workflow hook runs `onFailure: block`, because a
- * failure there would let an unvetted workflow through unexamined. The PostToolUse hook records the
- * agent of a dispatched launch, runs only for the Agent tool, and reports its own failures to the
- * root as context, since it authorizes nothing.
+ * push or runs `vcs commit` or `vcs pr`; both only add context and never block. The workflow hook
+ * runs `onFailure: block`, because a failure there would let an unvetted workflow through
+ * unexamined. The PostToolUse hook records the agent of a dispatched launch, runs only for the
+ * Agent tool, and reports its own failures to the root as context, since it authorizes nothing.
  */
 const hooks = (): GeneratedFile => ({
   path: inPlugin("hooks/hooks.json"),
@@ -128,6 +132,8 @@ const hooks = (): GeneratedFile => ({
           hooks: [
             hookCommand("vcs-reminder", { if: GIT_COMMIT }),
             hookCommand("vcs-reminder", { if: GIT_PUSH }),
+            hookCommand("vcs-reminder", { if: VCS_COMMIT }),
+            hookCommand("vcs-reminder", { if: VCS_PR }),
           ],
         },
         { matcher: "Workflow", hooks: [hookCommand("workflow", { onFailure: "block" })] },

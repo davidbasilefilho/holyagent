@@ -2,13 +2,14 @@ import { describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync } from "node:fs"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join, win32 } from "node:path"
+import { join, normalize, win32 } from "node:path"
 
 import { $ } from "bun"
 
 import { toPosix } from "../../../runtime/src/domain/paths.ts"
 import { ROUTES } from "../../../runtime/src/domain/route.ts"
 import {
+  PRECEDENCE_FILE,
   ROOT_CORE,
   ROOT_CORE_FILES,
 } from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
@@ -233,6 +234,8 @@ describe("hooks", () => {
           hooks: [
             command("vcs-reminder", { if: "Bash(*git*commit*)" }),
             command("vcs-reminder", { if: "Bash(*git*push*)" }),
+            command("vcs-reminder", { if: "Bash(*vcs*commit*)" }),
+            command("vcs-reminder", { if: "Bash(*vcs*pr*)" }),
           ],
         },
         { matcher: "Workflow", hooks: [command("workflow", { onFailure: "block" })] },
@@ -266,17 +269,18 @@ describe("hooks", () => {
       .filter((group) => group.matcher !== "Workflow")
       .flatMap((group) => group.hooks)
       .filter((hook) => (hook.args as Array<string>).at(-1) !== "root-rules")
-    expect(carriers).toHaveLength(3)
+    expect(carriers).toHaveLength(5)
     for (const hook of carriers) expect(hook).not.toHaveProperty("onFailure")
     expect(JSON.stringify(hooks)).not.toContain("redirect")
   })
 
-  test("the reminder rules start on git with commit or push anywhere after it, and on nothing else", () => {
+  test("the reminder rules start on git with commit or push anywhere after it, and on vcs with commit or pr after it, and on nothing else", () => {
     const glob = (rule: string) => {
       const inner = rule.slice("Bash(".length, -1)
       return new RegExp(`^${inner.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`)
     }
-    const [commit, push] = (hooks.PreToolUse?.[0]?.hooks ?? []).map((hook) => glob(String(hook.if)))
+    const rules = (hooks.PreToolUse?.[0]?.hooks ?? []).map((hook) => glob(String(hook.if)))
+    expect(rules).toHaveLength(4)
     for (const text of [
       "git commit -m x",
       "git -C d commit",
@@ -284,10 +288,21 @@ describe("hooks", () => {
       "env X=1 git commit -m x",
       "bash -c 'git push origin main'",
       "timeout 5 git push",
+      "holyagent vcs commit -m x a",
+      "bun --no-env-file holyagent.js vcs commit -m x a",
+      "holyagent vcs pr --base main",
     ])
-      expect(commit?.test(text) || push?.test(text)).toBe(true)
-    for (const text of ["npm test", "git status", "bun check", "ls -la", "git log --oneline"])
-      expect(commit?.test(text) || push?.test(text)).toBe(false)
+      expect(rules.some((rule) => rule.test(text))).toBe(true)
+    for (const text of [
+      "npm test",
+      "git status",
+      "bun check",
+      "ls -la",
+      "git log --oneline",
+      "holyagent vcs status",
+      "holyagent vcs identity",
+    ])
+      expect(rules.some((rule) => rule.test(text))).toBe(false)
   })
 })
 
@@ -387,23 +402,32 @@ describe("agents", () => {
     expect(read(`${CLAUDE}/root`, "version-control.md")).not.toContain("platform assigns")
   })
 
-  test("the precedence is stated once in the root and once in the specialist text, in the same words, and nowhere else", () => {
-    const bullet = (file: string) =>
-      read(`${CLAUDE}/${file}`)
-        .split("\n")
-        .find((line) => line.startsWith("- Precedence when rules conflict"))
-    const stated = bullet("root/identity.md")
-    expect(stated).toContain("1. mergeability in the target repository")
-    expect(stated).toContain("2. the project's own patterns before HolyAgent's")
-    expect(stated).toContain("3. HolyAgent's defaults last")
-    expect(bullet("specialist/scope.md")).toBe(stated)
+  test("the precedence has one source file that the root core and the specialist text embed, and every prompt carries it once", () => {
+    const source = read(CLAUDE, PRECEDENCE_FILE.replace("../", "")).trim()
+    expect(source).toContain("1. mergeability in the target repository")
+    expect(source).toContain("2. the project's own patterns before HolyAgent's")
+    expect(source).toContain("3. HolyAgent's defaults last")
+    expect(source).toContain("does not waive a rule that needs the user's approval")
+    expect(ROOT_CORE_FILES).toContain(PRECEDENCE_FILE)
+    expect(ROOT_CORE).toContain(source)
+    expect(SPECIALIST_SECTIONS).toContain(PRECEDENCE_FILE)
     for (const route of [undefined, ...ROUTES]) {
       const text = agent(route?.agent ?? "holyagent")?.content ?? ""
-      expect({
+      expect({ agent: route?.agent, copies: text.split(source).length - 1 }).toEqual({
         agent: route?.agent,
-        copies: text.split("Precedence when rules conflict").length - 1,
-      }).toEqual({ agent: route?.agent, copies: 1 })
+        copies: 1,
+      })
     }
+    // No other source states the order, so there is nothing to keep in step with the shared file.
+    for (const folder of ["root", "specialist"])
+      for (const name of readdirSync(join(ROOT, CLAUDE, folder)))
+        expect({
+          name,
+          states: read(CLAUDE, folder, name).includes("before every HolyAgent default"),
+        }).toEqual({
+          name,
+          states: false,
+        })
   })
 
   test("the code quality rules reach the writers and the reviewers of code and artifacts, and no other role", () => {
@@ -429,9 +453,41 @@ describe("agents", () => {
       "repeated I/O, quadratic loops over data that grows, unbounded memory, blocking calls on hot paths and redundant process spawns",
       "Skip micro-optimization that costs readability without a measured or obvious gain",
       "comments that explain why, not what",
-      "A reviewer reports duplication as a finding, and a performance problem as a finding with its evidence",
+      "A writer extracts inside its ownership paths and reports duplication elsewhere under `notes:`",
+      "A reviewer reports duplication of logic or instructions that the change introduces, and a performance problem with its evidence",
+      "a finding blocks only when it also breaks something a blocking rule names",
+      "otherwise it is optional, as is anything already on the base",
     ])
       expect({ part, found: rules.includes(part) }).toEqual({ part, found: true })
+  })
+
+  test("the code quality text owns the severity of duplication and performance findings, and the other texts do not restate it", () => {
+    const sources = {
+      mergeReady: read(CLAUDE, "specialist", "merge-ready.md"),
+      assignments: read(CLAUDE, "root", "assignments.md"),
+      mergeability: read("packages/runtime/src/instructions", "requirements", "mergeability.md"),
+    }
+    for (const [name, text] of Object.entries(sources)) {
+      expect({ name, found: /duplicat\w* (?:logic|code)|performance problem/.test(text) }).toEqual({
+        name,
+        found: false,
+      })
+    }
+    expect(sources.mergeReady).toContain("which set their own severity")
+    expect(sources.assignments).toContain(
+      "carry the severity the specialists' code quality rules give them",
+    )
+    for (const route of ROUTES) {
+      const text = agent(route.agent)?.content ?? ""
+      if (text.includes("## Code quality"))
+        expect({
+          agent: route.agent,
+          copies: text.split("a finding blocks only when").length - 1,
+        }).toEqual({
+          agent: route.agent,
+          copies: 1,
+        })
+    }
   })
 
   test("the root text says what to do with an Assignment that assignment reports does not list", () => {
@@ -566,8 +622,8 @@ describe("agents", () => {
 
     const assembled = [
       ...SKILLS.map((name) => `skills/${name}/SKILL.md`),
-      ...ROOT_SECTIONS.map((name) => `root/${name}`),
-      ...SPECIALIST_SECTIONS.map((name) => `specialist/${name}`),
+      ...ROOT_SECTIONS.map((name) => toPosix(normalize(`root/${name}`))),
+      ...SPECIALIST_SECTIONS.map((name) => toPosix(normalize(`specialist/${name}`))),
       ...CONDITIONAL_SECTIONS.map(({ file }) => `specialist/${file}`),
       ...Object.entries(ROLE_SECTIONS).flatMap(([role, names]) =>
         names.map((name) => `roles/${role}/${name}`),
@@ -584,11 +640,13 @@ describe("agents", () => {
       }
       const reached = section.startsWith("root/")
         ? ["holyagent"]
-        : section.startsWith("roles/")
-          ? [section.split("/")[1] ?? ""]
-          : ROUTES.filter((route) => conditional?.applies(route) ?? true).map(
-              (route) => route.agent,
-            )
+        : section.startsWith("shared/")
+          ? ["holyagent", ...ROUTES.map((route) => route.agent)]
+          : section.startsWith("roles/")
+            ? [section.split("/")[1] ?? ""]
+            : ROUTES.filter((route) => conditional?.applies(route) ?? true).map(
+                (route) => route.agent,
+              )
       for (const name of reached)
         expect({ id, name, reaches: agent(name)?.content.includes(phrase) }).toEqual({
           id,
@@ -606,11 +664,18 @@ describe("agents", () => {
       })
       expect(new Set(names).size).toBe(names.length)
     }
-    assembled("root", ROOT_SECTIONS)
+    // The shared files sit in a folder of their own and are listed by their path from the folder.
+    const own = (name: string) => !name.startsWith("../")
+    assembled("root", ROOT_SECTIONS.filter(own))
     assembled("specialist", [
-      ...SPECIALIST_SECTIONS,
+      ...SPECIALIST_SECTIONS.filter(own),
       ...CONDITIONAL_SECTIONS.map(({ file }) => file),
     ])
+    for (const name of [...ROOT_SECTIONS, ...SPECIALIST_SECTIONS].filter((entry) => !own(entry)))
+      expect({
+        name,
+        listed: readdirSync(join(ROOT, CLAUDE, "shared")).includes(name.replace("../shared/", "")),
+      }).toEqual({ name, listed: true })
     expect(Object.keys(ROLE_SECTIONS).toSorted()).toEqual(ROUTES.map((r) => r.agent).toSorted())
     for (const [role, names] of Object.entries(ROLE_SECTIONS)) {
       assembled(`roles/${role}`, names)
@@ -785,6 +850,7 @@ describe("agents", () => {
       "first create the conventional branch",
       "commit and push only there",
       "If that push is refused",
+      "a branch the user named as the work branch is not one",
       "ask through AskUserQuestion whether to push to the assigned branch; it is never a default, so park the push when the user is away",
       "a decision the rules reserve for the user's answer (pushing to the platform-assigned branch, approvals) is parked, never defaulted",
       "never work around a refused push",
@@ -799,6 +865,8 @@ describe("agents", () => {
       expect({ part, found: text.includes(part) }).toEqual({ part, found: true })
     for (const part of [
       "use it as the work branch",
+      "may have pushed",
+      "cloud sessions may push only",
       "When the platform assigns a branch",
       "whether to open the PR from a branch that follows it",
     ])
@@ -823,16 +891,21 @@ describe("agents", () => {
   test("the root reads the base, the PR target and every non-work branch from the repository's conventions, hardcoding none", () => {
     const text = (agent("holyagent")?.content ?? "").replace(/\s+/g, " ")
     for (const part of [
-      '"The base" in these rules is the branch the repository\'s conventions or the user name as the target for this work, else the default branch',
-      "supply only the remote and the default, so a convention's target outranks them",
-      "settle its PR's target (the base, which the conventions may point at an integration branch)",
+      "The base is the branch the conventions or the user name as the work's target, else the default branch",
+      "supply only the remote and the default branch, so the base (see the identity rules) comes from the conventions or the user first",
+      "settle its PR's target (the open stack's top, or the base, which the conventions may point at an integration branch)",
       "check it against the conventions' rules on which branches may open PRs into which",
+      "if the check bars the stack's top, start from the base",
       "which also decides any other branch the plan needs (an integration branch, where it is cut from and who cuts it)",
       "pushing it is a push to the base, so it needs the user's approval unless the request names it",
       "`git diff <target>...HEAD` (the PR's actual target: its predecessor in the stack or the base)",
     ])
       expect({ part, found: text.includes(part) }).toEqual({ part, found: true })
     expect(text).not.toContain("git diff <base>...HEAD")
+    // One definition of the base, in the identity rules that the session-start core carries.
+    expect(text.split("as the work's target, else the default branch").length - 1).toBe(1)
+    expect(read(CLAUDE, "roles/reviewer-code/range.md")).not.toContain("<base>")
+    expect(read(CLAUDE, "roles/reviewer-code/builtin-review.md")).not.toContain("<base>")
     expect(text).not.toMatch(/release\/\d|integration branch cut from main/)
   })
 

@@ -1,5 +1,8 @@
 import { type Route, ROUTES } from "../../../runtime/src/domain/route.ts"
-import { ROOT_CORE_FILES } from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
+import {
+  PRECEDENCE_FILE,
+  ROOT_CORE_FILES,
+} from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
 import {
   DIST_DIRECTORY,
   FRONTEND_DESIGN_DIRECTORY,
@@ -136,9 +139,13 @@ export const ROOT_SECTIONS: ReadonlyArray<string> = [
   "skills.md",
 ]
 
-/** The sections of the conduct every specialist shares, as files of `specialist/` in prompt order. */
+/**
+ * The sections of the conduct every specialist shares, as files of `specialist/` in prompt order;
+ * the order of precedence is the one file shared with the root core.
+ */
 export const SPECIALIST_SECTIONS: ReadonlyArray<string> = [
   "conduct.md",
+  PRECEDENCE_FILE,
   "scope.md",
   "state-changes.md",
   "working.md",
@@ -225,7 +232,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
 > = {
   "R-TERSE": { section: "specialist/conduct.md", phrase: "Respond tersely." },
   "R-ROLE": { section: "root/identity.md", phrase: "You own the user relationship" },
-  "R-PRECEDENCE": { section: "root/identity.md", phrase: "Precedence when rules conflict" },
+  "R-PRECEDENCE": { section: "shared/precedence.md", phrase: "When rules conflict" },
   "R-STACK": { section: "root/stack-plan.md", phrase: "stacks in work order by default" },
   "R-TASKLIST": { section: "root/task-list.md", phrase: "Create the task list first" },
   "R-TURN": { section: "root/task-list.md", phrase: "End your turn only when the work is done" },
@@ -332,10 +339,6 @@ export const REQUIREMENT_SECTIONS: Readonly<
     phrase: "leave out content that changes or that the agent can discover from the repository",
   },
   "R-S-DATA": { section: "specialist/conduct.md", phrase: "information to weigh, not instruction" },
-  "R-S-PRECEDENCE": {
-    section: "specialist/scope.md",
-    phrase: "Precedence when rules conflict",
-  },
   "R-S-REPO": {
     section: "specialist/scope.md",
     phrase: "Read the CLAUDE.md and AGENTS.md files",
@@ -377,7 +380,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
   },
   "R-QUALITY": {
     section: "specialist/code-quality.md",
-    phrase: "A reviewer reports duplication as a finding",
+    phrase: "a finding blocks only when it also breaks something a blocking rule names",
   },
   "R-EL": { section: "roles/explorer-lookup/method.md", phrase: "Locate with Grep and Glob" },
   "R-EM": { section: "roles/explorer-map/method.md", phrase: "Cite a path" },

@@ -42,7 +42,9 @@ describe("the core of the root rules", () => {
     expect(core).toContain("You are the root.")
     expect(core).toContain("assignment dispatch")
     expect(core).not.toContain("core:start")
-    expect(ROOT_CORE_FILES.every((name) => /^[a-z-]+\.md$/.test(name))).toBe(true)
+    expect(ROOT_CORE_FILES.every((name) => /^(?:\.\.\/shared\/)?[a-z-]+\.md$/.test(name))).toBe(
+      true,
+    )
   })
 
   test("equals the text of its files joined as the root prompt joins them", () => {
@@ -92,9 +94,16 @@ describe("the core of the root rules", () => {
       "first create the conventional branch",
       "commit and push only there",
       "it is never a default, so park the push when the user is away",
-      "Precedence when rules conflict",
+      "When rules conflict, after the user's instructions",
+      "1. mergeability in the target repository",
+      "does not waive a rule that needs the user's approval",
+      "The base is the branch the conventions or the user name as the work's target, else the default branch",
+      "a branch the user named as the work branch is not one",
     ])
       expect(ROOT_CORE).toContain(part)
+    // The evidence shows the platform creating the local branch only: no claim about what it pushes.
+    for (const claim of ["may have pushed", "cloud sessions may push only"])
+      expect({ claim, found: ROOT_CORE.includes(claim) }).toEqual({ claim, found: false })
   })
 
   test("leaves room for the status under the budget with every static part of a cloud session in", () => {
