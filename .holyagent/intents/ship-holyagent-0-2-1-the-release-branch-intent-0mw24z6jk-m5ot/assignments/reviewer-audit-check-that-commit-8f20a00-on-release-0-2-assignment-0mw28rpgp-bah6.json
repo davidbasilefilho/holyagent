@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mw28rpgp-bah6",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.audit",
+  "slug": "check-that-commit-8f20a00-on-release-0-2",
+  "objective": "Check that commit 8f20a00 on release/0.2.1/feat/dev-server-targets closes the six findings of the dev-server review.",
+  "state": "Running",
+  "scope": [
+    "Findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw28hg6a-olmc.md. Repair diff (dist excluded): /home/user/holyagent-work/diffs/devserver-repair.diff. Generated files: /home/user/holyagent-feat-dev-server-targets/packages/integrations/claude/dist/skills/{visual-judging,dev-server}/SKILL.md and dist/agents/{holyagent,worker-operations}.md.",
+    "For each finding say closed or open with file:line, and report any new contradiction the repair introduces."
+  ],
+  "constraints": [
+    "Keep working until the review is done; stop to ask only when you cannot go on. When done, stop and report; name anything unrequested instead of doing it. Read-only: change no repository files and make no git writes.",
+    "Report in under 250 words."
+  ],
+  "criteria": [
+    {
+      "text": "Finding 1 is closed",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No new contradiction is introduced",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "finding-status"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw28mliu-jv5w"
+  ],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-11-04T14:58:26.858Z"
+  },
+  "createdAt": "2026-11-04T14:58:26.858Z"
+}
