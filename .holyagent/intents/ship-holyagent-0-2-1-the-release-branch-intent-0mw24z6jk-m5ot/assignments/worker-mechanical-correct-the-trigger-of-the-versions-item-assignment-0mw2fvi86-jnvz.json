@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mw2fvi86-jnvz",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 4,
+  "roleTask": "Worker.mechanical",
+  "slug": "correct-the-trigger-of-the-versions-item",
+  "objective": "Correct the trigger of the versions item in the Git hooks list of docs/development.md in /home/user/holyagent-fix-audit.",
+  "state": "Running",
+  "scope": [
+    "The item you added says the versions job runs 'when a package.json is staged'. The lefthook glob 'package.json' matches only the root package.json (a review ran lefthook and confirmed that staging packages/runtime/package.json skips the job). Change that phrase to say the job runs when the root package.json is staged. Change nothing else."
+  ],
+  "constraints": [
+    "Edit only docs/development.md. Make no commits or other git writes and no edits under .git/ or .holyagent/.",
+    "Stop and report in under 60 words with the new line."
+  ],
+  "criteria": [
+    {
+      "text": "The versions item names the root package.json as its trigger",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "git-status"
+  ],
+  "ownershipPaths": [
+    "docs/development.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw2fobbz-p91n",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-04T18:17:21.414Z"
+  },
+  "createdAt": "2026-11-04T18:17:21.414Z"
+}
