@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mw2foas8-4ie9",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-final-audit-repair-commit",
+  "objective": "Re-review the final audit repair commit d9356d2 on release/0.2.1/fix/audit (worktree /home/user/holyagent-fix-audit) against the previous code findings.",
+  "state": "Running",
+  "scope": [
+    "Previous findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw2emv3e-9n67.md (finding 1 blocking reduce regression; finding 2 lock rename-back). The writer's report: /home/user/holyagent/.git/holyagent/reports/assignment-0mw2ezazb-hwhk.md. Review only 'git -C /home/user/holyagent-fix-audit diff 18d6e22 d9356d2' (without dist: /home/user/holyagent-work/diffs/rr2-final.diff): the workflow-check changes, lock.ts, the identity whitespace normalization, the CLI text, agents.ts, the dependency scripts (CRLF reading, nextRange keeping a dependency inside its current range) and the lefthook.yml versions job.",
+    "Binding: the workflow hook guards against accidental runaway scripts the root writes; real root scripts must stay allowed (runner /home/user/holyagent-work/check-workflow-scripts.ts over /root/.claude/projects/-home-user-holyagent/70184bfa-8a56-57cb-a6cf-d92f87c7692b/workflows/scripts/). vcs commit refuses only the exact agent identity. Run 'bunx --no-install mise run verify' in a scratch copy (git archive d9356d2 plus bun install --frozen-lockfile) and confirm the build leaves it unchanged; confirm each new test fails without its change."
+  ],
+  "constraints": [
+    "Read-only in the worktree: no repository edits and no git writes; experiments go in a scratch copy outside the repository.",
+    "Keep working until the review is done; stop and report. Report in under 350 words, findings ranked with file:line, blocking or non-blocking, each previous finding closed or open, and the smallest fix."
+  ],
+  "criteria": [
+    {
+      "text": "The final repair closes the previous code findings with tests that fail without each change",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No regression and mise run verify passes with the build in sync",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw2ezazb-hwhk"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T18:11:45.176Z"
+  },
+  "createdAt": "2026-11-04T18:11:45.176Z"
+}
