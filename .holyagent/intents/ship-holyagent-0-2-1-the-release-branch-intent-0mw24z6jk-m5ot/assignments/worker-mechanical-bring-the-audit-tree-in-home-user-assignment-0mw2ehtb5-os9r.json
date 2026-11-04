@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mw2ehtb5-os9r",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 4,
+  "roleTask": "Worker.mechanical",
+  "slug": "bring-the-audit-tree-in-home-user",
+  "objective": "Bring the audit tree in /home/user/holyagent-fix-audit to green gates with a fresh install and a plugin bundle built from the merged lockfile, changing formatting and generated files only.",
+  "state": "Running",
+  "scope": [
+    "Two writers just finished; the tree is uncommitted. The worktree's node_modules may predate the merged bun.lock (effect moved to 4.1.2), which makes the bundled dist/scripts/holyagent.js stale. Run, in order: 'bun install --frozen-lockfile'; 'bunx --no-install mise run build'; 'bunx --no-install mise run fmt:check' and, if it fails, the mise formatter task on the failing files only, then build again; 'bunx --no-install mise run verify'. See docs/development.md.",
+    "Then run the scratch runner /home/user/holyagent-work/check-workflow-scripts.ts (it calls the built check in dist; read it first, and if it imports the source check instead, point it at the rebuilt dist bundle the way the hook runs) over every script in /root/.claude/projects/-home-user-holyagent/70184bfa-8a56-57cb-a6cf-d92f87c7692b/workflows/scripts/ and report how many are allowed."
+  ],
+  "constraints": [
+    "Change only formatting and generated files in the repository; if verify fails for another reason, stop and report the failing tests with their messages without fixing code.",
+    "Make no commits or other git writes and no edits under .git/ or .holyagent/.",
+    "Keep working until done; stop and report. Report in under 150 words: commands, exit codes, counts, files reformatted, scripts allowed out of total."
+  ],
+  "criteria": [
+    {
+      "text": "After a frozen install, mise run build leaves dist in sync and mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Every real root workflow script is allowed by the built workflow check",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "git-status"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/claude/dist",
+    "package.json",
+    "scripts/dependency-pins.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-04T17:38:42.977Z"
+  },
+  "createdAt": "2026-11-04T17:38:42.977Z"
+}
