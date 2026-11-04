@@ -30,7 +30,7 @@ A new harness gets its own folder under `packages/integrations/`. It reuses the 
 
 ## Getting mise
 
-mise is a dev dependency (`mise` in `package.json`, the npm package mise's own docs recommend, pinned exactly and listed in `trustedDependencies`), so `bun install` installs it into `node_modules/.bin`. Bun runs a package's install script only when the package is trusted, and the trust entry lets this one fetch the `mise` binary for your platform and link it; that script runs `npm` through `node`, so both must be on `PATH` when you install, and it comes from npm and runs on your machine. Because `trustedDependencies` replaces Bun's default list, `@anthropic-ai/claude-code` and `lefthook` are listed there too. Run the commands through Bun, which finds the local binary. `bunx --no-install mise` never fetches a missing local mise from the registry: Bun uses a mise on `PATH` if there is one, and otherwise the command fails:
+mise is a dev dependency (`mise` in `package.json`, the npm package mise's own docs recommend, a caret range like every dependency, and listed in `trustedDependencies`), so `bun install` installs it into `node_modules/.bin`. Bun runs a package's install script only when the package is trusted, and the trust entry lets this one fetch the `mise` binary for your platform and link it; that script runs `npm` through `node`, so both must be on `PATH` when you install, and it comes from npm and runs on your machine. Because `trustedDependencies` replaces Bun's default list, `@anthropic-ai/claude-code` and `lefthook` are listed there too. Run the commands through Bun, which finds the local binary. `bunx --no-install mise` never fetches a missing local mise from the registry: Bun uses a mise on `PATH` if there is one, and otherwise the command fails:
 
 ```sh
 bun install --frozen-lockfile
@@ -44,21 +44,36 @@ bunx --no-install mise run verify
 
 `mise.toml` is the single source of commands. `package.json` scripts and the git hooks only delegate to it, and `--no-script` makes Bun run its own tool rather than a same-named script. Run gates through mise (`bunx --no-install mise run <task>` with the local one) so the `toolchain` task can first confirm a canary Bun.
 
-| Task        | Does                                                     |
-| ----------- | -------------------------------------------------------- |
-| `toolchain` | Fails unless Bun is a canary build, and names the fix    |
-| `prepare`   | Installs the git hooks; skips outside a git work tree    |
-| `check`     | `bun check`: type-check                                  |
-| `lint`      | `bun lint`: type-aware lint, no fixing                   |
-| `lint:fix`  | `bun lint --fix`; extra arguments go to Bun (`--staged`) |
-| `fmt`       | `bun fmt`: format in place; extra arguments go to Bun    |
-| `fmt:check` | `bun fmt --check`                                        |
-| `test`      | `bun test`                                               |
-| `vendor`    | Fetches the pinned ripgrep and fd into the plugin        |
-| `build`     | Generates the Claude plugin (runs `vendor` first)        |
-| `verify`    | `check`, `lint`, `fmt:check` and `test`, all read-only   |
+| Task          | Does                                                            |
+| ------------- | --------------------------------------------------------------- |
+| `toolchain`   | Fails unless Bun is a canary build, and names the fix           |
+| `prepare`     | Installs the git hooks; skips outside a git work tree           |
+| `check`       | `bun check`: type-check                                         |
+| `lint`        | `bun lint`: type-aware lint, no fixing                          |
+| `lint:fix`    | `bun lint --fix`; extra arguments go to Bun (`--staged`)        |
+| `fmt`         | `bun fmt`: format in place; extra arguments go to Bun           |
+| `fmt:check`   | `bun fmt --check`                                               |
+| `test`        | `bun test`                                                      |
+| `vendor`      | Fetches the pinned ripgrep and fd into the plugin               |
+| `build`       | Generates the Claude plugin (runs `vendor` first)               |
+| `deps:update` | Moves every pin to its newest stable release (see Dependencies) |
+| `deps:check`  | Fails when a pin is behind                                      |
+| `verify`      | `check`, `lint`, `fmt:check` and `test`, all read-only          |
 
 Done means `mise run verify` passes; after changing plugin sources, run `mise run build`. `scripts/repo-paths.test.ts` (part of `test`) fails on a tracked path over 120 characters, which overruns Windows MAX_PATH in the marketplace clone, or under `.holyagent/`, which lives on the `holyagent/state` branch.
+
+## Dependencies
+
+Every dependency range in every `package.json` is a caret range at its line boundary (`^X.0.0` for X of 1 or more, `^0.X.0`, `^0.0.X`), or `workspace:*` for a workspace package, and `bun.lock` holds the exact versions. A line boundary lets a fresh install take every compatible release without a manifest edit, while the lockfile keeps installs reproducible; `scripts/dependency-ranges.test.ts` fails on any other range, in any dependency field. This covers `@anthropic-ai/claude-code` and `mise`, which were pinned exactly: nothing depends on the exact version, because `trustedDependencies` matches names, `scripts/toolchain.ts` checks only that Bun is a canary build, and CI runs the Claude Code binary the lockfile resolves (`bun run claude`).
+
+Dependencies change only through the updater, `scripts/update-dependencies.ts`, so a pin never drifts by hand and a release is never a prerelease. It moves each pin to the newest stable release line (the major, or the minor for a `0.x` project) and the newest stable release within it. For a package that is the newest stable version that is not deprecated and is no higher than the registry's `latest` dist-tag, and the installs it runs use `--ignore-scripts`, so a package published just now never runs an install script on the maintainer's machine:
+
+- the external GitHub Actions in `.github/`: the tag becomes its full commit SHA, and the `# vX.Y.Z` comment follows;
+- the vendored ripgrep and fd in `packages/integrations/claude/src/vendor.ts`: the version and both SHA-256 hashes of every target, recomputed from the downloaded archives. Before a hash is pinned, the archive is compared with the SHA-256 its release publishes (ripgrep's `<archive>.sha256` file, or for fd, which publishes no file, the `digest` in GitHub's release API for the asset), and a difference or a missing checksum stops the update with the tree unchanged. Then the programs are installed from those downloads and `scripts/vendor.ts` removes what no pin names;
+- the mise tools in `mise.toml` that are pinned to a version (`bun`, whose stable base the `postinstall` hook upgrades to canary; `node = "lts"` is a channel and stays);
+- the ranges of every `package.json` (the root and the workspace packages, never `node_modules`), followed by `bun update` and `bun install` for the lockfile.
+
+The vendored `frontend-design` skill carries no version or source, so there is nothing to move. The commit permalinks in `docs/pi/` are research references and stay as written. Tags and commits are read with `git ls-remote`, package releases from the npm registry and fd's release digests from the GitHub API, which allows a limited number of requests an hour without a token. A `uses:` line the updater cannot read (no commit SHA, or a comment other than `# vX.Y.Z`) is listed as skipped, as is a mise tool it has no source for. Every download and file is read and checked before the first file is written. `mise run deps:update -- --dry-run` prints `current -> next` for every pin and writes nothing, `mise run deps:update` applies the moves, and `mise run deps:check` exits non-zero when a pin is behind. After an update, run `mise run build` and `mise run verify`; a pin whose update breaks a gate is fixed in code or reverted and reported, not left half-moved.
 
 ## Lint and format rules
 
@@ -89,7 +104,7 @@ Everything is configured in `bunfig.toml`. Bun's own `check`, `lint` and `fmt` a
 
 Every agent prompt is split into one file per section, and the order of the sections is fixed in `src/agents.ts`, not by file name; the sync test fails when a file in `root/`, `specialist/` or `roles/<agent>/` is not assembled or an assembled file is missing. The core of the root rules, which the SessionStart hook injects when the root is not the main thread, is the files named in `ROOT_CORE_FILES` (`root-core.ts`). `root/instruction-guidelines.md` holds the rules the root applies when it writes model-facing text, each tagged with the Anthropic prompting page it follows.
 
-**The bundled search tools.** `dist/scripts/vendor/<target>/` holds ripgrep (`rg`) and fd (`fd`) with their licenses (`licenses/<project>/`) for `darwin-arm64`, `linux-x64` and `windows-x64`; `holyagent rg …` and `holyagent fd …` run the one for the current platform with the caller's stdio and exit code (`packages/runtime/src/cli/tools.ts`). They sit under `scripts/` because claude.ai refuses a plugin with a top-level `bin/`. The pins live in `packages/integrations/claude/src/vendor.ts`: a release URL, the SHA-256 of each archive and the SHA-256 of the program inside, for ripgrep 15.2.0 and fd 10.5.0. ripgrep's archive hashes are the ones its release publishes; fd publishes none, so its hashes were taken from the downloads and are trusted on first use. `mise run vendor` (`scripts/vendor.ts`, which `build` depends on) downloads what is missing, checks the archive hash before reading it and the program hash after extracting, marks the programs executable, and removes files no pin names; with everything in place it does nothing, so a build needs no network. The vendor folder is committed, because the marketplace serves the plugin from `dist/`; `build.ts` leaves it in place while it regenerates the rest, and `vendor.test.ts` checks it against the pins offline. To upgrade a tool, change its version and hashes in `vendor.ts`, then run `mise run vendor` and `mise run build`.
+**The bundled search tools.** `dist/scripts/vendor/<target>/` holds ripgrep (`rg`) and fd (`fd`) with their licenses (`licenses/<project>/`) for `darwin-arm64`, `linux-x64` and `windows-x64`; `holyagent rg …` and `holyagent fd …` run the one for the current platform with the caller's stdio and exit code (`packages/runtime/src/cli/tools.ts`). They sit under `scripts/` because claude.ai refuses a plugin with a top-level `bin/`. The pins live in `packages/integrations/claude/src/vendor.ts`: a release URL, the SHA-256 of each archive and the SHA-256 of the program inside, for ripgrep and fd. The archive hashes equal what the releases publish: ripgrep's `<archive>.sha256` files, and for fd, which publishes none, the `digest` that GitHub's release API reports for each asset; `mise run deps:update` compares each download with that value before it pins the hash. `mise run vendor` (`scripts/vendor.ts`, which `build` depends on) downloads what is missing, checks the archive hash before reading it and the program hash after extracting, marks the programs executable, and removes files no pin names; with everything in place it does nothing, so a build needs no network. The vendor folder is committed, because the marketplace serves the plugin from `dist/`; `build.ts` leaves it in place while it regenerates the rest, and `vendor.test.ts` checks it against the pins offline. `mise run deps:update` upgrades a tool: it recomputes both hashes from the downloaded archives after checking them as above, then vendors the new programs (see Dependencies).
 
 For how a rebuilt plugin reaches a session, see the Updates paragraph in [usage.md](usage.md#install).
 
