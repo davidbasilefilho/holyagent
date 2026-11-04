@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mw2bt9ug-84dv",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-code-changes-of-the-audit",
+  "objective": "Review the code changes of the audit commit 3569104 on release/0.2.1/fix/audit (worktree /home/user/holyagent-fix-audit).",
+  "state": "Running",
+  "scope": [
+    "The writers' reports: /home/user/holyagent/.git/holyagent/reports/assignment-0mw2afimd-f9om.md (state and domain), assignment-0mw2afix2-jge2.md (CLI, vcs, setup) and assignment-0mw2afj6o-q863.md (instructions and docs), same folder. The findings they address: /home/user/holyagent-work/audit-code.md and /home/user/holyagent-work/audit-docs.md. Part D of /home/user/holyagent-work/spec-0.2.1.md and the maintainer decisions in the Intent (workflow hook refuses unbounded loops and large or computed repeat counts; keep the root-rules fallback; keep the legacy converter; ownership overlap per worktree) are binding.",
+    "Review 'git -C /home/user/holyagent-fix-audit show 3569104 -- packages/runtime/src packages/runtime/tests packages/integrations/claude/src packages/integrations/claude/tests ':!packages/runtime/src/instructions''. Run 'bunx --no-install mise run verify' there and confirm 'mise run build' leaves the tree unchanged.",
+    "Judge in particular: the stdin pathspec state commit (B1) on Windows and with odd file names; the rename-based stale-lock break (B8) against the delete-pending Windows behavior that commit c6de12f (fix(state): treat a delete-pending lock file on Windows as held) handles; the new optional Specialist.workTree field (where it is stored, and whether an older plugin version reading the same records would refuse them); P7 deleting an Assignment's brief and report on acceptance (the root cites accepted reports by path in later briefs, so say whether anything in the code or instructions still points at them); the U3 flag parser tightening (single-dash unknown flags, a repeated string flag, a vcs flag value starting with '--'); and that each new test fails without its change."
+  ],
+  "constraints": [
+    "Keep working until the review is done; stop to ask only when you cannot go on. When done, stop and report; name anything unrequested instead of doing it. Read-only in the worktree: no repository edits and no git writes; experiments go in a scratch copy outside the repository.",
+    "Report in under 450 words, findings ranked with file:line, blocking or non-blocking, and the smallest fix."
+  ],
+  "criteria": [
+    {
+      "text": "The code fixes are correct and each claimed test fails without its change",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No regression and mise run verify passes with the build in sync",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw2afimd-f9om",
+    "assignment-0mw2afix2-jge2",
+    "assignment-0mw2afj6o-q863"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T16:23:38.777Z"
+  },
+  "createdAt": "2026-11-04T16:23:38.777Z"
+}
