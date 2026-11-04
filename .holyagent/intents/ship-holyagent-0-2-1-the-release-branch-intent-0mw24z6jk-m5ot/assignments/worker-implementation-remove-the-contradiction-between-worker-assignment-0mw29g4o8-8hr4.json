@@ -1,0 +1,49 @@
+{
+  "id": "assignment-0mw29g4o8-8hr4",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "remove-the-contradiction-between-worker",
+  "objective": "Remove the contradiction between Worker.operations' dev-server role text and the dev-server skill in the worktree /home/user/holyagent-feat-dev-server-targets (branch release/0.2.1/feat/dev-server-targets).",
+  "state": "Running",
+  "scope": [
+    "Finding 5 in /home/user/holyagent/.git/holyagent/reports/assignment-0mw28rpgp-bah6.md: the generated dist/agents/worker-operations.md:19 says to record the target 'in the fields the brief lists', while dist/skills/dev-server/SKILL.md:30 says the brief names only the target record's file path. Worker.operations cannot call Skill, TaskGet or TaskList, so it never sees a field list unless its own text gives one.",
+    "Fix it in the source packages/runtime/src/instructions/claude-5.5/roles/worker-operations/dev-server.md so Worker.operations knows which fields to write at the path the brief names, with one source for the field list (B1 in /home/user/holyagent-work/spec-0.2.1.md: no duplicated text; if the skill and the role need the same list, embed it from one place the way the generator already embeds shared text, or point the role at the fields in a way it can read)."
+  ],
+  "constraints": [
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report: name unrequested features, tests, files or refactors in the report instead of adding them, and start no extra review rounds. Do not stop early with a summary that announces a next step or an offer to wait.",
+    "Make no version-control writes and no edits under .git/ or .holyagent/; the root commits. Report every changed path.",
+    "Work only inside /home/user/holyagent-feat-dev-server-targets. Gate: 'bunx --no-install mise run build' then 'bunx --no-install mise run verify' must pass.",
+    "Report in under 250 words."
+  ],
+  "criteria": [
+    {
+      "text": "Worker.operations' text and the dev-server skill agree on what the brief carries and which fields to record, with one source for the list",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify passes with the build in sync",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions/claude-5.5/roles/worker-operations/dev-server.md",
+    "packages/runtime/src/instructions/claude-5.5/skills/dev-server/SKILL.md",
+    "packages/integrations/claude/dist/agents/worker-operations.md",
+    "packages/integrations/claude/dist/skills/dev-server/SKILL.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T15:17:26.312Z"
+  },
+  "createdAt": "2026-11-04T15:17:26.312Z"
+}
