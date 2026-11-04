@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mw27v0gj-8rdp",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.artifact",
+  "slug": "re-review-the-repair-commit-91ab6ad-on",
+  "objective": "Re-review the repair commit 91ab6ad on release/0.2.1/feat/holyagent-rules against the previous artifact and code findings.",
+  "state": "Running",
+  "scope": [
+    "Previous findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw26gwko-bxr4.md (artifact) and assignment-0mw26gwa9-jdwx.md (code). The repair diff (generated dist excluded) is /home/user/holyagent-work/diffs/rules-91ab6ad.diff; the source tree is /home/user/holyagent-feat-holyagent-rules.",
+    "Say for each previous finding whether it is closed, using the instruction-writing rules in /home/user/holyagent-feat-holyagent-rules/packages/runtime/src/instructions/claude-5.5/skills/instruction-writing/SKILL.md, and report any new contradiction, repeated text or unclear trigger the repair introduces. Check the hook code change in packages/runtime/src/cli/git-push.ts and hook.ts by reading."
+  ],
+  "constraints": [
+    "Keep working until the review is done; stop to ask only when you cannot go on. When done, stop and report; name anything unrequested instead of doing it. Read-only: change no repository files and make no git writes.",
+    "Each new finding: file:line, evidence, blocking or not, smallest fix. Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "Each previous blocking finding is closed",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The repair introduces no new contradiction, repeated text or regression",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "finding-status"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw27auxg-42ic"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T14:33:01.459Z"
+  },
+  "createdAt": "2026-11-04T14:33:01.459Z"
+}
