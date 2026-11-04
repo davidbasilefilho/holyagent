@@ -167,6 +167,32 @@ export const MERGE_READY_SECTION = "merge-ready.md"
  */
 export const CODE_QUALITY_SECTION = "code-quality.md"
 
+/**
+ * The one source of the materiality definition (which visual discrepancies are repaired and which
+ * stay preference), relative to the repository root. The generator embeds its text wherever a
+ * source holds {@link MATERIALITY_MARKER}, so the definition has a single source and each generated
+ * file still carries it whole.
+ */
+export const MATERIALITY_FILE = `${INSTRUCTIONS_DIRECTORY}/shared/materiality.md`
+
+/** The line of an instruction source that the generator replaces with the materiality definition. */
+export const MATERIALITY_MARKER = "<!-- materiality -->"
+
+/**
+ * A source with its {@link MATERIALITY_MARKER} line replaced by the definition. The marker line is
+ * matched after trimming. A source without the marker is returned as it is; one with the marker
+ * twice is an error, because the definition would ship twice in one file.
+ */
+export const embedMateriality = (text: string, materiality: string, source: string): string => {
+  const lines = text.split("\n")
+  const isMarker = (line: string) => line.trim() === MATERIALITY_MARKER
+  const at = lines.findIndex(isMarker)
+  if (at === -1) return text
+  if (lines.findIndex((line, index) => index > at && isMarker(line)) !== -1)
+    throw new Error(`${source} must hold the line ${MATERIALITY_MARKER} at most once`)
+  return [...lines.slice(0, at), materiality.trim(), ...lines.slice(at + 1)].join("\n")
+}
+
 /** The interface inspection rules, a file of `specialist/` for the roles that inspect renders. */
 export const INSPECTION_SECTION = "interface-inspection.md"
 
@@ -293,7 +319,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
   "R-FINISH": { section: "root/assignments.md", phrase: "one more repair round" },
   "R-VISUAL": {
     section: "skills/visual-judging/SKILL.md",
-    phrase: "Read an image in the main thread only to show it to the user",
+    phrase: "Your own final pass, after Worker.visual and Reviewer.visual, decides acceptance",
   },
   "R-DEVSERVER": {
     section: "root/skills.md",
@@ -301,7 +327,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
   },
   "R-EVIDENCE": {
     section: "skills/evidence-judging/SKILL.md",
-    phrase: "starts a repair only with evidence from the reviewer",
+    phrase: "starts a repair only with evidence",
   },
   "R-VCS": {
     section: "root/version-control.md",
@@ -414,11 +440,15 @@ export const REQUIREMENT_SECTIONS: Readonly<
   },
   "R-RV-DESIGN": {
     section: "roles/reviewer-visual/frontend-design.md",
-    phrase: "Judge the design quality",
+    phrase: "read that file and judge against its checklist",
   },
   "R-INSPECT": {
     section: "specialist/interface-inspection.md",
-    phrase: "A material discrepancy affects acceptance",
+    phrase: "A passing build, snapshot or test does not show what renders",
+  },
+  "R-MATERIAL": {
+    section: "shared/materiality.md",
+    phrase: "A discrepancy is material, and starts a repair whatever its size",
   },
   "R-WD": { section: "roles/worker-debugging/phases.md", phrase: "Reproduce" },
   "R-WI": { section: "roles/worker-implementation/method.md", phrase: "smallest complete change" },
@@ -444,7 +474,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
   },
   "R-WVI-DESIGN": {
     section: "roles/worker-visual/frontend-design.md",
-    phrase: "Apply this guidance when you build or reshape an interface",
+    phrase: "read that file first, then build and inspect against its checklist and capture list",
   },
 }
 
@@ -573,12 +603,18 @@ const rootAgent = async (): Promise<GeneratedFile> => {
 export const agentFiles = async (): Promise<ReadonlyArray<GeneratedFile>> => {
   const directory = `${INSTRUCTIONS_DIRECTORY}/specialist`
   const files = CONDITIONAL_SECTIONS.map(({ file }) => file)
-  const [conduct, texts, design] = await Promise.all([
+  const [conduct, texts, design, materiality] = await Promise.all([
     readSections(directory, SPECIALIST_SECTIONS),
     readSections(directory, files),
     frontendDesign(),
+    readSource(MATERIALITY_FILE),
   ])
-  const conditional = Object.fromEntries(files.map((file, at) => [file, texts[at] ?? ""]))
+  const conditional = Object.fromEntries(
+    files.map((file, at) => [
+      file,
+      embedMateriality(texts[at] ?? "", materiality, `${directory}/${file}`),
+    ]),
+  )
   const shared: Shared = {
     conduct,
     conditional,

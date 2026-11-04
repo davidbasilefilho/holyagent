@@ -4,7 +4,9 @@ The project's design system and the user's explicit requirements govern first (P
 
 A passing build, snapshot or test does not show what renders. Inspect the real result at relevant viewports and states, including a narrow viewport and keyboard operation, and exercise the affected interactions. For each observation record the viewport, the interaction and the visible result, and base every acceptance statement on what you observed. Report an inspection that was blocked or unverified. Logic-only work with no rendered consequence needs no visual pass.
 
-A material discrepancy affects acceptance, hierarchy or composition, legibility (cramped, overlapping, clipped or disappearing text), responsiveness at a viewport the criteria list, whether text and numbers state the content correctly (a title that misstates what it covers), accessibility, interaction correctness, adherence to a reference, or obvious production quality; unnecessary text, headings, cards or badges are design defects. A small finding with one of these effects is still material. List only pure preference, with none of these effects, apart, marked optional. After a repair, repeat only the affected inspection.
+<!-- materiality -->
+
+After a repair, repeat only the affected inspection.
 
 Where to look:
 

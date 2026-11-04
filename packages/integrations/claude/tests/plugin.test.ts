@@ -18,8 +18,10 @@ import packageJson from "../package.json" with { type: "json" }
 import {
   BUILTIN_TOOLS,
   CONDITIONAL_SECTIONS,
+  embedMateriality,
   FRONTEND_DESIGN_SECTION,
   INSPECTION_SECTION,
+  MATERIALITY_FILE,
   MERGE_READY_SECTION,
   NATIVE_WEB_TOOLS,
   REQUIREMENT_SECTIONS,
@@ -629,6 +631,7 @@ describe("agents", () => {
       ...ROOT_SECTIONS.map((name) => toPosix(normalize(`root/${name}`))),
       ...SPECIALIST_SECTIONS.map((name) => toPosix(normalize(`specialist/${name}`))),
       ...CONDITIONAL_SECTIONS.map(({ file }) => `specialist/${file}`),
+      "shared/materiality.md",
       ...Object.entries(ROLE_SECTIONS).flatMap(([role, names]) =>
         names.map((name) => `roles/${role}/${name}`),
       ),
@@ -642,15 +645,20 @@ describe("agents", () => {
         expect({ id, skill: skill?.content.includes(phrase) }).toEqual({ id, skill: true })
         continue
       }
+      // The materiality definition is embedded where the inspection rules are, so it reaches the
+      // roles that get them.
+      const inspection = CONDITIONAL_SECTIONS.find(({ file }) => file === INSPECTION_SECTION)
       const reached = section.startsWith("root/")
         ? ["holyagent"]
-        : section.startsWith("shared/")
-          ? ["holyagent", ...ROUTES.map((route) => route.agent)]
-          : section.startsWith("roles/")
-            ? [section.split("/")[1] ?? ""]
-            : ROUTES.filter((route) => conditional?.applies(route) ?? true).map(
-                (route) => route.agent,
-              )
+        : section === "shared/materiality.md"
+          ? ROUTES.filter((route) => inspection?.applies(route)).map((route) => route.agent)
+          : section.startsWith("shared/")
+            ? ["holyagent", ...ROUTES.map((route) => route.agent)]
+            : section.startsWith("roles/")
+              ? [section.split("/")[1] ?? ""]
+              : ROUTES.filter((route) => conditional?.applies(route) ?? true).map(
+                  (route) => route.agent,
+                )
       for (const name of reached)
         expect({ id, name, reaches: agent(name)?.content.includes(phrase) }).toEqual({
           id,
@@ -920,7 +928,11 @@ describe("agents", () => {
 
   test("the mergeability bar and the inspection rules are fixed text in exactly the roles that need them, once", () => {
     for (const { file, applies } of CONDITIONAL_SECTIONS) {
-      const section = read(`${CLAUDE}/specialist`, file).trim()
+      const section = embedMateriality(
+        read(`${CLAUDE}/specialist`, file),
+        read(MATERIALITY_FILE),
+        file,
+      ).trim()
       for (const route of ROUTES) {
         const text = agent(route.agent)?.content ?? ""
         expect({ file, agent: route.agent, copies: text.split(section).length - 1 }).toEqual({
@@ -945,8 +957,13 @@ describe("agents", () => {
       ].toSorted(),
     )
     expect(MERGE_READY_SECTION).toBe("merge-ready.md")
+    const inspection = embedMateriality(
+      read(`${CLAUDE}/specialist`, INSPECTION_SECTION),
+      read(MATERIALITY_FILE),
+      INSPECTION_SECTION,
+    ).trim()
     const inspecting = ROUTES.filter((route) =>
-      agent(route.agent)?.content.includes(read(`${CLAUDE}/specialist`, INSPECTION_SECTION).trim()),
+      agent(route.agent)?.content.includes(inspection),
     ).map((route) => route.agent)
     expect(inspecting.toSorted()).toEqual(["reviewer-visual", "worker-visual"])
   })
@@ -1048,9 +1065,9 @@ describe("agents", () => {
     )
     for (const part of [
       "never from raw logs or whole files",
-      "starts a repair only with evidence from the reviewer",
+      "starts a repair only with evidence:",
       "a file:line trace (for a vulnerability, source to sink) from one without",
-      "a Reviewer.visual observation (viewport, interaction, visible result)",
+      "a Reviewer.visual observation (viewport, interaction, visible result) or a finding of your own final pass that cites the capture path and what it shows",
       "back to the same reviewer for that evidence",
       "have a specialist re-derive any number before it is published or decided on",
       "keep inference labeled as inference",
@@ -1082,6 +1099,33 @@ describe("agents", () => {
     expect(field(skill?.content ?? "", "description")).toStartWith(
       "Use before the first Worker.visual or Reviewer.visual dispatch",
     )
+    for (const part of [
+      "Your own final pass, after Worker.visual and Reviewer.visual, decides acceptance",
+      "inform the decision and do not make it",
+      "`web-design`, `mobile-design`, `desktop-design` or `tui-design`",
+      "`skills/<name>/SKILL.md` under the plugin folder",
+      "the host fills plugin-path variables only in loaded agent and skill text, never in a brief",
+      "repeat your final pass on the captures that changed",
+      "a web page Reviewer.visual inspects live and so leaves no captures, have Worker.visual or Worker.operations save the final captures at the listed sizes and variants, which Reviewer.visual then lists",
+    ])
+      expect({ part, found: skill?.content.includes(part) }).toEqual({ part, found: true })
+    // The platform skill reaches both specialists by a literal path: the dispatch rules (the root
+    // body and the session-start core alike) say briefs hold absolute paths, and the CLI path
+    // they show is where the plugin folder is read from.
+    expect(root).toContain("Write brief paths as literal absolute paths from the CLI path above.")
+    for (const name of ["worker-visual", "reviewer-visual"]) {
+      const text = agent(name)?.content ?? ""
+      expect({ name, found: text.includes("read that file") }).toEqual({ name, found: true })
+    }
+    expect(agent("reviewer-visual")?.content).toContain(
+      "List the paths of the final captures you judged from",
+    )
+    expect(agent("reviewer-visual")?.content).toContain(
+      "For a web page you inspect live, list the paths of the final captures that Worker.visual or Worker.operations saved",
+    )
+    const pointers = read(`${CLAUDE}/root`, "skills.md")
+    for (const name of ["web-design", "mobile-design", "desktop-design", "tui-design"])
+      expect({ name, found: pointers.includes(`\`${name}\``) }).toEqual({ name, found: true })
     const devServer = generated.find((file) => file.path.endsWith("skills/dev-server/SKILL.md"))
     expect(field(devServer?.content ?? "", "description")).toContain(
       "a terminal UI, a desktop app, or an Android or iOS app",
