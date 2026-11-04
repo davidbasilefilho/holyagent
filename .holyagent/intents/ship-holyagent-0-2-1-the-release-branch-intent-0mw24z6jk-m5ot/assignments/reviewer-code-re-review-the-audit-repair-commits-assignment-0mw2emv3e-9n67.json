@@ -1,0 +1,46 @@
+{
+  "id": "assignment-0mw2emv3e-9n67",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-audit-repair-commits",
+  "objective": "Re-review the audit repair commits ec37855 and 475b947 on release/0.2.1/fix/audit (worktree /home/user/holyagent-fix-audit) against the previous review findings and the maintainer decisions.",
+  "state": "Running",
+  "scope": [
+    "Previous findings to close: /home/user/holyagent/.git/holyagent/reports/assignment-0mw2bt9ug-84dv.md (code review of the audit commit). The writers' reports: /home/user/holyagent/.git/holyagent/reports/assignment-0mw2cxpun-kt9i.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw2cxpkv-v9vt.md (ec37855), /home/user/holyagent/.git/holyagent/reports/assignment-0mw2e2brx-3vld.md (475b947 code and tests). Binding decisions (Intent): vcs commit refuses only the exact agent identity (email noreply@anthropic.com, or a name exactly Claude or Claude Code); briefs and reports stay while the Intent is open and are removed when it is completed or closed; the holyagent-runtime bin is removed; the workflow hook auto-allow refuses unbounded loops and large or computed repeat/padStart/padEnd counts; the ownership check applies per worktree; the flag-parser tightening stays.",
+    "Review 'git -C /home/user/holyagent-fix-audit diff e939b07 ec37855' and 'git diff 0907b72 475b947' (code, tests and scripts; /home/user/holyagent-work/diffs/rr-ec37855.diff and rr-475b947.diff hold them without dist). Judge in particular: local/work-trees.json (written, read and cleared correctly; an older plugin still decodes every shared record); brief and report removal at intent close and its reporting of failures; the lock rename-back and its test; the workflow-check narrowing (a value used twice is refused only when it is grown) for gaps it reopens; the Windows timeout changes; that each claimed test fails without its change. Run 'bunx --no-install mise run verify' in a scratch copy made with git archive 475b947 plus 'bun install --frozen-lockfile', or in the worktree read-only, and confirm the build leaves the tree unchanged."
+  ],
+  "constraints": [
+    "Read-only in the worktree: no repository edits and no git writes; experiments go in a scratch copy outside the repository.",
+    "Keep working until the review is done; stop and report. Report in under 450 words, findings ranked with file:line, blocking or non-blocking, each previous finding closed or open, and the smallest fix."
+  ],
+  "criteria": [
+    {
+      "text": "The repairs close the previous code findings and implement the maintainer decisions correctly, each with a test that fails without it",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No regression and mise run verify passes with the build in sync",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw2cxpun-kt9i",
+    "assignment-0mw2cxpkv-v9vt",
+    "assignment-0mw2e2brx-3vld"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T17:42:38.570Z"
+  },
+  "createdAt": "2026-11-04T17:42:38.570Z"
+}
