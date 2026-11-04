@@ -1,0 +1,84 @@
+{
+  "id": "assignment-0mw28rpqg-35mw",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "integrate-the-platform-design-skills",
+  "objective": "Integrate the platform design skills into the root's visual workflow (Part C deliverable 2): the root picks the platform skill and names its path in the visual criteria, makes its own bounded final pass and decides, with one materiality source; in the worktree /home/user/holyagent-feat-visual-root-pass (branch release/0.2.1/feat/visual-root-pass, stacked on dev-server-targets).",
+  "state": "Running",
+  "scope": [
+    "Read /home/user/holyagent-work/spec-0.2.1.md Part C: binding requirements 2 and 7, 'How the pieces connect' (all bullets, especially 'How the visual specialists reach the skill' and 'Materiality'), and deliverable 2 (binding, approved as written). Read /home/user/holyagent-work/research.md item 2: ${CLAUDE_PLUGIN_ROOT} is expanded in agent and skill markdown bodies when they load, but not in text the root writes at run time, and claude.ai cloud sessions run the root from the session-start core (the hook resolves the CLI path there), not from the agent body.",
+    "1. The root picks the platform skill(s) (web-design, mobile-design, desktop-design, tui-design) for any visual Assignment and names the skill file's absolute path in the installed plugin in the Worker.visual and Reviewer.visual criteria, with a criterion to read it and judge against it; resolve the path the same way the root's CLI path is resolved today (in the root body and the session-start core where the CLI path appears), so the brief carries a literal absolute path. Worker.visual and Reviewer.visual role text says to read the named skill and to judge against its checklist; Worker.visual still embeds frontend-design unchanged (frontendDesign() in agents.ts stays as it is; web-design complements it). Update R-WVI-DESIGN and R-RV-DESIGN in agents.ts and requirements.md accordingly.",
+    "2. visual-judging: after Worker.visual and Reviewer.visual, the root makes its own final pass: it reads the reviewer's final captures at the listed sizes and variants against the skill's checklist and decides acceptance; Reviewer.visual's observations inform but do not make the decision; the pass stays bounded to those final captures to keep the root's context small. Revise R-VISUAL in requirements.md too.",
+    "3. One materiality source: today the material-effect list appears in skills/visual-judging/SKILL.md, specialist/interface-inspection.md, roles/reviewer-visual/frontend-design.md, requirements.md R-VISUAL, and design-core/core.md (which omits two effects). Make one source file for the definition (the effects, preference not repaired, the three-round cap where it belongs) and have the generator embed it everywhere it must appear (the core embeds it so skills stay self-contained, the way the design core is embedded); replace the restatements with it; add a test that every place carries the same current text and no other source restates it.",
+    "4. root/skills.md lists the four design skills with when to load them (as the other entries do).",
+    "5. Small leftovers from the design re-review: mark tui-design's 'at most three semantic colors plus one accent' and 'within 100 ms' as (default); and web-design's 'Name the mode in the plan' as (preference) or covered by the core's plan exception.",
+    "Update docs (docs/usage.md and any doc that describes visual acceptance) where behavior changes. Rebuild with 'bunx --no-install mise run build'; the rebuild may also change dist/scripts/holyagent.js in this worktree, which is fine."
+  ],
+  "constraints": [
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report: name unrequested features, tests, files or refactors in the report instead of adding them, and start no extra review rounds. Do not stop early with a summary that announces a next step or an offer to wait.",
+    "Make no version-control writes (no commit, checkout, switch, branch, stash, reset, push) and no edits under .git/ or .holyagent/; the root commits. Report every changed path.",
+    "Work only inside /home/user/holyagent-feat-visual-root-pass; run 'bun install --frozen-lockfile' there first. Do not change .claude/CLAUDE.md or AGENTS.md. Do not change what the visual agents embed (frontend-design stays). If a choice would change that, or rename dev-server, stop and report it as a question.",
+    "Apply packages/runtime/src/instructions/claude-5.5/skills/instruction-writing/SKILL.md and specialist/code-quality.md. Keep the session-start output within its budget (sessioncontext tests).",
+    "Gate: 'bunx --no-install mise run verify' must pass.",
+    "Report in under 500 words; long logs in /home/user/holyagent-work/logs/."
+  ],
+  "criteria": [
+    {
+      "text": "Visual briefs name the platform skill's absolute path in Worker.visual and Reviewer.visual criteria, resolved like the CLI path",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "visual-judging and R-VISUAL make the root's bounded final pass decide acceptance",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The materiality definition has one source embedded everywhere it appears, with a test",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "root/skills.md lists the four design skills and the visual role text and requirement entries match",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The design re-review leftovers are fixed",
+      "blocking": false,
+      "dimension": "style"
+    },
+    {
+      "text": "The plugin is rebuilt and mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "session-start-size"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/runtime/tests/sessioncontext.test.ts",
+    "packages/runtime/tests/instructions.test.ts",
+    "packages/integrations/claude/src/agents.ts",
+    "packages/integrations/claude/src/generate.ts",
+    "packages/integrations/claude/tests/plugin.test.ts",
+    "packages/integrations/claude/tests/design-skills.test.ts",
+    "packages/integrations/claude/dist/agents",
+    "packages/integrations/claude/dist/skills",
+    "docs/usage.md",
+    "docs/decisions.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T14:58:27.209Z"
+  },
+  "createdAt": "2026-11-04T14:58:27.209Z"
+}
