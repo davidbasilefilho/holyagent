@@ -1,0 +1,90 @@
+{
+  "id": "assignment-0mw2cxpun-kt9i",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "apply-the-maintainer-decisions-and-close",
+  "objective": "Apply the maintainer decisions and close the code-review leftovers of the audit commit on release/0.2.1/fix/audit in /home/user/holyagent-fix-audit.",
+  "state": "Running",
+  "scope": [
+    "Binding: Part D of /home/user/holyagent-work/spec-0.2.1.md and these maintainer decisions. (a) vcs commit refuses only the exact agent identity: email noreply@anthropic.com, or a name exactly \"Claude\" or \"Claude Code\"; a person whose name merely contains Claude may commit (finding B4 in /home/user/holyagent-work/audit-code.md; looksLikeAgent in packages/runtime/src/vcs/identity.ts, used by vcs/commit.ts and state/tree.ts). (b) An Assignment's brief and report stay while its Intent is open, so later briefs can cite them, and are removed when the Intent is completed or closed; this replaces the audit's delete-on-accept (removeFiles in cli/brief.ts, called from cli/assignment.ts:344). Find where an Intent is completed or closed and remove the briefs and reports of all its Assignments there; failures to remove are reported, not swallowed silently. (c) Remove the holyagent-runtime bin from packages/runtime/package.json; the plugin's holyagent command is the only program. Default kept: the shared flag parser's tightening stays.",
+    "Close these review findings (reports in /home/user/holyagent/.git/holyagent/reports/): from assignment-0mw2bt9ug-84dv.md, finding 1 (plan and recommend ignore the work tree: add an optional work-tree key to recommend/plan in domain/plan.ts and pass workTreeKey(call.root) from cli/overview.ts), finding 2 (the B8 lock break in state/lock.ts needs a test that fails without it; replace the link-back with a rename back, which works on file systems without hard links, and correct the comment that overclaims), finding 3 (keep the new Specialist.workTree key out of the records an older plugin reads: store it only in local, per-clone records, or otherwise make old plugins decode new records; say which you chose and why), finding 4 (add a test for vcs commit -m with a value starting with '--', documenting the --name=value form). From assignment-0mw2bta5g-lw9w.md: the args.ts:92 bug where a flag with no short form matches the literal '-undefined', with a test.",
+    "Close the audit leftovers in /home/user/holyagent-work/audit-code.md that the first pass left open: D2 (use stateDirectory at cli/hook.ts:419, cli/commands.ts:22, cli/program.ts:52), D5 (un-export reconcileOf, SPECIALIST_RULES/VCS_REMINDER, FETCH_TIMEOUT_MS and the others it lists that are used only in their own file, except where a test imports them), U1 (one helper for dropping undefined env entries), U2 (one git runner, if the merge is mechanical), P3 (pass the resolved state mode and branch into commitState), T5 (scripts/repo-paths.test.ts tests helpers it defines itself: test the real ones), U8 (overview.ts PLAN_NOTES points at root/workflows.md and root/dispatch.md instead of restating them, or is cut to what the CLI alone knows). Skip any item whose fix would change behavior beyond what it names, and say so.",
+    "A second writer edits packages/runtime/src/cli/workflow-check.ts and packages/runtime/tests/workflow-check.test.ts in the same worktree at the same time; leave those two files alone. A test failure confined to them is not yours; name it.",
+    "Finish with 'bunx --no-install mise run build' (it regenerates packages/integrations/claude/dist) and 'bunx --no-install mise run verify'; see docs/development.md."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md: Effect for effects and tagged errors, Effect Schema at data boundaries with onExcessProperty error, Bun APIs, Bun Shell for processes, JSDoc on every exported item.",
+    "Do not edit instruction text under packages/runtime/src/instructions, docs/, README.md or AGENTS.md; list any doc that your changes make stale, with file:line, so a docs writer can fix it.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report; name unrequested features, tests, files or refactors instead of adding them. Do not stop at a summary that announces the next step.",
+    "Make no commits, branch switches, stashes, resets or merges, and no edits under .git/ or .holyagent/; the root commits.",
+    "Work only inside /home/user/holyagent-fix-audit.",
+    "Report in under 500 words: each item with fixed or skipped and its test; write the diff to /home/user/holyagent-work/diffs/audit-code2.diff and long logs to /home/user/holyagent-work/logs/."
+  ],
+  "criteria": [
+    {
+      "text": "Decisions (a), (b) and (c) are implemented, each with a test that fails without it",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Review findings 1-4 and the args -undefined bug are fixed with tests that fail without each fix",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The listed audit leftovers are fixed or named as skipped with the reason",
+      "blocking": false,
+      "dimension": "scope"
+    },
+    {
+      "text": "mise run verify passes and mise run build leaves dist in sync",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The change follows the repository code rules and stays out of the instruction text and docs",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "diff-file",
+    "stale-docs"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/state",
+    "packages/runtime/src/domain",
+    "packages/runtime/src/vcs",
+    "packages/runtime/src/cli/args.ts",
+    "packages/runtime/src/cli/assignment.ts",
+    "packages/runtime/src/cli/brief.ts",
+    "packages/runtime/src/cli/overview.ts",
+    "packages/runtime/src/cli/hook.ts",
+    "packages/runtime/src/cli/commands.ts",
+    "packages/runtime/src/cli/program.ts",
+    "packages/runtime/src/cli/tools.ts",
+    "packages/runtime/src/cli/intent.ts",
+    "packages/runtime/src/setup",
+    "packages/runtime/package.json",
+    "packages/runtime/tests/cli.test.ts",
+    "packages/runtime/tests/store.test.ts",
+    "packages/runtime/tests/state-branch.test.ts",
+    "packages/runtime/tests/lifecycle.test.ts",
+    "packages/runtime/tests/vcs.test.ts",
+    "packages/runtime/tests/plan.test.ts",
+    "packages/runtime/tests/args.test.ts",
+    "scripts",
+    "packages/integrations/claude/dist",
+    "packages/integrations/claude/src/vendor.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T16:55:05.759Z"
+  },
+  "createdAt": "2026-11-04T16:55:05.759Z"
+}
