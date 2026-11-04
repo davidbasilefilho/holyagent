@@ -1,0 +1,35 @@
+{
+  "id": "assignment-0mw2d7bkf-q3o6",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 4,
+  "roleTask": "Worker.validation",
+  "slug": "check-that-the-merge-head-99522de-of",
+  "objective": "Check that the merge head 99522de of release/0.2.1/feat/dev-server-targets in /home/user/holyagent-feat-dev-server-targets builds in sync and passes the gates.",
+  "state": "Running",
+  "scope": [
+    "Run in /home/user/holyagent-feat-dev-server-targets: 'bun install --frozen-lockfile', 'bunx --no-install mise run build', then 'git status --short' (it must be empty: dist in sync), then 'bunx --no-install mise run verify'. See docs/development.md."
+  ],
+  "constraints": [
+    "Read-only: make no edits, commits or other git writes; if the build changes files, report them and leave them.",
+    "Keep working until the checks are run; stop and report. Report in under 150 words: each command, exit code and counts; logs in /home/user/holyagent-work/logs/."
+  ],
+  "criteria": [
+    {
+      "text": "The merge head builds with dist in sync and passes mise run verify",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-04T17:02:33.807Z"
+  },
+  "createdAt": "2026-11-04T17:02:33.807Z"
+}
