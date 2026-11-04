@@ -1,0 +1,65 @@
+{
+  "id": "assignment-0mw28hfkt-nwcv",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-review-findings-on-the-design",
+  "objective": "Repair the review findings on the design skills in the worktree /home/user/holyagent-feat-design-skills (release/0.2.1/feat/design-skills, head b5d21e1).",
+  "state": "Running",
+  "scope": [
+    "Context: /home/user/holyagent-work/spec-0.2.1.md Part C. Reviews: /home/user/holyagent/.git/holyagent/reports/assignment-0mw2860hc-17f2.md (artifact) and assignment-0mw2860qy-lzfj.md (code).",
+    "Blocking artifact 1: mark the taste and process rules of the core (one signature detail and remove one accessory; the gray placeholder) as (preference), and say in the core legend that the direction rules are checked as a plan in the worker's report or DESIGN.md, not on a render.",
+    "Blocking artifact 2: split mobile-design's color bullet so (preference) covers only the in-app appearance switch and the 7:1 aim; the light, dark and increased-contrast variants stay material.",
+    "Non-blocking artifact 4 to 9: apply each smallest fix as written (iOS 27 sentence; preference only on the expressive-motion clause; 'where the platform has a text scale'; 'where the platform has them' in the core; web icon-button label wording; one defined marker for defaults defined in the core legend, and 'transform and opacity').",
+    "Leave artifact 3 (the core's materiality list) alone: a later branch makes one materiality source.",
+    "Code 1: fail the build when a SKILL.md outside DESIGN_SKILLS holds the design-core marker (or embed wherever the marker appears), with a test.",
+    "Rebuild with 'bunx --no-install mise run build'."
+  ],
+  "constraints": [
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report: name unrequested features, tests, files or refactors in the report instead of adding them, and start no extra review rounds. Do not stop early with a summary that announces a next step or an offer to wait.",
+    "Make no version-control writes (no commit, checkout, switch, branch, stash, reset, push) and no edits under .git/ or .holyagent/; the root commits. Report every changed path.",
+    "Work only inside /home/user/holyagent-feat-design-skills. Keep each generated skill within 80 to 140 lines. Apply packages/runtime/src/instructions/claude-5.5/skills/instruction-writing/SKILL.md.",
+    "Gate: 'bunx --no-install mise run verify' must pass.",
+    "Report in under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "The two blocking findings are fixed",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Non-blocking findings 4 to 9 and code 1 are fixed or explained",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The plugin is rebuilt and mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions/claude-5.5/skills/web-design",
+    "packages/runtime/src/instructions/claude-5.5/skills/mobile-design",
+    "packages/runtime/src/instructions/claude-5.5/skills/desktop-design",
+    "packages/runtime/src/instructions/claude-5.5/skills/tui-design",
+    "packages/runtime/src/instructions/claude-5.5/design-core",
+    "packages/integrations/claude/src/generate.ts",
+    "packages/integrations/claude/tests/design-skills.test.ts",
+    "packages/integrations/claude/dist/skills"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw27v0qz-pua6",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T14:50:27.486Z"
+  },
+  "createdAt": "2026-11-04T14:50:27.486Z"
+}
