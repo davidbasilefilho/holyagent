@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "review-the-widened-dev-server-skill-and",
   "objective": "Review the widened dev-server skill and the matching role text (commit 979e5c5 on release/0.2.1/feat/dev-server-targets) against Part C of the 0.2.1 request.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read /home/user/holyagent-work/spec-0.2.1.md Part C: 'dev-server: one running target per platform', 'dev-server today', binding requirement 1 and deliverable 3.",
     "Read /home/user/holyagent-work/diffs/dev-server.diff and the generated files under /home/user/holyagent-feat-dev-server-targets/packages/integrations/claude/dist/ (skills/dev-server/SKILL.md, agents/worker-operations.md, worker-visual.md, reviewer-visual.md, holyagent.md).",
@@ -39,7 +39,29 @@
     "agentId": "workflow:wf_fd2cf1eb-d74/assignment-0mw28hg6a-olmc",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-04T14:50:28.258Z"
+    "startedAt": "2026-11-04T14:50:28.258Z",
+    "finishedAt": "2026-11-04T14:52:07.332Z"
+  },
+  "result": "result: Spec bullets and role text are met, with one blocking contradiction (`visual-judging` still says to start the shared server first) and five non-blocking items. I read the files and did not run `mise run verify`, so no test results are covered.\n\nfindings (paths under `/home/user/holyagent-feat-dev-server-targets/`; dist = `packages/integrations/claude/dist`):\n\nSpec bullets, all in `dist/skills/dev-server/SKILL.md`:\n- Detection with the signal used: met (L11-13).\n- Target record fields: met. All five spec groups are present, and \"address\" is widened to URL, session, display or device (L17-23).\n- Unique names: met (L25).\n- Owner-only stop: met (L48-50). The record carries the owner, and the stop command is checked against it.\n- Each platform with interchangeable tools: met (L37-42). Tools are called examples at L9 and L35.\n- `[verify]` notes: met as one blanket sentence (L35). The spec says to mark flags against installed versions, and no individual flag is marked. Non-blocking.\n- Environment matrix: met (L46), word for word with the spec.\n- Blocked report with reason and unblock: met (L46) and in `dist/agents/worker-operations.md:19`.\n- Closest honest substitute, and \"web build is not native render\": met (L46).\n\nRole text (spec deliverable 3):\n- Worker.operations (`dist/agents/worker-operations.md:19`): met. It reads the record, uses unique names, reports the completed record and whether it started or reused the target, reports blocked, and stops only what it started.\n- Worker.visual (`dist/agents/worker-visual.md:15`, `:17`): met. It reads the record, never a bare URL, starts no target, and reports blocked when no record is named or the target is down.\n- Reviewer.visual (`dist/agents/reviewer-visual.md:17`): met. It has no shell, judges captures from Worker.visual or Worker.operations, and reports blocked without a record or captures.\n- Root (`dist/agents/holyagent.md:178`): met.\n\nBlocking:\n1. `dist/skills/visual-judging/SKILL.md:15` (source `packages/runtime/src/instructions/claude-5.5/skills/visual-judging/SKILL.md:14`) says \"For web work, start the shared server first\".\n   - It misses spec Part C deliverable 3 and the brief's check for contradictions with untouched text. It limits the target to web work and names a \"server\", so the root can skip the target for TUI, desktop and mobile work.\n   - Fix: \"Start the render target first, per platform (the `dev-server` skill).\"\n\nNon-blocking:\n2. `dist/agents/holyagent.md:113` (source `root/assignments.md:12`) says \"(rounds, shared server, images)\", and `visual-judging` no longer states a shared-server rule beyond item 1. Fix: replace with \"render target\".\n3. `dist/skills/dev-server/SKILL.md:31` says \"Reviewer.visual has no shell and judges those captures\". `specialist/interface-inspection.md` still lets it inspect a web target live through the browser tools, and `reviewer-visual.md:17` allows this for web. Fix: \"judges those captures, or for web inspects the URL through its browser tools\".\n4. `dist/skills/dev-server/SKILL.md:35` repeats \"Tools are examples\" from L9, so the rule appears twice. Fix: drop the first clause at L35 and keep \"flags change between versions, so [verify] each against the installed one\".\n5. `dist/agents/worker-operations.md:19` says \"in the fields of the `dev-server` skill\", but Worker.operations cannot call Skill. The skill covers this at L30 by having the brief name the file path, so the role text depends on the root following that. Fix: \"in the fields the brief lists\".\n6. `docs/pi/claude-parity.md:49` says \"(a running app or a served static build)\", which is stale after the widening. Line 113 says the plugin ships two skills, but this is pre-existing and the plugin now has seven. Fix: \"a running render target\" at L49, and correct the count at L113 only if you want it in scope. `docs/development.md:84` only lists skill names, so it has no contradiction.\n\nUnrequested: none found. The diff also edits `docs/decisions.md`, `docs/usage.md`, `requirements.md`, `agents.ts` and the tests, which fits deliverable 3 and the requirement-phrase sync.\n\nevidence:\nEach dev-server spec bullet and the role-text requirement has a verdict (behavior): per-bullet verdicts above, from `dist/skills/dev-server/SKILL.md` L11-50, `dist/agents/worker-operations.md:19`, `worker-visual.md:15`/`:17`, `reviewer-visual.md:17` and `holyagent.md:178`, compared against spec Part C L393-422 and L436.\nEvery gap names file:line and a fix (behavior): findings 1-6 above each give file:line and a fix.\nfindings: 1 blocking (`dist/skills/visual-judging/SKILL.md:15`) and 5 non-blocking (listed above).\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Per-bullet verdicts with file:line; one blocking contradiction.",
+    "criteria": [
+      {
+        "criterion": "Each dev-server spec bullet and the role-text requirement has a verdict",
+        "support": "per-bullet verdicts above, from `dist/skills/dev-server/SKILL.md` L11-50, `dist/agents/worker-operations.md:19`, `worker-visual.md:15`/`:17`, `reviewer-visual.md:17` and `holyagent.md:178`, compared against spec Part C L393-422 and L436."
+      },
+      {
+        "criterion": "Every gap names file:line and a fix",
+        "support": "findings 1-6 above each give file:line and a fix."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "1 blocking (`dist/skills/visual-judging/SKILL.md:15`) and 5 non-blocking (listed above)."
+      }
+    ]
   },
   "createdAt": "2026-11-04T14:50:28.258Z"
 }
