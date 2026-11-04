@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-commit-e265f2a-on-release-0-2-1",
   "objective": "Review commit e265f2a on release/0.2.1/build/dependency-updater (worktree /home/user/holyagent-build-dependency-updater) against Part A4 of the 0.2.1 request.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read /home/user/holyagent-work/spec-0.2.1.md Part A4. Diff without dist and bun.lock: /home/user/holyagent-work/diffs/deps.diff; run 'bun test scripts/' and 'bunx --no-install mise run deps:update -- --dry-run' and 'bunx --no-install mise run deps:check' there (network reads are fine; write nothing).",
     "Check: the range test covers every dependency field in every package.json and the boundary rule exactly as specified (including ^0.0.X and workspace:*); line selection (major, minor for 0.x) and prerelease filtering; action tag to full SHA and version comment; vendored tools re-vendored with both checksums recomputed for every target; mise tools; package ranges and lockfile refresh; --dry-run writes nothing; check mode exits non-zero when behind; error handling (Effect tagged errors, Schema on every network response with onExcessProperty error); Windows behavior; duplication with scripts/vendor.ts and other helpers (B1); slow paths (redundant downloads or spawns)."
@@ -39,7 +39,33 @@
     "agentId": "workflow:wf_d245443b-97e/assignment-0mw293a4v-cfsz",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-04T15:07:26.863Z"
+    "startedAt": "2026-11-04T15:07:26.863Z",
+    "finishedAt": "2026-11-04T15:12:32.949Z"
+  },
+  "result": "result: Not merge-ready. One blocking finding: the `--dry-run` and `--check` behaviours have no test, and the only tests are on the pure helpers. Everything else I checked meets A4, and the other issues are optional.\n\nThe built-in `/code-review` ran (high effort, `e2745a7...e265f2a`) and gave 8 findings, classified below. I ran everything in `/home/user/holyagent-build-dependency-updater` and left its tree clean. `bun install --frozen-lockfile --dry-run` is clean.\n\n**Blocking**\n1. `scripts/update-dependencies.ts:512-538` (`main`) and `:454` (`applySurvey`) — no test covers the two specified modes. `--dry-run` writes nothing and `--check` exits non-zero when behind both live in `main`, which calls `survey` against the network. `dependency-pins.test.ts` and `dependency-ranges.test.ts` only test pure helpers, and no test imports `main`, `survey` or `applySurvey`. I confirmed the behaviour by hand: on a scratch copy with an old action SHA and a `^3` effect range, `--check` printed the 2 pins and exited 1, and `--dry-run` printed the same 2 and wrote nothing.\n   - Smallest fix: give `main` an injectable survey, e.g. `main(args, surveyFn = survey)`.\n   - Then add a hermetic test that stubs the survey result. It must assert that `--check` fails with `PinsBehind` when a pin is behind, passes when none is, and that `--dry-run` never calls `applySurvey`.\n\n**Optional**\n2. `update-dependencies.ts:454-485` — `applySurvey` rewrites the workflows, `mise.toml` and the `package.json` files before the network steps (hashing, `bun scripts/vendor.ts`, `bun update`). A failed download leaves a half-moved tree, which `docs/development.md` says must not happen. Fix: compute the hashes first, then write.\n3. `update-dependencies.ts:404` — ripgrep's archive hashes were the release-published ones, and the updater now rewrites them from the download. That matches the spec's \"recomputed from the downloaded assets\", but the claims in `vendor.ts:30` and `docs/development.md` become false after the next ripgrep move. Fix: reword them, or compare against the published `.sha256` for ripgrep.\n4. `dependency-pins.ts:121` — `ACTION_USE` silently skips a `uses:` line whose comment is not exactly `# vX.Y.Z`, so `deps:check` can pass with that action stale. Fix: report such lines in `skipped`. The review's CRLF claim is wrong: `.gitattributes` forces `eol=lf`, and JS `$` in multiline mode also matches before `\\r`.\n5. Duplication and slow path. This is B1.\n   - `programOf` repeats `readTar` in `vendor.ts`, and `download` repeats the fetch in `scripts/vendor.ts`.\n   - Each archive is downloaded twice, once by `hashesOf` and again by `bun scripts/vendor.ts`.\n   - The test's `FIELDS` repeats `DEPENDENCY_FIELDS` (`dependency-ranges.test.ts:9`).\n   - The manifest scan appears in the test, the updater and `bump-version.ts`.\n   - Fix: reuse `installAsset` on the bytes already downloaded, and export the shared constant.\n6. `update-dependencies.ts:293` and `dependency-ranges.test.ts:57` — the `**/package.json` glob walks `node_modules`. Fix: use the workspace globs instead.\n7. `parseTags` reads `git ls-remote` output with a regex rather than Schema. It is plain text, so this is minor.\n\n**Rejected**\n- `claude-code` and `mise` as carets: A4 asks for exactly this, and the `trustedDependencies` exposure is a user-level trade-off. I'd mention it to the maintainer, but it isn't a defect.\n- `JSON.stringify` rewrite: round-tripping all three manifests gives byte-identical output, and `fmt:check` passes.\n- `replaceAll(from, to)` on the version: the current URLs are safe, so it's hypothetical.\n\n**Verified as specified**\n- The range test covers all six fields including nested overrides, the `^X.0.0`, `^0.X.0` and `^0.0.X` boundaries, `workspace:*` limited to workspace names, and a per-field rejection test. It fails on the base, where the ranges were exact.\n- The newest-release logic, prerelease filtering, annotated-tag peeling to the commit, SHA and comment rewrite, both vendored checksums per target, and mise `node = \"lts\"` skipped with a note all behave as A4 says.\n- Windows: the glob output is normalised, and `.zip` and `.exe` are handled.\n- The review's `.github/**` glob also reaches composite actions.\n- Network responses are decoded with Schema and `onExcessProperty: \"error\"`, and the errors are tagged. Lint does not restrict `scripts/`.\n\nI could only read, not run, `applySurvey` (`bun update` and re-vendor) and `hashesOf`, because running them writes to the tree.\n\nchecks-run:\n- `bun test scripts/`: exit 0, 175 pass\n- `mise run deps:update -- --dry-run`: exit 0, 0 of 16 pins behind, tree clean\n- `mise run deps:check`: exit 0\n- `mise run check`, `lint` and `fmt:check`: all exit 0\n- Scratch-copy runs of `--check` and `--dry-run`: exit 1 and 0 as above\n\nevidence:\nchecks-run: listed above; I did not run `mise run verify` or `build`, to avoid writing build output.\nfindings: item 1 is blocking and items 2 to 7 are optional (above).\nThe range test and the updater implement A4 as specified, with tests that fail without the change: the range test and the pure-helper tests are fine, but the `--dry-run` and `--check` behaviour has no test (finding 1).\nThe updater follows the repository code rules: lint, check and fmt pass, and it uses Effect, tagged errors, Schema and the Bun Shell. Remaining points are the duplication in item 5 and the plain-text `parseTags` in item 7.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Review ran checks and built-in code-review; one blocking finding reproduced by hand",
+    "criteria": [
+      {
+        "criterion": "The range test and the updater implement A4 as specified, with tests that fail without the change",
+        "support": "the range test and the pure-helper tests are fine, but the `--dry-run` and `--check` behaviour has no test (finding 1)."
+      },
+      {
+        "criterion": "The updater follows the repository code rules",
+        "support": "lint, check and fmt pass, and it uses Effect, tagged errors, Schema and the Bun Shell. Remaining points are the duplication in item 5 and the plain-text `parseTags` in item 7."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "listed above; I did not run `mise run verify` or `build`, to avoid writing build output."
+      },
+      {
+        "label": "findings",
+        "support": "item 1 is blocking and items 2 to 7 are optional (above)."
+      }
+    ]
   },
   "createdAt": "2026-11-04T15:07:26.863Z"
 }
