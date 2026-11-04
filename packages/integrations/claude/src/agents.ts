@@ -297,7 +297,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
   },
   "R-DEVSERVER": {
     section: "root/skills.md",
-    phrase: "start the one server the visual specialists share",
+    phrase: "start the one target per platform that the visual specialists share",
   },
   "R-EVIDENCE": {
     section: "skills/evidence-judging/SKILL.md",
@@ -410,7 +410,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
   },
   "R-RV": {
     section: "roles/reviewer-visual/captures.md",
-    phrase: "report the inspection as blocked",
+    phrase: "Report the inspection as blocked when no record is named",
   },
   "R-RV-DESIGN": {
     section: "roles/reviewer-visual/frontend-design.md",
@@ -435,7 +435,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
   "R-WO": { section: "roles/worker-operations/method.md", phrase: "documented workflow" },
   "R-WO-DEV": {
     section: "roles/worker-operations/dev-server.md",
-    phrase: "Report the URL, exact command, process id and log location",
+    phrase: "Report the completed record and whether you started the target or reused it",
   },
   "R-WV": { section: "roles/worker-validation/method.md", phrase: "choose the real check" },
   "R-WVI": {
