@@ -1,0 +1,49 @@
+{
+  "id": "assignment-0mw26gveq-wprg",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 2,
+  "roleTask": "Worker.operations",
+  "slug": "bump-the-version-to-0-2-1-in-the",
+  "objective": "Bump the version to 0.2.1 in the worktree /home/user/holyagent-ci-release-flow with the repository's bump task and rebuild the plugin, so the release-flow PR's head carries 0.2.1.",
+  "state": "Running",
+  "scope": [
+    "In /home/user/holyagent-ci-release-flow run 'bunx --no-install mise run bump:patch', then 'bunx --no-install mise run build', then 'bunx --no-install mise run verify'.",
+    "Confirm the version now reads 0.2.1 in every file the bump and build touch (the three package.json files, bun.lock workspace entries, packages/integrations/claude/dist/.claude-plugin/plugin.json, .claude-plugin/marketplace.json, the bundled CLI)."
+  ],
+  "constraints": [
+    "Keep working until done; stop to ask only when you cannot go on. Make no version-control writes and no edits under .git/ or .holyagent/; the root commits. Edit no file by hand: only the commands above change files.",
+    "Report in under 150 words: each command with its exit code, the test counts, the changed paths, and the files read showing 0.2.1."
+  ],
+  "criteria": [
+    {
+      "text": "bump:patch, build and verify each exit 0",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Every version copy reads 0.2.1",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "package.json",
+    "bun.lock",
+    "packages/runtime/package.json",
+    "packages/integrations/claude/package.json",
+    "packages/integrations/claude/dist",
+    ".claude-plugin"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-04T13:54:02.114Z"
+  },
+  "createdAt": "2026-11-04T13:54:02.114Z"
+}
