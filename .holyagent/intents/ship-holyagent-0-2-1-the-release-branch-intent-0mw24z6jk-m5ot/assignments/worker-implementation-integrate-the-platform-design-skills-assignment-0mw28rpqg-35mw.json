@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "integrate-the-platform-design-skills",
   "objective": "Integrate the platform design skills into the root's visual workflow (Part C deliverable 2): the root picks the platform skill and names its path in the visual criteria, makes its own bounded final pass and decides, with one materiality source; in the worktree /home/user/holyagent-feat-visual-root-pass (branch release/0.2.1/feat/visual-root-pass, stacked on dev-server-targets).",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read /home/user/holyagent-work/spec-0.2.1.md Part C: binding requirements 2 and 7, 'How the pieces connect' (all bullets, especially 'How the visual specialists reach the skill' and 'Materiality'), and deliverable 2 (binding, approved as written). Read /home/user/holyagent-work/research.md item 2: ${CLAUDE_PLUGIN_ROOT} is expanded in agent and skill markdown bodies when they load, but not in text the root writes at run time, and claude.ai cloud sessions run the root from the session-start core (the hook resolves the CLI path there), not from the agent body.",
     "1. The root picks the platform skill(s) (web-design, mobile-design, desktop-design, tui-design) for any visual Assignment and names the skill file's absolute path in the installed plugin in the Worker.visual and Reviewer.visual criteria, with a criterion to read it and judge against it; resolve the path the same way the root's CLI path is resolved today (in the root body and the session-start core where the CLI path appears), so the brief carries a literal absolute path. Worker.visual and Reviewer.visual role text says to read the named skill and to judge against its checklist; Worker.visual still embeds frontend-design unchanged (frontendDesign() in agents.ts stays as it is; web-design complements it). Update R-WVI-DESIGN and R-RV-DESIGN in agents.ts and requirements.md accordingly.",
@@ -79,7 +79,53 @@
     "agentId": "workflow:wf_2919affc-e6e/assignment-0mw28rpqg-35mw",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-04T14:58:27.209Z"
+    "startedAt": "2026-11-04T14:58:27.209Z",
+    "finishedAt": "2026-11-04T15:16:31.108Z"
+  },
+  "result": "result: All five items are done and `bunx --no-install mise run verify` exits 0 after a rebuild with `bunx --no-install mise run build`. The root now picks the platform skill, makes its own bounded final pass and decides, and the materiality definition lives in one file the build embeds.\n\nchanged (all under /home/user/holyagent-feat-visual-root-pass):\n- New source `packages/runtime/src/instructions/claude-5.5/shared/materiality.md`.\n- Edited instruction sources under `packages/runtime/src/instructions/`:\n  - `claude-5.5/design-core/core.md`\n  - `claude-5.5/specialist/interface-inspection.md`\n  - `claude-5.5/skills/{visual-judging,tui-design,web-design}/SKILL.md`\n  - `claude-5.5/root/{dispatch,skills}.md`\n  - `claude-5.5/roles/worker-visual/frontend-design.md`\n  - `claude-5.5/roles/reviewer-visual/{frontend-design,captures}.md`\n  - `requirements.md`\n- Generator: `packages/integrations/claude/src/{agents,generate}.ts`.\n- Tests: `packages/integrations/claude/tests/{plugin,design-skills}.test.ts` and `packages/runtime/tests/sessioncontext.test.ts`.\n- Generated: `packages/integrations/claude/dist/agents` (holyagent, reviewer-visual, worker-visual), `dist/skills` (the five changed skills) and `dist/scripts/holyagent.js`.\n- Docs: `docs/usage.md`, `docs/decisions.md`.\n- Diff file for review: `/tmp/claude-0/-home-user-holyagent/70184bfa-8a56-57cb-a6cf-d92f87c7692b/scratchpad/visual-root-pass.diff`. It leaves out the bundled `holyagent.js`.\n\nchecks: `bunx --no-install mise run build` -> 0. `bunx --no-install mise run verify` -> 0, with 1140 pass, 1 skip, 0 fail. Logs are at `/home/user/holyagent-work/logs/visual-root-pass-verify{1..4}.log`; the first three are earlier failed runs, and `verify4` is the passing one.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- **Core budget is nearly used up.** The session-start core grew by 36 characters, from 5997 to 6033. `sessioncontext.test.ts` and `hooks.test.ts` tip over at about 41 added characters. That is why the core carries only \"Briefs hold literal absolute paths.\" The longer explanation of why sits in `visual-judging`. Raising `CONTEXT_BUDGET` in `src/cli/sessioncontext.ts` would give room, but that file is outside my paths.\n- I added one requirement, `R-MATERIAL`, for the new source file. Its test and mapping were needed to keep the requirements-to-sections check complete.\n- **Pending decision:** `docs/development.md` is outside my paths and is stale. It says \"seven skills\" (there are now eleven) and does not mention `shared/materiality.md`.\n- `Worker.visual` and `Reviewer.visual` both embed `frontend-design` unchanged.\n- I used `python3` for several text edits instead of Edit or Write.\n\nevidence:\n- Visual briefs name the platform skill's absolute path in Worker.visual and Reviewer.visual criteria, resolved like the CLI path: `visual-judging` has a \"Pick the platform skill\" section that puts the path in both specialists' criteria with a blocking read-and-judge criterion. The root derives the folder from the CLI path, which the build resolves in the agent body and the hook resolves in the core, and `dispatch.md` says briefs hold literal absolute paths. The two role files tell each specialist to read the named file and judge against its checklist, and `R-WVI-DESIGN` and `R-RV-DESIGN` are updated in `agents.ts` and `requirements.md`. `plugin.test.ts` and `sessioncontext.test.ts` assert this.\n- visual-judging and R-VISUAL make the root's bounded final pass decide acceptance: the \"Accept\" section of `visual-judging` carries it, and `R-VISUAL` is revised in `requirements.md` and `agents.ts`. The pass reads the reviewer's final captures at the listed sizes and variants, and the reviewer's observations inform but do not decide. `Reviewer.visual` now lists the paths of its final captures. `plugin.test.ts` asserts the key phrases.\n- The materiality definition has one source embedded everywhere it appears, with a test: `shared/materiality.md` is embedded through `embedMateriality` into `visual-judging`, `interface-inspection.md` (so `worker-visual` and `reviewer-visual`) and the design core (so the four design skills). Four new tests in `design-skills.test.ts` check that every place carries the current text, no generated file ships the marker, no other source restates it, and the embed fails on a duplicate marker.\n- root/skills.md lists the four design skills and the visual role text and requirement entries match: the `skills.md` bullet lists all four with when to load them, and the role text and `R-*` entries match as shown above. `plugin.test.ts` checks the pointers and the requirements-to-sections map.\n- The design re-review leftovers are fixed: `tui-design` marks \"at most three semantic colors plus one accent\" and \"within 100 ms\" as `(default)`, and `web-design` marks \"Name the mode in the plan\" as `(preference)`.\n- The plugin is rebuilt and mise run verify passes: build exits 0, and `verify` exits 0 with 1140 pass, 1 skip, 0 fail.\n- checks-run: `bunx --no-install mise run build` -> 0; `bunx --no-install mise run verify` -> 0 (type-check with no errors in 134 files, lint, format check, tests as above).\n- changed-paths: listed under \"changed\" above, 28 entries in `git status`, including the new `shared/materiality.md`.\n- session-start-size: `ROOT_CORE` is 6033 characters, up from 5997 on the base. The empty-project session-start output is 7708 characters against `CONTEXT_BUDGET` 9300. Both `sessioncontext.test.ts` and `hooks.test.ts` pass.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Build and verify exit 0 (1140 pass); tests cover each item",
+    "criteria": [
+      {
+        "criterion": "Visual briefs name the platform skill's absolute path in Worker.visual and Reviewer.visual criteria, resolved like the CLI path",
+        "support": "`visual-judging` has a \"Pick the platform skill\" section that puts the path in both specialists' criteria with a blocking read-and-judge criterion. The root derives the folder from the CLI path, which the build resolves in the agent body and the hook resolves in the core, and `dispatch.md` says briefs hold literal absolute paths. The two role files tell each specialist to read the named file and judge against its checklist, and `R-WVI-DESIGN` and `R-RV-DESIGN` are updated in `agents.ts` and `requirements.md`. `plugin.test.ts` and `sessioncontext.test.ts` assert this."
+      },
+      {
+        "criterion": "visual-judging and R-VISUAL make the root's bounded final pass decide acceptance",
+        "support": "the \"Accept\" section of `visual-judging` carries it, and `R-VISUAL` is revised in `requirements.md` and `agents.ts`. The pass reads the reviewer's final captures at the listed sizes and variants, and the reviewer's observations inform but do not decide. `Reviewer.visual` now lists the paths of its final captures. `plugin.test.ts` asserts the key phrases."
+      },
+      {
+        "criterion": "The materiality definition has one source embedded everywhere it appears, with a test",
+        "support": "`shared/materiality.md` is embedded through `embedMateriality` into `visual-judging`, `interface-inspection.md` (so `worker-visual` and `reviewer-visual`) and the design core (so the four design skills). Four new tests in `design-skills.test.ts` check that every place carries the current text, no generated file ships the marker, no other source restates it, and the embed fails on a duplicate marker."
+      },
+      {
+        "criterion": "root/skills.md lists the four design skills and the visual role text and requirement entries match",
+        "support": "the `skills.md` bullet lists all four with when to load them, and the role text and `R-*` entries match as shown above. `plugin.test.ts` checks the pointers and the requirements-to-sections map."
+      },
+      {
+        "criterion": "The design re-review leftovers are fixed",
+        "support": "`tui-design` marks \"at most three semantic colors plus one accent\" and \"within 100 ms\" as `(default)`, and `web-design` marks \"Name the mode in the plan\" as `(preference)`."
+      },
+      {
+        "criterion": "The plugin is rebuilt and mise run verify passes",
+        "support": "build exits 0, and `verify` exits 0 with 1140 pass, 1 skip, 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bunx --no-install mise run build` -> 0; `bunx --no-install mise run verify` -> 0 (type-check with no errors in 134 files, lint, format check, tests as above)."
+      },
+      {
+        "label": "changed-paths",
+        "support": "listed under \"changed\" above, 28 entries in `git status`, including the new `shared/materiality.md`."
+      },
+      {
+        "label": "session-start-size",
+        "support": "`ROOT_CORE` is 6033 characters, up from 5997 on the base. The empty-project session-start output is 7708 characters against `CONTEXT_BUDGET` 9300. Both `sessioncontext.test.ts` and `hooks.test.ts` pass."
+      }
+    ]
   },
   "createdAt": "2026-11-04T14:58:27.209Z"
 }
