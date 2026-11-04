@@ -5,7 +5,6 @@ import { Effect } from "effect"
 
 import { syncVersions } from "../../../scripts/bump-version.ts"
 import { VENDOR_DIRECTORY } from "./src/files.ts"
-import { generate, GENERATED_PATHS } from "./src/generate.ts"
 
 /**
  * Removes a path of the repository and everything below it except the folders in `keep`, which are
@@ -25,6 +24,9 @@ const clear = async (root: string, path: string, keep: ReadonlyArray<string>): P
  * the bundled tools stay where they are: `scripts/vendor.ts` owns them.
  */
 export const build = async (root: string): Promise<ReadonlyArray<string>> => {
+  // Imported here, not at the top: `generate.ts` reads the version from this package's package.json
+  // when it loads, so it must load after the sync in `main` has rewritten that file.
+  const { generate, GENERATED_PATHS } = await import("./src/generate.ts")
   const files = await generate()
   for (const path of GENERATED_PATHS) await clear(root, path, [VENDOR_DIRECTORY])
   for (const file of files) {

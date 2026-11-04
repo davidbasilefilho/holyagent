@@ -9421,43 +9421,7 @@ function resolveOptions(options) {
     replacer: options?.replacer
   };
 }
-var package_default = {
-  name: "holyagent",
-  version: "0.2.1",
-  private: true,
-  license: "Apache-2.0",
-  workspaces: [
-    "packages/*",
-    "packages/integrations/*"
-  ],
-  type: "module",
-  scripts: {
-    "bump:minor": "mise run bump:minor",
-    "bump:patch": "mise run bump:patch",
-    prepare: "mise run prepare",
-    build: "mise run build",
-    check: "mise run check",
-    fmt: "mise run fmt",
-    "fmt:check": "mise run fmt:check",
-    lint: "mise run lint",
-    "lint:fix": "mise run lint:fix",
-    test: "mise run test",
-    verify: "mise run verify"
-  },
-  devDependencies: {
-    "@anthropic-ai/claude-code": "2.1.300",
-    "@types/bun": "^1.0.0",
-    effect: "^4.0.0",
-    "eslint-plugin-jsdoc": "^65.4.2",
-    lefthook: "^2.0.0",
-    mise: "2026.10.24"
-  },
-  trustedDependencies: [
-    "@anthropic-ai/claude-code",
-    "lefthook",
-    "mise"
-  ]
-};
+var version = "0.2.1";
 
 import { join } from "path";
 
@@ -19185,10 +19149,10 @@ pp.readWord = function() {
   }
   return this.finishToken(type, word);
 };
-var version = "8.19.0";
+var version2 = "8.19.0";
 Parser.acorn = {
   Parser,
-  version,
+  version: version2,
   defaultOptions,
   Position,
   SourceLocation,
@@ -20527,7 +20491,7 @@ var execute = (given, host) => gen2(function* () {
     return { stdout: `${topHelp()}
 `, stderr: "", code: 0 };
   if (first === "--version")
-    return { stdout: `${package_default.version}
+    return { stdout: `${version}
 `, stderr: "", code: 0 };
   const command = COMMANDS.find((candidate) => candidate.path.every((word, index) => argv[index] === word));
   if (command === undefined) {
