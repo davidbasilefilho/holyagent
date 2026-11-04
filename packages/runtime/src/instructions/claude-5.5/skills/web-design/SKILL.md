@@ -11,7 +11,7 @@ Rules for pages and web apps, judged on what renders. Pair this with the embedde
 
 ## Web rules
 
-- Name the mode in the plan. An expressive page (marketing, editorial) is judged on point of view and composition; a task-oriented product UI is judged on familiarity and speed of use.
+- Name the mode in the plan. An expressive page (marketing, editorial) is judged on point of view and composition; a task-oriented product UI is judged on familiarity and speed of use. (preference)
 - A product UI earns familiarity: one type family, motion of about 150 to 250 ms only as feedback to an action, no page-load choreography, and a modal only as a last resort. (default)
 
 ### Systems, not values

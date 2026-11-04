@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
+import { toPosix } from "../../../runtime/src/domain/paths.ts"
+import { embedMateriality, MATERIALITY_FILE, MATERIALITY_MARKER } from "../src/agents.ts"
 import { INSTRUCTIONS_DIRECTORY } from "../src/files.ts"
 import {
   DESIGN_CORE_FILE,
@@ -14,7 +16,16 @@ import { ROOT } from "./built.ts"
 
 const read = (path: string) => readFileSync(join(ROOT, path), "utf8")
 const generated = await generate()
-const core = read(DESIGN_CORE_FILE).trim()
+/** Every instruction source (Markdown) under the instructions folder, requirements included. */
+const INSTRUCTION_FILES = (
+  await Array.fromAsync(
+    new Bun.Glob("**/*.md").scan({ cwd: join(ROOT, "packages/runtime/src/instructions") }),
+  )
+)
+  .map((path) => toPosix(`packages/runtime/src/instructions/${path}`))
+  .toSorted()
+const materiality = read(MATERIALITY_FILE).trim()
+const core = embedMateriality(read(DESIGN_CORE_FILE), materiality, DESIGN_CORE_FILE).trim()
 const skill = (name: string) =>
   generated.find((file) => file.path.endsWith(`skills/${name}/SKILL.md`))?.content ?? ""
 
@@ -136,5 +147,86 @@ describe("the platform design skills", () => {
     expect(BANNED_PATTERN.test("Android, iOS, Windows, GNOME, Material, Liquid Glass, Mica")).toBe(
       false,
     )
+  })
+})
+
+/** Instruction sources whose line {@link MATERIALITY_MARKER} the build replaces with the definition. */
+const MATERIALITY_SOURCES = [
+  "design-core/core.md",
+  "skills/visual-judging/SKILL.md",
+  "specialist/interface-inspection.md",
+]
+/**
+ * The generated files that carry the definition: both inspecting agents, the skill and the four
+ * design skills.
+ */
+const MATERIALITY_OUTPUTS = [
+  "agents/reviewer-visual.md",
+  "agents/worker-visual.md",
+  "skills/visual-judging/SKILL.md",
+  ...DESIGN_SKILLS.map((name) => `skills/${name}/SKILL.md`),
+]
+/** Wording that only the definition may hold, so a restatement shows as a second copy. */
+const DEFINITION_MARKERS = [
+  "hierarchy or composition",
+  "unnecessary text, headings, cards or badges",
+]
+
+describe("the materiality definition", () => {
+  test("has one source file that every generated place carries whole", () => {
+    expect(materiality.length).toBeGreaterThan(200)
+    for (const path of MATERIALITY_OUTPUTS) {
+      const file = generated.find((candidate) => candidate.path.endsWith(path))
+      expect({ path, carries: file?.content.includes(materiality) }).toEqual({
+        path,
+        carries: true,
+      })
+    }
+  })
+
+  test("is embedded by the build and ships no marker line", () => {
+    for (const file of generated)
+      expect({
+        path: file.path,
+        marker: file.content.split("\n").includes(MATERIALITY_MARKER),
+      }).toEqual({ path: file.path, marker: false })
+    const sources = INSTRUCTION_FILES.filter((path) =>
+      read(path).split("\n").includes(MATERIALITY_MARKER),
+    )
+    expect(
+      sources.map((path) => path.slice(`${INSTRUCTIONS_DIRECTORY}/`.length)).toSorted(),
+    ).toEqual(MATERIALITY_SOURCES)
+  })
+
+  test("is restated by no other instruction source or generated file", () => {
+    for (const path of INSTRUCTION_FILES) {
+      if (path === MATERIALITY_FILE) continue
+      const text = read(path)
+      for (const marker of DEFINITION_MARKERS)
+        expect({ path, marker, found: text.includes(marker) }).toEqual({
+          path,
+          marker,
+          found: false,
+        })
+    }
+    for (const file of generated) {
+      const holds = MATERIALITY_OUTPUTS.some((path) => file.path.endsWith(path))
+      for (const marker of DEFINITION_MARKERS)
+        expect({ path: file.path, marker, found: file.content.includes(marker) }).toEqual({
+          path: file.path,
+          marker,
+          found: holds,
+        })
+    }
+  })
+
+  test("embeds nothing into a source without the marker and fails on a second marker", () => {
+    expect(embedMateriality("body\n", "definition", "a")).toBe("body\n")
+    expect(embedMateriality(`one\n${MATERIALITY_MARKER}\ntwo`, " definition \n", "a")).toBe(
+      "one\ndefinition\ntwo",
+    )
+    expect(() =>
+      embedMateriality(`${MATERIALITY_MARKER}\n${MATERIALITY_MARKER}`, "definition", "a"),
+    ).toThrow("at most once")
   })
 })

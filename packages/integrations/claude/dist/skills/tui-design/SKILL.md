@@ -10,7 +10,11 @@ Rules for full-screen terminal apps and line-based tools, judged on text frames 
 
 ## Shared core
 
-Judge every rule on the rendered result, from the captures; the rules under Direction before code are the exception, checked as a plan in the worker's report or `DESIGN.md`, not on a render. `(behavior check)` marks a rule no capture can show (a file, a process, an input sequence): Worker.operations runs it and reports it, and nobody infers it from a still. `(preference)` marks taste: list it, do not repair it. A violation of any other rule is material: it harms acceptance, hierarchy or composition, legibility, responsiveness, correct text and numbers, accessibility, interaction or production quality. A number is binding only where a platform guideline fixes it; every other number is a default, marked `(default)`, that the design may override with a stated reason.
+Judge every rule on the rendered result, from the captures; the rules under Direction before code are the exception, checked as a plan in the worker's report or `DESIGN.md`, not on a render. `(behavior check)` marks a rule no capture can show (a file, a process, an input sequence): Worker.operations runs it and reports it, and nobody infers it from a still. `(preference)` marks taste: list it, do not repair it. A violation of any other rule is judged by this definition:
+
+A discrepancy is material, and starts a repair whatever its size, when it affects acceptance, hierarchy or composition, legibility (cramped, overlapping, clipped or disappearing text), responsiveness at a viewport or size the criteria list, whether text and numbers state the content correctly (a title that misstates what it covers), accessibility, interaction correctness, adherence to a reference or obvious production quality; unnecessary text, headings, cards or badges are design defects. Only pure preference, with none of these effects, stays unrepaired: list it apart, marked optional.
+
+A number is binding only where a platform guideline fixes it; every other number is a default, marked `(default)`, that the design may override with a stated reason.
 
 ### Direction before code
 
@@ -79,12 +83,14 @@ Judge every rule on the rendered result, from the captures; the rules under Dire
 - Precedence is flag, then config, then environment, then TTY detection. A non-empty NO_COLOR removes added color but keeps bold and underline; FORCE_COLOR forces color; empty variables count as unset. When both are set NO_COLOR wins, an accessibility choice this skill makes because its sources disagree; an explicit flag beats both. (behavior check)
 - Capability tier: COLORTERM of truecolor or 24bit, then a TERM ending in 256color, then 16 colors; TERM=dumb or no TTY gets none. COLORTERM is a hint that SSH and multiplexers lose. (behavior check)
 - Detect a light or dark background with a bounded query and default to dark.
-- At most three semantic colors plus one accent. Status colors pair with text or a shape. Both light and dark backgrounds stay legible.
+- At most three semantic colors plus one accent. (default)
+- Status colors pair with text or a shape. Both light and dark backgrounds stay legible.
 
 ### Piped and scripted output
 
 - Primary output goes to stdout and messages to stderr. With no TTY there is no animation, prompt or full-screen UI. (behavior check)
-- Offer `--json`, `--plain` and `--no-input`, with JSON bypassing all formatting; page only on a TTY. First output appears within 100 ms. (behavior check)
+- Offer `--json`, `--plain` and `--no-input`, with JSON bypassing all formatting; page only on a TTY. (behavior check)
+- First output appears within 100 ms. (default) (behavior check)
 
 ### Accessibility
 

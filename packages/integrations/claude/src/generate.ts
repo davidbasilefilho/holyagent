@@ -1,7 +1,7 @@
 import { join } from "node:path"
 
 import packageJson from "../package.json" with { type: "json" }
-import { agentFiles, PLUGIN_NAME } from "./agents.ts"
+import { agentFiles, embedMateriality, MATERIALITY_FILE, PLUGIN_NAME } from "./agents.ts"
 import {
   DIST_DIRECTORY,
   FRONTEND_DESIGN_DIRECTORY,
@@ -163,7 +163,7 @@ const commands = async (): Promise<ReadonlyArray<GeneratedFile>> => {
 /**
  * The one source of the shared design core, relative to the repository root. The generator embeds
  * its text into each of the {@link DESIGN_SKILLS}, so every one of them is self-contained and the
- * core still has a single source.
+ * core still has a single source. The core itself embeds the materiality definition first.
  */
 export const DESIGN_CORE_FILE = `${INSTRUCTIONS_DIRECTORY}/design-core/core.md`
 
@@ -203,7 +203,8 @@ export const skillBody = (path: string, text: string, core: string, source: stri
 
 const skills = async (): Promise<ReadonlyArray<GeneratedFile>> => {
   const root = `${INSTRUCTIONS_DIRECTORY}/skills`
-  const core = await readSource(DESIGN_CORE_FILE)
+  const materiality = await readSource(MATERIALITY_FILE)
+  const core = embedMateriality(await readSource(DESIGN_CORE_FILE), materiality, DESIGN_CORE_FILE)
   return Promise.all(
     (await listFiles(root)).map(async (path) => {
       const source = `${root}/${path}`
@@ -211,7 +212,10 @@ const skills = async (): Promise<ReadonlyArray<GeneratedFile>> => {
       if (!path.endsWith("SKILL.md")) return { path: inPlugin(`skills/${path}`), content: text }
       return {
         path: inPlugin(`skills/${path}`),
-        content: noteInFrontmatter(skillBody(path, text, core, source), source),
+        content: noteInFrontmatter(
+          skillBody(path, embedMateriality(text, materiality, source), core, source),
+          source,
+        ),
       }
     }),
   )

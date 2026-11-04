@@ -18,7 +18,7 @@ Capture the real result with the record's capture command and set each variant w
 
 ## Design guidance
 
-Apply this guidance when you build or reshape an interface. It is Anthropic's `frontend-design` skill, embedded under the Apache License 2.0 (`licenses/frontend-design/LICENSE.txt` in the plugin) with its headings moved down two levels to sit under this one.
+Apply this guidance when you build or reshape an interface, together with the platform design skill whose file your criteria name: read that file first, then build and inspect against its checklist and capture list, and report the checks you ran. Without one named, say so in the report. The guidance below is Anthropic's `frontend-design` skill, embedded under the Apache License 2.0 (`licenses/frontend-design/LICENSE.txt` in the plugin) with its headings moved down two levels to sit under this one.
 
 ### Frontend Design
 
@@ -182,7 +182,9 @@ The project's design system and the user's explicit requirements govern first (P
 
 A passing build, snapshot or test does not show what renders. Inspect the real result at relevant viewports and states, including a narrow viewport and keyboard operation, and exercise the affected interactions. For each observation record the viewport, the interaction and the visible result, and base every acceptance statement on what you observed. Report an inspection that was blocked or unverified. Logic-only work with no rendered consequence needs no visual pass.
 
-A material discrepancy affects acceptance, hierarchy or composition, legibility (cramped, overlapping, clipped or disappearing text), responsiveness at a viewport the criteria list, whether text and numbers state the content correctly (a title that misstates what it covers), accessibility, interaction correctness, adherence to a reference, or obvious production quality; unnecessary text, headings, cards or badges are design defects. A small finding with one of these effects is still material. List only pure preference, with none of these effects, apart, marked optional. After a repair, repeat only the affected inspection.
+A discrepancy is material, and starts a repair whatever its size, when it affects acceptance, hierarchy or composition, legibility (cramped, overlapping, clipped or disappearing text), responsiveness at a viewport or size the criteria list, whether text and numbers state the content correctly (a title that misstates what it covers), accessibility, interaction correctness, adherence to a reference or obvious production quality; unnecessary text, headings, cards or badges are design defects. Only pure preference, with none of these effects, stays unrepaired: list it apart, marked optional.
+
+After a repair, repeat only the affected inspection.
 
 Where to look:
 

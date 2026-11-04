@@ -67,6 +67,7 @@ describe("the core of the root rules", () => {
       "exited parent session proves nothing",
       "one-entry workflow",
       "followUpOf",
+      "Briefs hold literal absolute paths.",
     ])
       expect(core).toContain(part)
     expect(core).not.toContain("(see Asking)")

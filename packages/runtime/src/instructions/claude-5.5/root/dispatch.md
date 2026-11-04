@@ -1,6 +1,6 @@
 `holyagent <command>` is `bun --no-env-file --config="${CLAUDE_PLUGIN_ROOT}/scripts/empty-bunfig.toml" "${CLAUDE_PLUGIN_ROOT}/scripts/holyagent.js" <command>`, the only interface to Intents and Assignments (`holyagent help [command]`). Per Assignment:
 
-1. `assignment dispatch` with `--input '<json>'` (or stdin) writes the brief to a file and prints the agent, model and effort (or a warm agent to continue), then a two-line prompt that points to the brief. Use the prompt as printed; never open or re-emit the brief.
+1. `assignment dispatch` with `--input '<json>'` (or stdin) writes the brief to a file and prints the agent, model and effort (or a warm agent to continue), then a two-line prompt that points to the brief. Use the prompt as printed; never open or re-emit the brief. Briefs hold literal absolute paths.
 2. Run it as an `agent()` in your inline workflow script (one Assignment is a one-entry workflow); without the Workflow tool, launch it in the background. A hook records a spawned agent; otherwise, and for a continued one (SendMessage), run `assignment record <id> --agent <agentId>` (`--failed` when the launch failed).
 3. On its notice, `assignment close <id> --outcome <o> < <report-file>` passes the report verbatim, never retyped or summarized; add `--accept "<rationale>"` once its evidence holds.
 

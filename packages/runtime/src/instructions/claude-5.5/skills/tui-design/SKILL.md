@@ -48,12 +48,14 @@ Rules for full-screen terminal apps and line-based tools, judged on text frames 
 - Precedence is flag, then config, then environment, then TTY detection. A non-empty NO_COLOR removes added color but keeps bold and underline; FORCE_COLOR forces color; empty variables count as unset. When both are set NO_COLOR wins, an accessibility choice this skill makes because its sources disagree; an explicit flag beats both. (behavior check)
 - Capability tier: COLORTERM of truecolor or 24bit, then a TERM ending in 256color, then 16 colors; TERM=dumb or no TTY gets none. COLORTERM is a hint that SSH and multiplexers lose. (behavior check)
 - Detect a light or dark background with a bounded query and default to dark.
-- At most three semantic colors plus one accent. Status colors pair with text or a shape. Both light and dark backgrounds stay legible.
+- At most three semantic colors plus one accent. (default)
+- Status colors pair with text or a shape. Both light and dark backgrounds stay legible.
 
 ### Piped and scripted output
 
 - Primary output goes to stdout and messages to stderr. With no TTY there is no animation, prompt or full-screen UI. (behavior check)
-- Offer `--json`, `--plain` and `--no-input`, with JSON bypassing all formatting; page only on a TTY. First output appears within 100 ms. (behavior check)
+- Offer `--json`, `--plain` and `--no-input`, with JSON bypassing all formatting; page only on a TTY. (behavior check)
+- First output appears within 100 ms. (default) (behavior check)
 
 ### Accessibility
 
