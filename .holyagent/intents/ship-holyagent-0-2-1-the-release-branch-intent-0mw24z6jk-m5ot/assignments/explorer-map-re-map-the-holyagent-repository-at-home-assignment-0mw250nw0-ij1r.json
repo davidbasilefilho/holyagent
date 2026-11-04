@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mw250nw0-ij1r",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 1,
+  "roleTask": "Explorer.map",
+  "slug": "re-map-the-holyagent-repository-at-home",
+  "objective": "Re-map the holyagent repository at /home/user/holyagent (main at bd31cf7) for the 0.2.1 release so the root can plan branches and Assignments with disjoint ownership paths.",
+  "state": "Ready",
+  "scope": [
+    "Read /home/user/holyagent-work/spec-0.2.1.md first: it is the binding request. Confirm or correct each repository fact it states (Part C 'How the pieces connect', Part A file names, Part D example) on the current tree.",
+    "Part A: .github/workflows (names, jobs, check names, action pins), scripts/bump-version.ts (its ZeroVer parser and what files it edits), every place the version string appears (package.json files, plugin.json, marketplace.json, bundled CLI, anything else), mise.toml tasks and tools, every package.json dependency field and its current range or pin, the trusted preinstall and toolchain checks that rely on exact pins of @anthropic-ai/claude-code and mise (docs/development.md), the vendored ripgrep and fd (where, how vendored, checksums), whether the vendored frontend-design skill is pinned (to what), and any other pinned dependency.",
+    "Part B: where the root rules live (instruction sources under packages/runtime/src/instructions/claude-5.5/, how holyagent.md and agents are generated, the session-start hook's condensed rules and where that text comes from), whether a shared instruction source for several agents exists, where precedence is currently stated, where the platform-branch rule is and the vcs-reminder hook.",
+    "Part C: skill sources and generator, frontendDesign() in agents.ts, R-WVI-DESIGN and R-RV-DESIGN, the two materiality texts, root/skills.md, root/assignments.md, root/routing.md, dev-server, visual-judging, the exact-list tests and the description test, where credits live (docs/attributions.md or other).",
+    "How the plugin build (mise run build) works and which generated paths it writes, so writers know which generated files their change touches."
+  ],
+  "constraints": [
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done, stop and report; name anything unrequested instead of doing it. Do not end early with a summary that announces a next step or an offer to wait. Read-only: change no files, make no git writes.",
+    "Report in under 1100 words as a structured map: for each item give the path (with line numbers where useful) and the fact; list every disagreement with the spec explicitly under a 'Spec corrections' heading."
+  ],
+  "criteria": [
+    {
+      "text": "Every repository fact the spec states is confirmed or corrected with a path",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Every version location and every pinned or ranged dependency is listed with its path",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The instruction sources, generator and generated outputs touched by Parts B and C are listed with paths",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "spec-corrections",
+    "version-locations",
+    "dependency-inventory",
+    "instruction-layout"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-04T13:13:26.257Z"
+}
