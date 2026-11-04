@@ -452,7 +452,8 @@ describe("the state branch", () => {
     const closed = await holy(dir, ["intent", "close", "--reason", "shipped", "--drop", "stop"])
 
     expect(closed.code).toBe(0)
-    expect(String(toon(closed)["unremoved"])).toContain(mine.report)
+    // The CLI reports the path git resolves, which on Windows is the long form of the 8.3 temp directory.
+    expect(String(toon(closed)["unremoved"])).toContain(await filesystem.realpath(mine.report))
     expect(await exist(mine.brief)).toEqual([false])
     expect(await exist(mine.report)).toEqual([true])
   })
