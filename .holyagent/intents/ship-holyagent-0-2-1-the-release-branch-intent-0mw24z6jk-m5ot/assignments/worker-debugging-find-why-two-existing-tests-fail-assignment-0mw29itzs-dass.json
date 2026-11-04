@@ -1,0 +1,57 @@
+{
+  "id": "assignment-0mw29itzs-dass",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Worker.debugging",
+  "slug": "find-why-two-existing-tests-fail",
+  "objective": "Find why two existing tests fail intermittently on the windows-latest CI runner and fix the cause, in the worktree /home/user/holyagent-fix-windows-test-races (branch release/0.2.1/fix/windows-test-races, cut from release/0.2.1/integration at 67e4755).",
+  "state": "Running",
+  "scope": [
+    "Failure 1 (GitHub Actions job 126655020996 in davidbasilefilho/holyagent, run 41853283296): 'report and prompt > in a repository the brief lives in the git common directory, outside every work tree' (packages/runtime/tests/cli.test.ts:733) timed out at 5000 ms (5020 ms).",
+    "Failure 2 (job 126661094760, the re-run of the same job on the same commit 56c2b52): 'starting the state in a large tree > six commands that start at once all succeed while the state worktree is still being checked out' (packages/runtime/tests/state-branch.test.ts:920) failed after 11775 ms. Read its full failure output with the GitHub MCP tool get_job_logs (job_id 126661094760, return_content true; search the log for the test name and the lines before it) to learn whether it is a timeout or an assertion, and what error the commands returned.",
+    "The same commit passed the pull_request run's windows job, and neither test changed on this branch, so treat both as Windows timing or concurrency problems until evidence says otherwise. Decide from the evidence whether each is only a too-tight timeout for a git-spawning test on a slow runner, or a real race (for example concurrent state-worktree checkout, Windows file locking or rename semantics) in packages/runtime/src/state. A real race gets a source fix with the test kept as strict as it is; a pure timing case gets a timeout sized from the measured runtime, never a weaker assertion.",
+    "You cannot run Windows here. Reproduce what you can on Linux (for example run each test repeatedly under load, 'bun test <file> -t <name> --rerun-each 20'), and say which part of the diagnosis rests on the CI logs alone."
+  ],
+  "constraints": [
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report: name unrequested features, tests, files or refactors in the report instead of adding them, and start no extra review rounds. Do not stop early with a summary that announces a next step or an offer to wait.",
+    "Never skip, disable or quarantine a test, and never weaken an assertion, to get green.",
+    "Make no version-control writes and no edits under .git/ or .holyagent/; the root commits. Report every changed path.",
+    "Work only inside /home/user/holyagent-fix-windows-test-races. Follow .claude/CLAUDE.md. Gate: 'bunx --no-install mise run verify' must pass.",
+    "Report in under 350 words; put long logs in /home/user/holyagent-work/logs/."
+  ],
+  "criteria": [
+    {
+      "text": "Each failure has a cause supported by the CI log or a local reproduction",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The fix removes the cause without skipping a test or weakening an assertion",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diagnosis"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/tests/cli.test.ts",
+    "packages/runtime/tests/state-branch.test.ts",
+    "packages/runtime/src/state"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T15:19:32.440Z"
+  },
+  "createdAt": "2026-11-04T15:19:32.440Z"
+}
