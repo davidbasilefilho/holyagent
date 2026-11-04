@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mw26gw00-d5fp",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 2,
+  "roleTask": "Reviewer.security",
+  "slug": "assess-the-new-ci-workflows-commit",
+  "objective": "Assess the new CI workflows (commit 848a3be) and the vcs-reminder hook change (commit a79b22a) for security problems before they are pushed.",
+  "state": "Running",
+  "scope": [
+    "Read /home/user/holyagent-work/diffs/ci-848a3be.diff (workflows under .github/, scripts/pr-checks.ts) and the hook.ts part of /home/user/holyagent-work/diffs/rules-a79b22a.diff (packages/runtime/src/cli/hook.ts, the git symbolic-ref call on the payload cwd).",
+    "Workflows: trace untrusted inputs (head_ref, branch names, PR titles, tag names) to shell sinks (script injection through ${{ }} interpolation in run steps), token permissions per job (contents: write only where tagging), pull_request vs pull_request_target, checkout of untrusted code with write tokens, action pinning, and whether a fork PR or a crafted branch name could create tags or releases.",
+    "Hook: the spawned git process and its inputs (cwd from the payload, the command string), failure handling, and that it never returns a permission decision."
+  ],
+  "constraints": [
+    "Keep working until the review is done; stop to ask only when you cannot go on. When done, stop and report; name anything unrequested instead of doing it. Do not stop early with a summary that announces a next step. Read-only: change no repository files and make no git writes.",
+    "Each finding: source to sink with file:line, exploit scenario, severity, and the smallest fix. Report in under 500 words."
+  ],
+  "criteria": [
+    {
+      "text": "Every untrusted input that reaches a shell or a write token is traced with a verdict",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Job permissions are least-privilege as A2 requires",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw25gfld-iik9",
+    "assignment-0mw25gfwm-5dlj"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T13:54:02.880Z"
+  },
+  "createdAt": "2026-11-04T13:54:02.880Z"
+}
