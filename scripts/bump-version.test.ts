@@ -10,6 +10,7 @@ import {
   type BumpKind,
   bumpVersion,
   bumpVersions,
+  compareVersions,
   formatVersion,
   InvalidVersion,
   LOCKFILE,
@@ -68,6 +69,30 @@ describe("bumpVersion", () => {
     const error = Effect.runSync(Effect.flip(parseVersion(input)))
     expect(error).toBeInstanceOf(InvalidVersion)
     expect(error.input).toBe(input)
+  })
+})
+
+describe("compareVersions", () => {
+  const sign = (a: string, b: string) =>
+    Math.sign(
+      Effect.runSync(
+        Effect.all([parseVersion(a), parseVersion(b)]).pipe(
+          Effect.map(([x, y]) => compareVersions(x, y)),
+        ),
+      ),
+    )
+
+  test.each([
+    ["0.2.1", "0.2.0", 1],
+    ["0.3.0", "0.2.9", 1],
+    ["0.10.0", "0.9.0", 1],
+    ["0.2.10", "0.2.9", 1],
+    ["0.2.1", "0.2.1", 0],
+    ["0.2.1-3", "0.2.1", 0],
+    ["0.2.0", "0.2.1", -1],
+    ["0.2.9", "0.3.0", -1],
+  ] as const)("%s compared with %s is %d", (a, b, expected) => {
+    expect(sign(a, b)).toBe(expected)
   })
 })
 
