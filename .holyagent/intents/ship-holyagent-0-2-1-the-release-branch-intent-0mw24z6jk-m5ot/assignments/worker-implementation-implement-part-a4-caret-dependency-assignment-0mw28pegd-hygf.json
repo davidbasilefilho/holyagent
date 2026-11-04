@@ -1,0 +1,76 @@
+{
+  "id": "assignment-0mw28pegd-hygf",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "implement-part-a4-caret-dependency",
+  "objective": "Implement Part A4 (caret dependency ranges, the dependency-range test and the pin updater with its mise task), run the updater for 0.2.1 and get the gates green, in the worktree /home/user/holyagent-build-dependency-updater (branch release/0.2.1/build/dependency-updater, stacked on version-source).",
+  "state": "Running",
+  "scope": [
+    "Read /home/user/holyagent-work/spec-0.2.1.md Part A4 (binding) and the 'Dependency inventory' section of /home/user/holyagent-work/map.md.",
+    "Range test: every dependency field (dependencies, devDependencies, peerDependencies, optionalDependencies, overrides) in every package.json of the repository is a caret range at its line boundary (^X.0.0 for X >= 1, ^0.X.0, ^0.0.X) or workspace:* for workspace packages; anything else fails. Move @anthropic-ai/claude-code, mise, acorn and eslint-plugin-jsdoc to such ranges; bun.lock keeps exact versions. Check that nothing depends on the exact pins (trustedDependencies, scripts/toolchain.ts, the validation workflow's 'bun run claude', docs/development.md's reasons) and update docs/development.md where it explains the exact pins.",
+    "Updater script under scripts/ with a mise task (for example 'mise run deps:update', 'deps:update -- --dry-run', 'deps:check'), following .claude/CLAUDE.md (Bun, Effect with tagged errors, Effect Schema with onExcessProperty error on every network response, the Bun Shell for processes, JSDoc). It inventories every pinned or ranged dependency and moves each to the newest release line (major, or minor for 0.x) and the newest stable release within it, never a prerelease: GitHub Actions (resolve the tag to its full commit SHA, update the '# vX.Y.Z' comment); the vendored ripgrep and fd in scripts/vendor.ts (new version, both checksums recomputed from the downloaded assets for every target, then re-vendor with mise run vendor); the frontend-design skill only if it is pinned (map.md says it is not: say so); the mise tools in mise.toml (bun: keep the toolchain's canary constraint from scripts/toolchain.ts in mind and report rather than break it); the package.json ranges followed by a lockfile refresh (bun install / bun update); anything else the inventory finds. --dry-run prints current -> latest per pin and writes nothing; the check mode exits non-zero when a pin is behind. Network calls go through the GitHub API and registries the session can reach (HTTPS through the proxy; use GITHUB_TOKEN if set, else unauthenticated). Unit-test the version-line selection and prerelease filtering with fixtures, not the network.",
+    "Leave alone: the binary checksums except as the updater recomputes them, the commit permalinks in docs/pi/, and bun.lock except as the updater refreshes it.",
+    "Run the updater for real, apply the updates, rebuild ('bunx --no-install mise run build'), and get 'bunx --no-install mise run verify' green. If an update breaks a gate, fix the code for it if small, else hold that one pin back and report it.",
+    "AGENTS.md: add the rule that dependencies change only through the updater. Fix the stale bump comment in mise.toml lines 70-72 (the bump now edits only the root package.json)."
+  ],
+  "constraints": [
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report: name unrequested features, tests, files or refactors in the report instead of adding them, and start no extra review rounds. Do not stop early with a summary that announces a next step or an offer to wait.",
+    "Make no version-control writes (no commit, checkout, switch, branch, stash, reset, push) and no edits under .git/ or .holyagent/; the root commits. Report every changed path.",
+    "Work only inside /home/user/holyagent-build-dependency-updater; run 'bun install --frozen-lockfile' there first. Do not edit packages/integrations/claude/tests, dist/agents or dist/skills (other writers own them); the vendored binaries under dist/scripts/vendor are yours.",
+    "Gate: 'bunx --no-install mise run verify' must pass.",
+    "Report in under 500 words with the before -> after table of updates; long logs in /home/user/holyagent-work/logs/."
+  ],
+  "criteria": [
+    {
+      "text": "The range test checks every dependency field in every package.json and fails on non-caret or non-boundary ranges",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The updater covers actions, vendored tools with recomputed checksums, mise tools and package ranges, never picks a prerelease, and has --dry-run and a check mode",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The updater follows the repository code rules and its selection logic is unit-tested",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "The updates are applied and mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "AGENTS.md and docs/development.md state the rules",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "updates"
+  ],
+  "ownershipPaths": [
+    "package.json",
+    "bun.lock",
+    "packages/runtime/package.json",
+    "packages/integrations/claude/package.json",
+    "scripts",
+    "mise.toml",
+    ".github",
+    "AGENTS.md",
+    "docs/development.md",
+    "packages/integrations/claude/dist/scripts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T14:56:39.277Z"
+  },
+  "createdAt": "2026-11-04T14:56:39.277Z"
+}
