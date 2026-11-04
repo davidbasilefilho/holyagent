@@ -1065,9 +1065,9 @@ describe("agents", () => {
     )
     for (const part of [
       "never from raw logs or whole files",
-      "starts a repair only with evidence from the reviewer",
+      "starts a repair only with evidence:",
       "a file:line trace (for a vulnerability, source to sink) from one without",
-      "a Reviewer.visual observation (viewport, interaction, visible result)",
+      "a Reviewer.visual observation (viewport, interaction, visible result) or a finding of your own final pass that cites the capture path and what it shows",
       "back to the same reviewer for that evidence",
       "have a specialist re-derive any number before it is published or decided on",
       "keep inference labeled as inference",
@@ -1106,18 +1106,22 @@ describe("agents", () => {
       "`skills/<name>/SKILL.md` under the plugin folder",
       "the host fills plugin-path variables only in loaded agent and skill text, never in a brief",
       "repeat your final pass on the captures that changed",
+      "a web page Reviewer.visual inspects live and so leaves no captures, have Worker.visual or Worker.operations save the final captures at the listed sizes and variants, which Reviewer.visual then lists",
     ])
       expect({ part, found: skill?.content.includes(part) }).toEqual({ part, found: true })
     // The platform skill reaches both specialists by a literal path: the dispatch rules (the root
     // body and the session-start core alike) say briefs hold absolute paths, and the CLI path
     // they show is where the plugin folder is read from.
-    expect(root).toContain("Briefs hold literal absolute paths.")
+    expect(root).toContain("Write brief paths as literal absolute paths from the CLI path above.")
     for (const name of ["worker-visual", "reviewer-visual"]) {
       const text = agent(name)?.content ?? ""
       expect({ name, found: text.includes("read that file") }).toEqual({ name, found: true })
     }
     expect(agent("reviewer-visual")?.content).toContain(
       "List the paths of the final captures you judged from",
+    )
+    expect(agent("reviewer-visual")?.content).toContain(
+      "For a web page you inspect live, list the paths of the final captures that Worker.visual or Worker.operations saved",
     )
     const pointers = read(`${CLAUDE}/root`, "skills.md")
     for (const name of ["web-design", "mobile-design", "desktop-design", "tui-design"])

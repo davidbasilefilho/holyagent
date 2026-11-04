@@ -179,15 +179,16 @@ export const MATERIALITY_FILE = `${INSTRUCTIONS_DIRECTORY}/shared/materiality.md
 export const MATERIALITY_MARKER = "<!-- materiality -->"
 
 /**
- * A source with its {@link MATERIALITY_MARKER} line replaced by the definition. A source without
- * the marker is returned as it is; one with the marker twice is an error, because the definition
- * would ship twice in one file.
+ * A source with its {@link MATERIALITY_MARKER} line replaced by the definition. The marker line is
+ * matched after trimming. A source without the marker is returned as it is; one with the marker
+ * twice is an error, because the definition would ship twice in one file.
  */
 export const embedMateriality = (text: string, materiality: string, source: string): string => {
   const lines = text.split("\n")
-  const at = lines.indexOf(MATERIALITY_MARKER)
+  const isMarker = (line: string) => line.trim() === MATERIALITY_MARKER
+  const at = lines.findIndex(isMarker)
   if (at === -1) return text
-  if (lines.indexOf(MATERIALITY_MARKER, at + 1) !== -1)
+  if (lines.findIndex((line, index) => index > at && isMarker(line)) !== -1)
     throw new Error(`${source} must hold the line ${MATERIALITY_MARKER} at most once`)
   return [...lines.slice(0, at), materiality.trim(), ...lines.slice(at + 1)].join("\n")
 }
@@ -326,7 +327,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
   },
   "R-EVIDENCE": {
     section: "skills/evidence-judging/SKILL.md",
-    phrase: "starts a repair only with evidence from the reviewer",
+    phrase: "starts a repair only with evidence",
   },
   "R-VCS": {
     section: "root/version-control.md",

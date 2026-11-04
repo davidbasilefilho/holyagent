@@ -229,4 +229,13 @@ describe("the materiality definition", () => {
       embedMateriality(`${MATERIALITY_MARKER}\n${MATERIALITY_MARKER}`, "definition", "a"),
     ).toThrow("at most once")
   })
+
+  test("matches the marker line after trimming, so a stray space cannot ship it as a comment", () => {
+    expect(embedMateriality(`one\n  ${MATERIALITY_MARKER} \ntwo`, "definition", "a")).toBe(
+      "one\ndefinition\ntwo",
+    )
+    expect(() =>
+      embedMateriality(`${MATERIALITY_MARKER}\n\t${MATERIALITY_MARKER}  `, "definition", "a"),
+    ).toThrow("at most once")
+  })
 })

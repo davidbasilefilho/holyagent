@@ -16,7 +16,7 @@ Judge rendered work from what renders, not from a passing build or a report's cl
 ## Accept
 
 - Your own final pass, after Worker.visual and Reviewer.visual, decides acceptance. Read the final captures Reviewer.visual lists, at each size and variant the criteria and the skill's capture checklist name, against that skill's checklist (load it with Skill), and accept only when they pass. Reviewer.visual's observations (viewport, interaction and visible result for each) inform the decision and do not make it; a Worker.visual report alone, or an inspection reported as blocked, accepts nothing.
-- Keep the pass to those final captures: open none from an earlier round and take none yourself. For a missing size or variant, have Worker.visual or Worker.operations capture it, and judge nothing you cannot see.
+- Keep the pass to those final captures: open none from an earlier round and take none yourself. For a missing size or variant, or a web page Reviewer.visual inspects live and so leaves no captures, have Worker.visual or Worker.operations save the final captures at the listed sizes and variants, which Reviewer.visual then lists; judge nothing you cannot see.
 - A material finding of your pass starts a repair like any other, whether or not the reviewer reported it; say in the final report when your pass overruled the reviewer.
 - Read an image in the main thread only to show it to the user (a path is not delivery) or to settle a concrete doubt about that evidence, besides the final pass; Reviewer.visual and Worker.visual hand over captures and paths so that you do not have to.
 
