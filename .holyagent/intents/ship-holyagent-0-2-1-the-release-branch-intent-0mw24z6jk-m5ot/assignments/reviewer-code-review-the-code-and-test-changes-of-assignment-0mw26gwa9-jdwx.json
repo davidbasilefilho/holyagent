@@ -1,0 +1,50 @@
+{
+  "id": "assignment-0mw26gwa9-jdwx",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 2,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-code-and-test-changes-of",
+  "objective": "Review the code and test changes of commit a79b22a on release/0.2.1/feat/holyagent-rules (worktree /home/user/holyagent-feat-holyagent-rules) against Part B of the 0.2.1 request and the merge-ready bar.",
+  "state": "Running",
+  "scope": [
+    "Read /home/user/holyagent-work/spec-0.2.1.md Part B and /home/user/holyagent-work/b2-transcript.md.",
+    "Review with 'git -C /home/user/holyagent-feat-holyagent-rules show a79b22a -- packages/runtime/src packages/integrations/claude/src packages/runtime/tests packages/integrations/claude/tests' and run the affected tests there (sessioncontext, hooks, plugin).",
+    "Focus: the vcs-reminder hook's claude/* detection (git symbolic-ref on the payload cwd, push target parsing, failure fallback, cost per Bash call), the generator changes in agents.ts (CODE_QUALITY_SECTION, requirement entries), whether the tests actually fail without the change (the precedence drift test, the session-core test), the session-start size budget, and B1's no-duplication rule: the precedence is stated in two source files with identical wording guarded by a drift test; say whether the generator could embed one shared source into both prompts instead."
+  ],
+  "constraints": [
+    "Keep working until the review is done; stop to ask only when you cannot go on. When done, stop and report; name anything unrequested instead of doing it. Do not stop early with a summary that announces a next step. Read-only: change no repository files and make no git writes.",
+    "Each finding: file:line, what is wrong, the evidence or a concrete failure scenario, blocking or non-blocking with the reason, and the smallest fix. Report in under 600 words."
+  ],
+  "criteria": [
+    {
+      "text": "The hook detects commits and pushes on claude/* branches, stays context-only, and is tested",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The session-start core is generated from the same source as holyagent.md and the tests fail without the change",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "No duplicated source text or code is introduced, per B1",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw25gfwm-5dlj"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T13:54:03.249Z"
+  },
+  "createdAt": "2026-11-04T13:54:03.249Z"
+}
