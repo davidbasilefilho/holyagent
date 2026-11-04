@@ -1,0 +1,49 @@
+{
+  "id": "assignment-0mw27z4tu-lvxi",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "fix-the-three-non-blocking-re-review",
+  "objective": "Fix the three non-blocking re-review findings on release/0.2.1/ci/release-flow in the worktree /home/user/holyagent-ci-release-flow (head a9d307d).",
+  "state": "Running",
+  "scope": [
+    "The findings are in /home/user/holyagent/.git/holyagent/reports/assignment-0mw27v06y-1ugp.md under 'New findings'.",
+    "1. Replace the same-repository guard in validation.yml's branch-model and version jobs with an inline shell comparison (case-insensitive) placed before checkout, reading the head repository and github.repository from env; drop the now-unused same-repository command from scripts/pr-checks.ts and its tests if nothing else uses it, and keep scripts/workflows.test.ts asserting the guard step exists before checkout.",
+    "2. In .github/actions/tag-release/action.yml skip the previous-stable-tag lookup when prerelease is true, and do not hide a 'gh release list' failure behind '|| true' (fail loudly).",
+    "3. Make the action's version regex and comments agree with parseVersion: either accept and strip the legacy -Z suffix or state in the comment that the action accepts only 0.X.Y."
+  ],
+  "constraints": [
+    "Keep working until done; stop to ask only when you cannot go on. When done, stop and report. Make no version-control writes and no edits under .git/ or .holyagent/; the root commits. Follow .claude/CLAUDE.md.",
+    "Gate: 'bunx --no-install mise run verify' must pass; also 'bash -n' on the extracted action script.",
+    "Report in under 200 words."
+  ],
+  "criteria": [
+    {
+      "text": "The three findings are fixed",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    ".github",
+    "scripts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw27aup7-onwc",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T14:36:13.747Z"
+  },
+  "createdAt": "2026-11-04T14:36:13.747Z"
+}
