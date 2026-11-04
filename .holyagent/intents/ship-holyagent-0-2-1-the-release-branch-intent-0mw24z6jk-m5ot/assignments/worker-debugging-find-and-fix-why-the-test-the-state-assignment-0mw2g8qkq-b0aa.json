@@ -1,0 +1,50 @@
+{
+  "id": "assignment-0mw2g8qkq-b0aa",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 4,
+  "roleTask": "Worker.debugging",
+  "slug": "find-and-fix-why-the-test-the-state",
+  "objective": "Find and fix why the test 'the state branch > a file that cannot be removed when the Intent closes is reported, not swallowed' fails on windows-latest CI for PR #65 (head 56e5ec4) in /home/user/holyagent-fix-audit, branch release/0.2.1/fix/audit.",
+  "state": "Running",
+  "scope": [
+    "The test is packages/runtime/tests/state-branch.test.ts:443. It passes on Linux. On Windows CI it failed after 4119 ms (not a timeout): job https://github.com/davidbasilefilho/holyagent/actions/runs/41885852894/job/126769980694, job id 126769980694 in davidbasilefilho/holyagent. Read the failure message and assertion from that job's log with the GitHub MCP tool mcp__github__get_job_logs (load it with ToolSearch 'select:mcp__github__get_job_logs'; pass return_content true and tail_lines large enough to reach the failure detail, which is printed before the summary), and save the relevant excerpt to /home/user/holyagent-work/logs/win-unremoved.log.",
+    "Likely suspects, to confirm or rule out from the log and code: the 'unremoved' path printed by intent close differs from mine.report on Windows (separator, drive-letter case, a git-common-dir relative form, or TOON escaping backslashes), or removing a non-empty directory behaves differently (Windows rm on a directory with a child may succeed or fail differently, or the brief removal fails too). The code is packages/runtime/src/cli/intent.ts and cli/brief.ts.",
+    "Fix the cause, in the code if the CLI reports the path in a form that differs by platform, or in the test if only the assertion is platform-specific, keeping what the test proves: an unremovable report is listed under unremoved, exit 0, the brief removed, the report kept. Do not skip, disable or loosen the test to pass. Run 'bunx --no-install mise run build' and 'bunx --no-install mise run verify' (see docs/development.md)."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md code rules: Effect, no try/catch in runtime source, JSDoc on exported items.",
+    "Keep working until the cause is found and fixed; stop to ask only when you cannot go on. Name what you could not verify on Windows. When done, stop and report; name anything unrequested instead of doing it.",
+    "Make no commits or other git writes and no edits under .git/ or .holyagent/; the root commits.",
+    "Work only inside /home/user/holyagent-fix-audit; scratch in /home/user/holyagent-work/.",
+    "Report in under 250 words: the failure message, the cause and its evidence, the fix, the checks."
+  ],
+  "criteria": [
+    {
+      "text": "The cause of the Windows failure is shown from the CI log and fixed without weakening the test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build leaves dist in sync and mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli",
+    "packages/runtime/tests/state-branch.test.ts",
+    "packages/integrations/claude/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T18:27:38.763Z"
+  },
+  "createdAt": "2026-11-04T18:27:38.763Z"
+}
