@@ -1,0 +1,36 @@
+{
+  "id": "assignment-0mw2d1z2f-zz8k",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-merge-commit-5f31071-that",
+  "objective": "Review the merge commit 5f31071 that brings release/0.2.1/integration (with the version-source and holyagent-rules work) into release/0.2.1/build/dependency-updater, in /home/user/holyagent-build-dependency-updater.",
+  "state": "Running",
+  "scope": [
+    "The merge auto-resolved without conflicts. Judge whether the two sides still work together: the dependency updater (scripts, mise.toml tasks, vendor pins, the dependency ranges) against the version-source change (scripts/bump-version.ts, build.ts syncing the version, mise bump tasks) and the holyagent-rules changes. Read 'git -C /home/user/holyagent-build-dependency-updater diff b99d217 5f31071 --stat' and the parts that touch shared files (mise.toml, scripts/, package.json files, build.ts), and 'git diff 22dc962 5f31071' for what the branch adds over integration.",
+    "Binding: Part A of /home/user/holyagent-work/spec-0.2.1.md."
+  ],
+  "constraints": [
+    "Read-only: no repository edits and no git writes; experiments go in a scratch copy outside the repository.",
+    "Keep working until the review is done; stop and report. Report in under 300 words, findings ranked with file:line, blocking or non-blocking, and the smallest fix."
+  ],
+  "criteria": [
+    {
+      "text": "The merge leaves the dependency updater and the version source working together with no regression",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T16:58:24.327Z"
+  },
+  "createdAt": "2026-11-04T16:58:24.327Z"
+}
