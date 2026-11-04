@@ -1,0 +1,10 @@
+{
+  "id": "pull-0mw28ambq-jv9r",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "number": 57,
+  "url": "https://github.com/davidbasilefilho/holyagent/pull/57",
+  "branch": "release/0.2.1/ci/release-flow",
+  "base": "release/0.2.1/integration",
+  "created": true,
+  "recordedAt": "2026-11-04T14:45:09.638Z"
+}
