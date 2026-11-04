@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mw2abfuy-a288",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.artifact",
+  "slug": "re-review-the-visual-root-pass-repair",
+  "objective": "Re-review the visual root-pass repair commit b06ee0a on release/0.2.1/feat/visual-root-pass (worktree /home/user/holyagent-feat-visual-root-pass) against the earlier artifact and code findings.",
+  "state": "Running",
+  "scope": [
+    "Earlier findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw29g45p-pz2c.md (artifact 1 and 2 blocking, 3 to 5 non-blocking) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw29g4f8-oswm.md (code 1 to 3). Read the repair diff /home/user/holyagent-work/diffs/rootpass-repair.diff and the generated dist/skills/evidence-judging/SKILL.md, dist/skills/visual-judging/SKILL.md, dist/agents/reviewer-visual.md and dist/agents/holyagent.md under /home/user/holyagent-feat-visual-root-pass/packages/integrations/claude/.",
+    "Say whether each finding is closed, and whether the repair adds a contradiction, a repeated rule (B1) or an unclear trigger. Judge the new core sentence 'Write brief paths as literal absolute paths from the CLI path above.': can a root that has not loaded visual-judging act on it. Note whether the hooks.test.ts change from '+4 more intents' to a '\\+\\d+ more intents' pattern still checks what the test is named for."
+  ],
+  "constraints": [
+    "Keep working until the review is done; stop to ask only when you cannot go on. When done, stop and report; name anything unrequested instead of doing it. Read-only.",
+    "Report in under 300 words, findings ranked with file:line, blocking or non-blocking, and the smallest fix."
+  ],
+  "criteria": [
+    {
+      "text": "The earlier blocking findings are closed with no new contradiction, repeated rule or unclear trigger",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw29ppbw-3fwm"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T15:41:47.147Z"
+  },
+  "createdAt": "2026-11-04T15:41:47.147Z"
+}
