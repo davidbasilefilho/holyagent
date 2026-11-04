@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "fix-the-three-non-blocking-re-review",
   "objective": "Fix the three non-blocking re-review findings on release/0.2.1/ci/release-flow in the worktree /home/user/holyagent-ci-release-flow (head a9d307d).",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "The findings are in /home/user/holyagent/.git/holyagent/reports/assignment-0mw27v06y-1ugp.md under 'New findings'.",
     "1. Replace the same-repository guard in validation.yml's branch-model and version jobs with an inline shell comparison (case-insensitive) placed before checkout, reading the head repository and github.repository from env; drop the now-unused same-repository command from scripts/pr-checks.ts and its tests if nothing else uses it, and keep scripts/workflows.test.ts asserting the guard step exists before checkout.",
@@ -44,7 +44,33 @@
     "agentId": "workflow:wf_9a5fcdb2-180/assignment-0mw27z4tu-lvxi",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-04T14:36:13.747Z"
+    "startedAt": "2026-11-04T14:36:13.747Z",
+    "finishedAt": "2026-11-04T14:39:57.967Z"
+  },
+  "result": "result: all three findings fixed in /home/user/holyagent-ci-release-flow; `mise run verify` passes.\nchanged: .github/workflows/validation.yml, .github/actions/tag-release/action.yml, scripts/pr-checks.ts, scripts/pr-checks.test.ts, scripts/workflows.test.ts\nchecks: `bunx --no-install mise run verify` -> exit 0 (type-check clean, lint clean, 1116 pass / 1 skip / 0 fail). The `bash -n` run on the extracted action script passed.\nblockers: none\nquestions: none\nnotes:\n- `/home/user/holyagent-ci-release-flow/docs/development.md` lines 115 and 118 still name the `same-repository` command, which no longer exists. docs is outside my ownership, so the root should reword it to \"an inline shell check before checkout\".\n- The version regex now accepts `0.X.Y-Z`, with Z starting at 1, and strips the suffix, so the tag and title carry `0.X.Y`. I checked this by hand with 0.2.1, 0.2.1-3, 0.2.1-0 and 1.0.0. The workflow itself was not run.\n\nevidence:\n- The three findings are fixed:\n  - Fork guard: validation.yml has an inline case-insensitive comparison as the first step of `branch-model` and `version`, before checkout, and it fails on an empty head name. I removed `same-repository`, `checkSameRepository` and `ForeignHead` from pr-checks.ts and their tests. workflows.test.ts asserts the guard is step 0, before checkout, with the expected env and comparison.\n  - Previous-tag lookup: tag-release/action.yml skips it when `PRERELEASE=true`, and `gh release list` no longer ends in `|| true`.\n  - Version regex: the action's regex and comment now match `parseVersion`.\n- mise run verify passes: `bunx --no-install mise run verify` -> exit 0, 1116 pass, 0 fail.\n- checks-run: `bunx --no-install mise run verify` -> exit 0; `bash -n` on the extracted action script -> ok; manual regex and guard-comparison checks as described in the notes.\n- changed-paths: the five paths listed under changed above.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Verify exit 0 (1116 pass); bash -n ok; three findings fixed.",
+    "criteria": [
+      {
+        "criterion": "The three findings are fixed",
+        "support": "Fork guard: validation.yml has an inline case-insensitive comparison as the first step of `branch-model` and `version`, before checkout, and it fails on an empty head name. I removed `same-repository`, `checkSameRepository` and `ForeignHead` from pr-checks.ts and their tests. workflows.test.ts asserts the guard is step 0, before checkout, with the expected env and comparison.; Previous-tag lookup: tag-release/action.yml skips it when `PRERELEASE=true`, and `gh release list` no longer ends in `|| true`.; Version regex: the action's regex and comment now match `parseVersion`."
+      },
+      {
+        "criterion": "mise run verify passes",
+        "support": "`bunx --no-install mise run verify` -> exit 0, 1116 pass, 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bunx --no-install mise run verify` -> exit 0; `bash -n` on the extracted action script -> ok; manual regex and guard-comparison checks as described in the notes."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the five paths listed under changed above."
+      }
+    ]
   },
   "createdAt": "2026-11-04T14:36:13.747Z"
 }
