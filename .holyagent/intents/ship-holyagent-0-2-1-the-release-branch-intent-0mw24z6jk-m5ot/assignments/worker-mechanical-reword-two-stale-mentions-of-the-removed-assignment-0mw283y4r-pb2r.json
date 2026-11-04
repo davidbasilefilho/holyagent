@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "reword-two-stale-mentions-of-the-removed",
   "objective": "Reword two stale mentions of the removed same-repository command in /home/user/holyagent-ci-release-flow/docs/development.md.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "In /home/user/holyagent-ci-release-flow/docs/development.md, the branch-model table row (about line 115) and the paragraph below the table (about line 118) name `same-repository`, a pr-checks.ts command that no longer exists. The fork guard is now an inline shell step that runs first in the branch-model and version jobs, before checkout, comparing the head repository with this repository case-insensitively. Reword both mentions to say that, keeping the rest of the text and the table alignment (run 'bunx --no-install mise run fmt' in the worktree afterwards)."
   ],
@@ -37,7 +37,29 @@
     "agentId": "workflow:wf_ddd94e8b-bf7/assignment-0mw283y4r-pb2r",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-04T14:39:58.347Z"
+    "startedAt": "2026-11-04T14:39:58.347Z",
+    "finishedAt": "2026-11-04T14:40:51.686Z"
+  },
+  "result": "result: Both stale `same-repository` mentions in docs/development.md are reworded to describe the inline guard; fmt:check passes.\nchanged: docs/development.md\nchecks:\n- `bunx --no-install mise run fmt` -> exit 0, formatted 1 file (table realigned)\n- `bunx --no-install mise run fmt:check` -> exit 0, \"All 257 files are formatted.\"\n- `rg -n same-repository docs/development.md` -> exit 1, no matches\nblockers: none\nquestions: none\nnotes: The table column widened because my longer row-115 wording set the width, so the other table rows show whitespace-only churn. Diff saved to /tmp/claude-0/-home-user-holyagent/70184bfa-8a56-57cb-a6cf-d92f87c7692b/scratchpad/mech-diff.txt. The file changed on disk during my run; I took the current state as the base and did not revert anything.\nevidence:\n[blocking] No mention of same-repository remains and the text describes the inline guard: rg exit 1 on docs/development.md; row 115 and paragraph line 118 now say \"the inline guard, which runs first\" and \"An inline shell step runs first in each of them, before checkout, and compares the head repository with this repository case-insensitively\"\n[blocking] fmt:check exits 0: `bunx --no-install mise run fmt:check` exit 0\nchecks-run: fmt and fmt:check run as above; rg confirmed no leftover mention\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "rg finds none; fmt:check exit 0.",
+    "criteria": [
+      {
+        "criterion": "No mention of same-repository remains and the text describes the inline guard",
+        "support": "rg exit 1 on docs/development.md; row 115 and paragraph line 118 now say \"the inline guard, which runs first\" and \"An inline shell step runs first in each of them, before checkout, and compares the head repository with this repository case-insensitively\""
+      },
+      {
+        "criterion": "fmt:check exits 0",
+        "support": "`bunx --no-install mise run fmt:check` exit 0"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "fmt and fmt:check run as above; rg confirmed no leftover mention"
+      }
+    ]
   },
   "createdAt": "2026-11-04T14:39:58.347Z"
 }
