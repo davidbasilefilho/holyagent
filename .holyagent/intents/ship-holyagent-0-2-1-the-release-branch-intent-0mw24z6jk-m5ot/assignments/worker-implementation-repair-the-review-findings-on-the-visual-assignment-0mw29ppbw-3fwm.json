@@ -1,0 +1,69 @@
+{
+  "id": "assignment-0mw29ppbw-3fwm",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-review-findings-on-the-visual",
+  "objective": "Repair the review findings on the visual root pass in the worktree /home/user/holyagent-feat-visual-root-pass (branch release/0.2.1/feat/visual-root-pass, commit ca1d774 plus a clean merge of dev-server-targets).",
+  "state": "Running",
+  "scope": [
+    "Reviews: /home/user/holyagent/.git/holyagent/reports/assignment-0mw29g45p-pz2c.md (artifact) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw29g4f8-oswm.md (code). Part C of /home/user/holyagent-work/spec-0.2.1.md and B1 (no duplicated text) stay binding.",
+    "Artifact 1 (blocking): evidence-judging (skills/evidence-judging/SKILL.md:10) and R-EVIDENCE (requirements.md:46, and its agents.ts entry) start a visual repair only on a Reviewer.visual observation, while visual-judging now lets a finding of the root's own final pass start one. Make them agree: a finding of the root's final pass, citing the capture path and what it shows, also starts a repair.",
+    "Artifact 2 and code 2 (blocking): the root's final pass reads the final captures Reviewer.visual lists, but a web page Reviewer.visual inspects live may leave no captures. Make the text say who saves the final captures for a live-inspected web page (Worker.visual or Worker.operations, at the listed sizes and variants) and that Reviewer.visual lists their paths, in roles/reviewer-visual/captures.md and the visual-judging Accept section, without restating the rule in a third place.",
+    "Non-blocking, fix alongside: artifact 3, turn 'Briefs hold literal absolute paths.' (root/dispatch.md, in the session-start core) into an instruction that says to write every path in a brief as a literal absolute path, taking the plugin folder from the CLI path, within the core size budget (sessioncontext.test.ts and hooks.test.ts guard it), and update the tests that quote it; artifact 4, shorten root/skills.md:5 to a pointer to visual-judging; code 1, have embedMateriality in packages/integrations/claude/src/agents.ts match the marker line after trimming, with a test; code 3, update the docs/pi/claude-parity.md:49 row that still says visual work is accepted on Reviewer.visual's evidence."
+  ],
+  "constraints": [
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report: name unrequested features, tests, files or refactors in the report instead of adding them, and start no extra review rounds. Do not stop early with a summary that announces a next step or an offer to wait.",
+    "Make no version-control writes and no edits under .git/ or .holyagent/; the root commits. Report every changed path and save the diff of your change (git diff, excluding dist/scripts/holyagent.js) to /home/user/holyagent-work/diffs/rootpass-repair.diff.",
+    "Work only inside /home/user/holyagent-feat-visual-root-pass. Use the Edit and Write tools for file edits. Gate: 'bunx --no-install mise run build' then 'bunx --no-install mise run verify' must pass.",
+    "Report in under 350 words."
+  ],
+  "criteria": [
+    {
+      "text": "The root's own final-pass findings start a repair in evidence-judging, R-EVIDENCE and visual-judging alike",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The final pass always has captures to read, web pages included, with the rule stated once",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Non-blocking findings artifact 3 and 4 and code 1 and 3 are fixed or explained",
+      "blocking": false,
+      "dimension": "style"
+    },
+    {
+      "text": "mise run verify passes with the build in sync",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/integrations/claude/src/agents.ts",
+    "packages/integrations/claude/src/generate.ts",
+    "packages/integrations/claude/tests/plugin.test.ts",
+    "packages/integrations/claude/tests/design-skills.test.ts",
+    "packages/integrations/claude/tests/hooks.test.ts",
+    "packages/runtime/tests/sessioncontext.test.ts",
+    "packages/integrations/claude/dist/agents",
+    "packages/integrations/claude/dist/skills",
+    "packages/integrations/claude/dist/scripts/holyagent.js",
+    "docs/pi/claude-parity.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T15:24:52.989Z"
+  },
+  "createdAt": "2026-11-04T15:24:52.989Z"
+}
