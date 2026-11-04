@@ -14,7 +14,11 @@ import { apiPath, decodeAnswer, GitHub } from "./github.ts"
 import { checkedText } from "./message.ts"
 import { recordPull } from "./record.ts"
 
-const Created = Schema.Struct({ number: Schema.Int, html_url: Schema.String })
+const Created = Schema.Struct({
+  number: Schema.Int,
+  html_url: Schema.String,
+  head: Schema.Struct({ ref: Schema.String }),
+})
 
 /** The most a pull request body file may hold. */
 export const MAX_BODY_BYTES = 256 * 1024
@@ -131,19 +135,21 @@ export const pullRequest = (request: PullRequestRequest) =>
         ? undefined
         : yield* readBodyFile(request.root, request.bodyFile)
     const body = text === undefined ? undefined : yield* checkedText(text, request.allowWords)
-    const branch = yield* currentBranch
     const fields = {
       ...(title === undefined ? {} : { title }),
       ...(body === undefined ? {} : { body }),
       ...(request.base === undefined ? {} : { base: request.base }),
     }
 
+    // Only a new pull request needs the local branch; an update leaves the head alone and learns it
+    // from the answer, so it works from any branch or a detached HEAD.
+    const head = request.update === undefined ? yield* currentBranch : undefined
     const answer = yield* GitHub.use((github) =>
-      request.update === undefined
+      head !== undefined
         ? github.rest({
             method: "POST",
             path: `repos/${repo}/pulls`,
-            body: { ...fields, head: branch },
+            body: { ...fields, head },
           })
         : github.rest({
             method: "PATCH",
@@ -155,7 +161,7 @@ export const pullRequest = (request: PullRequestRequest) =>
     const recorded = yield* recordPull(request.state, {
       number: pull.number,
       url: pull.html_url,
-      branch,
+      branch: pull.head.ref,
       base: request.base,
       created: request.update === undefined,
     })

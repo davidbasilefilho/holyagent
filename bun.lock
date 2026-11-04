@@ -23,9 +23,6 @@
     "packages/runtime": {
       "name": "@holyagent/runtime",
       "version": "0.2.1",
-      "bin": {
-        "holyagent-runtime": "./src/cli/main.ts",
-      },
       "dependencies": {
         "@toon-format/toon": "^4.0.0",
         "acorn": "^8.0.0",

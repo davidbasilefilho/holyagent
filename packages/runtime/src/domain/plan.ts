@@ -85,6 +85,8 @@ interface Pool {
   readonly project: Project
   readonly dispatchable: ReadonlyArray<Assignment>
   readonly ready: ReadonlyArray<Assignment>
+  /** The key of the work tree the root dispatches from, as for {@link dispatchBlock}. */
+  readonly workTree: string | undefined
 }
 
 /**
@@ -92,7 +94,12 @@ interface Pool {
  * independentFrom and waits for nothing else, as writer and review one after the other. The review
  * does not depend on the writer, since a dependency needs the writer's acceptance first.
  */
-const reviewedWriters = ({ project, dispatchable, ready }: Pool): ReadonlyArray<Assignment> => {
+const reviewedWriters = ({
+  project,
+  dispatchable,
+  ready,
+  workTree,
+}: Pool): ReadonlyArray<Assignment> => {
   const pairs: Array<Assignment> = []
   const writers: Array<Assignment> = []
   for (const writer of dispatchable.filter((row) => isWriter(row.roleTask))) {
@@ -103,7 +110,7 @@ const reviewedWriters = ({ project, dispatchable, ready }: Pool): ReadonlyArray<
         isReviewer(row.roleTask) &&
         row.independentFrom.includes(writer.id) &&
         awaited(project, row).every((id) => id === writer.id) &&
-        dispatchBlock(project, row) === undefined,
+        dispatchBlock(project, row, undefined, workTree) === undefined,
     )
     if (review === undefined) continue
     writers.push(writer)
@@ -157,17 +164,21 @@ const continuations = (
  * its direct-subagent fallback. Work that would continue a warm specialist, which a workflow cannot
  * message, is listed beside it as `continues`, or is the whole `continue` recommendation when
  * nothing else is ready. Without workflows it takes the Assignments that can run side by side as
- * `subagent` work.
+ * `subagent` work. With the key of the work tree the root dispatches from in `workTree`, a Running
+ * writer in another work tree does not block the paths it owns, as in `assignment dispatch`.
  */
 export const recommend = (
   project: Project,
   registry: Registry,
   now: string,
   config: ExecutionConfig,
+  workTree?: string,
 ): Recommendation | undefined => {
   const ready = project.assignments.filter((row) => row.state === "Ready")
   const dispatchable = ready.filter(
-    (row) => dispatchBlock(project, row) === undefined && awaited(project, row).length === 0,
+    (row) =>
+      dispatchBlock(project, row, undefined, workTree) === undefined &&
+      awaited(project, row).length === 0,
   )
   if (config.workflowsAvailable) {
     // A workflow's agents are new and cannot be messaged, so work that would continue a warm
@@ -177,6 +188,7 @@ export const recommend = (
       project,
       dispatchable: dispatchable.filter(spawns),
       ready: ready.filter(spawns),
+      workTree,
     }
     for (const [reason, pick, paired] of SHAPES) {
       const chosen = pick(pool)

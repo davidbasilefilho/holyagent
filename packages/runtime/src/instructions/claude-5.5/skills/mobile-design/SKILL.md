@@ -59,5 +59,3 @@ Unless the brief asks for it:
 ## Capture checklist
 
 Capture each size class the brief targets (at least compact and one wider class). For each: light and dark, the largest standard and an accessibility text size, and reduced motion on. Add increased contrast on iOS, a refresh in progress, a sheet or back transition, and the keyboard open. Capture both OSes when the app ships on both.
-
-Apply it on the final captures: the worker before reporting, the reviewer in its findings and the root in its own final pass. Report only checks actually run, and name each check not run.

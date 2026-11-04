@@ -9,17 +9,20 @@ packages/
   runtime/                      shared by every harness
     src/domain/                 Intents, Assignments, routes, readiness, plan, warm-reuse directive
     src/state/                  records under .holyagent/, the state mode, the state branch and its worktree, the lock, per-clone local state
-    src/cli/                    the runtime CLI: intent, assignment, plan, status, reconcile, hook, setup, doctor, state
-    src/vcs/                    the vcs commands (commit, pr)
+    src/cli/                    the runtime CLI: intent, assignment, plan, status, reconcile, state, migrate, hook, setup, doctor, rg, fd
+    src/setup/                  what setup and doctor read and write: Claude Code settings, ctx7, the shell
+    src/vcs/                    the vcs commands (commit, pr, identity)
     src/instructions/
-      claude-5.5/               root/, specialist/, roles/<role>/ (one file per section), root-core.ts, skills/
+      claude-5.5/               root/, specialist/, roles/<role>/ (one file per section), shared/ (text the root and the specialists both embed), design-core/, skills/, root-core.ts
       requirements/             cache.md, commit-text.md, context.md, mergeability.md: inputs to the instructions, not behavior
   integrations/claude/          turns the runtime into the Claude Code plugin
     build.ts, src/              the generator and the wrapper source
     vendor/frontend-design/     Anthropic's skill text and license, kept byte for byte; the visual roles embed it
     tests/
-    dist/                       generated: the built plugin (.claude-plugin/, settings.json, agents/, skills/, hooks/, scripts/)
+    dist/                       generated: the built plugin (.claude-plugin/, settings.json, agents/, commands/, skills/, hooks/, licenses/, scripts/)
 .claude-plugin/marketplace.json generated; the marketplace entry for the plugin
+.github/                        the CI, publish and release workflows and the tag-release action
+scripts/                        Bun scripts behind the mise tasks: toolchain, hooks, vendoring, versions, the dependency updater, PR checks
 install/wsl-install.sh          prerequisites installer (WSL Ubuntu): Bun, Node LTS, git, gh; --dev adds mise
 install/windows-install.ps1     the same for native Windows (PowerShell; -Dev adds mise)
 docs/                           these pages; docs/pi holds the Pi research
@@ -56,6 +59,8 @@ bunx --no-install mise run verify
 | `test`        | `bun test`                                                      |
 | `vendor`      | Fetches the pinned ripgrep and fd into the plugin               |
 | `build`       | Generates the Claude plugin (runs `vendor` first)               |
+| `bump:patch`  | Raises the root version by a patch, then `build` (Versioning)   |
+| `bump:minor`  | Raises the root version by a minor, then `build` (Versioning)   |
 | `deps:update` | Moves every pin to its newest stable release (see Dependencies) |
 | `deps:check`  | Fails when a pin is behind                                      |
 | `verify`      | `check`, `lint`, `fmt:check` and `test`, all read-only          |
@@ -64,16 +69,16 @@ Done means `mise run verify` passes; after changing plugin sources, run `mise ru
 
 ## Dependencies
 
-Every dependency range in every `package.json` is a caret range at its line boundary (`^X.0.0` for X of 1 or more, `^0.X.0`, `^0.0.X`), or `workspace:*` for a workspace package, and `bun.lock` holds the exact versions. A line boundary lets a fresh install take every compatible release without a manifest edit, while the lockfile keeps installs reproducible; `scripts/dependency-ranges.test.ts` fails on any other range, in any dependency field. This covers `@anthropic-ai/claude-code` and `mise`, which were pinned exactly: nothing depends on the exact version, because `trustedDependencies` matches names, `scripts/toolchain.ts` checks only that Bun is a canary build, and CI runs the Claude Code binary the lockfile resolves (`bun run claude`).
+Every dependency range in every `package.json` is a caret range at its line boundary (`^X.0.0` for X of 1 or more, `^0.X.0`, `^0.0.X`), or `workspace:*` for a workspace package, and `bun.lock` holds the exact versions. A line boundary lets a fresh install take every compatible release without a manifest edit, while the lockfile keeps installs reproducible; `scripts/dependency-ranges.test.ts` fails on any other range, in any dependency field. This includes `@anthropic-ai/claude-code` and `mise`: nothing depends on their exact version, because `trustedDependencies` matches names, `scripts/toolchain.ts` checks only that Bun is a canary build, and CI runs the Claude Code binary the lockfile resolves (`bun run claude`).
 
-Dependencies change only through the updater, `scripts/update-dependencies.ts`, so a pin never drifts by hand and a release is never a prerelease. It moves each pin to the newest stable release line (the major, or the minor for a `0.x` project) and the newest stable release within it. For a package that is the newest stable version that is not deprecated and is no higher than the registry's `latest` dist-tag, and the installs it runs use `--ignore-scripts`, so a package published just now never runs an install script on the maintainer's machine:
+Dependencies change only through the updater, `scripts/update-dependencies.ts`, so a pin never drifts by hand and a release is never a prerelease. It moves each pin to the newest stable release line (the major, or the minor for a `0.x` project) and the newest stable release within it. For a package, the range it writes comes from the newest stable version that is not deprecated and is no higher than the registry's `latest` dist-tag, so a canary or a version above the publisher's current release is not chosen as the range. The cap covers that range only: `bun update` then resolves the lockfile within it by its own rules and can pick a release above `latest`. The installs run with `--ignore-scripts`, so no package's install script runs during an update; a later plain `bun install` runs the trusted ones, so read the lockfile diff first. The pins:
 
 - the external GitHub Actions in `.github/`: the tag becomes its full commit SHA, and the `# vX.Y.Z` comment follows;
 - the vendored ripgrep and fd in `packages/integrations/claude/src/vendor.ts`: the version and both SHA-256 hashes of every target, recomputed from the downloaded archives. Before a hash is pinned, the archive is compared with the SHA-256 its release publishes (ripgrep's `<archive>.sha256` file, or for fd, which publishes no file, the `digest` in GitHub's release API for the asset), and a difference or a missing checksum stops the update with the tree unchanged. Then the programs are installed from those downloads and `scripts/vendor.ts` removes what no pin names;
 - the mise tools in `mise.toml` that are pinned to a version (`bun`, whose stable base the `postinstall` hook upgrades to canary; `node = "lts"` is a channel and stays);
 - the ranges of every `package.json` (the root and the workspace packages, never `node_modules`), followed by `bun update` and `bun install` for the lockfile.
 
-The vendored `frontend-design` skill carries no version or source, so there is nothing to move. The commit permalinks in `docs/pi/` are research references and stay as written. Tags and commits are read with `git ls-remote`, package releases from the npm registry and fd's release digests from the GitHub API, which allows a limited number of requests an hour without a token. A `uses:` line the updater cannot read (no commit SHA, or a comment other than `# vX.Y.Z`) is listed as skipped, as is a mise tool it has no source for. Every download and file is read and checked before the first file is written. `mise run deps:update -- --dry-run` prints `current -> next` for every pin and writes nothing, `mise run deps:update` applies the moves, and `mise run deps:check` exits non-zero when a pin is behind. After an update, run `mise run build` and `mise run verify`; a pin whose update breaks a gate is fixed in code or reverted and reported, not left half-moved.
+The vendored `frontend-design` skill carries no version or source, so there is nothing to move. The commit permalinks in `docs/pi/` are research references and stay as written. Tags and commits are read with `git ls-remote`, package releases from the npm registry and fd's release digests from the GitHub API, which allows a limited number of requests an hour without a token. A `uses:` line the updater cannot read (no commit SHA, or a comment other than `# vX.Y.Z`) is listed as skipped, as is a mise tool it has no source for. Every download and file is read and checked before the first file is written; a failure of the vendor step or of `bun update` after that leaves the tree half moved, so revert it with git and run the updater again. `mise run deps:update -- --dry-run` prints `current -> next` for every pin and writes nothing, `mise run deps:update` applies the moves, and `mise run deps:check` exits non-zero when a pin is behind. After an update, run `mise run build` and `mise run verify`; a pin whose update breaks a gate is fixed in code or reverted and reported, not left half-moved.
 
 ## Lint and format rules
 
@@ -91,12 +96,13 @@ Everything is configured in `bunfig.toml`. Bun's own `check`, `lint` and `fmt` a
 1. `lint`: `bunx --no-install mise run lint:fix -- --staged`, then `stage_fixed` re-stages what lint changed (the `bun lint` docs do not say that `--staged --fix` stages again).
 2. `fmt`: `bunx --no-install mise run fmt -- --staged`, re-staged (Bun leaves a partly staged file unwritten rather than committing its unstaged changes).
 3. `build`: `bunx --no-install mise run build`, then `git add -A --` on exactly the generated paths, deletions included, so a commit always carries a plugin in step with its sources.
+4. `versions`: when the root `package.json` is staged, `git add --` on `packages/runtime/package.json`, `packages/integrations/claude/package.json` and `bun.lock`, the copies `build` rewrites, so a version bump carries every copy of the version; otherwise they are left alone.
 
 ## The generated plugin
 
 `mise run build` runs `packages/integrations/claude/build.ts`. It removes the generated paths (`GENERATED_PATHS` in `src/generate.ts`: the root `.claude-plugin/marketplace.json` and the built plugin in `packages/integrations/claude/dist/`) and writes them again from:
 
-- `packages/runtime/src/instructions/claude-5.5/`: the root agent (the body of `agents/holyagent.md` is the files of `root/` joined in the order of `ROOT_SECTIONS`), the eighteen specialist agents (the files of `roles/<agent>/` in the order of `ROLE_SECTIONS`, then the files of `specialist/` in the order of `SPECIALIST_SECTIONS` and, for the roles that need them, `CONDITIONAL_SECTIONS`: `specialist/writing-bar.md`, `merge-ready.md` and `interface-inspection.md`; the visual roles also embed the vendored `frontend-design` text from `packages/integrations/claude/vendor/`), and the seven skills of its own (`dev-server`, `user-busy`, `visual-judging`, `evidence-judging`, `ci-watch`, `instruction-writing` and `state-mode`, under `skills/`); what an agent kind always needs is fixed text, not a skill;
+- `packages/runtime/src/instructions/claude-5.5/`: the root agent (the body of `agents/holyagent.md` is the files of `root/` joined in the order of `ROOT_SECTIONS`), the eighteen specialist agents (the files of `roles/<agent>/` in the order of `ROLE_SECTIONS`, then the files of `specialist/` in the order of `SPECIALIST_SECTIONS` and, for the roles that need them, `CONDITIONAL_SECTIONS`: `specialist/writing-bar.md`, `merge-ready.md` and `interface-inspection.md`; the visual roles also embed the vendored `frontend-design` text from `packages/integrations/claude/vendor/`), and the skills of its own (one folder each under `skills/`, listed in [usage.md](usage.md#how-a-session-works); the four platform design skills carry the shared `design-core/core.md`, and `shared/materiality.md` replaces its marker line in the design core, `visual-judging` and `specialist/interface-inspection.md`); what an agent kind always needs is fixed text, not a skill. `shared/precedence.md` (the order of precedence) is in the root core and every specialist, and `shared/history-rules.md` is in the root prompt and the version-control reminder hook;
 - the route table in `packages/runtime/src/domain/route.ts` (model, effort and tools of each agent) and `packages/integrations/claude/src/agents.ts` (how each agent is assembled);
 - `packages/integrations/claude/src/wrapper.sh` and `empty-bunfig.toml`;
 - `packages/runtime/src/cli/main.ts`, bundled for Bun into `scripts/holyagent.js`;

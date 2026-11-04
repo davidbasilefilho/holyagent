@@ -76,5 +76,3 @@ Unless the brief asks for it:
 ## Capture checklist
 
 Capture text frames (with and without escapes) and image frames at 80×24 and a large size. Vary the color tier (truecolor, 256 color, 16 color and NO_COLOR), light and dark backgrounds, an ASCII locale and piped output; also a resize, the help view and the error view.
-
-Apply it on the final captures: the worker before reporting, the reviewer in its findings and the root in its own final pass. Report only checks actually run, and name each check not run.

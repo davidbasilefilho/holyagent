@@ -3,6 +3,7 @@ import { join } from "node:path"
 import { $ } from "bun"
 import { Data, Effect } from "effect"
 
+import { definedEnv } from "../setup/environment.ts"
 import { type Command, Verbatim } from "./types.ts"
 
 /** The search programs the plugin bundles, by the command that runs each. */
@@ -76,7 +77,7 @@ export const toolPath = (directory: string, tool: Tool, target: Target): string 
  * Runs a bundled program in a directory with the stdio of this process and returns its exit code.
  * The arguments reach the program unchanged. Fails with ToolMissing when the program is not there.
  */
-export const runTool = (options: {
+const runTool = (options: {
   readonly tool: Tool
   readonly directory: string
   readonly target: Target
@@ -88,13 +89,8 @@ export const runTool = (options: {
     const path = toolPath(options.directory, options.tool, options.target)
     if (!(yield* Effect.promise(() => Bun.file(path).exists())))
       return yield* new ToolMissing({ tool: options.tool, path })
-    const env = Object.fromEntries(
-      Object.entries(options.env).filter(
-        (entry): entry is [string, string] => entry[1] !== undefined,
-      ),
-    )
     const output = yield* Effect.promise(() =>
-      $`${path} ${options.args}`.cwd(options.cwd).env(env).nothrow(),
+      $`${path} ${options.args}`.cwd(options.cwd).env(definedEnv(options.env)).nothrow(),
     )
     return output.exitCode
   })

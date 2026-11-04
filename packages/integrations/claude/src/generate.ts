@@ -1,5 +1,6 @@
 import { join } from "node:path"
 
+import { ROUTES } from "../../../runtime/src/domain/route.ts"
 import packageJson from "../package.json" with { type: "json" }
 import { agentFiles, embedMateriality, MATERIALITY_FILE, PLUGIN_NAME } from "./agents.ts"
 import {
@@ -28,8 +29,36 @@ export const GENERATED_PATHS: ReadonlyArray<string> = [MARKETPLACE_PATH, DIST_DI
 
 const SOURCES = `${PLUGIN_DIRECTORY}/src`
 
-const DESCRIPTION =
-  "A root agent that plans work as Intents and Assignments and eighteen specialists it dispatches, with a CLI that keeps their state."
+/** The English words for the counts a specialist roster can have, indexed by the count. */
+const COUNT_WORDS: ReadonlyArray<string> = [
+  "no",
+  "one",
+  "two",
+  "three",
+  "four",
+  "five",
+  "six",
+  "seven",
+  "eight",
+  "nine",
+  "ten",
+  "eleven",
+  "twelve",
+  "thirteen",
+  "fourteen",
+  "fifteen",
+  "sixteen",
+  "seventeen",
+  "eighteen",
+  "nineteen",
+  "twenty",
+]
+
+/**
+ * The description of the plugin, in the plugin and marketplace manifests. The specialist count is
+ * the route table's, so the text cannot drift from the roster.
+ */
+export const DESCRIPTION = `A root agent that plans work as Intents and Assignments and ${COUNT_WORDS[ROUTES.length] ?? String(ROUTES.length)} specialists it dispatches, with a CLI that keeps their state.`
 
 const inPlugin = (path: string) => `${DIST_DIRECTORY}/${path}`
 
@@ -89,18 +118,20 @@ const hookCommand = (name: string, extra: Readonly<Record<string, unknown>> = {}
 
 /**
  * The rules that start the version-control reminder: a Bash command with `git` and then `commit`
- * (or `push`) anywhere in it. Probed against Claude Code 2.1.310, these match `git -C d commit`,
- * `sudo git push`, `env X=1 git commit`, `bash -c 'git push'`, `timeout 5 git push`, `xargs git
- * commit` and the same inside `&&` lists, subshells and substitutions, and they match no command
- * without both words, so `npm test` or `git status` spawn nothing. `holyagent vcs commit` and `vcs
- * pr` commit and open pull requests without `git` in the command line, so `vcs` followed by
- * `commit` or `pr` starts it too; the hook then checks the words itself. The reminder is context
- * only, so a command that hides the words (a variable, a git alias, a script) just gets none.
+ * (or `push`) anywhere in it. Probed by hand against Claude Code 2.1.310 (the tested version is the
+ * one in `docs/requirements.md`), these match `git -C d commit`, `sudo git push`, `env X=1 git
+ * commit`, `bash -c 'git push'`, `timeout 5 git push`, `xargs git commit` and the same inside `&&`
+ * lists, subshells and substitutions, and they match no command without both words, so `npm test`
+ * or `git status` spawn nothing. `holyagent vcs commit` and `vcs pr` commit and open pull requests
+ * without `git` in the command line, so the words `vcs commit` and `vcs pr` start it too (not `vcs`
+ * and `pr` far apart, which any command with `vcs` and a word that contains `pr` would match); the
+ * hook then checks the words itself. The reminder is context only, so a command that hides the
+ * words (a variable, a git alias, a script) just gets none.
  */
 const GIT_COMMIT = "Bash(*git*commit*)"
 const GIT_PUSH = "Bash(*git*push*)"
-const VCS_COMMIT = "Bash(*vcs*commit*)"
-const VCS_PR = "Bash(*vcs*pr*)"
+const VCS_COMMIT = "Bash(*vcs commit*)"
+const VCS_PR = "Bash(*vcs pr*)"
 
 /**
  * The six hooks. The session hook adds the state of the project (and, after a resume or compaction,

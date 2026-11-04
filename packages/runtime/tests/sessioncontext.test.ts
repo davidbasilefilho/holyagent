@@ -67,7 +67,8 @@ describe("the core of the root rules", () => {
       "exited parent session proves nothing",
       "one-entry workflow",
       "followUpOf",
-      "Write brief paths as literal absolute paths from the CLI path above.",
+      "A brief that names a plugin file",
+      "the directory above `scripts/` in the CLI path above",
     ])
       expect(core).toContain(part)
     expect(core).not.toContain("(see Asking)")
@@ -358,11 +359,15 @@ describe("the takeover line and the legacy context", () => {
       "default, user-facing agent of this session is the holyagent root",
       "whatever agent it started as",
       "${CLAUDE_PLUGIN_ROOT}/agents/holyagent.md` with the Read tool before acting",
-      "without being reminded",
       "all work through an Intent and Assignments dispatched to the holyagent specialists",
       "never implementing in the main thread",
     ])
       expect(ROOT_TAKEOVER).toContain(part)
+  })
+
+  test("the takeover line does not repeat the core's rule to follow the rules without a reminder", () => {
+    expect(ROOT_CORE).toContain("without a reminder")
+    expect(ROOT_TAKEOVER).not.toMatch(/remind/)
   })
 
   test("names the legacy folders and holyagent migrate, between the core and the reminder", () => {

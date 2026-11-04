@@ -81,6 +81,52 @@ describe("dispatch", () => {
     expect(ok(go([review, same])).assignment.state).toBe("Running")
   })
 
+  describe("when the writers run in work trees", () => {
+    const other = (workTree?: string) =>
+      running({
+        id: "assignment-b",
+        specialist: {
+          agentId: "agent-2",
+          model: "sonnet",
+          effort: "high",
+          startedAt: NOW,
+          ...(workTree === undefined ? {} : { workTree }),
+        },
+      })
+    const from = (workTree: string | undefined, rows: Parameters<typeof project>[0]) =>
+      dispatch(project(rows), [], "assignment-a", NOW, DEFAULT_CONFIG, workTree)
+
+    test("a writer may own the paths of a Running writer in another work tree", () => {
+      const started = ok(from("tree-two", [assignment(), other("tree-one")]))
+      expect(started.assignment).toMatchObject({
+        state: "Running",
+        specialist: { workTree: "tree-two" },
+      })
+    })
+
+    test("a writer may not own the paths of a Running writer in its own work tree", () => {
+      expect(refused(from("tree-one", [assignment(), other("tree-one")]))).toMatchObject({
+        _tag: "OwnershipConflict",
+        runningId: "assignment-b",
+      })
+    })
+
+    test("a Running writer or a dispatch with no known work tree still counts", () => {
+      expect(refused(from("tree-one", [assignment(), other()]))._tag).toBe("OwnershipConflict")
+      expect(refused(from(undefined, [assignment(), other("tree-one")]))._tag).toBe(
+        "OwnershipConflict",
+      )
+    })
+
+    test("a launch that failed rolls the Assignment back with no work tree", () => {
+      const started = ok(from("tree-one", [assignment()]))
+      const back = ok(
+        record(project([started.assignment]), [], "assignment-a", { launched: false }),
+      )
+      expect(back.assignment.specialist).toBeUndefined()
+    })
+  })
+
   test("dependencies must be Succeeded and accepted at the same revision", () => {
     const dependent = assignment({ dependencies: ["assignment-dep"] })
     const withDep = (dep: ReturnType<typeof assignment>) =>
@@ -130,6 +176,19 @@ describe("dispatch", () => {
     expect(directiveFor(review, [reviewer], after(6), DEFAULT_CONFIG).action).toBe("spawn")
   })
 
+  test("drops the idle specialists past the cache window and keeps the others", () => {
+    const stale = entry({ agentId: "agent-stale", lastFinishedAt: after(-56) })
+    const unfinished = entry({ agentId: "agent-unfinished" })
+    const { lastFinishedAt: _finished, ...never } = unfinished
+    const busy = entry({ agentId: "agent-busy", running: true, lastFinishedAt: after(-300) })
+    const warm = entry({ agentId: "agent-warm", paths: ["lib/x.ts"], lastFinishedAt: after(-55) })
+    const result = ok(go([assignment()], "assignment-a", [stale, never, busy, warm]))
+    expect(result.directive.action).toBe("spawn")
+    expect(result.registry?.map((row) => row.agentId)).toEqual(["agent-busy", "agent-warm"])
+    // Nothing to drop: the registry is left out of the change, as before.
+    expect(ok(go([assignment()], "assignment-a", [warm])).registry).toBeUndefined()
+  })
+
   test("a second dispatch does not take a specialist the first one holds", () => {
     const warm = entry({ lastFinishedAt: after(-5) })
     const first = ok(go([assignment({ followUpOf: "assignment-old" })], "assignment-a", [warm]))
@@ -163,9 +222,10 @@ describe("record", () => {
       roleTask: "Worker.implementation",
       assignments: ["assignment-a"],
       paths: ["src/a.ts"],
-      domains: ["src"],
       running: true,
     })
+    // The top-level folders were kept once and read by nothing; they are no longer written.
+    expect(result.registry[0]).not.toHaveProperty("domains")
   })
 
   test("refuses a known specialist reported with another configuration", () => {

@@ -5,10 +5,12 @@ import { $ } from "bun"
 import { Effect, type Exit } from "effect"
 
 import { fromGitPath, toPosix } from "../domain/paths.ts"
+import { definedEnv } from "../setup/environment.ts"
 import { looksLikeAgent } from "../vcs/identity.ts"
+import { spawn } from "../vcs/process.ts"
 import { StateIo, StateModeRefused } from "./errors.ts"
 import { commitFile, hasCode, io, readText } from "./files.ts"
-import { CONFIG_FILE, STATE_DIRECTORY, TRACKED_STATE_PATHSPEC } from "./layout.ts"
+import { CONFIG_FILE, STATE_DIRECTORY, stateDirectory, TRACKED_STATE_PATHSPEC } from "./layout.ts"
 import {
   type Patience,
   STATE_PATIENCE,
@@ -45,7 +47,16 @@ export interface StateTree {
   readonly root: string
   /** The `.holyagent` folder that holds the state: in the state worktree, else under `root`. */
   readonly directory: string
+  /** What was resolved on the way, which a commit then need not ask git for again. */
+  readonly resolved?: Resolved
 }
+
+/**
+ * The state mode of a clone and, in `branch` mode, its state branch, as {@link resolveState} read
+ * them from git config. {@link commitState} takes them instead of reading the same config again.
+ */
+export type Resolved =
+  { readonly mode: "branch"; readonly branch: string } | { readonly mode: "work" | "local" }
 
 /** The environment of a process, as the host passes it. */
 export type Environment = Readonly<Record<string, string | undefined>>
@@ -67,12 +78,7 @@ const REPOSITORY_VARIABLES: ReadonlySet<string> = new Set([
 ])
 
 const gitEnvironment = (env: Environment): Record<string, string> =>
-  Object.fromEntries(
-    Object.entries({ ...process.env, ...env }).filter(
-      (entry): entry is [string, string] =>
-        entry[1] !== undefined && !REPOSITORY_VARIABLES.has(entry[0]),
-    ),
-  )
+  definedEnv({ ...process.env, ...env }, REPOSITORY_VARIABLES)
 
 interface Ran {
   readonly code: number
@@ -80,16 +86,18 @@ interface Ran {
   readonly stderr: string
 }
 
-/** Runs git in a directory and reports how it ended; only a failure to start git is an error. */
-const git = (cwd: string, env: Environment, args: ReadonlyArray<string>) =>
-  Effect.tryPromise({
-    try: () => $`git ${args}`.cwd(cwd).env(gitEnvironment(env)).quiet().nothrow(),
-    catch: (cause) => new StateIo({ path: cwd, cause }),
-  }).pipe(
+/**
+ * Runs git in a directory and reports how it ended; only a failure to start git is an error. With
+ * `input`, git reads it from its standard input, which is how a list that grows with the state
+ * reaches it without a command line that can outgrow the system's limit.
+ */
+const git = (cwd: string, env: Environment, args: ReadonlyArray<string>, input?: string) =>
+  spawn("git", args, { cwd, env: gitEnvironment(env), stdin: input }).pipe(
+    Effect.catchDefect((cause) => Effect.fail(new StateIo({ path: cwd, cause }))),
     Effect.map((output): Ran => ({
-      code: output.exitCode,
-      stdout: output.stdout.toString(),
-      stderr: output.stderr.toString(),
+      code: output.code,
+      stdout: new TextDecoder("utf-8", { ignoreBOM: true }).decode(output.stdout),
+      stderr: output.stderr,
     })),
   )
 
@@ -100,8 +108,8 @@ const failed = (cwd: string, args: ReadonlyArray<string>, ran: Ran) =>
   })
 
 /** Runs git and returns its trimmed output, failing with StateIo on a non-zero exit. */
-const gitText = (cwd: string, env: Environment, args: ReadonlyArray<string>) =>
-  git(cwd, env, args).pipe(
+const gitText = (cwd: string, env: Environment, args: ReadonlyArray<string>, input?: string) =>
+  git(cwd, env, args, input).pipe(
     Effect.flatMap((ran) =>
       ran.code === 0 ? Effect.succeed(ran.stdout.trim()) : Effect.fail(failed(cwd, args, ran)),
     ),
@@ -366,7 +374,7 @@ const holdsRecords = (top: string, listed: ReadonlyArray<Listed>) =>
       top,
       ...listed.filter((tree) => !tree.prunable).map((tree) => tree.path),
     ]) {
-      const folder = join(entry, STATE_DIRECTORY)
+      const folder = stateDirectory(entry)
       if (!(yield* isDirectory(folder))) continue
       const names = yield* io(folder, () => readdir(folder))
       if (names.some((name) => name !== CONFIG_FILE)) return true
@@ -417,7 +425,7 @@ const requireFree = (listed: ReadonlyArray<Listed>, path: string, branch: string
   })
 
 /** The longest the state fetch may run before it is killed, in milliseconds. */
-export const FETCH_TIMEOUT_MS = 8_000
+const FETCH_TIMEOUT_MS = 8_000
 
 /** The ssh options of a state fetch: it never prompts and gives up connecting. */
 const NON_INTERACTIVE_SSH_OPTIONS = "-o BatchMode=yes -o ConnectTimeout=5"
@@ -642,7 +650,7 @@ interface Entry {
 }
 
 /** The per-clone files that move with the state: what the CLI keeps in `local/`. */
-const LOCAL_FILES: ReadonlySet<string> = new Set(["local/specialists.json", "local/vcs.json"])
+const LOCAL_FILES: ReadonlySet<string> = new Set(["local/specialists.json"])
 
 const sameBytes = (a: string, b: string) =>
   Effect.all([io(a, () => Bun.file(a).bytes()), io(b, () => Bun.file(b).bytes())]).pipe(
@@ -754,7 +762,7 @@ const copyInto = (root: string, relative: string, from: string) =>
 /** The files under a work tree's state folder, each with its git status when it is not clean. */
 const workTreeEntries = (top: string, env: Environment) =>
   Effect.gen(function* () {
-    const folder = join(top, STATE_DIRECTORY)
+    const folder = stateDirectory(top)
     if (!(yield* isDirectory(folder))) return [] as ReadonlyArray<Entry>
     const files = yield* io(folder, () =>
       Array.fromAsync(new Bun.Glob("**/*").scan({ cwd: folder, dot: true, onlyFiles: true })),
@@ -827,8 +835,8 @@ const migrateWorkTree = (
   commit: (message: string) => Effect.Effect<boolean, StateIo>,
   patience: Patience = STATE_PATIENCE,
 ) => {
-  const source = join(top, STATE_DIRECTORY)
-  const target = join(worktree, STATE_DIRECTORY)
+  const source = stateDirectory(top)
+  const target = stateDirectory(worktree)
   return migrationMarker(common, top).pipe(
     Effect.flatMap((marker) =>
       fileExists(marker).pipe(
@@ -927,7 +935,7 @@ const stageState = (worktree: string, env: Environment, copied: ReadonlyArray<st
     const tracked = [STATE_DIRECTORY, `:(exclude)${STATE_DIRECTORY}/local`]
     if ((yield* gitText(worktree, env, ["ls-files", "--", ...tracked])) !== "")
       yield* gitText(worktree, env, ["add", "-u", "--", ...tracked])
-    const folder = join(worktree, STATE_DIRECTORY)
+    const folder = stateDirectory(worktree)
     const files = yield* io(folder, () =>
       Array.fromAsync(new Bun.Glob("**/*").scan({ cwd: folder, dot: true, onlyFiles: true })),
     )
@@ -940,8 +948,15 @@ const stageState = (worktree: string, env: Environment, copied: ReadonlyArray<st
         ...named,
       ]),
     ].map((path) => `${STATE_DIRECTORY}/${path}`)
+    // The names go to git on its standard input, NUL-separated: on the command line they would
+    // outgrow the operating system's limit as the history grows (about 200 files on Windows).
     if (wanted.length > 0)
-      yield* gitText(worktree, env, ["--literal-pathspecs", "add", "-f", "--", ...wanted])
+      yield* gitText(
+        worktree,
+        env,
+        ["--literal-pathspecs", "add", "-f", "--pathspec-from-file=-", "--pathspec-file-nul"],
+        wanted.map((path) => `${path}\0`).join(""),
+      )
   })
 
 /**
@@ -950,14 +965,16 @@ const stageState = (worktree: string, env: Environment, copied: ReadonlyArray<st
  * the `work` and `local` modes (the work commit or nobody carries the state), when the folder is
  * not in a worktree on the state branch (outside git, or on another branch), or when nothing
  * changed. `copied` lists files outside the usual record names that the caller wrote and wants
- * committed (see {@link stageState}); every other stray file stays out. Call it under the state
- * lock.
+ * committed (see {@link stageState}); every other stray file stays out. `resolved` is the mode and
+ * branch that {@link resolveState} found, which save reading them from git config again; without it
+ * they are read. Call it under the state lock.
  */
 export const commitState = (
   directory: string,
   env: Environment,
   message: string,
   copied: ReadonlyArray<string> = [],
+  resolved?: Resolved,
 ) =>
   Effect.gen(function* () {
     const worktree = dirname(directory)
@@ -969,12 +986,15 @@ export const commitState = (
       io(worktree, () => realpath(fromGitPath(top.stdout.trim()))),
     ]).pipe(Effect.map(([a, b]) => a === b))
     if (!own) return false
-    if ((yield* stateModeOf(worktree, env)) !== "branch") return false
+    const known = resolved ?? {
+      mode: yield* stateModeOf(worktree, env),
+    }
+    if (known.mode !== "branch") return false
     // Only a worktree on the state branch takes the commit, wherever it is: the one under the git
     // directory can have been switched, and a commit there would land on the wrong branch.
     const current = yield* git(worktree, env, ["symbolic-ref", "--short", "-q", "HEAD"])
-    if (current.code !== 0 || current.stdout.trim() !== (yield* stateBranch(worktree, env)))
-      return false
+    const branch = "branch" in known ? known.branch : yield* stateBranch(worktree, env)
+    if (current.code !== 0 || current.stdout.trim() !== branch) return false
     yield* stageState(worktree, env, copied)
     if (yield* gitSucceeds(worktree, env, ["diff", "--cached", "--quiet", "--", STATE_DIRECTORY]))
       return false
@@ -1041,14 +1061,15 @@ export const resolveState = (
   Effect.gen(function* () {
     const repository = yield* locate(cwd, env)
     if (repository === undefined)
-      return { root: cwd, directory: join(cwd, STATE_DIRECTORY) } satisfies StateTree
+      return { root: cwd, directory: stateDirectory(cwd) } satisfies StateTree
     const { top, common } = repository
     const mode = yield* stateModeOf(top, env)
     if (mode !== "branch") {
       if (mode === "local" && ensure !== "peek") yield* ensureExcluded(top, common, env, patience)
-      return { root: top, directory: join(top, STATE_DIRECTORY) } satisfies StateTree
+      return { root: top, directory: stateDirectory(top), resolved: { mode } } satisfies StateTree
     }
     const branch = yield* stateBranch(top, env)
+    const resolved: Resolved = { mode, branch }
     const listed = yield* listWorktrees(top, env)
     const found = yield* checkedOut(listed, branch)
     const standard = join(common, "holyagent", worktreeFolder(branch))
@@ -1080,13 +1101,13 @@ export const resolveState = (
               patience,
             )
     if (ensured.kind === "deferred")
-      return { root: top, directory: join(top, STATE_DIRECTORY) } satisfies StateTree
+      return { root: top, directory: stateDirectory(top), resolved } satisfies StateTree
     if (ensured.kind === "absent") {
       yield* requireFree(listed, standard, branch)
-      return { root: top, directory: join(standard, STATE_DIRECTORY) } satisfies StateTree
+      return { root: top, directory: stateDirectory(standard), resolved } satisfies StateTree
     }
     const worktree = ensured.path
-    const directory = join(worktree, STATE_DIRECTORY)
+    const directory = stateDirectory(worktree)
     if (ensure !== "peek") {
       // A new state worktree takes in the state of every work tree of the clone, not just this one.
       // The state worktrees of other state branches are not work trees.
@@ -1106,11 +1127,11 @@ export const resolveState = (
             common,
             worktree,
             env,
-            (message) => commitState(directory, env, message),
+            (message) => commitState(directory, env, message, [], resolved),
             patience,
           )
     }
-    return { root: top, directory } satisfies StateTree
+    return { root: top, directory, resolved } satisfies StateTree
   })
 
 /** The state mode of a clone and where its state lives. */

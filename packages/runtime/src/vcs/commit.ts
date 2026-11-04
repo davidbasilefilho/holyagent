@@ -53,9 +53,9 @@ const requireOwnIdentity = Effect.gen(function* () {
 })
 
 /**
- * In a claude.ai cloud session, refuses a commit whose author is missing or looks like an agent's.
- * The author is what git resolves for the commit (`GIT_AUTHOR_*`, else `author.*`, else `user.*`),
- * and the committer, which is the platform's Claude there, is left alone.
+ * In a claude.ai cloud session, refuses a commit whose author is missing or is the agent's own
+ * identity. The author is what git resolves for the commit (`GIT_AUTHOR_*`, else `author.*`, else
+ * `user.*`), and the committer, which is the platform's Claude there, is left alone.
  */
 const requireOwnAuthor = Effect.gen(function* () {
   const line = yield* gitMaybe(["var", "GIT_AUTHOR_IDENT"])

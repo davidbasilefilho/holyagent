@@ -5,6 +5,7 @@ import {
   newestAllowedRelease,
   newestRelease,
   newestTag,
+  nextRange,
   packageDependencies,
   parseActionUses,
   parseChecksumFile,
@@ -80,6 +81,28 @@ describe("caretRange", () => {
 
   test("refuses a prerelease", () => {
     expect(() => caretRange("2.0.0-rc.1")).toThrow()
+  })
+})
+
+describe("nextRange", () => {
+  test.each([
+    ["^1.0.0", "4.0.6", "^4.0.0"],
+    ["^4.0.0", "4.2.0", "^4.0.0"],
+    ["^0.5.0", "0.6.1", "^0.6.0"],
+  ])("moves %s up to the line of %s", (current, release, range) => {
+    expect(nextRange(current, release)).toBe(range)
+  })
+
+  test.each([
+    ["^2.0.0", "1.9.0"],
+    ["^0.6.0", "0.5.3"],
+    ["^3.0.0", "0.0.0"],
+  ])("keeps %s when the registry's latest %s is on an older line", (current, release) => {
+    expect(nextRange(current, release)).toBe(current)
+  })
+
+  test("sets a range that is not a caret range", () => {
+    expect(nextRange("latest", "2.1.0")).toBe("^2.0.0")
   })
 })
 
@@ -295,6 +318,16 @@ describe("unreadableActionUses", () => {
       `- uses: actions/cache@${sha} # main`,
       `- uses: actions/upload@${sha}`,
       `uses: owner/repo/path@${sha} # v1.0`,
+    ])
+  })
+
+  test("reads a workflow with CRLF line endings the same as one with LF", () => {
+    const lines = [
+      `      - uses: actions/checkout@${sha} # v4.1.0`,
+      "      - uses: actions/setup-node@v4",
+    ]
+    expect(unreadableActionUses(lines.join("\r\n") + "\r\n")).toEqual([
+      "- uses: actions/setup-node@v4",
     ])
   })
 

@@ -1,6 +1,6 @@
 import { Context, Effect, Schema } from "effect"
 
-import { IntentId } from "../domain/ids.ts"
+import { AssignmentId, IntentId } from "../domain/ids.ts"
 import { Text } from "../domain/primitives.ts"
 import { type Registry, SpecialistEntry } from "../domain/specialists.ts"
 import { StateIo } from "./errors.ts"
@@ -12,6 +12,7 @@ import { localFile } from "./layout.ts"
 
 const ActiveIntentFile = Schema.Struct({ intentId: IntentId })
 const SpecialistsFile = Schema.Struct({ specialists: Schema.Array(SpecialistEntry) })
+const WorkTreesFile = Schema.Struct({ workTrees: Schema.Record(AssignmentId, Text) })
 
 /**
  * The top-level folder of the work tree a command runs in. The Intent in use is kept per work tree,
@@ -24,29 +25,19 @@ export const WorkTree = Context.Reference<string | undefined>("holyagent/state/W
   defaultValue: () => undefined,
 })
 
-/** The file that holds the Intent in use of a work tree, named by a hash of the work tree's path. */
+/**
+ * A short key for the top-level folder of a work tree: a hash of its path, which names the file of
+ * its Intent in use and marks the work tree an Assignment runs in.
+ */
+export const workTreeKey = (workTree: string): string =>
+  new Bun.CryptoHasher("sha1").update(workTree).digest("hex").slice(0, 16)
+
+/** The file that holds the Intent in use of a work tree, named by its {@link workTreeKey}. */
 const activeIntentFile = (directory: string, workTree: string): string =>
-  localFile(
-    directory,
-    `active-intent/${new Bun.CryptoHasher("sha1").update(workTree).digest("hex").slice(0, 16)}.json`,
-  )
+  localFile(directory, `active-intent/${workTreeKey(workTree)}.json`)
 
 /** The file the Intent in use was kept in before it was kept per work tree: one for the clone. */
 const LEGACY_ACTIVE_INTENT = "active-intent.json"
-
-/** What this clone knows of its version control, for the CLI to fill in. */
-export const Vcs = Schema.Struct({
-  branch: Schema.optionalKey(Text),
-  base: Schema.optionalKey(Text),
-  pullRequest: Schema.optionalKey(Text),
-  /**
-   * What an earlier version of the CLI kept about how commits are made. It is read as anything and
-   * kept as it was, so an older file never breaks the other commands.
-   */
-  detection: Schema.optionalKey(Schema.Unknown),
-})
-/** The version control facts of this clone. */
-export type Vcs = typeof Vcs.Type
 
 /** The per-clone state. */
 export interface Local {
@@ -56,7 +47,12 @@ export interface Local {
    */
   readonly activeIntent?: string
   readonly specialists: Registry
-  readonly vcs: Vcs
+  /**
+   * The key of the work tree each Running Assignment was dispatched from (see {@link workTreeKey}),
+   * by Assignment id. It lives here and not in the Assignment record, because an older plugin
+   * refuses a record with a key it does not know, and a work tree means nothing on another clone.
+   */
+  readonly workTrees: Readonly<Record<string, string>>
 }
 
 /**
@@ -85,11 +81,11 @@ export const readLocal = (directory: string) =>
     const active =
       own ?? (yield* readJson(ActiveIntentFile, localFile(directory, LEGACY_ACTIVE_INTENT)))
     const specialists = yield* readJson(SpecialistsFile, localFile(directory, "specialists.json"))
-    const vcs = yield* readJson(Vcs, localFile(directory, "vcs.json"))
+    const workTrees = yield* readJson(WorkTreesFile, localFile(directory, "work-trees.json"))
     return {
       ...(active === undefined ? {} : { activeIntent: active.intentId }),
       specialists: specialists?.specialists ?? [],
-      vcs: vcs ?? {},
+      workTrees: workTrees?.workTrees ?? {},
     } satisfies Local
   })
 
@@ -100,7 +96,7 @@ export const readLocal = (directory: string) =>
 export interface LocalChange {
   readonly activeIntent?: string
   readonly specialists?: Registry
-  readonly vcs?: Vcs
+  readonly workTrees?: Readonly<Record<string, string>>
 }
 
 /** Encodes the per-clone files named in the change, without writing anything. */
@@ -124,10 +120,10 @@ export const encodeLocal = (directory: string, change: LocalChange) =>
         path: localFile(directory, "specialists.json"),
         content: yield* encodeJson(SpecialistsFile, { specialists: change.specialists }),
       })
-    if (change.vcs !== undefined)
+    if (change.workTrees !== undefined)
       files.push({
-        path: localFile(directory, "vcs.json"),
-        content: yield* encodeJson(Vcs, change.vcs),
+        path: localFile(directory, "work-trees.json"),
+        content: yield* encodeJson(WorkTreesFile, { workTrees: change.workTrees }),
       })
     return files
   })

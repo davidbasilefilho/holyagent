@@ -1,7 +1,7 @@
 {
   "name": "@holyagent/claude",
   "version": "0.2.1",
-  "description": "The holyagent integration for Claude Code.",
+  "description": "The holyagent integration for Claude Code: generates the plugin from the runtime.",
   "license": "Apache-2.0",
   "type": "module",
   "dependencies": {

@@ -12,7 +12,7 @@ import { commitFile, encodeJson, type File, hasCode, io, readJson } from "./file
 import { assignmentFile, branchFile, intentFile, intentFolder, pullFile } from "./layout.ts"
 import { encodeLocal, type Local, type LocalChange, readLocal } from "./local.ts"
 import { type Patience, STATE_PATIENCE, withStateLock } from "./lock.ts"
-import { commitState, type Environment } from "./tree.ts"
+import { commitState, type Environment, type Resolved } from "./tree.ts"
 
 /**
  * A glob pattern for `pattern` below `folder`. Glob patterns are `/`-separated and read `\` as an
@@ -41,17 +41,27 @@ const requireLocation = (path: string, expected: string) =>
     ? Effect.void
     : Effect.fail(new CorruptRecord({ path, reason: `the record belongs in ${expected}` }))
 
+/**
+ * How many record files are read at once. The state holds a file for every Assignment ever made, so
+ * reading them one after the other makes every command as slow as the history is long.
+ */
+const READ_CONCURRENCY = 16
+
 const loadIntents = (directory: string) =>
   Effect.gen(function* () {
-    const intents: Array<Intent> = []
-    for (const file of yield* scan(directory, "intents/*/intent.json")) {
-      const path = join(directory, file)
-      const intent = yield* readJson(Intent, path)
-      if (intent === undefined) continue
-      yield* requireLocation(path, intentFile(directory, intent))
-      intents.push(intent)
-    }
-    return intents
+    const read = yield* Effect.forEach(
+      yield* scan(directory, "intents/*/intent.json"),
+      (file) =>
+        Effect.gen(function* () {
+          const path = join(directory, file)
+          const intent = yield* readJson(Intent, path)
+          if (intent === undefined) return []
+          yield* requireLocation(path, intentFile(directory, intent))
+          return [intent]
+        }),
+      { concurrency: READ_CONCURRENCY },
+    )
+    return read.flat()
   })
 
 const loadAssignments = (
@@ -60,21 +70,25 @@ const loadAssignments = (
   intents: ReadonlyArray<Intent>,
 ) =>
   Effect.gen(function* () {
-    const assignments: Array<Assignment> = []
-    for (const file of relatives) {
-      const path = join(directory, file)
-      const assignment = yield* readJson(Assignment, path)
-      if (assignment === undefined) continue
-      const intent = intents.find((candidate) => candidate.id === assignment.intentId)
-      if (intent === undefined)
-        return yield* new CorruptRecord({
-          path,
-          reason: `Intent ${assignment.intentId} does not exist`,
-        })
-      yield* requireLocation(path, assignmentFile(intentFolder(directory, intent), assignment))
-      assignments.push(assignment)
-    }
-    return assignments
+    const read = yield* Effect.forEach(
+      relatives,
+      (file) =>
+        Effect.gen(function* () {
+          const path = join(directory, file)
+          const assignment = yield* readJson(Assignment, path)
+          if (assignment === undefined) return []
+          const intent = intents.find((candidate) => candidate.id === assignment.intentId)
+          if (intent === undefined)
+            return yield* new CorruptRecord({
+              path,
+              reason: `Intent ${assignment.intentId} does not exist`,
+            })
+          yield* requireLocation(path, assignmentFile(intentFolder(directory, intent), assignment))
+          return [assignment]
+        }),
+      { concurrency: READ_CONCURRENCY },
+    )
+    return read.flat()
   })
 
 const loadLinks = (directory: string, intents: ReadonlyArray<Intent>) =>
@@ -152,12 +166,49 @@ export interface Snapshot extends Local {
   readonly links: Links
 }
 
+/**
+ * The project with the work tree of each Running Assignment put back into its specialist, from the
+ * per-clone file that keeps it (see {@link Local.workTrees}).
+ */
+const withWorkTrees = (project: Project, workTrees: Local["workTrees"]): Project => ({
+  ...project,
+  assignments: project.assignments.map((row) => {
+    const workTree = workTrees[row.id]
+    return row.state === "Running" && row.specialist !== undefined && workTree !== undefined
+      ? { ...row, specialist: { ...row.specialist, workTree } }
+      : row
+  }),
+})
+
+/** The Assignment as its record holds it: without the work tree of its specialist. */
+const withoutWorkTree = (row: Assignment): Assignment => {
+  if (row.specialist?.workTree === undefined) return row
+  const { workTree: _workTree, ...specialist } = row.specialist
+  return { ...row, specialist }
+}
+
+/**
+ * The work trees of the Running Assignments after `change`: a changed Assignment that is Running
+ * keeps the work tree it carries, any other changed one drops its entry, and the rest stay.
+ */
+const nextWorkTrees = (current: Local["workTrees"], changed: ReadonlyArray<Assignment>) => {
+  const touched = new Map(
+    changed.map((row) => [row.id, row.state === "Running" ? row.specialist?.workTree : undefined]),
+  )
+  const kept = Object.entries(current).flatMap(([id, workTree]) => {
+    const now = touched.has(id) ? touched.get(id) : workTree
+    return now === undefined ? [] : [[id, now]]
+  })
+  const added = [...touched].filter(([id, workTree]) => workTree !== undefined && !(id in current))
+  return Object.fromEntries([...kept, ...added]) as Local["workTrees"]
+}
+
 const readSnapshot = (directory: string, load: typeof loadProject = loadProject) =>
   Effect.gen(function* () {
-    const project = yield* load(directory)
-    const links = yield* loadLinks(directory, project.intents)
+    const loaded = yield* load(directory)
+    const links = yield* loadLinks(directory, loaded.intents)
     const local = yield* readLocal(directory)
-    return { ...local, project, links } satisfies Snapshot
+    return { ...local, project: withWorkTrees(loaded, local.workTrees), links } satisfies Snapshot
   })
 
 const retryCorrupt = {
@@ -181,15 +232,16 @@ export const readOpenState = (directory: string) =>
   readSnapshot(directory, loadOpenProject).pipe(Effect.retry(retryCorrupt))
 
 /** What to write: the changed records of a transition and the per-clone files to update. */
-export type StateChange = Change & Omit<LocalChange, "specialists">
+export type StateChange = Change & Omit<LocalChange, "specialists" | "workTrees">
 
 /**
  * Writes the changed records and local files. Everything is encoded and checked before the first
  * file is written, so a record that cannot be stored fails the whole change instead of leaving it
  * half done. Call it under the lock.
  */
-const persist = (directory: string, project: Project, change: StateChange) =>
+const persist = (directory: string, snapshot: Snapshot, change: StateChange) =>
   Effect.gen(function* () {
+    const { project } = snapshot
     const intents = [...(change.intents ?? []), ...project.intents]
     const files: Array<File> = []
     for (const intent of change.intents ?? [])
@@ -206,7 +258,7 @@ const persist = (directory: string, project: Project, change: StateChange) =>
         })
       files.push({
         path: assignmentFile(intentFolder(directory, intent), assignment),
-        content: yield* encodeJson(Assignment, assignment),
+        content: yield* encodeJson(Assignment, withoutWorkTree(assignment)),
       })
     }
     for (const record of change.branches ?? []) {
@@ -233,11 +285,12 @@ const persist = (directory: string, project: Project, change: StateChange) =>
         content: yield* encodeJson(PullRecord, record),
       })
     }
+    const workTrees = nextWorkTrees(snapshot.workTrees, change.assignments ?? [])
     files.push(
       ...(yield* encodeLocal(directory, {
         ...(change.activeIntent === undefined ? {} : { activeIntent: change.activeIntent }),
         ...(change.registry === undefined ? {} : { specialists: change.registry }),
-        ...(change.vcs === undefined ? {} : { vcs: change.vcs }),
+        ...(JSON.stringify(workTrees) === JSON.stringify(snapshot.workTrees) ? {} : { workTrees }),
       })),
     )
     for (const file of files) yield* commitFile(file.path, file.content)
@@ -267,27 +320,29 @@ const describe = (change: StateChange): string => {
  * on its own is whole. `env` is the environment git runs with for the commit; git's own (the
  * process environment) is always the base. `patience` is how long a busy lock is waited for (see
  * {@link withStateLock}); a plugin hook passes a deadline shared with its other locks to give up
- * inside the host's hook timeout.
+ * inside the host's hook timeout. `resolved` is what `resolveState` found, which the commit then
+ * need not read from git again.
  */
 export const updateState = <A extends StateChange, E>(
   directory: string,
   transition: (snapshot: Snapshot) => Effect.Effect<A, E>,
   env: Environment = {},
   patience: Patience = STATE_PATIENCE,
+  resolved?: Resolved,
 ) =>
   withStateLock(
     directory,
     Effect.gen(function* () {
       const snapshot = yield* readSnapshot(directory)
       const result = yield* transition(snapshot)
-      yield* persist(directory, snapshot.project, result)
+      yield* persist(directory, snapshot, result)
       if (
         result.intents !== undefined ||
         result.assignments !== undefined ||
         result.branches !== undefined ||
         result.pulls !== undefined
       )
-        yield* commitState(directory, env, describe(result))
+        yield* commitState(directory, env, describe(result), [], resolved)
       return result
     }),
     patience,

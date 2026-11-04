@@ -31,3 +31,9 @@ pre-commit:
         bunx --no-install mise run build && git add -A --
         .claude-plugin/marketplace.json
         packages/integrations/claude/dist
+    # The build copies the version of the root package.json into the two workspace manifests and
+    # bun.lock (`syncVersions`). When a package.json is staged, as in a version bump, those copies
+    # are staged too, so the commit carries every copy of the version; otherwise they are left alone.
+    - name: versions
+      glob: package.json
+      run: git add -- packages/runtime/package.json packages/integrations/claude/package.json bun.lock

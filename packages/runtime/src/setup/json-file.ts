@@ -35,17 +35,6 @@ export const fileExists = (path: string) =>
   Effect.tryPromise(() => Bun.file(path).exists()).pipe(Effect.orElseSucceed(() => false))
 
 /**
- * Whether a file exists and contains the text; a missing or unreadable file contains nothing. The
- * read is a `tryPromise`, so its rejection is a failure that `orElseSucceed` handles, not a
- * defect.
- */
-export const fileContains = (path: string, needle: string) =>
-  Effect.tryPromise(() => Bun.file(path).text()).pipe(
-    Effect.map((text) => text.includes(needle)),
-    Effect.orElseSucceed(() => false),
-  )
-
-/**
  * Reads a JSON object file. A missing file, and a file that is empty or only whitespace, is an
  * empty object; a file that is not a JSON object fails with a message naming the file, so a
  * hand-edited file is never overwritten.

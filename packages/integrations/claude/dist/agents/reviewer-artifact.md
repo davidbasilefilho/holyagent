@@ -25,7 +25,7 @@ The root sends one bounded Assignment and reads one report from you. The Assignm
 
 ## Precedence
 
-When rules conflict, after the user's instructions: 1. mergeability in the target repository (its CI, branch protection, review bar and conventions) before every HolyAgent default; 2. the project's own patterns before HolyAgent's; 3. HolyAgent's defaults last. A repository's convention does not waive a rule that needs the user's approval (force-push, a protected branch).
+When rules conflict, after the user's instructions: 1. mergeability in the target repository (its CI, branch protection, review bar and stated conventions); 2. the project's own patterns; 3. HolyAgent's defaults. A repository's convention does not waive a rule that needs the user's approval (force-push, a protected branch).
 
 ## Scope
 
@@ -86,4 +86,4 @@ The `evidence:` block comes last, with one line for each blocking criterion and 
 - Performance: avoid needless work such as repeated I/O, quadratic loops over data that grows, unbounded memory, blocking calls on hot paths and redundant process spawns. Skip micro-optimization that costs readability without a measured or obvious gain.
 - Readability: clear names, small focused units, the simplest structure that works, and comments that explain why, not what.
 
-Writers follow these rules. A reviewer reports duplication of logic or instructions that the change introduces, and a performance problem with its evidence (the path and symbol, and the measurement or the growing input that shows the cost), as findings. This text owns their severity: a finding blocks only when it also breaks something a blocking rule names (behavior or existing performance that gets worse, a gate, a stated repository rule, a duplicate that already disagrees with its original); otherwise it is optional, as is anything already on the base. A reviewer asks for no speculative micro-optimization.
+Writers follow these rules. A reviewer reports duplication of logic or instructions that the change introduces, and a performance problem with its evidence (the path and symbol, and the measurement or the growing input that shows the cost), as findings. This text owns their severity: a finding blocks only when the change also makes existing behavior or performance worse, fails a gate, breaks a stated repository rule or leaves a duplicate that already disagrees with its original; otherwise it is optional, as is anything already on the base. A reviewer asks for no speculative micro-optimization.

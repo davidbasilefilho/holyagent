@@ -31,20 +31,20 @@ export class AgentIdentity extends Data.TaggedError("AgentIdentity")<{
 }> {
   /** The description shown to the user. */
   override get message() {
-    return `The git identity ${this.identity} looks like an agent's, so the commit would not be the user's`
+    return `The git identity ${this.identity} is the agent's own, so the commit would not be the user's`
   }
 }
 
 /**
- * In a claude.ai cloud session the commit author is missing or looks like an agent's, so the commit
- * would not be the user's. The committer is the platform's Claude there and is not checked.
+ * In a claude.ai cloud session the commit author is missing or is the agent's own identity, so the
+ * commit would not be the user's. The committer is the platform's Claude there and is not checked.
  */
 export class CloudAuthor extends Data.TaggedError("CloudAuthor")<{
   readonly author: string
 }> {
   /** The description shown to the user. */
   override get message() {
-    return `The commit author ${this.author} is missing or looks like an agent's, so the commit would not be the user's`
+    return `The commit author ${this.author} is missing or is the agent's own identity, so the commit would not be the user's`
   }
 }
 

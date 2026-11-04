@@ -1,3 +1,4 @@
+import { rm } from "node:fs/promises"
 import { isAbsolute, join, resolve } from "node:path"
 
 import { Effect } from "effect"
@@ -23,23 +24,47 @@ const folderFor = (call: Call, name: string) =>
   )
 
 /**
+ * Writes `text` to `<id>.md` in the named folder and returns the absolute path; a repeat replaces
+ * it.
+ */
+const writeNamed = (call: Call, name: string, assignmentId: string, text: string) =>
+  Effect.gen(function* () {
+    const path = join(yield* folderFor(call, name), `${assignmentId}.md`)
+    yield* io(path, () => Bun.write(path, `${text}\n`))
+    return path
+  })
+
+/**
  * Writes the brief of an Assignment to its file and returns the absolute path, for the dispatch
  * prompt to name. The file is the Assignment's id with `.md`, so a repeated write replaces it.
  */
 export const writeBrief = (call: Call, assignmentId: string, brief: string) =>
-  Effect.gen(function* () {
-    const path = join(yield* folderFor(call, "briefs"), `${assignmentId}.md`)
-    yield* io(path, () => Bun.write(path, `${brief}\n`))
-    return path
-  })
+  writeNamed(call, "briefs", assignmentId, brief)
 
 /**
  * Writes the report of an Assignment, as a workflow's journal holds it, to `<id>.md` in the
  * `reports` folder next to the briefs, and returns the absolute path.
  */
 export const writeReport = (call: Call, assignmentId: string, report: string) =>
-  Effect.gen(function* () {
-    const path = join(yield* folderFor(call, "reports"), `${assignmentId}.md`)
-    yield* io(path, () => Bun.write(path, `${report}\n`))
-    return path
-  })
+  writeNamed(call, "reports", assignmentId, report)
+
+/**
+ * Removes the brief and the report files of the given Assignments, once their Intent is closed and
+ * nothing reads them again; the stored records keep their results. A missing file is fine. Returns
+ * a line for each file that could not be removed, which the caller reports: the Intent already
+ * closed, so a leftover file must not fail the command.
+ */
+export const removeFiles = (call: Call, assignmentIds: ReadonlyArray<string>) =>
+  Effect.forEach(["briefs", "reports"], (name) => folderFor(call, name)).pipe(
+    Effect.flatMap((folders) =>
+      Effect.forEach(
+        folders.flatMap((folder) => assignmentIds.map((id) => join(folder, `${id}.md`))),
+        (path) =>
+          io(path, () => rm(path, { force: true })).pipe(
+            Effect.as(undefined),
+            Effect.catch((error) => Effect.succeed(error.message)),
+          ),
+      ),
+    ),
+    Effect.map((lines) => lines.filter((line) => line !== undefined)),
+  )

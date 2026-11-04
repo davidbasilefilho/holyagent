@@ -10,7 +10,7 @@ import { Text, Timestamp } from "./primitives.ts"
 import { type Change, findAssignment, findIntent, type Project } from "./project.ts"
 import { dispatchBlock } from "./readiness.ts"
 import { Effort, Model, routeFor } from "./route.ts"
-import { bindSpecialist, type Registry, releaseSpecialist } from "./specialists.ts"
+import { bindSpecialist, pruneRegistry, type Registry, releaseSpecialist } from "./specialists.ts"
 
 /** The result of {@link dispatch}: the Running Assignment and how to run it. */
 export interface Dispatched extends Change {
@@ -22,7 +22,10 @@ export interface Dispatched extends Change {
  * Validates an Assignment (see {@link dispatchBlock}) and reserves it: Ready becomes Running and,
  * when the directive continues a warm specialist, that specialist is bound to it at once, so a
  * second dispatch cannot take it and its history is complete even if the launch is never recorded.
- * A refusal changes nothing.
+ * `workTree` is the key of the work tree it is dispatched from: it is recorded with the run, and
+ * only Running writers of that work tree (or of an unknown one) can hold its paths. Specialists
+ * that are idle past the cache window are dropped from the registry (see {@link pruneRegistry}). A
+ * refusal changes nothing.
  */
 export const dispatch = (
   project: Project,
@@ -30,13 +33,16 @@ export const dispatch = (
   assignmentId: string,
   now: string,
   config: ExecutionConfig,
+  workTree?: string,
 ) =>
   Effect.gen(function* () {
     yield* decodeInput(Timestamp, now)
     const assignment = yield* findAssignment(project, assignmentId)
-    const block = dispatchBlock(project, assignment)
+    // Specialists past the cache window can never be chosen again, so each dispatch drops them.
+    const warm = pruneRegistry(registry, now, config.ttlMinutes)
+    const block = dispatchBlock(project, assignment, new Set(), workTree)
     if (block !== undefined) return yield* block
-    const directive = directiveFor(assignment, registry, now, config)
+    const directive = directiveFor(assignment, warm, now, config)
     const route = routeFor(assignment.roleTask)
     const running: Assignment = {
       ...assignment,
@@ -46,6 +52,7 @@ export const dispatch = (
         model: route.model,
         effort: route.effort,
         startedAt: now,
+        ...(workTree === undefined ? {} : { workTree }),
       },
     }
     return {
@@ -54,13 +61,15 @@ export const dispatch = (
       assignments: [running],
       ...(directive.action === "continue"
         ? {
-            registry: yield* bindSpecialist(registry, running, {
+            registry: yield* bindSpecialist(warm, running, {
               agentId: directive.agentId,
               model: route.model,
               effort: route.effort,
             }),
           }
-        : {}),
+        : warm === registry
+          ? {}
+          : { registry: warm }),
     } satisfies Dispatched
   })
 

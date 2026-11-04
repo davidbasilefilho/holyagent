@@ -2,6 +2,7 @@ import { Effect } from "effect"
 
 import { Usage } from "../cli/errors.ts"
 import { MessageRefused } from "./errors.ts"
+import { looksLikeAgent } from "./identity.ts"
 
 // A commit belongs to the credential owner and carries no attribution to the agent. Session
 // trailers and the "Generated with … Claude Code" footer (alone on its line, after an optional
@@ -13,7 +14,8 @@ const CO_AUTHOR = /^\s*co-authored-by\s*:\s*(.*)$/i
 const SESSION_LINK = /https?:\/\/claude\.ai\/\S*/gi
 
 const namesAgent = (coAuthor: string) =>
-  /^claude\b/i.test(coAuthor.trim()) || /@(?:[\w-]+\.)*anthropic\.com\b/i.test(coAuthor)
+  looksLikeAgent({ name: coAuthor.replace(/<.*$/, ""), email: "" }) ||
+  /@(?:[\w-]+\.)*anthropic\.com\b/i.test(coAuthor)
 
 const isAttribution = (line: string) => {
   if (SESSION_TRAILER.test(line) || GENERATED_FOOTER.test(line)) return true

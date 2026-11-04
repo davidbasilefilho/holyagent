@@ -1,22 +1,33 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterAll, afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { mkdir, symlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import { MAX_BODY_BYTES } from "../src/vcs/pr.ts"
 import { cleanup, fakeGitHub, initRepo, put, scratch, seed, sh, toon, vcs } from "./vcs-fixtures.ts"
 
+// Tests that run git processes: process creation on Windows is slow enough on the CI runner to pass
+// Bun's 5 second default, and a slow test there is not a hung one. Linux and macOS keep the default.
+if (process.platform === "win32") setDefaultTimeout(60_000)
+afterAll(() => setDefaultTimeout(5_000))
+
 afterEach(cleanup)
 
 const OWNER = { name: "Octo", email: "42+octo@users.noreply.github.com" }
 
 describe("vcs pr", () => {
+  // GitHub names the head branch of the pull request in every answer; pull request 7 is on `feature`.
+  const PULL = {
+    number: 7,
+    html_url: "https://github.com/octo/project/pull/7",
+    head: { ref: "feature" },
+  }
   const prGithub = () =>
     fakeGitHub({
       rest: (request) =>
         request.method === "POST" && request.path.endsWith("/pulls")
-          ? { number: 7, html_url: "https://github.com/octo/project/pull/7" }
+          ? PULL
           : request.method === "PATCH"
-            ? { number: 7, html_url: "https://github.com/octo/project/pull/7" }
+            ? PULL
             : undefined,
     })
 
@@ -78,6 +89,28 @@ describe("vcs pr", () => {
     expect(made).toMatchObject({ number: 7, created: false })
     const patch = gh.calls.find((call) => call.route === "PATCH repos/octo/project/pulls/7")
     expect(patch?.body).toEqual({ title: "Better title" })
+  })
+
+  test("--update records the head GitHub reports, from any branch or a detached HEAD", async () => {
+    const dir = await withOrigin()
+    const gh = prGithub()
+    const intent = String(
+      toon(await vcs(dir, ["intent", "create"], gh.layer, { objective: "Ship it" })).id,
+    )
+    const recorded = async () =>
+      (
+        toon(await vcs(dir, ["intent", "show"], gh.layer))["pulls"] as Array<{ branch: string }>
+      ).map((pull) => pull.branch)
+
+    await sh(dir, ["git", "switch", "-q", "main"])
+    const onMain = toon(await vcs(dir, ["vcs", "pr", "--update", "7", "--title", "x"], gh.layer))
+    expect(onMain).toMatchObject({ number: 7, created: false, intent })
+    expect(await recorded()).toEqual(["feature"])
+
+    await sh(dir, ["git", "switch", "-q", "--detach"])
+    const detached = await vcs(dir, ["vcs", "pr", "--update", "7", "--title", "y"], gh.layer)
+    expect(detached.code).toBe(0)
+    expect(await recorded()).toEqual(["feature"])
   })
 
   test("text about the user is refused before anything is sent", async () => {

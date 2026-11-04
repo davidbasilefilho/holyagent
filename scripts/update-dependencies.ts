@@ -12,10 +12,10 @@ import {
   sha256,
 } from "../packages/integrations/claude/src/vendor.ts"
 import {
-  caretRange,
   type Hashes,
   newestAllowedRelease,
   newestTag,
+  nextRange,
   packageDependencies,
   type PackageDependency,
   parseActionUses,
@@ -388,7 +388,7 @@ const surveyPackages = (root: string) =>
     const ranges = new Map<string, Array<PackageDependency>>()
     for (const { file, dependencies } of manifests)
       for (const dependency of dependencies) {
-        const next = caretRange(releases.get(dependency.name) ?? "0.0.0")
+        const next = nextRange(dependency.range, releases.get(dependency.name) ?? "0.0.0")
         pins.push({
           kind: "package",
           name: `${dependency.name} (${dependency.field})`,
@@ -614,8 +614,9 @@ const writeRanges = (root: string, packages: Survey["packages"]) =>
  * SHA-256. Only then is anything written, so a failed download leaves the tree unchanged. The moved
  * programs are installed from the archives already downloaded, `scripts/vendor.ts` (the `vendor`
  * task) removes what no pin names, and `bun update` then refreshes the lockfile within the new
- * ranges. The installs run with `--ignore-scripts`, so a freshly published package never runs code
- * on this machine.
+ * ranges. The installs run with `--ignore-scripts`, so no install script runs during the update; a
+ * later plain `bun install` runs the trusted ones. A failure after the first write leaves the tree
+ * half moved.
  */
 export const applySurvey = (root: string, found: Survey) =>
   Effect.gen(function* () {
