@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "review-the-four-platform-design-skills",
   "objective": "Review the four platform design skills and their shared core (commit b5d21e1 on release/0.2.1/feat/design-skills) against Part C of the 0.2.1 request.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read /home/user/holyagent-work/spec-0.2.1.md Part C in full (binding, approved as written) and /home/user/holyagent-work/research.md items 4 and 5.",
     "Read the generated skills /home/user/holyagent-feat-design-skills/packages/integrations/claude/dist/skills/{web,mobile,desktop,tui}-design/SKILL.md, the core source packages/runtime/src/instructions/claude-5.5/design-core/core.md and docs/attributions.md there; the diff is /home/user/holyagent-work/diffs/design-skills.diff. Compare with the shape of packages/integrations/claude/vendor/frontend-design/SKILL.md.",
@@ -41,7 +41,33 @@
     "agentId": "workflow:wf_e6f70ca4-313/assignment-0mw2860hc-17f2",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-04T14:41:34.704Z"
+    "startedAt": "2026-11-04T14:41:34.704Z",
+    "finishedAt": "2026-11-04T14:46:29.736Z"
+  },
+  "result": "result: all Part C binding requirements are met or justified, with two blocking taste-marking gaps in the core (finding 1) and mobile-design (finding 2); the remaining findings do not block. I did not compare the skills' wording against the source skills, so the paraphrase requirement is partly unverified. I ran no checks and changed no files. Evidence is the four built skills, `core.md`, `docs/attributions.md` and the diff, read at b5d21e1.\n\n**requirement-verdicts**\n- Stack-agnostic: met. A search of the four built skills for framework, kit and API names found only \"Nerd Font\" at `tui-design/SKILL.md:75`, a font and not a framework. Each skill tells the reader to detect the stack and map the rule (`core.md:15`). The test at `design-skills.test.ts` bans the right terms.\n- Checkable on a render and symptom phrasing: gap (findings 1, 2, 5). Behavior checks are marked for Worker.operations and the TUI hygiene checks are correctly routed to it.\n- Lean, no machinery: met. The built skills are 100, 94, 95 and 110 lines, all within 80 to 140. The numbers are platform-fixed or tagged as defaults.\n- Descriptions start \"Use when\": met in all four. `web-design` leads with the situation, then what it holds.\n- Shared core matches the spec: met. `core.md` carries every spec bullet and has a single source, embedded by the generator with a test.\n- Platform bullets: all present, with the changes below.\n  - Dropped: web \"8 to 10 gray shades\" (`web-design:53`), justified by the no-numeric-dials rule.\n  - Dropped: Android compact \"(or a modal rail or drawer)\" (`mobile-design:71`), justified by research item 4 (\"compact windows always use a navigation bar\").\n  - Resolved: Android \"expanded rail over drawer\" [verify] is confirmed by research item 4.\n  - Changed: iOS 27 [verify] became a \"no remembered rule\" line (finding 4).\n  - Merged: the Android \"fake Material\" refuse list sits in the single mobile refuse list (`mobile-design:78-87`).\n  - Desktop and TUI: nothing dropped.\n- Refuse lists and capture checklists: met in all four. Web has all ten spec items. Desktop and TUI refuse lists are additions the spec did not list.\n- Paraphrase: unverified against sources. The text reads as original, and the only close phrase is \"remove one accessory\" (`core.md:23`), from the credited `frontend-design`.\n- Credits: met. `attributions.md:20-44` lists every source in the spec with URL and license. The unverified-license mxcl source is marked \"ideas only\", and clig.dev is marked CC BY-SA 4.0 and paraphrased.\n- Instruction-writing rules: met apart from the contradictions and ambiguities in the findings.\n\n**findings**\n1. Blocking. `core.md:7-9, 23-24` (built at `web-design:17-19, 33-34`, and the same in the other three). These rules are taste or process and no capture can show them, but are unmarked, so `core.md:3` makes a violation \"material\". Examples: a plan, a refinement or redesign statement, one signature detail, remove one accessory, a gray placeholder over drawn art. This breaks the requirement to mark taste as preference and to map each rule to a material effect. Fix: tag the \"one signature detail / remove one accessory\" bullet and the placeholder bullet `(preference)`. Say in `core.md:3` that the direction rules are checked as a plan in the worker's report or `DESIGN.md`, not on a render.\n2. Blocking. `mobile-design:64`. `(preference)` covers the whole bullet, including \"every custom color has light, dark and increased-contrast variants\", which is a visible accessibility rule. It would be listed and never repaired. Fix: split the bullet and keep `(preference)` only on \"no in-app appearance switch\" and the 7:1 aim.\n3. Non-blocking, to handle in the root-integration PR. `core.md:3` is a third copy of the materiality list, next to `visual-judging` and `interface-inspection.md`. It already differs: it omits \"adherence to a reference\" and \"responsiveness at a listed size\". The spec says to align the two into one source. Fix: make one source and have the core and `visual-judging` point to it.\n4. Non-blocking. `mobile-design:63`. \"rely on no remembered rule\" is ambiguous, and the sentence is tied to a dated Apple release. Fix: \"iOS 27 guidance on scroll edges, sidebars, tab bars, menus, search and icons is not encoded here; judge those on a render of the target OS.\"\n5. Non-blocking. `mobile-design:76`. `(preference)` also covers \"Choose components by behavior\". Fix: place it on the expressive-motion clause only.\n6. Non-blocking. `desktop-design:93` asks for a 150% or 200% text scale on every platform, but `desktop-design:65` says macOS has no dynamic text size. Fix: \"where the platform has a text scale\".\n7. Non-blocking. `core.md:30` assumes larger-text and high-contrast settings exist on every platform, including a terminal UI. Fix: \"where the platform has them\".\n8. Non-blocking. `web-design:65` requires the label to be shown as a tooltip on hover and focus, but the spec only requires a label. Fix: \"has an accessible label; a tooltip on hover and focus where a pointer exists\".\n9. Non-blocking. `web-design:46, 52, 54` use `(defaults)` and `(default)`, a marker the core does not define. `web-design:77` says \"position-like transforms\", which is vague. Fix: use one defined marker and write \"transform and opacity\".\n\nevidence:\nEach Part C binding requirement and skill bullet list is checked with a verdict: the requirement-verdicts section above covers requirements 1 to 7 and the web, mobile, desktop and TUI bullet lists; the two blocking gaps are findings 1 and 2.\nEvery gap names file:line and a fix: findings 1 to 9 each give a built-skill or `core.md` line and a smallest fix.\nrequirement-verdicts: the section above, from reading all four built skills, `core.md`, `attributions.md` and the diff.\nfindings: the numbered list above.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Findings carry file:line and fixes; verdicts per requirement.",
+    "criteria": [
+      {
+        "criterion": "Each Part C binding requirement and skill bullet list is checked with a verdict",
+        "support": "the requirement-verdicts section above covers requirements 1 to 7 and the web, mobile, desktop and TUI bullet lists; the two blocking gaps are findings 1 and 2."
+      },
+      {
+        "criterion": "Every gap names file:line and a fix",
+        "support": "findings 1 to 9 each give a built-skill or `core.md` line and a smallest fix."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "requirement-verdicts",
+        "support": "the section above, from reading all four built skills, `core.md`, `attributions.md` and the diff."
+      },
+      {
+        "label": "findings",
+        "support": "the numbered list above."
+      }
+    ]
   },
   "createdAt": "2026-11-04T14:41:34.704Z"
 }
