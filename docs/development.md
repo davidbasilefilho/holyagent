@@ -96,6 +96,7 @@ Everything is configured in `bunfig.toml`. Bun's own `check`, `lint` and `fmt` a
 1. `lint`: `bunx --no-install mise run lint:fix -- --staged`, then `stage_fixed` re-stages what lint changed (the `bun lint` docs do not say that `--staged --fix` stages again).
 2. `fmt`: `bunx --no-install mise run fmt -- --staged`, re-staged (Bun leaves a partly staged file unwritten rather than committing its unstaged changes).
 3. `build`: `bunx --no-install mise run build`, then `git add -A --` on exactly the generated paths, deletions included, so a commit always carries a plugin in step with its sources.
+4. `versions`: when the root `package.json` is staged, `git add --` on `packages/runtime/package.json`, `packages/integrations/claude/package.json` and `bun.lock`, the copies `build` rewrites, so a version bump carries every copy of the version; otherwise they are left alone.
 
 ## The generated plugin
 
