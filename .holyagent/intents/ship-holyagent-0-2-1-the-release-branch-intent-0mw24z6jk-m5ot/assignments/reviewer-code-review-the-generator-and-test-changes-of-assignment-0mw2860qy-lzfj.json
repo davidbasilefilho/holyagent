@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mw2860qy-lzfj",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-generator-and-test-changes-of",
+  "objective": "Review the generator and test changes of commit b5d21e1 on release/0.2.1/feat/design-skills (worktree /home/user/holyagent-feat-design-skills): the shared-core embedding and the design-skill tests.",
+  "state": "Running",
+  "scope": [
+    "Read /home/user/holyagent-work/spec-0.2.1.md Part C binding requirement 7 and deliverable 4.",
+    "Review 'git -C /home/user/holyagent-feat-design-skills show b5d21e1 -- packages/integrations/claude/src packages/integrations/claude/tests packages/runtime/tests' and run those tests there.",
+    "Check withDesignCore and the marker handling, whether the tests fail without the change and actually catch a stale core or a banned term (try a mutation), duplication with the existing frontendDesign or shared-file embedding patterns (B1), and Windows path behavior."
+  ],
+  "constraints": [
+    "Keep working until the review is done; stop to ask only when you cannot go on. When done, stop and report; name anything unrequested instead of doing it. Read-only: change no repository files and make no git writes.",
+    "Each finding: file:line, evidence, blocking or not, smallest fix. Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "The embedding is correct and the tests fail on a stale core or a banned term",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "No duplicated generator logic is introduced",
+      "blocking": false,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw27v0qz-pua6"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T14:41:35.050Z"
+  },
+  "createdAt": "2026-11-04T14:41:35.050Z"
+}
