@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mw2a6cmw-yssu",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-dependency-updater-repair",
+  "objective": "Re-review the dependency-updater repair commit b57ad52 and the merge 090da97 on release/0.2.1/build/dependency-updater (worktree /home/user/holyagent-build-dependency-updater) against the earlier code review.",
+  "state": "Running",
+  "scope": [
+    "Earlier findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw293a4v-cfsz.md (blocking 1, optional 2 to 7). The repair report is /home/user/holyagent/.git/holyagent/reports/assignment-0mw29asyz-gwix.md. Review 'git -C /home/user/holyagent-build-dependency-updater show b57ad52' and the merge's mise.toml resolution ('git -C /home/user/holyagent-build-dependency-updater diff 0018c6a 090da97 -- mise.toml', both sides' tasks kept).",
+    "Say whether each earlier finding is closed, whether the new hermetic tests for --check and --dry-run fail without the change, and whether the reuse of download, readArchive and installAsset, the workspace-glob manifest scan and the compute-everything-before-writing order introduce a regression. Run 'bunx --no-install mise run verify', 'mise run deps:check' and 'mise run deps:update -- --dry-run' there (both must leave the tree clean)."
+  ],
+  "constraints": [
+    "Keep working until the review is done; stop to ask only when you cannot go on. When done, stop and report; name anything unrequested instead of doing it. Read-only in the worktree: no repository edits and no git writes; experiments go in a scratch copy outside the repository.",
+    "Report in under 300 words, findings ranked with file:line, blocking or non-blocking, and the smallest fix."
+  ],
+  "criteria": [
+    {
+      "text": "The earlier findings are closed",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No regression and mise run verify passes on the merged head",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw29asyz-gwix",
+    "assignment-0mw2a25ta-yksh"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T15:37:49.688Z"
+  },
+  "createdAt": "2026-11-04T15:37:49.688Z"
+}
