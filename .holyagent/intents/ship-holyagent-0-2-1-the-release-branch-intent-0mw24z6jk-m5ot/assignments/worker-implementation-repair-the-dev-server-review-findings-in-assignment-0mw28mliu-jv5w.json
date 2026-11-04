@@ -1,0 +1,56 @@
+{
+  "id": "assignment-0mw28mliu-jv5w",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-dev-server-review-findings-in",
+  "objective": "Repair the dev-server review findings in the worktree /home/user/holyagent-feat-dev-server-targets (release/0.2.1/feat/dev-server-targets; it just merged the design-skills repair).",
+  "state": "Running",
+  "scope": [
+    "Review: /home/user/holyagent/.git/holyagent/reports/assignment-0mw28hg6a-olmc.md. Fix blocking finding 1 (visual-judging: 'Start the render target first, per platform (the dev-server skill)') and non-blocking 2 to 6 as each smallest fix says (for 6, fix only line 49 of docs/pi/claude-parity.md; leave line 113).",
+    "Rebuild with 'bunx --no-install mise run build' (this also confirms the merge left the generated plugin in sync)."
+  ],
+  "constraints": [
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report: name unrequested features, tests, files or refactors in the report instead of adding them, and start no extra review rounds. Do not stop early with a summary that announces a next step or an offer to wait.",
+    "Make no version-control writes (no commit, checkout, switch, branch, stash, reset, push) and no edits under .git/ or .holyagent/; the root commits. Report every changed path.",
+    "Work only inside /home/user/holyagent-feat-dev-server-targets. Change only the lines the findings name; leave visual-judging's acceptance and materiality text alone (a later branch rewrites them).",
+    "Gate: 'bunx --no-install mise run verify' must pass.",
+    "Report in under 200 words."
+  ],
+  "criteria": [
+    {
+      "text": "Finding 1 is fixed and findings 2 to 6 are fixed or explained",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The plugin is rebuilt and mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions/claude-5.5/skills/visual-judging",
+    "packages/runtime/src/instructions/claude-5.5/skills/dev-server",
+    "packages/runtime/src/instructions/claude-5.5/root/assignments.md",
+    "packages/runtime/src/instructions/claude-5.5/roles/worker-operations",
+    "packages/integrations/claude/tests/plugin.test.ts",
+    "packages/integrations/claude/dist/skills/visual-judging",
+    "packages/integrations/claude/dist/skills/dev-server",
+    "packages/integrations/claude/dist/agents",
+    "docs/pi/claude-parity.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw286100-xnuy",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T14:54:28.470Z"
+  },
+  "createdAt": "2026-11-04T14:54:28.470Z"
+}
