@@ -1,0 +1,48 @@
+{
+  "id": "assignment-0mw2ah562-r0z3",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Worker.debugging",
+  "slug": "fix-the-windows-failure-of-the-new",
+  "objective": "Fix the Windows failure of the new version-source test 'a bump followed by one build > leaves every copy, the plugin and marketplace manifests included, at the new version' in /home/user/holyagent-build-version-source (branch release/0.2.1/build/version-source, PR davidbasilefilho/holyagent#60).",
+  "state": "Running",
+  "scope": [
+    "It fails on windows-latest only (GitHub Actions job 126676222443, read it with the GitHub MCP tool get_job_logs, return_content true, and find the assertion output above the summary), after 321 ms; it passes on Linux. The re-review noted that its copy filter splits paths on '/' (scripts/bump-version.test.ts), which breaks on Windows separators; confirm the cause from the log before fixing.",
+    "Fix the test, or the code if the code is what breaks on Windows, keeping the assertions as strict as they are, and check the other new tests in that file for the same separator assumption."
+  ],
+  "constraints": [
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done and checked, stop and report; name anything unrequested instead of doing it.",
+    "Never skip, disable or weaken a test. Make no version-control writes and no edits under .git/ or .holyagent/; the root commits. Report every changed path.",
+    "Work only inside /home/user/holyagent-build-version-source. Gate: 'bunx --no-install mise run verify' must pass.",
+    "Report in under 200 words."
+  ],
+  "criteria": [
+    {
+      "text": "The cause is shown from the CI log and fixed without weakening the test",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diagnosis"
+  ],
+  "ownershipPaths": [
+    "scripts/bump-version.test.ts",
+    "scripts/bump-version.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T15:46:13.227Z"
+  },
+  "createdAt": "2026-11-04T15:46:13.227Z"
+}
