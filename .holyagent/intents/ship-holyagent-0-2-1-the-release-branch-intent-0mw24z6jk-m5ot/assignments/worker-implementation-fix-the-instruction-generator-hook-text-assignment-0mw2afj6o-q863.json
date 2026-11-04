@@ -1,0 +1,93 @@
+{
+  "id": "assignment-0mw2afj6o-q863",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "fix-the-instruction-generator-hook-text",
+  "objective": "Fix the instruction, generator, hook-text and documentation findings of the Part D audit in /home/user/holyagent-fix-audit (branch release/0.2.1/fix/audit), including the instruction audit of the new Part B and C text.",
+  "state": "Running",
+  "scope": [
+    "Findings: /home/user/holyagent-work/audit-code.md items B3, T1 [blocking], T3, T7, U6, U7, U8 and P5; /home/user/holyagent-work/audit-docs.md (drift A1 to A15 and duplication B1 to B10); and in /home/user/holyagent-work/root-notes.md the rules-branch leftovers (claude-parity.md:136 vcs globs, code-quality.md:7 circular performance wording, the Bash(*vcs*pr*) glob) and the root-pass leftovers (dispatch.md brief-path trigger, visual-judging 'leaves no captures' wording, dev-server SKILL.md:31, plugin.test.ts stale comment). These were read at main bd31cf7 or on earlier branches; confirm each holds here. Part D of /home/user/holyagent-work/spec-0.2.1.md is binding, with B1 (no repeated text).",
+    "Instruction audit: read /root/.claude/plugins/synced/03eb801d-6ff6-4373-b5b1-f94edf359a3e_0f3e6ee9-af2e-4c2c-8d3c-9be25ca27713/holyagent/skills/instruction-writing/SKILL.md, then audit packages/runtime/src/instructions/claude-5.5 (root, specialist, roles, shared, skills, design-core) for ambiguity, contradictions between files, conflicting rules, unclear triggers, outdated references and repeated text, including the new precedence, code-quality, branch, design-skill, dev-server and visual-judging text. Fix what you find; list each fix.",
+    "A1 Claude Code version: give the minimums one owner in docs/requirements.md and state the tested version as the @anthropic-ai/claude-code version in bun.lock (CI validates with it); the README and other docs point there.",
+    "The session-start core has little room (sessioncontext.test.ts 'stay whole' fails about 70 characters later): keep the core within it; if a fix needs room, trim repeated core text rather than raising CONTEXT_BUDGET, and report the measured sizes.",
+    "Leave docs/development.md, AGENTS.md, scripts/ and packages/integrations/claude/src/vendor.ts alone: another branch changes them; list what they need under notes.",
+    "Diff file: /home/user/holyagent-work/diffs/audit-text.diff (exclude dist/scripts/holyagent.js)."
+  ],
+  "constraints": [
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report: name unrequested features, tests, files or refactors in the report instead of adding them, and start no extra review rounds. Do not stop early with a summary that announces a next step or an offer to wait.",
+    "A fix that would materially change HolyAgent's behavior beyond what the item and the maintainer decisions below state is not yours to make: leave it and report it under questions with the smallest options. The maintainer decided: the workflow hook auto-allow refuses unbounded loops (while/do, for without a literal bound) and repeat/padStart/padEnd with a large or computed count; keep the root-rules PreToolUse fallback registration; keep the legacy .holyclaude/.holycodex converter; the CLI ownership-overlap check applies per worktree (writers in different worktrees may own the same relative paths).",
+    "Other writers work in the same worktree at the same time on disjoint paths: edit only your ownership paths; if a fix needs a file outside them, report it instead. Never skip, disable or weaken a test to get green; a test that cannot fail gets a real assertion.",
+    "Make no version-control writes (no commit, checkout, switch, branch, stash, reset, push) and no edits under .git/ or .holyagent/; the root commits. Report every changed path and save 'git diff -- <your paths>' to the diff file named in the scope.",
+    "Work only inside /home/user/holyagent-fix-audit. Follow .claude/CLAUDE.md (Effect, tagged errors, Schema with onExcessProperty error, Bun APIs and Bun Shell, JSDoc on exports). Gate: 'bunx --no-install mise run build' then 'bunx --no-install mise run verify'; a failure in another writer's paths that you did not cause is reported, not fixed.",
+    "Report in under 450 words: one line per item (fixed with the test that fails without it, explained, or left with the reason); put long logs in /home/user/holyagent-work/logs/.",
+    "Keep the README's fixed sections. Do not change .claude/CLAUDE.md."
+  ],
+  "criteria": [
+    {
+      "text": "T1 is fixed with an assertion that can fail",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The instruction audit's contradictions, conflicting rules, unclear triggers and repeated text are fixed or explained, each listed",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The docs drift and duplication items are fixed or explained",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Each other item is fixed or explained",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify passes with the build in sync",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "session-start-size"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/runtime/src/cli/hook.ts",
+    "packages/runtime/src/cli/overview.ts",
+    "packages/runtime/src/cli/sessioncontext.ts",
+    "packages/integrations/claude/src/agents.ts",
+    "packages/integrations/claude/src/generate.ts",
+    "packages/integrations/claude/build.ts",
+    "packages/integrations/claude/tests/plugin.test.ts",
+    "packages/integrations/claude/tests/design-skills.test.ts",
+    "packages/integrations/claude/tests/hooks.test.ts",
+    "packages/integrations/claude/tests/host.test.ts",
+    "packages/runtime/tests/sessioncontext.test.ts",
+    "packages/runtime/tests/instructions.test.ts",
+    "packages/integrations/claude/dist",
+    "docs/README.md",
+    "docs/requirements.md",
+    "docs/hooks.md",
+    "docs/components.md",
+    "docs/usage.md",
+    "docs/decisions.md",
+    "docs/commit-authorship.md",
+    "docs/attributions.md",
+    "docs/pi",
+    "README.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T15:44:58.081Z"
+  },
+  "createdAt": "2026-11-04T15:44:58.081Z"
+}
