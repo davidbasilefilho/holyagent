@@ -23,6 +23,10 @@ This repository's own convention, enforced by CI and rulesets; HolyAgent's instr
 - A push to a branch runs `publish.yml`: validation first, then `stable.yml` on `main` (tag `holyagent-<version>` and a Release) or `dev.yml` elsewhere (tag `holyagent-<version>-dev-<short-hash>` and a pre-release). Tags are never a trigger, so a tag cannot start a release.
 - Pin every external action to a full commit SHA with a `# vX.Y.Z` comment, and give `contents: write` only to the jobs that tag and release. A moving tag can change what runs with the repository's token; `scripts/workflows.test.ts` checks both rules.
 
+## The version
+
+- The version lives in the root `package.json` only and changes only through `mise run bump:patch` or `bump:minor`, which edit that file alone. `mise run build` copies it to the workspace `package.json` files and `bun.lock` and generates the plugin and marketplace manifests from it, and `scripts/bump-version.test.ts` fails when any copy differs. A hand-edited copy is overwritten by the next build and fails that test, and a second place to bump is how copies drift apart.
+
 ## Commits and pull requests
 
 - `holyagent vcs` has two commands, `commit` and `pr`; branches, pushes, merges and CI use plain Git and `gh`. The `commit-msg` hook (`holyagent hook commit-msg`, wired in `lefthook.yml`) keeps agent attribution out of commits made with plain Git too.
@@ -33,6 +37,10 @@ This repository's own convention, enforced by CI and rulesets; HolyAgent's instr
 ## Version-control rules
 
 - The root commits only with `holyagent vcs commit`, uses plain Git and `gh` for branches, pushes, merges and CI, and never force-pushes or pushes to a protected branch without the user's approval. After a denial it stops that line of work and reports a blocker, and does not reach the same result through another tool, because a workaround defeats the boundary the user set. A specialist makes no version-control writes and no edits under `.git/` or `.holyagent/`, and reports its changed paths for the root to record. Nothing blocks these writes: the rules are instruction text, restated by hooks that only add context (`docs/hooks.md`).
+
+## Dependencies
+
+- Dependencies change only through the updater: `mise run deps:update` (`--dry-run` previews it, `mise run deps:check` fails when a pin is behind). It moves the GitHub Actions, the vendored ripgrep and fd with their recomputed checksums, the mise tools and the `package.json` ranges to the newest stable release line, and refreshes `bun.lock`. A hand edit of a pin or of `bun.lock` skips the SHA resolution, the checksum recomputation and the prerelease filter, and drifts from what the updater and `scripts/dependency-ranges.test.ts` expect. Every dependency range in a `package.json` is a caret range at its line boundary, or `workspace:*`.
 
 ## The README
 

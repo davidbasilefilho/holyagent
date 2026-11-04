@@ -22,12 +22,12 @@
     "verify": "mise run verify"
   },
   "devDependencies": {
-    "@anthropic-ai/claude-code": "2.1.300",
+    "@anthropic-ai/claude-code": "^2.0.0",
     "@types/bun": "^1.0.0",
     "effect": "^4.0.0",
-    "eslint-plugin-jsdoc": "^65.4.2",
+    "eslint-plugin-jsdoc": "^65.0.0",
     "lefthook": "^2.0.0",
-    "mise": "2026.10.24"
+    "mise": "^2026.0.0"
   },
   "trustedDependencies": [
     "@anthropic-ai/claude-code",
