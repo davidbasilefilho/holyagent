@@ -28,15 +28,16 @@ export interface Asset {
 
 /**
  * Ripgrep 15.2.0, from https://github.com/BurntSushi/ripgrep/releases/tag/15.2.0. The archive
- * hashes are the ones the release publishes in its `.sha256` files; the program hashes were taken
- * from the extracted files.
+ * hashes equal the ones the release publishes in its `.sha256` files, which the updater compares
+ * each download with before pinning it; the program hashes were taken from the extracted files.
  */
 const RIPGREP_VERSION = "15.2.0"
 
 /**
  * Fd 10.5.1, from https://github.com/sharkdp/fd/releases/tag/v10.5.1. The release publishes no
- * checksum file, so the archive hashes were taken from the downloaded files and are trusted on
- * first use; a changed archive fails the build.
+ * checksum file, so the archive hashes equal the `digest` that GitHub's release API reports for
+ * each asset, which the updater compares each download with before pinning it; the program hashes
+ * were taken from the extracted files. A changed archive fails the build.
  */
 const FD_VERSION = "10.5.1"
 
@@ -214,6 +215,7 @@ export const readZip = (
   return found
 }
 
+/** The named files of a gzipped tar archive, by name; a name the archive lacks is absent. */
 const readTar = async (
   bytes: Uint8Array,
   names: ReadonlyArray<string>,
@@ -226,6 +228,14 @@ const readTar = async (
   }
   return found
 }
+
+/** The named files of a release archive of the given format, by name; a missing name is absent. */
+export const readArchive = (
+  format: ArchiveFormat,
+  bytes: Uint8Array,
+  names: ReadonlyArray<string>,
+): Promise<ReadonlyMap<string, Uint8Array>> =>
+  format === "zip" ? Promise.resolve().then(() => readZip(bytes, names)) : readTar(bytes, names)
 
 /**
  * Checks a downloaded archive against the pin and writes its program and licenses below the vendor
@@ -244,7 +254,7 @@ export const installAsset = async (
     )
   const program = `${asset.folder}/${asset.tool}${asset.target.suffix}`
   const wanted = [program, ...asset.licenses.map((file) => `${asset.folder}/${file}`)]
-  const files = asset.format === "zip" ? readZip(archive, wanted) : await readTar(archive, wanted)
+  const files = await readArchive(asset.format, archive, wanted)
   for (const name of wanted) if (!files.has(name)) throw new Error(`${asset.url} has no ${name}`)
   const binary = files.get(program)
   if (binary === undefined || sha256(binary) !== asset.binarySha256)

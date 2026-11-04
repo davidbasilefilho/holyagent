@@ -2,10 +2,13 @@ import { describe, expect, test } from "bun:test"
 
 import {
   caretRange,
+  newestAllowedRelease,
   newestRelease,
   newestTag,
   packageDependencies,
   parseActionUses,
+  parseChecksumFile,
+  parseDigest,
   parseMiseTools,
   parseRelease,
   parseTags,
@@ -14,6 +17,7 @@ import {
   rewriteActionUses,
   rewriteMiseTools,
   rewriteVendoredTool,
+  unreadableActionUses,
   withPackageRanges,
 } from "./dependency-pins.ts"
 
@@ -240,5 +244,93 @@ describe("package dependencies", () => {
     expect(result["devDependencies"]).toEqual({ mise: "^2026.0.0" })
     expect(result["dependencies"]).toEqual(manifest.dependencies)
     expect(Object.keys(result)).toEqual(Object.keys(manifest))
+  })
+})
+
+describe("newestAllowedRelease", () => {
+  const versions = (...list: ReadonlyArray<string | readonly [string, string]>) =>
+    Object.fromEntries(
+      list.map((entry) =>
+        typeof entry === "string" ? [entry, {}] : [entry[0], { deprecated: entry[1] }],
+      ),
+    )
+
+  test("never goes above the latest dist-tag", () => {
+    expect(newestAllowedRelease(versions("1.0.0", "1.2.0", "2.0.0", "3.1.0"), "2.0.0")).toBe(
+      "2.0.0",
+    )
+    expect(newestAllowedRelease(versions("1.0.0", "1.2.0", "9.9.9"), "1.2.0")).toBe("1.2.0")
+  })
+
+  test("skips deprecated versions, falling back to the newest one below", () => {
+    expect(
+      newestAllowedRelease(versions("1.0.0", "1.1.0", ["1.2.0", "use 1.3.0 instead"]), "1.2.0"),
+    ).toBe("1.1.0")
+  })
+
+  test("skips prereleases", () => {
+    expect(newestAllowedRelease(versions("1.0.0", "1.1.0-rc.1"), "1.1.0-rc.1")).toBeUndefined()
+    expect(newestAllowedRelease(versions("1.0.0", "1.1.0-rc.1"), "1.1.0")).toBe("1.0.0")
+  })
+
+  test("gives nothing when latest is not a stable release or every version is deprecated", () => {
+    expect(newestAllowedRelease(versions("1.0.0"), "next")).toBeUndefined()
+    expect(newestAllowedRelease(versions(["1.0.0", "old"]), "1.0.0")).toBeUndefined()
+  })
+})
+
+describe("unreadableActionUses", () => {
+  const sha = "a".repeat(40)
+
+  test("lists external uses lines the updater cannot read, trimmed", () => {
+    const text = [
+      `      - uses: actions/checkout@${sha} # v4.1.0`,
+      "      - uses: actions/setup-node@v4",
+      `      - uses: actions/cache@${sha} # main`,
+      `      - uses: actions/upload@${sha}`,
+      `        uses: owner/repo/path@${sha} # v1.0`,
+    ].join("\n")
+    expect(unreadableActionUses(text)).toEqual([
+      "- uses: actions/setup-node@v4",
+      `- uses: actions/cache@${sha} # main`,
+      `- uses: actions/upload@${sha}`,
+      `uses: owner/repo/path@${sha} # v1.0`,
+    ])
+  })
+
+  test("ignores local and docker references, comments and the pins it reads", () => {
+    const text = [
+      "    uses: ./.github/workflows/validation.yml",
+      "      - uses: ./.github/actions/tag-release",
+      "      - uses: docker://alpine:3",
+      `      # uses: actions/checkout@v4`,
+      `      - uses: actions/checkout@${sha} # v4.1.0`,
+    ].join("\n")
+    expect(unreadableActionUses(text)).toEqual([])
+  })
+})
+
+describe("published checksums", () => {
+  const hash = "0123456789abcdef".repeat(4)
+
+  test("reads a sha256sum file and a CertUtil report", () => {
+    expect(parseChecksumFile(`${hash}  ripgrep.tar.gz\n`)).toBe(hash)
+    expect(parseChecksumFile(`SHA256 hash of ripgrep.zip:\n${hash}\nCertUtil: done\n`)).toBe(hash)
+    expect(parseChecksumFile(`${hash.toUpperCase()}  x`)).toBe(hash)
+  })
+
+  test.each(["Not Found", "", "abc123", "0".repeat(63), "0".repeat(65)])(
+    "reads no hash from %j",
+    (text) => {
+      expect(parseChecksumFile(text)).toBeUndefined()
+    },
+  )
+
+  test("reads only a sha256 digest", () => {
+    expect(parseDigest(`sha256:${hash}`)).toBe(hash)
+    expect(parseDigest(`sha1:${hash}`)).toBeUndefined()
+    expect(parseDigest(hash)).toBeUndefined()
+    expect(parseDigest("sha256:short")).toBeUndefined()
+    expect(parseDigest("")).toBeUndefined()
   })
 })

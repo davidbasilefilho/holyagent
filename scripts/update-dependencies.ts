@@ -3,15 +3,24 @@ import { join } from "node:path"
 import { $ } from "bun"
 import { Console, Data, Effect, Schema } from "effect"
 
-import { type Asset, ASSETS, readZip, sha256 } from "../packages/integrations/claude/src/vendor.ts"
+import { VENDOR_DIRECTORY } from "../packages/integrations/claude/src/files.ts"
+import {
+  type Asset,
+  ASSETS,
+  installAsset,
+  readArchive,
+  sha256,
+} from "../packages/integrations/claude/src/vendor.ts"
 import {
   caretRange,
   type Hashes,
-  newestRelease,
+  newestAllowedRelease,
   newestTag,
   packageDependencies,
   type PackageDependency,
   parseActionUses,
+  parseChecksumFile,
+  parseDigest,
   parseMiseTools,
   parseTags,
   parseVendoredVersion,
@@ -19,9 +28,11 @@ import {
   rewriteMiseTools,
   rewriteVendoredTool,
   type Tag,
+  unreadableActionUses,
   type VendoredTool,
   withPackageRanges,
 } from "./dependency-pins.ts"
+import { download } from "./vendor.ts"
 
 /** A registry, a git remote or a download could not be reached or answered something unusable. */
 export class SourceError extends Data.TaggedError("SourceError")<{
@@ -53,6 +64,20 @@ export class CommandError extends Data.TaggedError("CommandError")<{
   /** The description shown to the user. */
   override get message() {
     return `${this.command} exited with ${this.exitCode}`
+  }
+}
+
+/** A downloaded archive does not have the SHA-256 that its release publishes. */
+export class ChecksumMismatch extends Data.TaggedError("ChecksumMismatch")<{
+  readonly url: string
+  readonly actual: string
+  readonly expected: string
+  /** Where the expected hash was published. */
+  readonly via: string
+}> {
+  /** The description shown to the user. */
+  override get message() {
+    return `${this.url} has SHA-256 ${this.actual}, but ${this.via} publishes ${this.expected}`
   }
 }
 
@@ -105,19 +130,38 @@ export interface Survey {
 const strict = { onExcessProperty: "error" } as const
 
 // A registry answers with many fields this program does not own. Excess properties are errors, so
-// the response is decoded as a record of unknown values, which has none, with the one field the
+// each response is decoded as a record of unknown values, which has none, with the fields the
 // program reads named in a struct with an explicit open rest.
 const Fields = Schema.Record(Schema.String, Schema.Unknown)
-const Packument = Schema.StructWithRest(Schema.Struct({ versions: Fields }), [Fields])
+const open = <S extends Schema.Struct.Fields>(fields: S) =>
+  Schema.StructWithRest(Schema.Struct(fields), [Fields])
+const Packument = open({
+  "dist-tags": open({ latest: Schema.String }),
+  versions: Schema.Record(Schema.String, open({ deprecated: Schema.optionalKey(Schema.Unknown) })),
+})
+const GithubRelease = open({
+  assets: Schema.Array(
+    open({ name: Schema.String, digest: Schema.optionalKey(Schema.NullOr(Schema.String)) }),
+  ),
+})
 
 const REGISTRY = "https://registry.npmjs.org"
 const ABBREVIATED = "application/vnd.npm.install-v1+json"
 
-/** The GitHub remotes of the tools the updater knows, with the tag prefix of their releases. */
 const GITHUB = "https://github.com"
-const VENDORED: Record<VendoredTool, { repository: string; prefix: string }> = {
-  ripgrep: { repository: "BurntSushi/ripgrep", prefix: "" },
-  fd: { repository: "sharkdp/fd", prefix: "v" },
+const GITHUB_API = "https://api.github.com"
+
+/**
+ * The GitHub remotes of the vendored tools, with the tag prefix of their releases and where a
+ * release publishes the SHA-256 of its archives: a `<archive>.sha256` file, or the `digest` of the
+ * asset in GitHub's release API.
+ */
+const VENDORED: Record<
+  VendoredTool,
+  { repository: string; prefix: string; checksums: "file" | "release-digest" }
+> = {
+  ripgrep: { repository: "BurntSushi/ripgrep", prefix: "", checksums: "file" },
+  fd: { repository: "sharkdp/fd", prefix: "v", checksums: "release-digest" },
 }
 
 /** The mise tools whose releases are tags of a GitHub repository. */
@@ -156,7 +200,11 @@ const tagsOf = (repository: string) =>
     catch: (cause) => new SourceError({ source: `${GITHUB}/${repository}`, cause }),
   }).pipe(Effect.map(parseTags))
 
-const releasesOf = (name: string) =>
+/**
+ * The release a package moves to: the newest stable, non-deprecated version no higher than the
+ * registry's `latest` dist-tag.
+ */
+const releaseOf = (name: string) =>
   Effect.gen(function* () {
     const source = `${REGISTRY}/${name.replace("/", "%2F")}`
     const response = yield* Effect.tryPromise({
@@ -169,11 +217,20 @@ const releasesOf = (name: string) =>
       try: () => response.json() as Promise<unknown>,
       catch: (cause) => new SourceError({ source, cause }),
     })
-    const { versions } = yield* Schema.decodeUnknownEffect(
+    const packument = yield* Schema.decodeUnknownEffect(
       Packument,
       strict,
     )(body).pipe(Effect.mapError((cause) => new SourceError({ source, cause })))
-    return Object.keys(versions)
+    const latest = packument["dist-tags"].latest
+    const release = newestAllowedRelease(packument.versions, latest)
+    return release === undefined
+      ? yield* Effect.fail(
+          new SourceError({
+            source,
+            cause: `no stable, non-deprecated release at or below ${latest}`,
+          }),
+        )
+      : release
   })
 
 const newestOrFail = (source: string, tags: ReadonlyArray<Tag>, prefix: string) => {
@@ -198,11 +255,17 @@ const resolveAll = <K, V, E>(keys: Iterable<K>, resolve: (key: K) => Effect.Effe
 const surveyActions = (root: string) =>
   Effect.gen(function* () {
     const files = yield* scan(root, ".github/**/*.{yml,yaml}", true)
-    const uses = yield* Effect.forEach(files, (file) =>
-      readText(root, file).pipe(
-        Effect.map((text) => parseActionUses(text).map((use) => ({ file, ...use }))),
+    const texts = yield* Effect.forEach(files, (file) =>
+      readText(root, file).pipe(Effect.map((text) => ({ file, text }))),
+    )
+    const uses = texts.flatMap(({ file, text }) =>
+      parseActionUses(text).map((use) => ({ file, ...use })),
+    )
+    const skipped = texts.flatMap(({ file, text }) =>
+      unreadableActionUses(text).map(
+        (line) => `action ${file}: "${line}" is not pinned as @<sha> # vX.Y.Z`,
       ),
-    ).pipe(Effect.map((perFile) => perFile.flat()))
+    )
     const latest = yield* resolveAll(
       uses.map((use) => use.repository),
       (repository) =>
@@ -228,7 +291,7 @@ const surveyActions = (root: string) =>
         }),
       ).values(),
     ]
-    return { pins, latest }
+    return { pins, latest, skipped }
   })
 
 const surveyVendored = (root: string) =>
@@ -288,11 +351,26 @@ const surveyMise = (root: string) =>
     return { pins, latest, skipped }
   })
 
+/**
+ * The `package.json` files of the repository: the root one and one in each folder that a
+ * `workspaces` glob of the root names, relative to `root`. Nothing under `node_modules` is read.
+ */
+export const manifestFiles = (root: string) =>
+  Effect.gen(function* () {
+    const text = yield* readText(root, "package.json")
+    const { workspaces = [] } = yield* Schema.decodeUnknownEffect(
+      Schema.fromJsonString(open({ workspaces: Schema.optionalKey(Schema.Array(Schema.String)) })),
+      strict,
+    )(text).pipe(Effect.mapError((cause) => new FileError({ file: "package.json", cause })))
+    const found = yield* Effect.forEach(workspaces, (glob) =>
+      scan(root, `${glob}/package.json`, false),
+    )
+    return ["package.json", ...new Set(found.flat())].toSorted()
+  })
+
 const surveyPackages = (root: string) =>
   Effect.gen(function* () {
-    const files = (yield* scan(root, "**/package.json", false)).filter(
-      (file) => !file.split("/").includes("node_modules"),
-    )
+    const files = yield* manifestFiles(root)
     const manifests = yield* Effect.forEach(files, (file) =>
       readText(root, file).pipe(
         Effect.flatMap((text) =>
@@ -304,17 +382,7 @@ const surveyPackages = (root: string) =>
     )
     const releases = yield* resolveAll(
       manifests.flatMap(({ dependencies }) => dependencies.map(({ name }) => name)),
-      (name) =>
-        releasesOf(name).pipe(
-          Effect.map(newestRelease),
-          Effect.flatMap((release) =>
-            release === undefined
-              ? Effect.fail(
-                  new SourceError({ source: `${REGISTRY}/${name}`, cause: "no stable release" }),
-                )
-              : Effect.succeed(release),
-          ),
-        ),
+      releaseOf,
     )
     const pins: Array<Pin> = []
     const ranges = new Map<string, Array<PackageDependency>>()
@@ -346,7 +414,7 @@ export const survey = (root: string) =>
     const packages = yield* surveyPackages(root)
     return {
       pins: [...actions.pins, ...vendored.pins, ...mise.pins, ...packages.pins],
-      skipped: mise.skipped,
+      skipped: [...actions.skipped, ...mise.skipped],
       actions: actions.latest,
       vendored: vendored.latest,
       mise: mise.latest,
@@ -354,70 +422,160 @@ export const survey = (root: string) =>
     } satisfies Survey
   })
 
-const download = (url: string) =>
-  Effect.gen(function* () {
-    const response = yield* Effect.tryPromise({
-      try: () => fetch(url),
-      catch: (cause) => new SourceError({ source: url, cause }),
-    })
-    if (!response.ok)
-      return yield* Effect.fail(
-        new SourceError({ source: url, cause: `answered ${response.status}` }),
-      )
-    return yield* Effect.tryPromise({
-      try: () => response.bytes(),
-      catch: (cause) => new SourceError({ source: url, cause }),
-    })
+/** What the updater reads from the network, so a test can stand in for it. */
+export type Get = (url: string) => Effect.Effect<Uint8Array, SourceError>
+
+/** The bytes at a URL, through the vendor script's download. */
+const fetchBytes: Get = (url) =>
+  Effect.tryPromise({
+    try: () => download(url),
+    catch: (cause) => new SourceError({ source: url, cause }),
   })
+
+const fetchText = (get: Get, url: string) =>
+  get(url).pipe(Effect.map((bytes) => new TextDecoder().decode(bytes)))
 
 /** The program inside a release archive, by its path in the archive. */
 const programOf = (asset: Asset, archive: Uint8Array, path: string) =>
-  Effect.gen(function* () {
-    const source = asset.url
-    const program =
-      asset.format === "zip"
-        ? (yield* Effect.try({
-            try: () => readZip(archive, [path]),
-            catch: (cause) => new SourceError({ source, cause }),
-          })).get(path)
-        : yield* Effect.tryPromise({
-            try: () => new Bun.Archive(archive).files(),
-            catch: (cause) => new SourceError({ source, cause }),
-          }).pipe(
-            Effect.flatMap((files) =>
-              Effect.tryPromise({
-                try: () => files.get(path)?.bytes() ?? Promise.resolve(undefined),
-                catch: (cause) => new SourceError({ source, cause }),
-              }),
-            ),
-          )
-    return program === undefined
-      ? yield* Effect.fail(new SourceError({ source, cause: `the archive has no ${path}` }))
-      : program
-  })
+  Effect.tryPromise({
+    try: () => readArchive(asset.format, archive, [path]).then((files) => files.get(path)),
+    catch: (cause) => new SourceError({ source: asset.url, cause }),
+  }).pipe(
+    Effect.flatMap((program) =>
+      program === undefined
+        ? Effect.fail(new SourceError({ source: asset.url, cause: `the archive has no ${path}` }))
+        : Effect.succeed(program),
+    ),
+  )
+
+/** Where a SHA-256 was published and what it is. */
+interface Published {
+  readonly hash: string
+  readonly via: string
+}
+
+/** Fails with `ChecksumMismatch` unless the archive's SHA-256 is the published one. */
+export const verifyChecksum = (url: string, actual: string, published: Published) =>
+  actual === published.hash
+    ? Effect.void
+    : Effect.fail(
+        new ChecksumMismatch({ url, actual, expected: published.hash, via: published.via }),
+      )
+
+const published = (
+  url: string,
+  via: string,
+  hash: string | undefined,
+): Effect.Effect<Published, SourceError> =>
+  hash === undefined
+    ? Effect.fail(new SourceError({ source: url, cause: `${via} publishes no SHA-256` }))
+    : Effect.succeed({ hash, via })
 
 /**
- * The hashes of a vendored tool's release archives for every target, taken from the downloads: the
- * SHA-256 of each archive and of the program inside. The archives are the current ones with the
- * version replaced in their URL and folder.
+ * The SHA-256 that a tool's release publishes for each archive, by archive URL: ripgrep's
+ * `<archive>.sha256` file, or, for fd, which publishes no file, the `digest` that GitHub's release
+ * API reports for the asset. It fails when the release publishes none for an archive, because an
+ * archive that nothing independent vouches for is not pinned.
  */
-export const hashesOf = (tool: VendoredTool, from: string, to: string) =>
-  Effect.forEach(
-    ASSETS.filter((asset) => asset.project === tool),
-    (asset) =>
-      Effect.gen(function* () {
-        const url = asset.url.replaceAll(from, to)
-        const folder = asset.folder.replaceAll(from, to)
-        const archive = yield* download(url)
-        const program = yield* programOf(
-          asset,
-          archive,
-          `${folder}/${asset.tool}${asset.target.suffix}`,
-        )
-        return [asset.target.id, { archive: sha256(archive), binary: sha256(program) }] as const
-      }),
-    { concurrency: 2 },
-  ).pipe(Effect.map((entries): ReadonlyMap<string, Hashes> => new Map(entries)))
+const publishedChecksums = (
+  tool: VendoredTool,
+  urls: ReadonlyArray<string>,
+  tag: string,
+  get: Get,
+) =>
+  Effect.gen(function* () {
+    const { repository, checksums } = VENDORED[tool]
+    if (checksums === "file")
+      return new Map(
+        yield* Effect.forEach(urls, (url) =>
+          fetchText(get, `${url}.sha256`).pipe(
+            Effect.flatMap((text) => published(url, `${url}.sha256`, parseChecksumFile(text))),
+            Effect.map((entry) => [url, entry] as const),
+          ),
+        ),
+      )
+    const api = `${GITHUB_API}/repos/${repository}/releases/tags/${tag}`
+    const release = yield* fetchText(get, api).pipe(
+      Effect.flatMap((text) =>
+        Schema.decodeUnknownEffect(
+          Schema.fromJsonString(GithubRelease),
+          strict,
+        )(text).pipe(Effect.mapError((cause) => new SourceError({ source: api, cause }))),
+      ),
+    )
+    const digests = new Map(release.assets.map(({ name, digest }) => [name, digest ?? ""] as const))
+    return new Map(
+      yield* Effect.forEach(urls, (url) =>
+        published(
+          url,
+          `the GitHub release API (${api})`,
+          parseDigest(digests.get(url.slice(url.lastIndexOf("/") + 1)) ?? ""),
+        ).pipe(Effect.map((entry) => [url, entry] as const)),
+      ),
+    )
+  })
+
+/** A release archive of a vendored tool that was downloaded and checked. */
+export interface Downloaded {
+  /** The asset at its new version, with the hashes it has now. */
+  readonly asset: Asset
+  readonly archive: Uint8Array
+  readonly hashes: Hashes
+}
+
+/**
+ * Downloads a vendored tool's release archives for every target and returns them with their hashes,
+ * by target id: the SHA-256 of each archive and of the program inside. The archives are the current
+ * ones with the version replaced in their URL and folder. Each archive is hashed once and compared
+ * with the hash its release publishes (see `publishedChecksums`) before its contents are read, and
+ * a difference fails with `ChecksumMismatch`, so no hash is pinned on the word of one download.
+ */
+export const fetchVendored = (
+  tool: VendoredTool,
+  from: string,
+  to: string,
+  get: Get = fetchBytes,
+) =>
+  Effect.gen(function* () {
+    const assets = ASSETS.filter((asset) => asset.project === tool).map((asset): Asset => ({
+      ...asset,
+      url: asset.url.replaceAll(from, to),
+      folder: asset.folder.replaceAll(from, to),
+    }))
+    const checksums = yield* publishedChecksums(
+      tool,
+      assets.map((asset) => asset.url),
+      `${VENDORED[tool].prefix}${to}`,
+      get,
+    )
+    return yield* Effect.forEach(
+      assets,
+      (asset) =>
+        Effect.gen(function* () {
+          const archive = yield* get(asset.url)
+          const hash = sha256(archive)
+          const expected = checksums.get(asset.url)
+          if (expected === undefined)
+            return yield* Effect.fail(new SourceError({ source: asset.url, cause: "no checksum" }))
+          yield* verifyChecksum(asset.url, hash, expected)
+          const program = yield* programOf(
+            asset,
+            archive,
+            `${asset.folder}/${asset.tool}${asset.target.suffix}`,
+          )
+          const hashes = { archive: hash, binary: sha256(program) }
+          return [
+            asset.target.id,
+            {
+              asset: { ...asset, archiveSha256: hashes.archive, binarySha256: hashes.binary },
+              archive,
+              hashes,
+            },
+          ] as const
+        }),
+      { concurrency: 2 },
+    ).pipe(Effect.map((entries): ReadonlyMap<string, Downloaded> => new Map(entries)))
+  })
 
 const run = (command: string, execute: () => Promise<{ readonly exitCode: number }>) =>
   Effect.tryPromise({
@@ -429,59 +587,82 @@ const run = (command: string, execute: () => Promise<{ readonly exitCode: number
     ),
   )
 
-const writeRanges = (root: string, packages: Survey["packages"]) =>
-  Effect.forEach(packages, ([file, ranges]) =>
+/** The text of each manifest of a survey with its ranges set; nothing is written. */
+const renderRanges = (root: string, packages: Survey["packages"]) =>
+  Effect.forEach([...packages], ([file, ranges]) =>
     Effect.gen(function* () {
       const text = yield* readText(root, file)
       const manifest = yield* Schema.decodeUnknownEffect(
         Schema.fromJsonString(Fields),
         strict,
       )(text).pipe(Effect.mapError((cause) => new FileError({ file, cause })))
-      yield* writeText(
-        root,
-        file,
-        `${JSON.stringify(withPackageRanges(manifest, ranges), null, 2)}\n`,
-      )
+      return [file, `${JSON.stringify(withPackageRanges(manifest, ranges), null, 2)}\n`] as const
     }),
   )
 
+const writeRanges = (root: string, packages: Survey["packages"]) =>
+  renderRanges(root, packages).pipe(
+    Effect.flatMap((rendered) =>
+      Effect.forEach(rendered, ([file, text]) => writeText(root, file, text)),
+    ),
+  )
+
 /**
- * Writes the moves a survey found. Actions, the mise tools and the package ranges are rewritten in
- * place; a vendored tool gets its new version and the hashes taken from its downloaded archives,
- * and `scripts/vendor.ts` (the `vendor` task) re-vendors the programs. `bun update` then refreshes
- * the lockfile within the new ranges.
+ * Writes the moves a survey found. Everything that can fail on the network or on a file is done
+ * first: the new texts of the workflows, `mise.toml`, the manifests and the vendored pins are
+ * computed, and every moved archive is downloaded and checked against its release's published
+ * SHA-256. Only then is anything written, so a failed download leaves the tree unchanged. The moved
+ * programs are installed from the archives already downloaded, `scripts/vendor.ts` (the `vendor`
+ * task) removes what no pin names, and `bun update` then refreshes the lockfile within the new
+ * ranges. The installs run with `--ignore-scripts`, so a freshly published package never runs code
+ * on this machine.
  */
 export const applySurvey = (root: string, found: Survey) =>
   Effect.gen(function* () {
-    const files = [...new Set(found.pins.filter((p) => p.kind === "action").map((p) => p.file))]
-    yield* Effect.forEach(files, (file) =>
-      readText(root, file).pipe(
-        Effect.flatMap((text) => writeText(root, file, rewriteActionUses(text, found.actions))),
-      ),
+    const workflows = yield* Effect.forEach(
+      [...new Set(found.pins.filter((p) => p.kind === "action").map((p) => p.file))],
+      (file) =>
+        readText(root, file).pipe(
+          Effect.map((text) => [file, rewriteActionUses(text, found.actions)] as const),
+        ),
     )
-    const mise = yield* readText(root, "mise.toml")
-    yield* writeText(root, "mise.toml", rewriteMiseTools(mise, found.mise))
-    yield* writeRanges(root, found.packages)
+    const mise = rewriteMiseTools(yield* readText(root, "mise.toml"), found.mise)
+    const ranges = yield* renderRanges(root, found.packages)
     const moved = found.pins.filter((pin) => pin.kind === "vendor" && isBehind(pin))
     let vendor = yield* readText(root, VENDOR_PINS)
+    const archives: Array<Downloaded> = []
     for (const pin of moved) {
       const tool = pin.name as VendoredTool
-      const hashes = yield* hashesOf(tool, pin.current, pin.next)
+      const fetched = yield* fetchVendored(tool, pin.current, pin.next)
+      archives.push(...fetched.values())
+      const hashes = new Map([...fetched].map(([target, { hashes }]) => [target, hashes] as const))
       vendor = yield* Effect.try({
         try: () => rewriteVendoredTool(vendor, tool, pin.next, hashes),
         catch: (cause) => new FileError({ file: VENDOR_PINS, cause }),
       })
     }
+    for (const [file, text] of workflows) yield* writeText(root, file, text)
+    yield* writeText(root, "mise.toml", mise)
+    for (const [file, text] of ranges) yield* writeText(root, file, text)
     if (moved.length > 0) {
       yield* writeText(root, VENDOR_PINS, vendor)
+      for (const { asset, archive } of archives)
+        yield* Effect.tryPromise({
+          try: () => installAsset(join(root, VENDOR_DIRECTORY), asset, archive),
+          catch: (cause) => new FileError({ file: asset.url, cause }),
+        })
       yield* run("bun scripts/vendor.ts", () => $`bun scripts/vendor.ts`.cwd(root).nothrow())
     }
     // `bun update` moves the lockfile to the newest release within each range, but it also writes
     // that release into package.json as the range. The ranges are written back, and `bun install`
     // then records them in the lockfile.
-    yield* run("bun update", () => $`bun update`.cwd(root).nothrow())
+    yield* run("bun update --ignore-scripts", () =>
+      $`bun update --ignore-scripts`.cwd(root).nothrow(),
+    )
     yield* writeRanges(root, found.packages)
-    yield* run("bun install", () => $`bun install`.cwd(root).nothrow())
+    yield* run("bun install --ignore-scripts", () =>
+      $`bun install --ignore-scripts`.cwd(root).nothrow(),
+    )
   })
 
 const describePin = (pin: Pin): string =>
@@ -503,16 +684,28 @@ const parseArguments = (args: ReadonlyArray<string>) => {
     : Effect.succeed({ mode, root: positional[0] ?? join(import.meta.dir, "..") })
 }
 
+/** The steps of a run that touch the network and the tree, so a test can stand in for them. */
+export interface Steps {
+  readonly survey: (root: string) => Effect.Effect<Survey, FileError | SourceError>
+  readonly apply: (
+    root: string,
+    found: Survey,
+  ) => Effect.Effect<void, CommandError | FileError | SourceError | ChecksumMismatch>
+}
+
 /**
  * Runs `[--dry-run | --check] [root]` on `root` (the repository root by default). `--dry-run`
  * prints `current -> next` for every pin and writes nothing; `--check` prints the pins that are
- * behind and fails when there are any; with neither, the updater moves every pin and refreshes the
- * lockfile. A failure is printed and sets a failing exit code.
+ * behind and fails with `PinsBehind` when there are any; with neither, the updater moves every pin
+ * and refreshes the lockfile. Only the apply mode calls `steps.apply`.
  */
-export const main = (args: ReadonlyArray<string>) =>
+export const execute = (
+  args: ReadonlyArray<string>,
+  steps: Steps = { survey, apply: applySurvey },
+) =>
   Effect.gen(function* () {
     const { mode, root } = yield* parseArguments(args)
-    const found = yield* survey(root)
+    const found = yield* steps.survey(root)
     const behind = found.pins.filter(isBehind)
     for (const pin of mode === "dry-run" ? found.pins : behind) yield* Console.log(describePin(pin))
     for (const note of found.skipped) yield* Console.log(`skipped ${note}`)
@@ -523,9 +716,13 @@ export const main = (args: ReadonlyArray<string>) =>
     }
     if (mode === "dry-run")
       return yield* Console.log(`${behind.length} of ${found.pins.length} pins are behind`)
-    yield* applySurvey(root, found)
+    yield* steps.apply(root, found)
     yield* Console.log(`moved ${behind.length} of ${found.pins.length} pins`)
-  }).pipe(
+  })
+
+/** Runs `execute`, prints a failure and sets a failing exit code. */
+export const main = (args: ReadonlyArray<string>, steps?: Steps) =>
+  execute(args, steps).pipe(
     Effect.catch((error) =>
       Console.error(`error: ${error._tag}: ${error.message}`).pipe(
         Effect.andThen(

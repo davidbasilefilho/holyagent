@@ -3,17 +3,10 @@ import { join } from "node:path"
 
 import { Effect, Schema } from "effect"
 
-const repository = join(import.meta.dir, "..")
+import { DEPENDENCY_FIELDS } from "./dependency-pins.ts"
+import { manifestFiles } from "./update-dependencies.ts"
 
-/** The fields of a `package.json` that name dependencies and their versions. */
-const FIELDS = [
-  "dependencies",
-  "devDependencies",
-  "peerDependencies",
-  "optionalDependencies",
-  "overrides",
-  "resolutions",
-]
+const repository = join(import.meta.dir, "..")
 
 /** A caret range at its line boundary: `^X.0.0` for X >= 1, `^0.X.0`, or `^0.0.X`. */
 const BOUNDARY_RANGE = /^\^(?:[1-9]\d*\.0\.0|0\.[1-9]\d*\.0|0\.0\.\d+)$/
@@ -28,7 +21,7 @@ interface Use {
 
 /** Every version specifier below the dependency fields, including nested override tables. */
 const uses = (manifest: Record<string, unknown>): Array<Use> =>
-  FIELDS.flatMap((field) => {
+  DEPENDENCY_FIELDS.flatMap((field) => {
     const walk = (value: unknown, path: string): Array<Use> =>
       value !== null && typeof value === "object" && !Array.isArray(value)
         ? Object.entries(value).flatMap(([name, inner]) => walk(inner, name))
@@ -54,10 +47,7 @@ const problems = (
   })
 
 const loadManifests = async () => {
-  const files = (await Array.fromAsync(new Bun.Glob("**/package.json").scan({ cwd: repository })))
-    .map((file) => file.replaceAll("\\", "/"))
-    .filter((file) => !file.split("/").includes("node_modules"))
-    .toSorted()
+  const files = await Effect.runPromise(manifestFiles(repository))
   return Promise.all(
     files.map(async (file) => ({
       file,
@@ -101,7 +91,7 @@ describe("the rule", () => {
     expect(problems("f", { dependencies: { other: "workspace:*" } }, workspaces)).toHaveLength(1)
   })
 
-  test.each(FIELDS)("a bad range in %s is found", (field) => {
+  test.each(DEPENDENCY_FIELDS)("a bad range in %s is found", (field) => {
     expect(problems("f", { [field]: { x: "1.2.3" } }, workspaces)).toHaveLength(1)
   })
 

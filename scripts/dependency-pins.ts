@@ -92,6 +92,29 @@ export const parseTags = (output: string): ReadonlyArray<Tag> => {
 }
 
 /**
+ * The release a package should move to: the newest stable version that is not deprecated and is no
+ * higher than the registry's `latest` dist-tag. The tag is the publisher's own statement of the
+ * current release, so a version published above it (a canary, or a malicious publish) is never
+ * picked; a `latest` that is not a stable release gives `undefined`, as does no eligible version.
+ * `versions` maps each published version to its metadata, where a truthy `deprecated` marks it.
+ */
+export const newestAllowedRelease = (
+  versions: Readonly<Record<string, { readonly deprecated?: unknown }>>,
+  latest: string,
+): string | undefined => {
+  const cap = parseRelease(latest)
+  if (cap === undefined) return undefined
+  return newestRelease(
+    Object.entries(versions).flatMap(([version, metadata]) => {
+      const release = parseRelease(version)
+      return release !== undefined && !metadata.deprecated && compareReleases(release, cap) <= 0
+        ? [version]
+        : []
+    }),
+  )
+}
+
+/**
  * The newest stable tag among some tags, with its release: tags that are not `<prefix>X.Y.Z`
  * (floating tags such as `v7`, prereleases, other products' tags) are ignored.
  */
@@ -108,6 +131,21 @@ export const newestTag = (
   const tag = release === undefined ? undefined : byRelease.get(release)
   return release === undefined || tag === undefined ? undefined : { release, tag }
 }
+
+/**
+ * The SHA-256 a `<asset>.sha256` file publishes: the first run of exactly 64 hex digits, as
+ * lowercase hex, else `undefined`. The files come in two layouts: `sha256sum`'s `<hash> <name>` and
+ * the Windows `CertUtil` report, where a line `SHA256 hash of <name>:` comes before the hash.
+ */
+export const parseChecksumFile = (text: string): string | undefined =>
+  /(?<![0-9a-f])[0-9a-f]{64}(?![0-9a-f])/i.exec(text)?.[0].toLowerCase()
+
+/**
+ * The SHA-256 in a GitHub release asset `digest` (`sha256:<hex>`) as lowercase hex, else
+ * `undefined`.
+ */
+export const parseDigest = (digest: string): string | undefined =>
+  /^sha256:([0-9a-f]{64})$/i.exec(digest)?.[1]?.toLowerCase()
 
 /** One external action reference in a workflow: `uses: owner/repo[/path]@<sha> # vX.Y.Z`. */
 export interface ActionUse {
@@ -128,6 +166,26 @@ export const parseActionUses = (text: string): ReadonlyArray<ActionUse> =>
     sha,
     version,
   }))
+
+const ACTION_LINE = new RegExp(ACTION_USE.source)
+const USES_LINE = /^\s*(?:-\s+)?uses:\s*(\S+)/
+
+/**
+ * The external `uses:` lines of a workflow or action file that `parseActionUses` cannot read: no
+ * full commit SHA, or a trailing comment other than `# vX.Y.Z`. The updater cannot move these, so
+ * it reports them instead of letting a stale action pass unnoticed. Local (`./`) and `docker://`
+ * references are not pins and are not listed. Each line is trimmed.
+ */
+export const unreadableActionUses = (text: string): ReadonlyArray<string> =>
+  text.split("\n").flatMap((line) => {
+    const target = USES_LINE.exec(line)?.[1]
+    return target === undefined ||
+      target.startsWith("./") ||
+      target.startsWith("docker://") ||
+      ACTION_LINE.test(line)
+      ? []
+      : [line.trim()]
+  })
 
 /**
  * Rewrites every pinned action of a workflow to the commit and version in `latest`, which maps
