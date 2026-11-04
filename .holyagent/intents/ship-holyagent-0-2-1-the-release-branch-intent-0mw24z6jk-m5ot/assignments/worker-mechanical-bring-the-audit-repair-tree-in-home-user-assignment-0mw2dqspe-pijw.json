@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mw2dqspe-pijw",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 4,
+  "roleTask": "Worker.mechanical",
+  "slug": "bring-the-audit-repair-tree-in-home-user",
+  "objective": "Bring the audit repair tree in /home/user/holyagent-fix-audit to a state where the build is in sync and mise run verify passes, changing formatting only.",
+  "state": "Running",
+  "scope": [
+    "Two writers just finished in this worktree; one ran the formatter over the other's mid-edit files, so packages/runtime/src/cli/workflow-check.ts and packages/runtime/tests/workflow-check.test.ts may fail the format check and the generated dist may be stale. Run 'bunx --no-install mise run build'. If 'bunx --no-install mise run fmt:check' (or the format step of verify) fails, run the repository formatter task from mise.toml on the failing files only, then rebuild. Then run 'bunx --no-install mise run verify'. See docs/development.md for the tasks.",
+    "Also run, from /home/user/holyagent-fix-audit, every workflow script in /root/.claude/projects/-home-user-holyagent/70184bfa-8a56-57cb-a6cf-d92f87c7692b/workflows/scripts/ through the workflow hook check and report which, if any, are refused and the reason the hook gives. Find how tests invoke the check (packages/runtime/tests/workflow-check.test.ts or packages/integrations/claude/tests/hooks.test.ts) and call it the same way from a scratch script in /home/user/holyagent-work/ (not in the repository). These are real scripts the root wrote; they should all be allowed."
+  ],
+  "constraints": [
+    "Change only formatting in the repository; if verify fails for any reason other than formatting or a stale build, stop and report the failing tests with their messages, without fixing code.",
+    "Make no commits or other git writes and no edits under .git/ or .holyagent/.",
+    "Keep working until done; stop and report. Report in under 200 words: commands, exit codes, counts, files reformatted, and the refused scripts with reasons."
+  ],
+  "criteria": [
+    {
+      "text": "mise run build leaves dist in sync and mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Every real root workflow script in the session scripts folder is allowed by the workflow hook check, or the refused ones are listed with the reason",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "git-status"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli/workflow-check.ts",
+    "packages/runtime/tests/workflow-check.test.ts",
+    "packages/integrations/claude/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-04T17:17:42.483Z"
+  },
+  "createdAt": "2026-11-04T17:17:42.483Z"
+}
