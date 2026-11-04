@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mw250ooj-g4ir",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 1,
+  "roleTask": "Explorer.trace",
+  "slug": "check-whether-holyagent-s-root-stack-and",
+  "objective": "Check whether HolyAgent's root stack and PR rules pick up a repository's own branch conventions from AGENTS.md (such as an integration branch per release that work PRs must target) and find where they would not or are ambiguous.",
+  "state": "Ready",
+  "scope": [
+    "Read /home/user/holyagent-work/spec-0.2.1.md Part A1 and B1 (precedence).",
+    "Read the root instruction sources under /home/user/holyagent/packages/runtime/src/instructions/claude-5.5/ (root/*.md, especially version control, stack plan, PR text) and the generated /home/user/holyagent/packages/integrations/claude/dist/agents/holyagent.md, plus any runtime code that picks a PR base or branch name (holyagent vcs pr, state-mode).",
+    "Walk the case: a repository whose AGENTS.md says each release has release/<v>/integration cut from main, work PRs target it, and only it opens a PR into main. Would the root pick the integration branch as 'the base' of a delivery's first PR, name branches correctly, stack correctly, and avoid opening a work PR into main? Name each rule (file and line) that reads 'the base' as the default branch or is otherwise ambiguous.",
+    "Also list where precedence (repository mergeability and conventions vs HolyAgent defaults) is stated today, file and line."
+  ],
+  "constraints": [
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done, stop and report; name anything unrequested instead of doing it. Do not end early with a summary that announces a next step or an offer to wait. Read-only: change no files, make no git writes.",
+    "Report in under 600 words: the walk-through, then a numbered list of ambiguous or wrong rules with file:line and a one-line generic fix for each."
+  ],
+  "criteria": [
+    {
+      "text": "The walk-through names each rule that decides base, branch name and PR target, with file:line",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Each ambiguous rule has a generic fix that hardcodes no repository's convention",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "walkthrough",
+    "ambiguities",
+    "precedence-sites"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-04T13:13:27.284Z"
+}
