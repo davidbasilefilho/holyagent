@@ -1,0 +1,36 @@
+{
+  "id": "assignment-0mw2d7bvf-bvlz",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-merge-commit-99522de-that",
+  "objective": "Review the merge commit 99522de that brings release/0.2.1/integration (now with the version-source and design-skills work) into release/0.2.1/feat/dev-server-targets, in /home/user/holyagent-feat-dev-server-targets.",
+  "state": "Running",
+  "scope": [
+    "The merge auto-resolved without conflicts, including the generated packages/integrations/claude/dist files. Judge whether the sides still work together: read 'git -C /home/user/holyagent-feat-dev-server-targets diff 8959d0c 99522de --stat' and the shared files it touches (plugin.test.ts, root/assignments.md, specialist/interface-inspection.md, requirements.md, generated dist files), and 'git diff ab9d81f 99522de' for what the branch adds over integration. Run 'bunx --no-install mise run build' in a scratch copy only if you need to confirm the generated files match their sources.",
+    "Binding: Part C of /home/user/holyagent-work/spec-0.2.1.md."
+  ],
+  "constraints": [
+    "Read-only: no repository edits and no git writes; experiments go in a scratch copy outside the repository.",
+    "Keep working until the review is done; stop and report. Report in under 300 words, findings ranked with file:line, blocking or non-blocking, and the smallest fix."
+  ],
+  "criteria": [
+    {
+      "text": "The merge leaves the dev-server targets and the integration work consistent with no regression",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T17:02:34.204Z"
+  },
+  "createdAt": "2026-11-04T17:02:34.204Z"
+}
