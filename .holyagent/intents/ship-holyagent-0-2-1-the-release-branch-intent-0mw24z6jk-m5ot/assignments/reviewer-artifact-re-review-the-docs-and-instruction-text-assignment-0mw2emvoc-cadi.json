@@ -35,6 +35,7 @@
     "assignment-0mw2e2c25-0wnn"
   ],
   "specialist": {
+    "agentId": "workflow:wf_d6b21692-bbb/assignment-0mw2emvoc-cadi",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-04T17:42:39.324Z"
