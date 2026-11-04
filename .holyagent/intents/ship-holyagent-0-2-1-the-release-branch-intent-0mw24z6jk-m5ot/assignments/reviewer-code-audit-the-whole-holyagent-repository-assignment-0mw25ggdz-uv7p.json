@@ -1,0 +1,50 @@
+{
+  "id": "assignment-0mw25ggdz-uv7p",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 2,
+  "roleTask": "Reviewer.code",
+  "slug": "audit-the-whole-holyagent-repository",
+  "objective": "Audit the whole holyagent repository code at /home/user/holyagent (main, bd31cf7) for Part D of the 0.2.1 request: bugs, dead code, tests that do not test what they claim, duplicated code, and slow paths.",
+  "state": "Running",
+  "scope": [
+    "Read /home/user/holyagent-work/spec-0.2.1.md Part D and B1 (no-duplication, performance, readability rules) for the bar.",
+    "Cover packages/runtime/src (cli, vcs, domain, setup, instructions/*.ts), packages/integrations/claude/src and build.ts, scripts/, and every test file. Skip generated packages/integrations/claude/dist and the docs/pi research.",
+    "Do not review the instruction markdown or docs (other audits cover them). Release flow, version source and dependency updater are being rewritten on other branches (.github/workflows, scripts/bump-version.ts and the version plumbing): note findings there briefly but do not dig."
+  ],
+  "constraints": [
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. When done, stop and report; name anything unrequested instead of doing it. Do not stop early with a summary that announces a next step or an offer to wait. Read-only: change no files in the repository and make no git writes.",
+    "Each finding: file:line, what is wrong, a concrete failure scenario or the evidence (a command and its output where you ran one), blocking or non-blocking, and the smallest fix. Mark any fix that would materially change HolyAgent's user-visible behavior.",
+    "You may run read-only commands such as bun test in /home/user/holyagent; run 'bun install --frozen-lockfile' first if node_modules is missing.",
+    "Write the full findings list to /home/user/holyagent-work/audit-code.md (outside the repository) and report in under 500 words: counts by category and the top findings."
+  ],
+  "criteria": [
+    {
+      "text": "Every finding carries file:line, evidence or a failure scenario, a severity and a fix",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Findings that would materially change HolyAgent behavior are marked",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The full list is written to /home/user/holyagent-work/audit-code.md",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings-file",
+    "categories"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T13:25:43.031Z"
+  },
+  "createdAt": "2026-11-04T13:25:43.031Z"
+}
