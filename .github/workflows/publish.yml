@@ -1,16 +1,18 @@
 name: Publish
 
-# Runs on branch pushes only: with a `branches` filter and no `tags` filter, a pushed tag never
-# starts it, so the tags it creates cannot loop back in. Nothing is tagged until validation passes
-# for the pushed commit.
+# Runs on branch pushes only: with a branch filter and no `tags` filter, a pushed tag never starts
+# it, so the tags it creates cannot loop back in. Nothing is tagged until validation passes for the
+# pushed commit. The holyagent/state branch holds records, not the project, so it has nothing to
+# validate or tag.
 on:
   push:
-    branches: ["**"]
+    branches-ignore: [holyagent/state]
 
 permissions:
   contents: read
 
-# A newer push queues behind a running one instead of cancelling a half-done release.
+# A newer push queues behind a running one instead of cancelling a half-done release. The called
+# validation never cancels a push run either (see validation.yml).
 concurrency:
   group: publish-${{ github.ref }}
   cancel-in-progress: false

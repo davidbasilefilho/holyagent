@@ -12,13 +12,16 @@ on:
 permissions:
   contents: read
 
+# Only a pull request run is cancelled by a newer one. A push run is called by publish.yml, which
+# queues pushes itself; cancelling it would fail that publish and leave the commit untagged.
 concurrency:
   group: validation-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # Enforces the release-branch model in AGENTS.md. The refs go through env so a branch name is
-  # never interpolated into the script.
+  # never interpolated into the script. A pull request from a fork fails: its branch names are its
+  # own to choose, so they prove nothing about the model.
   branch-model:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -36,6 +39,11 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Require a head in this repository
+        env:
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+        run: bun scripts/pr-checks.ts same-repository "$HEAD_REPOSITORY" "$GITHUB_REPOSITORY"
 
       - name: Check the branch model
         env:
@@ -67,6 +75,11 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Require a head in this repository
+        env:
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+        run: bun scripts/pr-checks.ts same-repository "$HEAD_REPOSITORY" "$GITHUB_REPOSITORY"
 
       - name: Check the version
         run: bun scripts/pr-checks.ts version main .

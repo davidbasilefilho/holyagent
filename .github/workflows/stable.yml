@@ -1,8 +1,8 @@
 name: Stable
 
-# Called by publish.yml for a push to main. Tags the commit holyagent-<version> and publishes a
-# GitHub Release from the version in the root package.json. A tag on another commit fails the run:
-# main moved on without a version bump.
+# Called by publish.yml for a push to main, which is the only caller. Tags the commit
+# holyagent-<version> and publishes a GitHub Release from the version in the root package.json. A
+# tag on another commit fails the run: main moved on without a version bump.
 on:
   workflow_call:
 
@@ -21,25 +21,5 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Read the version
-        id: version
-        run: |
-          version="$(jq -r .version package.json)"
-          if ! [[ "$version" =~ ^0\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
-            echo "::error::The version ${version} in package.json is not 0.X.Y."
-            exit 1
-          fi
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
-
       - name: Tag and release
-        if: github.ref == 'refs/heads/main'
         uses: ./.github/actions/tag-release
-        with:
-          tag: holyagent-${{ steps.version.outputs.version }}
-          title: HolyAgent ${{ steps.version.outputs.version }}
-
-      - name: Refuse any other branch
-        if: github.ref != 'refs/heads/main'
-        run: |
-          echo "::error::stable.yml releases main only; this run is for ${GITHUB_REF}."
-          exit 1

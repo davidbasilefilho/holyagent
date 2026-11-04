@@ -21,21 +21,8 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Read the version
-        id: version
-        run: |
-          version="$(jq -r .version package.json)"
-          if ! [[ "$version" =~ ^0\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
-            echo "::error::The version ${version} in package.json is not 0.X.Y."
-            exit 1
-          fi
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
-          echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
-
       - name: Tag and pre-release
         uses: ./.github/actions/tag-release
         with:
-          tag: holyagent-${{ steps.version.outputs.version }}-dev-${{ steps.version.outputs.short }}
-          title: HolyAgent ${{ steps.version.outputs.version }} dev ${{ steps.version.outputs.short }}
           notes: Development build of ${{ github.ref_name }} at ${{ github.sha }}.
           prerelease: "true"

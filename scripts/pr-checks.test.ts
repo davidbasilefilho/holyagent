@@ -10,13 +10,19 @@ import { InvalidVersion } from "./bump-version.ts"
 import {
   BranchModelViolation,
   checkBranchModel,
+  checkSameRepository,
   checkVersionNewer,
+  ForeignHead,
   type PullRequest,
   VersionNotNewer,
 } from "./pr-checks.ts"
 
 const rule = (pr: PullRequest) =>
-  Effect.runSync(Effect.flip(checkBranchModel(pr)).pipe(Effect.map(({ rule }) => rule)))
+  Effect.runSync(
+    Effect.flip(checkBranchModel(pr)).pipe(
+      Effect.map((error) => (error._tag === "BranchModelViolation" ? error.rule : error._tag)),
+    ),
+  )
 const passes = (pr: PullRequest) =>
   Effect.runSync(Effect.exit(checkBranchModel(pr)))._tag === "Success"
 
@@ -61,6 +67,27 @@ describe("checkBranchModel", () => {
     expect(rule({ base: "release/0.2.1/integration", head, version: "0.2.0" })).toBe("release-base")
   })
 
+  test.each([
+    ["release/0.2.1/integration", "0.2.1-1"],
+    ["release/0.2.1-1/integration", "0.2.1"],
+  ])("compares versions, not spellings: %s at %s", (head, version) => {
+    expect(passes({ base: "main", head, version })).toBe(true)
+  })
+
+  test.each([
+    ["release/0.2.01/integration", "0.2.1"],
+    ["release/next/integration", "0.2.1"],
+    ["release/0.2.10/integration", "0.2.1"],
+  ])("rejects the release segment of %s against version %s", (head, version) => {
+    expect(rule({ base: "main", head, version })).toBe("branch-version")
+  })
+
+  test("a malformed head version fails a release branch with InvalidVersion", () => {
+    expect(rule({ base: "main", head: "release/0.2.1/integration", version: "1.0.0" })).toBe(
+      "InvalidVersion",
+    )
+  })
+
   test("a failure names the rule, the branches and the reason", () => {
     const error = Effect.runSync(
       Effect.flip(checkBranchModel({ base: "main", head: "feature/x", version: "0.2.1" })),
@@ -69,6 +96,26 @@ describe("checkBranchModel", () => {
     expect(error.message).toContain("main-base")
     expect(error.message).toContain("feature/x")
   })
+})
+
+describe("checkSameRepository", () => {
+  const outcome = (head: string, repository: string) =>
+    Effect.runSync(Effect.exit(checkSameRepository(head, repository)))._tag
+
+  test("accepts the repository itself, whatever the case of its name", () => {
+    expect(outcome("owner/holyagent", "owner/holyagent")).toBe("Success")
+    expect(outcome("Owner/HolyAgent", "owner/holyagent")).toBe("Success")
+  })
+
+  test.each([["fork-owner/holyagent"], ["owner/holyagent-fork"], [""]])(
+    "rejects the head repository %p",
+    (head) => {
+      expect(outcome(head, "owner/holyagent")).toBe("Failure")
+      expect(
+        Effect.runSync(Effect.flip(checkSameRepository(head, "owner/holyagent"))),
+      ).toBeInstanceOf(ForeignHead)
+    },
+  )
 })
 
 describe("checkVersionNewer", () => {
@@ -133,6 +180,12 @@ describe("the command line", () => {
     expect(await run("version", "main", "head")).toBe(0)
     expect(await run("version", "head", "head")).toBe(1)
     expect(await run("version", "head", "main")).toBe(1)
+  })
+
+  test("same-repository exits 0 only for the repository itself", async () => {
+    expect(await run("same-repository", "owner/holyagent", "owner/holyagent")).toBe(0)
+    expect(await run("same-repository", "fork/holyagent", "owner/holyagent")).toBe(1)
+    expect(await run("same-repository", "", "owner/holyagent")).toBe(1)
   })
 
   test("an unknown command exits 1", async () => {

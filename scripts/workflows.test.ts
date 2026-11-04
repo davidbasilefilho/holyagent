@@ -14,7 +14,8 @@ const files = (): string[] =>
       .filter((path) => path.endsWith("action.yml")),
   ]
     .filter((path) => /\.ya?ml$/.test(path))
-    .map((path) => relative(repoRoot, path))
+    // Forward slashes on every platform: the assertions below name paths as GitHub does.
+    .map((path) => relative(repoRoot, path).replaceAll("\\", "/"))
     .sort()
 
 const read = (file: string) => readFileSync(join(repoRoot, file), "utf8")
@@ -96,7 +97,11 @@ describe("publish.yml", () => {
 
   test("runs on branch pushes and never on tags", () => {
     expect(Object.keys(publish.on)).toEqual(["push"])
-    expect(Object.keys(publish.on.push)).toEqual(["branches"])
+    expect(Object.keys(publish.on.push)).toEqual(["branches-ignore"])
+  })
+
+  test("skips holyagent/state, which has no package.json to validate or tag", () => {
+    expect(publish.on.push["branches-ignore"]).toEqual(["holyagent/state"])
   })
 
   test("calls stable on main and dev elsewhere, only after validation", () => {
@@ -117,7 +122,8 @@ describe("publish.yml", () => {
 describe("validation.yml", () => {
   const validation = parse(".github/workflows/validation.yml") as {
     on: Record<string, unknown>
-    jobs: Record<string, unknown>
+    concurrency: { group: string; "cancel-in-progress": unknown }
+    jobs: Record<string, { if?: string; steps?: Array<{ run?: string }> }>
   }
 
   test("runs on pull requests and when called, with the jobs the rulesets require", () => {
@@ -129,5 +135,27 @@ describe("validation.yml", () => {
       "version",
       "windows",
     ])
+  })
+
+  test("branch-model and version run for pull requests only, version only into main", () => {
+    expect(validation.jobs["branch-model"]?.if).toBe("github.event_name == 'pull_request'")
+    expect(validation.jobs["version"]?.if).toBe(
+      "github.event_name == 'pull_request' && github.base_ref == 'main'",
+    )
+  })
+
+  test("branch-model and version fail a pull request from another repository", () => {
+    for (const id of ["branch-model", "version"]) {
+      const runs = (validation.jobs[id]?.steps ?? []).map((step) => step.run ?? "")
+      expect(runs).toContain(
+        'bun scripts/pr-checks.ts same-repository "$HEAD_REPOSITORY" "$GITHUB_REPOSITORY"',
+      )
+    }
+  })
+
+  test("only a pull request run is cancelled by a newer run", () => {
+    expect(validation.concurrency["cancel-in-progress"]).toBe(
+      "${{ github.event_name == 'pull_request' }}",
+    )
   })
 })
