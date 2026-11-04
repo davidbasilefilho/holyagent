@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "add-the-four-stack-agnostic-platform",
   "objective": "Add the four stack-agnostic platform design skills (web-design, mobile-design, desktop-design, tui-design) with one shared-core source embedded by the generator, their tests and credits, in the worktree /home/user/holyagent-feat-design-skills (branch release/0.2.1/feat/design-skills, stacked on release/0.2.1/feat/holyagent-rules).",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read /home/user/holyagent-work/spec-0.2.1.md Part C: Objective, Binding requirements 1-7, Shared core, web-design, mobile-design, desktop-design, tui-design and Part C deliverables 1, 4 (skill lists, shared-core embedding, banned-term check) and 5 (credits). These are binding and approved as written; the research is done, do not redo it.",
     "Use /home/user/holyagent-work/research.md item 4 (Material 3: the drawer is confirmed no longer recommended in Material 3 Expressive in favor of the expanded rail; type roles, color roles and pairing, contrast levels; dark theme beyond role tones was not found, so state nothing more) and item 5 (iOS 27 Liquid Glass: only Apple-sourced facts may be stated; press-only or blog-only claims are left out; do not state that glass on glass is now allowed).",
@@ -86,7 +86,57 @@
     "agentId": "workflow:wf_79d9c6ba-b2a/assignment-0mw27v0qz-pua6",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-04T14:33:01.835Z"
+    "startedAt": "2026-11-04T14:33:01.835Z",
+    "finishedAt": "2026-11-04T14:40:32.016Z"
+  },
+  "result": "result: Four design skills, the shared core, generator embedding, tests and credits are done. `bunx --no-install mise run verify` passes (1075 pass, 0 fail).\n\nchanged:\n- `/home/user/holyagent-feat-design-skills/packages/runtime/src/instructions/claude-5.5/design-core/core.md` (new, the single core source, 31 lines)\n- `/home/user/holyagent-feat-design-skills/packages/runtime/src/instructions/claude-5.5/skills/{web,mobile,desktop,tui}-design/SKILL.md` (new)\n- `/home/user/holyagent-feat-design-skills/packages/integrations/claude/src/generate.ts` (adds `DESIGN_CORE_FILE`, `DESIGN_CORE_MARKER`, `DESIGN_SKILLS` and `withDesignCore`)\n- `/home/user/holyagent-feat-design-skills/packages/integrations/claude/tests/design-skills.test.ts` (new)\n- `/home/user/holyagent-feat-design-skills/packages/integrations/claude/tests/plugin.test.ts` (SKILLS list)\n- `/home/user/holyagent-feat-design-skills/packages/runtime/tests/instructions.test.ts` (skill list)\n- `/home/user/holyagent-feat-design-skills/docs/attributions.md` (new \"Design skill sources\" table)\n- `/home/user/holyagent-feat-design-skills/packages/integrations/claude/dist/skills/{web,mobile,desktop,tui}-design/` (rebuilt output)\n\nNo change to `root/skills.md`, `visual-judging`, `dev-server`, `agents.ts` or the visual role files. No test forced a `root/skills.md` entry.\n\nchecks:\n- `bunx --no-install mise run build`: exit 0, 39 files.\n- `bunx --no-install mise run verify`: exit 0. Type-check, lint, format check and tests all pass, including the byte-for-byte freshness test. Log: `/home/user/holyagent-work/logs/design-skills-verify.log`.\n- Lint failed once (`toSorted` needed a string map in the new test). I fixed it and reran.\n\nGenerated line counts: web-design 100, mobile-design 93, desktop-design 95, tui-design 109.\n\nThe new tests pass but I did not run them against the base. They would fail there because the skills and exports do not exist.\n\nblockers: none\nquestions: none\n\nnotes:\n- The core opens with the mark legend: `(behavior check)` for Worker.operations, `(preference)` for taste. Any unmarked rule counts as material and maps to visual-judging's effects. I did not tag each rule with its effect.\n- Android compact navigation says \"navigation bar\" only, per research item 4 (the compact-window guideline). The spec's \"or modal rail or drawer\" is left out.\n- iOS 27 is limited to Apple's \"what's new\" list of updated areas, with a line telling the reader to judge those on a render. Press and blog claims and glass-on-glass are left out. Material dark theme says only that light and dark use the same roles.\n- Primer CLI accessibility is not in deliverable 5's credit list, so I did not credit it. The GNOME HIG, Apple, Material, Android and Windows license cells say \"documentation terms; facts only\" because I did not verify their licenses.\n- The generator throws if a design skill source lacks exactly one `<!-- design-core -->` line.\n- I used one small Python edit for list text in the tests and a skill source.\n- Diff file for review: `/tmp/claude-0/-home-user-holyagent/70184bfa-8a56-57cb-a6cf-d92f87c7692b/scratchpad/design-skills.diff`.\n\nevidence:\nFour skill sources exist with Use-when descriptions, each generated skill self-contained at about 80 to 140 lines with the shared core, platform rules, refuse list and capture checklist: sources under `packages/runtime/src/instructions/claude-5.5/skills/*-design/SKILL.md`. Line counts 100, 93, 95 and 109. The \"are four generated skills\" and \"self-contained at about 80 to 140 lines\" tests in `design-skills.test.ts` pass.\nThe shared core has a single source file embedded by the generator, with a test that every generated design skill carries the current core: `design-core/core.md` is embedded by `withDesignCore` in `generate.ts`. The \"carries the current shared core\" and \"take the shared core from its one source file\" tests pass.\nNo design skill names a framework, library, component kit or API, with a test: the \"name no framework, library, component kit or API\" test checks 35 banned terms against the core and all four skills, and a companion test checks that the pattern catches names. Both pass.\nEvery rule is checkable on a render or marked as a behavior check, taste items are marked as preference, and numbers appear only where a platform guideline fixes them or as overridable defaults: the core legend defines the marks and the default rule. Style numbers are labelled \"(defaults)\". Review `design-skills.diff`; there is no automated check.\nOnly Apple- or Material-sourced facts are stated for the [verify] items, per research.md: `mobile-design` iOS 27 line, expanded rail over drawer, and the type and color roles and contrast levels. Press-only and blog-only claims, glass-on-glass and Material dark-theme detail are omitted.\ndocs/attributions.md credits every listed source with owner/repo or URL and license: all 19 rows are in the \"Design skill sources\" table, each with the skill it inspired and a \"no text was copied\" statement. Row licenses are as given, \"Not verified\" for mxcl, and CC BY-SA 4.0 for clig.dev.\nThe exact skill-list tests include the four names, the plugin is rebuilt, and mise run verify passes: SKILLS in `plugin.test.ts` and the list in `instructions.test.ts` are updated and sorted, `mise run build` exit 0, `mise run verify` exit 0.\nchecks-run: `bunx --no-install mise run build` (exit 0); `bunx --no-install mise run verify` (exit 0, 1075 pass, 0 fail, 1076 tests across 40 files). Not run: any render-based check of the skills.\nchanged-paths: the paths in `changed:` above, plus the new `dist/skills/*-design/` folders.\nline-counts: web-design 100, mobile-design 93, desktop-design 95, tui-design 109 (generated, in `packages/integrations/claude/dist/skills/`).\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Verify exit 0 (1075 pass); four skills 93-109 lines; core single source with embedding test; banned-term test; credits table.",
+    "criteria": [
+      {
+        "criterion": "Four skill sources exist with Use-when descriptions, each generated skill self-contained at about 80 to 140 lines with the shared core, platform rules, refuse list and capture checklist",
+        "support": "sources under `packages/runtime/src/instructions/claude-5.5/skills/*-design/SKILL.md`. Line counts 100, 93, 95 and 109. The \"are four generated skills\" and \"self-contained at about 80 to 140 lines\" tests in `design-skills.test.ts` pass."
+      },
+      {
+        "criterion": "The shared core has a single source file embedded by the generator, with a test that every generated design skill carries the current core",
+        "support": "`design-core/core.md` is embedded by `withDesignCore` in `generate.ts`. The \"carries the current shared core\" and \"take the shared core from its one source file\" tests pass."
+      },
+      {
+        "criterion": "No design skill names a framework, library, component kit or API, with a test",
+        "support": "the \"name no framework, library, component kit or API\" test checks 35 banned terms against the core and all four skills, and a companion test checks that the pattern catches names. Both pass."
+      },
+      {
+        "criterion": "Every rule is checkable on a render or marked as a behavior check, taste items are marked as preference, and numbers appear only where a platform guideline fixes them or as overridable defaults",
+        "support": "the core legend defines the marks and the default rule. Style numbers are labelled \"(defaults)\". Review `design-skills.diff`; there is no automated check."
+      },
+      {
+        "criterion": "Only Apple- or Material-sourced facts are stated for the [verify] items, per research.md",
+        "support": "`mobile-design` iOS 27 line, expanded rail over drawer, and the type and color roles and contrast levels. Press-only and blog-only claims, glass-on-glass and Material dark-theme detail are omitted."
+      },
+      {
+        "criterion": "docs/attributions.md credits every listed source with owner/repo or URL and license",
+        "support": "all 19 rows are in the \"Design skill sources\" table, each with the skill it inspired and a \"no text was copied\" statement. Row licenses are as given, \"Not verified\" for mxcl, and CC BY-SA 4.0 for clig.dev."
+      },
+      {
+        "criterion": "The exact skill-list tests include the four names, the plugin is rebuilt, and mise run verify passes",
+        "support": "SKILLS in `plugin.test.ts` and the list in `instructions.test.ts` are updated and sorted, `mise run build` exit 0, `mise run verify` exit 0."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bunx --no-install mise run build` (exit 0); `bunx --no-install mise run verify` (exit 0, 1075 pass, 0 fail, 1076 tests across 40 files). Not run: any render-based check of the skills."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the paths in `changed:` above, plus the new `dist/skills/*-design/` folders."
+      },
+      {
+        "label": "line-counts",
+        "support": "web-design 100, mobile-design 93, desktop-design 95, tui-design 109 (generated, in `packages/integrations/claude/dist/skills/`)."
+      }
+    ]
   },
   "createdAt": "2026-11-04T14:33:01.835Z"
 }
