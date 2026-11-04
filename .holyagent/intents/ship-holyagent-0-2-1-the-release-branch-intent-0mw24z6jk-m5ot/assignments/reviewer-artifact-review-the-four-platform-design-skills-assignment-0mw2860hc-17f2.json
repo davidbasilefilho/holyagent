@@ -1,0 +1,46 @@
+{
+  "id": "assignment-0mw2860hc-17f2",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-the-four-platform-design-skills",
+  "objective": "Review the four platform design skills and their shared core (commit b5d21e1 on release/0.2.1/feat/design-skills) against Part C of the 0.2.1 request.",
+  "state": "Running",
+  "scope": [
+    "Read /home/user/holyagent-work/spec-0.2.1.md Part C in full (binding, approved as written) and /home/user/holyagent-work/research.md items 4 and 5.",
+    "Read the generated skills /home/user/holyagent-feat-design-skills/packages/integrations/claude/dist/skills/{web,mobile,desktop,tui}-design/SKILL.md, the core source packages/runtime/src/instructions/claude-5.5/design-core/core.md and docs/attributions.md there; the diff is /home/user/holyagent-work/diffs/design-skills.diff. Compare with the shape of packages/integrations/claude/vendor/frontend-design/SKILL.md.",
+    "Check each binding requirement: stack-agnostic (no framework, library, kit or API names; stack-dependent rules tell the reader to detect and map); every rule checkable on a render, behavioral rules phrased as visible symptoms, behavior checks marked for Worker.operations, taste marked as preference; lean prose, no machinery, numbers only where a platform fixes them or as overridable defaults; 80-140 lines; descriptions start 'Use when'; the shared core content matches the spec's Shared core; each skill's platform rules cover the spec's bullets (list any dropped or changed bullet and say whether the change is justified by research.md, e.g. Android compact navigation); refuse lists and capture checklists present; paraphrase, not copied text; credits complete with owner/repo or URL and license.",
+    "Apply the instruction-writing rules in /home/user/holyagent-feat-design-skills/packages/runtime/src/instructions/claude-5.5/skills/instruction-writing/SKILL.md: ambiguity, unclear triggers, contradictions between the core and a skill or between skills."
+  ],
+  "constraints": [
+    "Keep working until the review is done; stop to ask only when you cannot go on. When done, stop and report; name anything unrequested instead of doing it. Read-only: change no repository files and make no git writes.",
+    "Each finding: file:line, the requirement it misses, blocking or not, smallest fix. Report in under 700 words."
+  ],
+  "criteria": [
+    {
+      "text": "Each Part C binding requirement and skill bullet list is checked with a verdict",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Every gap names file:line and a fix",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "requirement-verdicts",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw27v0qz-pua6"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T14:41:34.704Z"
+  },
+  "createdAt": "2026-11-04T14:41:34.704Z"
+}
