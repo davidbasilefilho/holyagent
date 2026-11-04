@@ -3,7 +3,6 @@ import { join, sep } from "node:path"
 
 import { REPOSITORY, VENDOR_DIRECTORY } from "../packages/integrations/claude/src/files.ts"
 import {
-  type Asset,
   ASSETS,
   binaryOf,
   expectedFiles,
@@ -15,9 +14,10 @@ import { toPosix } from "../packages/runtime/src/domain/paths.ts"
 
 const directory = join(REPOSITORY, VENDOR_DIRECTORY)
 
-const download = async (asset: Asset): Promise<Uint8Array> => {
-  const response = await fetch(asset.url)
-  if (!response.ok) throw new Error(`${asset.url} answered ${response.status}`)
+/** The bytes at a URL; rejects when the server answers anything but success. */
+export const download = async (url: string): Promise<Uint8Array> => {
+  const response = await fetch(url)
+  if (!response.ok) throw new Error(`${url} answered ${response.status}`)
   return new Uint8Array(await response.arrayBuffer())
 }
 
@@ -54,7 +54,7 @@ if (import.meta.main) {
     const files = [binaryOf(asset), ...licensesOf(asset)]
     if (!before.some((problem) => files.some((file) => problem.startsWith(`${file} `)))) continue
     console.log(`fetching ${asset.url}`)
-    await installAsset(directory, asset, await download(asset))
+    await installAsset(directory, asset, await download(asset.url))
   }
   const expected = new Set(expectedFiles())
   await removeUnpinned(directory, expected)

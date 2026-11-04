@@ -1,7 +1,7 @@
 import { encode } from "@toon-format/toon"
 import { Cause, Effect } from "effect"
 
-import packageJson from "../../package.json" with { type: "json" }
+import { version } from "../../../../package.json" with { type: "json" }
 import { stateDirectory } from "../state/layout.ts"
 import { WorkTree } from "../state/local.ts"
 import { updateState } from "../state/store.ts"
@@ -88,7 +88,7 @@ const execute = (given: ReadonlyArray<string>, host: Host) =>
     const [first] = argv
     if (first === undefined || first === "--help" || first === "-h")
       return { stdout: `${topHelp()}\n`, stderr: "", code: 0 }
-    if (first === "--version") return { stdout: `${packageJson.version}\n`, stderr: "", code: 0 }
+    if (first === "--version") return { stdout: `${version}\n`, stderr: "", code: 0 }
     const command = COMMANDS.find((candidate) =>
       candidate.path.every((word, index) => argv[index] === word),
     )
