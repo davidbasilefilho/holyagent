@@ -1,0 +1,36 @@
+{
+  "id": "assignment-0mw2ah4w2-jw45",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Worker.validation",
+  "slug": "check-that-the-four-feature-branches",
+  "objective": "Check that the four feature branches still pass their gates after merging release/0.2.1/integration (with the Windows lock fix) forward through the stack.",
+  "state": "Running",
+  "scope": [
+    "Worktrees, in order: /home/user/holyagent-feat-holyagent-rules, /home/user/holyagent-feat-design-skills, /home/user/holyagent-feat-dev-server-targets, /home/user/holyagent-feat-visual-root-pass. Each HEAD is a fresh merge commit.",
+    "In each: run 'bunx --no-install mise run build', then 'git status --short' (any changed file means the committed dist was out of sync: list the files and do not revert them), then 'bunx --no-install mise run verify'."
+  ],
+  "constraints": [
+    "Keep working until all four are checked; stop to ask only when you cannot go on. When done, stop and report. Make no git writes and edit no files yourself; the build may regenerate dist files, which you list.",
+    "Report in under 150 words: per worktree the build exit, the changed files after build, the verify exit and test counts."
+  ],
+  "criteria": [
+    {
+      "text": "Each of the four heads builds with dist in sync and passes mise run verify",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-04T15:46:12.866Z"
+  },
+  "createdAt": "2026-11-04T15:46:12.866Z"
+}
