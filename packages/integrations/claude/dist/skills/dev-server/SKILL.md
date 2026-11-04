@@ -27,7 +27,7 @@ Give every socket, session, display, device and port a name unique to this work,
 ## Start and share
 
 1. Check the task list for a target for this work. If one is there, run its readiness probe and reuse it; start a second only after the first is confirmed gone.
-2. Dispatch Worker.operations to start the target in the background per the record and wait for the probe. It cannot call Skill, so name this file's absolute path in its brief. Its report carries the completed record and says whether it started the target or reused one. Record that in the task list.
+2. Dispatch Worker.operations to start the target in the background per the record and wait for the probe. It cannot call Skill, so put the record and this file's absolute path in its brief: the record carries the values, and this file's "Target record" section is the only list of its fields. Its report carries the completed record and says whether it started the target or reused one. Record that in the task list.
 3. Tell every visual specialist, as a constraint, to use that target and start none of its own. Worker.visual and Worker.operations produce the captures; Reviewer.visual has no shell and judges those captures, or for web inspects the URL through its browser tools. A specialist that finds the target down, or no record in its criteria, reports the inspection as blocked; have Worker.operations restart it.
 
 ## Platforms
