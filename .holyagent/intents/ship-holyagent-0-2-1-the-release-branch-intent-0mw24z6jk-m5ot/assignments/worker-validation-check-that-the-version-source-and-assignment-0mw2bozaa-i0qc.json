@@ -1,0 +1,36 @@
+{
+  "id": "assignment-0mw2bozaa-i0qc",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Worker.validation",
+  "slug": "check-that-the-version-source-and",
+  "objective": "Check that the version-source and dependency-updater branches still pass their gates after merging release/0.2.1/integration (with the Windows lock fix) forward.",
+  "state": "Running",
+  "scope": [
+    "Worktrees, in order: /home/user/holyagent-build-version-source, /home/user/holyagent-build-dependency-updater. Each HEAD is a fresh merge commit.",
+    "In each: run 'bunx --no-install mise run build', then 'git status --short' (any changed file means the committed dist was out of sync: list the files and do not revert them), then 'bunx --no-install mise run verify'."
+  ],
+  "constraints": [
+    "Keep working until both are checked; stop to ask only when you cannot go on. When done, stop and report. Make no git writes and edit no files yourself; the build may regenerate dist files, which you list.",
+    "Report in under 150 words: per worktree the build exit, the changed files after build, the verify exit and test counts."
+  ],
+  "criteria": [
+    {
+      "text": "Each of the two heads builds with dist in sync and passes mise run verify",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-04T16:20:18.467Z"
+  },
+  "createdAt": "2026-11-04T16:20:18.467Z"
+}
