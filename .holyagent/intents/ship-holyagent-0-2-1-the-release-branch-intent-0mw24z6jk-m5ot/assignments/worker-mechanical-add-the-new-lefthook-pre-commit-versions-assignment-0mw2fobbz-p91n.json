@@ -1,0 +1,37 @@
+{
+  "id": "assignment-0mw2fobbz-p91n",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 4,
+  "roleTask": "Worker.mechanical",
+  "slug": "add-the-new-lefthook-pre-commit-versions",
+  "objective": "Add the new lefthook pre-commit versions job to the Git hooks list in docs/development.md of /home/user/holyagent-fix-audit.",
+  "state": "Running",
+  "scope": [
+    "Commit d9356d2 added a 'versions' job to lefthook.yml that stages the version copies and bun.lock the build rewrites when a package.json is staged. Read lefthook.yml and the Git hooks list in docs/development.md, and add one item for that job in the list's existing style, saying what it stages and when. Change nothing else."
+  ],
+  "constraints": [
+    "Edit only docs/development.md. Make no commits or other git writes and no edits under .git/ or .holyagent/.",
+    "Keep working until done; stop and report in under 100 words with the line you added."
+  ],
+  "criteria": [
+    {
+      "text": "docs/development.md lists the versions job accurately in the existing style",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "git-status"
+  ],
+  "ownershipPaths": [
+    "docs/development.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-04T18:11:45.887Z"
+  },
+  "createdAt": "2026-11-04T18:11:45.887Z"
+}
