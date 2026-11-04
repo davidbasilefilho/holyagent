@@ -1,0 +1,36 @@
+{
+  "id": "assignment-0mw2dsf6z-iecc",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-merge-commit-57d8056-that",
+  "objective": "Review the merge commit 57d8056 that brings release/0.2.1/integration into release/0.2.1/feat/visual-root-pass, in /home/user/holyagent-feat-visual-root-pass.",
+  "state": "Running",
+  "scope": [
+    "Integration holds squash commits of the design-skills (#62) and dev-server (#63) PRs, which this branch already contains in their final form plus its own later C work, and the version-source (#60), dependency-updater (#61) and Windows lock (#59) work it lacked. Twenty files conflicted; the root resolved every one with this branch's side, after checking that none of them is touched by #59, #60 or #61 and that the holyagent-rules PR head is an ancestor of the branch. Judge whether that resolution lost anything: for each conflicted file ('git -C /home/user/holyagent-feat-visual-root-pass diff --name-only ed27bc3 57d8056' with 'git diff cef3236 57d8056'), say whether integration carried any content the branch side drops. Confirm 'git diff cef3236 57d8056' is only this branch's visual-root-pass work, and that the #60/#61 changes (version sync, dependency ranges, updater, vendor pins) arrived intact.",
+    "Binding: Part C of /home/user/holyagent-work/spec-0.2.1.md."
+  ],
+  "constraints": [
+    "Read-only: no repository edits and no git writes; experiments go in a scratch copy outside the repository.",
+    "Keep working until the review is done; stop and report. Report in under 300 words, findings ranked with file:line, blocking or non-blocking, and the smallest fix."
+  ],
+  "criteria": [
+    {
+      "text": "The merge resolution keeps this branch's C work and every integration change with no regression",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T17:18:58.283Z"
+  },
+  "createdAt": "2026-11-04T17:18:58.283Z"
+}
