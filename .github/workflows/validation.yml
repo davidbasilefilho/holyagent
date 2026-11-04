@@ -1,18 +1,76 @@
-name: CI
+name: Validation
 
+# Runs on pull requests, and publish.yml calls it for every branch push so nothing is tagged
+# unvalidated. The job names below (check, windows, installers, branch-model, version) are the
+# status check contexts of pull requests; the rulesets in docs/development.md require them by name.
 on:
-  push:
-    branches: [main]
+  # `edited` also covers a changed base branch, which the branch-model job must see again.
   pull_request:
+    types: [opened, synchronize, reopened, edited]
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: validation-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # Enforces the release-branch model in AGENTS.md. The refs go through env so a branch name is
+  # never interpolated into the script.
+  branch-model:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # The head commit, not the merge commit: its package.json is the version the head carries.
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Set up tools
+        uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Check the branch model
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: bun scripts/pr-checks.ts branch-model "$BASE_REF" "$HEAD_REF"
+
+  # The version of a pull request into main must be strictly greater than the one on main.
+  version:
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Check out main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          path: main
+          persist-credentials: false
+
+      - name: Set up tools
+        uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Check the version
+        run: bun scripts/pr-checks.ts version main .
+
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 15

@@ -1,0 +1,35 @@
+name: Publish
+
+# Runs on branch pushes only: with a `branches` filter and no `tags` filter, a pushed tag never
+# starts it, so the tags it creates cannot loop back in. Nothing is tagged until validation passes
+# for the pushed commit.
+on:
+  push:
+    branches: ["**"]
+
+permissions:
+  contents: read
+
+# A newer push queues behind a running one instead of cancelling a half-done release.
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validation:
+    uses: ./.github/workflows/validation.yml
+
+  # Only the jobs that call the tagging workflows may write contents.
+  stable:
+    needs: validation
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/stable.yml
+    permissions:
+      contents: write
+
+  dev:
+    needs: validation
+    if: github.ref != 'refs/heads/main'
+    uses: ./.github/workflows/dev.yml
+    permissions:
+      contents: write

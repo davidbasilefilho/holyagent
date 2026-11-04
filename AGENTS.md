@@ -12,6 +12,17 @@ Rules for working in this repository, each with the reason it exists. The contri
 - `.holyagent/` state lives on its own branch, `holyagent/state`, in one worktree shared by every worktree of the clone, so work branches never carry it and nothing is copied between worktrees. Push `holyagent/state` with plain Git alongside the work branches.
 - Run the gates as `bunx --no-install mise run <task>` (see `docs/development.md`). A missing `mise` on PATH is no reason to skip the gates or run Bun steps by hand. Each worktree needs its own `bun install --frozen-lockfile`, because `node_modules` is not shared between worktrees. `bun install` runs the `prepare` step, which installs the repository's lefthook hooks into the shared `.git/hooks`; that is expected.
 
+## The release-branch model
+
+This repository's own convention, enforced by CI and rulesets; HolyAgent's instructions do not carry it.
+
+- Each release has an integration branch, `release/0.X.Y/integration`, cut from `main`. Work branches are `release/0.X.Y/<type>/<change>` and their PRs target the integration branch (stacking inside the release is fine). One integration branch per release lets `main` move only by a whole, validated release.
+- The first PR of a release carries the version bump as its own commit, made with `mise run bump:patch` (or `bump:minor`). Every later branch of the release is cut after it, so the version in a branch's head equals the `<v>` in its name, which the `branch-model` check compares.
+- Only `release/0.X.Y/integration` opens a PR into `main`. The `branch-model` check fails any other head into `main`, a `release/<v>/...` head whose `<v>` differs from the version in the head, and a PR into a `release/<v>/...` base from a branch of another release. The `version` check fails a PR into `main` unless the head's root `package.json` version is strictly greater than `main`'s, so a release cannot merge without its bump.
+- Rulesets protect `main` and `release/*/integration`: PRs only, no force push, no deletion. The required checks are the job ids in `.github/workflows/validation.yml`: `check`, `windows`, `installers` and `branch-model`, plus `version` on `main`. Renaming a job drops its check from protection until the ruleset names the new one; `docs/development.md` lists them.
+- A push to a branch runs `publish.yml`: validation first, then `stable.yml` on `main` (tag `holyagent-<version>` and a Release) or `dev.yml` elsewhere (tag `holyagent-<version>-dev-<short-hash>` and a pre-release). Tags are never a trigger, so a tag cannot start a release.
+- Pin every external action to a full commit SHA with a `# vX.Y.Z` comment, and give `contents: write` only to the jobs that tag and release. A moving tag can change what runs with the repository's token; `scripts/workflows.test.ts` checks both rules.
+
 ## Commits and pull requests
 
 - `holyagent vcs` has two commands, `commit` and `pr`; branches, pushes, merges and CI use plain Git and `gh`. The `commit-msg` hook (`holyagent hook commit-msg`, wired in `lefthook.yml`) keeps agent attribution out of commits made with plain Git too.
