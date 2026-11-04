@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from "node:fs"
 import { tmpdir } from "node:os"
-import { dirname, join, relative } from "node:path"
+import { basename, dirname, join } from "node:path"
 
 import { $ } from "bun"
 import { Effect } from "effect"
@@ -354,8 +354,7 @@ describe("a bump followed by one build", () => {
     try {
       cpSync(repository, copy, {
         recursive: true,
-        filter: (path) =>
-          path !== PLUGIN_DIST && !SKIPPED.includes(relative(repository, path).split("/").at(-1)!),
+        filter: (path) => path !== PLUGIN_DIST && !SKIPPED.includes(basename(path)),
       })
       for (const link of ["node_modules", "packages/runtime/node_modules"])
         symlinkSync(join(repository, link), join(copy, link))
