@@ -986,7 +986,7 @@ describe("agents", () => {
       }).toEqual({ agent: route.agent, points: false })
   })
 
-  test("the dev-server skill is generated, opens with the situation, and covers start, share and stop", () => {
+  test("the dev-server skill is generated, opens with the situation, and covers the target record, every platform, blocked targets and owner-only stop", () => {
     const skill = generated.find((file) =>
       file.path.endsWith("skills/dev-server/SKILL.md"),
     )?.content
@@ -995,13 +995,46 @@ describe("agents", () => {
     expect(field(skill ?? "", "description")).toStartWith("Use when ")
     for (const part of [
       "Worker.operations",
-      "process id",
-      "Worker.visual and Reviewer.visual",
-      "start none of your own",
-      "Stop it",
+      "## Detect",
+      "## Target record",
+      "the detected stack with its signal",
+      "the supported variants, each with its set and reset commands and current value",
+      "the owner and process group, the stop command, and what stopping cleans up",
+      "unique to this work",
+      "start none of its own",
+      "Reviewer.visual has no shell",
+      "Only the owner stops a target",
+      "- Web:",
+      "- Terminal UI:",
+      "- Linux desktop:",
+      "- Android:",
+      "- iOS:",
+      "- macOS and Windows desktop:",
+      "interchangeable example",
+      "[verify]",
+      "reports it blocked with the reason and what would unblock it",
+      "a web build of a native app is not the native render",
     ])
-      expect(skill).toContain(part)
+      expect({ part, found: skill?.includes(part) }).toEqual({ part, found: true })
     expect(read("packages/integrations/claude/dist/skills/dev-server/SKILL.md")).toBe(skill ?? "")
+    const roleParts: Record<string, ReadonlyArray<string>> = {
+      "worker-operations": [
+        "the target record",
+        "report it blocked with the reason and what would unblock it",
+      ],
+      "worker-visual": [
+        "the target record in your criteria, never from a bare URL",
+        "no record is named",
+      ],
+      "reviewer-visual": ["the target record in your criteria", "no record is named"],
+    }
+    for (const [name, parts] of Object.entries(roleParts))
+      for (const part of parts)
+        expect({ name, part, found: agent(name)?.content.includes(part) }).toEqual({
+          name,
+          part,
+          found: true,
+        })
   })
 
   test("the evidence-judging skill opens with the situation, gives each rule its reason, and the root points to it", () => {
@@ -1042,7 +1075,7 @@ describe("agents", () => {
       "`visual-judging`: load it before the first Worker.visual or Reviewer.visual dispatch",
       "loaded before the first visual dispatch",
       "starts a repair and a re-review once it carries the evidence `evidence-judging` requires",
-      "a served static or single-file build",
+      "a web app or served static build, a terminal UI, a desktop or mobile app",
     ])
       expect({ part, found: root.includes(part) }).toEqual({ part, found: true })
     const skill = generated.find((file) => file.path.endsWith("skills/visual-judging/SKILL.md"))
@@ -1050,7 +1083,9 @@ describe("agents", () => {
       "Use before the first Worker.visual or Reviewer.visual dispatch",
     )
     const devServer = generated.find((file) => file.path.endsWith("skills/dev-server/SKILL.md"))
-    expect(field(devServer?.content ?? "", "description")).toContain("static or single-file build")
+    expect(field(devServer?.content ?? "", "description")).toContain(
+      "a terminal UI, a desktop app, or an Android or iOS app",
+    )
   })
 
   test("Reviewer.artifact is a sonnet agent, and the root lists it with the sonnet roles, not the haiku ones", () => {
