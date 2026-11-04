@@ -190,6 +190,17 @@ const withDesignCore = (text: string, core: string, source: string): string => {
   return [...lines.slice(0, at), core.trim(), ...lines.slice(at + 1)].join("\n")
 }
 
+/**
+ * A skill's generated body. A design skill gets the shared core; any other skill holding the marker
+ * line is an error, because the marker would ship as literal text with no core.
+ */
+export const skillBody = (path: string, text: string, core: string, source: string): string => {
+  if (DESIGN_SKILLS.includes(path.split("/")[0] ?? "")) return withDesignCore(text, core, source)
+  if (text.split("\n").includes(DESIGN_CORE_MARKER))
+    throw new Error(`${source} holds ${DESIGN_CORE_MARKER} but is not listed in DESIGN_SKILLS`)
+  return text
+}
+
 const skills = async (): Promise<ReadonlyArray<GeneratedFile>> => {
   const root = `${INSTRUCTIONS_DIRECTORY}/skills`
   const core = await readSource(DESIGN_CORE_FILE)
@@ -198,10 +209,10 @@ const skills = async (): Promise<ReadonlyArray<GeneratedFile>> => {
       const source = `${root}/${path}`
       const text = await readSource(source)
       if (!path.endsWith("SKILL.md")) return { path: inPlugin(`skills/${path}`), content: text }
-      const body = DESIGN_SKILLS.includes(path.split("/")[0] ?? "")
-        ? withDesignCore(text, core, source)
-        : text
-      return { path: inPlugin(`skills/${path}`), content: noteInFrontmatter(body, source) }
+      return {
+        path: inPlugin(`skills/${path}`),
+        content: noteInFrontmatter(skillBody(path, text, core, source), source),
+      }
     }),
   )
 }
