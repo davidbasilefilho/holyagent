@@ -1,0 +1,35 @@
+{
+  "id": "assignment-0mw2dsewb-budf",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 4,
+  "roleTask": "Worker.validation",
+  "slug": "check-that-the-merge-head-57d8056-of",
+  "objective": "Check that the merge head 57d8056 of release/0.2.1/feat/visual-root-pass in /home/user/holyagent-feat-visual-root-pass builds in sync and passes the gates.",
+  "state": "Running",
+  "scope": [
+    "Run in /home/user/holyagent-feat-visual-root-pass: 'bun install --frozen-lockfile', 'bunx --no-install mise run build', then 'git status --short' (it must be empty: dist in sync), then 'bunx --no-install mise run verify'. See docs/development.md."
+  ],
+  "constraints": [
+    "Read-only: make no edits, commits or other git writes; if the build changes files, report them and leave them.",
+    "Keep working until the checks are run; stop and report. Report in under 150 words: each command, exit code and counts; logs in /home/user/holyagent-work/logs/."
+  ],
+  "criteria": [
+    {
+      "text": "The merge head builds with dist in sync and passes mise run verify",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-04T17:18:57.899Z"
+  },
+  "createdAt": "2026-11-04T17:18:57.899Z"
+}
