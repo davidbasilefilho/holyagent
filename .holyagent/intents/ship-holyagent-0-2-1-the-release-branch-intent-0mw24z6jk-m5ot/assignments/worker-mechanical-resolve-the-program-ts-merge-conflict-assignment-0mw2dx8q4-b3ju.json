@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mw2dx8q4-b3ju",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 4,
+  "roleTask": "Worker.mechanical",
+  "slug": "resolve-the-program-ts-merge-conflict",
+  "objective": "Resolve the program.ts merge conflict left by merging release/0.2.1/feat/visual-root-pass (57d8056, which now carries the version-source and dependency-updater work) into release/0.2.1/fix/audit in /home/user/holyagent-fix-audit.",
+  "state": "Running",
+  "scope": [
+    "The merge is in progress with UU packages/runtime/src/cli/program.ts and UU packages/integrations/claude/dist/scripts/holyagent.js. Do not commit, abort or restart it; the root commits the merge.",
+    "In program.ts only the import block conflicts. Keep the incoming version import, 'import { version } from \"../../../../package.json\" with { type: \"json\" }' (the version-source change: the root package.json is the one version source and the CLI imports only its version field), and keep the audit branch's 'import { stateDirectory } from \"../state/layout.ts\"' (the file already calls stateDirectory and uses version). Drop the packageJson default import and the STATE_DIRECTORY import if nothing else in the file uses them.",
+    "Then run 'bunx --no-install mise run build' (it regenerates dist/scripts/holyagent.js, which resolves that file) and 'bunx --no-install mise run verify'."
+  ],
+  "constraints": [
+    "Edit only program.ts by hand. Make no commits, checkout, reset, stash or merge --abort, and no edits under .git/ or .holyagent/.",
+    "If verify fails on anything other than this conflict, report the failing tests and their messages without fixing them.",
+    "Keep working until done; stop and report. Report in under 150 words with the final git status of unmerged files."
+  ],
+  "criteria": [
+    {
+      "text": "program.ts has no conflict markers and keeps the version import and the stateDirectory import",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build and mise run verify pass",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "git-status"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli/program.ts",
+    "packages/integrations/claude/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-04T17:22:43.181Z"
+  },
+  "createdAt": "2026-11-04T17:22:43.181Z"
+}
