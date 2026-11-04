@@ -11,7 +11,12 @@
     "Work in the A1 model: release/0.2.1/integration cut from main, one release/0.2.1/<type>/<change> branch and PR per reviewable change targeting the integration branch, validation changes landing first, bump to 0.2.1 on the integration branch with mise run bump:patch.",
     "Done means mise run verify passes with the build in sync, CI green on every PR including Windows, rulesets applied or reported as a blocker with the exact JSON, and the integration to main PR open and not merged.",
     "Docs, commits and PRs are in English.",
-    "Decision (maintainer): the root squash-merges each reviewed, green work PR into release/0.2.1/integration itself; only the integration to main PR waits for the maintainer and is not merged."
+    "Decision (maintainer): the root squash-merges each reviewed, green work PR into release/0.2.1/integration itself; only the integration to main PR waits for the maintainer and is not merged.",
+    "Default: the single version source is the root package.json version field; the build and a test propagate it everywhere else.",
+    "Default: the branch-version rule applies to every PR whose head is a release/<v>/ branch, so the first PR of a release (the validation PR for 0.2.1) carries the bump to <v> as its own commit, made with mise run bump:patch.",
+    "Default: publish.yml triggers on branch pushes only and calls validation.yml as a reusable workflow, then stable.yml or dev.yml with needs, so publishing runs only after validation passes for that commit; validation.yml runs directly on pull_request.",
+    "Default: the rulesets are reported as a blocker with their exact JSON, because this session may use gh only for search.",
+    "Finding: claude.ai cloud sessions ignore the plugin settings agent key (this session has the synced plugin with agent holyagent and its main thread is the default agent), so the session-start context must carry what the root follows before its first action."
   ],
   "revision": 2,
   "state": "Open",
