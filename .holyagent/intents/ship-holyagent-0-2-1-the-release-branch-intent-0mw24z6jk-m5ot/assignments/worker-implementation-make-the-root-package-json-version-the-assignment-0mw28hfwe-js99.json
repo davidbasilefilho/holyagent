@@ -1,0 +1,77 @@
+{
+  "id": "assignment-0mw28hfwe-js99",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-root-package-json-version-the",
+  "objective": "Make the root package.json version the single version source that reaches every other copy automatically (Part A3), in the worktree /home/user/holyagent-build-version-source (branch release/0.2.1/build/version-source, stacked on release/0.2.1/ci/release-flow).",
+  "state": "Running",
+  "scope": [
+    "Read /home/user/holyagent-work/spec-0.2.1.md Part A3 (binding) and the 'Version locations' section of /home/user/holyagent-work/map.md. Default recorded in the Intent: the single source is the root package.json version field.",
+    "Every other copy derives from it: packages/runtime/package.json, packages/integrations/claude/package.json, the bun.lock workspace entries, dist/.claude-plugin/plugin.json and .claude-plugin/marketplace.json (generate.ts reads the integration package today), the bundled CLI (runtime/src/cli/program.ts reads the runtime package), and anything else found (check scripts/pr-checks.ts and the tag-release action, which read the root package.json already).",
+    "Pick the propagation that keeps package.json files valid for Bun workspaces: either the build or a prepare step writes the workspace package versions from the root, or the workspace packages stop carrying a version where Bun allows it; say which and why. 'mise run bump:patch|minor' (scripts/bump-version.ts) must edit only the source, then the build propagates. A test fails when any copy differs from the source. AGENTS.md gets the rule: the version lives in the root package.json only, changes only through mise run bump:patch|minor, and the build and a test keep every copy equal. Update docs/development.md where it lists version copies.",
+    "Run 'bunx --no-install mise run build' so generated files stay in sync; the version must remain 0.2.1 everywhere."
+  ],
+  "constraints": [
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report: name unrequested features, tests, files or refactors in the report instead of adding them, and start no extra review rounds. Do not stop early with a summary that announces a next step or an offer to wait.",
+    "Make no version-control writes (no commit, checkout, switch, branch, stash, reset, push) and no edits under .git/ or .holyagent/; the root commits. Report every changed path.",
+    "Work only inside /home/user/holyagent-build-version-source; run 'bun install --frozen-lockfile' there first. Follow .claude/CLAUDE.md (Effect, Schema at boundaries, Bun, JSDoc) and reuse parseVersion/readVersion in scripts/bump-version.ts.",
+    "Put new tests under scripts/ or packages/runtime/tests; do not edit packages/integrations/claude/tests or dist/skills or dist/agents (other writers own them). If the plugin test must change, stop and report it instead.",
+    "Gate: 'bunx --no-install mise run verify' must pass.",
+    "Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "The root package.json version is the only hand-edited copy and every other copy derives from it",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "bump:patch and bump:minor edit only the source, with tests",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "A test fails when any copy differs from the source",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "AGENTS.md and docs/development.md state the rule",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "package.json",
+    "bun.lock",
+    "packages/runtime/package.json",
+    "packages/integrations/claude/package.json",
+    "packages/runtime/src/cli/program.ts",
+    "packages/runtime/tests/version.test.ts",
+    "scripts",
+    "AGENTS.md",
+    "docs/development.md",
+    "packages/integrations/claude/build.ts",
+    "packages/integrations/claude/dist/.claude-plugin",
+    "packages/integrations/claude/dist/scripts/holyagent.js",
+    ".claude-plugin"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T14:50:27.902Z"
+  },
+  "createdAt": "2026-11-04T14:50:27.902Z"
+}
