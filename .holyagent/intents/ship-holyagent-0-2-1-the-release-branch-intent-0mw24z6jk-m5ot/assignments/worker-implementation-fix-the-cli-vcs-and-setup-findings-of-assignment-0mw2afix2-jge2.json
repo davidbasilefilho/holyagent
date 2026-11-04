@@ -1,0 +1,92 @@
+{
+  "id": "assignment-0mw2afix2-jge2",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "fix-the-cli-vcs-and-setup-findings-of",
+  "objective": "Fix the CLI, vcs and setup findings of the Part D code audit in /home/user/holyagent-fix-audit (branch release/0.2.1/fix/audit).",
+  "state": "Running",
+  "scope": [
+    "Findings: /home/user/holyagent-work/audit-code.md, read at main bd31cf7; confirm each still holds on this branch before fixing it. Part D of /home/user/holyagent-work/spec-0.2.1.md is binding.",
+    "Your items: B5 (vcs pr --update records the current branch as the PR head); B6 (workflow hook auto-allow, per the maintainer decision, in workflow-check.ts, with tests for each refused form and for bounded loops still allowed); D1; D5 within your paths; U1 to U4 (env-record cleaner, git runners, flag parsers, firstNonEmpty and the Claude config dir resolvers) within your paths; T5 (scripts/repo-paths.test.ts tests helpers it defines itself). Also from /home/user/holyagent-work/root-notes.md: git-push.ts 'sudo -u user' and a redirect target counted as a push argument.",
+    "B4 (looksLikeAgent rejects a person named Claude) loosens a guard: do not change it; report the options. S1 and S2 are refactors: report, do not do.",
+    "Diff file: /home/user/holyagent-work/diffs/audit-cli.diff."
+  ],
+  "constraints": [
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report: name unrequested features, tests, files or refactors in the report instead of adding them, and start no extra review rounds. Do not stop early with a summary that announces a next step or an offer to wait.",
+    "A fix that would materially change HolyAgent's behavior beyond what the item and the maintainer decisions below state is not yours to make: leave it and report it under questions with the smallest options. The maintainer decided: the workflow hook auto-allow refuses unbounded loops (while/do, for without a literal bound) and repeat/padStart/padEnd with a large or computed count; keep the root-rules PreToolUse fallback registration; keep the legacy .holyclaude/.holycodex converter; the CLI ownership-overlap check applies per worktree (writers in different worktrees may own the same relative paths).",
+    "Other writers work in the same worktree at the same time on disjoint paths: edit only your ownership paths; if a fix needs a file outside them, report it instead. Never skip, disable or weaken a test to get green; a test that cannot fail gets a real assertion.",
+    "Make no version-control writes (no commit, checkout, switch, branch, stash, reset, push) and no edits under .git/ or .holyagent/; the root commits. Report every changed path and save 'git diff -- <your paths>' to the diff file named in the scope.",
+    "Work only inside /home/user/holyagent-fix-audit. Follow .claude/CLAUDE.md (Effect, tagged errors, Schema with onExcessProperty error, Bun APIs and Bun Shell, JSDoc on exports). Gate: 'bunx --no-install mise run build' then 'bunx --no-install mise run verify'; a failure in another writer's paths that you did not cause is reported, not fixed.",
+    "Report in under 450 words: one line per item (fixed with the test that fails without it, explained, or left with the reason); put long logs in /home/user/holyagent-work/logs/."
+  ],
+  "criteria": [
+    {
+      "text": "B5 and B6 are fixed with tests that fail without the fixes",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Each other item is fixed or explained",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/vcs",
+    "packages/runtime/src/setup",
+    "packages/runtime/src/cli/args.ts",
+    "packages/runtime/src/cli/commands.ts",
+    "packages/runtime/src/cli/config.ts",
+    "packages/runtime/src/cli/context.ts",
+    "packages/runtime/src/cli/errors.ts",
+    "packages/runtime/src/cli/git-push.ts",
+    "packages/runtime/src/cli/intent.ts",
+    "packages/runtime/src/cli/jsonreport.ts",
+    "packages/runtime/src/cli/main.ts",
+    "packages/runtime/src/cli/migrate.ts",
+    "packages/runtime/src/cli/program.ts",
+    "packages/runtime/src/cli/report.ts",
+    "packages/runtime/src/cli/setup.ts",
+    "packages/runtime/src/cli/tools.ts",
+    "packages/runtime/src/cli/types.ts",
+    "packages/runtime/src/cli/views.ts",
+    "packages/runtime/src/cli/workflow-check.ts",
+    "packages/runtime/tests/cli.test.ts",
+    "packages/runtime/tests/vcs-commit.test.ts",
+    "packages/runtime/tests/vcs-fixtures.test.ts",
+    "packages/runtime/tests/vcs-fixtures.ts",
+    "packages/runtime/tests/vcs-message.test.ts",
+    "packages/runtime/tests/vcs-pr.test.ts",
+    "packages/runtime/tests/setup-check.test.ts",
+    "packages/runtime/tests/setup-cli.test.ts",
+    "packages/runtime/tests/setup-files.test.ts",
+    "packages/runtime/tests/setup-fixture.ts",
+    "packages/runtime/tests/setup-scope.test.ts",
+    "packages/runtime/tests/setup.test.ts",
+    "packages/runtime/tests/stdin.test.ts",
+    "packages/runtime/tests/tools.test.ts",
+    "packages/runtime/tests/pipe.test.ts",
+    "packages/runtime/tests/windows-paths.test.ts",
+    "packages/runtime/tests/fixtures.ts",
+    "scripts/repo-paths.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T15:44:57.735Z"
+  },
+  "createdAt": "2026-11-04T15:44:57.735Z"
+}
