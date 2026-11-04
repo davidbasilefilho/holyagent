@@ -1,4 +1,5 @@
 import { afterAll, afterEach, describe, expect, setDefaultTimeout, spyOn, test } from "bun:test"
+import * as filesystem from "node:fs/promises"
 import { cp, mkdir, readdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
@@ -6,6 +7,7 @@ import { $ } from "bun"
 import { Effect, Exit } from "effect"
 
 import { fromGitPath, toPosix } from "../src/domain/paths.ts"
+import { withFileLock } from "../src/state/lock.ts"
 import { loadProject } from "../src/state/store.ts"
 import { fetchRemoteBranch, killGroup, releaseGroup } from "../src/state/tree.ts"
 import {
@@ -1037,6 +1039,61 @@ describe("moving the state found in a work tree", () => {
       objective: "Ship the parser",
     })
     expect((await stat(join(await stateTree(dir), record))).isFile()).toBe(true)
+  })
+})
+
+describe("a lock file that Windows has not finished deleting", () => {
+  /** Makes `open` of `file` for exclusive creation fail with EPERM while `blocked()` holds. */
+  const refusing = (file: string, blocked: () => boolean) => {
+    const original = filesystem.open
+    return spyOn(filesystem, "open").mockImplementation(
+      async (...args: Parameters<typeof filesystem.open>) => {
+        if (args[0] === file && args[1] === "wx" && blocked())
+          throw Object.assign(new Error(`EPERM: operation not permitted, open '${file}'`), {
+            code: "EPERM",
+          })
+        return original(...args)
+      },
+    )
+  }
+
+  test("a contender waits for it and takes the lock, as it does for a lock file that exists", async () => {
+    const file = join(await scratch(), "worktree.lock")
+    // The previous holder removed the lock while a contender still had it open: the file is gone for
+    // good once that handle closes, and until then Windows refuses to create it with EPERM.
+    await writeFile(
+      file,
+      JSON.stringify({ pid: process.pid, token: "held", acquiredAt: Date.now() }),
+    )
+    let pending = true
+    const spy = refusing(file, () => pending)
+    setTimeout(() => {
+      pending = false
+      void rm(file, { force: true })
+    }, 150)
+    try {
+      const ran = await Effect.runPromise(withFileLock(file, Effect.succeed("ran"), "long"))
+
+      expect(ran).toBe("ran")
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  test("a refusal with no file in the way is an I/O failure at once, not a wait", async () => {
+    const file = join(await scratch(), "worktree.lock")
+    const spy = refusing(file, () => true)
+    const started = Date.now()
+    try {
+      const failure = await Effect.runPromise(
+        Effect.flip(withFileLock(file, Effect.succeed("ran"), "long")),
+      )
+
+      expect(failure._tag).toBe("StateIo")
+    } finally {
+      spy.mockRestore()
+    }
+    expect(Date.now() - started).toBeLessThan(2000)
   })
 })
 

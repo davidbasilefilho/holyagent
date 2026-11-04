@@ -1,4 +1,12 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  setDefaultTimeout,
+  test,
+} from "bun:test"
 import { mkdir, mkdtemp, readdir, realpath, rm, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -15,6 +23,13 @@ import { dispatchedAssignment } from "../src/cli/report.ts"
 import { workflowRefusal } from "../src/cli/workflow-check.ts"
 import { fromGitPath } from "../src/domain/paths.ts"
 
+// A test that makes a repository and a state worktree runs a dozen git processes, and process
+// creation on Windows is slow enough on the CI runner (2.7 seconds for one such test, a stall of 5
+// for another) to pass Bun's 5 second default; a slow test there is not a hung one. Linux and macOS
+// keep the default.
+if (process.platform === "win32") setDefaultTimeout(60_000)
+afterAll(() => setDefaultTimeout(5_000))
+
 let project: string
 let home: string
 
@@ -26,8 +41,10 @@ beforeEach(async () => {
 })
 afterEach(() =>
   Promise.all([
-    rm(project, { recursive: true, force: true }),
-    rm(home, { recursive: true, force: true }),
+    // A git process or a scanner can still hold a file of the folder when the test ends (EBUSY on
+    // Windows), so the removal retries, as in stdin.test.ts.
+    rm(project, { recursive: true, force: true, maxRetries: 5 }),
+    rm(home, { recursive: true, force: true, maxRetries: 5 }),
   ]),
 )
 

@@ -10078,7 +10078,7 @@ var pullsOf = (links, intentId) => {
   return [...latest.values()].toSorted((a, b) => a.number - b.number);
 };
 
-import { link as link2, mkdir, open, rename as rename2, rm as rm2 } from "fs/promises";
+import { link as link2, lstat, mkdir, open, rename as rename2, rm as rm2 } from "fs/promises";
 import { dirname } from "path";
 var LockOwner = Struct({
   pid: Int,
@@ -10103,6 +10103,15 @@ var breakIfStale = (file) => gen2(function* () {
     yield* io(file, () => link2(taken, file)).pipe(ignore2);
   yield* io(taken, () => rm2(taken, { force: true }));
 }).pipe(ignore2);
+var BLOCKED_CODES = ["EPERM", "EACCES", "EBUSY"];
+var inTheWay = (file) => tryPromise2({ try: () => lstat(file), catch: (cause) => cause }).pipe(as2(true), catch_2((cause) => succeed6(!hasCode(cause, "ENOENT"))));
+var create = (file, retry = true) => tryPromise2({ try: () => open(file, "wx"), catch: (cause) => cause }).pipe(catch_2((cause) => {
+  if (hasCode(cause, "EEXIST"))
+    return fail5(new StateLocked({ lockFile: file }));
+  if (!BLOCKED_CODES.some((code) => hasCode(cause, code)))
+    return fail5(new StateIo({ path: file, cause }));
+  return inTheWay(file).pipe(flatMap2((present) => present ? fail5(new StateLocked({ lockFile: file })) : retry ? create(file, false) : fail5(new StateIo({ path: file, cause }))));
+}));
 var claim = (file) => gen2(function* () {
   const owner = {
     pid: process.pid,
@@ -10110,10 +10119,7 @@ var claim = (file) => gen2(function* () {
     acquiredAt: yield* currentTimeMillis2
   };
   const content = yield* encodeJson(LockOwner, owner).pipe(orDie2);
-  const handle = yield* tryPromise2({
-    try: () => open(file, "wx"),
-    catch: (cause) => hasCode(cause, "EEXIST") ? new StateLocked({ lockFile: file }) : new StateIo({ path: file, cause })
-  });
+  const handle = yield* create(file);
   yield* io(file, () => handle.writeFile(content)).pipe(tapError2(() => io(file, () => rm2(file, { force: true })).pipe(ignore2)), ensuring2(io(file, () => handle.close()).pipe(ignore2)));
   return owner.token;
 });
@@ -10149,7 +10155,7 @@ var release = (file, token) => readOwner(file).pipe(flatMap2((owner) => owner?.t
 var withFileLock = (file, use, patience = STATE_PATIENCE) => acquireUseRelease2(io(file, () => mkdir(dirname(file), { recursive: true })).pipe(andThen2(acquire(file, patience))), () => use, (token) => release(file, token));
 var withStateLock = (directory, use, patience = STATE_PATIENCE) => acquireUseRelease2(ensureLocalDirectory(directory).pipe(andThen2(acquire(localFile(directory, "lock"), patience))), () => use, (token) => release(localFile(directory, "lock"), token));
 
-import { lstat, mkdir as mkdir2, readdir, realpath, rename as rename3, rm as rm3, rmdir, stat } from "fs/promises";
+import { lstat as lstat2, mkdir as mkdir2, readdir, realpath, rename as rename3, rm as rm3, rmdir, stat } from "fs/promises";
 import { basename, dirname as dirname2, join as join2, relative, sep as sep2 } from "path";
 var {$ } = globalThis.Bun;
 
@@ -10412,7 +10418,7 @@ var ensureWorktree = (top, common, env, branch, path, options, patience = WORKTR
 var LOCAL_FILES = new Set(["local/specialists.json"]);
 var sameBytes = (a, b) => all2([io(a, () => Bun.file(a).bytes()), io(b, () => Bun.file(b).bytes())]).pipe(map4(([left, right]) => Buffer.from(left).equals(Buffer.from(right))));
 var fileExists = (path) => io(path, () => Bun.file(path).exists());
-var kindAt = (path) => io(path, () => lstat(path)).pipe(map4((info) => info.isSymbolicLink() ? "link" : info.isFile() ? "file" : info.isDirectory() ? "directory" : "other"), catchIf2((error) => hasCode(error.cause, "ENOENT") || hasCode(error.cause, "ENOTDIR"), () => succeed6(undefined)));
+var kindAt = (path) => io(path, () => lstat2(path)).pipe(map4((info) => info.isSymbolicLink() ? "link" : info.isFile() ? "file" : info.isDirectory() ? "directory" : "other"), catchIf2((error) => hasCode(error.cause, "ENOENT") || hasCode(error.cause, "ENOTDIR"), () => succeed6(undefined)));
 var realStateFolder = (root) => canonical(dirname2(root)).pipe(map4((parent) => join2(parent, basename(root))));
 var requireStateFolder = (root) => kindAt(root).pipe(flatMap2((kind) => kind === undefined || kind === "directory" ? void_3 : fail5(new StateIo({
   path: root,
@@ -12570,7 +12576,7 @@ var history_rules_default = "- Never bypass hooks or signing (`--no-verify`, `--
 
 var state_changes_default = "## Leave state changes to the root\n\nLeave to the root every command that changes git, GitHub or holyagent state (`git commit`, `branch`, `push`, `checkout`, `stash`, `merge`, `reset`, `gh` writes, and `holyagent vcs`, `assignment` and `intent` commands) and anything under `.git/` or `.holyagent/`. The root owns the branch, PR and state records and records your changed paths from the report; a stray write corrupts the shared tree, and nothing blocks one, so it rests on you. When you need such a change, say so in the report. Read-only commands are open: `git status`, `diff`, `log`, `show`, `blame`, `fetch`, and `holyagent status`, `plan`, `assignment show` and `assignment list`. Never change HEAD, a branch, the index or the working tree of a checkout other workers share with git commands (`switch`, `restore`, `clean`, `add`, `rebase`, `cherry-pick`): they would find their tree changed under them. To read or test a commit, use `git show <sha>:<path>`, `git diff`, or `git archive <sha>` extracted into the scratchpad. To undo your own edit, edit the file back.\n";
 
-import { lstat as lstat2, realpath as realpath3 } from "fs/promises";
+import { lstat as lstat3, realpath as realpath3 } from "fs/promises";
 import { dirname as dirname3, isAbsolute as isAbsolute2, join as join10, relative as relative4, resolve as resolve5, sep as sep6 } from "path";
 
 class SetupFailure extends TaggedError2("SetupFailure") {
@@ -12622,9 +12628,9 @@ var within = (parent, child) => {
 var real = (path) => tryPromise2(() => realpath3(path)).pipe(orElseSucceed2(() => {
   return;
 }));
-var present2 = (path) => tryPromise2(() => lstat2(path)).pipe(as2(true), orElseSucceed2(() => false));
+var present2 = (path) => tryPromise2(() => lstat3(path)).pipe(as2(true), orElseSucceed2(() => false));
 var isSymlink = (path) => tryPromise2({
-  try: () => lstat2(path),
+  try: () => lstat3(path),
   catch: (cause) => cause
 }).pipe(map4((stats) => stats.isSymbolicLink()), catch_2((error) => error.code === "ENOENT" || error.code === "ENOTDIR" ? succeed6(false) : fail5(new SetupFailure({ message: `cannot inspect ${path}: ${error.message}` }))));
 var settingsFile = fn2("settingsFile")(function* (env, scope, cwd) {
@@ -12973,7 +12979,7 @@ var setupNotice = (env, cwd) => {
   }));
 };
 
-import { lstat as lstat3, mkdir as mkdir4, open as open3 } from "fs/promises";
+import { lstat as lstat4, mkdir as mkdir4, open as open3 } from "fs/promises";
 import { tmpdir, userInfo } from "os";
 import { join as join13 } from "path";
 var SAFE_SESSION = /^[\w.-]{1,80}$/;
@@ -12983,14 +12989,14 @@ var markerOf = (sessionId) => join13(markers(), sessionId);
 var ensureMarkers = () => {
   const folder = markers();
   const uid = process.getuid?.();
-  return io(folder, () => mkdir4(folder, { recursive: true, mode: 448 })).pipe(andThen2(io(folder, () => lstat3(folder))), filterOrFail2((found) => found.isDirectory() && (uid === undefined || found.uid === uid && (found.mode & 18) === 0), () => new StateIo({
+  return io(folder, () => mkdir4(folder, { recursive: true, mode: 448 })).pipe(andThen2(io(folder, () => lstat4(folder))), filterOrFail2((found) => found.isDirectory() && (uid === undefined || found.uid === uid && (found.mode & 18) === 0), () => new StateIo({
     path: folder,
     cause: new Error("not a private directory owned by the current user")
   })));
 };
-var create = (sessionId) => ensureMarkers().pipe(andThen2(io(markerOf(sessionId), () => open3(markerOf(sessionId), "wx").then((file) => file.close()))), as2(true), catchIf2((error) => error.path === markerOf(sessionId) && hasCode(error.cause, "EEXIST"), () => succeed6(false)));
-var markRulesDelivered = (sessionId) => create(sessionId).pipe(asVoid2);
-var claimRulesDelivery = create;
+var create2 = (sessionId) => ensureMarkers().pipe(andThen2(io(markerOf(sessionId), () => open3(markerOf(sessionId), "wx").then((file) => file.close()))), as2(true), catchIf2((error) => error.path === markerOf(sessionId) && hasCode(error.cause, "EEXIST"), () => succeed6(false)));
+var markRulesDelivered = (sessionId) => create2(sessionId).pipe(asVoid2);
+var claimRulesDelivery = create2;
 
 import { join as join14 } from "path";
 var LEGACY_FOLDERS = {
