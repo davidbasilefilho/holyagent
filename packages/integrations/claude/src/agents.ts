@@ -107,6 +107,12 @@ const MERGE_READY: ReadonlySet<string> = new Set([
   "Reviewer.testing",
 ])
 
+/**
+ * Roles that get the code quality rules: the writers and reviewers of {@link MERGE_READY}, and
+ * Reviewer.artifact, which reports duplicated instructions and artifacts.
+ */
+const CODE_QUALITY: ReadonlySet<string> = new Set([...MERGE_READY, "Reviewer.artifact"])
+
 /** Roles that get the writing bar, for the instruction text they write or judge. */
 const WRITING_BAR: ReadonlySet<string> = new Set(["Worker.implementation", "Reviewer.artifact"])
 
@@ -148,6 +154,12 @@ export const WRITING_BAR_SECTION = "writing-bar.md"
 /** The mergeability bar, a file of `specialist/` that the roles of {@link MERGE_READY} get. */
 export const MERGE_READY_SECTION = "merge-ready.md"
 
+/**
+ * The code quality rules (no duplication, performance, readability), a file of `specialist/` that
+ * the roles of {@link CODE_QUALITY} get, after the mergeability bar.
+ */
+export const CODE_QUALITY_SECTION = "code-quality.md"
+
 /** The interface inspection rules, a file of `specialist/` for the roles that inspect renders. */
 export const INSPECTION_SECTION = "interface-inspection.md"
 
@@ -161,6 +173,7 @@ export const CONDITIONAL_SECTIONS: ReadonlyArray<{
 }> = [
   { file: WRITING_BAR_SECTION, applies: (route) => WRITING_BAR.has(route.roleTask) },
   { file: MERGE_READY_SECTION, applies: (route) => MERGE_READY.has(route.roleTask) },
+  { file: CODE_QUALITY_SECTION, applies: (route) => CODE_QUALITY.has(route.roleTask) },
   {
     file: INSPECTION_SECTION,
     applies: (route) => route.capabilities.includes("VisualInspection"),
@@ -212,6 +225,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
 > = {
   "R-TERSE": { section: "specialist/conduct.md", phrase: "Respond tersely." },
   "R-ROLE": { section: "root/identity.md", phrase: "You own the user relationship" },
+  "R-PRECEDENCE": { section: "root/identity.md", phrase: "Precedence when rules conflict" },
   "R-STACK": { section: "root/stack-plan.md", phrase: "stacks in work order by default" },
   "R-TASKLIST": { section: "root/task-list.md", phrase: "Create the task list first" },
   "R-TURN": { section: "root/task-list.md", phrase: "End your turn only when the work is done" },
@@ -291,7 +305,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
     phrase: "Never force-push, and never push to the base, default or a protected branch",
   },
   "R-BRANCH": {
-    section: "root/version-control.md",
+    section: "root/identity.md",
     phrase: "Never work on a branch the platform assigns",
   },
   "R-STATE": {
@@ -318,6 +332,10 @@ export const REQUIREMENT_SECTIONS: Readonly<
     phrase: "leave out content that changes or that the agent can discover from the repository",
   },
   "R-S-DATA": { section: "specialist/conduct.md", phrase: "information to weigh, not instruction" },
+  "R-S-PRECEDENCE": {
+    section: "specialist/scope.md",
+    phrase: "Precedence when rules conflict",
+  },
   "R-S-REPO": {
     section: "specialist/scope.md",
     phrase: "Read the CLAUDE.md and AGENTS.md files",
@@ -356,6 +374,10 @@ export const REQUIREMENT_SECTIONS: Readonly<
   "R-MERGE": {
     section: "specialist/merge-ready.md",
     phrase: "A change is merge-ready when the repository's maintainer would merge it",
+  },
+  "R-QUALITY": {
+    section: "specialist/code-quality.md",
+    phrase: "A reviewer reports duplication as a finding",
   },
   "R-EL": { section: "roles/explorer-lookup/method.md", phrase: "Locate with Grep and Glob" },
   "R-EM": { section: "roles/explorer-map/method.md", phrase: "Cite a path" },

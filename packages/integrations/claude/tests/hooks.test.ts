@@ -230,6 +230,85 @@ describe("hook vcs-reminder", () => {
     }
   })
 
+  describe("on the branches the platform assigns", () => {
+    const PLATFORM = "concerns a `claude/*` branch, which the platform assigns"
+    const repos: Array<string> = []
+    /** A repository whose HEAD is on `branch`; removed after the tests. */
+    const onBranch = async (branch: string) => {
+      const repo = await mkdtemp(join(tmpdir(), "holyagent-hook-branch-"))
+      repos.push(repo)
+      const result = await $`git init -q -b ${branch} .`
+        .cwd(repo)
+        .env({ ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" })
+        .quiet()
+        .nothrow()
+      expect(result.exitCode).toBe(0)
+      return repo
+    }
+    afterAll(() => Promise.all(repos.map((repo) => rm(repo, { recursive: true, force: true }))))
+
+    const reminder = async (command: string, cwd: string, payloadCwd?: string) => {
+      const result = await hook(
+        "vcs-reminder",
+        { ...bash(command), ...(payloadCwd === undefined ? {} : { cwd: payloadCwd }) },
+        cwd,
+        { GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" },
+      )
+      expect({ code: result.code, stderr: result.stderr }).toEqual({ code: 0, stderr: "" })
+      expect(result.stdout).not.toContain("permissionDecision")
+      return { text: additionalOf(result.stdout), output: addedContext(result.stdout) }
+    }
+
+    test("adds a sentence about the assigned branch to a commit or push made while HEAD is on claude/*", async () => {
+      const repo = await onBranch("claude/confident-mayer-4aznof")
+      for (const command of ["git commit -m x", "git push", "git push -u origin HEAD"]) {
+        const { text, output } = await reminder(command, repo)
+        expect(Object.keys(output ?? {}).toSorted()).toEqual(["additionalContext", "hookEventName"])
+        expect(output?.hookEventName).toBe("PreToolUse")
+        expect(text).toContain("holyagent vcs commit")
+        expect(text).toContain(PLATFORM)
+        expect(text).toContain("only on your own conventional branch")
+        expect(text.trim().split("\n")).toHaveLength(1)
+      }
+    })
+
+    test("adds it for a push that names a claude/* target, whatever the current branch", async () => {
+      const repo = await onBranch("release/0.2.1/feat/x")
+      for (const command of [
+        "git push -u origin claude/confident-mayer-4aznof",
+        "git push origin HEAD:claude/confident-mayer-4aznof",
+        "git push origin +HEAD:refs/heads/claude/confident-mayer-4aznof",
+        "git push origin 'claude/confident-mayer-4aznof'",
+      ])
+        expect({
+          command,
+          platform: (await reminder(command, repo)).text.includes(PLATFORM),
+        }).toEqual({ command, platform: true })
+    })
+
+    test("adds nothing for other branches, a claude/ word that is not a push target, or no repository", async () => {
+      const repo = await onBranch("release/0.2.1/feat/x")
+      for (const command of [
+        "git push -u origin release/0.2.1/feat/x",
+        "git commit -m 'docs: explain claude/x branches'",
+        "git push origin HEAD:feat/claude",
+      ])
+        expect({
+          command,
+          platform: (await reminder(command, repo)).text.includes(PLATFORM),
+        }).toEqual({ command, platform: false })
+      // `project` is no repository: git cannot answer, and the plain reminder stays.
+      const plain = await reminder("git push", project)
+      expect(plain.text).toContain("holyagent vcs commit")
+      expect(plain.text).not.toContain(PLATFORM)
+    })
+
+    test("reads the branch of the folder the payload names", async () => {
+      const repo = await onBranch("claude/confident-mayer-4aznof")
+      expect((await reminder("git commit -m x", project, repo)).text).toContain(PLATFORM)
+    })
+  })
+
   test("says nothing for any other command, any other tool and an input without a command", async () => {
     for (const command of [
       "git status",
@@ -1715,7 +1794,7 @@ describe("hook agent-launch", () => {
 })
 
 describe("hooks that need no state", () => {
-  test("do not run git, so a failing git cannot stop the version-control hooks or workflow", async () => {
+  test("do not need git, so a failing git cannot stop the version-control hooks or workflow", async () => {
     const bin = await mkdtemp(join(tmpdir(), "holyagent-hook-badgit-"))
     try {
       const env = await brokenGit(bin)

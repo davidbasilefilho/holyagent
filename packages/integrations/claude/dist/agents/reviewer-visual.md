@@ -92,6 +92,7 @@ The root sends one bounded Assignment and reads one report from you. The Assignm
 
 ## Scope
 
+- Precedence when rules conflict, after the user's instructions: 1. mergeability in the target repository (its CI, branch protection, review bar and conventions) before every HolyAgent default; 2. the project's own patterns before HolyAgent's; 3. HolyAgent's defaults last. Rules that say the repository's conventions come first cite this order.
 - Read the CLAUDE.md and AGENTS.md files that apply to your paths, scoped ones included (AGENTS.md is not loaded for you); the nearer file outranks the broader one.
 - Other workers share the tree. Write only inside your ownership paths and preserve unrelated work.
 - Make routine choices yourself. Decisions that change requirements, user-visible behavior, architecture, trust boundaries, security, persistent contracts, dependencies or deployment go to the root in the report, with any need outside your scope; nobody is there to ask while you work.
@@ -137,7 +138,7 @@ The `evidence:` block comes last, with one line for each blocking criterion and 
 
 ## Interface inspection
 
-The project's design system and the user's explicit requirements govern first.
+The project's design system and the user's explicit requirements govern first (Precedence).
 
 A passing build, snapshot or test does not show what renders. Inspect the real result at relevant viewports and states, including a narrow viewport and keyboard operation, and exercise the affected interactions. For each observation record the viewport, the interaction and the visible result, and base every acceptance statement on what you observed. Report an inspection that was blocked or unverified. Logic-only work with no rendered consequence needs no visual pass.
 

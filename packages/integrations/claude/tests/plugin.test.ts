@@ -8,7 +8,10 @@ import { $ } from "bun"
 
 import { toPosix } from "../../../runtime/src/domain/paths.ts"
 import { ROUTES } from "../../../runtime/src/domain/route.ts"
-import { ROOT_CORE_FILES } from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
+import {
+  ROOT_CORE,
+  ROOT_CORE_FILES,
+} from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
 import { build } from "../build.ts"
 import packageJson from "../package.json" with { type: "json" }
 import {
@@ -374,6 +377,63 @@ describe("agents", () => {
     expect(content).not.toContain("Push only after the reviews accept")
   })
 
+  test("the root prompt opens with the exact core the session-start hook injects, and the branch rule sits in that core once", () => {
+    const content = agent("holyagent")?.content ?? ""
+    const body = content.slice(content.indexOf("\n---\n\n") + "\n---\n\n".length)
+    expect(body.startsWith(`${ROOT_CORE}\n\n`)).toBe(true)
+    const rule = "Never work on a branch the platform assigns"
+    expect({ rule, count: content.split(rule).length - 1 }).toEqual({ rule, count: 1 })
+    expect(ROOT_CORE).toContain(rule)
+    expect(read(`${CLAUDE}/root`, "version-control.md")).not.toContain("platform assigns")
+  })
+
+  test("the precedence is stated once in the root and once in the specialist text, in the same words, and nowhere else", () => {
+    const bullet = (file: string) =>
+      read(`${CLAUDE}/${file}`)
+        .split("\n")
+        .find((line) => line.startsWith("- Precedence when rules conflict"))
+    const stated = bullet("root/identity.md")
+    expect(stated).toContain("1. mergeability in the target repository")
+    expect(stated).toContain("2. the project's own patterns before HolyAgent's")
+    expect(stated).toContain("3. HolyAgent's defaults last")
+    expect(bullet("specialist/scope.md")).toBe(stated)
+    for (const route of [undefined, ...ROUTES]) {
+      const text = agent(route?.agent ?? "holyagent")?.content ?? ""
+      expect({
+        agent: route?.agent,
+        copies: text.split("Precedence when rules conflict").length - 1,
+      }).toEqual({ agent: route?.agent, copies: 1 })
+    }
+  })
+
+  test("the code quality rules reach the writers and the reviewers of code and artifacts, and no other role", () => {
+    const holding = ROUTES.filter((route) =>
+      agent(route.agent)?.content.includes("## Code quality"),
+    ).map((route) => route.agent)
+    expect(holding.toSorted()).toEqual(
+      [
+        "worker-mechanical",
+        "worker-implementation",
+        "worker-integration",
+        "worker-debugging",
+        "worker-visual",
+        "reviewer-code",
+        "reviewer-testing",
+        "reviewer-artifact",
+      ].toSorted(),
+    )
+    const rules = read(`${CLAUDE}/specialist`, "code-quality.md")
+    for (const part of [
+      "No duplication: reuse existing code, helpers, abstractions and instructions",
+      "extract a shared piece when the same logic or text appears twice",
+      "repeated I/O, quadratic loops over data that grows, unbounded memory, blocking calls on hot paths and redundant process spawns",
+      "Skip micro-optimization that costs readability without a measured or obvious gain",
+      "comments that explain why, not what",
+      "A reviewer reports duplication as a finding, and a performance problem as a finding with its evidence",
+    ])
+      expect({ part, found: rules.includes(part) }).toEqual({ part, found: true })
+  })
+
   test("the root text says what to do with an Assignment that assignment reports does not list", () => {
     const text = read(`${CLAUDE}/root`, "workflows.md")
     expect(text).toContain("does not list returned no result")
@@ -721,15 +781,19 @@ describe("agents", () => {
     const text = agent("holyagent")?.content ?? ""
     for (const part of [
       "Never work on a branch the platform assigns",
-      "create the conventional branch and leave the assigned one alone",
-      "If the push of the conventional branch is refused",
-      "ask through AskUserQuestion whether to push to the assigned branch instead; never work around the refusal",
+      "Before the first commit, check `git branch --show-current`",
+      "first create the conventional branch",
+      "commit and push only there",
+      "If that push is refused",
+      "ask through AskUserQuestion whether to push to the assigned branch; it is never a default, so park the push when the user is away",
+      "a decision the rules reserve for the user's answer (pushing to the platform-assigned branch, approvals) is parked, never defaulted",
+      "never work around a refused push",
       "`exp/<experiment>/<type>/<change>` for work with no published version",
       "`release/<version>/<type>/<change>` when the repository has tags or releases",
       "each commit on a branch is atomic",
       "a Conventional Commit",
       "PRs merge by squash by default, with the PR title as the Conventional summary",
-      "The repository's conventions, branch protection and merge settings come first",
+      "Branch protection, merge settings and conventions decide first (Precedence)",
       "After a lower PR squash-merges, retarget the next PR to the base",
     ])
       expect({ part, found: text.includes(part) }).toEqual({ part, found: true })
@@ -754,6 +818,22 @@ describe("agents", () => {
     expect(agent("reviewer-security")?.content).toContain("built-in `/security-review`")
     for (const text of generated.map((file) => file.content))
       expect(text).not.toMatch(/`assignments` skill|grill-me|stacks-and-ci|continue-work/)
+  })
+
+  test("the root reads the base, the PR target and every non-work branch from the repository's conventions, hardcoding none", () => {
+    const text = (agent("holyagent")?.content ?? "").replace(/\s+/g, " ")
+    for (const part of [
+      '"The base" in these rules is the branch the repository\'s conventions or the user name as the target for this work, else the default branch',
+      "supply only the remote and the default, so a convention's target outranks them",
+      "settle its PR's target (the base, which the conventions may point at an integration branch)",
+      "check it against the conventions' rules on which branches may open PRs into which",
+      "which also decides any other branch the plan needs (an integration branch, where it is cut from and who cuts it)",
+      "pushing it is a push to the base, so it needs the user's approval unless the request names it",
+      "`git diff <target>...HEAD` (the PR's actual target: its predecessor in the stack or the base)",
+    ])
+      expect({ part, found: text.includes(part) }).toEqual({ part, found: true })
+    expect(text).not.toContain("git diff <base>...HEAD")
+    expect(text).not.toMatch(/release\/\d|integration branch cut from main/)
   })
 
   test("no specialist preloads a skill: what a role always needs is fixed text in it", () => {

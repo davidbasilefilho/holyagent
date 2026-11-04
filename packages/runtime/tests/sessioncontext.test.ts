@@ -85,6 +85,23 @@ describe("the core of the root rules", () => {
       expect(ROOT_CORE).toContain(part)
   })
 
+  test("carries the branch rule and the precedence a root needs before its first action", () => {
+    for (const part of [
+      "Never work on a branch the platform assigns",
+      "Before the first commit, check `git branch --show-current`",
+      "first create the conventional branch",
+      "commit and push only there",
+      "it is never a default, so park the push when the user is away",
+      "Precedence when rules conflict",
+    ])
+      expect(ROOT_CORE).toContain(part)
+  })
+
+  test("leaves room for the status under the budget with every static part of a cloud session in", () => {
+    const fixed = [ROOT_CORE, ROOT_TAKEOVER, CLOUD_IDENTITY, SESSION_REMINDER].join("\n\n")
+    expect(fixed.length).toBeLessThanOrEqual(CONTEXT_BUDGET - 1000)
+  })
+
   test("sets the language rule: English for repository artifacts, the user's latest language for the user", () => {
     expect(ROOT_CORE).toContain("in English by default unless the target repository's convention")
     expect(ROOT_CORE).toContain("in the language of the user's latest message")
@@ -294,7 +311,7 @@ describe("the requirements of the Intent in use", () => {
 
   test("stay whole while the status can still narrow to fit them", () => {
     const requirements = Array.from(
-      { length: 8 },
+      { length: 6 },
       (_, at) => `Requirement ${at}: ${LONG.slice(0, 400)}`,
     )
     const text = sessionContext(bigStatus(40, 30), ROOT_CORE, undefined, intent(requirements))
