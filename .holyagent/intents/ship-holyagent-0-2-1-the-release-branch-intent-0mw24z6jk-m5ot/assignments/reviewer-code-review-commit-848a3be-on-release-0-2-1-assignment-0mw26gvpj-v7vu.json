@@ -1,0 +1,55 @@
+{
+  "id": "assignment-0mw26gvpj-v7vu",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 2,
+  "roleTask": "Reviewer.code",
+  "slug": "review-commit-848a3be-on-release-0-2-1",
+  "objective": "Review commit 848a3be on release/0.2.1/ci/release-flow (worktree /home/user/holyagent-ci-release-flow) against Parts A1 and A2 of the 0.2.1 request and the merge-ready bar.",
+  "state": "Running",
+  "scope": [
+    "Read /home/user/holyagent-work/spec-0.2.1.md Part A1 and A2 and the Intent defaults: the branch-version rule applies to every release/<v>/ head, so the first PR of a release carries the bump; publish.yml calls validation.yml as a reusable workflow then stable.yml or dev.yml with needs; the single version source is the root package.json version.",
+    "Review with 'git -C /home/user/holyagent-ci-release-flow show 848a3be' and by running 'bun test scripts/' there. Check the workflow logic by reading: triggers (no tag pushes, pull_request types), job conditions, the branch-model and version checks' inputs (refs, fetching main's package.json), the tag-release composite action (idempotency per commit, loud failure when the stable tag is on another commit, dev tag naming with the short hash), that required check contexts match /home/user/holyagent-work/rulesets/*.json, and Windows behavior of the scripts.",
+    "Also check the new scripts follow .claude/CLAUDE.md (Effect, Schema at boundaries with onExcessProperty error, Bun Shell, JSDoc), reuse parseVersion, and avoid duplication; and that AGENTS.md, docs/development.md and docs/usage.md are accurate."
+  ],
+  "constraints": [
+    "Keep working until the review is done; stop to ask only when you cannot go on. When done, stop and report; name anything unrequested instead of doing it. Do not stop early with a summary that announces a next step. Read-only: change no repository files and make no git writes.",
+    "Each finding: file:line, what is wrong, the evidence or a concrete failure scenario, blocking or non-blocking with the reason, and the smallest fix. Report in under 600 words."
+  ],
+  "criteria": [
+    {
+      "text": "Workflow triggers, conditions and permissions implement A2 as specified",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The branch-model and version checks implement A1 and A2 and their tests fail without the change",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The ruleset check contexts match the job names",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The code follows the repository rules and B1 (no duplication, readability)",
+      "blocking": false,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw25gfld-iik9"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-04T13:54:02.503Z"
+  },
+  "createdAt": "2026-11-04T13:54:02.503Z"
+}
