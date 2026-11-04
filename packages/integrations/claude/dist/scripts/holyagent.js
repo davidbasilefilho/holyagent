@@ -9422,22 +9422,41 @@ function resolveOptions(options) {
   };
 }
 var package_default = {
-  name: "@holyagent/runtime",
+  name: "holyagent",
   version: "0.2.1",
-  description: "The holyagent runtime: instructions and the shared command surface.",
+  private: true,
   license: "Apache-2.0",
-  bin: {
-    "holyagent-runtime": "./src/cli/main.ts"
-  },
+  workspaces: [
+    "packages/*",
+    "packages/integrations/*"
+  ],
   type: "module",
-  exports: {
-    ".": "./src/index.ts"
+  scripts: {
+    "bump:minor": "mise run bump:minor",
+    "bump:patch": "mise run bump:patch",
+    prepare: "mise run prepare",
+    build: "mise run build",
+    check: "mise run check",
+    fmt: "mise run fmt",
+    "fmt:check": "mise run fmt:check",
+    lint: "mise run lint",
+    "lint:fix": "mise run lint:fix",
+    test: "mise run test",
+    verify: "mise run verify"
   },
-  dependencies: {
-    "@toon-format/toon": "^4.0.0",
-    acorn: "8.19.0",
-    effect: "^4.0.0"
-  }
+  devDependencies: {
+    "@anthropic-ai/claude-code": "2.1.300",
+    "@types/bun": "^1.0.0",
+    effect: "^4.0.0",
+    "eslint-plugin-jsdoc": "^65.4.2",
+    lefthook: "^2.0.0",
+    mise: "2026.10.24"
+  },
+  trustedDependencies: [
+    "@anthropic-ai/claude-code",
+    "lefthook",
+    "mise"
+  ]
 };
 
 import { join } from "path";

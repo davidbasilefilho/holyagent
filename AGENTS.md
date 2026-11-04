@@ -23,6 +23,10 @@ This repository's own convention, enforced by CI and rulesets; HolyAgent's instr
 - A push to a branch runs `publish.yml`: validation first, then `stable.yml` on `main` (tag `holyagent-<version>` and a Release) or `dev.yml` elsewhere (tag `holyagent-<version>-dev-<short-hash>` and a pre-release). Tags are never a trigger, so a tag cannot start a release.
 - Pin every external action to a full commit SHA with a `# vX.Y.Z` comment, and give `contents: write` only to the jobs that tag and release. A moving tag can change what runs with the repository's token; `scripts/workflows.test.ts` checks both rules.
 
+## The version
+
+- The version lives in the root `package.json` only and changes only through `mise run bump:patch` or `bump:minor`, which edit that file alone. `mise run build` copies it to the workspace `package.json` files and `bun.lock` and generates the plugin and marketplace manifests from it, and `scripts/bump-version.test.ts` fails when any copy differs. A hand-edited copy is overwritten by the next build and fails that test, and a second place to bump is how copies drift apart.
+
 ## Commits and pull requests
 
 - `holyagent vcs` has two commands, `commit` and `pr`; branches, pushes, merges and CI use plain Git and `gh`. The `commit-msg` hook (`holyagent hook commit-msg`, wired in `lefthook.yml`) keeps agent attribution out of commits made with plain Git too.

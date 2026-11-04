@@ -3,7 +3,7 @@ import { join } from "node:path"
 import { encode } from "@toon-format/toon"
 import { Cause, Effect } from "effect"
 
-import packageJson from "../../package.json" with { type: "json" }
+import packageJson from "../../../../package.json" with { type: "json" }
 import { STATE_DIRECTORY } from "../state/layout.ts"
 import { WorkTree } from "../state/local.ts"
 import { updateState } from "../state/store.ts"

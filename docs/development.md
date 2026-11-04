@@ -85,7 +85,7 @@ Everything is configured in `bunfig.toml`. Bun's own `check`, `lint` and `fmt` a
 - the route table in `packages/runtime/src/domain/route.ts` (model, effort and tools of each agent) and `packages/integrations/claude/src/agents.ts` (how each agent is assembled);
 - `packages/integrations/claude/src/wrapper.sh` and `empty-bunfig.toml`;
 - `packages/runtime/src/cli/main.ts`, bundled for Bun into `scripts/holyagent.js`;
-- the hook table in `generate.ts`, and the version from `packages/integrations/claude/package.json`.
+- the hook table in `generate.ts`, and the version from `packages/integrations/claude/package.json`, which the build first syncs from the root `package.json` (see Versioning).
 
 Every agent prompt is split into one file per section, and the order of the sections is fixed in `src/agents.ts`, not by file name; the sync test fails when a file in `root/`, `specialist/` or `roles/<agent>/` is not assembled or an assembled file is missing. The core of the root rules, which the SessionStart hook injects when the root is not the main thread, is the files named in `ROOT_CORE_FILES` (`root-core.ts`). `root/instruction-guidelines.md` holds the rules the root applies when it writes model-facing text, each tagged with the Anthropic prompting page it follows.
 
@@ -99,7 +99,7 @@ Do not edit generated files; each carries a note naming its source. `.prettierig
 
 ## Versioning
 
-Versions follow ZeroVer, `0.X.Y`: the major stays 0, a minor bump advances X and resets Y, and a patch bump advances Y; 0.1.0 was the first release. The version lives in the `package.json` files, and the build copies the one in `packages/integrations/claude/package.json` into `plugin.json` and `.claude-plugin/marketplace.json`; a test checks they agree. The branch model that carries a version to a release is below.
+Versions follow ZeroVer, `0.X.Y`: the major stays 0, a minor bump advances X and resets Y, and a patch bump advances Y; 0.1.0 was the first release. The version lives in the root `package.json` only, and `mise run bump:patch` or `bump:minor` is the only way it changes: `scripts/bump-version.ts` edits that file and nothing else. `mise run build` then runs `bun scripts/bump-version.ts sync`, which copies the version into `packages/runtime/package.json`, `packages/integrations/claude/package.json` and the workspace entries of `bun.lock`, and generates `plugin.json` and `.claude-plugin/marketplace.json` from the integration's copy; the bundled CLI's `--version` reads the root `package.json`. The workspace manifests keep a `version` field because Bun workspaces and the plugin generator read their own package's, so the build writes it rather than the field being dropped. `scripts/bump-version.test.ts` fails when any copy differs from the source. The branch model that carries a version to a release is below.
 
 ## Branches, CI and releases
 

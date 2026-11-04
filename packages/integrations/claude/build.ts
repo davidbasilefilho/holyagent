@@ -1,6 +1,9 @@
 import { chmod, readdir, rm } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
+import { Effect } from "effect"
+
+import { syncVersions } from "../../../scripts/bump-version.ts"
 import { VENDOR_DIRECTORY } from "./src/files.ts"
 import { generate, GENERATED_PATHS } from "./src/generate.ts"
 
@@ -34,6 +37,8 @@ export const build = async (root: string): Promise<ReadonlyArray<string>> => {
 
 if (import.meta.main) {
   const root = join(dirname(import.meta.path), "../../..")
+  // The root package.json holds the one version; copy it to the other files before they are read.
+  await Effect.runPromise(syncVersions(root))
   const written = await build(root)
   console.log(`built ${written.length} files into ${root}`)
 }
