@@ -13,6 +13,7 @@ import {
   manifestFiles,
   type Pin,
   PinsBehind,
+  releaseOf,
   SourceError,
   type Steps,
   type Survey,
@@ -160,6 +161,21 @@ describe("verifyChecksum", () => {
     expect(error.message).toContain("b".repeat(64))
     expect(error.message).toContain("a".repeat(64))
     expect(error.message).toContain("the release")
+  })
+})
+
+describe("releaseOf", () => {
+  test("fails with a SourceError when the registry does not answer in time", async () => {
+    const stalled = Bun.serve({ port: 0, fetch: () => new Promise<Response>(() => {}) })
+    try {
+      const error = await Effect.runPromise(
+        Effect.flip(releaseOf("left-pad", `http://127.0.0.1:${stalled.port}`, 50)),
+      )
+      expect(error).toBeInstanceOf(SourceError)
+      expect(error.source).toBe(`http://127.0.0.1:${stalled.port}/left-pad`)
+    } finally {
+      await stalled.stop(true)
+    }
   })
 })
 

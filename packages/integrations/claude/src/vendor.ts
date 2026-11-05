@@ -35,11 +35,10 @@ const RIPGREP_VERSION = "15.2.0"
 
 /**
  * Fd 10.5.1, from https://github.com/sharkdp/fd/releases/tag/v10.5.1. The release publishes no
- * checksum file. For later versions the updater compares each download with the `digest` that
- * GitHub's release API reports for the asset before it pins a hash, but the 10.5.1 archive hashes
- * were not compared that way: the API was unreachable then, so they are the SHA-256 of the archives
- * as downloaded over HTTPS and were never checked against those digests. The program hashes were
- * taken from the extracted files. A changed archive fails the build.
+ * checksum file. The 10.5.1 archive hashes match the SHA-256 digests GitHub shows for the release
+ * assets. For later versions the updater compares each download with the `digest` that GitHub's
+ * release API reports for the asset before it pins a hash. The program hashes were taken from the
+ * extracted files. A changed archive fails the build.
  */
 const FD_VERSION = "10.5.1"
 
