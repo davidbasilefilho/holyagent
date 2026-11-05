@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "re-review-repair-commit-72bf3f2-on",
   "objective": "Re-review repair commit 72bf3f2 on release/0.2.1/fix/followups for the workflow hook and vendored-download security properties.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read /home/user/holyagent-work/diffs/followups-3.diff (git diff b46fa93 72bf3f2, without dist) and the current files in /home/user/holyagent-fix-followups: packages/runtime/src/cli/workflow-check.ts and scripts/vendor.ts. Previous findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw3kkmcj-c34q.md.",
     "Binding scope (Intent): the workflow hook auto-allow guards against accidental runaway scripts the root writes; crafted-only misses rank low. Judge whether the new installMissing flow keeps hash pinning intact: a failed, partial or tampered download must never be pinned or installed, and successful ones may be kept."
@@ -34,7 +34,25 @@
     "agentId": "workflow:wf_4a67819a-946/assignment-0mw3lbfhz-k5w2",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-05T13:37:28.631Z"
+    "startedAt": "2026-11-05T13:37:28.631Z",
+    "finishedAt": "2026-11-05T13:44:53.146Z"
+  },
+  "result": "result: Previous findings 1-3 are closed. I found no path around the hash pins or the maintainer decisions, and no blockers. The new `installMissing` flow keeps the pins intact. I read the code and ran no tests, because this session has no shell.\n\nThe built-in `/security-review` did not run. The Skill call failed because `origin/HEAD...` does not resolve in this clone. The loaded skill text was the built-in's. I reviewed `followups-3.diff` and the current files by hand.\n\n**Vendor flow (`scripts/vendor.ts:77-95`)**\n- Each asset runs `install(folder, asset, await fetchArchive(url))`, and `installAsset` hashes the archive first (`claude/src/vendor.ts:277`).\n- It also checks the program hash and that the wanted entries exist before any `Bun.write` (`:277-297`).\n- A failed, timed-out, oversized, 404 or tampered download throws before a write. `installMissing` catches it, installs nothing for that asset and names it in the returned problems.\n- Successful archives stay installed. That matches the decision that successful ones may be kept.\n- `main` (`vendor.ts:105-110`) removes unpinned files, then runs `vendorProblems`, which checks the program hash, license presence and strays. It throws if `failed` or `problems` is non-empty, so a failed download still exits non-zero.\n- Pins are not written here. Only `deps:update` pins, and it still checks the published digest first.\n- Parallel installs write to distinct paths. A mid-write fault would leave a binary that `vendorProblems` rejects by hash. A truncated license would pass, but licenses are not hash-pinned and this was already the case.\n\n**Workflow hook (`workflow-check.ts`)**\n- Previous finding 1 is closed: `separatorsOf` (`:1945-1968`) now follows split/spread/`Array.from` through names.\n- Previous finding 2 is closed: `textsOf` handles conditionals, and the `comesFromArgs` pass (`:2153-2199`) refuses an unknown replacement inside a loop or function unless it comes from `args`.\n- Previous finding 3 is closed: the docs now state the per-entry zip cap.\n\n**Findings (low, crafted-only, not blockers)**\n1. `workflow-check.ts:1945-1968`: `separatorsOf` returns empty for an array derived through `.map`, `.filter`, `.reverse` or `.slice` after the split. For example `s.split('').map(c => c).join('--')` in a loop is probably not judged. Smallest fix: follow a `CallExpression` on an array method to its object.\n2. `workflow-check.ts:1974-1977` (unverified suspicion, nothing run): a regex first argument, as in `s.replaceAll(/a/g, 'aa')`, gives empty `takenTexts` and so is probably not judged as growth. Smallest fix: treat a regex first argument as taking an unknown length, and apply the `comesFromArgs` rule to its replacement.\n\nevidence:\nThe repair closes the previous findings and adds no new path around the hash pins or the maintainer decisions: Met. The archive hash is checked before any read (`claude/src/vendor.ts:277`) and the program hash before any write (`:287`). A failure is caught per asset (`scripts/vendor.ts:89`), and `main` still throws on `failed` or `problems` (`:109`). The `workflow-check.ts` hunks close previous findings 1 and 2. Only low crafted-only misses remain.\nfindings: low items 1-2 above, in /home/user/holyagent-fix-followups/packages/runtime/src/cli/workflow-check.ts. No findings in /home/user/holyagent-fix-followups/scripts/vendor.ts.\n",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "pin checks precede every write, failures caught per asset and still exit non-zero; low crafted-only items only",
+    "criteria": [
+      {
+        "criterion": "The repair closes the previous findings and adds no new path around the hash pins or the maintainer decisions",
+        "support": "Met. The archive hash is checked before any read (`claude/src/vendor.ts:277`) and the program hash before any write (`:287`). A failure is caught per asset (`scripts/vendor.ts:89`), and `main` still throws on `failed` or `problems` (`:109`). The `workflow-check.ts` hunks close previous findings 1 and 2. Only low crafted-only misses remain."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "low items 1-2 above, in /home/user/holyagent-fix-followups/packages/runtime/src/cli/workflow-check.ts. No findings in /home/user/holyagent-fix-followups/scripts/vendor.ts."
+      }
+    ]
   },
   "createdAt": "2026-11-05T13:37:28.631Z"
 }
