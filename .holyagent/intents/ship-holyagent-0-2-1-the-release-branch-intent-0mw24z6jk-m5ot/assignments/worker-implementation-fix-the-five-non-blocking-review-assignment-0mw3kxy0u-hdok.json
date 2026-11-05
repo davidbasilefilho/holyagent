@@ -1,0 +1,85 @@
+{
+  "id": "assignment-0mw3kxy0u-hdok",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 5,
+  "roleTask": "Worker.implementation",
+  "slug": "fix-the-five-non-blocking-review",
+  "objective": "Fix the five non-blocking review leftovers on release/0.2.1/fix/followups in /home/user/holyagent-fix-followups.",
+  "state": "Running",
+  "scope": [
+    "Findings to fix, from /home/user/holyagent/.git/holyagent/reports/assignment-0mw3kkm43-yv6m.md (code) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw3kkmcj-c34q.md (security):",
+    "1. packages/runtime/src/cli/workflow-check.ts (~1944): a single non-global `s = s.replace('a','xyz')` outside any loop is now refused, though the base allowed it. Restore it: apply the textual growth rule to replaceAll, and to replace only with a global regex, or only inside a loop or function body, whichever is the smaller rule that keeps the existing tests.",
+    "2. workflow-check.ts (~1919-1932): a join is judged only when its receiver is a direct `.split(literal)` call. Close `const p = s.split(''); s = p.join('--')`, `s = [...s].join('--')` and `s = Array.from(s).join('--')` inside a loop by tracing the join receiver through a binding, spread and Array.from back to the grown value. Real root scripts call `.join('\\n')` on arrays of lines all the time, so judge only a join whose receiver derives from the binding being reassigned.",
+    "3. workflow-check.ts (~1908-1918): textsOf stops at parameters and conditionals. Make a conditional contribute both branches. For a replacement text that is not known (such as a function parameter, as in `const g=(s,r)=>s.replaceAll('a',r)`), refuse the call when it is inside a loop or a function body and the text does not come from args. Skip this part if it would refuse a real root script, and say so.",
+    "4. scripts/vendor.ts (~770): Promise.all downloads every missing archive before installing any, so one failure discards the downloads that succeeded. Install each archive once its own download and pin check succeed, keep the archives that succeeded, and still exit non-zero naming every failed one. A failed or partial download must never be pinned or installed. Use the composition the file already uses.",
+    "5. docs/development.md: the 64 MiB cap text says it bounds what an archive may inflate to. For zip it applies per wanted entry. Say that precisely. Update docs/hooks.md where it describes the text growth rules if 1 to 3 change them.",
+    "Each behavior change gets a test that fails without it. The real root workflow scripts must stay allowed: run /home/user/holyagent-work/check-workflow-scripts.ts as it was run before (read it for the invocation) and report the allowed count, which was 52/52.",
+    "Finish with 'bunx --no-install mise run build' and 'bunx --no-install mise run verify' (see docs/development.md). Write the diff of your changes (git diff HEAD, without dist) to /home/user/holyagent-work/diffs/followups-3.diff."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md code rules: Effect composition, JSDoc on exported items, Bun APIs.",
+    "Binding (Intent): the workflow hook auto-allow guards against accidental runaway scripts the root writes; a refused script falls back to the permission prompt; add no limits beyond these findings.",
+    "Keep working until done; stop and report. Name anything unrequested instead of doing it.",
+    "Make no commits or other git writes and no edits under .git/ or .holyagent/.",
+    "Work only inside /home/user/holyagent-fix-followups (and write the diff file named above).",
+    "Report in under 300 words; put long logs in /home/user/holyagent-work/logs/."
+  ],
+  "criteria": [
+    {
+      "text": "A single non-global replace outside a loop is allowed again and the growth tests still pass",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The join, spread and Array.from aliases in a loop are refused while real root scripts stay allowed",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Conditional and parameter replacement texts are judged, or the report says why a part was skipped",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A failed archive download no longer discards the archives that succeeded and nothing unpinned is installed",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The docs describe the zip cap per entry and the changed growth rules",
+      "blocking": false,
+      "dimension": "style"
+    },
+    {
+      "text": "Each behavior change has a test that fails without it",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "mise run build leaves dist in sync and mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "diff-file",
+    "real-scripts"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli",
+    "packages/runtime/tests",
+    "packages/integrations/claude/dist",
+    "docs",
+    "scripts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw3jzcrt-wwer",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-05T13:26:59.454Z"
+  },
+  "createdAt": "2026-11-05T13:26:59.454Z"
+}
