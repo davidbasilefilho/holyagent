@@ -9,9 +9,9 @@
     "Do not change .claude/CLAUDE.md; repository rules go in AGENTS.md, HolyAgent rules go in the plugin's instructions; keep the README's fixed section structure and update docs/ wherever behavior changes.",
     "Follow .claude/CLAUDE.md code rules: Effect for effects and tagged errors, Effect Schema at data boundaries with onExcessProperty error, Bun APIs, Bun Shell for processes, JSDoc on every exported item, skill descriptions start with the situation.",
     "Work in the A1 model: release/0.2.1/integration cut from main, one release/0.2.1/<type>/<change> branch and PR per reviewable change targeting the integration branch, validation changes landing first, bump to 0.2.1 on the integration branch with mise run bump:patch.",
-    "Done means mise run verify passes with the build in sync, CI green on every PR including Windows, rulesets applied or reported as a blocker with the exact JSON, and the integration to main PR open and not merged.",
+    "Done means mise run verify passes with the build in sync, CI green on every PR including Windows, rulesets applied or reported as a blocker with the exact JSON, and the integration to main PR merged once it is merge-ready.",
     "Docs, commits and PRs are in English.",
-    "Decision (maintainer): the root squash-merges each reviewed, green work PR into release/0.2.1/integration itself; only the integration to main PR waits for the maintainer and is not merged.",
+    "Decision (maintainer): the root squash-merges each reviewed, green work PR into release/0.2.1/integration itself; the integration to main PR is merged too once it is merge-ready (maintainer, later: merge whenever merge-ready).",
     "Default: the single version source is the root package.json version field; the build and a test propagate it everywhere else.",
     "Default: the branch-version rule applies to every PR whose head is a release/<v>/ branch, so the first PR of a release (the validation PR for 0.2.1) carries the bump to <v> as its own commit, made with mise run bump:patch.",
     "Default: publish.yml triggers on branch pushes only and calls validation.yml as a reusable workflow, then stable.yml or dev.yml with needs, so publishing runs only after validation passes for that commit; validation.yml runs directly on pull_request.",
@@ -26,9 +26,10 @@
     "Decision (maintainer): an Assignment's brief and report stay while its Intent is open, so later briefs can cite them, and are removed when the Intent is completed or closed.",
     "Decision (maintainer): remove the undocumented holyagent-runtime bin from packages/runtime/package.json; the plugin's holyagent command is the only program.",
     "Default: the shared flag parser's tightening (an unknown single-dash flag and a repeated string flag are errors) stays; it is reversible and the docs describe the flags.",
-    "Default: the workflow hook auto-allow guards against accidental runaway scripts the root writes; past the maintainer's loop and repeat-count rule it refuses the growth patterns the reviews found and that a small rule closes, a crafted script it misses still only exhausts the local session, and the remaining limits are reported."
+    "Default: the workflow hook auto-allow guards against accidental runaway scripts the root writes; past the maintainer's loop and repeat-count rule it refuses the growth patterns the reviews found and that a small rule closes, a crafted script it misses still only exhausts the local session, and the remaining limits are reported.",
+    "Decision (maintainer, later): fix every remaining fixable review leftover on a follow-up branch into integration, and merge every PR, the integration to main PR included, as soon as it is merge-ready."
   ],
-  "revision": 4,
+  "revision": 5,
   "state": "Open",
   "createdAt": "2026-11-04T13:12:17.120Z"
 }
