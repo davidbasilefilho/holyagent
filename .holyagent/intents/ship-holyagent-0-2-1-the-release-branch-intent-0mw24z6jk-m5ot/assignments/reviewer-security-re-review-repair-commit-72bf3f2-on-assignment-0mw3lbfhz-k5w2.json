@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mw3lbfhz-k5w2",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.security",
+  "slug": "re-review-repair-commit-72bf3f2-on",
+  "objective": "Re-review repair commit 72bf3f2 on release/0.2.1/fix/followups for the workflow hook and vendored-download security properties.",
+  "state": "Running",
+  "scope": [
+    "Read /home/user/holyagent-work/diffs/followups-3.diff (git diff b46fa93 72bf3f2, without dist) and the current files in /home/user/holyagent-fix-followups: packages/runtime/src/cli/workflow-check.ts and scripts/vendor.ts. Previous findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw3kkmcj-c34q.md.",
+    "Binding scope (Intent): the workflow hook auto-allow guards against accidental runaway scripts the root writes; crafted-only misses rank low. Judge whether the new installMissing flow keeps hash pinning intact: a failed, partial or tampered download must never be pinned or installed, and successful ones may be kept."
+  ],
+  "constraints": [
+    "Read-only: no repository edits and no git writes.",
+    "Keep working until the review is done; stop and report. Report in under 300 words, findings ranked by severity with file:line, and the smallest fix."
+  ],
+  "criteria": [
+    {
+      "text": "The repair closes the previous findings and adds no new path around the hash pins or the maintainer decisions",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw3kxy0u-hdok"
+  ],
+  "followUpOf": "assignment-0mw3kkmcj-c34q",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-05T13:37:28.631Z"
+  },
+  "createdAt": "2026-11-05T13:37:28.631Z"
+}
