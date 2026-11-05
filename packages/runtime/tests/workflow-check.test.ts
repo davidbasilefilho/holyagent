@@ -412,6 +412,30 @@ describe("the workflow check refuses text that grows by replacement or joining",
       "a template replacement that is longer",
       "let s = 'a'\nfor (let i = 0; i < 40; i++) { s = s.replaceAll('a', `bb`) }",
     ],
+    [
+      "a longer replacement kept in a temporary",
+      "let s = 'abcd'\nfor (let i = 0; i < 40; i++) { const t = s.replaceAll('abcd', '$&$&'); s = t }",
+    ],
+    [
+      "a longer replacement held in a name",
+      "let s = 'a'\nconst r = 'aa'\nfor (let i = 0; i < 40; i++) { s = s.replaceAll('a', r) }",
+    ],
+    [
+      "a longer replacement held in a name, in a function",
+      "const r = 'aa'\nconst g = (s) => s.replaceAll('a', r)\nlet s = 'a'\nfor (let i = 0; i < 40; i++) { s = g(s) }",
+    ],
+    [
+      "a pattern and a replacement held in names, through a temporary",
+      "let s = 'a'\nconst p = 'a'\nconst r = 'aa'\nfor (let i = 0; i < 40; i++) { const t = s.replaceAll(p, r); s = t }",
+    ],
+    [
+      "a join of the text with itself",
+      "let s = 'aa'\nfor (let i = 0; i < 40; i++) { s = s.split('a').join(s) }",
+    ],
+    [
+      "a longer separator kept in a temporary",
+      "let s = 'a'\nfor (let i = 0; i < 40; i++) { const t = s.split('').join('--'); s = t }",
+    ],
   ])("refuses %s", async (_label, text) => {
     expect(await refusal(text)).toBeString()
   })
@@ -425,6 +449,41 @@ describe("the workflow check refuses text that grows by replacement or joining",
     [
       "a replacement without a dollar of the same length",
       "let s = 'abcd'\nfor (let i = 0; i < 3; i++) { s = s.replaceAll('abcd', 'wxyz') }",
+    ],
+    [
+      "a longer replacement of text that does not come from the result",
+      "const r = 'aa'\nlet s = ''\nfor (const x of args.items) { s = x.name.replaceAll('a', r) }\nlog(s)",
+    ],
+    [
+      "a longer replacement kept apart from the text it replaces in",
+      "const out = []\nfor (const x of args.items) { const t = x.name.replaceAll('a', 'bb'); out.push(t) }\nlog(out)",
+    ],
+    ["a longer replacement done once", "const t = 'abcd'.replaceAll('abcd', '$&$&')\nlog(t)"],
+    ["a join of the text with a separator", "log(args.items.join(args.separator))"],
+  ])("allows %s", async (_label, text) => {
+    expect(await refusal(text)).toBeUndefined()
+  })
+})
+
+describe("the workflow check follows an alias made with map or Array.from", () => {
+  test.each<readonly [string, string]>([
+    [
+      "two maps of one array joined again",
+      "let a = [1]\nfor (let i = 0; i < 40; i++) { const b = a.map((x) => x); const c = a.map((x) => x); a = [...b, ...c] }",
+    ],
+    [
+      "two Array.from copies of one array joined again",
+      "let a = [1]\nfor (let i = 0; i < 40; i++) { const b = Array.from(a); const c = Array.from(a); a = [...b, ...c] }",
+    ],
+  ])("refuses %s", async (_label, text) => {
+    expect(await refusal(text)).toBeString()
+  })
+
+  test.each<readonly [string, string]>([
+    ["an array copied by Array.from from args", "log(Array.from(args.items))"],
+    [
+      "mapped names looped over",
+      "const names = args.items.map((x) => x.name)\nconst out = []\nfor (const n of names) { out.push(n.toUpperCase()) }\nlog(out)",
     ],
   ])("allows %s", async (_label, text) => {
     expect(await refusal(text)).toBeUndefined()

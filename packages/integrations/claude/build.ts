@@ -40,7 +40,17 @@ export const build = async (root: string): Promise<ReadonlyArray<string>> => {
 if (import.meta.main) {
   const root = join(dirname(import.meta.path), "../../..")
   // The root package.json holds the one version; copy it to the other files before they are read.
-  await Effect.runPromise(syncVersions(root))
-  const written = await build(root)
-  console.log(`built ${written.length} files into ${root}`)
+  const failure = await Effect.runPromise(
+    syncVersions(root).pipe(
+      Effect.as(undefined),
+      Effect.catch((error) => Effect.succeed(error)),
+    ),
+  )
+  if (failure !== undefined) {
+    console.error(`error: ${failure._tag}: ${failure.message}`)
+    process.exitCode = 1
+  } else {
+    const written = await build(root)
+    console.log(`built ${written.length} files into ${root}`)
+  }
 }

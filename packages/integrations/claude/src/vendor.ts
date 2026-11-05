@@ -1,6 +1,6 @@
 import { chmod } from "node:fs/promises"
 import { join } from "node:path"
-import { inflateRawSync } from "node:zlib"
+import { gunzipSync, inflateRawSync } from "node:zlib"
 
 import { type Target, TARGETS, type Tool } from "../../../runtime/src/cli/tools.ts"
 import { listFiles } from "./files.ts"
@@ -35,9 +35,11 @@ const RIPGREP_VERSION = "15.2.0"
 
 /**
  * Fd 10.5.1, from https://github.com/sharkdp/fd/releases/tag/v10.5.1. The release publishes no
- * checksum file, so the archive hashes equal the `digest` that GitHub's release API reports for
- * each asset, which the updater compares each download with before pinning it; the program hashes
- * were taken from the extracted files. A changed archive fails the build.
+ * checksum file. For later versions the updater compares each download with the `digest` that
+ * GitHub's release API reports for the asset before it pins a hash, but the 10.5.1 archive hashes
+ * were not compared that way: the API was unreachable then, so they are the SHA-256 of the archives
+ * as downloaded over HTTPS and were never checked against those digests. The program hashes were
+ * taken from the extracted files. A changed archive fails the build.
  */
 const FD_VERSION = "10.5.1"
 
@@ -172,6 +174,24 @@ export const vendorProblems = async (directory: string): Promise<ReadonlyArray<s
   return problems
 }
 
+/**
+ * The most a release archive may weigh, as downloaded and as inflated (a zip entry, a whole tar).
+ * The real archives are a few megabytes, so a stream or a compressed payload far above this is not
+ * one, and reading it all would only exhaust memory.
+ */
+export const MAX_ARCHIVE_BYTES = 64 * 1024 * 1024
+
+/** Inflates with the size cap; a payload that inflates past it fails with a message that says so. */
+const inflateCapped = (name: string, inflate: (limit: number) => Uint8Array): Uint8Array => {
+  try {
+    return inflate(MAX_ARCHIVE_BYTES)
+  } catch (cause) {
+    throw cause instanceof RangeError
+      ? new Error(`${name} inflates to more than ${MAX_ARCHIVE_BYTES} bytes`, { cause })
+      : cause
+  }
+}
+
 const END_OF_DIRECTORY = 0x06054b50
 const DIRECTORY_ENTRY = 0x02014b50
 const LOCAL_HEADER = 0x04034b50
@@ -210,7 +230,12 @@ export const readZip = (
     const data = bytes.subarray(start, start + size)
     if (method !== 0 && method !== 8)
       throw new Error(`The zip entry ${name} uses compression method ${method}`)
-    found.set(name, method === 0 ? data : inflateRawSync(data))
+    found.set(
+      name,
+      method === 0
+        ? data
+        : inflateCapped(name, (limit) => inflateRawSync(data, { maxOutputLength: limit })),
+    )
   }
   return found
 }
@@ -220,7 +245,10 @@ const readTar = async (
   bytes: Uint8Array,
   names: ReadonlyArray<string>,
 ): Promise<ReadonlyMap<string, Uint8Array>> => {
-  const files = await new Bun.Archive(bytes).files()
+  const tar = inflateCapped("The tar archive", (limit) =>
+    gunzipSync(bytes, { maxOutputLength: limit }),
+  )
+  const files = await new Bun.Archive(tar).files()
   const found = new Map<string, Uint8Array>()
   for (const name of names) {
     const file = files.get(name)
