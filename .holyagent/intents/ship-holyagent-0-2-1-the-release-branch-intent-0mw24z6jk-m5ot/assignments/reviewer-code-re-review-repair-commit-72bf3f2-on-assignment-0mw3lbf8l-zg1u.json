@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mw3lbf8l-zg1u",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-repair-commit-72bf3f2-on",
+  "objective": "Re-review repair commit 72bf3f2 on release/0.2.1/fix/followups (worktree /home/user/holyagent-fix-followups) against the previous code findings.",
+  "state": "Running",
+  "scope": [
+    "Review only 'git diff b46fa93 72bf3f2' (also in /home/user/holyagent-work/diffs/followups-3.diff, without dist). Previous findings it addresses: /home/user/holyagent/.git/holyagent/reports/assignment-0mw3kkm43-yv6m.md (1 single replace refused, 2 join through a binding, 3 Promise.all discarding downloads) and items 2 and 3 of /home/user/holyagent/.git/holyagent/reports/assignment-0mw3kkmcj-c34q.md (conditional and parameter replacement texts, zip cap wording).",
+    "Binding scope (Intent): the workflow hook auto-allow guards against accidental runaway scripts the root writes; a refused script falls back to the permission prompt. Real root workflow scripts must stay allowed: rerun /home/user/holyagent-work/check-workflow-scripts.ts on this head (writer reported 53/53).",
+    "Run 'bunx --no-install mise run verify' on a scratch copy of HEAD (git archive + bun install --frozen-lockfile) and confirm 'mise run build' leaves it unchanged."
+  ],
+  "constraints": [
+    "Read-only on the worktree: no repository edits and no git writes; scratch copies go in the scratchpad.",
+    "Keep working until the review is done; stop and report. Report in under 300 words, findings ranked with file:line and the smallest fix."
+  ],
+  "criteria": [
+    {
+      "text": "The repair closes the previous findings without a regression and mise run verify passes with the build in sync",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw3kxy0u-hdok"
+  ],
+  "followUpOf": "assignment-0mw3kkm43-yv6m",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-05T13:37:28.293Z"
+  },
+  "createdAt": "2026-11-05T13:37:28.293Z"
+}
