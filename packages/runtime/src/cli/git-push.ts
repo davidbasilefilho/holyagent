@@ -4,6 +4,10 @@
  */
 const SEPARATORS: ReadonlySet<string> = new Set([";", "&", "|", "\n", "(", ")", "`"])
 
+/** Whether `char` extends the redirection operator in `word` (`>>`, `>&`, `>|`, `<<<`). */
+const continuesOperator = (word: string, char: string): boolean =>
+  char === "<" || char === ">" || ((char === "&" || char === "|") && /[<>]$/.test(word))
+
 /**
  * The words of each simple command of a shell line, with quotes removed and a quoted string kept as
  * one word. Escapes, expansions and here-documents are not followed: this reads what a command
@@ -15,10 +19,12 @@ const simpleCommands = (line: string): ReadonlyArray<ReadonlyArray<string>> => {
   let word = ""
   let started = false
   let quote: string | undefined
+  let operator = false
   const endWord = () => {
     if (started) words.push(word)
     word = ""
     started = false
+    operator = false
   }
   const endCommand = () => {
     endWord()
@@ -29,7 +35,17 @@ const simpleCommands = (line: string): ReadonlyArray<ReadonlyArray<string>> => {
     if (quote !== undefined) {
       if (char === quote) quote = undefined
       else word += char
-    } else if (char === "'" || char === '"') {
+      continue
+    }
+    // A redirection operator is a word of its own, so its target is not glued to the word before it.
+    if (operator && !continuesOperator(word, char)) endWord()
+    if (char === "<" || char === ">") {
+      if (!operator && !/^\d*$/.test(word)) endWord()
+      operator = true
+      word += char
+      started = true
+    } else if (operator) word += char
+    else if (char === "'" || char === '"') {
       quote = char
       started = true
     } else if (SEPARATORS.has(char)) endCommand()
@@ -52,11 +68,12 @@ const SHELLS: ReadonlySet<string> = new Set(["bash", "sh", "zsh", "dash", "ksh"]
 
 /**
  * What may stand before `git` in a command that runs it: environment assignments, the common
- * wrappers (`sudo`, `env`, `timeout 5`, `xargs` and the like) and their flags and durations. A
- * command that starts with anything else (`echo git push …`) only mentions git.
+ * wrappers (`sudo`, `env`, `timeout 5`, `xargs` and the like) and their flags and durations, and
+ * the shell words that open a command (`then`, `do`, `else`, `if`, `while`, `!`, `{`). A command
+ * that starts with anything else (`echo git push …`) only mentions git.
  */
 const WRAPPER_WORD =
-  /^(?:\w+=.*|sudo|env|command|exec|time|nice|nohup|xargs|timeout|stdbuf|-.*|\d+[smhd]?)$/
+  /^(?:\w+=.*|sudo|env|command|exec|time|nice|nohup|xargs|timeout|stdbuf|-.*|\d+[smhd]?|then|do|else|elif|if|while|until|!|\{)$/
 
 /** The options of each wrapper that take their value as the next word (`sudo -u root git push`). */
 const WRAPPER_OPTIONS_WITH_VALUE: Readonly<Record<string, ReadonlySet<string>>> = {
@@ -98,18 +115,18 @@ const programAt = (words: ReadonlyArray<string>): number => {
 }
 
 /**
- * A redirection: `>`, `>>`, `<`, `2>` and the like, with the target attached (`>log`) or as the
- * next word. Its target is a file, not an argument of the command.
+ * A redirection operator as `simpleCommands` yields it: `>`, `>>`, `<`, `2>`, `>&` and the like,
+ * always a word of its own. The word after it is its target, a file or descriptor and not an
+ * argument of the command.
  */
-const REDIRECTION = /^(?:\d*|&)(?:>>?|<<?<?)(.*)$/
+const REDIRECTION = /^\d*[<>]+[&|]?$/
 
 /** The words of a command without its redirections and their targets. */
 const withoutRedirections = (words: ReadonlyArray<string>): ReadonlyArray<string> => {
   const kept: Array<string> = []
   for (let at = 0; at < words.length; at += 1) {
-    const redirection = REDIRECTION.exec(words[at] ?? "")
-    if (redirection === null) kept.push(words[at] ?? "")
-    else if (redirection[1] === "") at += 1
+    if (REDIRECTION.test(words[at] ?? "")) at += 1
+    else kept.push(words[at] ?? "")
   }
   return kept
 }

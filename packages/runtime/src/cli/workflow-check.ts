@@ -145,6 +145,7 @@ const COMBINING_METHODS: ReadonlySet<string> = new Set([
   "splice",
   "replace",
   "replaceAll",
+  "join",
 ])
 
 /** The globals of the workflow runtime and the plain built-ins a script may use, free. */
@@ -849,6 +850,18 @@ const inspect = (script: string): string | undefined => {
   const everyWalk: Array<Walk> = []
   const growths: Array<GrowthSite> = []
   const combinations: Array<Combination> = []
+  // The calls that put text in place of text (`replace`, `replaceAll`, `join`), judged once every
+  // name is known: whether they paste in more than they take out.
+  const textSwaps: Array<{
+    readonly node: JsNode
+    readonly receiver: JsNode
+    readonly method: string
+    readonly first: JsNode | undefined
+    readonly second: JsNode | undefined
+    readonly scope: Scope
+    /** Whether it stands in a loop or a function, where it can run again and again. */
+    readonly repeats: boolean
+  }> = []
   const combine = (at: JsNode, combination: Omit<Combination, "at">) => {
     combinations.push({ ...combination, at })
   }
@@ -1249,6 +1262,19 @@ const inspect = (script: string): string | undefined => {
           }
         if (ITERATING_METHODS.has(method)) passes = DATA_ITERATIONS
       }
+      if (
+        object !== undefined &&
+        (method === "replace" || method === "replaceAll" || method === "join")
+      )
+        textSwaps.push({
+          node,
+          receiver: object,
+          method,
+          first: given[0],
+          second: given[1],
+          scope,
+          repeats: functionsAround.length > 0 || loopDepth > 0,
+        })
       if (COMBINING_METHODS.has(method) && object !== undefined)
         combine(node, { operands: [object, ...values], scope, merging: true })
       else if (owner === "Array" && method === "of") combine(node, { operands: values, scope })
@@ -1702,14 +1728,20 @@ const inspect = (script: string): string | undefined => {
         case "CallExpression": {
           const callee = nodeAt(node, "callee")
           if (callee?.type !== "MemberExpression" || callee["computed"] === true) return []
-          return COPYING_METHODS.has(nameOf(nodeAt(callee, "property")) ?? "")
-            ? [
-                ...copiedFrom(nodeAt(callee, "object"), scope),
-                ...nodesAt(node, "arguments").flatMap((argument) =>
+          const method = nameOf(nodeAt(callee, "property")) ?? ""
+          const object = nodeAt(callee, "object")
+          // `Array.from(a)` copies its argument; any other method hands back something made from
+          // its receiver (`a.map(…)`), which an alias must not hide.
+          if (nameOf(object) === "Array" && method === "from")
+            return copiedFrom(nodesAt(node, "arguments")[0], scope)
+          return [
+            ...copiedFrom(object, scope),
+            ...(COPYING_METHODS.has(method)
+              ? nodesAt(node, "arguments").flatMap((argument) =>
                   copiedFrom(unspread(argument), scope),
-                ),
-              ]
-            : []
+                )
+              : []),
+          ]
         }
         default:
           return []
@@ -1882,6 +1914,86 @@ const inspect = (script: string): string | undefined => {
         visit(origin.name, origin.scope, origin.path, new Set())
       return found
     }
+    // Text put in place of text: every literal a name may hold, for a name set only to literals; a
+    // conditional holds the literals of both branches.
+    const textsOf = (node: JsNode | undefined, scope: Scope, seen: Set<Binding>): Array<string> => {
+      const text = literalText(node)
+      if (text !== undefined) return [text]
+      if (node?.type === "ConditionalExpression") {
+        const branches = [nodeAt(node, "consequent"), nodeAt(node, "alternate")].map((branch) =>
+          textsOf(branch, scope, seen),
+        )
+        return branches.some((found) => found.length === 0) ? [] : branches.flat()
+      }
+      const name = nameOf(node)
+      const held = name === undefined ? undefined : binding(scope, name)
+      if (held === undefined || held.unsafe || held.sources.length === 0 || seen.has(held))
+        return []
+      seen.add(held)
+      const texts = held.sources.map((source) => textsOf(source.node, source.scope, seen))
+      seen.delete(held)
+      return texts.some((found) => found.length === 0) ? [] : texts.flat()
+    }
+    // What a join's receiver was split on: the separator of `s.split(sep)`, `""` for `[...s]` and
+    // `Array.from(s)`, followed through the names set to such a value. Empty when it is not known,
+    // so a join of an array that does not derive from a split is not judged.
+    const separatorsOf = (
+      node: JsNode | undefined,
+      scope: Scope,
+      seen: Set<Binding>,
+    ): Array<string> => {
+      if (node?.type === "CallExpression") {
+        const callee = nodeAt(node, "callee")
+        const member = callee?.type === "MemberExpression" ? callee : undefined
+        const method = nameOf(nodeAt(member ?? node, "property"))
+        const given = nodesAt(node, "arguments")
+        if (method === "split") return textsOf(given[0], scope, new Set())
+        return nameOf(nodeAt(member ?? node, "object")) === "Array" &&
+          method === "from" &&
+          given.length === 1
+          ? [""]
+          : []
+      }
+      if (node?.type === "ArrayExpression") {
+        const elements = nodesAt(node, "elements")
+        return elements.length === 1 && elements[0]?.type === "SpreadElement" ? [""] : []
+      }
+      const name = nameOf(node)
+      const held = name === undefined ? undefined : binding(scope, name)
+      if (held === undefined || held.sources.length === 0 || seen.has(held)) return []
+      seen.add(held)
+      const found = held.sources.map((source) => separatorsOf(source.node, source.scope, seen))
+      seen.delete(held)
+      return found.some((separators) => separators.length === 0) ? [] : found.flat()
+    }
+    // A swap that pastes in more than it takes out reads its receiver twice, like `s + s`, so a
+    // result that flows back into the receiver (through a temporary too) is a doubling. A single
+    // `replace` outside any loop or function swaps one match, so it grows the text by a constant.
+    for (const swap of textSwaps) {
+      if (swap.method === "replace" && !swap.repeats) continue
+      const takenTexts =
+        swap.method === "join"
+          ? separatorsOf(swap.receiver, swap.scope, new Set())
+          : textsOf(swap.first, swap.scope, new Set())
+      // `join()` with no separator joins with a comma.
+      const putTexts =
+        swap.method === "join" && swap.first === undefined
+          ? [","]
+          : textsOf(swap.method === "join" ? swap.first : swap.second, swap.scope, new Set())
+      if (
+        takenTexts.some((from) =>
+          putTexts.some(
+            (to) => to.length > from.length || (swap.method !== "join" && to.includes("$")),
+          ),
+        )
+      )
+        combinations.push({
+          at: swap.node,
+          operands: [swap.receiver, swap.receiver],
+          scope: swap.scope,
+          merging: true,
+        })
+    }
     // The constructs that use a value twice, and the values they use twice.
     const doublings: Array<{ readonly at: JsNode; readonly shared: Array<Binding | string> }> = []
     for (const combination of combinations) {
@@ -2038,6 +2150,53 @@ const inspect = (script: string): string | undefined => {
           changed = true
         }
     }
+    // Replacement text nothing says the length of (a parameter, a loop variable, a name set by a
+    // computation) can be as long as the text it goes into, so inside a loop or a function it
+    // has to come from `args` (which the root hands in, not a runaway script).
+    const everyReference = byStart(references, (reference) => reference.start)
+    const comesFromArgs = (node: JsNode, seen: Set<Binding>, origin: boolean): boolean => {
+      const end = endOf(node)
+      const inside: Array<Reference> = []
+      for (
+        let at = firstFrom(everyReference, (reference) => reference.start, startOf(node));
+        at < everyReference.length && spend();
+        at++
+      ) {
+        const reference = everyReference[at]
+        if (reference === undefined || reference.start >= end) break
+        inside.push(reference)
+      }
+      // A value written out in the script is no data from `args`; an expression of no names is
+      // judged where it stands.
+      if (inside.length === 0) return !origin
+      return inside.every((reference) => {
+        const held = binding(reference.scope, reference.name)
+        if (held === undefined || held.functions.size > 0 || seen.has(held)) return true
+        seen.add(held)
+        // A parameter gets the argument at its position from each call of its function.
+        const passed = applications.flatMap((call) =>
+          [...(binding(call.scope, call.name)?.functions ?? [])].flatMap((callee) => {
+            const given = call.inputs[(parametersOf.get(callee) ?? []).indexOf(held)]
+            return given === undefined ? [] : [given]
+          }),
+        )
+        const origins = [
+          ...held.sources.map((source) => source.node),
+          ...passed,
+          ...flows.filter((flow) => flow.takers().includes(held)).flatMap((flow) => flow.inputs),
+        ]
+        return origins.length > 0 && origins.every((from) => comesFromArgs(from, seen, true))
+      })
+    }
+    for (const swap of textSwaps)
+      if (
+        swap.repeats &&
+        swap.method !== "join" &&
+        swap.second !== undefined &&
+        textsOf(swap.second, swap.scope, new Set()).length === 0 &&
+        !comesFromArgs(swap.second, new Set(), false)
+      )
+        return refuse("replaces text with text whose length it cannot tell, again and again")
     for (const doubling of doublings)
       if (doubling.shared.some((key) => typeof key !== "string" && grown.has(key)))
         return refuse("uses one value twice to build a bigger one")

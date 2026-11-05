@@ -146,6 +146,9 @@ const GithubRelease = open({
 })
 
 const REGISTRY = "https://registry.npmjs.org"
+
+/** How long a registry request may take, from the request to the last byte of the answer. */
+export const REGISTRY_TIMEOUT_MS = 60_000
 const ABBREVIATED = "application/vnd.npm.install-v1+json"
 
 const GITHUB = "https://github.com"
@@ -202,13 +205,22 @@ const tagsOf = (repository: string) =>
 
 /**
  * The release a package moves to: the newest stable, non-deprecated version no higher than the
- * registry's `latest` dist-tag.
+ * registry's `latest` dist-tag. A registry that takes longer than `timeoutMs` to answer fails with
+ * a `SourceError`, so a stalled connection cannot hang the update.
  */
-const releaseOf = (name: string) =>
+export const releaseOf = (
+  name: string,
+  registry: string = REGISTRY,
+  timeoutMs: number = REGISTRY_TIMEOUT_MS,
+) =>
   Effect.gen(function* () {
-    const source = `${REGISTRY}/${name.replace("/", "%2F")}`
+    const source = `${registry}/${name.replace("/", "%2F")}`
     const response = yield* Effect.tryPromise({
-      try: () => fetch(source, { headers: { accept: ABBREVIATED } }),
+      try: () =>
+        fetch(source, {
+          headers: { accept: ABBREVIATED },
+          signal: AbortSignal.timeout(timeoutMs),
+        }),
       catch: (cause) => new SourceError({ source, cause }),
     })
     if (!response.ok)

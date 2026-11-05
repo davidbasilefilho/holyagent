@@ -13623,17 +13623,20 @@ var gatherLegacy = (root, directory) => gen2(function* () {
 
 var SEPARATORS = new Set([";", "&", "|", `
 `, "(", ")", "`"]);
+var continuesOperator = (word, char) => char === "<" || char === ">" || (char === "&" || char === "|") && /[<>]$/.test(word);
 var simpleCommands = (line) => {
   const commands = [];
   let words = [];
   let word = "";
   let started = false;
   let quote;
+  let operator = false;
   const endWord = () => {
     if (started)
       words.push(word);
     word = "";
     started = false;
+    operator = false;
   };
   const endCommand = () => {
     endWord();
@@ -13647,7 +13650,19 @@ var simpleCommands = (line) => {
         quote = undefined;
       else
         word += char;
-    } else if (char === "'" || char === '"') {
+      continue;
+    }
+    if (operator && !continuesOperator(word, char))
+      endWord();
+    if (char === "<" || char === ">") {
+      if (!operator && !/^\d*$/.test(word))
+        endWord();
+      operator = true;
+      word += char;
+      started = true;
+    } else if (operator)
+      word += char;
+    else if (char === "'" || char === '"') {
       quote = char;
       started = true;
     } else if (SEPARATORS.has(char))
@@ -13664,7 +13679,7 @@ var simpleCommands = (line) => {
 };
 var programOf = (word) => (word.split(/[\\/]/).at(-1) ?? word).replace(/\.exe$/i, "");
 var SHELLS = new Set(["bash", "sh", "zsh", "dash", "ksh"]);
-var WRAPPER_WORD = /^(?:\w+=.*|sudo|env|command|exec|time|nice|nohup|xargs|timeout|stdbuf|-.*|\d+[smhd]?)$/;
+var WRAPPER_WORD = /^(?:\w+=.*|sudo|env|command|exec|time|nice|nohup|xargs|timeout|stdbuf|-.*|\d+[smhd]?|then|do|else|elif|if|while|until|!|\{)$/;
 var WRAPPER_OPTIONS_WITH_VALUE = {
   sudo: new Set([
     "-u",
@@ -13701,15 +13716,14 @@ var programAt = (words) => {
   }
   return at;
 };
-var REDIRECTION = /^(?:\d*|&)(?:>>?|<<?<?)(.*)$/;
+var REDIRECTION = /^\d*[<>]+[&|]?$/;
 var withoutRedirections = (words) => {
   const kept = [];
   for (let at = 0;at < words.length; at += 1) {
-    const redirection = REDIRECTION.exec(words[at] ?? "");
-    if (redirection === null)
-      kept.push(words[at] ?? "");
-    else if (redirection[1] === "")
+    if (REDIRECTION.test(words[at] ?? ""))
       at += 1;
+    else
+      kept.push(words[at] ?? "");
   }
   return kept;
 };
@@ -19543,7 +19557,8 @@ var COMBINING_METHODS = new Set([
   "unshift",
   "splice",
   "replace",
-  "replaceAll"
+  "replaceAll",
+  "join"
 ]);
 var GLOBALS = new Set([
   "parallel",
@@ -19964,6 +19979,7 @@ var inspect = (script) => {
   const everyWalk = [];
   const growths = [];
   const combinations = [];
+  const textSwaps = [];
   const combine = (at, combination) => {
     combinations.push({ ...combination, at });
   };
@@ -20283,6 +20299,16 @@ var inspect = (script) => {
         if (ITERATING_METHODS.has(method))
           passes = DATA_ITERATIONS;
       }
+      if (object !== undefined && (method === "replace" || method === "replaceAll" || method === "join"))
+        textSwaps.push({
+          node,
+          receiver: object,
+          method,
+          first: given[0],
+          second: given[1],
+          scope,
+          repeats: functionsAround.length > 0 || loopDepth > 0
+        });
       if (COMBINING_METHODS.has(method) && object !== undefined)
         combine(node, { operands: [object, ...values], scope, merging: true });
       else if (owner === "Array" && method === "of")
@@ -20671,10 +20697,14 @@ var inspect = (script) => {
           const callee = nodeAt(node, "callee");
           if (callee?.type !== "MemberExpression" || callee["computed"] === true)
             return [];
-          return COPYING_METHODS.has(nameOf(nodeAt(callee, "property")) ?? "") ? [
-            ...copiedFrom(nodeAt(callee, "object"), scope),
-            ...nodesAt(node, "arguments").flatMap((argument) => copiedFrom(unspread(argument), scope))
-          ] : [];
+          const method = nameOf(nodeAt(callee, "property")) ?? "";
+          const object = nodeAt(callee, "object");
+          if (nameOf(object) === "Array" && method === "from")
+            return copiedFrom(nodesAt(node, "arguments")[0], scope);
+          return [
+            ...copiedFrom(object, scope),
+            ...COPYING_METHODS.has(method) ? nodesAt(node, "arguments").flatMap((argument) => copiedFrom(unspread(argument), scope)) : []
+          ];
         }
         default:
           return [];
@@ -20805,6 +20835,59 @@ var inspect = (script) => {
         visit(origin.name, origin.scope, origin.path, new Set);
       return found;
     };
+    const textsOf = (node, scope, seen) => {
+      const text = literalText(node);
+      if (text !== undefined)
+        return [text];
+      if (node?.type === "ConditionalExpression") {
+        const branches = [nodeAt(node, "consequent"), nodeAt(node, "alternate")].map((branch) => textsOf(branch, scope, seen));
+        return branches.some((found) => found.length === 0) ? [] : branches.flat();
+      }
+      const name = nameOf(node);
+      const held = name === undefined ? undefined : binding(scope, name);
+      if (held === undefined || held.unsafe || held.sources.length === 0 || seen.has(held))
+        return [];
+      seen.add(held);
+      const texts = held.sources.map((source) => textsOf(source.node, source.scope, seen));
+      seen.delete(held);
+      return texts.some((found) => found.length === 0) ? [] : texts.flat();
+    };
+    const separatorsOf = (node, scope, seen) => {
+      if (node?.type === "CallExpression") {
+        const callee = nodeAt(node, "callee");
+        const member = callee?.type === "MemberExpression" ? callee : undefined;
+        const method = nameOf(nodeAt(member ?? node, "property"));
+        const given = nodesAt(node, "arguments");
+        if (method === "split")
+          return textsOf(given[0], scope, new Set);
+        return nameOf(nodeAt(member ?? node, "object")) === "Array" && method === "from" && given.length === 1 ? [""] : [];
+      }
+      if (node?.type === "ArrayExpression") {
+        const elements = nodesAt(node, "elements");
+        return elements.length === 1 && elements[0]?.type === "SpreadElement" ? [""] : [];
+      }
+      const name = nameOf(node);
+      const held = name === undefined ? undefined : binding(scope, name);
+      if (held === undefined || held.sources.length === 0 || seen.has(held))
+        return [];
+      seen.add(held);
+      const found = held.sources.map((source) => separatorsOf(source.node, source.scope, seen));
+      seen.delete(held);
+      return found.some((separators) => separators.length === 0) ? [] : found.flat();
+    };
+    for (const swap of textSwaps) {
+      if (swap.method === "replace" && !swap.repeats)
+        continue;
+      const takenTexts = swap.method === "join" ? separatorsOf(swap.receiver, swap.scope, new Set) : textsOf(swap.first, swap.scope, new Set);
+      const putTexts = swap.method === "join" && swap.first === undefined ? [","] : textsOf(swap.method === "join" ? swap.first : swap.second, swap.scope, new Set);
+      if (takenTexts.some((from) => putTexts.some((to) => to.length > from.length || swap.method !== "join" && to.includes("$"))))
+        combinations.push({
+          at: swap.node,
+          operands: [swap.receiver, swap.receiver],
+          scope: swap.scope,
+          merging: true
+        });
+    }
     const doublings = [];
     for (const combination of combinations) {
       if (combination.callee !== undefined && (binding(combination.scope, combination.callee)?.functions.size ?? 0) === 0)
@@ -20935,6 +21018,38 @@ var inspect = (script) => {
           changed = true;
         }
     }
+    const everyReference = byStart(references, (reference) => reference.start);
+    const comesFromArgs = (node, seen, origin) => {
+      const end = endOf(node);
+      const inside = [];
+      for (let at = firstFrom(everyReference, (reference) => reference.start, startOf(node));at < everyReference.length && spend(); at++) {
+        const reference = everyReference[at];
+        if (reference === undefined || reference.start >= end)
+          break;
+        inside.push(reference);
+      }
+      if (inside.length === 0)
+        return !origin;
+      return inside.every((reference) => {
+        const held = binding(reference.scope, reference.name);
+        if (held === undefined || held.functions.size > 0 || seen.has(held))
+          return true;
+        seen.add(held);
+        const passed = applications.flatMap((call) => [...binding(call.scope, call.name)?.functions ?? []].flatMap((callee) => {
+          const given = call.inputs[(parametersOf.get(callee) ?? []).indexOf(held)];
+          return given === undefined ? [] : [given];
+        }));
+        const origins = [
+          ...held.sources.map((source) => source.node),
+          ...passed,
+          ...flows.filter((flow) => flow.takers().includes(held)).flatMap((flow) => flow.inputs)
+        ];
+        return origins.length > 0 && origins.every((from) => comesFromArgs(from, seen, true));
+      });
+    };
+    for (const swap of textSwaps)
+      if (swap.repeats && swap.method !== "join" && swap.second !== undefined && textsOf(swap.second, swap.scope, new Set).length === 0 && !comesFromArgs(swap.second, new Set, false))
+        return refuse("replaces text with text whose length it cannot tell, again and again");
     for (const doubling of doublings)
       if (doubling.shared.some((key) => typeof key !== "string" && grown.has(key)))
         return refuse("uses one value twice to build a bigger one");

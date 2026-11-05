@@ -396,6 +396,34 @@ describe("a bump followed by one build", () => {
   }, 60_000)
 })
 
+describe("a build whose version sync fails", () => {
+  test("reports the error and exits 1 without building", async () => {
+    // Only the files the build reads before the sync: the real tree is not needed to reach it.
+    const copy = mkdtempSync(join(tmpdir(), "holyagent-build-fail-"))
+    try {
+      for (const file of [
+        "scripts/bump-version.ts",
+        "packages/integrations/claude/build.ts",
+        "packages/integrations/claude/src/files.ts",
+        "packages/runtime/src/domain/paths.ts",
+      ])
+        cpSync(join(repository, file), join(copy, file), { recursive: true })
+      symlinkSync(join(repository, "node_modules"), join(copy, "node_modules"))
+      await Bun.write(join(copy, "package.json"), JSON.stringify({ version: "1.x" }))
+      const build =
+        await $`${process.execPath} ${join(copy, "packages/integrations/claude/build.ts")}`
+          .nothrow()
+          .quiet()
+      expect(build.stderr.toString()).toContain('error: InvalidVersion: Invalid version "1.x"')
+      expect(build.stderr.toString()).not.toContain("FiberFailure")
+      expect(build.exitCode).toBe(1)
+      expect(build.stdout.toString()).not.toContain("built")
+    } finally {
+      rmSync(copy, { recursive: true, force: true })
+    }
+  }, 30_000)
+})
+
 describe("the repository's versions", () => {
   test("every copy equals the version in the root package.json", async () => {
     const source = (await readJson<Versioned>(VERSION_SOURCE)).version
