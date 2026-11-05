@@ -1,0 +1,58 @@
+{
+  "id": "assignment-0mw3kfp5c-6alo",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 5,
+  "roleTask": "Worker.implementation",
+  "slug": "correct-the-fd-10-5-1-hash-provenance",
+  "objective": "Correct the fd 10.5.1 hash provenance text and add the registry fetch timeout in /home/user/holyagent-fix-followups (branch release/0.2.1/fix/followups).",
+  "state": "Running",
+  "scope": [
+    "The maintainer has since compared the three fd 10.5.1 archive SHA-256 digests shown on https://github.com/sharkdp/fd/releases/tag/v10.5.1 with the pinned archive hashes in packages/integrations/claude/src/vendor.ts, and all three match. Rewrite the comment above FD_VERSION and the matching text in docs/development.md (which you changed in the last commit to say they were never compared) to say the 10.5.1 archive hashes match the SHA-256 digests GitHub shows for the release assets; keep the sentences about the updater and the program hashes. Search docs/ and AGENTS.md for any other text that calls the fd hashes unconfirmed and correct it.",
+    "Add a timeout to the registry fetch in scripts/update-dependencies.ts (about line 211; you noted it has none), using the same AbortSignal.timeout approach and DOWNLOAD_TIMEOUT_MS-style constant as scripts/vendor.ts, with a test that fails without it if one can be written without the network (as the existing --check and --dry-run tests do).",
+    "Finish with 'bunx --no-install mise run build' and 'bunx --no-install mise run verify' (see docs/development.md)."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md code rules; JSDoc on exported items.",
+    "Keep working until done; stop and report. Name anything unrequested instead of doing it.",
+    "Make no commits or other git writes and no edits under .git/ or .holyagent/.",
+    "Work only inside /home/user/holyagent-fix-followups.",
+    "Report in under 200 words."
+  ],
+  "criteria": [
+    {
+      "text": "The fd 10.5.1 provenance text says the archive hashes match the release page digests, everywhere it appears",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The registry fetch has a timeout with a test, or the report says why no offline test is possible",
+      "blocking": false,
+      "dimension": "tests"
+    },
+    {
+      "text": "mise run build leaves dist in sync and mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/claude/src/vendor.ts",
+    "packages/integrations/claude/dist",
+    "docs",
+    "AGENTS.md",
+    "scripts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw3jzcrt-wwer",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-05T13:12:48.144Z"
+  },
+  "createdAt": "2026-11-05T13:12:48.144Z"
+}
