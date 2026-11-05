@@ -1,10 +1,8 @@
-import { join } from "node:path"
-
 import { encode } from "@toon-format/toon"
 import { Cause, Effect } from "effect"
 
-import packageJson from "../../package.json" with { type: "json" }
-import { STATE_DIRECTORY } from "../state/layout.ts"
+import { version } from "../../../../package.json" with { type: "json" }
+import { stateDirectory } from "../state/layout.ts"
 import { WorkTree } from "../state/local.ts"
 import { updateState } from "../state/store.ts"
 import { resolveState } from "../state/tree.ts"
@@ -47,9 +45,9 @@ const topHelp = (): string =>
 const callFor = (args: Call["args"], host: Host, emit: Call["emit"], command: Command) =>
   Effect.gen(function* () {
     // A stateless command never reads the state, so a git failure must not stop it.
-    const { root, directory } =
+    const { root, directory, resolved } =
       command.stateless === true
-        ? { root: host.cwd, directory: join(host.cwd, STATE_DIRECTORY) }
+        ? { root: host.cwd, directory: stateDirectory(host.cwd), resolved: undefined }
         : yield* resolveState(
             host.cwd,
             host.env,
@@ -66,7 +64,7 @@ const callFor = (args: Call["args"], host: Host, emit: Call["emit"], command: Co
       env: host.env,
       root,
       directory,
-      update: (transition) => updateState(directory, transition, host.env),
+      update: (transition) => updateState(directory, transition, host.env, undefined, resolved),
       config: loadConfig(host.env, root),
       text: readReport(host),
       emit,
@@ -90,7 +88,7 @@ const execute = (given: ReadonlyArray<string>, host: Host) =>
     const [first] = argv
     if (first === undefined || first === "--help" || first === "-h")
       return { stdout: `${topHelp()}\n`, stderr: "", code: 0 }
-    if (first === "--version") return { stdout: `${packageJson.version}\n`, stderr: "", code: 0 }
+    if (first === "--version") return { stdout: `${version}\n`, stderr: "", code: 0 }
     const command = COMMANDS.find((candidate) =>
       candidate.path.every((word, index) => argv[index] === word),
     )

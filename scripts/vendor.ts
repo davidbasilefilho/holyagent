@@ -9,16 +9,38 @@ import {
   expectedFiles,
   installAsset,
   licensesOf,
+  MAX_ARCHIVE_BYTES,
   vendorProblems,
 } from "../packages/integrations/claude/src/vendor.ts"
 import { toPosix } from "../packages/runtime/src/domain/paths.ts"
 
 const directory = join(REPOSITORY, VENDOR_DIRECTORY)
 
-const download = async (asset: Asset): Promise<Uint8Array> => {
-  const response = await fetch(asset.url)
-  if (!response.ok) throw new Error(`${asset.url} answered ${response.status}`)
-  return new Uint8Array(await response.arrayBuffer())
+/** How long a download may take, from the request to the last byte. */
+export const DOWNLOAD_TIMEOUT_MS = 60_000
+
+/**
+ * The bytes at a URL; rejects when the server answers anything but success, takes longer than
+ * `timeoutMs` or sends more than `limit` bytes (a declared length above it is refused before any
+ * byte is read, and the body is cut off at the limit when it carries more than it declared).
+ */
+export const download = async (
+  url: string,
+  limit: number = MAX_ARCHIVE_BYTES,
+  timeoutMs: number = DOWNLOAD_TIMEOUT_MS,
+): Promise<Uint8Array> => {
+  const response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) })
+  if (!response.ok) throw new Error(`${url} answered ${response.status}`)
+  const declared = Number(response.headers.get("content-length"))
+  if (declared > limit) throw new Error(`${url} is ${declared} bytes, above the ${limit} allowed`)
+  const chunks: Array<Uint8Array> = []
+  let total = 0
+  for await (const chunk of response.body ?? []) {
+    total += chunk.length
+    if (total > limit) throw new Error(`${url} sent more than the ${limit} bytes allowed`)
+    chunks.push(chunk)
+  }
+  return Buffer.concat(chunks)
 }
 
 /**
@@ -46,19 +68,45 @@ export const removeUnpinned = async (
   return stray
 }
 
+/**
+ * Downloads each asset and installs it as soon as its own download and pin check succeed, so one
+ * failure does not discard the others. An asset whose download fails or whose archive fails the pin
+ * check is not installed and is named in the returned problems. The fetch and install steps are
+ * parameters so a test can stand in for the network.
+ */
+export const installMissing = async (
+  folder: string,
+  assets: ReadonlyArray<Asset>,
+  fetchArchive: (url: string) => Promise<Uint8Array> = download,
+  install: (folder: string, asset: Asset, archive: Uint8Array) => Promise<void> = installAsset,
+): Promise<ReadonlyArray<string>> => {
+  const outcomes = await Promise.all(
+    assets.map(async (asset) => {
+      try {
+        console.log(`fetching ${asset.url}`)
+        await install(folder, asset, await fetchArchive(asset.url))
+        return undefined
+      } catch (cause) {
+        return `${asset.url}: ${cause instanceof Error ? cause.message : String(cause)}`
+      }
+    }),
+  )
+  return outcomes.filter((problem) => problem !== undefined)
+}
+
 if (import.meta.main) {
   // Downloads, verifies and extracts what the vendor folder lacks or holds wrongly, then removes
   // what no pin names. With everything in place it does nothing, so a build needs no network.
   const before = await vendorProblems(directory)
-  for (const asset of ASSETS) {
+  const missing = ASSETS.filter((asset) => {
     const files = [binaryOf(asset), ...licensesOf(asset)]
-    if (!before.some((problem) => files.some((file) => problem.startsWith(`${file} `)))) continue
-    console.log(`fetching ${asset.url}`)
-    await installAsset(directory, asset, await download(asset))
-  }
+    return before.some((problem) => files.some((file) => problem.startsWith(`${file} `)))
+  })
+  const failed = await installMissing(directory, missing)
   const expected = new Set(expectedFiles())
   await removeUnpinned(directory, expected)
   const problems = await vendorProblems(directory)
-  if (problems.length > 0) throw new Error(`${VENDOR_DIRECTORY}: ${problems.join("; ")}`)
+  if (failed.length > 0 || problems.length > 0)
+    throw new Error(`${VENDOR_DIRECTORY}: ${[...failed, ...problems].join("; ")}`)
   console.log(`vendored ${expected.size} files in ${VENDOR_DIRECTORY}`)
 }

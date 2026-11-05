@@ -1,6 +1,7 @@
 import { Effect } from "effect"
 
 import { recommend } from "../domain/plan.ts"
+import { workTreeKey } from "../state/local.ts"
 import { readOpenState, type Snapshot } from "../state/store.ts"
 import { nowIso } from "./context.ts"
 import { intentInUse, resolveIntent } from "./intent.ts"
@@ -73,8 +74,7 @@ const reconcileFrom = ({ project }: Snapshot) => {
  * The Running Assignments with their agent ids, and what to do with a lost one, as `reconcile`
  * prints them.
  */
-export const reconcileOf = (directory: string) =>
-  readOpenState(directory).pipe(Effect.map(reconcileFrom))
+const reconcileOf = (directory: string) => readOpenState(directory).pipe(Effect.map(reconcileFrom))
 
 /** The status and the reconcile result from one read of the state, for a session that resumes. */
 export const resumeOf = (directory: string) =>
@@ -85,11 +85,13 @@ export const resumeOf = (directory: string) =>
     })),
   )
 
-/** What the root does with a workflow recommendation, for the `plan` help. */
+/**
+ * What the output of `plan` means, for the `plan` help. The root workflow and dispatch text own how
+ * to write, run, record and close a workflow; these notes name only what the command prints.
+ */
 const PLAN_NOTES: ReadonlyArray<string> = [
-  "workflow first: `assignment dispatch` each id for its agent, model, effort and prompt, then write the inline script yourself and run it with the Workflow tool; an entry is {id, agent, model, effort, prompt}, where the prompt is the short one `assignment dispatch` printed: it names the brief file the specialist reads, so pass it as it is and never open or retype the brief. A single Assignment is a one-entry workflow, and `continues` lists work that continues a warm specialist by SendMessage beside it. `fallback` is for a session where the Workflow tool is disabled or unavailable: its writers launch together, and `afterwards` launch once the writers they depend on are terminal",
-  "the script opens with a literal `export const meta = {name, description}` and has one agent() per entry, every one with agentType holyagent:<agent> and the entry's model and effort. Run the entries through pipeline() and put a review stage after its writers; return only `{ done: [ids] }`, the Assignments whose agent returned a report, since the reports stay out of the Workflow result. An inline script whose every agent() names a holyagent specialist runs without a permission prompt; any other agent type, a scriptPath or a resume goes through the normal flow",
-  "the run ends with a notice carrying the returned value, and the tool result has the run id. Per entry: `assignment record <id> --agent workflow:<run-id>/<id>`. Then `assignment reports <journal.jsonl>` writes each agent's report (the script passes no `schema`, so agent() returns the specialist's own report) to a file named by its Assignment id and lists id, path and words, and `assignment close <id> --outcome <o> [--accept <rationale>] < <report-file>` closes from the file, verbatim and never retyped or summarized. An Assignment that `assignment reports` does not list follows the closing rule in the root workflow text. A workflow's agents cannot be messaged, so a gap in a report, like any repair, is a new draft with followUpOf",
+  "`workflow` first: `assignments` are the ids in run order, a writer followed by the review of its work; `assignment dispatch` each for its agent, model, effort and prompt, then write the inline script as the root workflow text says. A single Assignment is a one-entry workflow",
+  "`continues` lists Ready work that continues a warm specialist, by SendMessage beside the workflow. `fallback` is the same work as direct subagents, for a session where the Workflow tool is disabled or unavailable: its writers launch together, and the `afterwards` reviews launch once the writers they depend on are terminal",
 ]
 
 /** The `plan`, `status` and `reconcile` commands. */
@@ -102,7 +104,7 @@ export const OVERVIEW_COMMANDS: ReadonlyArray<Command> = [
     notes: PLAN_NOTES,
     flags: {},
     positionals: 0,
-    run: ({ directory, config }) =>
+    run: ({ directory, config, root }) =>
       Effect.gen(function* () {
         const settings = yield* config
         const snapshot = yield* readOpenState(directory)
@@ -116,6 +118,7 @@ export const OVERVIEW_COMMANDS: ReadonlyArray<Command> = [
           snapshot.specialists,
           now,
           settings,
+          workTreeKey(root),
         )
         if (recommendation === undefined)
           return { action: "none", reason: "no Ready Assignment can start now" }

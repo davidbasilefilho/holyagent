@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { deflateRawSync } from "node:zlib"
+import { deflateRawSync, gzipSync } from "node:zlib"
 
 import { TARGETS, TOOLS } from "../../../runtime/src/cli/tools.ts"
 import { toPosix } from "../../../runtime/src/domain/paths.ts"
@@ -12,6 +12,8 @@ import {
   binaryOf,
   expectedFiles,
   installAsset,
+  MAX_ARCHIVE_BYTES,
+  readArchive,
   readZip,
   sha256,
   vendorProblems,
@@ -118,6 +120,25 @@ describe("installing an archive", () => {
 
   test("refuses bytes that are not a zip archive", () => {
     expect(() => readZip(text("not a zip file at all"), ["x"])).toThrow("not a zip file")
+  })
+
+  test("refuses a zip entry that inflates past the cap", () => {
+    const bomb = zip([["a/bomb.bin", new Uint8Array(MAX_ARCHIVE_BYTES + 1), 8]])
+    expect(bomb.length).toBeLessThan(MAX_ARCHIVE_BYTES)
+    expect(() => readZip(bomb, ["a/bomb.bin"])).toThrow("a/bomb.bin inflates to more than")
+  })
+
+  test("refuses a gzip stream that inflates past the cap", async () => {
+    const bomb = gzipSync(new Uint8Array(MAX_ARCHIVE_BYTES + 1))
+    expect(bomb.length).toBeLessThan(MAX_ARCHIVE_BYTES)
+    await expect(readArchive("tar.gz", bomb, ["a/x"])).rejects.toThrow("inflates to more than")
+  })
+
+  test("reads a file of a gzipped tar archive by name", async () => {
+    const tar = await new Bun.Archive({ "a/one.txt": "one", "a/two.txt": "two" }).bytes()
+    const found = await readArchive("tar.gz", gzipSync(tar), ["a/one.txt", "a/absent.txt"])
+    expect([...found.keys()]).toEqual(["a/one.txt"])
+    expect(new TextDecoder().decode(found.get("a/one.txt"))).toBe("one")
   })
 
   test("refuses an archive whose SHA-256 differs from the pin and writes nothing", async () => {

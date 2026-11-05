@@ -27,12 +27,15 @@ export type DispatchBlock =
  * Ready, its Intent is open and still at its revision, a writer owns a path and no Running writer
  * owns an overlapping one (equal paths or a directory prefix, ignoring case), and every dependency
  * is Succeeded and accepted at its revision. Dependencies named in `assumeAccepted` count as
- * accepted, for planning a run that will finish them first.
+ * accepted, for planning a run that will finish them first. Writers in different work trees may own
+ * the same paths, since each tree has its own files: with the key of the work tree in `workTree`, a
+ * Running writer counts only when it runs in that work tree or its work tree is not known.
  */
 export const dispatchBlock = (
   project: Project,
   assignment: Assignment,
   assumeAccepted: ReadonlySet<string> = new Set(),
+  workTree?: string,
 ): DispatchBlock | undefined => {
   if (assignment.state !== "Ready")
     return new InvalidTransition({ id: assignment.id, state: assignment.state, action: "dispatch" })
@@ -62,6 +65,8 @@ export const dispatchBlock = (
   if (writes)
     for (const running of project.assignments) {
       if (running.state !== "Running" || !isWriter(running.roleTask)) continue
+      const elsewhere = running.specialist?.workTree
+      if (workTree !== undefined && elsewhere !== undefined && elsewhere !== workTree) continue
       const path = firstOverlap(assignment.ownershipPaths, running.ownershipPaths)
       if (path !== undefined)
         return new OwnershipConflict({ id: assignment.id, runningId: running.id, path })

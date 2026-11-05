@@ -13,6 +13,7 @@ import {
 import { findIntent, requireOpen } from "../domain/project.ts"
 import { readState, type Snapshot } from "../state/store.ts"
 import { booleanFlag, requiredFlag, stringFlag } from "./args.ts"
+import { removeFiles } from "./brief.ts"
 import { nowIso } from "./context.ts"
 import { NoActiveIntent, Usage } from "./errors.ts"
 import type { Command } from "./types.ts"
@@ -155,8 +156,9 @@ export const INTENT_COMMANDS: ReadonlyArray<Command> = [
     notes: ["pull before closing: another clone may hold work this one cannot see"],
     flags: { reason: "string", drop: "string" },
     positionals: 0,
-    run: ({ update, args }) =>
+    run: (call) =>
       Effect.gen(function* () {
+        const { update, args } = call
         const reason = yield* requiredFlag(args, "reason", "intent close --reason <text>")
         const drop = stringFlag(args, "drop")
         const now = yield* nowIso
@@ -169,13 +171,23 @@ export const INTENT_COMMANDS: ReadonlyArray<Command> = [
                 current.id,
                 { reason, ...(drop === undefined ? {} : { drop }) },
                 now,
+              ).pipe(
+                Effect.map((change) => ({
+                  ...change,
+                  owned: snapshot.project.assignments
+                    .filter((row) => row.intentId === current.id)
+                    .map((row) => row.id),
+                })),
               ),
             ),
           ),
         )
+        // The briefs and reports stay while the Intent is open, so a later brief can cite them.
+        const unremoved = yield* removeFiles(call, closed.owned)
         return present({
           ...intentView(closed.intent),
           dropped: closed.assignments.map((assignment) => assignment.id),
+          unremoved,
         })
       }),
   },

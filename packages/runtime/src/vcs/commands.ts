@@ -1,12 +1,11 @@
-import { join } from "node:path"
-
 import { Effect } from "effect"
 
+import { type FlagShape, readFlags } from "../cli/args.ts"
 import { Usage } from "../cli/errors.ts"
 import { type Call, type Command } from "../cli/types.ts"
 import { present } from "../cli/views.ts"
-import { STATE_DIRECTORY } from "../state/layout.ts"
-import { type FlagShape, readArguments, requiredValue, valueOf } from "./arguments.ts"
+import { stateDirectory } from "../state/layout.ts"
+import { requiredValue, valueOf } from "./arguments.ts"
 import { IDENTITY_USAGE, setAuthor } from "./author.ts"
 import { commit } from "./commit.ts"
 import { inCloudSession } from "./identity.ts"
@@ -19,7 +18,7 @@ import { readSettings } from "./settings.ts"
  * The folder that holds the config file: `.holyagent` of the work tree. The config file is the
  * project's settings, not state, so it is never read from the state worktree.
  */
-const settingsFolders = (call: Call) => [join(call.root, STATE_DIRECTORY)]
+const settingsFolders = (call: Call) => [stateDirectory(call.root)]
 
 /** Reads the raw arguments of a command against its flags, refusing more positionals than it takes. */
 const arguments_ = (
@@ -28,7 +27,7 @@ const arguments_ = (
   spec: Readonly<Record<string, FlagShape>>,
   positionals: number | "any",
 ) =>
-  readArguments(call.args.positionals, spec, usage).pipe(
+  readFlags(call.args.positionals, spec, usage).pipe(
     Effect.filterOrFail(
       (args) => positionals === "any" || args.positionals.length === positionals,
       (args) =>
@@ -56,7 +55,7 @@ export const VCS_COMMANDS: ReadonlyArray<Command> = [
       "Commit exactly the named paths with the configured git identity (in a claude.ai cloud session, with the user as author and the platform's committer), after the message check, and record the branch and commit on the Intent in use",
     notes: [
       "state mode (holyagent state mode): in branch, the default, Intent state is committed on the state branch as it changes and a path under .holyagent/ is refused; in local it is in no commit and such a path is refused; in work the changed state files (not config.json unless named) are staged with the named paths",
-      "the message is cleaned of agent attribution and refused when it talks about the user or the agent; an identity that looks like an agent's is refused; in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) it is the author that is checked, and the committer is left as the platform set it",
+      "the message is cleaned of agent attribution and refused when it talks about the user or the agent; an identity that is exactly the agent's own (the email noreply@anthropic.com, or the name Claude or Claude Code) is refused; in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) it is the author that is checked, and the committer is left as the platform set it",
       "the repository's own hooks run, a commit-msg hook that runs `holyagent hook commit-msg` included",
     ],
     flags: {},
@@ -99,7 +98,7 @@ export const VCS_COMMANDS: ReadonlyArray<Command> = [
       "Set the commit author of this clone in its local git config (author.name and author.email), so a commit has the user as author and keeps the committer",
     notes: [
       "for a claude.ai cloud session: take the name, id and login from the GitHub connector's get_me, and pass the email as <id>+<login>@users.noreply.github.com",
-      "it writes only those two keys of .git/config, never a file of the repository, and refuses an identity that looks like an agent's",
+      "it writes only those two keys of .git/config, never a file of the repository, and refuses an identity that is exactly the agent's own (the email noreply@anthropic.com, or the name Claude or Claude Code)",
     ],
     flags: {},
     raw: true,

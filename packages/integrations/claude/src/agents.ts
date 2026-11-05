@@ -1,5 +1,8 @@
 import { type Route, ROUTES } from "../../../runtime/src/domain/route.ts"
-import { ROOT_CORE_FILES } from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
+import {
+  PRECEDENCE_FILE,
+  ROOT_CORE_FILES,
+} from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
 import {
   DIST_DIRECTORY,
   FRONTEND_DESIGN_DIRECTORY,
@@ -107,8 +110,21 @@ const MERGE_READY: ReadonlySet<string> = new Set([
   "Reviewer.testing",
 ])
 
+/**
+ * Roles that get the code quality rules: the writers and reviewers of {@link MERGE_READY}, and
+ * Reviewer.artifact, which reports duplicated instructions and artifacts.
+ */
+const CODE_QUALITY: ReadonlySet<string> = new Set([...MERGE_READY, "Reviewer.artifact"])
+
 /** Roles that get the writing bar, for the instruction text they write or judge. */
 const WRITING_BAR: ReadonlySet<string> = new Set(["Worker.implementation", "Reviewer.artifact"])
+
+/**
+ * The bullets on hooks, signing and history rewrites, a file of `shared/` as a path relative to
+ * `root/`. The root prompt embeds it after its version-control rules and the version-control
+ * reminder hook adds the same sentences, so the rules have one source.
+ */
+export const HISTORY_RULES_FILE = "../shared/history-rules.md"
 
 /**
  * The sections of the root prompt, as files of `root/` in prompt order. The core opens it; the
@@ -124,15 +140,20 @@ export const ROOT_SECTIONS: ReadonlyArray<string> = [
   "assignments.md",
   "instruction-guidelines.md",
   "version-control.md",
+  HISTORY_RULES_FILE,
   "stack-plan.md",
   "pr-text.md",
   "asking.md",
   "skills.md",
 ]
 
-/** The sections of the conduct every specialist shares, as files of `specialist/` in prompt order. */
+/**
+ * The sections of the conduct every specialist shares, as files of `specialist/` in prompt order;
+ * the order of precedence is the one file shared with the root core.
+ */
 export const SPECIALIST_SECTIONS: ReadonlyArray<string> = [
   "conduct.md",
+  PRECEDENCE_FILE,
   "scope.md",
   "state-changes.md",
   "working.md",
@@ -148,6 +169,38 @@ export const WRITING_BAR_SECTION = "writing-bar.md"
 /** The mergeability bar, a file of `specialist/` that the roles of {@link MERGE_READY} get. */
 export const MERGE_READY_SECTION = "merge-ready.md"
 
+/**
+ * The code quality rules (no duplication, performance, readability), a file of `specialist/` that
+ * the roles of {@link CODE_QUALITY} get, after the mergeability bar.
+ */
+export const CODE_QUALITY_SECTION = "code-quality.md"
+
+/**
+ * The one source of the materiality definition (which visual discrepancies are repaired and which
+ * stay preference), relative to the repository root. The generator embeds its text wherever a
+ * source holds {@link MATERIALITY_MARKER}, so the definition has a single source and each generated
+ * file still carries it whole.
+ */
+export const MATERIALITY_FILE = `${INSTRUCTIONS_DIRECTORY}/shared/materiality.md`
+
+/** The line of an instruction source that the generator replaces with the materiality definition. */
+export const MATERIALITY_MARKER = "<!-- materiality -->"
+
+/**
+ * A source with its {@link MATERIALITY_MARKER} line replaced by the definition. The marker line is
+ * matched after trimming. A source without the marker is returned as it is; one with the marker
+ * twice is an error, because the definition would ship twice in one file.
+ */
+export const embedMateriality = (text: string, materiality: string, source: string): string => {
+  const lines = text.split("\n")
+  const isMarker = (line: string) => line.trim() === MATERIALITY_MARKER
+  const at = lines.findIndex(isMarker)
+  if (at === -1) return text
+  if (lines.findIndex((line, index) => index > at && isMarker(line)) !== -1)
+    throw new Error(`${source} must hold the line ${MATERIALITY_MARKER} at most once`)
+  return [...lines.slice(0, at), materiality.trim(), ...lines.slice(at + 1)].join("\n")
+}
+
 /** The interface inspection rules, a file of `specialist/` for the roles that inspect renders. */
 export const INSPECTION_SECTION = "interface-inspection.md"
 
@@ -161,6 +214,7 @@ export const CONDITIONAL_SECTIONS: ReadonlyArray<{
 }> = [
   { file: WRITING_BAR_SECTION, applies: (route) => WRITING_BAR.has(route.roleTask) },
   { file: MERGE_READY_SECTION, applies: (route) => MERGE_READY.has(route.roleTask) },
+  { file: CODE_QUALITY_SECTION, applies: (route) => CODE_QUALITY.has(route.roleTask) },
   {
     file: INSPECTION_SECTION,
     applies: (route) => route.capabilities.includes("VisualInspection"),
@@ -212,6 +266,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
 > = {
   "R-TERSE": { section: "specialist/conduct.md", phrase: "Respond tersely." },
   "R-ROLE": { section: "root/identity.md", phrase: "You own the user relationship" },
+  "R-PRECEDENCE": { section: "shared/precedence.md", phrase: "When rules conflict" },
   "R-STACK": { section: "root/stack-plan.md", phrase: "stacks in work order by default" },
   "R-TASKLIST": { section: "root/task-list.md", phrase: "Create the task list first" },
   "R-TURN": { section: "root/task-list.md", phrase: "End your turn only when the work is done" },
@@ -272,15 +327,15 @@ export const REQUIREMENT_SECTIONS: Readonly<
   "R-FINISH": { section: "root/assignments.md", phrase: "one more repair round" },
   "R-VISUAL": {
     section: "skills/visual-judging/SKILL.md",
-    phrase: "Read an image in the main thread only to show it to the user",
+    phrase: "Your own final pass, after Worker.visual and Reviewer.visual, decides acceptance",
   },
   "R-DEVSERVER": {
     section: "root/skills.md",
-    phrase: "start the one server the visual specialists share",
+    phrase: "start the one target per platform that the visual specialists share",
   },
   "R-EVIDENCE": {
     section: "skills/evidence-judging/SKILL.md",
-    phrase: "starts a repair only with evidence from the reviewer",
+    phrase: "starts a repair only with evidence",
   },
   "R-VCS": {
     section: "root/version-control.md",
@@ -291,7 +346,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
     phrase: "Never force-push, and never push to the base, default or a protected branch",
   },
   "R-BRANCH": {
-    section: "root/version-control.md",
+    section: "root/identity.md",
     phrase: "Never work on a branch the platform assigns",
   },
   "R-STATE": {
@@ -357,6 +412,11 @@ export const REQUIREMENT_SECTIONS: Readonly<
     section: "specialist/merge-ready.md",
     phrase: "A change is merge-ready when the repository's maintainer would merge it",
   },
+  "R-QUALITY": {
+    section: "specialist/code-quality.md",
+    phrase:
+      "a finding blocks only when the change also makes existing behavior or performance worse",
+  },
   "R-EL": { section: "roles/explorer-lookup/method.md", phrase: "Locate with Grep and Glob" },
   "R-EM": { section: "roles/explorer-map/method.md", phrase: "Cite a path" },
   "R-ET": { section: "roles/explorer-trace/method.md", phrase: "Begin at the trigger" },
@@ -385,15 +445,19 @@ export const REQUIREMENT_SECTIONS: Readonly<
   },
   "R-RV": {
     section: "roles/reviewer-visual/captures.md",
-    phrase: "report the inspection as blocked",
+    phrase: "Report the inspection as blocked when no captures are supplied",
   },
   "R-RV-DESIGN": {
     section: "roles/reviewer-visual/frontend-design.md",
-    phrase: "Judge the design quality",
+    phrase: "read that file and judge against its checklist",
   },
   "R-INSPECT": {
     section: "specialist/interface-inspection.md",
-    phrase: "A material discrepancy affects acceptance",
+    phrase: "A passing build, snapshot or test does not show what renders",
+  },
+  "R-MATERIAL": {
+    section: "shared/materiality.md",
+    phrase: "A discrepancy is material, and starts a repair whatever its size",
   },
   "R-WD": { section: "roles/worker-debugging/phases.md", phrase: "Reproduce" },
   "R-WI": { section: "roles/worker-implementation/method.md", phrase: "smallest complete change" },
@@ -410,7 +474,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
   "R-WO": { section: "roles/worker-operations/method.md", phrase: "documented workflow" },
   "R-WO-DEV": {
     section: "roles/worker-operations/dev-server.md",
-    phrase: "Report the URL, exact command, process id and log location",
+    phrase: "Report the completed record and whether you started the target or reused it",
   },
   "R-WV": { section: "roles/worker-validation/method.md", phrase: "choose the real check" },
   "R-WVI": {
@@ -419,7 +483,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
   },
   "R-WVI-DESIGN": {
     section: "roles/worker-visual/frontend-design.md",
-    phrase: "Apply this guidance when you build or reshape an interface",
+    phrase: "read that file first, then build and inspect against its checklist and capture list",
   },
 }
 
@@ -538,9 +602,16 @@ const rootAgent = async (): Promise<GeneratedFile> => {
     "effort: high",
     `disallowedTools: ${denylist(ROOT_BUILTINS)}`,
   ])
+  // The history rules continue the bullet list of the version-control rules, so no blank line
+  // splits it; every other section is a paragraph of its own.
+  const body = (await readSections(source, ROOT_SECTIONS))
+    .map((text, at) =>
+      at === 0 ? text : `${ROOT_SECTIONS[at] === HISTORY_RULES_FILE ? "\n" : "\n\n"}${text}`,
+    )
+    .join("")
   return {
     path: `${DIST_DIRECTORY}/agents/${PLUGIN_NAME}.md`,
-    content: `${head}\n\n${(await readSections(source, ROOT_SECTIONS)).join("\n\n")}\n`,
+    content: `${head}\n\n${body}\n`,
   }
 }
 
@@ -548,12 +619,18 @@ const rootAgent = async (): Promise<GeneratedFile> => {
 export const agentFiles = async (): Promise<ReadonlyArray<GeneratedFile>> => {
   const directory = `${INSTRUCTIONS_DIRECTORY}/specialist`
   const files = CONDITIONAL_SECTIONS.map(({ file }) => file)
-  const [conduct, texts, design] = await Promise.all([
+  const [conduct, texts, design, materiality] = await Promise.all([
     readSections(directory, SPECIALIST_SECTIONS),
     readSections(directory, files),
     frontendDesign(),
+    readSource(MATERIALITY_FILE),
   ])
-  const conditional = Object.fromEntries(files.map((file, at) => [file, texts[at] ?? ""]))
+  const conditional = Object.fromEntries(
+    files.map((file, at) => [
+      file,
+      embedMateriality(texts[at] ?? "", materiality, `${directory}/${file}`),
+    ]),
+  )
   const shared: Shared = {
     conduct,
     conditional,

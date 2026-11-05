@@ -1,7 +1,8 @@
 import { join } from "node:path"
 
+import { ROUTES } from "../../../runtime/src/domain/route.ts"
 import packageJson from "../package.json" with { type: "json" }
-import { agentFiles, PLUGIN_NAME } from "./agents.ts"
+import { agentFiles, embedMateriality, MATERIALITY_FILE, PLUGIN_NAME } from "./agents.ts"
 import {
   DIST_DIRECTORY,
   FRONTEND_DESIGN_DIRECTORY,
@@ -28,8 +29,36 @@ export const GENERATED_PATHS: ReadonlyArray<string> = [MARKETPLACE_PATH, DIST_DI
 
 const SOURCES = `${PLUGIN_DIRECTORY}/src`
 
-const DESCRIPTION =
-  "A root agent that plans work as Intents and Assignments and eighteen specialists it dispatches, with a CLI that keeps their state."
+/** The English words for the counts a specialist roster can have, indexed by the count. */
+const COUNT_WORDS: ReadonlyArray<string> = [
+  "no",
+  "one",
+  "two",
+  "three",
+  "four",
+  "five",
+  "six",
+  "seven",
+  "eight",
+  "nine",
+  "ten",
+  "eleven",
+  "twelve",
+  "thirteen",
+  "fourteen",
+  "fifteen",
+  "sixteen",
+  "seventeen",
+  "eighteen",
+  "nineteen",
+  "twenty",
+]
+
+/**
+ * The description of the plugin, in the plugin and marketplace manifests. The specialist count is
+ * the route table's, so the text cannot drift from the roster.
+ */
+export const DESCRIPTION = `A root agent that plans work as Intents and Assignments and ${COUNT_WORDS[ROUTES.length] ?? String(ROUTES.length)} specialists it dispatches, with a CLI that keeps their state.`
 
 const inPlugin = (path: string) => `${DIST_DIRECTORY}/${path}`
 
@@ -89,14 +118,20 @@ const hookCommand = (name: string, extra: Readonly<Record<string, unknown>> = {}
 
 /**
  * The rules that start the version-control reminder: a Bash command with `git` and then `commit`
- * (or `push`) anywhere in it. Probed against Claude Code 2.1.310, these match `git -C d commit`,
- * `sudo git push`, `env X=1 git commit`, `bash -c 'git push'`, `timeout 5 git push`, `xargs git
- * commit` and the same inside `&&` lists, subshells and substitutions, and they match no command
- * without both words, so `npm test` or `git status` spawn nothing. The reminder is context only, so
- * a command that hides the words (a variable, a git alias, a script) just gets none.
+ * (or `push`) anywhere in it. Probed by hand against Claude Code 2.1.310 (the tested version is the
+ * one in `docs/requirements.md`), these match `git -C d commit`, `sudo git push`, `env X=1 git
+ * commit`, `bash -c 'git push'`, `timeout 5 git push`, `xargs git commit` and the same inside `&&`
+ * lists, subshells and substitutions, and they match no command without both words, so `npm test`
+ * or `git status` spawn nothing. `holyagent vcs commit` and `vcs pr` commit and open pull requests
+ * without `git` in the command line, so the words `vcs commit` and `vcs pr` start it too (not `vcs`
+ * and `pr` far apart, which any command with `vcs` and a word that contains `pr` would match); the
+ * hook then checks the words itself. The reminder is context only, so a command that hides the
+ * words (a variable, a git alias, a script) just gets none.
  */
 const GIT_COMMIT = "Bash(*git*commit*)"
 const GIT_PUSH = "Bash(*git*push*)"
+const VCS_COMMIT = "Bash(*vcs commit*)"
+const VCS_PR = "Bash(*vcs pr*)"
 
 /**
  * The six hooks. The session hook adds the state of the project (and, after a resume or compaction,
@@ -105,10 +140,10 @@ const GIT_PUSH = "Bash(*git*push*)"
  * once; it has no matcher, so it sees every tool. The SubagentStart hook adds the version-control
  * rules to each specialist (it has no matcher, and the hook itself picks the plugin's specialists),
  * and the PreToolUse reminder adds them in one line to a Bash command that mentions git commit or
- * push; both only add context and never block. The workflow hook runs `onFailure: block`, because a
- * failure there would let an unvetted workflow through unexamined. The PostToolUse hook records the
- * agent of a dispatched launch, runs only for the Agent tool, and reports its own failures to the
- * root as context, since it authorizes nothing.
+ * push or runs `vcs commit` or `vcs pr`; both only add context and never block. The workflow hook
+ * runs `onFailure: block`, because a failure there would let an unvetted workflow through
+ * unexamined. The PostToolUse hook records the agent of a dispatched launch, runs only for the
+ * Agent tool, and reports its own failures to the root as context, since it authorizes nothing.
  */
 const hooks = (): GeneratedFile => ({
   path: inPlugin("hooks/hooks.json"),
@@ -128,6 +163,8 @@ const hooks = (): GeneratedFile => ({
           hooks: [
             hookCommand("vcs-reminder", { if: GIT_COMMIT }),
             hookCommand("vcs-reminder", { if: GIT_PUSH }),
+            hookCommand("vcs-reminder", { if: VCS_COMMIT }),
+            hookCommand("vcs-reminder", { if: VCS_PR }),
           ],
         },
         { matcher: "Workflow", hooks: [hookCommand("workflow", { onFailure: "block" })] },
@@ -154,15 +191,62 @@ const commands = async (): Promise<ReadonlyArray<GeneratedFile>> => {
   ]
 }
 
+/**
+ * The one source of the shared design core, relative to the repository root. The generator embeds
+ * its text into each of the {@link DESIGN_SKILLS}, so every one of them is self-contained and the
+ * core still has a single source. The core itself embeds the materiality definition first.
+ */
+export const DESIGN_CORE_FILE = `${INSTRUCTIONS_DIRECTORY}/design-core/core.md`
+
+/** The line of a design skill's source that the generator replaces with the shared design core. */
+export const DESIGN_CORE_MARKER = "<!-- design-core -->"
+
+/** The platform design skills, which carry the shared design core. */
+export const DESIGN_SKILLS: ReadonlyArray<string> = [
+  "web-design",
+  "mobile-design",
+  "desktop-design",
+  "tui-design",
+]
+
+/**
+ * A design skill's source with the marker line replaced by the shared design core. A source without
+ * exactly one marker line is an error, because the skill would ship without its core.
+ */
+const withDesignCore = (text: string, core: string, source: string): string => {
+  const lines = text.split("\n")
+  const at = lines.indexOf(DESIGN_CORE_MARKER)
+  if (at === -1 || lines.indexOf(DESIGN_CORE_MARKER, at + 1) !== -1)
+    throw new Error(`${source} must hold the line ${DESIGN_CORE_MARKER} exactly once`)
+  return [...lines.slice(0, at), core.trim(), ...lines.slice(at + 1)].join("\n")
+}
+
+/**
+ * A skill's generated body. A design skill gets the shared core; any other skill holding the marker
+ * line is an error, because the marker would ship as literal text with no core.
+ */
+export const skillBody = (path: string, text: string, core: string, source: string): string => {
+  if (DESIGN_SKILLS.includes(path.split("/")[0] ?? "")) return withDesignCore(text, core, source)
+  if (text.split("\n").includes(DESIGN_CORE_MARKER))
+    throw new Error(`${source} holds ${DESIGN_CORE_MARKER} but is not listed in DESIGN_SKILLS`)
+  return text
+}
+
 const skills = async (): Promise<ReadonlyArray<GeneratedFile>> => {
   const root = `${INSTRUCTIONS_DIRECTORY}/skills`
+  const materiality = await readSource(MATERIALITY_FILE)
+  const core = embedMateriality(await readSource(DESIGN_CORE_FILE), materiality, DESIGN_CORE_FILE)
   return Promise.all(
     (await listFiles(root)).map(async (path) => {
       const source = `${root}/${path}`
       const text = await readSource(source)
+      if (!path.endsWith("SKILL.md")) return { path: inPlugin(`skills/${path}`), content: text }
       return {
         path: inPlugin(`skills/${path}`),
-        content: path.endsWith("SKILL.md") ? noteInFrontmatter(text, source) : text,
+        content: noteInFrontmatter(
+          skillBody(path, embedMateriality(text, materiality, source), core, source),
+          source,
+        ),
       }
     }),
   )

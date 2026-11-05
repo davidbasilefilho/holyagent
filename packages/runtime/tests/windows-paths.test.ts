@@ -5,8 +5,9 @@ import { join } from "node:path"
 
 import { Effect } from "effect"
 
-import { claudeConfigDirectory, workflowsAvailable } from "../src/cli/config.ts"
+import { workflowsAvailable } from "../src/cli/config.ts"
 import { fromGitPath, toPosix } from "../src/domain/paths.ts"
+import { claudeConfigDirectory } from "../src/setup/environment.ts"
 import { globBelow } from "../src/state/store.ts"
 import { commitScope } from "../src/vcs/commit.ts"
 

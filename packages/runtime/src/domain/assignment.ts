@@ -56,6 +56,12 @@ export const Specialist = Schema.Struct({
   effort: Effort,
   startedAt: Timestamp,
   finishedAt: Schema.optionalKey(Timestamp),
+  /**
+   * The key of the work tree it was dispatched from. The ownership of paths is exclusive within a
+   * work tree only, since two work trees hold separate copies of the files; an Assignment
+   * dispatched without one (an older record) counts for every work tree.
+   */
+  workTree: Schema.optionalKey(Text),
 })
 /** A bound specialist. */
 export type Specialist = typeof Specialist.Type

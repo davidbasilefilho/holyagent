@@ -1,6 +1,6 @@
 `holyagent <command>` is `bun --no-env-file --config="${CLAUDE_PLUGIN_ROOT}/scripts/empty-bunfig.toml" "${CLAUDE_PLUGIN_ROOT}/scripts/holyagent.js" <command>`, the only interface to Intents and Assignments (`holyagent help [command]`). Per Assignment:
 
-1. `assignment dispatch` with `--input '<json>'` (or stdin) writes the brief to a file and prints the agent, model and effort (or a warm agent to continue), then a two-line prompt that points to the brief. Use the prompt as printed; never open or re-emit the brief.
+1. `assignment dispatch` with `--input '<json>'` (or stdin) writes the brief to a file and prints the agent, model and effort (or a warm agent to continue), then a two-line prompt pointing to it. Use the prompt as printed; never open or re-emit the brief. A brief that names a plugin file (a skill to read) gives its literal absolute path under the plugin folder, the directory above `scripts/` in the CLI path above: plugin-path variables are filled in agent and skill text only.
 2. Run it as an `agent()` in your inline workflow script (one Assignment is a one-entry workflow); without the Workflow tool, launch it in the background. A hook records a spawned agent; otherwise, and for a continued one (SendMessage), run `assignment record <id> --agent <agentId>` (`--failed` when the launch failed).
 3. On its notice, `assignment close <id> --outcome <o> < <report-file>` passes the report verbatim, never retyped or summarized; add `--accept "<rationale>"` once its evidence holds.
 
@@ -8,6 +8,6 @@ Send an evidence gap back by SendMessage, then close again; a workflow agent can
 
 Start all ready independent work together and end the turn. Completion notices are the only wake-ups: no polling, no steering, no scheduled check-ins or wait loops while work runs; a wake that changes nothing gets one short line.
 
-Stop a running agent or workflow (TaskStop) only when a new requirement or new information conflicts with that running work. When finishing and then repairing costs less than stopping and relaunching, let it finish. Close a stopped Assignment with `--outcome stopped`. A user message that conflicts with nothing running leaves it alone.
+Stop a running agent or workflow (TaskStop) only when a new requirement or new information conflicts with that running work. When finishing and then repairing costs less than stopping and relaunching, let it finish. Close a stopped Assignment with `--outcome stopped`.
 
 After a resume or compaction, `reconcile` is in context: close a Running Assignment as `interrupted` only once its agent is confirmed gone (SendMessage or transcript; an exited parent session proves nothing).

@@ -2,20 +2,29 @@ import { describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync } from "node:fs"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join, win32 } from "node:path"
+import { join, normalize, win32 } from "node:path"
 
 import { $ } from "bun"
 
+import { LOCKFILE, VERSION_COPIES } from "../../../../scripts/bump-version.ts"
+import { Dimension } from "../../../runtime/src/domain/assignment.ts"
 import { toPosix } from "../../../runtime/src/domain/paths.ts"
 import { ROUTES } from "../../../runtime/src/domain/route.ts"
-import { ROOT_CORE_FILES } from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
+import {
+  PRECEDENCE_FILE,
+  ROOT_CORE,
+  ROOT_CORE_FILES,
+} from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
 import { build } from "../build.ts"
 import packageJson from "../package.json" with { type: "json" }
 import {
   BUILTIN_TOOLS,
   CONDITIONAL_SECTIONS,
+  embedMateriality,
   FRONTEND_DESIGN_SECTION,
+  HISTORY_RULES_FILE,
   INSPECTION_SECTION,
+  MATERIALITY_FILE,
   MERGE_READY_SECTION,
   NATIVE_WEB_TOOLS,
   REQUIREMENT_SECTIONS,
@@ -25,7 +34,7 @@ import {
   WRITING_BAR_SECTION,
 } from "../src/agents.ts"
 import { DIST_DIRECTORY, VENDOR_DIRECTORY } from "../src/files.ts"
-import { generate, GENERATED_PATHS, MARKETPLACE_PATH } from "../src/generate.ts"
+import { DESCRIPTION, generate, GENERATED_PATHS, MARKETPLACE_PATH } from "../src/generate.ts"
 import { fresh, PLUGIN, ROOT } from "./built.ts"
 import { isExecutable } from "./host.ts"
 
@@ -35,12 +44,16 @@ const AGENTS = join("packages", "integrations", "claude", "dist", "agents")
 /** The skills of the plugin, which only the root loads. */
 const SKILLS = [
   "ci-watch",
+  "desktop-design",
   "dev-server",
   "evidence-judging",
   "instruction-writing",
+  "mobile-design",
   "state-mode",
+  "tui-design",
   "user-busy",
   "visual-judging",
+  "web-design",
 ]
 
 /** The paths of every file below a path of the repository, relative to the repository. */
@@ -127,13 +140,19 @@ describe("the generated plugin is in step with its sources", () => {
   })
 
   test("the commit hook stages exactly the generated paths", () => {
-    const stage = read("lefthook.yml").split("git add -A --")[1] ?? ""
+    const stage = (read("lefthook.yml").split("git add -A --")[1] ?? "").split("- name:")[0] ?? ""
     expect(
       stage
         .split("\n")
         .map((line) => line.trim())
-        .filter(Boolean),
+        .filter((line) => line !== "" && !line.startsWith("#")),
     ).toEqual([...GENERATED_PATHS])
+  })
+
+  test("the commit hook stages the copies of the version and the lockfile that the build rewrites", () => {
+    const job = read("lefthook.yml").split("- name: versions")[1] ?? ""
+    const staged = /git add -- (.*)/.exec(job)?.[1]?.trim().split(/\s+/)
+    expect(staged).toEqual([...VERSION_COPIES, LOCKFILE])
   })
 
   test("generated files carry the note where their format allows one", () => {
@@ -230,6 +249,8 @@ describe("hooks", () => {
           hooks: [
             command("vcs-reminder", { if: "Bash(*git*commit*)" }),
             command("vcs-reminder", { if: "Bash(*git*push*)" }),
+            command("vcs-reminder", { if: "Bash(*vcs commit*)" }),
+            command("vcs-reminder", { if: "Bash(*vcs pr*)" }),
           ],
         },
         { matcher: "Workflow", hooks: [command("workflow", { onFailure: "block" })] },
@@ -263,17 +284,18 @@ describe("hooks", () => {
       .filter((group) => group.matcher !== "Workflow")
       .flatMap((group) => group.hooks)
       .filter((hook) => (hook.args as Array<string>).at(-1) !== "root-rules")
-    expect(carriers).toHaveLength(3)
+    expect(carriers).toHaveLength(5)
     for (const hook of carriers) expect(hook).not.toHaveProperty("onFailure")
     expect(JSON.stringify(hooks)).not.toContain("redirect")
   })
 
-  test("the reminder rules start on git with commit or push anywhere after it, and on nothing else", () => {
+  test("the reminder rules start on git with commit or push anywhere after it, and on vcs with commit or pr after it, and on nothing else", () => {
     const glob = (rule: string) => {
       const inner = rule.slice("Bash(".length, -1)
       return new RegExp(`^${inner.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`)
     }
-    const [commit, push] = (hooks.PreToolUse?.[0]?.hooks ?? []).map((hook) => glob(String(hook.if)))
+    const rules = (hooks.PreToolUse?.[0]?.hooks ?? []).map((hook) => glob(String(hook.if)))
+    expect(rules).toHaveLength(4)
     for (const text of [
       "git commit -m x",
       "git -C d commit",
@@ -281,10 +303,21 @@ describe("hooks", () => {
       "env X=1 git commit -m x",
       "bash -c 'git push origin main'",
       "timeout 5 git push",
+      "holyagent vcs commit -m x a",
+      "bun --no-env-file holyagent.js vcs commit -m x a",
+      "holyagent vcs pr --base main",
     ])
-      expect(commit?.test(text) || push?.test(text)).toBe(true)
-    for (const text of ["npm test", "git status", "bun check", "ls -la", "git log --oneline"])
-      expect(commit?.test(text) || push?.test(text)).toBe(false)
+      expect(rules.some((rule) => rule.test(text))).toBe(true)
+    for (const text of [
+      "npm test",
+      "git status",
+      "bun check",
+      "ls -la",
+      "git log --oneline",
+      "holyagent vcs status",
+      "holyagent vcs identity",
+    ])
+      expect(rules.some((rule) => rule.test(text))).toBe(false)
   })
 })
 
@@ -340,7 +373,11 @@ describe("agents", () => {
   })
 
   test("the root's body is the files of root/ in the fixed order", () => {
-    const body = ROOT_SECTIONS.map((name) => read(`${CLAUDE}/root`, name).trim()).join("\n\n")
+    // The history rules continue the bullet list before them; every other section is a paragraph.
+    const body = ROOT_SECTIONS.map(
+      (name, at) =>
+        `${at === 0 ? "" : name === HISTORY_RULES_FILE ? "\n" : "\n\n"}${read(`${CLAUDE}/root`, name).trim()}`,
+    ).join("")
     expect(agent("holyagent")?.content.endsWith(`\n---\n\n${body}\n`)).toBe(true)
     expect(ROOT_SECTIONS.slice(0, ROOT_CORE_FILES.length)).toEqual([...ROOT_CORE_FILES])
   })
@@ -372,6 +409,104 @@ describe("agents", () => {
     ])
       expect({ rule, count: content.split(rule).length - 1 }).toEqual({ rule, count: 1 })
     expect(content).not.toContain("Push only after the reviews accept")
+  })
+
+  test("the root prompt opens with the exact core the session-start hook injects, and the branch rule sits in that core once", () => {
+    const content = agent("holyagent")?.content ?? ""
+    const body = content.slice(content.indexOf("\n---\n\n") + "\n---\n\n".length)
+    expect(body.startsWith(`${ROOT_CORE}\n\n`)).toBe(true)
+    const rule = "Never work on a branch the platform assigns"
+    expect({ rule, count: content.split(rule).length - 1 }).toEqual({ rule, count: 1 })
+    expect(ROOT_CORE).toContain(rule)
+    expect(read(`${CLAUDE}/root`, "version-control.md")).not.toContain("platform assigns")
+  })
+
+  test("the precedence has one source file that the root core and the specialist text embed, and every prompt carries it once", () => {
+    const source = read(CLAUDE, PRECEDENCE_FILE.replace("../", "")).trim()
+    expect(source).toContain("1. mergeability in the target repository")
+    expect(source).toContain("2. the project's own patterns;")
+    expect(source).toContain("3. HolyAgent's defaults.")
+    expect(source).toContain("does not waive a rule that needs the user's approval")
+    expect(ROOT_CORE_FILES).toContain(PRECEDENCE_FILE)
+    expect(ROOT_CORE).toContain(source)
+    expect(SPECIALIST_SECTIONS).toContain(PRECEDENCE_FILE)
+    for (const route of [undefined, ...ROUTES]) {
+      const text = agent(route?.agent ?? "holyagent")?.content ?? ""
+      expect({ agent: route?.agent, copies: text.split(source).length - 1 }).toEqual({
+        agent: route?.agent,
+        copies: 1,
+      })
+    }
+    // No other source states the order, so there is nothing to keep in step with the shared file.
+    for (const folder of ["root", "specialist"])
+      for (const name of readdirSync(join(ROOT, CLAUDE, folder)))
+        expect({
+          name,
+          states: read(CLAUDE, folder, name).includes("1. mergeability in the target repository"),
+        }).toEqual({
+          name,
+          states: false,
+        })
+  })
+
+  test("the code quality rules reach the writers and the reviewers of code and artifacts, and no other role", () => {
+    const holding = ROUTES.filter((route) =>
+      agent(route.agent)?.content.includes("## Code quality"),
+    ).map((route) => route.agent)
+    expect(holding.toSorted()).toEqual(
+      [
+        "worker-mechanical",
+        "worker-implementation",
+        "worker-integration",
+        "worker-debugging",
+        "worker-visual",
+        "reviewer-code",
+        "reviewer-testing",
+        "reviewer-artifact",
+      ].toSorted(),
+    )
+    const rules = read(`${CLAUDE}/specialist`, "code-quality.md")
+    for (const part of [
+      "No duplication: reuse existing code, helpers, abstractions and instructions",
+      "extract a shared piece when the same logic or text appears twice",
+      "repeated I/O, quadratic loops over data that grows, unbounded memory, blocking calls on hot paths and redundant process spawns",
+      "Skip micro-optimization that costs readability without a measured or obvious gain",
+      "comments that explain why, not what",
+      "A writer extracts inside its ownership paths and reports duplication elsewhere under `notes:`",
+      "A reviewer reports duplication of logic or instructions that the change introduces, and a performance problem with its evidence",
+      "a finding blocks only when the change also makes existing behavior or performance worse, fails a gate, breaks a stated repository rule or leaves a duplicate that already disagrees with its original",
+      "otherwise it is optional, as is anything already on the base",
+    ])
+      expect({ part, found: rules.includes(part) }).toEqual({ part, found: true })
+  })
+
+  test("the code quality text owns the severity of duplication and performance findings, and the other texts do not restate it", () => {
+    const sources = {
+      mergeReady: read(CLAUDE, "specialist", "merge-ready.md"),
+      assignments: read(CLAUDE, "root", "assignments.md"),
+      mergeability: read("packages/runtime/src/instructions", "requirements", "mergeability.md"),
+    }
+    for (const [name, text] of Object.entries(sources)) {
+      expect({ name, found: /duplicat\w* (?:logic|code)|performance problem/.test(text) }).toEqual({
+        name,
+        found: false,
+      })
+    }
+    expect(sources.mergeReady).toContain("which set their own severity")
+    expect(sources.assignments).toContain(
+      "carry the severity the specialists' code quality rules give them",
+    )
+    for (const route of ROUTES) {
+      const text = agent(route.agent)?.content ?? ""
+      if (text.includes("## Code quality"))
+        expect({
+          agent: route.agent,
+          copies: text.split("a finding blocks only when").length - 1,
+        }).toEqual({
+          agent: route.agent,
+          copies: 1,
+        })
+    }
   })
 
   test("the root text says what to do with an Assignment that assignment reports does not list", () => {
@@ -506,9 +641,10 @@ describe("agents", () => {
 
     const assembled = [
       ...SKILLS.map((name) => `skills/${name}/SKILL.md`),
-      ...ROOT_SECTIONS.map((name) => `root/${name}`),
-      ...SPECIALIST_SECTIONS.map((name) => `specialist/${name}`),
+      ...ROOT_SECTIONS.map((name) => toPosix(normalize(`root/${name}`))),
+      ...SPECIALIST_SECTIONS.map((name) => toPosix(normalize(`specialist/${name}`))),
       ...CONDITIONAL_SECTIONS.map(({ file }) => `specialist/${file}`),
+      "shared/materiality.md",
       ...Object.entries(ROLE_SECTIONS).flatMap(([role, names]) =>
         names.map((name) => `roles/${role}/${name}`),
       ),
@@ -522,13 +658,20 @@ describe("agents", () => {
         expect({ id, skill: skill?.content.includes(phrase) }).toEqual({ id, skill: true })
         continue
       }
+      // The materiality definition is embedded where the inspection rules are, so it reaches the
+      // roles that get them.
+      const inspection = CONDITIONAL_SECTIONS.find(({ file }) => file === INSPECTION_SECTION)
       const reached = section.startsWith("root/")
         ? ["holyagent"]
-        : section.startsWith("roles/")
-          ? [section.split("/")[1] ?? ""]
-          : ROUTES.filter((route) => conditional?.applies(route) ?? true).map(
-              (route) => route.agent,
-            )
+        : section === "shared/materiality.md"
+          ? ROUTES.filter((route) => inspection?.applies(route)).map((route) => route.agent)
+          : section.startsWith("shared/")
+            ? ["holyagent", ...ROUTES.map((route) => route.agent)]
+            : section.startsWith("roles/")
+              ? [section.split("/")[1] ?? ""]
+              : ROUTES.filter((route) => conditional?.applies(route) ?? true).map(
+                  (route) => route.agent,
+                )
       for (const name of reached)
         expect({ id, name, reaches: agent(name)?.content.includes(phrase) }).toEqual({
           id,
@@ -546,11 +689,18 @@ describe("agents", () => {
       })
       expect(new Set(names).size).toBe(names.length)
     }
-    assembled("root", ROOT_SECTIONS)
+    // The shared files sit in a folder of their own and are listed by their path from the folder.
+    const own = (name: string) => !name.startsWith("../")
+    assembled("root", ROOT_SECTIONS.filter(own))
     assembled("specialist", [
-      ...SPECIALIST_SECTIONS,
+      ...SPECIALIST_SECTIONS.filter(own),
       ...CONDITIONAL_SECTIONS.map(({ file }) => file),
     ])
+    for (const name of [...ROOT_SECTIONS, ...SPECIALIST_SECTIONS].filter((entry) => !own(entry)))
+      expect({
+        name,
+        listed: readdirSync(join(ROOT, CLAUDE, "shared")).includes(name.replace("../shared/", "")),
+      }).toEqual({ name, listed: true })
     expect(Object.keys(ROLE_SECTIONS).toSorted()).toEqual(ROUTES.map((r) => r.agent).toSorted())
     for (const [role, names] of Object.entries(ROLE_SECTIONS)) {
       assembled(`roles/${role}`, names)
@@ -721,20 +871,27 @@ describe("agents", () => {
     const text = agent("holyagent")?.content ?? ""
     for (const part of [
       "Never work on a branch the platform assigns",
-      "create the conventional branch and leave the assigned one alone",
-      "If the push of the conventional branch is refused",
-      "ask through AskUserQuestion whether to push to the assigned branch instead; never work around the refusal",
+      "Before the first commit, check `git branch --show-current`",
+      "first create the conventional branch",
+      "commit and push only there",
+      "If that push is refused",
+      "a branch the user named as the work branch is not one",
+      "ask through AskUserQuestion whether to push to the assigned branch; it is never a default, so park the push when the user is away",
+      "a decision the rules reserve for the user's answer (pushing to the platform-assigned branch, approvals) is parked, never defaulted",
+      "never work around a refused push",
       "`exp/<experiment>/<type>/<change>` for work with no published version",
       "`release/<version>/<type>/<change>` when the repository has tags or releases",
       "each commit on a branch is atomic",
       "a Conventional Commit",
       "PRs merge by squash by default, with the PR title as the Conventional summary",
-      "The repository's conventions, branch protection and merge settings come first",
+      "Branch protection, merge settings and conventions decide first (Precedence)",
       "After a lower PR squash-merges, retarget the next PR to the base",
     ])
       expect({ part, found: text.includes(part) }).toEqual({ part, found: true })
     for (const part of [
       "use it as the work branch",
+      "may have pushed",
+      "cloud sessions may push only",
       "When the platform assigns a branch",
       "whether to open the PR from a branch that follows it",
     ])
@@ -756,6 +913,27 @@ describe("agents", () => {
       expect(text).not.toMatch(/`assignments` skill|grill-me|stacks-and-ci|continue-work/)
   })
 
+  test("the root reads the base, the PR target and every non-work branch from the repository's conventions, hardcoding none", () => {
+    const text = (agent("holyagent")?.content ?? "").replace(/\s+/g, " ")
+    for (const part of [
+      "The base is the branch the conventions or the user name as the work's target, else the default branch",
+      "supply only the remote and the default branch, so the base (see the identity rules) comes from the conventions or the user first",
+      "settle its PR's target (the open stack's top, or the base, which the conventions may point at an integration branch)",
+      "check it against the conventions' rules on which branches may open PRs into which",
+      "if the check bars the stack's top, start from the base",
+      "which also decides any other branch the plan needs (an integration branch, where it is cut from and who cuts it)",
+      "pushing it is a push to the base, so it needs the user's approval unless the request names it",
+      "`git diff <target>...HEAD` (the PR's actual target: its predecessor in the stack or the base)",
+    ])
+      expect({ part, found: text.includes(part) }).toEqual({ part, found: true })
+    expect(text).not.toContain("git diff <base>...HEAD")
+    // One definition of the base, in the identity rules that the session-start core carries.
+    expect(text.split("as the work's target, else the default branch").length - 1).toBe(1)
+    expect(read(CLAUDE, "roles/reviewer-code/range.md")).not.toContain("<base>")
+    expect(read(CLAUDE, "roles/reviewer-code/builtin-review.md")).not.toContain("<base>")
+    expect(text).not.toMatch(/release\/\d|integration branch cut from main/)
+  })
+
   test("no specialist preloads a skill: what a role always needs is fixed text in it", () => {
     for (const route of ROUTES)
       expect(frontmatter(agent(route.agent)?.content ?? "")).not.toContain("skills:")
@@ -763,7 +941,11 @@ describe("agents", () => {
 
   test("the mergeability bar and the inspection rules are fixed text in exactly the roles that need them, once", () => {
     for (const { file, applies } of CONDITIONAL_SECTIONS) {
-      const section = read(`${CLAUDE}/specialist`, file).trim()
+      const section = embedMateriality(
+        read(`${CLAUDE}/specialist`, file),
+        read(MATERIALITY_FILE),
+        file,
+      ).trim()
       for (const route of ROUTES) {
         const text = agent(route.agent)?.content ?? ""
         expect({ file, agent: route.agent, copies: text.split(section).length - 1 }).toEqual({
@@ -788,10 +970,29 @@ describe("agents", () => {
       ].toSorted(),
     )
     expect(MERGE_READY_SECTION).toBe("merge-ready.md")
+    const inspection = embedMateriality(
+      read(`${CLAUDE}/specialist`, INSPECTION_SECTION),
+      read(MATERIALITY_FILE),
+      INSPECTION_SECTION,
+    ).trim()
     const inspecting = ROUTES.filter((route) =>
-      agent(route.agent)?.content.includes(read(`${CLAUDE}/specialist`, INSPECTION_SECTION).trim()),
+      agent(route.agent)?.content.includes(inspection),
     ).map((route) => route.agent)
     expect(inspecting.toSorted()).toEqual(["reviewer-visual", "worker-visual"])
+  })
+
+  test("each visual role says once that a missing target record blocks the inspection and that it starts no target", () => {
+    for (const name of ["worker-visual", "reviewer-visual"]) {
+      const text = agent(name)?.content ?? ""
+      expect({ name, copies: text.match(/no record (?:is )?named/g)?.length }).toEqual({
+        name,
+        copies: 1,
+      })
+      expect({ name, copies: text.match(/start none of your own/gi)?.length }).toEqual({
+        name,
+        copies: 1,
+      })
+    }
   })
 
   test("the visual roles embed the frontend-design guidance with its headings two levels down and its license named", () => {
@@ -829,7 +1030,7 @@ describe("agents", () => {
       }).toEqual({ agent: route.agent, points: false })
   })
 
-  test("the dev-server skill is generated, opens with the situation, and covers start, share and stop", () => {
+  test("the dev-server skill is generated, opens with the situation, and covers the target record, every platform, blocked targets and owner-only stop", () => {
     const skill = generated.find((file) =>
       file.path.endsWith("skills/dev-server/SKILL.md"),
     )?.content
@@ -838,13 +1039,49 @@ describe("agents", () => {
     expect(field(skill ?? "", "description")).toStartWith("Use when ")
     for (const part of [
       "Worker.operations",
-      "process id",
-      "Worker.visual and Reviewer.visual",
-      "start none of your own",
-      "Stop it",
+      "## Detect",
+      "## Target record",
+      "the detected stack with its signal",
+      "the supported variants, each with its set and reset commands and current value",
+      "the owner and process group, the stop command, and what stopping cleans up",
+      "unique to this work",
+      "start none of its own",
+      "Reviewer.visual has no shell",
+      "Only the owner stops a target",
+      "- Web:",
+      "- Terminal UI:",
+      "- Linux desktop:",
+      "- Android:",
+      "- iOS:",
+      "- macOS and Windows desktop:",
+      "interchangeable example",
+      "[verify]",
+      "reports it blocked with the reason and what would unblock it",
+      "a web build of a native app is not the native render",
     ])
-      expect(skill).toContain(part)
+      expect({ part, found: skill?.includes(part) }).toEqual({ part, found: true })
     expect(read("packages/integrations/claude/dist/skills/dev-server/SKILL.md")).toBe(skill ?? "")
+    const roleParts: Record<string, ReadonlyArray<string>> = {
+      "worker-operations": [
+        "the target record",
+        "report it blocked with the reason and what would unblock it",
+      ],
+      "worker-visual": [
+        "the target record in your criteria, never from a bare URL",
+        "with no record named or the target down",
+      ],
+      "reviewer-visual": [
+        "the target record in your criteria",
+        "with no record named or the target down",
+      ],
+    }
+    for (const [name, parts] of Object.entries(roleParts))
+      for (const part of parts)
+        expect({ name, part, found: agent(name)?.content.includes(part) }).toEqual({
+          name,
+          part,
+          found: true,
+        })
   })
 
   test("the evidence-judging skill opens with the situation, gives each rule its reason, and the root points to it", () => {
@@ -858,9 +1095,9 @@ describe("agents", () => {
     )
     for (const part of [
       "never from raw logs or whole files",
-      "starts a repair only with evidence from the reviewer",
+      "starts a repair only with evidence:",
       "a file:line trace (for a vulnerability, source to sink) from one without",
-      "a Reviewer.visual observation (viewport, interaction, visible result)",
+      "a Reviewer.visual observation (viewport, interaction, visible result) or a finding of your own final pass that cites the capture path and what it shows",
       "back to the same reviewer for that evidence",
       "have a specialist re-derive any number before it is published or decided on",
       "keep inference labeled as inference",
@@ -885,15 +1122,46 @@ describe("agents", () => {
       "`visual-judging`: load it before the first Worker.visual or Reviewer.visual dispatch",
       "loaded before the first visual dispatch",
       "starts a repair and a re-review once it carries the evidence `evidence-judging` requires",
-      "a served static or single-file build",
+      "a web app or served static build, a terminal UI, a desktop or mobile app",
     ])
       expect({ part, found: root.includes(part) }).toEqual({ part, found: true })
     const skill = generated.find((file) => file.path.endsWith("skills/visual-judging/SKILL.md"))
     expect(field(skill?.content ?? "", "description")).toStartWith(
       "Use before the first Worker.visual or Reviewer.visual dispatch",
     )
+    for (const part of [
+      "Your own final pass, after Worker.visual and Reviewer.visual, decides acceptance",
+      "inform the decision and do not make it",
+      "`web-design`, `mobile-design`, `desktop-design` or `tui-design`",
+      "`skills/<name>/SKILL.md` under the plugin folder",
+      "repeat your final pass on the captures that changed",
+      "a web page that Reviewer.visual inspected live and for which Worker.visual saved no captures, have Worker.visual or Worker.operations save the final captures at the listed sizes and variants, which Reviewer.visual then lists",
+    ])
+      expect({ part, found: skill?.content.includes(part) }).toEqual({ part, found: true })
+    // The platform skill reaches both specialists by a literal path: the dispatch rules (the root
+    // body and the session-start core alike) say a brief names a plugin file by its absolute path
+    // and where the plugin folder is read from; the skill points to them and does not repeat why.
+    for (const text of [root, ROOT_CORE])
+      for (const part of ["A brief that names a plugin file", "the directory above `scripts/`"])
+        expect({ part, found: text.includes(part) }).toEqual({ part, found: true })
+    expect(skill?.content).not.toContain("the directory above `scripts/`")
+    for (const name of ["worker-visual", "reviewer-visual"]) {
+      const text = agent(name)?.content ?? ""
+      expect({ name, found: text.includes("read that file") }).toEqual({ name, found: true })
+    }
+    expect(agent("reviewer-visual")?.content).toContain(
+      "List the paths of the final captures you judged from",
+    )
+    expect(agent("reviewer-visual")?.content).toContain(
+      "For a web page you inspect live, list the paths of the final captures that Worker.visual or Worker.operations saved",
+    )
+    const pointers = read(`${CLAUDE}/root`, "skills.md")
+    for (const name of ["web-design", "mobile-design", "desktop-design", "tui-design"])
+      expect({ name, found: pointers.includes(`\`${name}\``) }).toEqual({ name, found: true })
     const devServer = generated.find((file) => file.path.endsWith("skills/dev-server/SKILL.md"))
-    expect(field(devServer?.content ?? "", "description")).toContain("static or single-file build")
+    expect(field(devServer?.content ?? "", "description")).toContain(
+      "a terminal UI, a desktop app, or an Android or iOS app",
+    )
   })
 
   test("Reviewer.artifact is a sonnet agent, and the root lists it with the sonnet roles, not the haiku ones", () => {
@@ -997,33 +1265,53 @@ describe("agents", () => {
     )
   })
 
-  test("the guide gaps are each stated once, in the file that owns them", () => {
+  test("the guide gaps are each stated once, in the file that owns them, and in exactly the agents and skills that need them", () => {
     const once = (text: string, phrase: string) => text.split(phrase).length - 1
-    const root = agent("holyagent")?.content ?? ""
-    const gaps: ReadonlyArray<readonly [string, string, string]> = [
-      ["G1", `${CLAUDE}/root/task-list.md`, "End your turn only when the work is done"],
-      ["G2", `${CLAUDE}/root/user-messages.md`, "asks for ideas, options or a plan"],
+    const specialists = ROUTES.map((route) => `agents/${route.agent}.md`)
+    // The generated agent and skill files that hold the phrase, with how often each holds it.
+    const holders = (phrase: string) =>
+      generated
+        .filter((file) => file.path.includes("/agents/") || file.path.includes("/skills/"))
+        .map((file) => ({
+          file: /(?:agents|skills)\/.*$/.exec(file.path)?.[0] ?? file.path,
+          copies: once(file.content, phrase),
+        }))
+        .filter(({ copies }) => copies > 0)
+        .toSorted((a, b) => (a.file < b.file ? -1 : 1))
+    // Each gap: the source file that owns the phrase and every generated file that may hold it.
+    // The root states its own mistaken-request rule in its own words under the same phrase.
+    const gaps: ReadonlyArray<readonly [string, string, string, ReadonlyArray<string>]> = [
+      [
+        "G1",
+        `${CLAUDE}/root/task-list.md`,
+        "End your turn only when the work is done",
+        ["agents/holyagent.md"],
+      ],
+      [
+        "G2",
+        `${CLAUDE}/root/user-messages.md`,
+        "asks for ideas, options or a plan",
+        ["agents/holyagent.md"],
+      ],
       [
         "G3",
         `${CLAUDE}/specialist/writing-bar.md`,
         "filler sections, redundant summaries or boilerplate",
+        ["agents/reviewer-artifact.md", "agents/worker-implementation.md"],
       ],
-      ["G4", `${CLAUDE}/specialist/scope.md`, "seems mistaken or a better approach exists"],
+      [
+        "G4",
+        `${CLAUDE}/specialist/scope.md`,
+        "seems mistaken or a better approach exists",
+        ["agents/holyagent.md", ...specialists],
+      ],
     ]
-    for (const [gap, path, phrase] of gaps) {
+    for (const [gap, path, phrase, files] of gaps) {
       expect({ gap, count: once(read(path), phrase) }).toEqual({ gap, count: 1 })
-      // No other instruction file states it.
-      const holders = generated
-        .filter((file) => file.path.includes("/agents/") || file.path.includes("/skills/"))
-        .filter((file) => file.content.includes(phrase))
-        .map((file) => file.path.split("/").at(-1))
-      expect({ gap, holders: holders.length > 0 }).toEqual({ gap, holders: true })
-    }
-    expect(once(root, "asks for ideas, options or a plan")).toBe(1)
-    for (const route of ROUTES) {
-      const text = agent(route.agent)?.content ?? ""
-      expect(once(text, "seems mistaken or a better approach exists")).toBe(1)
-      expect(once(text, "End your turn only when the work is done")).toBe(0)
+      expect({ gap, holders: holders(phrase) }).toEqual({
+        gap,
+        holders: files.toSorted().map((file) => ({ file, copies: 1 })),
+      })
     }
   })
 
@@ -1080,6 +1368,85 @@ describe("agents", () => {
     expect(requirements).toContain("Inference: that paths in context files go stale")
   })
 
+  test("the mergeability table names exactly the dimensions the runtime stores", () => {
+    const table = read(`${CLAUDE}/specialist`, "merge-ready.md")
+      .split("\n")
+      .filter((line) => line.startsWith("| ") && !line.startsWith("| Dimension"))
+      .map((line) => line.split("|")[1]?.trim() ?? "")
+      .filter((name) => /^[a-z][a-z-]*$/.test(name))
+    expect(table).toEqual([...Dimension.literals])
+  })
+
+  test("the hooks, signing and history rewrite rules have one source file that the root prompt embeds once, after its version-control rules", () => {
+    const rules = read(CLAUDE, HISTORY_RULES_FILE.replace("../", "")).trim()
+    expect(ROOT_SECTIONS.indexOf(HISTORY_RULES_FILE)).toBe(
+      ROOT_SECTIONS.indexOf("version-control.md") + 1,
+    )
+    const root = agent("holyagent")?.content ?? ""
+    expect(root.split(rules).length - 1).toBe(1)
+    // They continue the bullet list of the version-control rules, with no blank line between.
+    expect(root.slice(0, root.indexOf(rules))).toMatch(/\n- [^\n]*\n$/)
+    for (const route of ROUTES)
+      expect({ agent: route.agent, holds: agent(route.agent)?.content.includes(rules) }).toEqual({
+        agent: route.agent,
+        holds: false,
+      })
+    // The root's own version-control file leaves them to the shared file.
+    for (const line of rules.split("\n"))
+      expect(read(`${CLAUDE}/root`, "version-control.md")).not.toContain(line.slice(2))
+  })
+
+  test("the specialist count in the manifests and the docs is the route table's", () => {
+    const words = [
+      "one",
+      "two",
+      "three",
+      "four",
+      "five",
+      "six",
+      "seven",
+      "eight",
+      "nine",
+      "ten",
+      "eleven",
+      "twelve",
+      "thirteen",
+      "fourteen",
+      "fifteen",
+      "sixteen",
+      "seventeen",
+      "eighteen",
+      "nineteen",
+      "twenty",
+    ]
+    const word = words[ROUTES.length - 1]
+    expect(DESCRIPTION).toContain(` ${word} specialists `)
+    for (const path of [
+      "packages/integrations/claude/dist/.claude-plugin/plugin.json",
+      MARKETPLACE_PATH,
+    ])
+      expect(read(path)).toContain(DESCRIPTION)
+    // Every count of the roster that a page states, in words or digits, is the route table's.
+    const count = new RegExp(
+      `\\b(${[...words, "\\d+"].join("|")}) (?:specialists|route agents|agent names)\\b`,
+      "gi",
+    )
+    const pages = [
+      "README.md",
+      "docs/README.md",
+      "docs/decisions.md",
+      "docs/development.md",
+      "docs/hooks.md",
+      "docs/pi/claude-parity.md",
+    ]
+    for (const path of pages) {
+      const wrong = [...read(path).matchAll(count)]
+        .map((match) => match[1]?.toLowerCase())
+        .filter((found) => found !== word && found !== String(ROUTES.length))
+      expect({ path, wrong }).toEqual({ path, wrong: [] })
+    }
+  })
+
   test("agent files sit where the plugin expects them", () => {
     // The folder is joined with the platform's separator; the plugin and git expect it with `/`.
     expect(toPosix(AGENTS)).toBe("packages/integrations/claude/dist/agents")
@@ -1089,14 +1456,18 @@ describe("agents", () => {
   })
 })
 
-const available = (await $`claude --version`.quiet().nothrow()).exitCode === 0
-
 describe("claude plugin validate", () => {
+  // The pinned Claude Code of the `@anthropic-ai/claude-code` devDependency (the version in
+  // bun.lock, which the CI validation step runs too), started through Bun so a `claude` on PATH of
+  // another version never decides. A missing install fails the test: nothing is skipped.
   // The external claude CLI starts a fresh process per check; on a loaded machine (the parallel
   // verify gates, other workers) that can outlast the 5 s default, so the checks get a longer one.
   const VALIDATE_TIMEOUT = 30_000
   const check = async (directory: string) => {
-    const result = await $`claude plugin validate --strict ${directory}`.quiet().nothrow()
+    const result = await $`bun run claude plugin validate --strict ${directory}`
+      .cwd(ROOT)
+      .quiet()
+      .nothrow()
     return { code: result.exitCode, text: `${result.stdout.toString()}${result.stderr.toString()}` }
   }
   // The "plugin directory" block (README, license, icon) is about listing in Anthropic's catalog and
@@ -1110,8 +1481,8 @@ describe("claude plugin validate", () => {
     expect(own).not.toMatch(/×|Found \d+ (?:error|warning)/)
   }
 
-  test.skipIf(!available)(
-    "the built plugin passes strict validation",
+  test(
+    "the built plugin passes strict validation with the pinned Claude Code",
     async () => {
       const { code, text } = await check(PLUGIN)
       expect(code).toBe(0)
@@ -1120,8 +1491,8 @@ describe("claude plugin validate", () => {
     VALIDATE_TIMEOUT,
   )
 
-  test.skipIf(!available)(
-    "the repository root marketplace passes strict validation",
+  test(
+    "the repository root marketplace passes strict validation with the pinned Claude Code",
     async () => {
       const { code, text } = await check(ROOT)
       expect(code).toBe(0)
@@ -1129,8 +1500,4 @@ describe("claude plugin validate", () => {
     },
     VALIDATE_TIMEOUT,
   )
-
-  test.skipIf(available)("is skipped because the claude CLI is not installed", () => {
-    console.warn("claude is not on PATH: plugin validation did not run")
-  })
 })

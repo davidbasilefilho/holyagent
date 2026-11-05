@@ -42,7 +42,9 @@ describe("the core of the root rules", () => {
     expect(core).toContain("You are the root.")
     expect(core).toContain("assignment dispatch")
     expect(core).not.toContain("core:start")
-    expect(ROOT_CORE_FILES.every((name) => /^[a-z-]+\.md$/.test(name))).toBe(true)
+    expect(ROOT_CORE_FILES.every((name) => /^(?:\.\.\/shared\/)?[a-z-]+\.md$/.test(name))).toBe(
+      true,
+    )
   })
 
   test("equals the text of its files joined as the root prompt joins them", () => {
@@ -65,6 +67,8 @@ describe("the core of the root rules", () => {
       "exited parent session proves nothing",
       "one-entry workflow",
       "followUpOf",
+      "A brief that names a plugin file",
+      "the directory above `scripts/` in the CLI path above",
     ])
       expect(core).toContain(part)
     expect(core).not.toContain("(see Asking)")
@@ -83,6 +87,30 @@ describe("the core of the root rules", () => {
       "a decision, a blocker only they can clear, and the final report",
     ])
       expect(ROOT_CORE).toContain(part)
+  })
+
+  test("carries the branch rule and the precedence a root needs before its first action", () => {
+    for (const part of [
+      "Never work on a branch the platform assigns",
+      "Before the first commit, check `git branch --show-current`",
+      "first create the conventional branch",
+      "commit and push only there",
+      "it is never a default, so park the push when the user is away",
+      "When rules conflict, after the user's instructions",
+      "1. mergeability in the target repository",
+      "does not waive a rule that needs the user's approval",
+      "The base is the branch the conventions or the user name as the work's target, else the default branch",
+      "a branch the user named as the work branch is not one",
+    ])
+      expect(ROOT_CORE).toContain(part)
+    // The evidence shows the platform creating the local branch only: no claim about what it pushes.
+    for (const claim of ["may have pushed", "cloud sessions may push only"])
+      expect({ claim, found: ROOT_CORE.includes(claim) }).toEqual({ claim, found: false })
+  })
+
+  test("leaves room for the status under the budget with every static part of a cloud session in", () => {
+    const fixed = [ROOT_CORE, ROOT_TAKEOVER, CLOUD_IDENTITY, SESSION_REMINDER].join("\n\n")
+    expect(fixed.length).toBeLessThanOrEqual(CONTEXT_BUDGET - 1000)
   })
 
   test("sets the language rule: English for repository artifacts, the user's latest language for the user", () => {
@@ -294,7 +322,7 @@ describe("the requirements of the Intent in use", () => {
 
   test("stay whole while the status can still narrow to fit them", () => {
     const requirements = Array.from(
-      { length: 8 },
+      { length: 6 },
       (_, at) => `Requirement ${at}: ${LONG.slice(0, 400)}`,
     )
     const text = sessionContext(bigStatus(40, 30), ROOT_CORE, undefined, intent(requirements))
@@ -331,11 +359,15 @@ describe("the takeover line and the legacy context", () => {
       "default, user-facing agent of this session is the holyagent root",
       "whatever agent it started as",
       "${CLAUDE_PLUGIN_ROOT}/agents/holyagent.md` with the Read tool before acting",
-      "without being reminded",
       "all work through an Intent and Assignments dispatched to the holyagent specialists",
       "never implementing in the main thread",
     ])
       expect(ROOT_TAKEOVER).toContain(part)
+  })
+
+  test("the takeover line does not repeat the core's rule to follow the rules without a reminder", () => {
+    expect(ROOT_CORE).toContain("without a reminder")
+    expect(ROOT_TAKEOVER).not.toMatch(/remind/)
   })
 
   test("names the legacy folders and holyagent migrate, between the core and the reminder", () => {

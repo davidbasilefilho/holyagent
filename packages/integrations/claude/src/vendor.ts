@@ -1,6 +1,6 @@
 import { chmod } from "node:fs/promises"
 import { join } from "node:path"
-import { inflateRawSync } from "node:zlib"
+import { gunzipSync, inflateRawSync } from "node:zlib"
 
 import { type Target, TARGETS, type Tool } from "../../../runtime/src/cli/tools.ts"
 import { listFiles } from "./files.ts"
@@ -28,17 +28,19 @@ export interface Asset {
 
 /**
  * Ripgrep 15.2.0, from https://github.com/BurntSushi/ripgrep/releases/tag/15.2.0. The archive
- * hashes are the ones the release publishes in its `.sha256` files; the program hashes were taken
- * from the extracted files.
+ * hashes equal the ones the release publishes in its `.sha256` files, which the updater compares
+ * each download with before pinning it; the program hashes were taken from the extracted files.
  */
 const RIPGREP_VERSION = "15.2.0"
 
 /**
- * Fd 10.5.0, from https://github.com/sharkdp/fd/releases/tag/v10.5.0. The release publishes no
- * checksum file, so the archive hashes were taken from the downloaded files and are trusted on
- * first use; a changed archive fails the build.
+ * Fd 10.5.1, from https://github.com/sharkdp/fd/releases/tag/v10.5.1. The release publishes no
+ * checksum file. The 10.5.1 archive hashes match the SHA-256 digests GitHub shows for the release
+ * assets. For later versions the updater compares each download with the `digest` that GitHub's
+ * release API reports for the asset before it pins a hash. The program hashes were taken from the
+ * extracted files. A changed archive fails the build.
  */
-const FD_VERSION = "10.5.0"
+const FD_VERSION = "10.5.1"
 
 const target = (id: string): Target => {
   const found = TARGETS.find((candidate) => candidate.id === id)
@@ -115,22 +117,22 @@ export const ASSETS: ReadonlyArray<Asset> = [
     "darwin-arm64",
     "aarch64-apple-darwin",
     "tar.gz",
-    "b67e1836c468e42e411984b56e52fa7abec08c2bd22c867398e7cc134aac5e12",
-    "cf3bde435da174f41cf9589a2efeaf03804df7c250fc15e8b8a1e9bfc66ebc9a",
+    "2d336895ed27b14c5cc9fc5eb22df03b3ee842b5dce80060e99d9cdc1b1b9fc7",
+    "96eb610125107448e6e442647745ddd81ed26fed3b2936583ef7e4ebe52b880e",
   ),
   fd(
     "linux-x64",
     "x86_64-unknown-linux-musl",
     "tar.gz",
-    "761c72dc8e120d85b22292063be8a796e2eeb20eb3e4f38b8fa2343ccf3514a7",
-    "e79642a479d2816c887047476bbe6ad229465f30de031033574dee2a095e0037",
+    "f6c95edb190c241df6fddc815a5bab4051444993ac5d92ddc6eec0e0dc2342c7",
+    "86102b09f45e4f63cf1f67f98e8d2f7fd6e9420a9c7d1f77401a1b979004b8b1",
   ),
   fd(
     "windows-x64",
     "x86_64-pc-windows-msvc",
     "zip",
-    "a227701b8551c35a9931d9f6da75503cf86d88e182d71fb849a70864c5d57cd7",
-    "d67d27a8e375ed7e9bca2b506a9dd5082bc24547aeba908b863f6f8b8ab0c3b9",
+    "e52306a600e60b7ba92019c81dc753e6ea6665379d005867d38215ffd14cf5c2",
+    "6d89badd1939553fc849913d047e83db5db001ae748e99ba888d150dd12cd784",
   ),
 ]
 
@@ -171,6 +173,24 @@ export const vendorProblems = async (directory: string): Promise<ReadonlyArray<s
   return problems
 }
 
+/**
+ * The most a release archive may weigh, as downloaded and as inflated (a zip entry, a whole tar).
+ * The real archives are a few megabytes, so a stream or a compressed payload far above this is not
+ * one, and reading it all would only exhaust memory.
+ */
+export const MAX_ARCHIVE_BYTES = 64 * 1024 * 1024
+
+/** Inflates with the size cap; a payload that inflates past it fails with a message that says so. */
+const inflateCapped = (name: string, inflate: (limit: number) => Uint8Array): Uint8Array => {
+  try {
+    return inflate(MAX_ARCHIVE_BYTES)
+  } catch (cause) {
+    throw cause instanceof RangeError
+      ? new Error(`${name} inflates to more than ${MAX_ARCHIVE_BYTES} bytes`, { cause })
+      : cause
+  }
+}
+
 const END_OF_DIRECTORY = 0x06054b50
 const DIRECTORY_ENTRY = 0x02014b50
 const LOCAL_HEADER = 0x04034b50
@@ -209,16 +229,25 @@ export const readZip = (
     const data = bytes.subarray(start, start + size)
     if (method !== 0 && method !== 8)
       throw new Error(`The zip entry ${name} uses compression method ${method}`)
-    found.set(name, method === 0 ? data : inflateRawSync(data))
+    found.set(
+      name,
+      method === 0
+        ? data
+        : inflateCapped(name, (limit) => inflateRawSync(data, { maxOutputLength: limit })),
+    )
   }
   return found
 }
 
+/** The named files of a gzipped tar archive, by name; a name the archive lacks is absent. */
 const readTar = async (
   bytes: Uint8Array,
   names: ReadonlyArray<string>,
 ): Promise<ReadonlyMap<string, Uint8Array>> => {
-  const files = await new Bun.Archive(bytes).files()
+  const tar = inflateCapped("The tar archive", (limit) =>
+    gunzipSync(bytes, { maxOutputLength: limit }),
+  )
+  const files = await new Bun.Archive(tar).files()
   const found = new Map<string, Uint8Array>()
   for (const name of names) {
     const file = files.get(name)
@@ -226,6 +255,14 @@ const readTar = async (
   }
   return found
 }
+
+/** The named files of a release archive of the given format, by name; a missing name is absent. */
+export const readArchive = (
+  format: ArchiveFormat,
+  bytes: Uint8Array,
+  names: ReadonlyArray<string>,
+): Promise<ReadonlyMap<string, Uint8Array>> =>
+  format === "zip" ? Promise.resolve().then(() => readZip(bytes, names)) : readTar(bytes, names)
 
 /**
  * Checks a downloaded archive against the pin and writes its program and licenses below the vendor
@@ -244,7 +281,7 @@ export const installAsset = async (
     )
   const program = `${asset.folder}/${asset.tool}${asset.target.suffix}`
   const wanted = [program, ...asset.licenses.map((file) => `${asset.folder}/${file}`)]
-  const files = asset.format === "zip" ? readZip(archive, wanted) : await readTar(archive, wanted)
+  const files = await readArchive(asset.format, archive, wanted)
   for (const name of wanted) if (!files.has(name)) throw new Error(`${asset.url} has no ${name}`)
   const binary = files.get(program)
   if (binary === undefined || sha256(binary) !== asset.binarySha256)

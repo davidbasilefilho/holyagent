@@ -1,4 +1,12 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  setDefaultTimeout,
+  test,
+} from "bun:test"
 import { mkdir, mkdtemp, readdir, realpath, rm, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -7,10 +15,20 @@ import { decode } from "@toon-format/toon"
 import { $ } from "bun"
 import { Effect } from "effect"
 
+import { parseArgs, readFlags } from "../src/cli/args.ts"
 import { StdinMissing } from "../src/cli/errors.ts"
+import { pushTargets } from "../src/cli/git-push.ts"
 import { run } from "../src/cli/program.ts"
 import { dispatchedAssignment } from "../src/cli/report.ts"
+import { workflowRefusal } from "../src/cli/workflow-check.ts"
 import { fromGitPath } from "../src/domain/paths.ts"
+
+// A test that makes a repository and a state worktree runs a dozen git processes, and process
+// creation on Windows is slow enough on the CI runner (2.7 seconds for one such test, a stall of 5
+// for another) to pass Bun's 5 second default; a slow test there is not a hung one. Linux and macOS
+// keep the default.
+if (process.platform === "win32") setDefaultTimeout(60_000)
+afterAll(() => setDefaultTimeout(5_000))
 
 let project: string
 let home: string
@@ -23,8 +41,10 @@ beforeEach(async () => {
 })
 afterEach(() =>
   Promise.all([
-    rm(project, { recursive: true, force: true }),
-    rm(home, { recursive: true, force: true }),
+    // A git process or a scanner can still hold a file of the folder when the test ends (EBUSY on
+    // Windows), so the removal retries, as in stdin.test.ts.
+    rm(project, { recursive: true, force: true, maxRetries: 5 }),
+    rm(home, { recursive: true, force: true, maxRetries: 5 }),
   ]),
 )
 
@@ -1031,18 +1051,11 @@ describe("command line", () => {
     expect(await help("intent", "update")).toContain("--material")
     const plan = await help("plan")
     for (const part of [
-      "write the inline script yourself",
-      "{id, agent, model, effort, prompt}",
-      "one agent() per entry",
-      "agentType holyagent:<agent>",
-      "runs without a permission prompt",
-      "fallback",
+      "a writer followed by the review of its work",
+      "as the root workflow text says",
+      "`continues` lists Ready work that continues a warm specialist",
       "Workflow tool is disabled or unavailable",
-      "workflow:<run-id>/<id>",
-      "verbatim",
-      "{ done: [ids] }",
-      "`assignment reports <journal.jsonl>`",
-      "does not list follows the closing rule in the root workflow text",
+      "`afterwards` reviews launch once the writers they depend on are terminal",
     ])
       expect(plan).toContain(part)
     for (const gone of [
@@ -1403,5 +1416,178 @@ describe("process", () => {
     expect(unknown.exitCode).toBe(2)
     expect(unknown.stderr.toString()).toStartWith("error: Usage:")
     expect((await $`bun ${main} --version`.quiet()).text()).toMatch(/^\d+\.\d+\.\d+(?:-\d+)?\n$/)
+  })
+})
+
+describe("the workflow check refuses scripts that could hang or exhaust memory", () => {
+  const AGENT = "await agent('p', { agentType: 'holyagent:worker-implementation' })"
+  const refusal = (...lines: ReadonlyArray<string>) =>
+    Effect.runPromise(workflowRefusal([...lines, AGENT].join("\n")))
+
+  test.each<readonly [string, string]>([
+    ["a while loop", "while (true) {}"],
+    ["a while loop with a test", "let n = 0\nwhile (n < 3) { n += 1 }"],
+    ["a do loop", "let n = 0\ndo { n += 1 } while (n < 3)"],
+    ["a for loop with no head", "for (;;) {}"],
+    ["a for loop with no bound", "for (let i = 0; ; i++) {}"],
+    ["a for loop over a huge literal bound", "for (let i = 0; i < 1e12; i++) {}"],
+    ["a for loop over a bound just above the limit", "for (let i = 0; i < 1001; i++) {}"],
+    ["a for loop bounded by data", "for (let i = 0; i < args.n; i++) {}"],
+    ["a for loop bounded by a name", "const n = 3\nfor (let i = 0; i < n; i++) {}"],
+    ["a for loop that counts away from its bound", "for (let i = 0; i < 10; i--) {}"],
+    ["a for loop that does not step", "for (let i = 0; i < 10; i += 0) {}"],
+    ["a for loop that steps by a computed amount", "for (let i = 0; i < 10; i += args.step) {}"],
+    ["a for loop with a var counter", "for (var i = 0; i < 10; i++) {}"],
+    ["a for loop with two counters", "for (let i = 0, j = 0; i < 10; i++) {}"],
+    ["a for loop whose body resets the counter", "for (let i = 0; i < 10; i++) { i = 0 }"],
+    ["a for loop whose body steps the counter back", "for (let i = 0; i < 10; i++) { i-- }"],
+    [
+      "a for loop whose body destructures into the counter",
+      "for (let i = 0; i < 10; i++) { [i] = [0] }",
+    ],
+    [
+      "a for loop whose closure resets the counter",
+      "for (let i = 0; i < 10; i++) { [1].forEach(() => { i = 0 }) }",
+    ],
+    [
+      "loops nested past the total limit",
+      "for (let i = 0; i < 1000; i++) { for (let j = 0; j < 1000; j++) {} }",
+    ],
+    [
+      "a for-of loop that keeps adding to the array it walks",
+      "const xs = [1]\nfor (const x of xs) { xs.push(x) }",
+    ],
+    [
+      "a for-of loop that writes past the end of the array it walks",
+      "const xs = [1]\nfor (const x of xs) { xs[xs.length] = x }",
+    ],
+    ["repeat with a huge count", "'x'.repeat(2 ** 30)"],
+    ["repeat with a huge literal", "'x'.repeat(1073741824)"],
+    ["repeat with a count from data", "'x'.repeat(args.n)"],
+    ["repeat with a count from a name", "const n = 5\n'x'.repeat(n)"],
+    ["repeat with a spread count", "'x'.repeat(...args.counts)"],
+    ["padStart with a huge count", "'x'.padStart(1e9, 'y')"],
+    ["padStart with a count from data", "'x'.padStart(args.width)"],
+    ["padEnd with a huge count", "'x'.padEnd(2 ** 30)"],
+    ["padEnd with a count from data", "'x'.padEnd(args.width, '-')"],
+  ])("refuses %s", async (_label, text) => {
+    expect(await refusal(text)).toBeString()
+  })
+
+  test.each<readonly [string, string]>([
+    ["a counted loop up", "for (let i = 0; i < 10; i++) { log(i) }"],
+    ["a counted loop that includes its bound", "for (let i = 1; i <= 3; ++i) { log(i) }"],
+    ["a counted loop down", "for (let i = 5; i > 0; i--) { log(i) }"],
+    ["a counted loop with a step", "for (let i = 0; i < 100; i += 10) { log(i) }"],
+    ["a counted loop at the limit", `for (let i = 0; i < 1000; i++) { log(i) }`],
+    [
+      "a counted loop indexing and growing other data",
+      "const rows = []\nlet total = 0\nfor (let i = 0; i < 3; i++) { rows.push(i); total += i }",
+    ],
+    [
+      "nested counted loops within the total limit",
+      "for (let i = 0; i < 100; i++) { for (let j = 0; j < 100; j++) { log(i, j) } }",
+    ],
+    [
+      "a counted loop with break and continue",
+      "for (let i = 0; i < 5; i++) { if (i === 2) continue; if (i > 3) break }",
+    ],
+    ["a for-of loop over data", "for (const entry of args.entries) { log(entry) }"],
+    [
+      "a for-of loop that fills another array",
+      "const out = []\nfor (const entry of args.entries) { out.push(entry) }",
+    ],
+    ["a for-in loop", "for (const key in args) { log(key) }"],
+    ["repeat with a small literal", "log('x'.repeat(3))"],
+    ["repeat at the limit", "log('x'.repeat(1000))"],
+    ["padStart and padEnd with small literals", "log('7'.padStart(2, '0'), 'a'.padEnd(10))"],
+    [
+      "map and forEach over data",
+      "log(args.entries.map((e) => e.id))\nargs.entries.forEach((e) => log(e))",
+    ],
+  ])("allows %s", async (_label, text) => {
+    expect(await refusal(text)).toBeUndefined()
+  })
+})
+
+describe("one flag parser for every command", () => {
+  const SPEC = { title: "string", force: "boolean" } as const
+
+  test("after -- every argument is a positional, so a positional may start with dashes", async () => {
+    const parsed = await Effect.runPromise(
+      parseArgs(["--title", "t", "--", "--force", "--title"], SPEC, "x"),
+    )
+    expect(parsed).toEqual({ positionals: ["--force", "--title"], flags: { title: "t" } })
+  })
+
+  test("reads --name value, --name=value and switches", async () => {
+    const parsed = await Effect.runPromise(
+      parseArgs(["a", "--title=--t", "--force", "b"], SPEC, "x"),
+    )
+    expect(parsed).toEqual({ positionals: ["a", "b"], flags: { title: "--t", force: true } })
+  })
+
+  test.each<readonly [string, ReadonlyArray<string>, string]>([
+    ["an unknown flag", ["--nope"], "Unknown flag --nope"],
+    ["an unknown short flag", ["-x"], "Unknown flag -x"],
+    ["the text -undefined, which no flag spells", ["-undefined", "v"], "Unknown flag -undefined"],
+    ["a switch given a value", ["--force=yes"], "Flag --force takes no value"],
+    ["a missing value", ["--title"], "Flag --title needs a value"],
+    ["a value that looks like a flag", ["--title", "--force"], "Flag --title needs a value"],
+    ["a flag given twice", ["--title", "a", "--title", "b"], "Flag --title was given twice"],
+  ])("refuses %s", async (_label, args, message) => {
+    const failure = await Effect.runPromise(Effect.flip(parseArgs(args, SPEC, "x")))
+    expect(failure).toMatchObject({ _tag: "Usage", message })
+  })
+
+  test("repeats, declared short flags and a lone dash are read for flags that allow them", async () => {
+    const parsed = await Effect.runPromise(
+      readFlags(["-m", "a", "-m", "b", "-", "--"], { message: { kind: "many", short: "m" } }, "x"),
+    )
+    expect(parsed.values).toEqual({ message: ["a", "b"] })
+    expect(parsed.positionals).toEqual(["-"])
+  })
+})
+
+describe("the runtime package", () => {
+  test("ships no program of its own: the plugin's holyagent command is the only one", async () => {
+    const manifest = (await Bun.file(join(import.meta.dir, "..", "package.json")).json()) as object
+
+    expect(manifest).not.toHaveProperty("bin")
+  })
+})
+
+describe("the push targets of a shell line", () => {
+  test.each<readonly [string, ReadonlyArray<string>]>([
+    ["git push origin claude/x", ["claude/x"]],
+    ["sudo git push origin claude/x", ["claude/x"]],
+    ["sudo -u user git push origin claude/x", ["claude/x"]],
+    ["sudo -u git git push origin claude/x", ["claude/x"]],
+    ["sudo --user=root git push origin claude/x", ["claude/x"]],
+    ["env -u HOME git push origin claude/x", ["claude/x"]],
+    ["timeout -s KILL 5 git push origin claude/x", ["claude/x"]],
+    ["nice -n 5 git push origin claude/x", ["claude/x"]],
+    ["xargs -I {} git push origin claude/x", ["claude/x"]],
+    ["git push origin claude/x > out.log", ["claude/x"]],
+    ["git push origin claude/x 2>push.log", ["claude/x"]],
+    ["git push origin feat > claude/out.log", ["feat"]],
+    ["git push origin feat >claude/out.log", ["feat"]],
+    ["git push origin feat >> claude/out.log 2>&1", ["feat"]],
+    ["git push origin feat 2> claude/err.log", ["feat"]],
+    ["git push origin feat < claude/in.txt", ["feat"]],
+    ["git push origin feat>claude/out.log", ["feat"]],
+    ["git push origin feat 2>&1 | tee claude/x", ["feat"]],
+    ["git push origin feat >& claude/out.log", ["feat"]],
+    ["git push origin feat>>claude/out.log", ["feat"]],
+    ["if true; then git push origin claude/x; fi", ["claude/x"]],
+    ["for b in a; do git push origin claude/x; done", ["claude/x"]],
+    ["while ! git push origin claude/x; do sleep 1; done", ["claude/x"]],
+    ["if x; then :; else git push origin claude/x; fi", ["claude/x"]],
+    ["{ git push origin claude/x; }", ["claude/x"]],
+    ["then sudo -u user git push origin claude/x", ["claude/x"]],
+    ["command -p git push origin claude/x", ["claude/x"]],
+    ["sudo -u user echo git push origin claude/x", []],
+  ])("%s", (line, targets) => {
+    expect(pushTargets(line)).toEqual(targets)
   })
 })

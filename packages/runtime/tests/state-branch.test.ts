@@ -1,4 +1,6 @@
 import { afterAll, afterEach, describe, expect, setDefaultTimeout, spyOn, test } from "bun:test"
+import { writeFileSync } from "node:fs"
+import * as filesystem from "node:fs/promises"
 import { cp, mkdir, readdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
@@ -6,8 +8,9 @@ import { $ } from "bun"
 import { Effect, Exit } from "effect"
 
 import { fromGitPath, toPosix } from "../src/domain/paths.ts"
+import { deadlineIn, withFileLock } from "../src/state/lock.ts"
 import { loadProject } from "../src/state/store.ts"
-import { fetchRemoteBranch, killGroup, releaseGroup } from "../src/state/tree.ts"
+import { commitState, fetchRemoteBranch, killGroup, releaseGroup } from "../src/state/tree.ts"
 import {
   cleanup,
   fakeGitHub,
@@ -40,7 +43,11 @@ const holy = (dir: string, argv: ReadonlyArray<string>, stdin?: unknown) =>
     fakeGitHub({
       rest: (request) =>
         request.method === "POST" || request.method === "PATCH"
-          ? { number: 7, html_url: "https://github.com/octo/project/pull/7" }
+          ? {
+              number: 7,
+              html_url: "https://github.com/octo/project/pull/7",
+              head: { ref: "feature" },
+            }
           : undefined,
     }).layer,
     stdin,
@@ -305,6 +312,152 @@ describe("the state branch", () => {
     expect((await sh(second, ["git", "config", `branch.${STATE}.remote`])).trim()).toBe("origin")
   })
 
+  test("writers in different worktrees may own the same path, and in one worktree they may not", async () => {
+    const dir = await initRepo(OWNER)
+    await seed(dir, { "a.txt": "a\n" })
+    await createIntent(dir, "Ship the parser")
+    const tree = join(await scratch("holyagent-worktree-"), "tree")
+    await sh(dir, ["git", "worktree", "add", "-q", "-b", "feature", tree])
+    const first = await planAssignment(dir, "Build the parser", "src/parser.ts")
+    const second = await planAssignment(dir, "Build the parser again", "src/parser.ts")
+    const third = await planAssignment(dir, "Build the parser once more", "src/parser.ts")
+
+    // The dispatch prints TOON fields and then the prompt, which is not TOON, so its text is read.
+    const started = await holy(dir, ["assignment", "dispatch"], { id: first })
+    expect(started.code).toBe(0)
+    expect(started.stdout).toContain("state: Running")
+    // The other worktree has its own copy of src/parser.ts.
+    const beside = await holy(tree, ["assignment", "dispatch"], { id: second })
+    expect(beside.code).toBe(0)
+    expect(beside.stdout).toContain("state: Running")
+    // Each worktree still holds its own path against a third writer.
+    for (const where of [dir, tree]) {
+      const refused = await holy(where, ["assignment", "dispatch"], { id: third })
+      expect(refused.code).not.toBe(0)
+      expect(refused.stderr).toContain("OwnershipConflict")
+    }
+  })
+
+  test("the work tree of a Running writer is kept in the clone's local files, not in the shared record", async () => {
+    const dir = await initRepo(OWNER)
+    await seed(dir, { "a.txt": "a\n" })
+    await createIntent(dir, "Ship the parser")
+    const id = await planAssignment(dir, "Build the parser", "src/parser.ts")
+    await holy(dir, ["assignment", "dispatch"], { id })
+    const state = join(await stateTree(dir), ".holyagent")
+    const file = (await readdir(join(state, "intents"), { recursive: true })).find(
+      (name) => name.endsWith(".json") && name.includes("assignments") && name.includes(id),
+    )
+
+    // An older plugin refuses a key it does not know, so the record must not carry one.
+    const record = JSON.parse(await readFile(join(state, "intents", String(file)), "utf8")) as {
+      state: string
+      specialist: object
+    }
+    expect(record.state).toBe("Running")
+    expect(record.specialist).not.toHaveProperty("workTree")
+    const local = join(state, "local", "work-trees.json")
+    const kept = async () =>
+      (JSON.parse(await readFile(local, "utf8")) as { workTrees: Record<string, string> }).workTrees
+    expect(Object.keys(await kept())).toEqual([id])
+
+    await holy(dir, ["assignment", "record", id, "--agent", "agent-1"])
+    expect(Object.keys(await kept())).toEqual([id])
+    await holy(dir, ["assignment", "close", id, "--outcome", "failure"])
+    expect(await kept()).toEqual({})
+  })
+
+  test("plan offers a path that only another worktree's writer holds", async () => {
+    const dir = await initRepo(OWNER)
+    await seed(dir, { "a.txt": "a\n" })
+    await createIntent(dir, "Ship the parser")
+    const tree = join(await scratch("holyagent-worktree-"), "tree")
+    await sh(dir, ["git", "worktree", "add", "-q", "-b", "feature", tree])
+    const first = await planAssignment(dir, "Build the parser", "src/parser.ts")
+    const second = await planAssignment(dir, "Build the parser again", "src/parser.ts")
+    await holy(dir, ["assignment", "dispatch"], { id: first })
+
+    expect(toon(await holy(tree, ["plan"]))).toMatchObject({ assignments: [second] })
+    expect(toon(await holy(dir, ["plan"]))).toMatchObject({ action: "none" })
+  })
+
+  /**
+   * An Assignment dispatched and recorded, with a brief and a report file; returns the id and both
+   * paths.
+   */
+  const dispatched = async (dir: string, objective: string, path: string) => {
+    const id = await planAssignment(dir, objective, path)
+    await holy(dir, ["assignment", "dispatch"], { id })
+    await holy(dir, ["assignment", "record", id, "--agent", `agent-${id}`])
+    await put(join(dir, ".git", "holyagent"), { [`reports/${id}.md`]: "the report\n" })
+    return {
+      id,
+      brief: join(dir, ".git", "holyagent", "briefs", `${id}.md`),
+      report: join(dir, ".git", "holyagent", "reports", `${id}.md`),
+    }
+  }
+
+  const exist = async (...paths: ReadonlyArray<string>) =>
+    Promise.all(
+      paths.map((path) =>
+        stat(path).then(
+          () => true,
+          () => false,
+        ),
+      ),
+    )
+
+  test("the brief and report files stay while the Intent is open and go when it is closed", async () => {
+    const dir = await initRepo(OWNER)
+    await seed(dir, { "a.txt": "a\n" })
+    const first = await createIntent(dir, "Ship the parser")
+    const mine = await dispatched(dir, "Build the parser", "src/parser.ts")
+    await createIntent(dir, "Ship the printer")
+    const other = await dispatched(dir, "Build the printer", "src/printer.ts")
+    await holy(dir, ["intent", "use", first])
+    expect(await exist(mine.brief, mine.report)).toEqual([true, true])
+
+    // Accepting the Assignment leaves its files, so a later brief can cite the report.
+    const accepted = await holy(
+      dir,
+      ["assignment", "close", mine.id, "--outcome", "success", "--accept", "fine", "--report-json"],
+      {
+        status: "done",
+        changed_paths: [],
+        checks: [],
+        blockers: [],
+        notes: [],
+        evidence: ["works", "tests"].map((key) => ({ key, support: "checked" })),
+      },
+    )
+    expect(toon(accepted)).toMatchObject({ id: mine.id, accepted: true })
+    expect(await exist(mine.brief, mine.report)).toEqual([true, true])
+
+    // Closing the Intent removes the files of its Assignments only.
+    const closed = toon(await holy(dir, ["intent", "close", "--reason", "shipped"]))
+    expect(closed["unremoved"]).toBeUndefined()
+    expect(await exist(mine.brief, mine.report)).toEqual([false, false])
+    expect(await exist(other.brief, other.report)).toEqual([true, true])
+  })
+
+  test("a file that cannot be removed when the Intent closes is reported, not swallowed", async () => {
+    const dir = await initRepo(OWNER)
+    await seed(dir, { "a.txt": "a\n" })
+    await createIntent(dir, "Ship the parser")
+    const mine = await dispatched(dir, "Build the parser", "src/parser.ts")
+    // A folder where the report file should be makes the removal fail.
+    await rm(mine.report)
+    await mkdir(join(mine.report, "inside"), { recursive: true })
+
+    const closed = await holy(dir, ["intent", "close", "--reason", "shipped", "--drop", "stop"])
+
+    expect(closed.code).toBe(0)
+    // The CLI reports the path git resolves, which on Windows is the long form of the 8.3 temp directory.
+    expect(String(toon(closed)["unremoved"])).toContain(await filesystem.realpath(mine.report))
+    expect(await exist(mine.brief)).toEqual([false])
+    expect(await exist(mine.report)).toEqual([true])
+  })
+
   test("a remote that cannot be reached leaves the state branch starting from the base", async () => {
     const dir = await initRepo(OWNER)
     await sh(dir, ["git", "remote", "add", "origin", join(dir, "missing-remote")])
@@ -313,6 +466,35 @@ describe("the state branch", () => {
     await createIntent(dir, "Ship the parser")
 
     expect((await sh(dir, ["git", "merge-base", STATE, "main"])).trim()).toBe(base)
+  })
+})
+
+describe("a state commit", () => {
+  test("takes the mode and branch it is given and does not read them from git config again", async () => {
+    const dir = await initRepo(OWNER)
+    await seed(dir, { "a.txt": "a\n" })
+    await createIntent(dir, "Ship the parser")
+    const directory = join(await stateTree(dir), ".holyagent")
+    const intents = join(directory, "intents")
+    const file = join(
+      intents,
+      String(
+        (await readdir(intents, { recursive: true })).find((name) => name.endsWith("intent.json")),
+      ),
+    )
+    await writeFile(file, (await readFile(file, "utf8")).replace("Ship the parser", "Ship it"))
+    const commit = (resolved: Parameters<typeof commitState>[4]) =>
+      Effect.runPromise(commitState(directory, GIT_ENV, "chore(state): edit", [], resolved))
+    const heads = async () => (await sh(dir, ["git", "rev-parse", STATE])).trim()
+    const before = await heads()
+
+    // Git config says branch mode on holyagent/state; the given values decide, not the config.
+    expect(await commit({ mode: "work" })).toBe(false)
+    expect(await commit({ mode: "branch", branch: "another" })).toBe(false)
+    expect(await heads()).toBe(before)
+
+    expect(await commit({ mode: "branch", branch: STATE })).toBe(true)
+    expect(await heads()).not.toBe(before)
   })
 })
 
@@ -641,6 +823,63 @@ describe("the first commit on a state branch that tracks nothing yet", () => {
   })
 })
 
+describe("staging the state files of a long history", () => {
+  // The git that counts arguments is a shell script, which Windows does not run as `git`.
+  test.skipIf(process.platform === "win32")(
+    "the command line of a state commit does not grow with the number of records",
+    async () => {
+      const dir = await initRepo(OWNER)
+      await seed(dir, { "a.txt": "a\n" })
+      await createIntent(dir, "Ship the parser")
+      for (const name of ["a", "b", "c", "d", "e", "f"])
+        await planAssignment(dir, `Build ${name}`, `src/${name}.ts`)
+      // A git that records how many arguments each `add` got, then runs the real one.
+      const bin = await scratch("holyagent-git-")
+      const log = join(bin, "add-arguments")
+      const real = Bun.which("git") ?? "git"
+      await writeFile(
+        join(bin, "git"),
+        [
+          "#!/bin/sh",
+          `for argument in "$@"; do`,
+          `  if [ "$argument" = add ]; then echo "$#" >> "${log}"; break; fi`,
+          "done",
+          `exec "${real}" "$@"`,
+          "",
+        ].join("\n"),
+        { mode: 0o755 },
+      )
+
+      const created = toon(
+        await vcs(
+          dir,
+          ["assignment", "create"],
+          fakeGitHub().layer,
+          {
+            roleTask: "Worker.implementation",
+            objective: "Build g",
+            criteria: [{ text: "works", blocking: true, dimension: "behavior" }],
+            evidence: ["tests"],
+            ownershipPaths: ["src/g.ts"],
+          },
+          { PATH: `${bin}:${process.env["PATH"] ?? ""}` },
+        ),
+      ) as { id: string }
+
+      // The state holds eight records and the settings. None of their names is on the command line,
+      // so the number of arguments does not depend on how many there are.
+      const counts = lines(await readFile(log, "utf8")).map(Number)
+      expect(counts.length).toBeGreaterThan(0)
+      expect(Math.max(...counts)).toBeLessThanOrEqual(10)
+      // The new record was still staged and committed.
+      const tracked = lines(await sh(dir, ["git", "ls-tree", "-r", "--name-only", STATE]))
+      expect(tracked.filter((path) => path.includes("/assignments/"))).toHaveLength(7)
+      expect(tracked.some((path) => path.includes(created.id))).toBe(true)
+      expect(await sh(await stateTree(dir), ["git", "status", "--porcelain"])).toBe("")
+    },
+  )
+})
+
 describe("migrating the legacy state", () => {
   test("every file migrate copied into an Intent folder is committed, a stray file beside them is not", async () => {
     const dir = await initRepo(OWNER)
@@ -913,6 +1152,170 @@ describe("moving the state found in a work tree", () => {
       objective: "Ship the parser",
     })
     expect((await stat(join(await stateTree(dir), record))).isFile()).toBe(true)
+  })
+})
+
+describe("a lock file that Windows has not finished deleting", () => {
+  /** Makes `open` of `file` for exclusive creation fail with EPERM while `blocked()` holds. */
+  const refusing = (file: string, blocked: () => boolean) => {
+    const original = filesystem.open
+    return spyOn(filesystem, "open").mockImplementation(
+      async (...args: Parameters<typeof filesystem.open>) => {
+        if (args[0] === file && args[1] === "wx" && blocked())
+          throw Object.assign(new Error(`EPERM: operation not permitted, open '${file}'`), {
+            code: "EPERM",
+          })
+        return original(...args)
+      },
+    )
+  }
+
+  test("a contender waits for it and takes the lock, as it does for a lock file that exists", async () => {
+    const file = join(await scratch(), "worktree.lock")
+    // The previous holder removed the lock while a contender still had it open: the file is gone for
+    // good once that handle closes, and until then Windows refuses to create it with EPERM.
+    await writeFile(
+      file,
+      JSON.stringify({ pid: process.pid, token: "held", acquiredAt: Date.now() }),
+    )
+    let pending = true
+    const spy = refusing(file, () => pending)
+    setTimeout(() => {
+      pending = false
+      void rm(file, { force: true })
+    }, 150)
+    try {
+      const ran = await Effect.runPromise(withFileLock(file, Effect.succeed("ran"), "long"))
+
+      expect(ran).toBe("ran")
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  test("a refusal with no file in the way is an I/O failure at once, not a wait", async () => {
+    const file = join(await scratch(), "worktree.lock")
+    const spy = refusing(file, () => true)
+    const started = Date.now()
+    try {
+      const failure = await Effect.runPromise(
+        Effect.flip(withFileLock(file, Effect.succeed("ran"), "long")),
+      )
+
+      expect(failure._tag).toBe("StateIo")
+    } finally {
+      spy.mockRestore()
+    }
+    expect(Date.now() - started).toBeLessThan(2000)
+  })
+})
+
+describe("breaking a stale lock", () => {
+  test("a lock claimed after the stale check stays, on a file system without hard links", async () => {
+    const file = join(await scratch(), "worktree.lock")
+    const child = Bun.spawn([process.execPath, "-e", ""])
+    await child.exited
+    const gone = JSON.stringify({ pid: child.pid, token: "gone", acquiredAt: Date.now() - 60_000 })
+    const live = JSON.stringify({ pid: process.pid, token: "live", acquiredAt: Date.now() })
+    await writeFile(file, gone)
+    // The contender has read the dead owner. Just before it first changes the lock file, another
+    // process replaces the lock, as it could between the contender's read and its removal.
+    let replaced = false
+    const replacing = <A extends Array<unknown>, R>(original: (...args: A) => R) =>
+      ((...args: A) => {
+        if (!replaced && args[0] === file) {
+          replaced = true
+          writeFileSync(file, live)
+        }
+        return original(...args)
+      }) as (...args: A) => R
+    const [rename, remove] = [filesystem.rename, filesystem.rm]
+    const renameSpy = spyOn(filesystem, "rename").mockImplementation(replacing(rename))
+    const removeSpy = spyOn(filesystem, "rm").mockImplementation(replacing(remove))
+    const linkSpy = spyOn(filesystem, "link").mockImplementation(() =>
+      Promise.reject(
+        Object.assign(new Error("ENOTSUP: operation not supported"), { code: "ENOTSUP" }),
+      ),
+    )
+    try {
+      const failure = await Effect.runPromise(
+        Effect.flip(
+          deadlineIn(400).pipe(
+            Effect.flatMap((deadline) => withFileLock(file, Effect.succeed("ran"), deadline)),
+          ),
+        ),
+      )
+
+      expect(failure._tag).toBe("StateLocked")
+      expect(await readFile(file, "utf8")).toBe(live)
+      expect((await readdir(join(file, ".."))).filter((name) => name.includes("stale"))).toEqual([])
+    } finally {
+      renameSpy.mockRestore()
+      removeSpy.mockRestore()
+      linkSpy.mockRestore()
+    }
+  })
+
+  test("a lock created while a moved lock is put back is not overwritten", async () => {
+    const file = join(await scratch(), "worktree.lock")
+    const child = Bun.spawn([process.execPath, "-e", ""])
+    await child.exited
+    const owner = (token: string, pid: number) =>
+      JSON.stringify({ pid, token, acquiredAt: Date.now() })
+    const [gone, live, newer] = [
+      owner("gone", child.pid),
+      owner("live", process.pid),
+      owner("newer", process.pid),
+    ]
+    await writeFile(file, gone)
+    // The contender has read the dead owner. Just before it moves the lock file, another process
+    // replaces the lock; then, just before the contender puts the moved lock back, a third process
+    // creates a lock there, as it could in the gap after the contender found the place empty.
+    let replaced = false
+    const [rename, link] = [filesystem.rename, filesystem.link]
+    const renameSpy = spyOn(filesystem, "rename").mockImplementation(
+      (...args: Parameters<typeof rename>) => {
+        if (!replaced && args[0] === file) {
+          replaced = true
+          writeFileSync(file, live)
+        }
+        if (args[1] === file) writeFileSync(file, newer)
+        return rename(...args)
+      },
+    )
+    const linkSpy = spyOn(filesystem, "link").mockImplementation(
+      (...args: Parameters<typeof link>) => {
+        if (args[1] === file) writeFileSync(file, newer)
+        return link(...args)
+      },
+    )
+    try {
+      const failure = await Effect.runPromise(
+        Effect.flip(
+          deadlineIn(400).pipe(
+            Effect.flatMap((deadline) => withFileLock(file, Effect.succeed("ran"), deadline)),
+          ),
+        ),
+      )
+
+      expect(failure._tag).toBe("StateLocked")
+      expect(await readFile(file, "utf8")).toBe(newer)
+      expect((await readdir(join(file, ".."))).filter((name) => name.includes("stale"))).toEqual([])
+    } finally {
+      renameSpy.mockRestore()
+      linkSpy.mockRestore()
+    }
+  })
+
+  test("a lock of a dead process is broken and taken", async () => {
+    const file = join(await scratch(), "worktree.lock")
+    const child = Bun.spawn([process.execPath, "-e", ""])
+    await child.exited
+    await writeFile(file, JSON.stringify({ pid: child.pid, token: "gone", acquiredAt: Date.now() }))
+
+    const ran = await Effect.runPromise(withFileLock(file, Effect.succeed("ran")))
+
+    expect(ran).toBe("ran")
   })
 })
 

@@ -32,22 +32,11 @@ export class ManifestError extends Data.TaggedError("ManifestError")<{
   }
 }
 
-/** The version files do not all carry the same version, so there is no single version to bump. */
-export class VersionMismatch extends Data.TaggedError("VersionMismatch")<{
-  readonly versions: ReadonlyArray<{ readonly file: string; readonly version: string }>
-}> {
-  /** The description shown to the user. */
-  override get message() {
-    const listed = this.versions.map(({ file, version }) => `${file} ${version}`).join(", ")
-    return `Versions disagree: ${listed}`
-  }
-}
-
-/** The command line arguments are not `<minor|patch> [root]`. */
+/** The command line arguments are not `<minor|patch|sync> [root]`. */
 export class Usage extends Data.TaggedError("Usage")<{ readonly kind: string | undefined }> {
   /** The description shown to the user. */
   override get message() {
-    return `Expected minor or patch and an optional root directory; got ${this.kind ?? "nothing"}`
+    return `Expected minor, patch or sync and an optional root directory; got ${this.kind ?? "nothing"}`
   }
 }
 
@@ -70,6 +59,13 @@ export const parseVersion = (input: string): Effect.Effect<Version, InvalidVersi
 /** Renders a version as `0.X.Y`. */
 export const formatVersion = ({ minor, patch }: Version): string => `0.${minor}.${patch}`
 
+/**
+ * Orders two versions by minor, then patch: negative when `a` is older than `b`, zero when equal,
+ * positive when newer. The major is always 0, so it takes no part.
+ */
+export const compareVersions = (a: Version, b: Version): number =>
+  a.minor - b.minor || a.patch - b.patch
+
 /** Advances one position and resets the later one: minor clears patch. */
 export const bumpVersion = (version: Version, kind: BumpKind): Version => {
   switch (kind) {
@@ -81,12 +77,18 @@ export const bumpVersion = (version: Version, kind: BumpKind): Version => {
 }
 
 /**
- * The package manifests that carry the one version, relative to the repository root. The plugin and
- * marketplace manifests are generated from the Claude integration's version by `mise run build`,
- * and the runtime CLI's `--version` reads the runtime's, so none of them is edited here.
+ * The one hand-edited version, in the root manifest, relative to the repository root. Every other
+ * copy is written from it by `syncVersions`, and `bumpVersions` edits nothing else.
  */
-export const VERSION_FILES: ReadonlyArray<string> = [
-  "package.json",
+export const VERSION_SOURCE = "package.json"
+
+/**
+ * The workspace manifests that carry a copy of the version, relative to the repository root. Bun
+ * workspaces and the plugin generator read their own package's `version`, so the copy stays and
+ * `syncVersions` writes it. The plugin and marketplace manifests are generated from the Claude
+ * integration's copy by `mise run build`, and the CLI's `--version` reads the root manifest.
+ */
+export const VERSION_COPIES: ReadonlyArray<string> = [
   "packages/runtime/package.json",
   "packages/integrations/claude/package.json",
 ]
@@ -108,12 +110,19 @@ const strict = { onExcessProperty: "error" } as const
 // place and every other byte stays. A workspace entry is the only place a "name" line is directly
 // followed by a "version" line; the root workspace carries no version and the package entries are
 // arrays.
-const WORKSPACE_VERSION = /("name": "[^"]+",\n\s+"version": ")[^"]*(")/g
+const WORKSPACE_VERSION = /("name": "[^"]+",\r?\n\s+"version": ")[^"]*(")/g
 
 const failWith = (file: string) =>
   Effect.mapError((cause: unknown) => new ManifestError({ file, cause }))
 
-const load = (root: string, file: string) => {
+interface Loaded {
+  readonly file: string
+  readonly path: string
+  readonly manifest: Manifest
+  readonly version: string
+}
+
+const load = (root: string, file: string): Effect.Effect<Loaded, ManifestError> => {
   const path = join(root, file)
   return Effect.gen(function* () {
     const text = yield* Effect.tryPromise(() => Bun.file(path).text())
@@ -126,6 +135,10 @@ const load = (root: string, file: string) => {
   }).pipe(failWith(file))
 }
 
+/** Reads the `version` field of the manifest `file` under `root` without parsing it as `0.X.Y`. */
+export const readVersion = (root: string, file: string): Effect.Effect<string, ManifestError> =>
+  load(root, file).pipe(Effect.map(({ version }) => version))
+
 const lockfileWithVersion = (text: string, version: string) =>
   text.search(WORKSPACE_VERSION) < 0
     ? Effect.fail(new ManifestError({ file: LOCKFILE, cause: "no workspace version found" }))
@@ -136,54 +149,68 @@ const lockfileWithVersion = (text: string, version: string) =>
         ),
       )
 
-const BumpKindArgument = Schema.Literals(["minor", "patch"])
+const CommandArgument = Schema.Literals(["minor", "patch", "sync"])
+
+const writeLoaded = ({ file, path, manifest }: Loaded, version: string) =>
+  Effect.tryPromise(() =>
+    Bun.write(path, `${JSON.stringify({ ...manifest, version }, null, 2)}\n`),
+  ).pipe(failWith(file))
 
 /**
- * Reads the version files and `bun.lock` under `root`, refuses when the files disagree, then writes
- * the bumped version to all of them and to every workspace entry of `bun.lock`. Nothing is written
- * unless every file was read and they agree. Returns the old and new version.
+ * Reads the version of the root manifest under `root` and writes the next one back to it, nothing
+ * else: the copies follow from `syncVersions`. Returns the old and new version.
  */
 export const bumpVersions = (
   root: string,
   kind: BumpKind,
-): Effect.Effect<
-  { readonly from: string; readonly to: string },
-  ManifestError | VersionMismatch | InvalidVersion
-> =>
+): Effect.Effect<{ readonly from: string; readonly to: string }, ManifestError | InvalidVersion> =>
   Effect.gen(function* () {
-    const loaded = yield* Effect.forEach(VERSION_FILES, (file) => load(root, file))
-    const [first] = loaded
-    if (first === undefined || loaded.some(({ version }) => version !== first.version))
-      return yield* new VersionMismatch({
-        versions: loaded.map(({ file, version }) => ({ file, version })),
-      })
-    const from = first.version
+    const source = yield* load(root, VERSION_SOURCE)
+    const from = source.version
     const to = formatVersion(bumpVersion(yield* parseVersion(from), kind))
-    const lockPath = join(root, LOCKFILE)
-    const lockText = yield* Effect.tryPromise(() => Bun.file(lockPath).text()).pipe(
-      Effect.flatMap((text) => lockfileWithVersion(text, to)),
-      failWith(LOCKFILE),
-    )
-    yield* Effect.forEach(loaded, ({ file, path, manifest }) =>
-      Effect.tryPromise(() =>
-        Bun.write(path, `${JSON.stringify({ ...manifest, version: to }, null, 2)}\n`),
-      ).pipe(failWith(file)),
-    )
-    yield* Effect.tryPromise(() => Bun.write(lockPath, lockText)).pipe(failWith(LOCKFILE))
+    yield* writeLoaded(source, to)
     return { from, to }
   })
 
 /**
- * Runs `<minor|patch> [root]`: bumps the versions under `root` (the repository root by default),
- * prints `old -> new`, or prints the failure and sets a failing exit code.
+ * Writes the version of the root manifest under `root` into every workspace manifest and every
+ * workspace entry of `bun.lock`, leaving every other byte alone, and returns that version. A file
+ * that already carries it is not written. Every file is read and checked before the first write, so
+ * nothing is written when the source is not `0.X.Y`, a copy is unreadable or the lockfile has no
+ * workspace version.
+ */
+export const syncVersions = (root: string): Effect.Effect<string, ManifestError | InvalidVersion> =>
+  Effect.gen(function* () {
+    const { version } = yield* load(root, VERSION_SOURCE)
+    yield* parseVersion(version)
+    const lockPath = join(root, LOCKFILE)
+    const lockText = yield* Effect.tryPromise(() => Bun.file(lockPath).text()).pipe(
+      failWith(LOCKFILE),
+    )
+    const synced = yield* lockfileWithVersion(lockText, version)
+    const copies = yield* Effect.forEach(VERSION_COPIES, (file) => load(root, file))
+    yield* Effect.forEach(
+      copies.filter((copy) => copy.version !== version),
+      (copy) => writeLoaded(copy, version),
+    )
+    if (synced !== lockText)
+      yield* Effect.tryPromise(() => Bun.write(lockPath, synced)).pipe(failWith(LOCKFILE))
+    return version
+  })
+
+/**
+ * Runs `<minor|patch|sync> [root]` on `root` (the repository root by default): `minor` and `patch`
+ * bump the root manifest and print `old -> new`, `sync` copies its version to the other files and
+ * prints it. A failure is printed and sets a failing exit code.
  */
 export const main = (args: ReadonlyArray<string>) =>
   Effect.gen(function* () {
     const [argument, root = join(import.meta.dir, "..")] = args
-    const kind = yield* Schema.decodeUnknownEffect(BumpKindArgument)(argument).pipe(
+    const command = yield* Schema.decodeUnknownEffect(CommandArgument)(argument).pipe(
       Effect.mapError(() => new Usage({ kind: argument })),
     )
-    const { from, to } = yield* bumpVersions(root, kind)
+    if (command === "sync") return yield* Console.log(yield* syncVersions(root))
+    const { from, to } = yield* bumpVersions(root, command)
     yield* Console.log(`${from} -> ${to}`)
   }).pipe(
     Effect.catch((error) =>

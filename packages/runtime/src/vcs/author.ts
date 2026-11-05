@@ -35,7 +35,7 @@ export const setAuthor = (request: AuthorRequest) =>
         "--email needs an email address such as 1234+login@users.noreply.github.com",
       )
     if (looksLikeAgent({ name, email }))
-      return yield* refuse(`${name} <${email}> looks like an agent's identity, not the user's`)
+      return yield* refuse(`${name} <${email}> is the agent's own identity, not the user's`)
     yield* git(["config", "--local", "author.name", name])
     yield* git(["config", "--local", "author.email", email])
     return { name, email }

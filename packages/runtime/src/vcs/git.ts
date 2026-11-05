@@ -71,7 +71,7 @@ export const gitPaths = (args: ReadonlyArray<string>, paths: ReadonlyArray<strin
  * A branch name git accepts as it is written. One that starts with a dash would read as an option
  * and one that starts with a plus would turn a push refspec into a forced one.
  */
-export const validBranch = (name: string): Effect.Effect<string, Usage, Git> =>
+const validBranch = (name: string): Effect.Effect<string, Usage, Git> =>
   Effect.gen(function* () {
     const plain = !name.startsWith("-") && !name.startsWith("+")
     if (plain && (yield* gitMaybe(["check-ref-format", "--branch", name])) === name) return name
@@ -91,7 +91,7 @@ export const currentBranch: Effect.Effect<string, DetachedHead | Usage, Git> = E
 )
 
 /** The URL with any user name or password removed, so it is safe to keep and to print. */
-export const stripUserinfo = (url: string): string =>
+const stripUserinfo = (url: string): string =>
   url.replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/@]*@/i, "$1")
 
 /**

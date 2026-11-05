@@ -1,18 +1,15 @@
 {
   "name": "@holyagent/runtime",
-  "version": "0.2.0",
-  "description": "The holyagent runtime: instructions and the shared command surface.",
+  "version": "0.2.1",
+  "description": "The holyagent runtime shared by every harness: the domain, the state, the vcs commands, the instruction text and the command line.",
   "license": "Apache-2.0",
-  "bin": {
-    "holyagent-runtime": "./src/cli/main.ts"
-  },
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
   "dependencies": {
     "@toon-format/toon": "^4.0.0",
-    "acorn": "8.19.0",
+    "acorn": "^8.0.0",
     "effect": "^4.0.0"
   }
 }

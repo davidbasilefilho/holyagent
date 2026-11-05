@@ -22,7 +22,7 @@ export const SESSION_REMINDER: string = reminder.trim()
  * `${CLAUDE_PLUGIN_ROOT}` in it is for the caller to fill in, as the host does in agent text only.
  */
 export const ROOT_TAKEOVER =
-  "The default, user-facing agent of this session is the holyagent root, whatever agent it started as: read `${CLAUDE_PLUGIN_ROOT}/agents/holyagent.md` with the Read tool before acting, follow these rules without being reminded, and run all work through an Intent and Assignments dispatched to the holyagent specialists, never implementing in the main thread."
+  "The default, user-facing agent of this session is the holyagent root, whatever agent it started as: read `${CLAUDE_PLUGIN_ROOT}/agents/holyagent.md` with the Read tool before acting, and run all work through an Intent and Assignments dispatched to the holyagent specialists, never implementing in the main thread."
 
 /**
  * How the commit author is set in a claude.ai cloud session, from the GitHub connector. A
@@ -176,8 +176,17 @@ export const sessionContext = (
     ].join("\n\n")
   const fits = (text: string) => text.length <= CONTEXT_BUDGET
   const all = wanted?.requirements.length ?? 0
-  const attempts = LADDER.map((step) => build(step, all))
   const counts = LADDER.at(-1) ?? { rows: 0, chars: 0 }
-  const cuts = Array.from({ length: all }, (_, at) => build(counts, all - 1 - at))
-  return attempts.find(fits) ?? cuts.find(fits) ?? cuts.at(-1) ?? attempts.at(-1) ?? ""
+  // Candidates in the order of preference, built one at a time: the first that fits ends the
+  // search, so a roomy context renders once and a requirement list is never cut before it must be.
+  function* candidates(): Generator<string> {
+    for (const step of LADDER) yield build(step, all)
+    for (let shown = all - 1; shown >= 0; shown -= 1) yield build(counts, shown)
+  }
+  let last = ""
+  for (const text of candidates()) {
+    if (fits(text)) return text
+    last = text
+  }
+  return last
 }

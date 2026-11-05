@@ -1,4 +1,12 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  setDefaultTimeout,
+  test,
+} from "bun:test"
 import { mkdtemp, readdir, realpath, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -9,6 +17,11 @@ import { Effect } from "effect"
 
 import { StdinMissing } from "../src/cli/errors.ts"
 import { run } from "../src/cli/program.ts"
+
+// Tests that run git processes: process creation on Windows is slow enough on the CI runner to pass
+// Bun's 5 second default, and a slow test there is not a hung one. Linux and macOS keep the default.
+if (process.platform === "win32") setDefaultTimeout(60_000)
+afterAll(() => setDefaultTimeout(5_000))
 
 let project: string
 
