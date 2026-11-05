@@ -436,6 +436,38 @@ describe("the workflow check refuses text that grows by replacement or joining",
       "a longer separator kept in a temporary",
       "let s = 'a'\nfor (let i = 0; i < 40; i++) { const t = s.split('').join('--'); s = t }",
     ],
+    [
+      "a join of a split kept in a name",
+      "let s = 'abc'\nfor (let i = 0; i < 40; i++) { const p = s.split(''); s = p.join('--') }",
+    ],
+    [
+      "a join of a spread into characters",
+      "let s = 'abc'\nfor (let i = 0; i < 40; i++) { s = [...s].join('--') }",
+    ],
+    [
+      "a join of Array.from into characters",
+      "let s = 'abc'\nfor (let i = 0; i < 40; i++) { s = Array.from(s).join('--') }",
+    ],
+    [
+      "a join of a spread kept in a name",
+      "let s = 'abc'\nfor (let i = 0; i < 40; i++) { const cs = [...s]; s = cs.join('--') }",
+    ],
+    [
+      "a longer replacement in one branch of a conditional",
+      "let s = 'a'\nconst r = args.long ? 'aa' : 'a'\nfor (let i = 0; i < 40; i++) { s = s.replaceAll('a', r) }",
+    ],
+    [
+      "a longer replacement in a conditional written in place",
+      "let s = 'a'\nfor (let i = 0; i < 40; i++) { s = s.replaceAll('a', args.long ? 'aa' : 'a') }",
+    ],
+    [
+      "a replacement that is a parameter given a literal",
+      "const g = (s, r) => s.replaceAll('a', r)\nlet s = 'a'\nfor (let i = 0; i < 40; i++) { s = g(s, 'bb') }",
+    ],
+    [
+      "a replacement taken from a list written in the script",
+      "const names = ['a', 'bb']\nlet s = 'a'\nfor (const n of names) { s = s.replaceAll('a', n) }",
+    ],
   ])("refuses %s", async (_label, text) => {
     expect(await refusal(text)).toBeString()
   })
@@ -460,6 +492,31 @@ describe("the workflow check refuses text that grows by replacement or joining",
     ],
     ["a longer replacement done once", "const t = 'abcd'.replaceAll('abcd', '$&$&')\nlog(t)"],
     ["a join of the text with a separator", "log(args.items.join(args.separator))"],
+    ["a single replace outside any loop", "let s = 'abc'\ns = s.replace('a', 'xyz')\nlog(s)"],
+    [
+      "a join of lines with a newline",
+      "let out = ''\nfor (const x of args.items) { const lines = [out, x.name]; out = lines.join('\\n') }\nlog(out)",
+    ],
+    [
+      "a join of the lines of the result with the same newline",
+      "let out = 'a\\nb'\nfor (let i = 0; i < 3; i++) { const lines = out.split('\\n'); out = lines.join('\\n') }\nlog(out)",
+    ],
+    [
+      "a join of a spread of lines",
+      "const lines = args.items.map((x) => x.name)\nlet out = ''\nfor (let i = 0; i < 3; i++) { out = [...lines].join('\\n') }\nlog(out)",
+    ],
+    [
+      "a replacement of the conditional with the same length",
+      "let s = 'a'\nconst r = args.upper ? 'A' : 'b'\nfor (let i = 0; i < 3; i++) { s = s.replaceAll('a', r) }",
+    ],
+    [
+      "a replacement that is a parameter given text from args",
+      "const g = (s, r) => s.replaceAll('a', r)\nlet s = 'a'\nfor (let i = 0; i < 3; i++) { s = g(s, args.mark) }",
+    ],
+    [
+      "a replacement that is a field of an item of args",
+      "log(args.items.map((x) => x.name.replace('{a}', x.alias)))",
+    ],
   ])("allows %s", async (_label, text) => {
     expect(await refusal(text)).toBeUndefined()
   })

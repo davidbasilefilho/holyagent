@@ -3,6 +3,7 @@ import { join, sep } from "node:path"
 
 import { REPOSITORY, VENDOR_DIRECTORY } from "../packages/integrations/claude/src/files.ts"
 import {
+  type Asset,
   ASSETS,
   binaryOf,
   expectedFiles,
@@ -67,6 +68,32 @@ export const removeUnpinned = async (
   return stray
 }
 
+/**
+ * Downloads each asset and installs it as soon as its own download and pin check succeed, so one
+ * failure does not discard the others. An asset whose download fails or whose archive fails the pin
+ * check is not installed and is named in the returned problems. The fetch and install steps are
+ * parameters so a test can stand in for the network.
+ */
+export const installMissing = async (
+  folder: string,
+  assets: ReadonlyArray<Asset>,
+  fetchArchive: (url: string) => Promise<Uint8Array> = download,
+  install: (folder: string, asset: Asset, archive: Uint8Array) => Promise<void> = installAsset,
+): Promise<ReadonlyArray<string>> => {
+  const outcomes = await Promise.all(
+    assets.map(async (asset) => {
+      try {
+        console.log(`fetching ${asset.url}`)
+        await install(folder, asset, await fetchArchive(asset.url))
+        return undefined
+      } catch (cause) {
+        return `${asset.url}: ${cause instanceof Error ? cause.message : String(cause)}`
+      }
+    }),
+  )
+  return outcomes.filter((problem) => problem !== undefined)
+}
+
 if (import.meta.main) {
   // Downloads, verifies and extracts what the vendor folder lacks or holds wrongly, then removes
   // what no pin names. With everything in place it does nothing, so a build needs no network.
@@ -75,17 +102,11 @@ if (import.meta.main) {
     const files = [binaryOf(asset), ...licensesOf(asset)]
     return before.some((problem) => files.some((file) => problem.startsWith(`${file} `)))
   })
-  const archives = await Promise.all(
-    missing.map((asset) => {
-      console.log(`fetching ${asset.url}`)
-      return download(asset.url)
-    }),
-  )
-  for (const [index, asset] of missing.entries())
-    await installAsset(directory, asset, archives[index] as Uint8Array)
+  const failed = await installMissing(directory, missing)
   const expected = new Set(expectedFiles())
   await removeUnpinned(directory, expected)
   const problems = await vendorProblems(directory)
-  if (problems.length > 0) throw new Error(`${VENDOR_DIRECTORY}: ${problems.join("; ")}`)
+  if (failed.length > 0 || problems.length > 0)
+    throw new Error(`${VENDOR_DIRECTORY}: ${[...failed, ...problems].join("; ")}`)
   console.log(`vendored ${expected.size} files in ${VENDOR_DIRECTORY}`)
 }
