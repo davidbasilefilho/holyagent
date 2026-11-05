@@ -1,0 +1,69 @@
+{
+  "id": "assignment-0mw3jzcrt-wwer",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "fix-the-review-leftovers-that-remain",
+  "objective": "Fix the review leftovers that remain open on release/0.2.1/integration, in the new worktree /home/user/holyagent-fix-followups (branch release/0.2.1/fix/followups, cut from integration 20eee5d).",
+  "state": "Running",
+  "scope": [
+    "Run 'bun install --frozen-lockfile' first. Confirm each item still holds on this head before changing it; skip and name any that is already fixed. Each fix that changes behavior gets a test that fails without it.",
+    "(1) Workflow hook (packages/runtime/src/cli/workflow-check.ts), from /home/user/holyagent/.git/holyagent/reports/assignment-0mw2fob2m-oc9p.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw2foas8-4ie9.md: text growth through a temporary or a non-literal replacement inside a loop (for example 'const t = s.replaceAll(\"abcd\", \"$&$&\"); s = t', or 'const r = \"aa\"; s = s.replaceAll(\"a\", r)'); 'join' missing from COMBINING_METHODS ('s = s.split(\"a\").join(s)'); copiedFrom not following aliases made with map or Array.from, which hides a doubling. Say in docs/hooks.md that args members are trusted input to the check (Array.from over an args member is allowed). All real root scripts in /root/.claude/projects/-home-user-holyagent/70184bfa-8a56-57cb-a6cf-d92f87c7692b/workflows/scripts/ must stay allowed (runner /home/user/holyagent-work/check-workflow-scripts-src.ts, pointed at this worktree), and packages/integrations/claude/tests/hooks.test.ts must pass.",
+    "(2) Push detection (packages/runtime/src/cli/git-push.ts), from /home/user/holyagent/.git/holyagent/reports/assignment-0mw2d1z2f-zz8k.md: a redirect target is counted as a push argument ('git push origin main > claude/log.txt' reads as a push to a claude/* branch); pushes after shell words such as then or do and after 'sudo -u <user>' are missed. Tokenize redirects before collecting positionals and handle those wrapper words.",
+    "(3) Vendoring and dependency updates (packages/integrations/claude/scripts/vendor.ts or wherever the download lives, scripts/update-dependencies.ts): downloads have no timeout or size cap and inflateRawSync output is unbounded; add a timeout (AbortSignal.timeout) and a size cap on downloads and inflation, and run the missing downloads concurrently if that is a small change. The comment above FD_VERSION in packages/integrations/claude/src/vendor.ts says the fd archive hashes equal the digests GitHub's release API reports; those digests were never compared for 10.5.1 because the API was unreachable, so reword it to say what was and was not checked.",
+    "(4) packages/integrations/claude/build.ts:43 prints a raw FiberFailure when syncVersions fails; report the tagged error's message instead.",
+    "Update docs where behavior changes. Finish with 'bunx --no-install mise run build' and 'bunx --no-install mise run verify' (see docs/development.md)."
+  ],
+  "constraints": [
+    "Follow .claude/CLAUDE.md code rules: Effect for effects and tagged errors, no try/catch, new Promise, Promise statics or async functions in runtime source, Effect Schema at boundaries, Bun APIs, JSDoc on every exported item. Do not change .claude/CLAUDE.md.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on or before a risky step. When the work is done and checked, stop and report; name unrequested features, tests, files or refactors instead of adding them. Do not stop at a summary that announces the next step.",
+    "Make no commits or other git writes and no edits under .git/ or .holyagent/; the root commits.",
+    "Work only inside /home/user/holyagent-fix-followups; scratch in /home/user/holyagent-work/.",
+    "Report in under 400 words: each item fixed or skipped with its test; diff to /home/user/holyagent-work/diffs/followups.diff."
+  ],
+  "criteria": [
+    {
+      "text": "Each listed leftover is fixed with a test that fails without it, or named as already fixed or skipped with the reason",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "All real root workflow scripts stay allowed and hooks.test.ts passes",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "mise run build leaves dist in sync and mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The change follows the repository code rules and stays inside the listed items",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli",
+    "packages/runtime/tests",
+    "packages/integrations/claude/src",
+    "packages/integrations/claude/scripts",
+    "packages/integrations/claude/build.ts",
+    "packages/integrations/claude/tests",
+    "packages/integrations/claude/dist",
+    "scripts",
+    "docs"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-05T13:00:05.610Z"
+  },
+  "createdAt": "2026-11-05T13:00:05.610Z"
+}
