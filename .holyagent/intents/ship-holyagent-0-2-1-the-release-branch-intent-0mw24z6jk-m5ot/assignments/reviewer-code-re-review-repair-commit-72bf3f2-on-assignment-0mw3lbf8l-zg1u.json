@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-repair-commit-72bf3f2-on",
   "objective": "Re-review repair commit 72bf3f2 on release/0.2.1/fix/followups (worktree /home/user/holyagent-fix-followups) against the previous code findings.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Review only 'git diff b46fa93 72bf3f2' (also in /home/user/holyagent-work/diffs/followups-3.diff, without dist). Previous findings it addresses: /home/user/holyagent/.git/holyagent/reports/assignment-0mw3kkm43-yv6m.md (1 single replace refused, 2 join through a binding, 3 Promise.all discarding downloads) and items 2 and 3 of /home/user/holyagent/.git/holyagent/reports/assignment-0mw3kkmcj-c34q.md (conditional and parameter replacement texts, zip cap wording).",
     "Binding scope (Intent): the workflow hook auto-allow guards against accidental runaway scripts the root writes; a refused script falls back to the permission prompt. Real root workflow scripts must stay allowed: rerun /home/user/holyagent-work/check-workflow-scripts.ts on this head (writer reported 53/53).",
@@ -36,7 +36,29 @@
     "agentId": "workflow:wf_4a67819a-946/assignment-0mw3lbf8l-zg1u",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-05T13:37:28.293Z"
+    "startedAt": "2026-11-05T13:37:28.293Z",
+    "finishedAt": "2026-11-05T13:44:52.738Z"
+  },
+  "result": "result: The repair closes all five previous findings (the three items from the first report, plus conditional/parameter replacement texts and the zip cap wording). No regression found, and `mise run verify` passes with the build in sync. No blockers. Four optional items remain; the first three are in `workflow-check.ts`, the fourth in `scripts/vendor.ts`.\n\nchanged: none (scratch copy only: `/tmp/claude-0/-home-user-holyagent/70184bfa-8a56-57cb-a6cf-d92f87c7692b/scratchpad/head`).\n\nchecks:\n- Built-in `/code-review` on `b46fa93...72bf3f2` ran (loaded skill was the built-in) and gave 6 claims, classified below.\n- `bunx --no-install mise run verify` on `git archive 72bf3f2` plus `bun install --frozen-lockfile`: 1595 pass, 0 fail, and the lint output showed no problems. The tail of the output hid the type-check and format-check lines, and I did not capture an exit code.\n- `mise run build` on that copy: exit 0, and `git status` was empty afterwards, so the build is in sync.\n- The writer's `check-workflow-scripts.ts` (pointed at the scratch build): 54/54 real root scripts allowed. The set has grown since the writer's 53.\n- Probes through `workflowRefusal` confirmed the claims below. I could not run the real network for `installMissing`; the new tests stub the fetch.\n\nfindings (all optional, none a regression from `b46fa93`; each fails to the permission prompt or was already allowed on the base):\n1. `workflow-check.ts:~2185` (`comesFromArgs`): any reference to a function binding counts as data from `args`. So `let s='aa'; const f=()=>s; for(...40){ s=s.replaceAll('a', f()) }` is allowed (confirmed). It needs a deliberately crafted script. Smallest fix: treat a function binding as not from `args` unless its return value comes from `args`.\n2. `workflow-check.ts:~1953` (`separatorsOf`): `[...lines].join('\\n')` is treated as a character split. Round-tripping `out.split('\\n')` through a spread therefore refuses with \"uses one value twice\" (confirmed). It is a false refusal that falls back to the prompt. Smallest fix: judge `[...x]` and `Array.from(x)` as `\"\"` only when `x` is not itself an array derived from a split.\n3. `workflow-check.ts:~1959`: `s.split('').map(c=>c).join('--')` and `const [a,...rest]=s; rest.join('--')` in a loop are allowed (confirmed). Both were allowed on the base. Smallest fix: refuse a join whose receiver derives from a string split or spread but passes through another method.\n4. `scripts/vendor.ts:~105`: a failed download is reported twice (the `failed` message, then the `X is missing` problems). Cosmetic.\n\nevidence:\nThe repair closes the previous findings without a regression and mise run verify passes with the build in sync: verify on a scratch copy of HEAD, 1595 pass and 0 fail; `mise run build` left the tree unchanged; 54/54 real scripts allowed; the five previous findings are closed by the diff and its new tests.\nchecks-run: verify, build, the 54-script runner, and the four probes, as listed above.\nfindings: the four optional items above; no blockers.\n",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "verify 1595/0 on a scratch copy of HEAD, build in sync, 54/54 real scripts; only optional crafted-only items",
+    "criteria": [
+      {
+        "criterion": "The repair closes the previous findings without a regression and mise run verify passes with the build in sync",
+        "support": "verify on a scratch copy of HEAD, 1595 pass and 0 fail; `mise run build` left the tree unchanged; 54/54 real scripts allowed; the five previous findings are closed by the diff and its new tests."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "verify, build, the 54-script runner, and the four probes, as listed above."
+      },
+      {
+        "label": "findings",
+        "support": "the four optional items above; no blockers."
+      }
+    ]
   },
   "createdAt": "2026-11-05T13:37:28.293Z"
 }
