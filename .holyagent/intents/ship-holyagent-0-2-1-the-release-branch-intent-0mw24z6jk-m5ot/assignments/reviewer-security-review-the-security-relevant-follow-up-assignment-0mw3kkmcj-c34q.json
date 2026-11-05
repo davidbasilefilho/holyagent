@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mw3kkmcj-c34q",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.security",
+  "slug": "review-the-security-relevant-follow-up",
+  "objective": "Review the security-relevant follow-up changes on release/0.2.1/fix/followups: the workflow hook, push detection and the vendored-download limits.",
+  "state": "Running",
+  "scope": [
+    "Read /home/user/holyagent-work/diffs/followups-all.diff and the current files in /home/user/holyagent-fix-followups: packages/runtime/src/cli/workflow-check.ts, packages/runtime/src/cli/git-push.ts, scripts/vendor.ts, packages/integrations/claude/src/vendor.ts, scripts/update-dependencies.ts. Previous findings these close: /home/user/holyagent/.git/holyagent/reports/assignment-0mw2fob2m-oc9p.md (crafted-only text growth and map/Array.from aliases).",
+    "Binding scope (Intent): the workflow hook auto-allow guards against accidental runaway scripts the root writes; a refused script falls back to the permission prompt; crafted-only misses rank low. Push detection only adds reminder context and enforces nothing. Judge whether the download changes keep hash pinning intact (a capped or timed-out download must fail, never pin or install partial bytes) and whether the inflation caps hold for zip and tar.gz."
+  ],
+  "constraints": [
+    "Read-only: no repository edits and no git writes.",
+    "Keep working until the review is done; stop and report. Report in under 300 words, findings ranked by severity with file:line, and the smallest fix."
+  ],
+  "criteria": [
+    {
+      "text": "The changes close the previous findings and add no new path around the hash pins or the maintainer decisions",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw3jzcrt-wwer",
+    "assignment-0mw3kfp5c-6alo"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-05T13:16:37.796Z"
+  },
+  "createdAt": "2026-11-05T13:16:37.796Z"
+}
