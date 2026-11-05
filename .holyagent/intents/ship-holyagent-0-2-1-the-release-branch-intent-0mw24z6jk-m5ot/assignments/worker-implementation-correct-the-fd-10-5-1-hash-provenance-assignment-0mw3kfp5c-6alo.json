@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "correct-the-fd-10-5-1-hash-provenance",
   "objective": "Correct the fd 10.5.1 hash provenance text and add the registry fetch timeout in /home/user/holyagent-fix-followups (branch release/0.2.1/fix/followups).",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "The maintainer has since compared the three fd 10.5.1 archive SHA-256 digests shown on https://github.com/sharkdp/fd/releases/tag/v10.5.1 with the pinned archive hashes in packages/integrations/claude/src/vendor.ts, and all three match. Rewrite the comment above FD_VERSION and the matching text in docs/development.md (which you changed in the last commit to say they were never compared) to say the 10.5.1 archive hashes match the SHA-256 digests GitHub shows for the release assets; keep the sentences about the updater and the program hashes. Search docs/ and AGENTS.md for any other text that calls the fd hashes unconfirmed and correct it.",
     "Add a timeout to the registry fetch in scripts/update-dependencies.ts (about line 211; you noted it has none), using the same AbortSignal.timeout approach and DOWNLOAD_TIMEOUT_MS-style constant as scripts/vendor.ts, with a test that fails without it if one can be written without the network (as the existing --check and --dry-run tests do).",
@@ -53,7 +53,9 @@
     "agentId": "workflow:wf_a271b6c2-945/assignment-0mw3kfp5c-6alo",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-05T13:12:48.144Z"
+    "startedAt": "2026-11-05T13:12:48.144Z",
+    "finishedAt": "2026-11-05T13:16:35.301Z"
   },
+  "result": "result: fd 10.5.1 provenance text corrected and the registry fetch now has a 60-second timeout with an offline test; build and verify pass.\nchanged: packages/integrations/claude/src/vendor.ts, docs/development.md, scripts/update-dependencies.ts, scripts/update-dependencies.test.ts\nchecks:\n- `bunx --no-install mise run build` -> exit 0, 39 files built, no `dist` diff.\n- `bunx --no-install mise run verify` -> exit 0; type-check and lint clean, format check passes (after running `bun fmt` on `scripts/update-dependencies.ts`), 1578 tests pass, 0 fail.\nblockers: none\nquestions: none\nnotes:\n- `releaseOf` is now exported, taking optional `registry` and `timeoutMs` arguments, so the test can use a local server that never answers.\n- I did not run the new test against the unfixed code. Without the timeout, the stalled fetch would hang until Bun's 5-second test timeout, so it should fail.\n- Nothing else in `docs/`, `AGENTS.md` or `README.md` calls the fd hashes unconfirmed. `docs/usage.md:37` says the tag names \"have not been run through\" the install steps, which is unrelated to fd.\nevidence:\n- The fd 10.5.1 provenance text says the archive hashes match the release page digests, everywhere it appears: `vendor.ts` comment above `FD_VERSION` and `docs/development.md` line 113. A search of `docs`, `AGENTS.md` and `README.md` found no other fd-hash text.\n- mise run build leaves dist in sync and mise run verify passes: build exit 0 with `git status` showing no `dist` change; verify exit 0 with 1578 pass.\n- checks-run: the build and verify runs above.\n- diff-file: /tmp/claude-0/-home-user-holyagent/70184bfa-8a56-57cb-a6cf-d92f87c7692b/scratchpad/followups.diff\n",
   "createdAt": "2026-11-05T13:12:48.144Z"
 }
