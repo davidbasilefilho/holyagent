@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mw3kkm43-yv6m",
+  "intentId": "intent-0mw24z6jk-m5ot",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-follow-up-commits-on-release",
+  "objective": "Review the follow-up commits on release/0.2.1/fix/followups (worktree /home/user/holyagent-fix-followups), 'git diff 20eee5d HEAD', against the leftovers they close.",
+  "state": "Running",
+  "scope": [
+    "The writers' reports: /home/user/holyagent/.git/holyagent/reports/assignment-0mw3jzcrt-wwer.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw3kfp5c-6alo.md. The leftovers came from /home/user/holyagent/.git/holyagent/reports/assignment-0mw2fob2m-oc9p.md, /home/user/holyagent/.git/holyagent/reports/assignment-0mw2foas8-4ie9.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw2d1z2f-zz8k.md. The diff without dist is /home/user/holyagent-work/diffs/followups-all.diff.",
+    "Judge: the workflow-check changes (replace/replaceAll/join judged after all names are known, copiedFrom following any method receiver and Array.from) for regressions; real root scripts must stay allowed (runner /home/user/holyagent-work/check-workflow-scripts.ts over /root/.claude/projects/-home-user-holyagent/70184bfa-8a56-57cb-a6cf-d92f87c7692b/workflows/scripts/, against a build of this head); git-push.ts redirect splitting and shell keywords; the download timeout, size cap, concurrency and inflation caps in scripts/vendor.ts and src/vendor.ts (including that a legitimate archive is under the caps); the build.ts error path; the registry fetch timeout and its test. Run 'bunx --no-install mise run verify' in a scratch copy (git archive HEAD plus bun install --frozen-lockfile), confirm the build leaves it unchanged, and confirm each new test fails without its change (the writer did not run the registry-timeout test against the old code)."
+  ],
+  "constraints": [
+    "Read-only in the worktree: no repository edits and no git writes; experiments in a scratch copy outside the repository.",
+    "Keep working until the review is done; stop and report. Report in under 350 words, findings ranked with file:line, blocking or non-blocking, and the smallest fix."
+  ],
+  "criteria": [
+    {
+      "text": "The follow-up fixes are correct and each has a test that fails without it",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No regression and mise run verify passes with the build in sync",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw3jzcrt-wwer",
+    "assignment-0mw3kfp5c-6alo"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-05T13:16:37.491Z"
+  },
+  "createdAt": "2026-11-05T13:16:37.491Z"
+}
