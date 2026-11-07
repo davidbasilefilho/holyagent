@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-non-blocking-review-findings",
   "objective": "Repair the non-blocking review findings on the host-neutral CLI commit ee51233.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-cli (branch release/0.3.0/refactor/host-neutral-cli, node_modules installed). Gates: bunx --no-install mise run <task>.",
     "Fix: (1) program.ts ~101/118/134: an invalid HOLYAGENT_HOST makes --help fail; let help paths fall back to the Claude words like failed() does (commands that load config may still refuse the bad value). (2) vcs/message.ts PI_SESSION_LINK uses \\S* and swallows a closing ')' (repro: cleanMessage(\"fix\\n\\nSee [session](https://pi.dev/session/#abc) for details\") returns \"See [session]( for details\"); also fix the same flaw in the existing claude.ai session-link pattern; add tests. (3) vcs/message.ts PI_GENERATED_FOOTER can backtrack quadratically on 'generated with pi(' followed by many ')' and a letter; use a bounded character class such as [^\\s)]* and add a test with a long crafted line that completes quickly. (4) PI_NAME strips 'Co-authored-by: Pi <any address>'; require the pi.dev address (or pi's noreply form) so a person named Pi is kept; add tests. (5) domain/host.ts:50,62 hard-codes 'workflow:' and 'pi-workflow:'; reuse WORKFLOW_AGENT_PREFIX and PI_WORKFLOW_AGENT_PREFIX from directive.ts. (6) assignment.ts:306: assignment record now loads the whole config, so a bad HOLYAGENT_REUSE_TTL_MINUTES or HOLYAGENT_WORKFLOWS breaks recording; read only the host there (agentHostOf). (7) overview.ts:178 reconcile calls agentHostOf(env) itself; read host from the loaded config where one is loaded, or keep agentHostOf consistently (pick one and say why). (8) assignment.ts:116: under pi, record and reports help still say a hook records agents and describe Claude's journal; give the pi host its own wording (the pi launcher records nothing by hook; the launcher glue or the root records it; reports reads Claude workflow journals only for now)."
@@ -51,5 +51,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mw6uaeb7-w8rw",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-07T20:40:50.657Z"
+  },
   "createdAt": "2026-11-07T20:40:36.082Z"
 }
