@@ -1,0 +1,22 @@
+{
+  "id": "intent-0mw6muvcv-5we5",
+  "slug": "0-3-0-pi-10-10-cover-the-pi-integration",
+  "objective": "0.3.0 pi 10/10: Cover the Pi integration in CI and on Windows, so the required checks fail when the Pi package is stale or broken on any supported platform.",
+  "requirements": [
+    "Maintainer (verbatim): \"please add intents for the next 0.3.0 release where I will implement the pi extension integration\"; the maintainer implements 0.3.0, so these Intents record the work and carry no Assignments until the maintainer starts it.",
+    "Maintainer (verbatim): \"in the docs/pi/ it's supposed to use already existent extensions for required functionality\" and \"the first provider to implement will be kimi for coding global\".",
+    "Release model: work lands on release/0.3.0/integration cut from main, as one release/0.3.0/<type>/<change> branch and one PR per change; the first PR of the release carries the version bump made with mise run bump:minor.",
+    "Done means mise run verify passes with the generated output in sync (mise run build) and CI green on every required check, including the windows job.",
+    "The check job's generated-output freshness check covers the Pi package, and the windows job runs the Pi tests.",
+    "Extension and launcher code that runs on Windows calls the bundled CLI through Bun on holyagent.js directly, not through the POSIX sh wrapper.",
+    "Child launches and paths work on native Windows, where Pi's built-in tool list includes powershell beside bash.",
+    "Workflow and dependency tests still pass: pinned action SHAs with version comments, caret dependency ranges, the path-length test.",
+    "A contract test covers the Pi RPC or JSON events the integration consumes (agent_settled, tool events, extension_ui_request) against the pinned Pi version.",
+    "Open: whether CI runs a real Pi process (needs Node 22.19 and network) or a recorded fixture of its events.",
+    "Open: whether a job is added or renamed, in which case the rulesets' required status check names change and an admin must edit them.",
+    "Open: whether Pi behavior on native Windows is verified; the research is source reading only and says nothing about Windows runs."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-07T16:43:53.791Z"
+}
