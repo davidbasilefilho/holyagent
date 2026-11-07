@@ -10,7 +10,7 @@ Judge rendered work from what renders, not from a passing build or a report's cl
 ## Pick the platform skill
 
 - Pick the platform design skill for the work before the first Worker.visual or Reviewer.visual dispatch: `web-design`, `mobile-design`, `desktop-design` or `tui-design`, one for each platform of a multi-platform project. Both specialists keep Read but cannot call Skill, so name each skill's file in their criteria by its literal absolute path, `skills/<name>/SKILL.md` under the plugin folder (as the dispatch rules say), with a blocking criterion to read it and to build and inspect (Worker.visual) or judge (Reviewer.visual) against its checklist and capture list.
-- Worker.visual still builds with the embedded `frontend-design` guidance; the platform skill adds the systems, the platform rules and the capture checklist.
+- The platform skill is the only design guidance the two specialists get: the shared core (direction before code, the plan, copy, the quality floor), the platform rules, the refuse list and the capture checklist.
 - Start the render target first, per platform (the `dev-server` skill).
 
 ## Accept
@@ -24,7 +24,7 @@ Judge rendered work from what renders, not from a passing build or a report's cl
 
 <!-- materiality -->
 
-A departure from the embedded `frontend-design` guidance that has none of these effects is preference too. The project's design system and the user's explicit requirements outrank taste.
+A departure from the platform skill's direction rules that has none of these effects is preference too. The project's design system and the user's explicit requirements outrank taste.
 
 ## Repair
 

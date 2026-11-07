@@ -6,7 +6,7 @@ description: Use when building, reshaping or judging the visual design of a web 
 
 # Web design
 
-Rules for pages and web apps, judged on what renders. Pair this with the embedded `frontend-design` guidance, which owns the visual direction; this skill adds the systems, the semantics and the capture floor.
+Rules for pages and web apps, judged on what renders: the visual direction, the systems, the semantics and the capture floor.
 
 ## Shared core
 
@@ -16,12 +16,14 @@ A discrepancy is material, and starts a repair whatever its size, when it affect
 
 A number is binding only where a platform guideline fixes it; every other number is a default, marked `(default)`, that the design may override with a stated reason.
 
-Apply the skill's capture checklist on the final captures: the worker before reporting, the reviewer in its findings and the root in its own final pass. Report only checks actually run, and name each check not run.
+Apply the skill's capture checklist on the final captures: the worker before reporting, the reviewer in its findings and the root in its own final pass. Critique your own work while you build, with captures wherever the environment can take them. Report only checks actually run, and name each check not run.
 
 ### Direction before code
 
-- Name the subject, the audience and the main job, and propose them when the brief omits them. The brief's own words outrank every avoid list below.
-- Write a compact plan before building: palette roles, type roles, a layout concept and two or three principles. Test it with "would I make this for any similar product?" and the competitor test: drop an idea that still works with a competitor's name on it.
+- Name the subject, the audience and the main job, and propose them in the plan when the brief omits them, taking any known preferences or project context as a hint. The brief's own words outrank every avoid list below.
+- Draw distinctive choices from the subject itself, its industry, materials and vernacular, and build with the brief's real content throughout: a toy for eight-year-olds and a dashboard for financial analysts should not look related.
+- Make deliberate, opinionated choices on palette, type and layout that are specific to this brief, and take aesthetic risk when it is justified.
+- Write a compact plan before building: four to six named palette colors with values and roles, type roles, a layout concept in one-sentence prose with ASCII wireframes to compare options and its alignment (left, centered or justified), and two or three principles. Test it with "would I make this for any similar product?" and the competitor test: drop an idea that still works with a competitor's name on it. Revise every part that fails, say what changed and why, and only then write code.
 - Say whether this is a refinement, which preserves the existing design, or a redesign, which replaces it.
 
 ### Platform fidelity over invention
@@ -32,24 +34,42 @@ Apply the skill's capture checklist on the final captures: the worker before rep
 
 ### Design record
 
-- Read `DESIGN.md` at the project root before UI work and create or update it after: platform and stack, direction, color roles, type roles, spacing and shape, components and states, do and don't. Note a changed decision instead of silently overwriting it. (behavior check)
+- Read `DESIGN.md` at the project root before UI work and create or update it after: platform and stack, direction, color roles, type roles, spacing and shape, components and states, do and don't, and a short note of what you tried, so later passes try something new. Note a changed decision instead of silently overwriting it. (behavior check)
 
 ### Spend boldness in one place
 
-- One signature detail per screen, and remove one accessory before finishing. Replace removed ornament with scale, real content or a real image, so the screen is not left thin. (preference)
+- One signature detail per screen; everything around it stays quiet and disciplined. Cut decoration that does not serve the brief, remove one accessory before finishing, and replace it with scale, real content or a real image, so the screen is not left thin. (preference)
 - A labeled gray placeholder beats drawn art or emoji used as icons. (preference)
+
+### Structure and content
+
+- A structural device (outline, border, divider, eyebrow, label or number) encodes something true about the content and is not decoration. Number items only when the content is a sequence, such as steps or a timeline; check before adding numbers.
+- When the brief has no real content, write specific copy and placeholder content from the subject: generic copy makes a design read as templated as generic layout does.
+
+### Copy
+
+- Words are design content, not decoration. Before writing, ask what the screen has to say and the simplest way to say it; each written element does one job.
+- Write from the user's side, naming things as users understand them (notifications, not webhook config). Say what something is or does and do not sell it; specific and legible beats clever.
+- Use active voice, plain verbs, sentence case (or the platform's own capitalization) and no filler, with a tone that fits the brand and the audience.
+- A control says exactly what happens ("Save changes", not "Submit"), and an action keeps one name through the whole flow: the Archive button leads to an "Archived" confirmation.
+- Failure and emptiness give direction. An error says what went wrong and how to fix it, in the interface's voice and without apology or vagueness; an empty screen invites the next action.
 
 ### Quality floor, unannounced
 
-- Text contrast is at least 4.5:1 and non-text control contrast at least 3:1. Color is never the only signal.
+- Text contrast is at least 4.5:1 and non-text control contrast at least 3:1. Color is never the only signal, and the palette is harmonious.
 - Every state exists and is captured where reachable: hover or press, focus, disabled, loading, empty, error and long content.
 - The system's reduced-motion, larger-text and high-contrast settings, where the platform has them, change the render.
-- Copy uses the user's words, specific verbs and one name per action, and an error says how to fix it.
 
 ## Web rules
 
 - Name the mode in the plan. An expressive page (marketing, editorial) is judged on point of view and composition; a task-oriented product UI is judged on familiarity and speed of use. (preference)
 - A product UI earns familiarity: one type family, motion of about 150 to 250 ms only as feedback to an action, no page-load choreography, and a modal only as a last resort. (default)
+
+### Hero and typography
+
+- The hero is the first thing a visitor sees. Open with the most characteristic thing in the subject's world, in the form that suits it: a headline, an image, an animation, a live demo or an interactive moment. A big number with a small label, supporting stats and a gradient accent is the default hero, so use it only when it is truly the best option.
+- Type carries the page's personality. Use one family or two, and if two, clearly distinct ones. Choose typefaces for this brief and not the families you would reach for on any project, and set a clear type scale in the tradition of The Elements of Typographic Style, with intentional weights, widths and spacing. (preference)
+- When type is a headline or a visual element, its treatment is part of the design and not a neutral vehicle for the words.
 
 ### Systems, not values
 
@@ -57,7 +77,9 @@ Apply the skill's capture checklist on the final captures: the worker before rep
 - More space surrounds a group than sits inside it, so groups read at a glance.
 - Two font weights. Hierarchy comes from weight and color before size, with at most three text colors. (default)
 - The layout holds its hierarchy in grayscale before color is added. (preference)
-- Body text measure is 65 to 75 characters, and a line never spans a wide screen. (default)
+- Body text measure is 65 to 75 characters, and a line never spans a wide screen. Serif body text may run slightly longer and takes more line height than sans serif. (default)
+- Section spacing is set in one place and selector specificity stays flat, so a class like `.section` and a rule on an element like `.cta` do not cancel each other's padding or margin. Symptom: uneven or doubled gaps between sections.
+- The layout holds from phone width to desktop with no horizontal scroll or clipped content.
 
 ### Actions and hierarchy
 
@@ -80,6 +102,7 @@ Apply the skill's capture checklist on the final captures: the worker before rep
 
 ### Motion
 
+- Motion nobody triggered is sparing and aimed at one moment, such as a single page-load sequence or one reveal. Fade-and-slide entrances on every section and hover transitions on every card are the generic default. Motion that answers an action (opening, expanding, confirming) is welcome when it shows what changed.
 - Only transform and opacity animate, never a blanket "all properties" transition. (behavior check)
 - Animations can be interrupted, and under reduced motion movement is replaced by a fade or nothing. Capture with the setting on.
 
@@ -89,15 +112,19 @@ Apply the skill's capture checklist on the final captures: the worker before rep
 
 ## Refuse list
 
-Unless the brief asks for it:
+Unless the brief asks for it (its own words win, even when they name one of these looks), and without spending an axis the brief leaves free on one of these defaults:
 
 - identical icon-card grids and hero metric tiles
-- an eyebrow label over every heading
+- the SaaS-card kit: content chopped into identical rounded cards, one corner radius on everything whatever its rank, the same soft gray shadow under each, and gradient washes as decoration
+- an eyebrow label over every heading, all-caps labels, and other labels above content that say nothing
+- accenting a single word or phrase of a headline with italic, bold or another color
 - gradient text and side-stripe borders
 - glass as decoration (preference)
 - emoji as icons
 - "01 / 02 / 03" numbering without a real sequence
-- cream with terracotta, or near-black with an acid accent (preference)
+- a broadsheet layout of hairline rules, square corners and dense newspaper columns for a subject that is not editorial (preference)
+- template chrome whatever the subject: meta strings joined with middle dots, labels built as "WORD — fragment" with a spaced em dash, a tinted near-black such as #0B0B0B or #111 standing in for black, a monospace face for small data labels, and "→" appended to link and button text
+- cream (near #F4F1EA) with a high-contrast serif and a clay accent (near #D97757, which reads as a generated-page tell), or near-black with one acid-green or vermilion accent (preference)
 
 ## Capture checklist
 
