@@ -39,14 +39,14 @@ After that, plain `pi` starts the HolyAgent root, the way the Claude plugin does
 
 ## The pin
 
-- **Pi is pinned at 1.5.0** (released 2026-11-02), and every reused extension is pinned with it: `pi-provider-kimi-code`, `@tintinweb/pi-subagents`, `pi-web-kit`, `@aliou/pi-processes`, `@juicesharp/rpiv-todo`, `@juicesharp/rpiv-ask-user-question`, `@amaster.ai/pi-computer-use` (computer use through Cua Driver, [t3-code.md](t3-code.md#computer-use-through-cua-driver)) and `billion-context`. The versions are chosen when the package is built.
+- **Pi is pinned at 1.5.0** (released 2026-11-02), and every reused extension is pinned with it: `pi-provider-kimi-code`, `@tintinweb/pi-subagents`, `pi-web-kit`, `@aliou/pi-processes`, `@juicesharp/rpiv-todo`, `@juicesharp/rpiv-ask-user-question`, `@amaster.ai/pi-computer-use` (computer use through the Cua Driver it bundles, which moves with this pin, [t3-code.md](t3-code.md#computer-use-through-cua-driver)) and `billion-context`. The versions are chosen when the package is built.
 - **A pin moves only through `mise run deps:update`**, the repository's dependency updater ([development.md](../development.md)). For Pi it re-records the CI fixtures, so a Pi change that breaks the integration's contract shows up as a failing replay, not in a user's session ([orchestration.md](orchestration.md#ci-and-windows)). `mise run deps:check` fails when a pin is behind.
 - **Why pin hard:** Pi released about weekly, and Billion Context releases about daily ([README.md](README.md#version-risk), [caching-and-subagents.md](caching-and-subagents.md#context-compression-with-billion-context)).
 
 ## What setup and doctor do
 
 - **`holyagent setup`** for Pi sets Pi's `npmCommand` setting to `bun`, so Pi installs packages with Bun. The maintainer's words: "in the holyagent setup for pi it should set bun as the npmcommand".
-- **`holyagent setup`** also, for T3 Code: installs the Cua driver per user and walks through the macOS permissions, and writes T3's beneficial settings once their format is verified, or prints the T3 Settings steps ([t3-code.md](t3-code.md#computer-use-through-cua-driver), [t3-code.md](t3-code.md#t3-settings-written-by-setup)). Its check states that HolyAgent threads in T3 need Full access ([t3-code.md](t3-code.md#full-access-is-required)).
+- **`holyagent setup`** also, for T3 Code: walks through the macOS Accessibility and Screen Recording permissions for the Cua Driver that `@amaster.ai/pi-computer-use` bundles (there is no separate driver install), and writes T3's beneficial settings once their format is verified, or prints the T3 Settings steps ([t3-code.md](t3-code.md#computer-use-through-cua-driver), [t3-code.md](t3-code.md#t3-settings-written-by-setup)). Its check states that HolyAgent threads in T3 need Full access ([t3-code.md](t3-code.md#full-access-is-required)).
 - **`holyagent doctor`** checks that Pi, Node.js 22.19 or newer and the HolyAgent package are present. It only checks and installs nothing. Inference: the package counts as present when it is installed at either scope ([Global and project-local installs](#global-and-project-local-installs)).
 - **The Windows installer's Node minimum rises from 22.13 to 22.19** ([components.md](../components.md#mise-node-bun-gh)), because Pi needs Node 22.19. The installers do not install Pi.
 
