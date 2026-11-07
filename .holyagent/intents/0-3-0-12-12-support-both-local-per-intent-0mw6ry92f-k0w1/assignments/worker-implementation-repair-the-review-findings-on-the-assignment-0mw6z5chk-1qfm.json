@@ -1,0 +1,77 @@
+{
+  "id": "assignment-0mw6z5chk-1qfm",
+  "intentId": "intent-0mw6ry92f-k0w1",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-review-findings-on-the",
+  "objective": "Repair the review findings on the HolyAgent config commit and apply the maintainer's later config decisions.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-config (branch release/0.3.0/feat/holyagent-config, HEAD is a merge of the host-neutral CLI branch on top of c9fd8c5; node_modules installed). Gates: bunx --no-install mise run <task>. Diff of the original commit: /home/user/holyagent-notes/pr3.diff.",
+    "Blocker: packages/runtime/src/vcs/commands.ts:79 and :154 and packages/runtime/src/cli/hook.ts:473 call readSettings without call.env, so HOLYAGENT_HOME and HOME from the call are ignored and tests read the real ~/.holyagent; pass the call's env at every call site, with a test that a fixture home is honoured.",
+    "Maintainer decisions to apply: (a) for computer use (pi.features.computerUse), T3 device access (pi.t3.deviceAccess) and the web tools (pi.features.web), a false or \"off\" in the user-level file is final: the project config can turn them off but not back on; every other key keeps project-wins; tests. (b) Add pi.enable (boolean, default true): when false the pi integration loads nothing and setup leaves T3's Pi provider alone; when true setup always enables T3's Pi provider. Remove pi.t3.piProvider (replaced by pi.enable) and pi.t3.contextMeter (maintainer: do not set the context meter). Keep pi.t3.scope; pi.t3.deviceAccess and pi.t3.worktrees default true (they are the setup TUI's preselected options).",
+    "Other findings to fix: errors use a dedicated tagged error for config (e.g. ConfigInvalid) with its own CLI message and hint instead of CorruptRecord's 'not a valid state file' (add it in packages/runtime/src/cli/errors.ts), and the merged-decode error names a real path; cap pi.codemode.maxWorkers (1 to 16); build the pi.routes schema from KIMI_ROUTES so the role list exists once; DEFAULT_CONFIG must not throw at import (no decodeUnknownSync at module load); piPackages returns packages in FEATURE_PACKAGES order; export the config module from packages/runtime/src/index.ts; accept \"vcs\": null as an absent section for backward compatibility (pi and claude stay strict). Root default: vcs commands keep decoding the whole config, so an invalid file stops them with the file and field named, as docs/pi/configuration.md says; state this in the docs.",
+    "Update docs/pi/configuration.md for every key change and the user-false-is-final rule, and docs/pi/t3-code.md where it names the context meter or piProvider."
+  ],
+  "constraints": [
+    "Repository rules: Effect and tagged errors, no try/catch, new Promise or async in runtime source; Effect Schema with onExcessProperty error; Bun APIs; JSDoc on exports; tests for each behavior.",
+    "Regenerate with bunx --no-install mise run build. No git writes; write git diff HEAD plus new files to /home/user/holyagent-notes/pr3-repair.diff. Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "Blocker fixed: every readSettings caller passes the call's env, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "User false is final for computer use, device access and web tools, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "pi.enable added with default true; pi.t3.piProvider and pi.t3.contextMeter removed; deviceAccess and worktrees default true",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Findings fixed: dedicated config error, maxWorkers cap, single route list, no import-time throw, package order, index export, vcs null accepted",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Docs: configuration.md and t3-code.md match the keys and rules",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Gates: mise run verify exits 0",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/config",
+    "packages/runtime/src/vcs",
+    "packages/runtime/src/cli/hook.ts",
+    "packages/runtime/src/cli/errors.ts",
+    "packages/runtime/src/index.ts",
+    "packages/runtime/tests",
+    "packages/integrations/claude/dist/scripts",
+    "docs/pi/configuration.md",
+    "docs/pi/t3-code.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw6urc7l-7dsc",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-07T22:27:57.944Z"
+  },
+  "createdAt": "2026-11-07T22:27:57.944Z"
+}
