@@ -25,9 +25,12 @@
     "Maintainer (verbatim): \"setup should be a tui with flags to set stuff, the options I check should be options, but the default isn't determined\". The T3 part of holyagent setup for pi is a TUI with flags for each choice; it offers: enable the Pi provider (providerInstances.pi), agent device access (enableDeviceSupport and enableAgentDeviceAccess, only where Xcode or the Android SDK is present), and new threads in worktrees (defaultThreadEnvMode). Pi as the default model is not offered. defaultRuntimeMode full-access and enableAgentBrowserAccess true are restored only when they differ from T3's defaults.",
     "Decided (maintainer): setup sets backgroundActivity overrides pauseWhenHostLocked, pauseWhenHostLowPower, pauseWhenClientLowPower and pauseWhenOnBattery to false, keeping the balanced profile otherwise, so unattended specialists never pause.",
     "Decided (maintainer): setup sets sourceControlWritingStyle to Conventional Commits with no agent attribution (custom instructions) and removeAgentCreditsOnMerge true, so T3-made commits match HolyAgent's rules.",
-    "Maintainer: the printed per-device steps cover desktop notifications, in-app notifications and phone push (T3 Connect); further relevant options are being asked."
+    "Maintainer: the printed per-device steps cover desktop notifications, in-app notifications and phone push (T3 Connect); further relevant options are being asked.",
+    "Maintainer (verbatim): \"sorry, pi provider enabled shouldn't be optional when the pi.enable key in the holyagent config is true (true is the default). the other two should be selected by default. also the tui must use opentui solid, tuiparts and grab the exact same style from the last released holycodex tui\". The config gains pi.enable (default true); while it is true setup always enables T3's Pi provider. In the TUI, agent device access and new threads in worktrees start selected. The setup TUI is built with OpenTUI Solid and tuiparts and copies the exact style of the last released holycodex TUI.",
+    "Maintainer: printed steps recommend follow-up behavior steer and notification sound; and (verbatim) \"these should be enabled by default, without opting out. unless the user changes the t3 settings manually. these are just the defaults\": setup always applies continueThreadsAfterServerUpdate on, autoResumeLimitedThreads on, worktree cleanup on merge, and newWorktreesStartFromOrigin on, with no TUI option, but writes a key only when the user has not set it in T3 (a value the user set by hand is left alone).",
+    "Maintainer (verbatim): \"there are more relevant settings you are not asking me\": more T3 settings are put to the maintainer before the setup TUI is built."
   ],
-  "revision": 6,
+  "revision": 7,
   "state": "Open",
   "createdAt": "2026-11-07T18:48:47.925Z"
 }
