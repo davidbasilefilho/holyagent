@@ -1,0 +1,22 @@
+{
+  "id": "intent-0mw6mutwc-frer",
+  "slug": "0-3-0-pi-1-10-add-the-packages",
+  "objective": "0.3.0 pi 1/10: Add the packages/integrations/pi package that generates a Pi package from the shared runtime instructions, so the Pi integration has a scaffold, a build and a sync check beside the Claude plugin.",
+  "requirements": [
+    "Maintainer (verbatim): \"please add intents for the next 0.3.0 release where I will implement the pi extension integration\"; the maintainer implements 0.3.0, so these Intents record the work and carry no Assignments until the maintainer starts it.",
+    "Maintainer (verbatim): \"in the docs/pi/ it's supposed to use already existent extensions for required functionality\" and \"the first provider to implement will be kimi for coding global\".",
+    "Release model: work lands on release/0.3.0/integration cut from main, as one release/0.3.0/<type>/<change> branch and one PR per change; the first PR of the release carries the version bump made with mise run bump:minor.",
+    "Done means mise run verify passes with the generated output in sync (mise run build) and CI green on every required check, including the windows job.",
+    "A new folder packages/integrations/pi/ sits beside packages/integrations/claude/ and reuses the runtime's domain, state, CLI and instructions without copying them.",
+    "The output is a Pi package: conventional extensions/, skills/ and prompts/ directories or a pi key in package.json, with the pi-package keyword.",
+    "The host modules @earendil-works/pi-ai, pi-agent-core, pi-coding-agent, pi-tui and typebox are peerDependencies and are not bundled. Open: the docs require the range \"*\" for these, while scripts/dependency-ranges.test.ts accepts only caret ranges in every dependency field; which one yields.",
+    "A second generator reads the same instruction sources as the Claude build and writes the Pi package; its paths join the generated-path list so the existing byte-for-byte sync check covers them, every generated file carries a note naming its source, and the version is synced from the root package.json by mise run build.",
+    "A sync test for the Pi output exists, modelled on packages/integrations/claude/tests/plugin.test.ts.",
+    "Every tracked path in the new package stays within the 120-character limit enforced by scripts/repo-paths.test.ts.",
+    "Open: which Pi version the package is built and tested against (the research read 1.4.0 only; Pi releases about weekly) and how the pin is recorded.",
+    "Open: whether extension code ships as TypeScript (Pi loads .ts through jiti) or built JavaScript, and whether the Effect-only lint override of packages/runtime/src applies to it."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-07T16:43:51.900Z"
+}
