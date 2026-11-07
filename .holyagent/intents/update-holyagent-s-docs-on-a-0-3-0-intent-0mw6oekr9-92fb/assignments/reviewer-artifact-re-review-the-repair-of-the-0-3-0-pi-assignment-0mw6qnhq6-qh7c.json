@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "re-review-the-repair-of-the-0-3-0-pi",
   "objective": "Re-review the repair of the 0.3.0 pi plan docs on release/0.3.0/docs/pi-integration-plan and confirm it closes the earlier findings without introducing new errors.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "The earlier review with its findings: /home/user/holyagent-work/review-docs-030-r1.md (line numbers refer to commit dab5435).",
     "The repair diff since dab5435 (one committed repair plus a small wording edit): /home/user/holyagent-work/docs-030-repair.diff; the current files are in /home/user/holyagent-docs-pi-plan/docs/pi/.",
@@ -45,7 +45,33 @@
     "agentId": "workflow:wf_03cc0062-946/assignment-0mw6qnhq6-qh7c",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-07T18:30:07.998Z"
+    "startedAt": "2026-11-07T18:30:07.998Z",
+    "finishedAt": "2026-11-07T18:33:52.820Z"
+  },
+  "result": "result: Both blocking findings and every non-blocking finding are closed, and the two new decisions match their sources. The repair introduced no blocking error. I checked by reading only: this session has no shell, so I ran no commands and read the repair diff, the current pages, the decisions file, the Intents and the research.\n\n**Blocking findings**\n- **Finding 1, overturned text: closed.**\n  - `orchestration.md:122` now reads \"**Host-driven (Inference; not used).**\"\n  - `claude-parity.md` (orchestration row) now reads \"The launcher is `@tintinweb/pi-subagents`… HolyAgent adds glue only where the package falls short (the gap-only `holy_assign`…). Architecture 1 … is not used\".\n- **Finding 2, unconfirmed fact stated as settled: closed.**\n  - `caching-and-subagents.md:34` now reads \"It is meant to replace Pi's compaction: the standalone `billion-context-pi` route cancels it, and the native `billion-context` route's behavior is to be verified (see below).\"\n  - The `claude-parity.md` \"No `autoCompactWindow`\" row says the same.\n\n**Non-blocking findings (all closed)**\n- **README.md:3 and auto-mode.md:7** now say \"nine open 0.3.0 Intents\" and \"the nine open Intents\".\n- **Script confirmation** is settled as decided in `claude-parity.md` section 5 and section 6 and in `orchestration.md:16`. I found no leftover \"still asks\".\n- **providers.md:24** now ties the built-in's API type to the caching inference. The \"never at low\" bullet now excepts the two visual specialists.\n- **Codex traces:**\n  - The `openai-codex.json` link is gone from `README.md`.\n  - The Codex parenthetical is gone from `claude-parity.md`, and the Codex adapter row from the `caching-and-subagents.md` table.\n  - What remains is the provider list in `providers.md` and the \"dropped\" notes in `auto-mode.md`, which are accurate.\n- **extensions.md** now says how the Moonshot tools get enabled is not stated in the research, and that API-key logins cannot use them. It also adds a paragraph saying the rpiv packages on Pi 1.5.0 are \"to be verified by the recorded fixtures\".\n- **Vendored design text:** `claude-parity.md:90` now says each visual role has its own `design.md` section, \"HolyAgent's own wording; nothing is vendored\". This matches Intent 3/10 (\"in HolyAgent's own words since 0.2.2 removed the vendored frontend-design\"). The `tui-design` and `desktop-design` skills exist under `packages/`.\n- **pi.dev 1.4.0 line:** now marked \"superseded… not re-read\".\n- **First person:** the remaining first-person wording is gone. The one \"I\" left is a quoted maintainer sentence.\n\n**New decisions**\n- **Script confirmation:** matches `pi-decisions.md` line 32 and the Intents (Intent 7 records it as \"Decided (maintainer)…\"). It appears in `auto-mode.md:13`, `orchestration.md:16`, `claude-parity.md:106` and `:139`. The old open point 6 is removed.\n- **K2.8 instructions:** the new section in `providers.md` follows `pi-decisions.md` line 34 and the research. It uses the K3/K3.1 guide set plus the K3 tool-calling guide and rejects the K2.6/K2.7 guide. It says no `tool_choice` `required`, and flags the Tencent source as secondary, the unknowns, and the \"behaves like K3\" basis. The README row and the anchor `#the-k28-preview-specialists` are correct.\n\n**New errors**\n- All 10 changed paths in the diff are under `docs/pi/`, and I found no stale open-point count.\n- Non-blocking: `providers.md` says K2.8 context is \"1,048,576 tokens\", while the research says \"1M\". The caching \"(see below)\" points to the standalone-versus-native sentence at line 39 and not to an open-point entry.\n\nevidence:\nEarlier findings closed: `orchestration.md:122` and `claude-parity.md` orchestration row, `caching-and-subagents.md:34` and `:39`, `README.md:3`, `providers.md:24` and `:69`, `extensions.md:41`, `claude-parity.md:90`. Read only; no commands run.\nNew decisions correct: `pi-decisions.md:32,34`, Intents 3/10 and 7/10, `research/assignment-0mw6qfair-ykt4.md`, and `providers.md:80,339-354`.\nNo new errors: `docs-030-repair.diff` touches only `docs/pi/*`. No stale counts or \"open\" wording on decided points. The new anchor resolves to a heading.\nfindings: no blocking findings remain; the two non-blocking nits are above.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "every earlier finding closed with quoted text; no blocking error; nits judged no change needed",
+    "criteria": [
+      {
+        "criterion": "Earlier findings closed: each blocking and non-blocking finding of the first review is closed or marked to be verified where the sources leave it open",
+        "support": "`orchestration.md:122` and `claude-parity.md` orchestration row, `caching-and-subagents.md:34` and `:39`, `README.md:3`, `providers.md:24` and `:69`, `extensions.md:41`, `claude-parity.md:90`. Read only; no commands run."
+      },
+      {
+        "criterion": "New decisions correct: the script-confirmation and K2.8 instruction decisions match the decisions file, the Intents and the research",
+        "support": "`pi-decisions.md:32,34`, Intents 3/10 and 7/10, `research/assignment-0mw6qfair-ykt4.md`, and `providers.md:80,339-354`."
+      },
+      {
+        "criterion": "No new errors: the repair adds no blocking error",
+        "support": "`docs-030-repair.diff` touches only `docs/pi/*`. No stale counts or \"open\" wording on decided points. The new anchor resolves to a heading."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "no blocking findings remain; the two non-blocking nits are above."
+      }
+    ]
   },
   "createdAt": "2026-11-07T18:30:07.998Z"
 }
