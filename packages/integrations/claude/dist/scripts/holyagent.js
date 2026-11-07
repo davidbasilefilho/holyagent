@@ -1374,7 +1374,9 @@ var Number2 = /* @__PURE__ */ make((self, that) => {
   return self < that ? -1 : 1;
 });
 var mapInput = /* @__PURE__ */ dual(2, (self, f) => make((b1, b2) => self(f(b1), f(b2))));
+var isLessThan = (O) => dual(2, (self, that) => O(self, that) === -1);
 var isGreaterThan = (O) => dual(2, (self, that) => O(self, that) === 1);
+var isLessThanOrEqualTo = (O) => dual(2, (self, that) => O(self, that) !== 1);
 var isGreaterThanOrEqualTo = (O) => dual(2, (self, that) => O(self, that) !== -1);
 
 var none2 = () => none;
@@ -7213,9 +7215,6 @@ function make6(ast, options) {
 var lambda = (f) => f;
 
 var SchemaErrorTypeId = "~effect/Schema/SchemaError";
-function isSchemaError(u) {
-  return hasProperty(u, SchemaErrorTypeId) && u[SchemaErrorTypeId] === SchemaErrorTypeId;
-}
 
 function declareConstructor() {
   return (typeParameters, run, annotations) => {
@@ -7254,9 +7253,6 @@ class SchemaError extends (/* @__PURE__ */ TaggedError2("SchemaError")) {
     return `SchemaError(${this.message})`;
   }
 }
-function isSchemaError2(u) {
-  return isSchemaError(u);
-}
 function fromIssueEffect(self) {
   if (effectIsExit(self)) {
     return fromIssueExit(self);
@@ -7266,41 +7262,11 @@ function fromIssueEffect(self) {
 function fromIssueExit(exit) {
   return isSuccess3(exit) ? exit : failCause2(map3(exit.cause, (issue) => new SchemaError(issue)));
 }
-function getSchemaErrorOrThrow(cause, message) {
-  let schemaError;
-  for (const reason of cause.reasons) {
-    if (!isFailReason2(reason) || !isSchemaError2(reason.error)) {
-      throw new globalThis.Error(message, {
-        cause
-      });
-    }
-    schemaError ??= reason.error;
-  }
-  if (schemaError === undefined) {
-    throw new globalThis.Error(message, {
-      cause
-    });
-  }
-  return schemaError;
-}
-function runSchemaErrorSync(self) {
-  const exit = runSyncExit2(self);
-  if (isSuccess3(exit)) {
-    return exit.value;
-  }
-  throw getSchemaErrorOrThrow(exit.cause, "Sync adapter can only throw schema errors");
-}
 var is2 = is;
 function decodeUnknownEffect2(schema, options) {
   const parser = decodeUnknownEffect(schema, options);
   return (input, options) => {
     return fromIssueEffect(parser(input, options));
-  };
-}
-function decodeUnknownSync(schema, options) {
-  const parser = decodeUnknownEffect2(schema, options);
-  return (input, options) => {
-    return runSchemaErrorSync(parser(input, options));
   };
 }
 function encodeUnknownEffect2(schema, options) {
@@ -7481,6 +7447,33 @@ function makeIsGreaterThanOrEqualTo(options) {
     });
   };
 }
+function makeIsBetween(deriveOptions) {
+  const greaterThanOrEqualTo = isGreaterThanOrEqualTo(deriveOptions.order);
+  const greaterThan = isGreaterThan(deriveOptions.order);
+  const lessThanOrEqualTo = isLessThanOrEqualTo(deriveOptions.order);
+  const lessThan = isLessThan(deriveOptions.order);
+  const formatter = deriveOptions.formatter ?? format;
+  return (options, annotations) => {
+    const gte = options.exclusiveMinimum ? greaterThan : greaterThanOrEqualTo;
+    const lte = options.exclusiveMaximum ? lessThan : lessThanOrEqualTo;
+    return makeFilter2((input) => gte(input, options.minimum) && lte(input, options.maximum), {
+      expected: `a value between ${formatter(options.minimum)}${options.exclusiveMinimum ? " (excluded)" : ""} and ${formatter(options.maximum)}${options.exclusiveMaximum ? " (excluded)" : ""}`,
+      arbitraryConstraint: {
+        order: deriveOptions.order,
+        minimum: options.minimum,
+        maximum: options.maximum,
+        ...options.exclusiveMinimum && {
+          exclusiveMinimum: true
+        },
+        ...options.exclusiveMaximum && {
+          exclusiveMaximum: true
+        }
+      },
+      ...deriveOptions.annotate?.(options),
+      ...annotations
+    });
+  };
+}
 function encodeNumberPayload(number) {
   if (!globalThis.Number.isFinite(number)) {
     throw new globalThis.RangeError(`Expected a finite number, got ${format(number)}`);
@@ -7503,6 +7496,36 @@ var isGreaterThanOrEqualTo2 = /* @__PURE__ */ makeIsGreaterThanOrEqualTo({
       runtime: `Schema.isGreaterThanOrEqualTo(${format(minimum)})`
     })
   })
+});
+var isBetween = /* @__PURE__ */ makeIsBetween({
+  order: Number2,
+  annotate: (options) => {
+    const exclusiveMinimum = options.exclusiveMinimum ? true : undefined;
+    const exclusiveMaximum = options.exclusiveMaximum ? true : undefined;
+    const payload = {
+      minimum: encodeNumberPayload(options.minimum),
+      maximum: encodeNumberPayload(options.maximum),
+      ...exclusiveMinimum && {
+        exclusiveMinimum
+      },
+      ...exclusiveMaximum && {
+        exclusiveMaximum
+      }
+    };
+    return {
+      representation: {
+        id: "effect/schema/isBetween",
+        payload
+      },
+      toJsonSchema: () => ({
+        [exclusiveMinimum ? "exclusiveMinimum" : "minimum"]: options.minimum,
+        [exclusiveMaximum ? "exclusiveMaximum" : "maximum"]: options.maximum
+      }),
+      toCode: () => ({
+        runtime: `Schema.isBetween({ minimum: ${format(options.minimum)}, maximum: ${format(options.maximum)}, exclusiveMinimum: ${format(exclusiveMinimum)}, exclusiveMaximum: ${format(exclusiveMaximum)} })`
+      })
+    };
+  }
 });
 function isInt(annotations) {
   return makeFilter2((n) => globalThis.Number.isSafeInteger(n), {
@@ -8393,6 +8416,7 @@ var HINTS = {
   StateLocked: "Another process holds the state lock; retry in a moment.",
   StateIo: "Check what the message names: the permissions of the .holyagent folder of the state worktree (under the git directory, or in the project outside git), that git runs there, and that no branch already uses a name the state branch needs (holyagent/state needs no branch called holyagent; git config holyagent.stateBranch picks another name).",
   CorruptRecord: "Fix or delete the file the message names, or restore it from version control.",
+  ConfigInvalid: "Fix the field the message names in that config.json (the keys and values are listed in docs/pi/configuration.md), or delete the file to use the defaults.",
   ...VCS_HINTS
 };
 var describeFailure = (error, words = CLAUDE_WORDS) => {
@@ -11947,6 +11971,12 @@ var pullRequest = (request) => gen2(function* () {
 
 import { join as join7 } from "path";
 
+class ConfigInvalid extends TaggedError2("ConfigInvalid") {
+  get message() {
+    return `${this.path} is not a valid HolyAgent config: ${this.reason}`;
+  }
+}
+
 var defaulted = (schema, value) => schema.pipe(withDecodingDefaultKey(succeed6(value)));
 var VcsSettings = Struct({
   api: optionalKey2(Boolean3),
@@ -11984,33 +12014,15 @@ var route = (key) => defaulted(Struct({
   model: defaulted(ModelId, KIMI_ROUTES[key].model),
   thinking: defaulted(Thinking, KIMI_ROUTES[key].thinking)
 }), {});
+var ROUTE_FIELDS = Object.fromEntries(Object.keys(KIMI_ROUTES).map((key) => [key, route(key)]));
 var WebMode = Literals(["provider", "pi-web-kit", "off"]);
 var CodemodeMode = Literals(["on", "only"]);
 var T3Scope = Literals(["global", "project"]);
 var Enabled = Boolean3;
 var PiSection = defaulted(Struct({
+  enable: defaulted(Enabled, true),
   provider: defaulted(PiProvider, "kimi-coding-global"),
-  routes: defaulted(Struct({
-    root: route("root"),
-    "Explorer.map": route("Explorer.map"),
-    "Explorer.lookup": route("Explorer.lookup"),
-    "Explorer.trace": route("Explorer.trace"),
-    "Librarian.lookup": route("Librarian.lookup"),
-    "Librarian.research": route("Librarian.research"),
-    "Worker.mechanical": route("Worker.mechanical"),
-    "Worker.implementation": route("Worker.implementation"),
-    "Worker.integration": route("Worker.integration"),
-    "Worker.operations": route("Worker.operations"),
-    "Worker.validation": route("Worker.validation"),
-    "Worker.debugging": route("Worker.debugging"),
-    "Worker.visual": route("Worker.visual"),
-    "Reviewer.visual": route("Reviewer.visual"),
-    "Reviewer.code": route("Reviewer.code"),
-    "Reviewer.testing": route("Reviewer.testing"),
-    "Reviewer.audit": route("Reviewer.audit"),
-    "Reviewer.security": route("Reviewer.security"),
-    "Reviewer.artifact": route("Reviewer.artifact")
-  }), {}),
+  routes: defaulted(Struct(ROUTE_FIELDS), {}),
   features: defaulted(Struct({
     web: defaulted(WebMode, "provider"),
     processes: defaulted(Enabled, true),
@@ -12022,13 +12034,11 @@ var PiSection = defaulted(Struct({
   }), {}),
   codemode: defaulted(Struct({
     mode: defaulted(CodemodeMode, "only"),
-    maxWorkers: defaulted(Int.check(isGreaterThanOrEqualTo2(1)), 4)
+    maxWorkers: defaulted(Int.check(isBetween({ minimum: 1, maximum: 16 })), 4)
   }), {}),
   t3: defaulted(Struct({
     scope: defaulted(T3Scope, "global"),
-    piProvider: defaulted(Enabled, true),
     worktrees: defaulted(Enabled, true),
-    contextMeter: defaulted(Enabled, true),
     deviceAccess: defaulted(Enabled, true)
   }), {})
 }), {});
@@ -12039,7 +12049,7 @@ var Config = Struct({
   claude: ClaudeSection
 });
 var ConfigFile = toEncoded2(Config);
-var DEFAULT_CONFIG2 = decodeUnknownSync(Config)({});
+var defaultConfig = decodeUnknownEffect2(Config)({});
 
 var HOME_VARIABLE = "HOLYAGENT_HOME";
 var userConfigFile = (env) => join7(firstNonEmpty(env[HOME_VARIABLE]) ?? homeDirectory(env), STATE_DIRECTORY, CONFIG_FILE);
@@ -12051,20 +12061,34 @@ var merge3 = (base, override) => isRecord(base) && isRecord(override) ? {
     Object.hasOwn(base, key) ? merge3(base[key], value) : value
   ]))
 } : override;
-var JsonFile = fromJsonString2(ConfigFile);
-var readConfigFile = (path) => readText(path).pipe(flatMap2((text) => text === undefined ? succeed6(undefined) : decodeUnknownEffect2(JsonFile, { onExcessProperty: "error" })(text).pipe(mapError2((error) => new CorruptRecord({ path, reason: error.message })))));
+var FINAL_OFF = [
+  { path: ["pi", "features", "computerUse"], off: false },
+  { path: ["pi", "features", "web"], off: "off" },
+  { path: ["pi", "t3", "deviceAccess"], off: false }
+];
+var valueAt = (value, path) => path.reduce((node, key) => isRecord(node) ? node[key] : undefined, value);
+var setAt = (value, path, leaf) => {
+  const [key, ...rest] = path;
+  return key === undefined ? leaf : { ...isRecord(value) ? value : {}, [key]: setAt(valueAt(value, [key]), rest, leaf) };
+};
+var mergeFiles = (user, project) => FINAL_OFF.reduce((merged, { path, off }) => valueAt(user, path) === off ? setAt(merged, path, off) : merged, merge3(user, project));
+var JsonValue = fromJsonString2(Unknown2);
+var withoutNullVcs = (value) => isRecord(value) && value["vcs"] === null ? Object.fromEntries(Object.entries(value).filter(([key]) => key !== "vcs")) : value;
+var readConfigFile = (path) => readText(path).pipe(flatMap2((text) => text === undefined ? succeed6(undefined) : decodeUnknownEffect2(JsonValue)(text).pipe(map4(withoutNullVcs), flatMap2(decodeUnknownEffect2(ConfigFile, { onExcessProperty: "error" })), mapError2((error) => new ConfigInvalid({ path, reason: error.message })))));
 var loadConfig = ({ projectDirectories, env = process.env }) => gen2(function* () {
   const userPath = userConfigFile(env);
   const user = yield* readConfigFile(userPath);
   let project;
-  let projectPath = userPath;
+  let projectPath;
   for (const directory of projectDirectories) {
-    projectPath = join7(directory, CONFIG_FILE);
-    project = yield* readConfigFile(projectPath);
-    if (project !== undefined)
+    const path = join7(directory, CONFIG_FILE);
+    project = yield* readConfigFile(path);
+    if (project !== undefined) {
+      projectPath = path;
       break;
+    }
   }
-  return yield* decodeUnknownEffect2(Config)(merge3(user ?? {}, project ?? {})).pipe(mapError2((error) => new CorruptRecord({ path: `${userPath}, ${projectPath}`, reason: error.message })));
+  return yield* decodeUnknownEffect2(Config)(mergeFiles(user ?? {}, project ?? {})).pipe(mapError2((error) => new ConfigInvalid({ path: projectPath ?? userPath, reason: error.message })));
 });
 
 var readSettings = (directories, env = process.env) => loadConfig({ projectDirectories: directories, env }).pipe(map4((config) => config.vcs));
@@ -12098,7 +12122,7 @@ var VCS_COMMANDS = [
           message: messages.length === 0 ? "Missing -m <headline>" : "Name the paths to commit after --",
           hint: `Usage: holyagent ${COMMIT_USAGE}`
         });
-      const settings = yield* readSettings(settingsFolders(call));
+      const settings = yield* readSettings(settingsFolders(call), call.env);
       const message = yield* prepareMessage(messages, settings.allowWords ?? []);
       const done = yield* commit({
         message,
@@ -12159,7 +12183,7 @@ var VCS_COMMANDS = [
         yield* requiredValue(args, "base", PR_USAGE);
         yield* requiredValue(args, "title", PR_USAGE);
       }
-      const settings = yield* readSettings(settingsFolders(call));
+      const settings = yield* readSettings(settingsFolders(call), call.env);
       return yield* pullRequest({
         state: call,
         root: call.root,
@@ -13311,7 +13335,7 @@ var mergeUserSettings = fn2("mergeUserSettings")(function* (options) {
   return [file, ...entries.map(describe2), summary];
 });
 var without = (node, key) => Object.fromEntries(Object.entries(node).filter(([name]) => name !== key));
-var valueAt = (node, path) => {
+var valueAt2 = (node, path) => {
   let current = node;
   for (const key of path) {
     if (!isJsonObject2(current))
@@ -13378,7 +13402,7 @@ var undoUserSettings = fn2("undoUserSettings")(function* (options) {
   const removals = [];
   for (const { path, value } of plan) {
     if (value === undefined) {
-      const existing = valueAt(result, path);
+      const existing = valueAt2(result, path);
       removals.push(existing === undefined ? { path: path.join("."), status: "absent", value: undefined, wanted: undefined } : { path: path.join("."), status: "unrecorded", value: existing, wanted: undefined });
       continue;
     }
@@ -21601,7 +21625,7 @@ var HOOK_COMMANDS = [
       const message = cleaned.split(`
 `).filter((line) => !line.startsWith(comment)).join(`
 `);
-      const phrases = forbiddenPhrases(message, (yield* readSettings([stateDirectory(call.root)])).allowWords);
+      const phrases = forbiddenPhrases(message, (yield* readSettings([stateDirectory(call.root)], call.env)).allowWords);
       if (phrases.length > 0)
         return yield* new MessageRefused({ phrases });
       if (cleaned !== above.trim() || cleanedBelow !== below.trim())

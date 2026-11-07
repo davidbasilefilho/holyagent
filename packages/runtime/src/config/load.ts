@@ -3,9 +3,9 @@ import { join } from "node:path"
 import { Effect, Schema } from "effect"
 
 import { type Env, firstNonEmpty, homeDirectory } from "../setup/environment.ts"
-import { CorruptRecord } from "../state/errors.ts"
 import { readText } from "../state/files.ts"
 import { CONFIG_FILE, STATE_DIRECTORY } from "../state/layout.ts"
+import { ConfigInvalid } from "./errors.ts"
 import { Config, ConfigFile } from "./schema.ts"
 
 /**
@@ -42,11 +42,48 @@ const merge = (base: unknown, override: unknown): unknown =>
       }
     : override
 
-const JsonFile = Schema.fromJsonString(ConfigFile)
+/**
+ * Settings that the user-level file can switch off for good: where the user file holds the "off"
+ * value, the project file cannot turn the setting back on (it can still turn it off). They are the
+ * settings that grant access, to the computer, to devices and to the web.
+ */
+const FINAL_OFF: ReadonlyArray<{ readonly path: ReadonlyArray<string>; readonly off: unknown }> = [
+  { path: ["pi", "features", "computerUse"], off: false },
+  { path: ["pi", "features", "web"], off: "off" },
+  { path: ["pi", "t3", "deviceAccess"], off: false },
+]
+
+const valueAt = (value: unknown, path: ReadonlyArray<string>): unknown =>
+  path.reduce((node, key) => (isRecord(node) ? node[key] : undefined), value)
+
+const setAt = (value: unknown, path: ReadonlyArray<string>, leaf: unknown): unknown => {
+  const [key, ...rest] = path
+  return key === undefined
+    ? leaf
+    : { ...(isRecord(value) ? value : {}), [key]: setAt(valueAt(value, [key]), rest, leaf) }
+}
+
+/** Merges the project over the user, then restores every setting the user switched off for good. */
+const mergeFiles = (user: unknown, project: unknown): unknown =>
+  FINAL_OFF.reduce(
+    (merged, { path, off }) => (valueAt(user, path) === off ? setAt(merged, path, off) : merged),
+    merge(user, project),
+  )
+
+const JsonValue = Schema.fromJsonString(Schema.Unknown)
+
+/**
+ * A `"vcs": null` is read as no `vcs` section, as older files and tools wrote it; the other
+ * sections stay strict.
+ */
+const withoutNullVcs = (value: unknown): unknown =>
+  isRecord(value) && value["vcs"] === null
+    ? Object.fromEntries(Object.entries(value).filter(([key]) => key !== "vcs"))
+    : value
 
 /**
  * Reads one config file and decodes it strictly: an unknown key or an invalid value, at any depth,
- * fails with CorruptRecord naming the field and this file's path. A missing file reads as
+ * fails with ConfigInvalid naming the field and this file's path. A missing file reads as
  * undefined, and no default is applied yet, so the file can still be merged.
  */
 export const readConfigFile = (path: string) =>
@@ -54,8 +91,10 @@ export const readConfigFile = (path: string) =>
     Effect.flatMap((text) =>
       text === undefined
         ? Effect.succeed(undefined)
-        : Schema.decodeUnknownEffect(JsonFile, { onExcessProperty: "error" })(text).pipe(
-            Effect.mapError((error) => new CorruptRecord({ path, reason: error.message })),
+        : Schema.decodeUnknownEffect(JsonValue)(text).pipe(
+            Effect.map(withoutNullVcs),
+            Effect.flatMap(Schema.decodeUnknownEffect(ConfigFile, { onExcessProperty: "error" })),
+            Effect.mapError((error) => new ConfigInvalid({ path, reason: error.message })),
           ),
     ),
   )
@@ -75,24 +114,28 @@ export interface ConfigSources {
  * Loads the HolyAgent config: the user-level `~/.holyagent/config.json`, then the project's
  * `.holyagent/config.json`, each decoded with excess properties refused, merged key by key with the
  * project winning (lists replace wholesale), and the defaults filling what neither file sets. A
- * missing file reads as an empty one; a bad file stops the load with CorruptRecord for that file.
+ * setting that the user file switches off for good (`pi.features.computerUse`, `pi.features.web`,
+ * `pi.t3.deviceAccess`) stays off whatever the project says. A missing file reads as an empty one;
+ * a bad file stops the load with ConfigInvalid for that file.
  */
 export const loadConfig = ({ projectDirectories, env = process.env }: ConfigSources) =>
   Effect.gen(function* () {
     const userPath = userConfigFile(env)
     const user = yield* readConfigFile(userPath)
     let project: typeof user
-    let projectPath = userPath
+    let projectPath: string | undefined
     for (const directory of projectDirectories) {
-      projectPath = join(directory, CONFIG_FILE)
-      project = yield* readConfigFile(projectPath)
-      if (project !== undefined) break
+      const path = join(directory, CONFIG_FILE)
+      project = yield* readConfigFile(path)
+      if (project !== undefined) {
+        projectPath = path
+        break
+      }
     }
     // Both files decoded on their own, so this only fills in defaults; it cannot refuse a setting.
-    return yield* Schema.decodeUnknownEffect(Config)(merge(user ?? {}, project ?? {})).pipe(
+    return yield* Schema.decodeUnknownEffect(Config)(mergeFiles(user ?? {}, project ?? {})).pipe(
       Effect.mapError(
-        (error) =>
-          new CorruptRecord({ path: `${userPath}, ${projectPath}`, reason: error.message }),
+        (error) => new ConfigInvalid({ path: projectPath ?? userPath, reason: error.message }),
       ),
     )
   })

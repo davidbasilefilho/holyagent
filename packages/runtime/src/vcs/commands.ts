@@ -76,7 +76,7 @@ export const VCS_COMMANDS: ReadonlyArray<Command> = [
               messages.length === 0 ? "Missing -m <headline>" : "Name the paths to commit after --",
             hint: `Usage: holyagent ${COMMIT_USAGE}`,
           })
-        const settings = yield* readSettings(settingsFolders(call))
+        const settings = yield* readSettings(settingsFolders(call), call.env)
         const message = yield* prepareMessage(messages, settings.allowWords ?? [])
         const done = yield* commit({
           message,
@@ -151,7 +151,7 @@ export const VCS_COMMANDS: ReadonlyArray<Command> = [
           yield* requiredValue(args, "base", PR_USAGE)
           yield* requiredValue(args, "title", PR_USAGE)
         }
-        const settings = yield* readSettings(settingsFolders(call))
+        const settings = yield* readSettings(settingsFolders(call), call.env)
         return yield* pullRequest({
           state: call,
           root: call.root,

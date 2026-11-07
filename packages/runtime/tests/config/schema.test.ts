@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test"
 
-import { DEFAULT_CONFIG, KIMI_ROUTES } from "../../src/config/schema.ts"
+import { KIMI_ROUTES } from "../../src/config/schema.ts"
 import { RoleTask } from "../../src/domain/route.ts"
+import { DEFAULT_CONFIG } from "./defaults.ts"
 
 /** The Kimi table of docs/pi/providers.md, written out row by row. */
 const DOCUMENTED_ROUTES = {
@@ -35,7 +36,8 @@ describe("default config", () => {
   })
 
   test("no specialist but the two visual ones runs at low, and only they run on k3.1-pro", () => {
-    const rows = Object.entries(DEFAULT_CONFIG.pi.routes).filter(([key]) => key !== "root")
+    const rows: ReadonlyArray<readonly [string, { model: string; thinking: string }]> =
+      Object.entries(DEFAULT_CONFIG.pi.routes).filter(([key]) => key !== "root")
     expect(rows).toHaveLength(18)
     for (const [key, choice] of rows) {
       const visual = key.endsWith(".visual")
@@ -49,6 +51,7 @@ describe("default config", () => {
   })
 
   test("the other settings default as configuration.md documents", () => {
+    expect(DEFAULT_CONFIG.pi.enable).toBe(true)
     expect(DEFAULT_CONFIG.pi.provider).toBe("kimi-coding-global")
     expect(DEFAULT_CONFIG.pi.features).toEqual({
       web: "provider",
@@ -62,9 +65,7 @@ describe("default config", () => {
     expect(DEFAULT_CONFIG.pi.codemode).toEqual({ mode: "only", maxWorkers: 4 })
     expect(DEFAULT_CONFIG.pi.t3).toEqual({
       scope: "global",
-      piProvider: true,
       worktrees: true,
-      contextMeter: true,
       deviceAccess: true,
     })
     expect(DEFAULT_CONFIG.claude).toEqual({})

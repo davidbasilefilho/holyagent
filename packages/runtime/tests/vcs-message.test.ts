@@ -1,7 +1,8 @@
 import { afterAll, afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
+import { join } from "node:path"
 
 import { cleanMessage, forbiddenPhrases } from "../src/vcs/message.ts"
-import { cleanup, fakeGitHub, initRepo, put, seed, sh, toon, vcs } from "./vcs-fixtures.ts"
+import { cleanup, fakeGitHub, initRepo, put, scratch, seed, sh, toon, vcs } from "./vcs-fixtures.ts"
 
 // Tests that run git processes: process creation on Windows is slow enough on the CI runner to pass
 // Bun's 5 second default, and a slow test there is not a hung one. Linux and macOS keep the default.
@@ -185,6 +186,64 @@ describe("vcs commit messages", () => {
       gh.layer,
     )
     expect(toon(result)).toMatchObject({ branch: "main" })
+  })
+
+  test("allowWords in the user file of the call's HOLYAGENT_HOME apply, not the real home's", async () => {
+    const { dir, gh } = await ready()
+    const home = await scratch()
+    await put(home, {
+      ".holyagent/config.json": JSON.stringify({ vcs: { allowWords: ["subagent"] } }),
+    })
+    const refused = await vcs(
+      dir,
+      ["vcs", "commit", "-m", "Route to a subagent", "--", "a.txt"],
+      gh.layer,
+    )
+    expect(refused.code).toBe(3)
+    const result = await vcs(
+      dir,
+      ["vcs", "commit", "-m", "Route to a subagent", "--", "a.txt"],
+      gh.layer,
+      undefined,
+      { HOLYAGENT_HOME: home },
+    )
+    expect(toon(result)).toMatchObject({ branch: "main" })
+  })
+
+  test("a bad config file in the call's home stops the commit and names that file", async () => {
+    const { dir, gh } = await ready()
+    const home = await scratch()
+    await put(home, { ".holyagent/config.json": '{"nope":1}' })
+    const before = (await sh(dir, ["git", "rev-parse", "HEAD"])).trim()
+    const result = await vcs(
+      dir,
+      ["vcs", "commit", "-m", "Change a", "--", "a.txt"],
+      gh.layer,
+      undefined,
+      {
+        HOLYAGENT_HOME: home,
+      },
+    )
+    expect(result.code).toBe(4)
+    expect(result.stderr).toContain("error: ConfigInvalid:")
+    expect(result.stderr).toContain("docs/pi/configuration.md")
+    expect(result.stderr).toContain(join(home, ".holyagent", "config.json"))
+    expect((await sh(dir, ["git", "rev-parse", "HEAD"])).trim()).toBe(before)
+  })
+
+  test("the commit-msg hook reads the call's home too", async () => {
+    const { dir, gh } = await ready()
+    const home = await scratch()
+    await put(home, {
+      ".holyagent/config.json": JSON.stringify({ vcs: { allowWords: ["subagent"] } }),
+    })
+    await put(dir, { MSG: "Route to a subagent\n" })
+    const file = join(dir, "MSG")
+    expect((await vcs(dir, ["hook", "commit-msg", file], gh.layer)).code).toBe(3)
+    const allowed = await vcs(dir, ["hook", "commit-msg", file], gh.layer, undefined, {
+      HOLYAGENT_HOME: home,
+    })
+    expect(allowed.code).toBe(0)
   })
 
   test("attribution is cleaned off before the check and before git sees the message", async () => {

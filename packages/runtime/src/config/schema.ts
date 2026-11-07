@@ -95,6 +95,14 @@ const route = (key: RouteKey) =>
   )
 
 /**
+ * One schema per route-table row, made from the keys of {@link KIMI_ROUTES}, so the list of rows
+ * exists once. The cast only restores the per-key shape that `Object.fromEntries` widens.
+ */
+const ROUTE_FIELDS = Object.fromEntries(
+  Object.keys(KIMI_ROUTES).map((key) => [key, route(key as RouteKey)]),
+) as { readonly [Key in RouteKey]: ReturnType<typeof route> }
+
+/**
  * How a session reaches the web: `provider` uses the provider extension's own tools (Kimi's
  * `moonshot_search` and `moonshot_fetch`) and loads no package, `pi-web-kit` loads that package
  * instead (the fallback for a login that cannot use the provider's tools), `off` has no web tools.
@@ -118,31 +126,9 @@ const Enabled = Schema.Boolean
 /** The `pi` section: read only by the Pi integration. */
 const PiSection = defaulted(
   Schema.Struct({
+    enable: defaulted(Enabled, true),
     provider: defaulted(PiProvider, "kimi-coding-global"),
-    routes: defaulted(
-      Schema.Struct({
-        root: route("root"),
-        "Explorer.map": route("Explorer.map"),
-        "Explorer.lookup": route("Explorer.lookup"),
-        "Explorer.trace": route("Explorer.trace"),
-        "Librarian.lookup": route("Librarian.lookup"),
-        "Librarian.research": route("Librarian.research"),
-        "Worker.mechanical": route("Worker.mechanical"),
-        "Worker.implementation": route("Worker.implementation"),
-        "Worker.integration": route("Worker.integration"),
-        "Worker.operations": route("Worker.operations"),
-        "Worker.validation": route("Worker.validation"),
-        "Worker.debugging": route("Worker.debugging"),
-        "Worker.visual": route("Worker.visual"),
-        "Reviewer.visual": route("Reviewer.visual"),
-        "Reviewer.code": route("Reviewer.code"),
-        "Reviewer.testing": route("Reviewer.testing"),
-        "Reviewer.audit": route("Reviewer.audit"),
-        "Reviewer.security": route("Reviewer.security"),
-        "Reviewer.artifact": route("Reviewer.artifact"),
-      }),
-      {},
-    ),
+    routes: defaulted(Schema.Struct(ROUTE_FIELDS), {}),
     features: defaulted(
       Schema.Struct({
         web: defaulted(WebMode, "provider"),
@@ -158,16 +144,14 @@ const PiSection = defaulted(
     codemode: defaulted(
       Schema.Struct({
         mode: defaulted(CodemodeMode, "only"),
-        maxWorkers: defaulted(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)), 4),
+        maxWorkers: defaulted(Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 16 })), 4),
       }),
       {},
     ),
     t3: defaulted(
       Schema.Struct({
         scope: defaulted(T3Scope, "global"),
-        piProvider: defaulted(Enabled, true),
         worktrees: defaulted(Enabled, true),
-        contextMeter: defaulted(Enabled, true),
         deviceAccess: defaulted(Enabled, true),
       }),
       {},
@@ -201,5 +185,8 @@ export const ConfigFile = Schema.toEncoded(Config)
 /** One `config.json` as decoded, before the merge and the defaults. */
 export type ConfigFile = typeof ConfigFile.Type
 
-/** The config every setting of which is at its default: what a missing file means. */
-export const DEFAULT_CONFIG: Config = Schema.decodeUnknownSync(Config)({})
+/**
+ * The config every setting of which is at its default: what a missing file means. It is an Effect
+ * so that building it at import cannot throw; it succeeds for every build of the schema.
+ */
+export const defaultConfig = Schema.decodeUnknownEffect(Config)({})

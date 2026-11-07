@@ -135,6 +135,8 @@ const HINTS: Readonly<Record<string, string>> = {
   StateIo:
     "Check what the message names: the permissions of the .holyagent folder of the state worktree (under the git directory, or in the project outside git), that git runs there, and that no branch already uses a name the state branch needs (holyagent/state needs no branch called holyagent; git config holyagent.stateBranch picks another name).",
   CorruptRecord: "Fix or delete the file the message names, or restore it from version control.",
+  ConfigInvalid:
+    "Fix the field the message names in that config.json (the keys and values are listed in docs/pi/configuration.md), or delete the file to use the defaults.",
   ...VCS_HINTS,
 }
 

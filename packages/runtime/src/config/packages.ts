@@ -17,20 +17,19 @@ export const FEATURE_PACKAGES = {
 export const WEB_KIT_PACKAGE = "pi-web-kit"
 
 /**
- * The Pi packages that must be loaded for a config, in a stable order: the provider extension, then
- * each enabled feature's package. A disabled feature is neither loaded nor required, and the
- * `provider` web mode loads nothing, since the provider extension supplies those tools.
+ * The Pi packages that must be loaded for a config, in a stable order: the provider extension, each
+ * enabled feature's package in the order of {@link FEATURE_PACKAGES}, then the web kit when asked
+ * for. A disabled feature is neither loaded nor required, the `provider` web mode loads nothing
+ * (the provider extension supplies those tools), and with `pi.enable` off nothing is loaded.
  */
 export const piPackages = (config: Config): ReadonlyArray<string> => {
-  const { provider, features } = config.pi
+  const { enable, provider, features } = config.pi
+  if (!enable) return []
   return [
     PROVIDER_PACKAGES[provider],
-    ...(features.subagents ? [FEATURE_PACKAGES.subagents] : []),
-    ...(features.contextCompression ? [FEATURE_PACKAGES.contextCompression] : []),
-    ...(features.todo ? [FEATURE_PACKAGES.todo] : []),
-    ...(features.ask ? [FEATURE_PACKAGES.ask] : []),
+    ...(Object.keys(FEATURE_PACKAGES) as Array<keyof typeof FEATURE_PACKAGES>)
+      .filter((feature) => features[feature])
+      .map((feature) => FEATURE_PACKAGES[feature]),
     ...(features.web === "pi-web-kit" ? [WEB_KIT_PACKAGE] : []),
-    ...(features.processes ? [FEATURE_PACKAGES.processes] : []),
-    ...(features.computerUse ? [FEATURE_PACKAGES.computerUse] : []),
   ]
 }

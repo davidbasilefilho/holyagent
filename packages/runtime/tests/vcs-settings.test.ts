@@ -43,7 +43,7 @@ describe("readSettings", () => {
     const error = await Effect.runPromise(
       Effect.flip(readSettings([dir], { HOLYAGENT_HOME: await scratch() })),
     )
-    expect(error).toMatchObject({ _tag: "CorruptRecord", path: join(dir, "config.json") })
+    expect(error).toMatchObject({ _tag: "ConfigInvalid", path: join(dir, "config.json") })
     expect(error.message).toContain("bogus")
   })
 

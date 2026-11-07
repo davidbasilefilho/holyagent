@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test"
 
-import { piPackages } from "../../src/config/packages.ts"
-import { type Config, DEFAULT_CONFIG } from "../../src/config/schema.ts"
+import { FEATURE_PACKAGES, piPackages, WEB_KIT_PACKAGE } from "../../src/config/packages.ts"
+import type { Config } from "../../src/config/schema.ts"
+import { DEFAULT_CONFIG } from "./defaults.ts"
 
 const withFeatures = (features: Partial<Config["pi"]["features"]>): Config => ({
   ...DEFAULT_CONFIG,
@@ -52,5 +53,31 @@ describe("piPackages", () => {
     expect(piPackages(withFeatures({ web: "provider" }))).not.toContain("pi-web-kit")
     expect(piPackages(withFeatures({ web: "off" }))).not.toContain("pi-web-kit")
     expect(piPackages(withFeatures({ web: "pi-web-kit" }))).toContain("pi-web-kit")
+  })
+})
+
+describe("piPackages order and pi.enable", () => {
+  test("the features follow the order of FEATURE_PACKAGES and the web kit comes last", () => {
+    const config = withFeatures({ web: "pi-web-kit" })
+    expect(piPackages(config)).toEqual([
+      "pi-provider-kimi-code",
+      ...Object.values(FEATURE_PACKAGES),
+      WEB_KIT_PACKAGE,
+    ])
+  })
+
+  test("pi.enable off loads nothing, whatever the features say", () => {
+    const off: Config = { ...DEFAULT_CONFIG, pi: { ...DEFAULT_CONFIG.pi, enable: false } }
+    expect(piPackages(off)).toEqual([])
+    expect(
+      piPackages({
+        ...off,
+        pi: { ...off.pi, features: { ...off.pi.features, web: "pi-web-kit" } },
+      }),
+    ).toEqual([])
+  })
+
+  test("pi.enable on loads the provider extension", () => {
+    expect(piPackages(DEFAULT_CONFIG)[0]).toBe("pi-provider-kimi-code")
   })
 })
