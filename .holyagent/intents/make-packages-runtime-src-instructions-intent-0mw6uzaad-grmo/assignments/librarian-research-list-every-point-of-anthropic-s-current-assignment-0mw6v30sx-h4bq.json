@@ -5,7 +5,7 @@
   "roleTask": "Librarian.research",
   "slug": "list-every-point-of-anthropic-s-current",
   "objective": "List every point of Anthropic's current official prompting guidance for Claude 5-family models, with the source page and section of each, so a claude-5.5/guide.md can carry each point.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Sources: Anthropic's prompt-engineering documentation (the prompting best-practices page for current Claude models and the pages it links under prompt engineering, on docs.claude.com or platform.claude.com), plus any guidance on writing agent system prompts, skills and tool descriptions in the Claude Code or Agent SDK docs. Fetch with the web tools you have (for example the Exa fetch tool).",
     "Compare with the rules HolyAgent already carries in /home/user/holyagent-0.3.0/packages/runtime/src/instructions/claude-5.5/skills/instruction-writing/ (each rule there is tagged with its source page): list every guide point, and mark each as already in that skill (cite the rule) or missing."
@@ -31,5 +31,10 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-07T20:34:11.686Z"
+  },
   "createdAt": "2026-11-07T20:34:11.025Z"
 }
