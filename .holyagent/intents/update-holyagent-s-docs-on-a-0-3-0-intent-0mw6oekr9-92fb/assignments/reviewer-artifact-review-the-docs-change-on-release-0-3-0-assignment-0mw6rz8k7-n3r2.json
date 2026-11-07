@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "review-the-docs-change-on-release-0-3-0",
   "objective": "Review the docs change on release/0.3.0/docs/t3-and-install-scopes that records T3 Code as the primary interface of HolyAgent on pi, local and global installs with a user-level config, and the maintainer-tested claude.ai chat and Cowork support.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "The diff: /home/user/holyagent-work/docs-t3b.diff (uncommitted changes in /home/user/holyagent-docs-t3, including the new docs/pi/t3-code.md); read the current files where context matters.",
     "Sources of truth: the last two lines of /home/user/holyagent-work/pi-intents-final.jsonl (T3 Code Intent \"0.3.0 pi 11/12\" and install-scope Intent \"0.3.0 12/12\"); the last lines of /home/user/holyagent-work/pi-decisions.md (T3, computer use, settings, user config, defaults, Cowork); research in /home/user/holyagent-work/research/ (assignment-0mw6r54ng-kg9r, -0mw6r9zxs-l85j, -0mw6rgzog-2rb3, -0mw6rlor5-3o9f, -0mw6rgzw5-cgu7)."
@@ -49,7 +49,37 @@
     "agentId": "workflow:wf_1324e0ea-2a6/assignment-0mw6rz8k7-n3r2",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-07T19:07:15.607Z"
+    "startedAt": "2026-11-07T19:07:15.607Z",
+    "finishedAt": "2026-11-07T19:21:23.673Z"
+  },
+  "result": "result: No blocking gaps found. All four criteria are met, with two non-blocking notes. I had no shell, so I reviewed from the diff file and the files on disk and ran no gates.\n\n**Findings (non-blocking)**\n1. `/home/user/holyagent-docs-t3/docs/pi/configuration.md:123` is an unchanged line on a page this diff touches. Quoted: \"a launch should pass an explicit session directory, `--model`, `--tools` or `--exclude-tools` and `--approve` rather than rely on the user's `~/.pi/agent/settings.json`\".\n   - Decided behavior (Intent 12, `pi-decisions.md` line 47): `--approve` only when the parent session trusted the project.\n   - Line 116 of the same page, edited in this diff, states that rule, so the two lines now read as slightly inconsistent.\n   - Smallest fix: change the line to \"and `--approve` when the parent trusted the project\".\n2. `/home/user/holyagent-docs-t3/docs/usage.md` claude.ai section: \"it works correctly there\".\n   - The research (`assignment-0mw6rgzw5-cgu7.md`, lines 31-32) notes that this rests on the maintainer's test alone, and that a plugin `settings` key (so `agent: holyagent`) is ignored in Cowork.\n   - Intent 12 and `pi-decisions.md` (lines 43, 48) require the claim, and the page attributes it to the maintainer, so this is fine as written.\n   - Optional: add one sentence that the root there rests on the session-start hook.\n\n**Checks**\n- **Intent 11 (T3):** every requirement is recorded with its decided value in `docs/pi/t3-code.md` and the `README.md` table. This covers the RPC mode and the dialogs-only rule. It also covers Full access with a warning, `@tintinweb/pi-subagents`' own trigger instead of `delegate_task`, the keep and deactivate tool lists, and the once-at-`session_start` filter reapplied on `before_agent_start` and `session_tree`. The rest is also present:\n  - the `tool_call` backstop and caching;\n  - the twelve pinned browser names;\n  - Cua through `@amaster.ai/pi-computer-use` in standard mode, confirmations off, for the two visual roles only, with per-user setup and macOS permissions;\n  - devices, T3 settings with an undo, \"Relied on\", the To verify list, and recorded RPC fixtures.\n- **Intent 12 (install scopes):**\n  - The three Claude scopes appear in `usage.md#install-scopes`, with commands and the team-sharing steps.\n  - Setup and doctor default to the install scope, marked planned, and the shipped state is marked shipped.\n  - Pi global (first) and project-local installs, the trust step, and specialists inheriting the parent's trust are in `installation.md`.\n  - The `~/.holyagent/config.json` merge is in `configuration.md`.\n  - The claude.ai text replaces the \"does not work\" claim in `usage.md` and `requirements.md`, and plain chat is noted as skills-only.\n  - Both test lines are present.\n  - A repo-wide search found no leftover \"does not work\" or \"hooks are activated\" text.\n- **No contradictions:**\n  - `delegate_task` and `custom()` are described only as deactivated or unused.\n  - Only Full access is supported under T3.\n  - Cua confirmations are off and computer use goes to the two visual roles only.\n  - Other pages (`approval.md`, `auto-mode.md`, `claude-parity.md`, `providers.md`) are consistent with this.\n- **Plan not shipped, and sourced:**\n  - The pages that state the plan carry a \"planned for 0.3.0\" status or inline \"planned\" markers.\n  - `requirements.md` keeps Pi as \"Not supported yet\".\n  - \"Eleven open Intents\" matches 9 + 2.\n  - Facts match research files `kg9r`, `l85j`, `2rb3`, `3o9f` and `cgu7`. Inferences and third-party mirrors are labelled, and unverified points sit in To verify.\n- **Scope and links:**\n  - The diff touches only `README.md` (one added install line), `docs/*.md` and `docs/pi/*.md`, including the new `t3-code.md`.\n  - The README keeps its six sections.\n  - I checked every new relative link and anchor against the headings in `usage.md`, `configuration.md`, `installation.md`, `claude-parity.md`, `t3-code.md` and `components.md`, and all resolve.\n\n**Limit:** without a shell I could not run `git status` to confirm there are no other untracked files in the worktree.\n\nevidence:\nDecisions recorded: `/home/user/holyagent-docs-t3/docs/pi/t3-code.md` (all Intent 11 items); `docs/pi/installation.md`, `docs/pi/configuration.md`, `docs/usage.md` (Install scopes, claude.ai) and `docs/requirements.md` (Intent 12).\nPages agree: searches over `docs/` found no stale \"does not work\" text and no pi page contradicting the decisions; the only inconsistency is the non-blocking `docs/pi/configuration.md:123`.\nPlan not shipped and sourced: planned markers at `docs/usage.md:131` and `:172`, `docs/components.md`, `docs/pi/t3-code.md:3`; claims checked against `/home/user/holyagent-work/research/assignment-0mw6r54ng-kg9r.md`, `-0mw6r9zxs-l85j.md`, `-0mw6rgzog-2rb3.md`, `-0mw6rlor5-3o9f.md`, `-0mw6rgzw5-cgu7.md`.\nScope and links: `/home/user/holyagent-work/docs-t3b.diff` file list (README.md, docs/ only); anchors checked by heading grep.\nfindings: two non-blocking, listed above.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "review checked both Intents item by item against the diff and research; no blocking finding",
+    "criteria": [
+      {
+        "criterion": "Decisions recorded: every requirement of both Intents appears with its decided value",
+        "support": "`/home/user/holyagent-docs-t3/docs/pi/t3-code.md` (all Intent 11 items); `docs/pi/installation.md`, `docs/pi/configuration.md`, `docs/usage.md` (Install scopes, claude.ai) and `docs/requirements.md` (Intent 12)."
+      },
+      {
+        "criterion": "Pages agree: no touched page contradicts the decisions",
+        "support": "searches over `docs/` found no stale \"does not work\" text and no pi page contradicting the decisions; the only inconsistency is the non-blocking `docs/pi/configuration.md:123`."
+      },
+      {
+        "criterion": "Plan not shipped and sourced: planned behavior is marked planned and facts match the research",
+        "support": "planned markers at `docs/usage.md:131` and `:172`, `docs/components.md`, `docs/pi/t3-code.md:3`; claims checked against `/home/user/holyagent-work/research/assignment-0mw6r54ng-kg9r.md`, `-0mw6r9zxs-l85j.md`, `-0mw6rgzog-2rb3.md`, `-0mw6rlor5-3o9f.md`, `-0mw6rgzw5-cgu7.md`."
+      },
+      {
+        "criterion": "Scope and links: only allowed paths change and relative links resolve",
+        "support": "`/home/user/holyagent-work/docs-t3b.diff` file list (README.md, docs/ only); anchors checked by heading grep."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "two non-blocking, listed above."
+      }
+    ]
   },
   "createdAt": "2026-11-07T19:07:15.607Z"
 }
