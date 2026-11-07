@@ -13,9 +13,11 @@
     "Open: the distribution channel for the Pi package; the repository publishes GitHub releases and tags, has no npm publishing, and the research names pi install sources npm:, git:, https and local path.",
     "Open: whether the installers or holyagent setup and doctor install or check Pi; the Windows installer refuses Node older than 22.13 while Pi needs 22.19.",
     "Open: the rule for moving the pinned Pi version, given weekly Pi releases and the deps:update flow.",
-    "Open: whether Bun is a supported way to install or run Pi; the research finds it undocumented and the Pi CLI shebang targets Node."
+    "Open: whether Bun is a supported way to install or run Pi; the research finds it undocumented and the Pi CLI shebang targets Node.",
+    "Maintainer (verbatim): \"the pi extension and integration will use a config.json that will set options, functionality, the provider, which will enable/disable its deps, etc\".",
+    "The config.json from Intent 0.3.0 pi 4/10 selects this: the docs describe every config.json option with its default, and installing the package installs only the dependencies the default config.json enables."
   ],
-  "revision": 1,
+  "revision": 2,
   "state": "Open",
   "createdAt": "2026-11-07T16:43:53.582Z"
 }
