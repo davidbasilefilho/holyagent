@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "assess-the-pr-3-repair-commit-a38b600",
   "objective": "Assess the PR 3 repair commit a38b600 (range 2e1c021..a38b600, worktree /home/user/holyagent-0.3.0-config) for security regressions in the user/project config trust boundary, and confirm the earlier security notes are closed or settled.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "The repair diff is in /home/user/holyagent-notes/pr3-repair.diff; source is readable under /home/user/holyagent-0.3.0-config.",
     "Earlier security findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw6vbafl-giio.md."
@@ -48,7 +48,33 @@
     "agentId": "workflow:wf_5c6cebf3-a7a/assignment-0mw6zi8w8-bi8h",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-07T22:37:59.816Z"
+    "startedAt": "2026-11-07T22:37:59.816Z",
+    "finishedAt": "2026-11-07T22:42:38.089Z"
+  },
+  "result": "result: No blocker. The user-level off is final on every merge path, and I found no new vulnerability. This is from source reads only: there was no shell, so I ran no tests, lint or type-check. The built-in `/security-review` could not run. It failed on `git diff --name-only origin/HEAD...` with \"unknown revision\" because the checkout has no `origin/HEAD`. The review below is manual, over `/home/user/holyagent-notes/pr3-repair.diff` and `/home/user/holyagent-0.3.0-config`.\n\nchanged: none (read-only)\n\nchecks: tests not run (no Bash tool).\n\nblockers: none\n\nquestions: none\n\nnotes (non-blocking):\n1. Earlier notes 1, 2, 4, 6, 7 and 8 are closed.\n   - Note 1 is closed by `FINAL_OFF` in `load.ts`.\n   - Note 2 is closed by the `maxWorkers` cap of 16.\n   - Note 4 is settled: `\"vcs\": null` is tolerated, while `pi` and `claude` stay strict (tested).\n   - Note 6 is closed: `readSettings` calls now pass `call.env`.\n   - Notes 7 and 8 are closed: `ConfigInvalid` is exported from `src/index.ts`, and its path is `projectPath ?? userPath`.\n2. Earlier note 3 is settled by a stated choice. `docs/pi/configuration.md` now says the whole file is decoded by every command, so a bad user file still blocks commits and the hook. The error names the file and field.\n3. Earlier note 5 is still open and was already there before this PR. A symlinked `config.json` is read through `Bun.file().text()`, and `ConfigInvalid.reason` carries the decoder's `error.message`. That message can quote a bad value, or a snippet of non-JSON content, on stderr. I did not verify how much a JSON parse error quotes. Impact is low, because it needs control of a file the user already runs commands against. You could truncate the reason or not follow symlinks.\n4. `FINAL_OFF` only fires when the user file sets the off value itself. A user file that is missing or silent leaves the defaults (true) in force, as the docs state.\n\nchecked and sound:\n- **Merge path:** `loadConfig` in `load.ts` is the only merge of the two files. The CLI's `loadConfig` in `cli/config.ts` is unrelated, and there are no other config consumers yet.\n- **Final off:** `mergeFiles` merges project over user, then forces each `FINAL_OFF` path back to off if the user value is off. A project `true` or `pi-web-kit` is overridden, siblings are untouched, and a project off still wins over a user on. The paths are static, and both inputs are decoded first, so `__proto__` is refused as an excess key and nothing can pollute a prototype.\n- **Fail closed:** a bad user or project file stops the load with `ConfigInvalid` and never falls back to defaults. The final decode is defaults-only and maps its error to `ConfigInvalid`.\n- **Home directory:** `userConfigFile` joins fixed names onto `HOLYAGENT_HOME` or the home directory. Both come from `call.env`, never from project content.\n- **Generated plugin:** `dist/scripts/holyagent.js` contains the repair's `FINAL_OFF` and `mergeFiles`.\n\nevidence:\nA project config cannot re-enable a security-relevant feature the user-level config turned off, on any merge path: `/home/user/holyagent-0.3.0-config/packages/runtime/src/config/load.ts` lines 50-71 and 121-141. It is the only merge. Tests in `tests/config/load.test.ts`, \"a user-level off is final\", cover all three settings. I did not run them.\nThe repair introduces no new vulnerability (path handling of the home directory, environment use, error output leaking content): home path, env use and error output are as above. The only leakage is the pre-existing symlink and echo case (note 3).\nfindings: none blocking; notes 1-4 above.\ndiff-file: /home/user/holyagent-notes/pr3-repair.diff\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Final-off traced to the single merge path in load.ts with tests; no new vulnerability; only the evidence label was matched to the criterion text, support unchanged.",
+    "criteria": [
+      {
+        "criterion": "A project config cannot re-enable a security-relevant feature the user-level config turned off, on any merge path",
+        "support": "`/home/user/holyagent-0.3.0-config/packages/runtime/src/config/load.ts` lines 50-71 and 121-141. It is the only merge. Tests in `tests/config/load.test.ts`, \"a user-level off is final\", cover all three settings. I did not run them."
+      },
+      {
+        "criterion": "The repair introduces no new vulnerability (path handling of the home directory, environment use, error output leaking content)",
+        "support": "home path, env use and error output are as above. The only leakage is the pre-existing symlink and echo case (note 3)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "none blocking; notes 1-4 above."
+      },
+      {
+        "label": "diff-file",
+        "support": "/home/user/holyagent-notes/pr3-repair.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-07T22:37:59.816Z"
 }
