@@ -23,11 +23,11 @@
     "The Kimi route table maps every specialist role (the eighteen roles of the Claude route table) to a model and thinking level, each choice with a reason, and lives in the config.json defaults so it can be changed without code.",
     "Maintainer (verbatim): \"there will be no auto-mode, full access shall be the default\".",
     "Decided: the provider is pi's built-in kimi-coding with pi-provider-kimi-code (Leechael) pinned on top, KIMI_CODE_REGION=global, so requests go to api.kimi.ai/coding/v1 (Moonshot's overseas host; api.kimi.com is mainland China). Login is OAuth (/login kimi-coding), which the Moonshot-side tools require; KIMI_API_KEY is the fallback.",
-    "Decided routing (maintainer): root k3.1-pro at high (max selectable in config.json; a later 0.3.x task measures high against max on real sessions). Specialists on kimi-for-coding (Kimi K2.8 Preview): max for Worker.implementation, Worker.debugging, Worker.integration and Reviewer.code, Reviewer.security, Reviewer.testing, Reviewer.artifact; high for Worker.mechanical, Worker.validation, Worker.operations, the lookup and map roles, Reviewer.audit, Librarian.research and Explorer.trace; never low. Worker.visual k3.1-pro at low; Reviewer.visual k3.1-pro at high.",
+    "Decided routing (maintainer): root k3.1-pro at high (max selectable in config.json; a later 0.3.x task measures high against max on real sessions). Specialists on kimi-for-coding (Kimi K2.8 Preview): max for Worker.implementation, Worker.debugging, Worker.integration and Reviewer.code, Reviewer.security, Reviewer.testing, Reviewer.artifact; high for Worker.mechanical, Worker.validation, Worker.operations, the lookup and map roles, Reviewer.audit, Librarian.research and Explorer.trace; never low. Worker.visual k3.1-pro at low; Reviewer.visual k3.1-pro at low too, because the root makes the final visual pass (maintainer: \"both visual specialists must be low, as root does the final review pass\").",
     "Decided (maintainer): web search and fetch use the Kimi extension's moonshot_search and moonshot_fetch when Kimi is the provider, with pi-web-kit as the config.json fallback (Moonshot currently says its web search is not recommended for production).",
     "Decided (maintainer): input-token cache hit rate targets 95% or more and aims for 98% or more, measured as cached input tokens over all input tokens per session and per Assignment. Kimi caches by exact content prefix in 256-token chunks with a 300 to 1800 s TTL, and changing model or effort invalidates it, so prompts keep a byte-stable prefix, each session keeps one model and effort, and the rate is reported from provider usage."
   ],
-  "revision": 7,
+  "revision": 8,
   "state": "Open",
   "createdAt": "2026-11-07T16:43:52.730Z"
 }
