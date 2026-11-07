@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-review-findings-on-the",
   "objective": "Repair the review findings on the HolyAgent config commit and apply the maintainer's later config decisions.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-config (branch release/0.3.0/feat/holyagent-config, HEAD is a merge of the host-neutral CLI branch on top of c9fd8c5; node_modules installed). Gates: bunx --no-install mise run <task>. Diff of the original commit: /home/user/holyagent-notes/pr3.diff.",
     "Blocker: packages/runtime/src/vcs/commands.ts:79 and :154 and packages/runtime/src/cli/hook.ts:473 call readSettings without call.env, so HOLYAGENT_HOME and HOME from the call are ignored and tests read the real ~/.holyagent; pass the call's env at every call site, with a test that a fixture home is honoured.",
@@ -72,7 +72,53 @@
     "agentId": "workflow:wf_0da7fafa-4d9/assignment-0mw6z5chk-1qfm",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-07T22:27:57.944Z"
+    "startedAt": "2026-11-07T22:27:57.944Z",
+    "finishedAt": "2026-11-07T22:34:53.230Z"
+  },
+  "result": "result: the blocker and the other review findings are fixed and the maintainer's config decisions are applied. `bunx --no-install mise run verify` exits 0 with 1709 tests passing and 0 failing.\n\nchanged (all under `/home/user/holyagent-0.3.0-config`):\n- `packages/runtime/src/config/{schema,load,packages,index}.ts` and new `errors.ts`\n- `packages/runtime/src/cli/{errors,hook}.ts`\n- `packages/runtime/src/vcs/commands.ts`\n- `packages/runtime/src/index.ts`\n- `packages/runtime/tests/config/{load,packages,schema}.test.ts` and new `defaults.ts`\n- `packages/runtime/tests/{vcs-message,vcs-pr,vcs-settings}.test.ts`\n- `packages/integrations/claude/dist/scripts/holyagent.js` (regenerated)\n- `docs/pi/configuration.md`, `docs/pi/t3-code.md`\n\nchecks:\n- `bunx --no-install mise run verify` -> exit 0, 1709 pass, 0 fail; log at `/home/user/holyagent-notes/pr3-repair-verify.log`.\n- `bunx --no-install mise run build` -> exit 0.\n- With the `call.env` fixes reverted, the five new fixture-home tests fail. I restored the fixes afterwards.\n\nblockers: none\nquestions: none\n\nnotes:\n- **Error class location:** `ConfigInvalid` is defined in `config/errors.ts`, not `cli/errors.ts`, because `config/load.ts` importing from `cli/` would be a layering inversion. `cli/errors.ts` holds its hint, which points to `docs/pi/configuration.md`. It keeps CorruptRecord's exit code of 4.\n- **`DEFAULT_CONFIG`:** `DEFAULT_CONFIG` is now `defaultConfig`, an Effect, so nothing runs at import. The old name also clashed with `domain/directive.ts` once the config module was exported from the index. Tests use `tests/config/defaults.ts`.\n- **Package order:** `piPackages` now emits the provider, then `FEATURE_PACKAGES` order, then `pi-web-kit` last. The web kit used to sit between `ask` and `processes`.\n- **Merged-decode path:** the merged-decode error now names the project file if one was found, else the user file. The old code could name a path that did not exist.\n- **`vcs: null`:** it is dropped before the merge, so a project `\"vcs\": null` does not clear the user's vcs settings.\n- **User-false-is-final:** a project value that would turn one of these back on is silently ignored, not an error. A user `true`, or a user web mode other than `off`, binds nothing.\n- **T3 setup code:** no T3 setup code exists in this tree, so the `pi.enable` setup behaviour is documented in `docs/pi/t3-code.md` and `configuration.md` only.\n- **Outside my paths:** `docs/pi/README.md:26` still lists \"context meter\" among the settings setup writes. The root should fix it.\n\nevidence:\n- Blocker fixed: every readSettings caller passes the call's env, with a test: `vcs/commands.ts` (both sites) and `cli/hook.ts` now pass `call.env`. The tests are in `vcs-message.test.ts` (commit, hook) and `vcs-pr.test.ts`, and fail without the fix.\n- User false is final for computer use, device access and web tools, with tests: `mergeFiles` and `FINAL_OFF` in `config/load.ts`; the \"a user-level off is final\" block in `tests/config/load.test.ts` passes.\n- pi.enable added with default true; pi.t3.piProvider and pi.t3.contextMeter removed; deviceAccess and worktrees default true: `config/schema.ts`, `config/packages.ts`, `tests/config/schema.test.ts` and `packages.test.ts` pass. The removed keys are refused as unknown keys.\n- Findings fixed: dedicated config error, maxWorkers cap, single route list, no import-time throw, package order, index export, vcs null accepted: `config/errors.ts`, the `cli/errors.ts` hint, `isBetween` 1 to 16, `ROUTE_FIELDS` built from `KIMI_ROUTES`, `defaultConfig`, `piPackages`, `index.ts` export and `withoutNullVcs`, each with a test.\n- Docs: configuration.md and t3-code.md match the keys and rules: `docs/pi/configuration.md` has the keys table, the user-false-is-final rule, `ConfigInvalid` and \"vcs decodes the whole config\"; `docs/pi/t3-code.md` has no context meter in the setup list.\n- Gates: mise run verify exits 0: exit 0, 1709 pass, 0 fail.\n- changed-paths: the changed list above.\n- checks-run: the checks list above.\n- diff-file: `/home/user/holyagent-notes/pr3-repair.diff`\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "verify exit 0 (1709 pass); env tests fail with the fix reverted; each decision tested.",
+    "criteria": [
+      {
+        "criterion": "Blocker fixed: every readSettings caller passes the call's env, with a test",
+        "support": "`vcs/commands.ts` (both sites) and `cli/hook.ts` now pass `call.env`. The tests are in `vcs-message.test.ts` (commit, hook) and `vcs-pr.test.ts`, and fail without the fix."
+      },
+      {
+        "criterion": "User false is final for computer use, device access and web tools, with tests",
+        "support": "`mergeFiles` and `FINAL_OFF` in `config/load.ts`; the \"a user-level off is final\" block in `tests/config/load.test.ts` passes."
+      },
+      {
+        "criterion": "pi.enable added with default true; pi.t3.piProvider and pi.t3.contextMeter removed; deviceAccess and worktrees default true",
+        "support": "`config/schema.ts`, `config/packages.ts`, `tests/config/schema.test.ts` and `packages.test.ts` pass. The removed keys are refused as unknown keys."
+      },
+      {
+        "criterion": "Findings fixed: dedicated config error, maxWorkers cap, single route list, no import-time throw, package order, index export, vcs null accepted",
+        "support": "`config/errors.ts`, the `cli/errors.ts` hint, `isBetween` 1 to 16, `ROUTE_FIELDS` built from `KIMI_ROUTES`, `defaultConfig`, `piPackages`, `index.ts` export and `withoutNullVcs`, each with a test."
+      },
+      {
+        "criterion": "Docs: configuration.md and t3-code.md match the keys and rules",
+        "support": "`docs/pi/configuration.md` has the keys table, the user-false-is-final rule, `ConfigInvalid` and \"vcs decodes the whole config\"; `docs/pi/t3-code.md` has no context meter in the setup list."
+      },
+      {
+        "criterion": "Gates: mise run verify exits 0",
+        "support": "exit 0, 1709 pass, 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "the changed list above."
+      },
+      {
+        "label": "checks-run",
+        "support": "the checks list above."
+      },
+      {
+        "label": "diff-file",
+        "support": "`/home/user/holyagent-notes/pr3-repair.diff`"
+      }
+    ]
   },
   "createdAt": "2026-11-07T22:27:57.944Z"
 }
