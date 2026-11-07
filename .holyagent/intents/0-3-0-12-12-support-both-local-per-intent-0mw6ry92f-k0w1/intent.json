@@ -10,9 +10,10 @@
     "pi: global and project-local installs both work; the docs present both, global first (root default); a project-local install documents the trust step, and specialists of a project-local install inherit the parent session's project trust (--approve only when the parent trusted the project; root default). The behavior when HolyAgent is declared at both scopes is verified during implementation.",
     "User config (maintainer: \"Add ~/.holyagent config\"): a user-level ~/.holyagent/config.json with the same Effect Schema as .holyagent/config.json (common settings, pi section, claude section) holds per-user defaults; a project's .holyagent/config.json overrides it key by key; both are decoded with onExcessProperty error before merging.",
     "claude.ai chat and Cowork (one Claude since 2026-09-16): plugins install per account from Customize > Plugins (no local or global notion there; an organization Owner can set a plugin to Installed by default or Required). The docs state, as tested by the maintainer, that HolyAgent works correctly there, replacing the earlier statement in docs/usage.md and docs/requirements.md that it does not work because of how hooks are activated; plain chat still loads skills only.",
-    "Tests cover install scope resolution for setup and doctor and the user/project config merge inside the existing CI jobs."
+    "Tests cover install scope resolution for setup and doctor and the user/project config merge inside the existing CI jobs.",
+    "Decided (maintainer): for security-relevant pi features (computer use, T3 device access, the web tools), a false in the user-level ~/.holyagent/config.json is final: a project config can turn them off but cannot turn them back on. Every other key keeps the project-wins merge. Setup does not write T3's context meter, and the config has no key for it (maintainer: \"don't set it\")."
   ],
-  "revision": 2,
+  "revision": 3,
   "state": "Open",
   "createdAt": "2026-11-07T19:06:29.608Z"
 }
