@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mw6mfshp-5j7r",
+  "intentId": "intent-0mw6lz68m-7i26",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.code",
+  "slug": "review-commits-7a59dd0-bump-to-0-2-2-and",
+  "objective": "Review commits 7a59dd0 (bump to 0.2.2) and a8ccaa5 (drop frontend-design) on release/0.2.2/refactor/drop-frontend-design for correctness and regressions.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-drop-frontend-design; review 'git diff 3bcefd3 HEAD'. Focus: the generator and license wiring in packages/integrations/claude/src (agents.ts, files.ts, generate.ts), REQUIREMENT_SECTIONS and requirements.md paths, the role section rename to design.md, .eslintignore/.prettierignore, tests in packages/integrations/claude/tests/plugin.test.ts, and that the bump commit carries 0.2.2 in every copy.",
+    "Run 'bunx --no-install mise run verify' on a scratch copy of HEAD (git archive HEAD plus bun install --frozen-lockfile) and confirm 'mise run build' leaves it unchanged; check the new tests fail on 7a59dd0. Use the built-in /code-review on the committed range if available."
+  ],
+  "constraints": [
+    "Read-only on the worktree: no repository edits and no git writes; scratch copies go in the scratchpad.",
+    "Keep working until the review is done; stop and report. Report in under 400 words, findings ranked with file:line and the smallest fix."
+  ],
+  "criteria": [
+    {
+      "text": "The removal breaks no generation, test or gate and mise run verify passes with the build in sync",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The new tests fail without the change",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw6m4mkb-egy5",
+    "assignment-0mw6m0v0w-juwz"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-07T16:32:10.237Z"
+  },
+  "createdAt": "2026-11-07T16:32:10.237Z"
+}
