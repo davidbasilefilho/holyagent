@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-three-non-blocking-review",
   "objective": "Repair the three non-blocking review findings on the integration-branch rule change: scope the identity bullet, tighten the creation versus existing-base wording, and state the mergeability rationale once.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Work only in the git worktree /home/user/holyagent-0.3.0 (branch release/0.3.0/feat/integration-branch-default, node_modules already installed). Gates: `bunx --no-install mise run <task>`.",
     "Findings to fix (from the review of commit 85bd5ba): (1) packages/runtime/src/instructions/claude-5.5/root/identity.md:9 'Creating a missing base is no such push.' is unscoped: say it applies to cutting and pushing a base the conventions name that the remote lacks, and that pushing commits onto an existing base still is such a push; a suggested wording is 'Cutting and pushing a base the conventions name that the remote lacks is no such push; pushing commits onto an existing base is.' (2) claude-5.5/root/stack-plan.md:8 'Later commits pushed onto an existing base still need the user's approval' is loose: say the created base carries only the start the conventions give, and that pushing commits onto an existing base needs approval. (3) The mergeability rationale is restated in stack-plan.md:8 and R-BRANCH (requirements.md) while shared/precedence.md:3 and R-PRECEDENCE own it: point to Precedence instead of restating it, keeping the rule.",
@@ -55,5 +55,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mw6u0jk3-mkyc",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-07T20:24:36.280Z"
+  },
   "createdAt": "2026-11-07T20:24:35.017Z"
 }
