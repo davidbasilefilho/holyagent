@@ -1,0 +1,21 @@
+{
+  "id": "intent-0mw6muv72-jkrt",
+  "slug": "0-3-0-pi-9-10-document-and-ship-the",
+  "objective": "0.3.0 pi 9/10: Document and ship the install path for the Pi integration, so a user can install the pinned package and Pi prerequisites and find the usage in the docs.",
+  "requirements": [
+    "Maintainer (verbatim): \"please add intents for the next 0.3.0 release where I will implement the pi extension integration\"; the maintainer implements 0.3.0, so these Intents record the work and carry no Assignments until the maintainer starts it.",
+    "Maintainer (verbatim): \"in the docs/pi/ it's supposed to use already existent extensions for required functionality\" and \"the first provider to implement will be kimi for coding global\".",
+    "Release model: work lands on release/0.3.0/integration cut from main, as one release/0.3.0/<type>/<change> branch and one PR per change; the first PR of the release carries the version bump made with mise run bump:minor.",
+    "Done means mise run verify passes with the generated output in sync (mise run build) and CI green on every required check, including the windows job.",
+    "The documented Pi install is Node.js 22.19 or newer plus the official installer or npm install -g --ignore-scripts @earendil-works/pi-coding-agent@<pinned>; the HolyAgent package is installed with pi install npm:...@x.y.z (or a git or local source) so the pin is explicit; Bun is documented as needed by the HolyAgent CLI, not as a Pi install route.",
+    "docs/components.md no longer says there is no Pi integration, and docs/usage.md, docs/development.md (layout and generated paths) and docs/pi/README.md describe the new package and how to start the root.",
+    "README.md keeps exactly its six sections in order; any Pi mention there is a link into docs/.",
+    "Open: the distribution channel for the Pi package; the repository publishes GitHub releases and tags, has no npm publishing, and the research names pi install sources npm:, git:, https and local path.",
+    "Open: whether the installers or holyagent setup and doctor install or check Pi; the Windows installer refuses Node older than 22.13 while Pi needs 22.19.",
+    "Open: the rule for moving the pinned Pi version, given weekly Pi releases and the deps:update flow.",
+    "Open: whether Bun is a supported way to install or run Pi; the research finds it undocumented and the Pi CLI shebang targets Node."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-07T16:43:53.582Z"
+}
