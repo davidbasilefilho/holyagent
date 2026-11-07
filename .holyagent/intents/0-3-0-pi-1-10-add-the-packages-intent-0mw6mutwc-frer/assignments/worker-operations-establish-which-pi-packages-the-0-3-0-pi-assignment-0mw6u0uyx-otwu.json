@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "establish-which-pi-packages-the-0-3-0-pi",
   "objective": "Establish which pi packages the 0.3.0 Pi integration depends on actually resolve from the npm registry or GitHub in this environment, with their latest versions, peer dependencies and entry layout, and whether pi itself runs here.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Work only in a new empty directory /home/user/holyagent-notes/pi-probe (create it; the ownership path below names it nominally because ownership paths must be repository-relative); never write inside /home/user/holyagent or /home/user/holyagent-0.3.0.",
     "For each package, report: resolves or not, the latest stable version and its publish date, the version range of @earendil-works/pi-coding-agent it supports (peerDependencies or engines), its license, and its pi manifest (the pi key in package.json or extensions/, skills/, prompts/ directories). Packages: @earendil-works/pi-coding-agent (is 1.5.0 published?), @earendil-works/pi-ai, @earendil-works/pi-agent-core, @earendil-works/pi-tui, typebox, @tintinweb/pi-subagents, @juicesharp/rpiv-todo, @juicesharp/rpiv-ask-user-question, pi-web-kit, @aliou/pi-processes, billion-context, @amaster.ai/pi-computer-use, and pi-provider-kimi-code (npm, or GitHub Leechael/pi-provider-kimi-code). Use `bun pm view <pkg> --json` or `npm view <pkg> --json` (whichever works; the registry goes through the session proxy).",
@@ -37,5 +37,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-07T20:04:39.667Z"
+  },
   "createdAt": "2026-11-07T20:04:30.537Z"
 }
