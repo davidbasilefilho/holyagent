@@ -1,0 +1,36 @@
+{
+  "id": "assignment-0mw6nzg4o-mmob",
+  "intentId": "intent-0mw6lz68m-7i26",
+  "intentRevision": 1,
+  "roleTask": "Librarian.research",
+  "slug": "find-out-how-billion-context-ranxianglei",
+  "objective": "Find out how Billion Context (ranxianglei/billion-context, with its acp-kernel) can be installed for HolyAgent's pi integration, and what it requires.",
+  "state": "Running",
+  "scope": [
+    "Maintainer (verbatim): \"also billioncontext shall be installed\". Context: HolyAgent's Claude plugin once depended on Billion Context to compress the conversation and removed it in commit 85a8560 (PR #40, 2026-10-29; 'git show 85a8560' in /home/user/holyagent shows what it installed and the attribution text it carried). The pi plan is in /home/user/holyagent/docs/pi/.",
+    "Answer with dated links: does Billion Context support pi (a pi package or extension, an MCP server, or only Claude Code and other hosts); how it is installed and configured for pi; how it interacts with pi's own compaction and with prompt caching on Kimi for Coding; its current version, release cadence and maintenance; its license terms, including the visible attribution requirement quoted in that commit; its runtime needs (Node version, native modules) and Windows support; and whether it works with pi-subagents children and codemode."
+  ],
+  "constraints": [
+    "Read-only: write no files and make no git writes; put the full answer in the report.",
+    "Keep working until done; stop and report. Report in under 400 words, a verdict line first."
+  ],
+  "criteria": [
+    {
+      "text": "Pi support, install route and license terms are answered from dated, linked sources or marked unknown",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-07T17:15:26.952Z"
+  },
+  "createdAt": "2026-11-07T17:15:26.952Z"
+}
