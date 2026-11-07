@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "review-the-docs-commit-dab5435-on",
   "objective": "Review the docs commit dab5435 on release/0.3.0/docs/pi-integration-plan, which records the decided 0.3.0 pi integration plan in docs/pi and the pages that point to it, for correctness and completeness against the maintainer's decisions and the sourced research.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "The diff is /home/user/holyagent-work/docs-030.diff (commit 4ac7fcd..dab5435); the changed files are in /home/user/holyagent-docs-pi-plan/docs/ (read them whole where context matters).",
     "Sources of truth: /home/user/holyagent-work/pi-decisions.md (the maintainer's decisions with verbatim quotes; note the latest one: both visual specialists, Worker.visual and Reviewer.visual, run k3.1-pro at low because the root makes the final visual pass); /home/user/holyagent-work/pi-intents-final.jsonl (the ten 0.3.0 Intents); /home/user/holyagent-work/research/*.md (sourced facts on pi 1.5.0, Kimi models and hosts, pi-provider-kimi-code, rpiv versus howaboua, codemode and reasoning effort, Billion Context).",
@@ -61,7 +61,41 @@
     "agentId": "workflow:wf_fbeece1a-efc/assignment-0mw6p5tr7-iv2e",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-07T17:48:24.163Z"
+    "startedAt": "2026-11-07T17:48:24.163Z",
+    "finishedAt": "2026-11-07T18:23:45.186Z"
+  },
+  "result": "result: 2 blocking findings, both small; the other four blocking criteria are met. Checks were by reading only: no Bash was available, and I read the diff, all ten `docs/pi` pages and the research.\n\n**Blocking**\n\n1. **Overturned text left in place.**\n   - `/home/user/holyagent-docs-pi-plan/docs/pi/orchestration.md:122` still reads \"**Host-driven (recommended, Inference.)**\". Line 120 of the same page says architecture 1 \"is not used either\".\n   - `/home/user/holyagent-docs-pi-plan/docs/pi/claude-parity.md:26` says \"That is architecture 2 of orchestration.md, with architecture 1's process per Assignment\". Line 120 says architecture 2 is built only where `@tintinweb/pi-subagents` leaves a gap.\n   - The decision (`pi-decisions.md` line 25) makes the package the launcher.\n   - Fix: drop \"(recommended)\" on line 122. Reword claude-parity line 26 to \"the launcher is `@tintinweb/pi-subagents`; HolyAgent glue only where it falls short\".\n\n2. **A third-party fact is stated as settled when the research did not confirm it.**\n   - `caching-and-subagents.md:34` says \"It replaces Pi's compaction\", and `claude-parity.md:23` repeats it. Line 39 of the first page says the native route's behaviour \"was not confirmed\".\n   - The research (`assignment-0mw6nzg4o-mmob.md`) confirms only the standalone `billion-context-pi`, which cancels Pi's compaction with `session_before_compact`. The decided package is the main `billion-context`, the native route.\n   - Fix: write \"meant to replace Pi's compaction; the standalone route cancels it, the native route is unconfirmed\".\n\n**Non-blocking**\n\n- `README.md:3` says \"ten 0.3.0 Intents\", but Intent 8/10 is closed. `auto-mode.md:7` says \"the other nine\".\n- `auto-mode.md:12` says no handler \"blocks, asks or reviews\". `claude-parity.md:106` and `:174` leave \"scripts that call anything but the 18 specialists still ask\" open. This comes from Intent 7/10. The root should settle it.\n- `providers.md:24` says \"Nothing in the plan depends on which\" API type. `caching-and-subagents.md:17` infers `prompt_cache_key` behaviour that holds only for `openai-completions`.\n- `providers.md:69` says \"Specialists run on `kimi-for-coding` … never at low\". Both visual specialists run `k3.1-pro` at low (line 70).\n- The Codex material you said was removed still leaves traces: the `openai-codex.json` link at `README.md:54`, \"(and on the Codex-backed provider)\" at `claude-parity.md:161`, and the `openai-codex-responses` row in the `caching-and-subagents.md` table.\n- `extensions.md:39` says the Moonshot tools are off by default. It does not say how HolyAgent enables them, and API-key logins cannot use them.\n- The research (`assignment-0mw6nts7x-wy9p.md`) found no evidence that the rpiv packages work on Pi 1.5.0. The docs pin them on 1.5.0 without saying so.\n- No page says the role prompts carry vendored frontend-design text. `claude-parity.md:90` says the visual roles read \"the platform design skill their criteria name\", which matches `packages/integrations/claude/src/agents.ts`. Intent 3/10 says the roles carry their own design text. The root should reconcile the two.\n- `README.md:44` says pi.dev reported 1.4.0 as latest, next to the 1.5.0 text. Several pages use first person (\"my own conclusions\").\n\n**Points you flagged**\n- **`holy_assign`:** `orchestration.md:15` limits it to gaps the package leaves, and says \"The Intent text still names\" it. This is honest. Intents 2/10 and 7/10 still name it, and are not edited.\n- **Built-in API type:** `providers.md:24` correctly records the disagreement between commit `209bc7b9` and `main`.\n- **Codex and `gpt-6-luna`:** the removal is consistent with the dropped auto-mode reviewer.\n- **Open points in `claude-parity.md`:** all six are open in the sources.\n\nevidence:\nDecisions recorded: met. Every line of `pi-decisions.md` appears with its value, including both visual specialists at `k3.1-pro` low (`providers.md:67,70`, `README.md:22`).\nOverturned text replaced: gap. Finding 1 above. The rest is clean: no auto-mode as planned, no score routing, and nicobailon appears only as replaced.\nPlan not shipped: met. Every page opens with a Status line saying \"planned\" or \"decided\", and the diff keeps \"not shipped\" wording in `docs/README.md`, `components.md` and `requirements.md`.\nSourced facts: gap. Finding 2 above. All other checked facts match the research: Kimi hosts, models and efforts, region variable, cache facts, rpiv and howaboua versions, codemode limits, and Billion Context.\nDocs only and links valid: met. All 14 changed paths are under `docs/`. Every relative link target exists and every anchor matches a heading.\nfindings: the two blocking and the non-blocking list above.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "review read the diff, every page and the research; two blocking findings verified against the cited lines",
+    "criteria": [
+      {
+        "criterion": "Decisions recorded: every decision in pi-decisions.md appears in docs/pi with its decided value",
+        "support": "met. Every line of `pi-decisions.md` appears with its value, including both visual specialists at `k3.1-pro` low (`providers.md:67,70`, `README.md:22`)."
+      },
+      {
+        "criterion": "Overturned text replaced: no page still presents a decided point as open, presents auto-mode as planned, keeps score-based routing as the 0.3.0 plan, names nicobailon's pi-subagents as the runner, or says vendored frontend-design text",
+        "support": "gap. Finding 1 above. The rest is clean: no auto-mode as planned, no score routing, and nicobailon appears only as replaced."
+      },
+      {
+        "criterion": "Plan not shipped: the pages present the pi integration as the 0.3.0 plan",
+        "support": "met. Every page opens with a Status line saying \"planned\" or \"decided\", and the diff keeps \"not shipped\" wording in `docs/README.md`, `components.md` and `requirements.md`."
+      },
+      {
+        "criterion": "Sourced facts: third-party facts match the research reports",
+        "support": "gap. Finding 2 above. All other checked facts match the research: Kimi hosts, models and efforts, region variable, cache facts, rpiv and howaboua versions, codemode limits, and Billion Context."
+      },
+      {
+        "criterion": "Docs only and links valid: the diff touches only docs/ and its relative links resolve",
+        "support": "met. All 14 changed paths are under `docs/`. Every relative link target exists and every anchor matches a heading."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "the two blocking and the non-blocking list above."
+      }
+    ]
   },
   "createdAt": "2026-11-07T17:48:24.163Z"
 }
