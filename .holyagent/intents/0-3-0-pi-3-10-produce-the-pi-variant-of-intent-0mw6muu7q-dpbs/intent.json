@@ -16,12 +16,13 @@
     "The package ships code-review and security-review prompt templates in prompts/, which Reviewer.code and Reviewer.security expand as their first pass over the committed range. Open: the text of the two first-pass prompts, which the research does not give.",
     "No path-guard extension is loaded, the version-control boundary stays instruction-only, no autoCompactWindow equivalent is set, no session_before_compact handler is registered.",
     "The instruction files follow the cache requirements: static material first, no dates or counters, no mid-session roster change.",
-    "Open: which Pi model ids and thinking levels stand for the route table's haiku/sonnet, medium/high/xhigh and the root's opus; the first answer is for Kimi for Coding and is decided in the provider Intent.",
     "Maintainer (verbatim): \"for the pi integration we will need kimi k3.1 specific instructions following its official instruction guide\".",
     "The Pi instruction text has a Kimi K3.1 variant, a per-model set beside packages/runtime/src/instructions/claude-5.5 (for example kimi-k3.1/), written to Moonshot's official Kimi K3.1 prompting and instruction guide rather than adapted from the Claude 5.5 wording; each rule that departs from the Claude set cites the guide section it follows, the way the Claude set cites Anthropic's guidance.",
-    "Open: the official Kimi K3.1 instruction guide's URL and version, and which of its recommendations (system prompt structure, tool-use format, thinking mode, length and temperature defaults) apply to the root and to each specialist."
+    "Decided (maintainer): the Kimi K3.1 instruction set follows Moonshot's prompt best-practice guide (https://platform.kimi.ai/docs/guide/prompt-best-practice), the K3.1 Pro quickstart (https://platform.kimi.ai/docs/guide/kimi-k3-1-pro-quickstart) and the agent-setup guide (https://platform.kimi.ai/docs/guide/use-kimi-k3-to-setup-agent), citing the section each rule follows; Moonshot has no K3.1-specific prompting guide.",
+    "Decided (maintainer): it follows the agent guide's structure: a short per-role system prompt with role, workflow and quality boundaries, and the details in tool descriptions and on-demand skills.",
+    "K3.1 Pro request constraints from the quickstart: thinking is always on and set with reasoning_effort; temperature, top_p and n are fixed and omitted; the whole assistant message, reasoning_content and tool_calls included, is passed back unchanged."
   ],
-  "revision": 2,
+  "revision": 3,
   "state": "Open",
   "createdAt": "2026-11-07T16:43:52.310Z"
 }
