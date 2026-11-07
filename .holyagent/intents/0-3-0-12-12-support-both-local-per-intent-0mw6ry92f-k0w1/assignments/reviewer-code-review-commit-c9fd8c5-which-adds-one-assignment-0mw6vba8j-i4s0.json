@@ -1,0 +1,42 @@
+{
+  "id": "assignment-0mw6vba8j-i4s0",
+  "intentId": "intent-0mw6ry92f-k0w1",
+  "intentRevision": 2,
+  "roleTask": "Reviewer.code",
+  "slug": "review-commit-c9fd8c5-which-adds-one",
+  "objective": "Review commit c9fd8c5, which adds one Effect Schema for HolyAgent config (common settings, pi and claude sections), a loader merging ~/.holyagent/config.json under the project's .holyagent/config.json, and piPackages, against the merge-ready bar.",
+  "state": "Ready",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-config, branch release/0.3.0/feat/holyagent-config; the commit is HEAD on top of ee51233. Diff: /home/user/holyagent-notes/pr3.diff. Decided design: docs/pi/configuration.md ('Keys and defaults' and the merge rules), docs/pi/providers.md (Kimi route table).",
+    "Requirements: both files decoded with onExcessProperty error before a key-by-key merge where the project wins; unknown key or invalid value fails naming the field and the file; piPackages excludes disabled features; Kimi route defaults match providers.md; the existing vcs settings behave as before (the implementer notes two intended changes: unknown top-level keys now fail, and user-level vcs settings now apply under the project's); repository code rules (Effect, tagged errors, no try/catch, new Promise or async, Schema, Bun APIs, JSDoc). Known gaps the implementer named: errors reuse the CorruptRecord tag whose message says 'not a valid state file', and src/index.ts does not export the config module."
+  ],
+  "constraints": [
+    "Read-only; no git writes. Findings blocking or non-blocking with file:line and a reproduction or trace. For security: the config decides which pi packages load and reads files from the home directory; check path handling, HOLYAGENT_HOME, symlinks and what an attacker-controlled project config can enable. Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "Behavior: each requirement holds, or a finding shows where not",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Regressions: existing vcs settings and commands behave as before apart from the two stated changes",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Repo standards: the repository code rules hold",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw6urc7l-7dsc"
+  ],
+  "createdAt": "2026-11-07T20:40:36.499Z"
+}
