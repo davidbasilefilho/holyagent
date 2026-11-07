@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-commit-c9fd8c5-which-adds-one",
   "objective": "Review commit c9fd8c5, which adds one Effect Schema for HolyAgent config (common settings, pi and claude sections), a loader merging ~/.holyagent/config.json under the project's .holyagent/config.json, and piPackages, against the merge-ready bar.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-config, branch release/0.3.0/feat/holyagent-config; the commit is HEAD on top of ee51233. Diff: /home/user/holyagent-notes/pr3.diff. Decided design: docs/pi/configuration.md ('Keys and defaults' and the merge rules), docs/pi/providers.md (Kimi route table).",
     "Requirements: both files decoded with onExcessProperty error before a key-by-key merge where the project wins; unknown key or invalid value fails naming the field and the file; piPackages excludes disabled features; Kimi route defaults match providers.md; the existing vcs settings behave as before (the implementer notes two intended changes: unknown top-level keys now fail, and user-level vcs settings now apply under the project's); repository code rules (Effect, tagged errors, no try/catch, new Promise or async, Schema, Bun APIs, JSDoc). Known gaps the implementer named: errors reuse the CorruptRecord tag whose message says 'not a valid state file', and src/index.ts does not export the config module."
@@ -42,7 +42,33 @@
     "agentId": "workflow:wf_35b5d5c2-5c8/assignment-0mw6vba8j-i4s0",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-07T20:40:50.892Z"
+    "startedAt": "2026-11-07T20:40:50.892Z",
+    "finishedAt": "2026-11-07T20:46:50.829Z"
+  },
+  "result": "result: not merge-ready, one blocker. Requirements 1–5 hold. `mise run verify` exits 0 (1671 pass, 0 fail, type-check, lint and format clean). `mise run build` was not run, so I did not check that the generated `dist/scripts/holyagent.js` matches the source.\n\nThe built-in `/code-review` ran on `ee51233...c9fd8c5`. I read the cited code for each of its findings.\n\nblockers:\n1. **`vcs` commands ignore `call.env` when reading the config** (`packages/runtime/src/vcs/commands.ts:79` and `:154`, `packages/runtime/src/cli/hook.ts:473`). `readSettings(settingsFolders(call))` is called without `call.env`, so it defaults to `process.env`. `HOLYAGENT_HOME` and `HOME` in the call's environment are therefore ignored.\n   - The fixtures set `HOME: cwd` (`tests/vcs-fixtures.ts:124`, `tests/cli.test.ts:56`), yet the commit, pr and commit-msg paths read the machine's real `~/.holyagent/config.json`.\n   - Those tests now depend on the developer's home, and a bad file there fails them. They pass here only because no such file exists.\n   - Fix: pass `call.env` at all three call sites.\n\nnon-blocking, for the root to decide:\n2. **`readSettings` validates the whole config** (`vcs/settings.ts:13`). A typo in `pi` or `claude`, or a bad `~/.holyagent/config.json`, now blocks `vcs commit`, `vcs pr` and the `commit-msg` hook in every repository.\n   - Repro: a user file with `pi.features.web:\"bogus\"` makes `readSettings` fail with `CorruptRecord` naming that file.\n   - Unknown top-level keys failing is a stated change. Failure from invalid `pi` or `claude` values and from user-file errors is a wider effect that was not named. Decide whether the commit path should decode only `vcs`.\n3. **Error text and path** (`config/load.ts:82`). The known gap stands: the message still says \"not a valid state file\". The merged-decode error also uses `path: \"<user>, <project>\"`, which is not a path. With no project directories it names the user file twice. In practice the merged decode cannot fail after both files decode.\n4. **Security: project config wins over user config for risky toggles.** A repo's `.holyagent/config.json` can switch `pi.features.computerUse`, `web:\"pi-web-kit\"` and `processes` back on after the user turned them off. `pi.t3.deviceAccess` and `t3.scope` are also project-overridable.\n   - Packages come only from the fixed `FEATURE_PACKAGES` and `PROVIDER_PACKAGES` maps, so a repo cannot name an arbitrary package.\n   - `codemode.maxWorkers` has no upper bound.\n   - Everything under `pi` follows the decided rule that the project wins. Decide whether the user's `false` for security-relevant features should be final, as `stateBranch` already is.\n   - `HOLYAGENT_HOME` is a trusted environment variable, and a relative value resolves against the working directory. `readText` follows symlinks, so a symlinked project config is read and its value can show up in a decode error. Both are low risk.\n5. **Duplicated route table.** The `pi.routes` struct at `schema.ts:~102` and `KIMI_ROUTES` are two hand lists. The schema could be built from `KIMI_ROUTES`.\n6. **Import-time throw.** `DEFAULT_CONFIG` uses `decodeUnknownSync` at module load (`schema.ts:205`), which throws instead of using Effect.\n7. **`piPackages` order.** It puts `web` between `ask` and `processes`, which is not the `FEATURE_PACKAGES` order.\n8. **Known gap.** `src/index.ts` does not export the config module.\n\nI could only read the following, not run it: symlink and `HOLYAGENT_HOME` handling, and the Pi launch use of `piPackages`.\n\nevidence:\nBehavior: Requirements 1–5 hold. Both files go through `readConfigFile` (`load.ts:50`) with `onExcessProperty: \"error\"` before `merge`, where the project wins and lists replace. A repro with a bad `pi.features.web` returned an error naming the field and the file path. `KIMI_ROUTES` matches the providers.md table row by row. `piPackages` drops disabled features (`packages.ts`). The only blocker is finding 1.\nRegressions: `mise run verify` exits 0 with 1671 pass and 0 fail. The vcs behavior changes are the two stated ones plus findings 1 and 2.\nRepo standards: no try/catch, `new Promise` or async in `config/`, and lint exits 0. Tagged errors are reused as `CorruptRecord` (known gap), JSDoc is present, and `decodeUnknownSync` at import is finding 6.\nfindings: see items 1–8 above.\n",
+  "acceptance": {
+    "revision": 2,
+    "rationale": "Findings carry file:line and repros; one blocker (call.env) goes to repair.",
+    "criteria": [
+      {
+        "criterion": "Behavior: each requirement holds, or a finding shows where not",
+        "support": "Requirements 1–5 hold. Both files go through `readConfigFile` (`load.ts:50`) with `onExcessProperty: \"error\"` before `merge`, where the project wins and lists replace. A repro with a bad `pi.features.web` returned an error naming the field and the file path. `KIMI_ROUTES` matches the providers.md table row by row. `piPackages` drops disabled features (`packages.ts`). The only blocker is finding 1."
+      },
+      {
+        "criterion": "Regressions: existing vcs settings and commands behave as before apart from the two stated changes",
+        "support": "`mise run verify` exits 0 with 1671 pass and 0 fail. The vcs behavior changes are the two stated ones plus findings 1 and 2."
+      },
+      {
+        "criterion": "Repo standards: the repository code rules hold",
+        "support": "no try/catch, `new Promise` or async in `config/`, and lint exits 0. Tagged errors are reused as `CorruptRecord` (known gap), JSDoc is present, and `decodeUnknownSync` at import is finding 6."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "see items 1–8 above."
+      }
+    ]
   },
   "createdAt": "2026-11-07T20:40:36.499Z"
 }
