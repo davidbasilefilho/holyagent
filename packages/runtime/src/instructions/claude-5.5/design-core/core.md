@@ -40,7 +40,7 @@ Apply the skill's capture checklist on the final captures: the worker before rep
 
 - Interface text exists to help someone understand and act, so treat it as part of the design. Decide what the screen must convey and the shortest way to convey it, with one job for each piece of text.
 - Speak in the user's terms, calling a thing what the user calls it ("saved searches", not "query presets"). Say what a thing is or does without selling it; concrete beats clever.
-- Set text in sentence case unless the platform sets its own casing, leave out padding, keep the tone in step with the brand and its readers, and write in the active voice with everyday verbs.
+- Set text in sentence case unless the platform sets its own casing, leave out padding, keep the tone conversational and in step with the brand and its readers, and write in the active voice with everyday verbs.
 - A control names its outcome ("Send invoice", not "Submit"), and each action carries one name from first label to confirmation: the Duplicate button leads to a "Duplicated" confirmation.
 - When something fails or nothing is there yet, point the way. An error states what happened and how to recover, speaks as the interface and not as a person, and neither apologizes nor stays vague; an empty state invites the first action.
 

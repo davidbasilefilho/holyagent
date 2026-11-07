@@ -1033,7 +1033,7 @@ describe("agents", () => {
       "each action carries one name from first label to confirmation",
       "An error states what happened and how to recover",
       "an empty state invites the first action",
-      "keep the tone in step with the brand and its readers",
+      "keep the tone conversational and in step with the brand and its readers",
       "under reduced motion, movement becomes a fade or nothing",
       "Check your own work as it takes shape",
     ]
