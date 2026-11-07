@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mw6mvu4s-q1kx",
+  "intentId": "intent-0mw6lz68m-7i26",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.artifact",
+  "slug": "re-review-the-repair-of-the-frontend",
+  "objective": "Re-review the repair of the frontend-design removal against the previous artifact findings.",
+  "state": "Running",
+  "scope": [
+    "Previous findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw6mfsbq-lzbz.md and the code reviewer's notes 1, 2, 4 and 5 in /home/user/holyagent/.git/holyagent/reports/assignment-0mw6mfshp-5j7r.md. Repair diff (without dist): /home/user/holyagent-work/diffs/drop-frontend-design-repair.diff. Original skill: /home/user/holyagent-work/logs/frontend-design-original.md. Current files in /home/user/holyagent-drop-frontend-design: packages/runtime/src/instructions/claude-5.5/design-core/core.md, skills/web-design/SKILL.md, skills/visual-judging/SKILL.md, roles/worker-visual/design.md, roles/reviewer-visual/design.md, docs/attributions.md, README.md.",
+    "Judge: no passage still tracks the original's sentences, ordering or distinctive phrases (compare side by side); every directive still keeps its meaning (none lost in the rewrite); the duplicates and web-only core items are resolved; the attribution is accurate."
+  ],
+  "constraints": [
+    "Read-only: no edits and no git writes.",
+    "Keep working until the review is done; stop and report. Report in under 300 words: blocking findings first with file:line and the smallest fix."
+  ],
+  "criteria": [
+    {
+      "text": "No passage tracks the source's wording and every directive keeps its meaning",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "The previous findings are closed",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw6mmtwn-sjv2",
+    "assignment-0mw6m4mkb-egy5"
+  ],
+  "followUpOf": "assignment-0mw6mfsbq-lzbz",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-07T16:44:38.860Z"
+  },
+  "createdAt": "2026-11-07T16:44:38.860Z"
+}
