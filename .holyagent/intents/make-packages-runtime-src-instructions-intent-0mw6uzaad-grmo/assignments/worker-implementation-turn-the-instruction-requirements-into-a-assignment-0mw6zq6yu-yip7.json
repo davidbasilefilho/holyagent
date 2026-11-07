@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "turn-the-instruction-requirements-into-a",
   "objective": "Turn the instruction requirements into a requirements/ tree that mirrors the claude-5.5 instruction tree file for file, add guide.md for claude-5.5 and kimi-k3.1, an instructions:scaffold script, mirror and coverage tests, and packages/runtime/AGENTS.md, in the worktree /home/user/holyagent-0.3.0-req (branch release/0.3.0/feat/requirements-tree).",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Work only in /home/user/holyagent-0.3.0-req; run every command there. First run `bun install --frozen-lockfile` there (node_modules is per worktree; it installs lefthook hooks, which is expected).",
     "Today packages/runtime/src/instructions/ holds requirements.md (ids such as R-OUTWARD, R-GIT, R-BRANCH) and requirements/{cache,context,mergeability,commit-text}.md, beside the model set claude-5.5/ (root/, specialist/, shared/, roles/<role>/, skills/<skill>/, design-core/, session-reminder.md, session-cloud-identity.md, root-core.ts). Find every consumer first (packages/integrations/claude/src/{agents,generate}.ts, packages/integrations/claude/tests/plugin.test.ts, the instruction-writing skill, docs/*.md, README.md, install/windows-install.ps1) so nothing breaks.",
@@ -70,5 +70,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-07T22:44:35.120Z"
+  },
   "createdAt": "2026-11-07T22:44:10.567Z"
 }
