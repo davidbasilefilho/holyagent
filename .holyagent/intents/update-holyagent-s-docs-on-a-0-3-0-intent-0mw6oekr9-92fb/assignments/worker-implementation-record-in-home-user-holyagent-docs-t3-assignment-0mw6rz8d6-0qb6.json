@@ -1,0 +1,78 @@
+{
+  "id": "assignment-0mw6rz8d6-0qb6",
+  "intentId": "intent-0mw6oekr9-92fb",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "record-in-home-user-holyagent-docs-t3",
+  "objective": "Record in /home/user/holyagent-docs-t3 (branch release/0.3.0/docs/t3-and-install-scopes, cut from release/0.3.0/integration) the decided 0.3.0 plans for T3 Code as the primary interface of HolyAgent on pi, for local and global installs in Claude Code and pi with a user-level config, and the maintainer-tested support for claude.ai chat and Cowork.",
+  "state": "Running",
+  "scope": [
+    "Sources of truth: the last two lines of /home/user/holyagent-work/pi-intents-final.jsonl (objectives \"0.3.0 pi 11/12\" for T3 Code and \"0.3.0 12/12\" for install scopes); the T3, computer-use, settings, user-config, defaults and Cowork lines at the end of /home/user/holyagent-work/pi-decisions.md; research in /home/user/holyagent-work/research/: assignment-0mw6r54ng-kg9r.md (how T3 runs pi), assignment-0mw6r9zxs-l85j.md (T3 tools to keep or deactivate), assignment-0mw6rgzog-2rb3.md (T3 browser, computer use, features and settings), assignment-0mw6rlor5-3o9f.md (Cua Driver), assignment-0mw6rgzw5-cgu7.md (install scopes and claude.ai).",
+    "T3 Code: add docs/pi/t3-code.md (Status: planned for 0.3.0) covering: T3 Code as the primary interface, plain pi terminal still supported; how T3 runs pi (`pi --mode rpc`, pi 0.80.5 or newer so the 1.5.0 pin satisfies it, enabled in T3 Settings, the user's own pi install and extensions, T3's MCP bridge); rpc-mode behavior; only T3's dialogs and status, never custom() TUI, with a HolyAgent adapter for rpiv tools where needed; Full access required with a setup-check warning; specialists report through @tintinweb/pi-subagents' own new-turn trigger, verified under T3 by a recorded fixture; the browser (T3 preview_* tools, named) and html_render and html_preview kept and pinned in the fixed tool set; the other mcp__t3-code__ tools deactivated with pi.setActiveTools at session_start (reapplied on before_agent_start and session_tree, tool_call block as backstop) and why; computer use through Cua Driver via the pinned @amaster.ai/pi-computer-use extension, standard mode, confirmations off, only the two visual specialists, per-user driver install and the macOS permissions, and the security note that it can operate any app under Full access; device access enabled where supported; setup writing T3's settings (format to be verified, UI steps as fallback); features relied on as they are; the to-verify list; tests on recorded rpc fixtures in the existing CI jobs. Keep the research's source links; label third-party sources and inference.",
+    "Install scopes: document for Claude Code the user, project and local scopes (commands, precedence, sharing a project-scope install with a team, setup and doctor following the scope) and for pi the global and project-local installs (global first, the trust step, specialists inheriting trust, the both-scopes case to be verified); and the user-level ~/.holyagent/config.json with the same schema, overridden key by key by .holyagent/config.json. Put this where it fits: docs/usage.md (Claude install and setup), docs/pi/installation.md and docs/pi/configuration.md, and docs/components.md or docs/requirements.md if they describe config or install; mark the new behavior as planned for 0.3.0 where it is not shipped.",
+    "claude.ai: rewrite docs/usage.md section '## claude.ai' and the claude.ai row of docs/requirements.md so they state, as tested by the maintainer, that HolyAgent works correctly in claude.ai chat and Cowork (one Claude since 2026-09-16), with plugins installed per account from Customize > Plugins and an Owner able to set Installed by default or Required, and that plain chat still loads skills only; remove the sentence saying it does not work because of how hooks are activated. Keep the existing sourced facts that still hold.",
+    "Agreement: update docs/pi/README.md (decision table rows and page list; the count of open 0.3.0 Intents is now eleven: the T3 Code and install-scope Intents join the nine), docs/README.md (index), docs/pi/extensions.md (Cua extension, rpiv under T3), docs/pi/orchestration.md (T3's delegate_task not used; completion notices under T3), docs/pi/approval.md and auto-mode.md (T3's modes and the Full access requirement), docs/pi/caching-and-subagents.md (tool set fixed at session start), docs/pi/providers.md if routing or tools are listed, and docs/pi/claude-parity.md (T3 and computer-use rows; still-open list). The section '## T3 Code' of docs/usage.md describes the Claude plugin under T3 and stays, with a pointer to docs/pi/t3-code.md for pi."
+  ],
+  "constraints": [
+    "Docs only: change files under docs/ and, only for one short line on install scopes in its install section, README.md (keep its six sections: # HolyAgent, ## How do I install it?, ## Why HolyAgent?, ## Development, ## Special thanks, ## License). No code, tests, package.json or generated files; leave .claude/CLAUDE.md and AGENTS.md alone.",
+    "Describe 0.3.0 behavior as planned, not shipped; the claude.ai statement is current behavior tested by the maintainer.",
+    "State only facts the sources support; mark unknowns as to be verified. Neutral voice, no first person, relative links, 'Inference:' labels, as the existing pages.",
+    "Make no git writes (no add, commit, checkout, stash); the root commits. Write the diff to /home/user/holyagent-work/docs-t3b.diff: `git -C /home/user/holyagent-docs-t3 diff -- docs README.md`, then append `git -C /home/user/holyagent-docs-t3 diff --no-index /dev/null <file>` for each new file (exit 1 is expected). List it as diff-file evidence.",
+    "Run the format task on your files, then `bunx --no-install mise run verify` in the worktree, and a relative-link and anchor check over docs/**/*.md and README.md.",
+    "Report in under 450 words with one evidence line per criterion."
+  ],
+  "criteria": [
+    {
+      "text": "T3 plan recorded: docs/pi/t3-code.md states every requirement of the T3 Code Intent with its decided value and sources",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Install scopes recorded: Claude Code scopes, pi scopes and the user-level config are documented as the Intent states",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "claude.ai corrected: usage.md and requirements.md state the maintainer-tested support for chat and Cowork and no longer say it does not work",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Pages agree: the touched pages, decision table and Intent count agree, and nothing presents T3's delegate_task, custom() TUI or a non-Full-access T3 mode as used",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Plan not shipped and sourced: 0.3.0 behavior is stated as planned and facts match the research",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Scope and links: only docs/ and at most one README install line change, README keeps its six sections, every relative link and anchor resolves",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Verify passes: mise run verify exits 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "docs",
+    "README.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-07T19:07:15.355Z"
+  },
+  "createdAt": "2026-11-07T19:07:15.355Z"
+}
