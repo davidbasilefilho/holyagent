@@ -1,0 +1,48 @@
+{
+  "id": "assignment-0mw6rlor5-3o9f",
+  "intentId": "intent-0mw6oekr9-92fb",
+  "intentRevision": 2,
+  "roleTask": "Librarian.research",
+  "slug": "identify-the-cua-driver-the-maintainer",
+  "objective": "Identify the \"cua driver\" the maintainer chose as computer use for HolyAgent on pi under T3 Code, and establish how HolyAgent would install and connect it.",
+  "state": "Running",
+  "scope": [
+    "Maintainer (verbatim), answering how HolyAgent on pi gets computer use since T3 Code provides none for pi: \"cua driver\". Likely the Cua project (trycua/cua, cua.ai) and its driver or computer-server component; confirm which component the name refers to.",
+    "Context: /home/user/holyagent-work/research/assignment-0mw6rgzog-2rb3.md (T3 has no computer use for pi; pi reaches MCP servers through its own config; T3 injects only its own MCP bridge). HolyAgent's visual specialists (Worker.visual, Reviewer.visual) would use it to inspect desktop apps; the browser stays T3's preview_* tools.",
+    "Questions: (1) What the cua driver is, its license, maintenance state (latest release and date), supported OSes (macOS, Linux, Windows) and whether it controls the host desktop or a VM or container. (2) How an agent calls it: an MCP server (name, tools such as screenshot, click, type), a CLI, or a Python or TypeScript SDK; and whether pi can use it through an MCP server entry in pi's settings or through an existing pi extension. (3) Install steps and prerequisites (Python, Docker, macOS permissions such as Accessibility and Screen Recording, Lume VMs), and whether it can be installed per user or per project. (4) Security considerations of host desktop control under T3's Full access. (5) Any existing integration with pi, T3 Code or Claude Code."
+  ],
+  "constraints": [
+    "Authoritative sources first (the Cua repository, docs and releases); label third-party and inference.",
+    "End with the concrete requirements for HolyAgent (install, connection, which roles use it, per-user or per-project), and any real choice for the maintainer with options, separate from facts to verify.",
+    "Report in under 450 words."
+  ],
+  "criteria": [
+    {
+      "text": "Identified: names the cua driver component with license, maintenance and OS support, with sources",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Connection: states how pi would call it and how it installs, with sources",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Requirements: lists the requirements for HolyAgent and separates choices from facts to verify",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-07T18:56:43.409Z"
+  },
+  "createdAt": "2026-11-07T18:56:43.409Z"
+}
