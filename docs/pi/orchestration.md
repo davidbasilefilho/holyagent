@@ -17,6 +17,8 @@ What follows from it:
 - **No extra report tool.** A specialist's final message is its report; there is no `assignment_report` tool, and the `evidence:` block the CLI parses stays the report format ([claude-parity.md](claude-parity.md#4-specialists)).
 - **Open until built:** whether the package's tools are callable from codemode scripts, which matters under mode `only` (see [Codemode in 0.3.0](#codemode-in-030)), and whether children are driven over RPC or JSON mode when HolyAgent code has to drive one itself. Pi documents both and recommends neither ([rpc.md](https://cdn.jsdelivr.net/npm/@earendil-works/pi-coding-agent@1.5.0/docs/rpc.md), [json.md](https://cdn.jsdelivr.net/npm/@earendil-works/pi-coding-agent@1.5.0/docs/json.md)).
 - **The Claude plugin's workflow rules carry over** with the runtime change that makes "workflows available" a host-neutral switch ([claude-parity.md](claude-parity.md#5-workflows)).
+- **Under T3 Code, T3's `delegate_task` is not used.** T3 injects its own orchestration tools (`delegate_task`, `task_status`, `task_cancel`, the `t3_thread_*` family and the rest) into every Pi session it runs; HolyAgent deactivates them and keeps its own specialists, which report through the package's own new-turn trigger ([t3-code.md](t3-code.md#t3s-tools-kept-and-deactivated)).
+- **Completion notices under T3.** T3 treats a turn as done on `agent_settled`, so the notice of a background specialist that finishes afterwards has to start a new root turn in T3 (inference: it may not appear otherwise). A recorded fixture of T3's RPC traffic verifies that; what HolyAgent does if it does not is not decided ([t3-code.md](t3-code.md#specialists-and-completion-notices)).
 
 ## Codemode in 0.3.0
 
@@ -47,7 +49,7 @@ To be verified when the integration is built:
 
 - **Recorded fixtures, not a real Pi.** CI replays recorded Pi events for the pinned Pi version. The fixtures are re-recorded when `mise run deps:update` moves Pi ([installation.md](installation.md#the-pin)). A real Pi process would need Node 22.19 and network access, which the plan avoids in CI.
 - **Inside the existing jobs.** The Pi tests run inside the existing `check` and `windows` jobs, so no job is added or renamed and the rulesets' required check names do not change ([development.md](../development.md)). The `check` job's generated-output freshness check covers the Pi package.
-- **A contract test** covers the Pi RPC or JSON events the integration consumes (`agent_settled`, tool events, `extension_ui_request`) against the pinned version.
+- **A contract test** covers the Pi RPC or JSON events the integration consumes (`agent_settled`, tool events, `extension_ui_request`) against the pinned version. The T3 Code behavior is covered by recorded `pi --mode rpc` fixtures in the same jobs ([t3-code.md](t3-code.md#tests)).
 - **Windows.** Extension and launcher code calls the bundled CLI through Bun on `holyagent.js` directly, not through the POSIX `sh` wrapper. Child launches and paths must work on native Windows, where Pi's built-in tool list includes `powershell` beside `bash`. Whether Pi itself behaves on native Windows is not verified: the research read source only and ran nothing there, so the `windows` job is where it is checked.
 - **The other gates still pass:** pinned action SHAs with version comments, caret dependency ranges (with the Pi peer-dependency exception, see [extensions.md](extensions.md#the-holyagent-package)) and the path-length test.
 
@@ -127,5 +129,5 @@ These were the options before the decision. [Decision for 0.3.0](#decision-for-0
 
 - No resumable workflow runtime: HolyAgent would need its own result cache keyed by run and node (Inference; Pi's documented persistence is the session transcript and `store()`).
 - The tool surface changes between releases (1.0.1 to 1.4.0 in three weeks, [npm registry metadata](https://registry.npmjs.org/@earendil-works/pi-coding-agent)). Decided: Pi and every reused extension are pinned, and recorded fixtures replay the RPC/JSON events HolyAgent consumes ([CI and Windows](#ci-and-windows)).
-- RPC and JSON modes cannot show the built-in project-trust prompt, so children pass `--approve` (full access, see [auto-mode.md](auto-mode.md)).
+- RPC and JSON modes cannot show the built-in project-trust prompt, so children inherit the parent's project trust and pass `--approve` when the parent session trusted the project (full access, see [auto-mode.md](auto-mode.md) and [installation.md](installation.md#global-and-project-local-installs)).
 - Pi has no built-in notion of "blocked on user decision" beyond extension dialogs; the host must answer `extension_ui_request` records or the run stalls until its timeout.

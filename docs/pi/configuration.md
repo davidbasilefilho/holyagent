@@ -23,6 +23,7 @@ What the `pi` section will set, with the default each decision gives:
 | Web search and fetch      | Kimi's `moonshot_search` and `moonshot_fetch`; `pi-web-kit` is the fallback, disabled while the provider extension offers web tools     | [extensions.md](extensions.md#tool-surface-for-030)                                           |
 | Long-command watching     | `@aliou/pi-processes` on                                                                                                                | [extensions.md](extensions.md#tool-surface-for-030)                                           |
 | Task list and questions   | `@juicesharp/rpiv-todo` and `@juicesharp/rpiv-ask-user-question` on                                                                     | [extensions.md](extensions.md#tool-surface-for-030)                                           |
+| Computer use              | `@amaster.ai/pi-computer-use`, for the two visual specialists only; on or off like any reused extension                                 | [t3-code.md](t3-code.md#computer-use-through-cua-driver)                                      |
 | Context compression       | Billion Context on, for the root and the specialists                                                                                    | [caching-and-subagents.md](caching-and-subagents.md#context-compression-with-billion-context) |
 | Workflows and specialists | `@tintinweb/pi-subagents`                                                                                                               | [orchestration.md](orchestration.md#decision-for-030)                                         |
 
@@ -32,6 +33,18 @@ Rules for the file:
 - An invalid file stops the run with a message that names the field. It never falls back silently.
 - Installing the package installs only the dependencies that the default `config.json` enables.
 - The key names are to be settled when the schema is written. That change also documents every option with its default on this page.
+
+### The user-level config
+
+The maintainer's words: "Add ~/.holyagent config". In 0.3.0 a user-level `~/.holyagent/config.json` holds per-user defaults:
+
+- It has the same Effect Schema as the project's `.holyagent/config.json`: the common settings, the `pi` section and the `claude` section.
+- The project's `.holyagent/config.json` overrides it key by key.
+- Both files are decoded with `onExcessProperty: "error"` before they are merged, so an unknown key in either stops the run with a message that names the field and the file ([rules above](#holyagent-configjson)).
+- How nested objects and lists merge is to be settled when the schema is written.
+- Tests cover the user and project merge inside the existing CI jobs.
+
+Inference: Pi itself keeps provider logins, `defaultProjectTrust` and `npmCommand` in `~/.pi/agent`, so the user-level file is for HolyAgent's own defaults and not a second home for those. The file is read by the Claude plugin too; its scopes are in [usage.md](../usage.md#install-scopes).
 
 ## Files and locations
 
@@ -100,7 +113,7 @@ There is **no** settings key for prompt-cache retention or for tool approval: th
 **Status: planned for 0.3.0.** Decided:
 
 - Pi starts as plain `pi` after the one-time `pi install` ([installation.md](installation.md#how-holyagent-installs)); that session is the root. The root launches specialists as child Pi processes through `@tintinweb/pi-subagents` ([orchestration.md](orchestration.md#decision-for-030)).
-- Specialists run with `--approve` (full access, see [auto-mode.md](auto-mode.md)), `PI_SKIP_VERSION_CHECK=1` and `PI_TELEMETRY=0`. They are not run fully offline: the 1.5.0 docs word `PI_OFFLINE` as disabling automatic network activity, including model catalog refreshes.
+- Specialists run in full access (see [auto-mode.md](auto-mode.md)) with `PI_SKIP_VERSION_CHECK=1` and `PI_TELEMETRY=0`, and inherit the parent session's project trust: they get `--approve` only when the parent trusted the project ([installation.md](installation.md#global-and-project-local-installs)). They are not run fully offline: the 1.5.0 docs word `PI_OFFLINE` as disabling automatic network activity, including model catalog refreshes.
 - The root and every specialist run codemode in mode `only`, and `PI_CODEMODE_MAX_WORKERS` is 4 ([orchestration.md](orchestration.md#codemode-in-030)).
 - `holyagent setup` sets Pi's `npmCommand` setting to `bun`, so Pi installs its packages with Bun ([installation.md](installation.md#what-setup-and-doctor-do)).
 - Model and thinking level reach Pi as `--model <provider/id>:<thinking>` from the route table in `config.json` ([providers.md](providers.md#routing)).
