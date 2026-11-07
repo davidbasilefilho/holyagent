@@ -1,48 +1,99 @@
 # Pi configuration: files, locations, precedence, keys
 
-**Status: planned for 0.3.0. The first section is the plan for HolyAgent's own configuration; the sections after it are research on Pi's configuration and are not shipped behaviour.**
+**Status: the first section describes HolyAgent's own configuration, which the runtime reads in 0.3.0; the sections after it are research on Pi's configuration and are not shipped behaviour.**
 
 Pi 1.4.0, commit `4a080252f06caf63a525d7873c5d94d3c23887e0` (the plan pins 1.5.0; see [README.md](README.md#version-risk)). "Inference:" marks a conclusion drawn here, not a stated fact.
 
 ## HolyAgent config.json
 
-HolyAgent already reads `.holyagent/config.json`; today the file holds the `vcs` section ([commit-authorship.md](../commit-authorship.md)). The maintainer decided that the Pi integration uses this same file ("alter/extend .holyagent/config.json, pi section and claude section, common stuff should be outside those sections"). In 0.3.0 it will have three kinds of content:
+HolyAgent reads `.holyagent/config.json` in the project and `~/.holyagent/config.json` for the user ([the user-level config](#the-user-level-config)). The maintainer decided that the Pi integration uses this same file ("alter/extend .holyagent/config.json, pi section and claude section, common stuff should be outside those sections"). The file has three kinds of content:
 
 - a `pi` section, read only by the Pi integration;
-- a `claude` section, read only by the Claude plugin;
-- settings common to both hosts, outside both sections (the existing `vcs` section is one).
+- a `claude` section, read only by the Claude plugin (it holds no option yet, and an empty object is valid);
+- settings common to both hosts, outside both sections: today the `vcs` section ([commit-authorship.md](../commit-authorship.md)).
 
-The file is the one place that sets the Pi integration's options, which functionality is on, and the model provider. Turning a function or the provider on or off turns on or off the existing Pi extensions and packages that supply it, and a disabled one is neither loaded nor required.
-
-What the `pi` section will set, with the default each decision gives:
-
-| Setting                   | Default                                                                                                                                 | Detail                                                                                        |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Provider                  | Kimi for Coding (global); selecting it enables `pi-provider-kimi-code`, and deselecting it disables that extension                      | [providers.md](providers.md#kimi-for-coding-global)                                           |
-| Route table               | The Kimi table: model and effort for every specialist role, so a change needs no code. The root's effort is `high`; `max` is selectable | [providers.md](providers.md#routing)                                                          |
-| Web search and fetch      | Kimi's `moonshot_search` and `moonshot_fetch`; `pi-web-kit` is the fallback, disabled while the provider extension offers web tools     | [extensions.md](extensions.md#tool-surface-for-030)                                           |
-| Long-command watching     | `@aliou/pi-processes` on                                                                                                                | [extensions.md](extensions.md#tool-surface-for-030)                                           |
-| Task list and questions   | `@juicesharp/rpiv-todo` and `@juicesharp/rpiv-ask-user-question` on                                                                     | [extensions.md](extensions.md#tool-surface-for-030)                                           |
-| Computer use              | `@amaster.ai/pi-computer-use`, for the two visual specialists only; on or off like any reused extension                                 | [t3-code.md](t3-code.md#computer-use-through-cua-driver)                                      |
-| Context compression       | Billion Context on, for the root and the specialists                                                                                    | [caching-and-subagents.md](caching-and-subagents.md#context-compression-with-billion-context) |
-| Workflows and specialists | `@tintinweb/pi-subagents`                                                                                                               | [orchestration.md](orchestration.md#decision-for-030)                                         |
+The file is the one place that sets the Pi integration's options, which functionality is on, and the model provider. Turning a function or the provider on or off turns on or off the existing Pi extensions and packages that supply it, and a disabled one is neither loaded nor required. The schema is `packages/runtime/src/config/schema.ts` (the `Config` schema, with every default in it); `piPackages(config)` in `packages/runtime/src/config/packages.ts` returns the packages a config must load.
 
 Rules for the file:
 
 - It is decoded with Effect Schema and `onExcessProperty: "error"` when it loads, and every option has a documented default.
-- An invalid file stops the run with a message that names the field. It never falls back silently.
+- An unknown key or an invalid value, at any depth, stops the run with a `CorruptRecord` error whose message names the field (as a path such as `["pi"]["routes"]["root"]["thinking"]`) and whose `path` is the file. It never falls back silently, and it never ignores a key it does not know.
+- Every key may be left out; the file `{}` is valid and means all defaults.
 - Installing the package installs only the dependencies that the default `config.json` enables.
-- The key names are to be settled when the schema is written. That change also documents every option with its default on this page.
+
+### Keys and defaults
+
+Common settings, outside the sections:
+
+| Key               | Type            | Default | Meaning                                                                                                                |
+| ----------------- | --------------- | ------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `vcs.allowWords`  | list of strings | none    | Phrases of the commit and PR message check that the project's domain uses legitimately                                 |
+| `vcs.api`         | boolean         | none    | No longer used; accepted so an older file still reads                                                                  |
+| `vcs.stateBranch` | string          | none    | No longer used (only git config `holyagent.stateBranch` names the state branch); accepted so an older file still reads |
+
+The `claude` section has no key; `"claude": {}` is valid and any key in it is refused.
+
+The `pi` section ([providers.md](providers.md), [extensions.md](extensions.md), [t3-code.md](t3-code.md)):
+
+| Key                              | Type                                                      | Default                | Meaning                                                                                                                                                                                                                           |
+| -------------------------------- | --------------------------------------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pi.provider`                    | `"kimi-coding-global"`                                    | `"kimi-coding-global"` | The model provider: Pi's built-in `kimi-coding` with `pi-provider-kimi-code` on top and `KIMI_CODE_REGION=global`. The only value in 0.3.0, so `pi-provider-kimi-code` is always loaded                                           |
+| `pi.routes.<row>.model`          | non-empty string                                          | per row, below         | The model id for the row, as the provider names it; it is checked against the user's catalog at launch                                                                                                                            |
+| `pi.routes.<row>.thinking`       | `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` | per row, below         | The reasoning level for the row, the values of Pi's `--thinking`                                                                                                                                                                  |
+| `pi.features.web`                | `"provider"`, `"pi-web-kit"`, `"off"`                     | `"provider"`           | `provider`: the provider extension's own web tools (`moonshot_search`, `moonshot_fetch`), no extra package; `pi-web-kit`: load `pi-web-kit` (the fallback, for a login that cannot use the provider's tools); `off`: no web tools |
+| `pi.features.processes`          | boolean                                                   | `true`                 | Long-command watching: `@aliou/pi-processes`                                                                                                                                                                                      |
+| `pi.features.todo`               | boolean                                                   | `true`                 | Task list: `@juicesharp/rpiv-todo`                                                                                                                                                                                                |
+| `pi.features.ask`                | boolean                                                   | `true`                 | Questions to the user: `@juicesharp/rpiv-ask-user-question`                                                                                                                                                                       |
+| `pi.features.computerUse`        | boolean                                                   | `true`                 | Computer use for the two visual specialists: `@amaster.ai/pi-computer-use`                                                                                                                                                        |
+| `pi.features.contextCompression` | boolean                                                   | `true`                 | Context compression for the root and the specialists: `billion-context`                                                                                                                                                           |
+| `pi.features.subagents`          | boolean                                                   | `true`                 | Workflows and specialists: `@tintinweb/pi-subagents`                                                                                                                                                                              |
+| `pi.codemode.mode`               | `"on"`, `"only"`                                          | `"only"`               | How the `codemode` tool presents other tools; `only` for the root and every specialist ([orchestration.md](orchestration.md#codemode-in-030))                                                                                     |
+| `pi.codemode.maxWorkers`         | integer, at least 1                                       | `4`                    | `PI_CODEMODE_MAX_WORKERS` for the root and every specialist process                                                                                                                                                               |
+| `pi.t3.scope`                    | `"global"`, `"project"`                                   | `"global"`             | Whether setup writes the T3 Code settings for every project or as overrides of this one                                                                                                                                           |
+| `pi.t3.piProvider`               | boolean                                                   | `true`                 | Setup enables the Pi provider in T3 Code                                                                                                                                                                                          |
+| `pi.t3.worktrees`                | boolean                                                   | `true`                 | Setup turns on T3 Code's worktrees                                                                                                                                                                                                |
+| `pi.t3.contextMeter`             | boolean                                                   | `true`                 | Setup turns on T3 Code's context meter                                                                                                                                                                                            |
+| `pi.t3.deviceAccess`             | boolean                                                   | `true`                 | Setup turns on T3 Code's device access ([t3-code.md](t3-code.md#t3-settings-written-by-setup))                                                                                                                                    |
+
+A `false` feature is not loaded and not required: `piPackages` leaves its package out, and with every feature off only `pi-provider-kimi-code` remains. The `pi.codemode` and `pi.t3` settings load no package.
+
+The route rows, each with the `model` and `thinking` defaults of the Kimi table ([providers.md](providers.md#routing)). `<row>` is `root` or one of the 18 specialists:
+
+| Row                                                                                                             | `model`           | `thinking` |
+| --------------------------------------------------------------------------------------------------------------- | ----------------- | ---------- |
+| `root`                                                                                                          | `k3.1-pro`        | `high`     |
+| `Worker.implementation`, `Worker.debugging`, `Worker.integration`                                               | `kimi-for-coding` | `max`      |
+| `Reviewer.code`, `Reviewer.security`, `Reviewer.testing`, `Reviewer.artifact`                                   | `kimi-for-coding` | `max`      |
+| `Worker.mechanical`, `Worker.validation`, `Worker.operations`                                                   | `kimi-for-coding` | `high`     |
+| `Explorer.map`, `Explorer.lookup`, `Explorer.trace`, `Librarian.lookup`, `Librarian.research`, `Reviewer.audit` | `kimi-for-coding` | `high`     |
+| `Worker.visual`, `Reviewer.visual`                                                                              | `k3.1-pro`        | `low`      |
+
+Any other row name is an unknown key. The root's `thinking` is `high`; `max` is selectable.
+
+An example that turns computer use off, moves the root to `max` and keeps the route table's other rows:
+
+```json
+{
+  "vcs": { "allowWords": ["subagent"] },
+  "pi": {
+    "routes": { "root": { "thinking": "max" } },
+    "features": { "computerUse": false }
+  }
+}
+```
 
 ### The user-level config
 
-The maintainer's words: "Add ~/.holyagent config". In 0.3.0 a user-level `~/.holyagent/config.json` holds per-user defaults:
+The maintainer's words: "Add ~/.holyagent config". A user-level `~/.holyagent/config.json` holds per-user defaults:
 
 - It has the same Effect Schema as the project's `.holyagent/config.json`: the common settings, the `pi` section and the `claude` section.
-- The project's `.holyagent/config.json` overrides it key by key.
-- Both files are decoded with `onExcessProperty: "error"` before they are merged, so an unknown key in either stops the run with a message that names the field and the file ([rules above](#holyagent-configjson)).
-- How nested objects and lists merge is to be settled when the schema is written.
-- Tests cover the user and project merge inside the existing CI jobs.
+- Its folder is `.holyagent` in `HOLYAGENT_HOME` when that variable is set and not empty (tests and sandboxes use it), else in the home directory (`HOME`, else `USERPROFILE`, else the operating system's answer).
+- Both files are decoded with `onExcessProperty: "error"` before they are merged, so an unknown key or an invalid value in either stops the run with a message that names the field and the file ([rules above](#holyagent-configjson)). A missing file reads as an empty one.
+- **The merge is key by key, and the project wins.** The loader decodes the user file and the project file on their own, merges the two, and fills every setting that neither sets with its default. A key the project leaves out keeps the user's value; the project never resets it to the default.
+  - Objects merge recursively, down to a single route's `thinking`: a user file that sets `pi.routes.root.model` and a project file that sets `pi.routes.root.thinking` give a root with both.
+  - Any other value, a list included, from the project replaces the user's. Lists are not concatenated or merged by element, so the project's `vcs.allowWords` is the whole list and an empty list there clears the user's. The same rule is Pi's own for its settings, except for the resource lists that Pi combines ([Precedence](#precedence)); HolyAgent has no list that combines.
+- The project's `.holyagent/config.json` is the config file of the first state folder that has one.
+- Tests (`packages/runtime/tests/config/`) cover the merge, the errors and the defaults inside the existing CI jobs.
 
 Inference: Pi itself keeps provider logins, `defaultProjectTrust` and `npmCommand` in `~/.pi/agent`, so the user-level file is for HolyAgent's own defaults and not a second home for those. The file is read by the Claude plugin too; its scopes are in [usage.md](../usage.md#install-scopes).
 

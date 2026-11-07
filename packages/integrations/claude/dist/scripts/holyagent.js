@@ -177,6 +177,9 @@ function isNotUndefined(input) {
 function isNotNullish(input) {
   return input != null;
 }
+function isNever(_) {
+  return false;
+}
 function isUnknown(_) {
   return true;
 }
@@ -5196,6 +5199,16 @@ var Null = class extends ASTNodeImpl {
   }
 };
 var null_ = /* @__PURE__ */ new Null;
+var Never = class extends ASTNodeImpl {
+  _tag = "Never";
+  getParser() {
+    return fromRefinement(this, isNever);
+  }
+  getExpected() {
+    return "never";
+  }
+};
+var never2 = /* @__PURE__ */ new Never;
 var Unknown = class extends ASTNodeImpl {
   _tag = "Unknown";
   getParser() {
@@ -7200,6 +7213,9 @@ function make6(ast, options) {
 var lambda = (f) => f;
 
 var SchemaErrorTypeId = "~effect/Schema/SchemaError";
+function isSchemaError(u) {
+  return hasProperty(u, SchemaErrorTypeId) && u[SchemaErrorTypeId] === SchemaErrorTypeId;
+}
 
 function declareConstructor() {
   return (typeParameters, run, annotations) => {
@@ -7238,6 +7254,9 @@ class SchemaError extends (/* @__PURE__ */ TaggedError2("SchemaError")) {
     return `SchemaError(${this.message})`;
   }
 }
+function isSchemaError2(u) {
+  return isSchemaError(u);
+}
 function fromIssueEffect(self) {
   if (effectIsExit(self)) {
     return fromIssueExit(self);
@@ -7247,11 +7266,41 @@ function fromIssueEffect(self) {
 function fromIssueExit(exit) {
   return isSuccess3(exit) ? exit : failCause2(map3(exit.cause, (issue) => new SchemaError(issue)));
 }
+function getSchemaErrorOrThrow(cause, message) {
+  let schemaError;
+  for (const reason of cause.reasons) {
+    if (!isFailReason2(reason) || !isSchemaError2(reason.error)) {
+      throw new globalThis.Error(message, {
+        cause
+      });
+    }
+    schemaError ??= reason.error;
+  }
+  if (schemaError === undefined) {
+    throw new globalThis.Error(message, {
+      cause
+    });
+  }
+  return schemaError;
+}
+function runSchemaErrorSync(self) {
+  const exit = runSyncExit2(self);
+  if (isSuccess3(exit)) {
+    return exit.value;
+  }
+  throw getSchemaErrorOrThrow(exit.cause, "Sync adapter can only throw schema errors");
+}
 var is2 = is;
 function decodeUnknownEffect2(schema, options) {
   const parser = decodeUnknownEffect(schema, options);
   return (input, options) => {
     return fromIssueEffect(parser(input, options));
+  };
+}
+function decodeUnknownSync(schema, options) {
+  const parser = decodeUnknownEffect2(schema, options);
+  return (input, options) => {
+    return runSchemaErrorSync(parser(input, options));
   };
 }
 function encodeUnknownEffect2(schema, options) {
@@ -7280,6 +7329,7 @@ function Literal2(literal) {
   });
   return out;
 }
+var Never2 = /* @__PURE__ */ make7(never2);
 var Unknown2 = /* @__PURE__ */ make7(unknown);
 var Null2 = /* @__PURE__ */ make7(null_);
 var String4 = /* @__PURE__ */ make7(string2);
@@ -7476,6 +7526,41 @@ function isInt(annotations) {
   });
 }
 var Int = /* @__PURE__ */ Number5.check(/* @__PURE__ */ isInt());
+function makeIsMinLength(minLength, minCodePoints, annotations) {
+  return makeFilter2((input) => input.length >= minLength, {
+    expected: `a value with a length of at least ${minLength}`,
+    representation: {
+      id: "effect/schema/isMinLength",
+      payload: {
+        minLength
+      }
+    },
+    toJsonSchema: ({
+      type
+    }) => type === "string" ? minLength <= 1 ? {
+      minLength: minCodePoints
+    } : [{
+      minLength: minCodePoints
+    }, true] : type === "array" ? {
+      minItems: minLength
+    } : type === undefined ? [{
+      minLength: minCodePoints,
+      minItems: minLength
+    }, true] : [{}, true],
+    toCode: () => ({
+      runtime: `Schema.isMinLength(${minLength})`
+    }),
+    [STRUCTURAL_ANNOTATION_KEY]: true,
+    arbitraryConstraint: {
+      minLength
+    },
+    ...annotations
+  });
+}
+function isNonEmpty(annotations) {
+  return makeIsMinLength(1, 1, annotations);
+}
+var NonEmptyString = /* @__PURE__ */ String4.check(/* @__PURE__ */ isNonEmpty());
 var RegExp2 = /* @__PURE__ */ instanceOf(globalThis.RegExp, {
   representation: {
     id: "effect/schema/RegExp",
@@ -11779,25 +11864,128 @@ var pullRequest = (request) => gen2(function* () {
 });
 
 import { join as join7 } from "path";
+
+var defaulted = (schema, value) => schema.pipe(withDecodingDefaultKey(succeed6(value)));
 var VcsSettings = Struct({
   api: optionalKey2(Boolean3),
   allowWords: optionalKey2(ArraySchema(String4)),
   stateBranch: optionalKey2(String4)
 });
-var File2 = fromJsonString2(Record(String4, Unknown2));
-var readSettings = (directories) => gen2(function* () {
-  for (const directory of directories) {
-    const path = join7(directory, "config.json");
-    const text = yield* readText(path);
-    if (text === undefined)
-      continue;
-    const corrupt = (reason) => new CorruptRecord({ path, reason });
-    const file = yield* decodeUnknownEffect2(File2)(text).pipe(mapError2((error) => corrupt(error.message)));
-    return yield* decodeUnknownEffect2(VcsSettings, { onExcessProperty: "error" })(file["vcs"] ?? {}).pipe(mapError2((error) => corrupt(`vcs: ${error.message}`)));
-  }
-  const defaults = {};
-  return defaults;
+var PiProvider = Literals(["kimi-coding-global"]);
+var Thinking = Literals(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
+var ModelId = NonEmptyString;
+var KIMI_ROOT = "k3.1-pro";
+var KIMI_SPECIALIST = "kimi-for-coding";
+var kimi = (model, thinking) => ({ model, thinking });
+var KIMI_ROUTES = {
+  root: kimi(KIMI_ROOT, "high"),
+  "Explorer.map": kimi(KIMI_SPECIALIST, "high"),
+  "Explorer.lookup": kimi(KIMI_SPECIALIST, "high"),
+  "Explorer.trace": kimi(KIMI_SPECIALIST, "high"),
+  "Librarian.lookup": kimi(KIMI_SPECIALIST, "high"),
+  "Librarian.research": kimi(KIMI_SPECIALIST, "high"),
+  "Worker.mechanical": kimi(KIMI_SPECIALIST, "high"),
+  "Worker.implementation": kimi(KIMI_SPECIALIST, "max"),
+  "Worker.integration": kimi(KIMI_SPECIALIST, "max"),
+  "Worker.operations": kimi(KIMI_SPECIALIST, "high"),
+  "Worker.validation": kimi(KIMI_SPECIALIST, "high"),
+  "Worker.debugging": kimi(KIMI_SPECIALIST, "max"),
+  "Worker.visual": kimi(KIMI_ROOT, "low"),
+  "Reviewer.visual": kimi(KIMI_ROOT, "low"),
+  "Reviewer.code": kimi(KIMI_SPECIALIST, "max"),
+  "Reviewer.testing": kimi(KIMI_SPECIALIST, "max"),
+  "Reviewer.audit": kimi(KIMI_SPECIALIST, "high"),
+  "Reviewer.security": kimi(KIMI_SPECIALIST, "max"),
+  "Reviewer.artifact": kimi(KIMI_SPECIALIST, "max")
+};
+var route = (key) => defaulted(Struct({
+  model: defaulted(ModelId, KIMI_ROUTES[key].model),
+  thinking: defaulted(Thinking, KIMI_ROUTES[key].thinking)
+}), {});
+var WebMode = Literals(["provider", "pi-web-kit", "off"]);
+var CodemodeMode = Literals(["on", "only"]);
+var T3Scope = Literals(["global", "project"]);
+var Enabled = Boolean3;
+var PiSection = defaulted(Struct({
+  provider: defaulted(PiProvider, "kimi-coding-global"),
+  routes: defaulted(Struct({
+    root: route("root"),
+    "Explorer.map": route("Explorer.map"),
+    "Explorer.lookup": route("Explorer.lookup"),
+    "Explorer.trace": route("Explorer.trace"),
+    "Librarian.lookup": route("Librarian.lookup"),
+    "Librarian.research": route("Librarian.research"),
+    "Worker.mechanical": route("Worker.mechanical"),
+    "Worker.implementation": route("Worker.implementation"),
+    "Worker.integration": route("Worker.integration"),
+    "Worker.operations": route("Worker.operations"),
+    "Worker.validation": route("Worker.validation"),
+    "Worker.debugging": route("Worker.debugging"),
+    "Worker.visual": route("Worker.visual"),
+    "Reviewer.visual": route("Reviewer.visual"),
+    "Reviewer.code": route("Reviewer.code"),
+    "Reviewer.testing": route("Reviewer.testing"),
+    "Reviewer.audit": route("Reviewer.audit"),
+    "Reviewer.security": route("Reviewer.security"),
+    "Reviewer.artifact": route("Reviewer.artifact")
+  }), {}),
+  features: defaulted(Struct({
+    web: defaulted(WebMode, "provider"),
+    processes: defaulted(Enabled, true),
+    todo: defaulted(Enabled, true),
+    ask: defaulted(Enabled, true),
+    computerUse: defaulted(Enabled, true),
+    contextCompression: defaulted(Enabled, true),
+    subagents: defaulted(Enabled, true)
+  }), {}),
+  codemode: defaulted(Struct({
+    mode: defaulted(CodemodeMode, "only"),
+    maxWorkers: defaulted(Int.check(isGreaterThanOrEqualTo2(1)), 4)
+  }), {}),
+  t3: defaulted(Struct({
+    scope: defaulted(T3Scope, "global"),
+    piProvider: defaulted(Enabled, true),
+    worktrees: defaulted(Enabled, true),
+    contextMeter: defaulted(Enabled, true),
+    deviceAccess: defaulted(Enabled, true)
+  }), {})
+}), {});
+var ClaudeSection = defaulted(Record(String4, Never2), {});
+var Config = Struct({
+  vcs: defaulted(VcsSettings, {}),
+  pi: PiSection,
+  claude: ClaudeSection
 });
+var ConfigFile = toEncoded2(Config);
+var DEFAULT_CONFIG = decodeUnknownSync(Config)({});
+
+var HOME_VARIABLE = "HOLYAGENT_HOME";
+var userConfigFile = (env) => join7(firstNonEmpty(env[HOME_VARIABLE]) ?? homeDirectory(env), STATE_DIRECTORY, CONFIG_FILE);
+var isRecord = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+var merge3 = (base, override) => isRecord(base) && isRecord(override) ? {
+  ...base,
+  ...Object.fromEntries(Object.entries(override).map(([key, value]) => [
+    key,
+    Object.hasOwn(base, key) ? merge3(base[key], value) : value
+  ]))
+} : override;
+var JsonFile = fromJsonString2(ConfigFile);
+var readConfigFile = (path) => readText(path).pipe(flatMap2((text) => text === undefined ? succeed6(undefined) : decodeUnknownEffect2(JsonFile, { onExcessProperty: "error" })(text).pipe(mapError2((error) => new CorruptRecord({ path, reason: error.message })))));
+var loadConfig = ({ projectDirectories, env = process.env }) => gen2(function* () {
+  const userPath = userConfigFile(env);
+  const user = yield* readConfigFile(userPath);
+  let project;
+  let projectPath = userPath;
+  for (const directory of projectDirectories) {
+    projectPath = join7(directory, CONFIG_FILE);
+    project = yield* readConfigFile(projectPath);
+    if (project !== undefined)
+      break;
+  }
+  return yield* decodeUnknownEffect2(Config)(merge3(user ?? {}, project ?? {})).pipe(mapError2((error) => new CorruptRecord({ path: `${userPath}, ${projectPath}`, reason: error.message })));
+});
+
+var readSettings = (directories, env = process.env) => loadConfig({ projectDirectories: directories, env }).pipe(map4((config) => config.vcs));
 
 var settingsFolders = (call) => [stateDirectory(call.root)];
 var arguments_ = (call, usage, spec, positionals) => readFlags(call.args.positionals, spec, usage).pipe(filterOrFail2((args) => positionals === "any" || args.positionals.length === positionals, (args) => new Usage({
@@ -11974,7 +12162,7 @@ var accept = (project, assignmentId, input) => gen2(function* () {
   return { assignment: accepted, assignments: [accepted] };
 });
 
-var DEFAULT_CONFIG = {
+var DEFAULT_CONFIG2 = {
   ttlMinutes: 55,
   workflowsAvailable: false,
   host: "claude"
@@ -13949,9 +14137,9 @@ var WORKFLOWS_VARIABLE = "HOLYAGENT_WORKFLOWS";
 var Minutes = NumberFromString.check(isFinite2(), isGreaterThanOrEqualTo2(0));
 var reuseTtl = (env) => {
   const raw = env[TTL_VARIABLE];
-  return raw === undefined || raw.trim() === "" ? succeed6(DEFAULT_CONFIG.ttlMinutes) : decodeUnknownEffect2(Minutes)(raw.trim()).pipe(mapError2(() => new Usage({
+  return raw === undefined || raw.trim() === "" ? succeed6(DEFAULT_CONFIG2.ttlMinutes) : decodeUnknownEffect2(Minutes)(raw.trim()).pipe(mapError2(() => new Usage({
     message: `${TTL_VARIABLE} must be a number of minutes, not "${raw}"`,
-    hint: `Unset ${TTL_VARIABLE} for the default of ${DEFAULT_CONFIG.ttlMinutes}.`
+    hint: `Unset ${TTL_VARIABLE} for the default of ${DEFAULT_CONFIG2.ttlMinutes}.`
   })));
 };
 var given = (raw) => raw === undefined || raw.trim() === "" ? undefined : raw.trim();
@@ -13987,7 +14175,7 @@ var workflowsAvailable = (env, root) => {
     })));
   return agentHostOf(env).pipe(flatMap2((host) => host === "pi" ? succeed6(false) : claudeWorkflowsAvailable(env, root)));
 };
-var loadConfig = (env, root) => all2({
+var loadConfig2 = (env, root) => all2({
   ttlMinutes: reuseTtl(env),
   workflowsAvailable: workflowsAvailable(env, root),
   host: agentHostOf(env)
@@ -21915,7 +22103,7 @@ var callFor = (args, host, emit, command) => gen2(function* () {
     root,
     directory,
     update: (transition) => updateState(directory, transition, host.env, undefined, resolved),
-    config: loadConfig(host.env, root),
+    config: loadConfig2(host.env, root),
     text: readReport(host),
     emit,
     vcs: host.vcs ?? vcsLive(root, host.env),
