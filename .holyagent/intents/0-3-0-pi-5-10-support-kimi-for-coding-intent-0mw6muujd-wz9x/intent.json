@@ -4,6 +4,7 @@
   "objective": "0.3.0 pi 5/10: Support Kimi for Coding (global) as the first model provider of the Pi integration, so a Pi session and its specialists run on it, leaving other providers as later work.",
   "requirements": [
     "Maintainer (verbatim): \"please add intents for the next 0.3.0 release where I will implement the pi extension integration\"; the maintainer implements 0.3.0, so these Intents record the work and carry no Assignments until the maintainer starts it.",
+    "Maintainer, 2026-11-07: implement 0.3.0 now, every part except the dropped auto-mode gate (pi 8/10); test with unit tests and recorded or synthesized fixtures only, no live Kimi runs; merge each PR once it is reviewed and green.",
     "Maintainer (verbatim): \"in the docs/pi/ it's supposed to use already existent extensions for required functionality\" and \"the first provider to implement will be kimi for coding global\".",
     "Release model: work lands on release/0.3.0/integration cut from main, as one release/0.3.0/<type>/<change> branch and one PR per change; the first PR of the release carries the version bump made with mise run bump:minor.",
     "Done means mise run verify passes with the generated output in sync (mise run build) and CI green on every required check, including the windows job.",
@@ -27,7 +28,7 @@
     "Decided (maintainer): web search and fetch use the Kimi extension's moonshot_search and moonshot_fetch when Kimi is the provider, with pi-web-kit as the config.json fallback (Moonshot currently says its web search is not recommended for production).",
     "Decided (maintainer): input-token cache hit rate targets 95% or more and aims for 98% or more, measured as cached input tokens over all input tokens per session and per Assignment. Kimi caches by exact content prefix in 256-token chunks with a 300 to 1800 s TTL, and changing model or effort invalidates it, so prompts keep a byte-stable prefix, each session keeps one model and effort, and the rate is reported from provider usage."
   ],
-  "revision": 8,
+  "revision": 9,
   "state": "Open",
   "createdAt": "2026-11-07T16:43:52.730Z"
 }
