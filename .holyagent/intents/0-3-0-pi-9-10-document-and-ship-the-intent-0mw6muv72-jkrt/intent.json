@@ -10,14 +10,12 @@
     "The documented Pi install is Node.js 22.19 or newer plus the official installer or npm install -g --ignore-scripts @earendil-works/pi-coding-agent@<pinned>; the HolyAgent package is installed with pi install npm:...@x.y.z (or a git or local source) so the pin is explicit; Bun is documented as needed by the HolyAgent CLI, not as a Pi install route.",
     "docs/components.md no longer says there is no Pi integration, and docs/usage.md, docs/development.md (layout and generated paths) and docs/pi/README.md describe the new package and how to start the root.",
     "README.md keeps exactly its six sections in order; any Pi mention there is a link into docs/.",
-    "Open: the distribution channel for the Pi package; the repository publishes GitHub releases and tags, has no npm publishing, and the research names pi install sources npm:, git:, https and local path.",
-    "Open: whether the installers or holyagent setup and doctor install or check Pi; the Windows installer refuses Node older than 22.13 while Pi needs 22.19.",
-    "Open: the rule for moving the pinned Pi version, given weekly Pi releases and the deps:update flow.",
-    "Open: whether Bun is a supported way to install or run Pi; the research finds it undocumented and the Pi CLI shebang targets Node.",
     "Maintainer (verbatim): \"the pi extension and integration will use a config.json that will set options, functionality, the provider, which will enable/disable its deps, etc\".",
-    "The config.json from Intent 0.3.0 pi 4/10 selects this: the docs describe every config.json option with its default, and installing the package installs only the dependencies the default config.json enables."
+    "The config.json from Intent 0.3.0 pi 4/10 selects this: the docs describe every config.json option with its default, and installing the package installs only the dependencies the default config.json enables.",
+    "Decided (maintainer): holyagent doctor checks that pi, Node 22.19 or newer and the package are present, without installing them; the Windows installer's Node minimum rises from 22.13 to 22.19.",
+    "Decided: pi runs on Node; Bun is used by pi only as its npmCommand for package installs."
   ],
-  "revision": 2,
+  "revision": 3,
   "state": "Open",
   "createdAt": "2026-11-07T16:43:53.582Z"
 }
