@@ -1,0 +1,16 @@
+{
+  "id": "intent-0mw6oekr9-92fb",
+  "slug": "update-holyagent-s-docs-on-a-0-3-0",
+  "objective": "Update HolyAgent's docs on a 0.3.0 release branch so they describe the decided pi integration plan, without implementing it.",
+  "requirements": [
+    "Maintainer (verbatim): \"alright please update the docs in a 0.3.0 release branch\" and \"ask me questions for all open stuff and whatever else is needed\"; earlier: \"you aren't supposed to implement 0.3.0\".",
+    "The docs record the plan as decided in the ten 0.3.0 pi Intents (decisions in /home/user/holyagent-work/pi-decisions.md, Intents in /home/user/holyagent-work/pi-intents-final.jsonl) and the sourced research facts; they describe it as the plan for 0.3.0, not as shipped behavior, and change no code.",
+    "Release model (repository convention): release/0.3.0/integration from main; this change on release/0.3.0/docs/pi-integration-plan; the first PR of 0.3.0 carries the bump made with mise run bump:minor as its own commit.",
+    "Do not change .claude/CLAUDE.md; keep the README's six fixed sections; detail goes in docs/.",
+    "Done means mise run verify passes with the build in sync and CI green including Windows.",
+    "Default (maintainer's standing instruction, \"merge whenever merge ready\"): the root squash-merges the reviewed, green docs PR into release/0.3.0/integration; the integration to main PR waits until the maintainer's 0.3.0 implementation lands, since main publishes a stable release."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-07T17:27:12.789Z"
+}
