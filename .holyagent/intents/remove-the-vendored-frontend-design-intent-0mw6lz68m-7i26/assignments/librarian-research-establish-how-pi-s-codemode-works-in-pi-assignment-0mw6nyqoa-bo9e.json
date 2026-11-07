@@ -1,0 +1,37 @@
+{
+  "id": "assignment-0mw6nyqoa-bo9e",
+  "intentId": "intent-0mw6lz68m-7i26",
+  "intentRevision": 1,
+  "roleTask": "Librarian.research",
+  "slug": "establish-how-pi-s-codemode-works-in-pi",
+  "objective": "Establish how pi's codemode works in pi 1.5.0 and what Moonshot says about Kimi K3.1 Pro reasoning effort, so the maintainer can decide how HolyAgent's pi root uses codemode and whether the root runs at max.",
+  "state": "Running",
+  "scope": [
+    "Maintainer (verbatim): \"I wanna specifically use codemode\" and \"assess if max is worth it for root\". Context: /home/user/holyagent/docs/pi/orchestration.md and claude-parity.md describe builtin:codemode as the host for HolyAgent's workflow scripts (the root writes a JavaScript script that fans out specialists, like Claude Code's Workflow tool).",
+    "Codemode, from pi 1.5.0 docs and source (https://cdn.jsdelivr.net/npm/@earendil-works/pi-coding-agent@1.5.0/docs/ and the earendil-works/pi repository): its modes (for example whether an 'only' mode exposes every tool through codemode and what that breaks; rpiv-ask-user-question issue #310 says it is not invoked under codemode 'only'); which tools and extension tools a script can call and how (including tools from extensions such as pi-subagents and @aliou/pi-processes); whether a script can call a subagent or model and await or run several in parallel; PI_CODEMODE_MAX_WORKERS semantics (default 2, counted across all sessions in the process, 256 MB per script, 60 s wait) and whether a script blocks the root's turn while it runs or can run in the background; timeouts and limits; how results and errors return; how parentToolCallId scopes nested calls; any permission or sandbox controls on scripts.",
+    "Kimi reasoning effort, from https://platform.kimi.ai/docs/guide/use-reasoning-effort, the K3.1 Pro quickstart and https://www.kimi.com/code/docs/en/kimi-code/models: what low, high and max change (quality, latency, tokens, Kimi for Coding quota), Moonshot's own advice on when to use max, and any published benchmark by effort level."
+  ],
+  "constraints": [
+    "Read-only: write no files and make no git writes; put the full answer in the report.",
+    "Keep working until done; stop and report. Report in under 600 words: codemode facts first, then reasoning effort, each claim with its link, and 'unknown' where the sources do not say."
+  ],
+  "criteria": [
+    {
+      "text": "Each codemode and reasoning-effort point has a sourced answer or an explicit unknown",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-07T17:14:53.962Z"
+  },
+  "createdAt": "2026-11-07T17:14:53.962Z"
+}
