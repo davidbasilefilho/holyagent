@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "make-the-holyagent-runtime-cli-host",
   "objective": "Make the holyagent runtime CLI host-neutral wherever it assumes Claude Code, so a pi session can use Intents, Assignments, workflows and hook commands, without changing the generated Claude plugin's behavior.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Work only in the git worktree /home/user/holyagent-0.3.0-cli (branch release/0.3.0/refactor/host-neutral-cli). First run `bun install --frozen-lockfile` there. Run gates as `bunx --no-install mise run <task>` from that worktree.",
     "Context: a repository map with paths and line numbers is at /home/user/holyagent-notes/repo-map.md (area 2 lists the Claude assumptions: cli/config.ts L57-67 workflow availability and CLAUDE_CODE_DISABLE_WORKFLOWS; domain/directive.ts workflow: prefix; cli/assignment.ts namespace and help naming Agent/Workflow tools; cli/workflow-check.ts; cli/hook.ts; vcs/message.ts attribution regexes and DEFAULT_PHRASES). The decided pi design is in docs/pi/*.md in the worktree (orchestration.md, claude-parity.md, caching-and-subagents.md especially). The pi launcher package is @tintinweb/pi-subagents; its README and probe notes are at /home/user/holyagent-notes/pi-probe/readmes/pi-subagents.md and /home/user/holyagent-notes/pi-deps.md, and its installed source at /home/user/holyagent-notes/pi-probe/node_modules/@tintinweb/pi-subagents (read it to learn the agent ids it assigns and the tool names Agent and SubagentWorkflow).",
@@ -74,5 +74,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-07T20:11:57.936Z"
+  },
   "createdAt": "2026-11-07T20:11:55.507Z"
 }
