@@ -1,0 +1,42 @@
+{
+  "id": "assignment-0mw6uqowx-rq4j",
+  "intentId": "intent-0mw6muu20-ygf9",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.security",
+  "slug": "review-commit-ee51233-which-makes-the",
+  "objective": "Review commit ee51233, which makes the holyagent runtime CLI host-neutral for pi (HOLYAGENT_HOST and HOLYAGENT_WORKFLOWS, pi agent-id forms, host-aware help, exported session-start builders, pi attribution stripping), against the merge-ready bar.",
+  "state": "Ready",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-cli, branch release/0.3.0/refactor/host-neutral-cli; the commit is HEAD on top of 85bd5ba. Diff file: /home/user/holyagent-notes/pr2.diff. The implementer's notes are in the commit message; docs/pi/orchestration.md ('The runtime under Pi') describes the forms.",
+    "Requirements it must meet: a pi host setting toggles workflow availability and plan prints the direct-launch fallback; assignment record and directives accept the ids @tintinweb/pi-subagents assigns (source under /home/user/holyagent-notes/pi-probe/node_modules/@tintinweb/pi-subagents); help under pi names no Claude Workflow tool; Claude output unchanged; the commit-message cleaner strips pi attribution; repository rules (Effect and tagged errors, no try/catch, new Promise or async in runtime source, Effect Schema at boundaries with onExcessProperty error, Bun APIs, JSDoc on exports)."
+  ],
+  "constraints": [
+    "Read-only; no git writes. Report findings marked blocking or non-blocking with file:line and a reproduction or trace. Report in under 400 words; long logs under /home/user/holyagent-notes/."
+  ],
+  "criteria": [
+    {
+      "text": "Behavior: each requirement holds, or a finding shows where it does not",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Regressions: Claude-host behavior and existing commands are unchanged",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Repo standards: the repository's code rules hold in the changed code",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw6uaeb7-w8rw"
+  ],
+  "createdAt": "2026-11-07T20:24:35.746Z"
+}
