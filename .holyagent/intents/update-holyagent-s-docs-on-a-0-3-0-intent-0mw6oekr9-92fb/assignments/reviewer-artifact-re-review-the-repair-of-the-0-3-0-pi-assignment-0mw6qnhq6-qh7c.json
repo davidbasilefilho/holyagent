@@ -1,0 +1,50 @@
+{
+  "id": "assignment-0mw6qnhq6-qh7c",
+  "intentId": "intent-0mw6oekr9-92fb",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.artifact",
+  "slug": "re-review-the-repair-of-the-0-3-0-pi",
+  "objective": "Re-review the repair of the 0.3.0 pi plan docs on release/0.3.0/docs/pi-integration-plan and confirm it closes the earlier findings without introducing new errors.",
+  "state": "Running",
+  "scope": [
+    "The earlier review with its findings: /home/user/holyagent-work/review-docs-030-r1.md (line numbers refer to commit dab5435).",
+    "The repair diff since dab5435 (one committed repair plus a small wording edit): /home/user/holyagent-work/docs-030-repair.diff; the current files are in /home/user/holyagent-docs-pi-plan/docs/pi/.",
+    "Two new maintainer decisions the repair records: no workflow script asks for confirmation, whatever agents it calls; the kimi-for-coding (K2.8 Preview) specialists use the K3/K3.1 guide set plus the K3 tool-calling guide, per /home/user/holyagent-work/research/assignment-0mw6qfair-ykt4.md. The 0.3.0 Intents (/home/user/holyagent-work/pi-intents-final.jsonl) now record both, and name @tintinweb/pi-subagents as the launcher with holy_assign only for gaps.",
+    "Sources of truth: /home/user/holyagent-work/pi-decisions.md, the Intents file and /home/user/holyagent-work/research/*.md."
+  ],
+  "constraints": [
+    "Judge only the repair: for each earlier finding say closed or still open with the quoted current text; then report any new blocking error the repair introduced (a decision stated wrongly, a decided point presented as open, plan stated as shipped, a fact the research does not support, a broken relative link, a change outside docs/). Wording preferences are non-blocking.",
+    "Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "Earlier findings closed: each blocking and non-blocking finding of the first review is closed or marked to be verified where the sources leave it open",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "New decisions correct: the script-confirmation and K2.8 instruction decisions match the decisions file, the Intents and the research",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No new errors: the repair adds no blocking error",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw6qgwkt-bzlx"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-07T18:30:07.998Z"
+  },
+  "createdAt": "2026-11-07T18:30:07.998Z"
+}
