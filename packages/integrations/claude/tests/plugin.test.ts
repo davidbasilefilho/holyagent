@@ -925,7 +925,9 @@ describe("agents", () => {
       "check it against the conventions' rules on which branches may open PRs into which",
       "if the check bars the stack's top, start from the base",
       "which also decides any other branch the plan needs (an integration branch, where it is cut from and who cuts it)",
-      "pushing it is a push to the base, so it needs the user's approval unless the request names it",
+      "cut it from the start the convention gives and push it as part of this plan without asking, since mergeability in the target repository outranks HolyAgent's defaults",
+      "Later commits pushed onto an existing base still need the user's approval",
+      "Creating a missing base is no such push",
       "`git diff <target>...HEAD` (the PR's actual target: its predecessor in the stack or the base)",
     ])
       expect({ part, found: text.includes(part) }).toEqual({ part, found: true })
