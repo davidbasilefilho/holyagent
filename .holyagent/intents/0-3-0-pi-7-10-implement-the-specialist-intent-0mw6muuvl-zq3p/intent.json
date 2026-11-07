@@ -16,14 +16,12 @@
     "A workflow script that calls only holy_assign with the eighteen names runs without a prompt; any other script asks through ctx.ui.confirm and is blocked when there is no UI.",
     "When codemode or holy_assign is not among the active tools, the launcher provides a direct subagent fallback and signals workflows-unavailable to the runtime switch.",
     "Abort and deadlines are the host's job; the launcher sets PI_CACHE_RETENTION=long on children where the provider's adapter honors it.",
-    "Open: child mode, rpc or json with -p per turn; the research gives both and recommends neither for children.",
-    "Open: whether an assignment_report tool with terminate true is added; the research calls it optional.",
-    "Open: how the two-worker codemode limit (PI_CODEMODE_MAX_WORKERS) is handled for fan-out, and whether scripts that reach bash or write are restricted by parentToolCallId.",
-    "Open: whether children set PI_OFFLINE, PI_SKIP_VERSION_CHECK or PI_TELEMETRY=0 to stop the pi.dev version check and install ping.",
     "Maintainer (verbatim): \"for the kimi provider, currently kimi k3.1 pro should be root and the kimi-for-coding model (which is kimi k2.8 preview) should be the specialists, except stuff like visual stuff that should be kimi k3.1 pro low or something. it really depends on the specialists and the routing should be figured out\".",
-    "The launcher picks each specialist's model and thinking level from the Kimi route table of Intent 0.3.0 pi 5/10 when Kimi for Coding is the configured provider."
+    "The launcher picks each specialist's model and thinking level from the Kimi route table of Intent 0.3.0 pi 5/10 when Kimi for Coding is the configured provider.",
+    "Decided (maintainer): specialists and workflows run through @tintinweb/pi-subagents; its SubagentWorkflow tool runs Claude-style workflow scripts in the background, so the root stays free and is woken as each specialist finishes.",
+    "Decided: no extra report tool; a specialist's final message is its report."
   ],
-  "revision": 2,
+  "revision": 3,
   "state": "Open",
   "createdAt": "2026-11-07T16:43:53.169Z"
 }
