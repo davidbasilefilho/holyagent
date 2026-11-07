@@ -3,14 +3,14 @@
   "slug": "update-holyagent-s-docs-on-a-0-3-0",
   "objective": "Update HolyAgent's docs on a 0.3.0 release branch so they describe the decided pi integration plan, without implementing it.",
   "requirements": [
-    "Maintainer (verbatim): \"alright please update the docs in a 0.3.0 release branch\" and \"ask me questions for all open stuff and whatever else is needed\"; earlier: \"you aren't supposed to implement 0.3.0\"; later: \"also I want holyagent pi to be compatible with t3 code\".",
-    "The docs record the plan as decided in the 0.3.0 pi Intents (decisions in /home/user/holyagent-work/pi-decisions.md, Intents in /home/user/holyagent-work/pi-intents-final.jsonl, now eleven with the T3 Code Intent) and the sourced research facts; they describe it as the plan for 0.3.0, not as shipped behavior, and change no code.",
-    "Release model (repository convention): release/0.3.0/integration from main; the first PR (merged as #70) carried the bump made with mise run bump:minor; the T3 Code docs follow on release/0.3.0/docs/t3-code into release/0.3.0/integration.",
+    "Maintainer (verbatim): \"alright please update the docs in a 0.3.0 release branch\" and \"ask me questions for all open stuff and whatever else is needed\"; earlier: \"you aren't supposed to implement 0.3.0\"; later: \"also I want holyagent pi to be compatible with t3 code\"; \"t3code shall be the primary interface for the pi integration...\"; \"for 0.3.0, we will support both local and global installations for holyagent in claude and pi\"; \"also document that holyagent in claude chat/cowork (they're now unified) works correctly\".",
+    "The docs record the plan as decided in the 0.3.0 pi Intents (decisions in /home/user/holyagent-work/pi-decisions.md, Intents in /home/user/holyagent-work/pi-intents-final.jsonl, now twelve with the T3 Code and install-scope Intents) and the sourced research facts; they describe it as the plan for 0.3.0, not as shipped behavior, and change no code.",
+    "Release model (repository convention): release/0.3.0/integration from main; the first PR (merged as #70) carried the bump made with mise run bump:minor; the T3 Code, install-scope and chat/Cowork docs follow on release/0.3.0/docs/t3-and-install-scopes into release/0.3.0/integration.",
     "Do not change .claude/CLAUDE.md; keep the README's six fixed sections; detail goes in docs/.",
     "Done means mise run verify passes with the build in sync and CI green including Windows.",
     "Default (maintainer's standing instruction, \"merge whenever merge ready\"): the root squash-merges each reviewed, green docs PR into release/0.3.0/integration; the integration to main PR waits until the maintainer's 0.3.0 implementation lands, since main publishes a stable release."
   ],
-  "revision": 2,
+  "revision": 3,
   "state": "Open",
   "createdAt": "2026-11-07T17:27:12.789Z"
 }
