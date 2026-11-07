@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mw6qfair-ykt4",
+  "intentId": "intent-0mw6oekr9-92fb",
+  "intentRevision": 1,
+  "roleTask": "Librarian.research",
+  "slug": "establish-which-moonshot-prompting-or",
+  "objective": "Establish which Moonshot prompting or instruction guide best fits how the kimi-for-coding model (Kimi K2.8 Preview) behaves, so HolyAgent's pi specialists that run on it load instruction text written to the most relevant guide.",
+  "state": "Running",
+  "scope": [
+    "The maintainer's rule (verbatim): \"separate k2.8 or k2.7, or k2.6, k2.5, whichever is more relevant. if k3 or k3.1 is more relevant, we should use it. it depends on how the model behaves\".",
+    "Find Moonshot's official guides for the Kimi K2 line (K2.5, K2.6, K2.7, K2.8 or K2.8 Preview, including any kimi-for-coding or Kimi Code docs) and for K3 and K3.1 (already chosen for the root: https://platform.kimi.ai/docs/guide/prompt-best-practice, https://platform.kimi.ai/docs/guide/kimi-k3-1-pro-quickstart, https://platform.kimi.ai/docs/guide/use-kimi-k3-to-setup-agent).",
+    "Compare K2.8 Preview's documented behavior with each guide's assumptions: thinking or reasoning mode and how reasoning_content is handled, reasoning_effort levels, fixed or tunable sampling parameters (temperature, top_p), tool-calling format and parallel calls, system-prompt handling, context length, and any model card, release note or changelog that says K2.8 shares its post-training or prompt format with K2.x or K3.x.",
+    "Earlier research for context: /home/user/holyagent-work/research/assignment-0mw6nnalc-kg0z.md (Kimi models and hosts) and /home/user/holyagent-work/research/assignment-0mw6nyqoa-bo9e.md (codemode and reasoning effort)."
+  ],
+  "constraints": [
+    "Use authoritative sources first: platform.kimi.ai and moonshot docs, the official Kimi Code / kimi-cli repositories, Moonshot's Hugging Face model cards. Label anything from third parties or inference as such.",
+    "Answer with: the recommended guide set for the K2.8 specialists (one of: a K2.x guide by name, the K3/K3.1 guides, or a mix), the reasons tied to observed behavior, each claim with its URL, and what stays unknown.",
+    "Report in under 450 words."
+  ],
+  "criteria": [
+    {
+      "text": "Recommendation: names one guide set for the K2.8 Preview specialists with reasons tied to the model's documented behavior",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Sourced: each behavioral claim carries an authoritative URL, and inference is labelled",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-07T18:23:45.412Z"
+  },
+  "createdAt": "2026-11-07T18:23:45.412Z"
+}
