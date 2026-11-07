@@ -26,9 +26,13 @@
     "Open: whether Kimi K3.1 is served through Kimi for Coding and under which model id; the sources list k3, kimi-for-coding and kimi-for-coding-highspeed.",
     "Open: whether to enable the extension's Moonshot-side tools, which send data to Moonshot's services; the extension's open issue #16 on tool schemas; and its single-maintainer risk (fallback: the built-in kimi-coding provider).",
     "Maintainer (verbatim): \"the pi extension and integration will use a config.json that will set options, functionality, the provider, which will enable/disable its deps, etc\".",
-    "The config.json from Intent 0.3.0 pi 4/10 selects this: the provider (Kimi for Coding global first) and its options; selecting it enables pi-provider-kimi-code, and deselecting it disables that extension."
+    "The config.json from Intent 0.3.0 pi 4/10 selects this: the provider (Kimi for Coding global first) and its options; selecting it enables pi-provider-kimi-code, and deselecting it disables that extension.",
+    "Maintainer (verbatim): \"for the kimi provider, currently kimi k3.1 pro should be root and the kimi-for-coding model (which is kimi k2.8 preview) should be the specialists, except stuff like visual stuff that should be kimi k3.1 pro low or something. it really depends on the specialists and the routing should be figured out\".",
+    "Kimi route table, starting point: the root runs on Kimi K3.1 Pro; specialists run on the kimi-for-coding model (Kimi K2.8 Preview); visual specialists (Worker.visual, Reviewer.visual) and others that need it run on Kimi K3.1 Pro at a low thinking or effort level.",
+    "The Kimi route table maps every specialist role (the eighteen roles of the Claude route table) to a model and thinking level, each choice with a reason, and lives in the config.json defaults so it can be changed without code.",
+    "Open: the per-specialist routing, which the maintainer says depends on each specialist and must be worked out (for example which reviewers and the debugging worker need K3.1 Pro, and what 'low' maps to in the provider's thinking levels); and the exact model ids for Kimi K3.1 Pro and Kimi K2.8 Preview under Kimi for Coding."
   ],
-  "revision": 4,
+  "revision": 5,
   "state": "Open",
   "createdAt": "2026-11-07T16:43:52.730Z"
 }
