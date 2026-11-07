@@ -1,0 +1,53 @@
+{
+  "id": "assignment-0mw6rgzw5-cgu7",
+  "intentId": "intent-0mw6oekr9-92fb",
+  "intentRevision": 2,
+  "roleTask": "Librarian.research",
+  "slug": "establish-what-supporting-both-local-per",
+  "objective": "Establish what supporting both local (per-project) and global (per-user) installations of HolyAgent means for the Claude Code plugin and for the planned pi package in 0.3.0, and how HolyAgent behaves in claude.ai chat and Cowork today.",
+  "state": "Running",
+  "scope": [
+    "Maintainer (verbatim): \"for 0.3.0, we will support both local and global installations for holyagent in claude and pi\" and \"also document that holyagent in claude chat/cowork (they're now unified) works correctly\". The maintainer has tested chat/Cowork; the current docs (docs/usage.md '## claude.ai' and docs/requirements.md) still say it does not work there.",
+    "Repository (read-only): /home/user/holyagent-docs-t3 — README.md install section, docs/usage.md, docs/requirements.md, docs/hooks.md, docs/components.md, docs/pi/installation.md and docs/pi/configuration.md; .claude-plugin/marketplace.json; packages/integrations/claude/dist/.claude-plugin/plugin.json and hooks; skills/setup (the /holyagent:setup skill that merges recommended settings into user, project or local settings); the runtime's state modes (.holyagent/ in branch, work or local mode) and how the CLI path is resolved.",
+    "Questions: (1) Claude Code: which plugin and marketplace install scopes exist (user, project, local, managed) per the current Claude Code docs (code.claude.com/docs plugins, plugin-marketplaces, settings), how a project-scoped install is shared with a team (.claude/settings.json enabledPlugins and extraKnownMarketplaces), and what in HolyAgent depends on the scope: the setup skill's target file, the SessionStart setup check, hooks, the CLI path given to the root, the plugin data directory. (2) claude.ai: how plugins are installed for chat/Cowork (account level, organization level), whether there is a local versus global notion there, and what Anthropic's current docs say loads in Cowork sessions (agents, hooks, skills, MCP). (3) pi: global install (`pi install` into ~/.pi) versus project-local install (`pi install -l` into .pi/settings.json) per pi 1.5.0 docs, precedence when both exist, trust gating of project extensions, and how a project-local HolyAgent package would find its CLI, config and Billion Context, codemode and extension dependencies. (4) .holyagent/config.json: which settings make sense per project versus per user, and whether a user-level config file (for example ~/.holyagent/config.json) is needed for global installs."
+  ],
+  "constraints": [
+    "Authoritative sources first (code.claude.com docs, support.claude.com, claude.com docs, earendil-works/pi docs at 1.5.0 or main, pi.dev); label inference.",
+    "End with: the concrete requirements for local and global installs per host (Claude Code, claude.ai, pi), each sourced or inference; then real choices for the maintainer with options and consequences, separate from facts to verify.",
+    "Report in under 650 words."
+  ],
+  "criteria": [
+    {
+      "text": "Claude scopes: states the Claude Code install scopes and what in HolyAgent depends on scope, with sources",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "pi scopes: states pi's global and project-local install and its precedence and trust rules, with sources",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "claude.ai: states how plugins install and load in chat and Cowork today, with sources",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Choices separated: real maintainer choices with options, apart from facts to verify",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-07T18:53:04.565Z"
+  },
+  "createdAt": "2026-11-07T18:53:04.565Z"
+}
