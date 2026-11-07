@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-0-3-0-pi-plan-docs-in-home",
   "objective": "Repair the 0.3.0 pi plan docs in /home/user/holyagent-docs-pi-plan (commit dab5435 on release/0.3.0/docs/pi-integration-plan) so they fix every finding of the independent review and record two new maintainer decisions.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "The review is /home/user/holyagent-work/review-docs-030-r1.md; line numbers there refer to commit dab5435. Sources of truth are /home/user/holyagent-work/pi-decisions.md, /home/user/holyagent-work/pi-intents-final.jsonl and /home/user/holyagent-work/research/*.md (new: assignment-0mw6qfair-ykt4.md on K2.8 Preview).",
     "Blocking 1: docs/pi/orchestration.md around line 122 still calls the host-driven architecture 'recommended' although line 120 says it is not used; docs/pi/claude-parity.md around line 26 calls the launcher 'architecture 2 ... with architecture 1's process per Assignment'. The decision makes @tintinweb/pi-subagents the launcher with HolyAgent glue only where it falls short: drop the 'recommended' label and reword claude-parity to say exactly that.",
@@ -63,7 +63,49 @@
     "agentId": "workflow:wf_33e11d3d-3dc/assignment-0mw6qgwkt-bzlx",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-07T18:25:00.653Z"
+    "startedAt": "2026-11-07T18:25:00.653Z",
+    "finishedAt": "2026-11-07T18:29:26.892Z"
+  },
+  "result": "result: Both blocking findings, both new decisions and every non-blocking item are fixed; `mise run verify` exits 0 and the link check is clean.\n\nchanged (all under `/home/user/holyagent-docs-pi-plan/docs/pi/`): `README.md`, `approval.md`, `auto-mode.md`, `caching-and-subagents.md`, `claude-parity.md`, `configuration.md`, `extensions.md`, `installation.md`, `orchestration.md`, `providers.md`. Nothing outside `docs/` changed, and I made no git writes.\n\nchecks:\n- `bunx --no-install mise run fmt -- docs/pi` -> 0, 2 files reformatted.\n- `bunx --no-install mise run verify` -> 0, 1596 pass, 0 fail, lint clean.\n- Relative-link and anchor check over `docs/**/*.md` and `README.md` (script at `/tmp/claude-0/-home-user-holyagent/70184bfa-8a56-57cb-a6cf-d92f87c7692b/scratchpad/linkcheck.py`) -> 21 files, 0 bad.\n\nblockers: none\nquestions: none\n\nnotes:\n- **Intent text:** the Intent text for the launcher still lists a confirmation for scripts, and Intents 2/10 and 7/10 still name `holy_assign`. The docs say the decision overrides the first and I did not edit either.\n- **Moonshot web tools:** the Kimi research does not say how the Moonshot web tools get enabled, so `extensions.md` marks that to be settled.\n- **Visual roles:** the visual roles' `design.md` is a short pointer to the platform design skills (`web-design`, `mobile-design`, `desktop-design`, `tui-design`), not a block of design text. `claude-parity.md` says that, and notes that nothing is vendored since 0.2.2.\n- **Remaining Codex mentions:** `providers.md` still lists `openai-codex` among Pi's catalog provider ids and explains why that research was dropped. `auto-mode.md` still lists the dropped reviewer rule as removed. Both are accurate removal records, so I left them.\n\nevidence:\nBlocking findings fixed: `orchestration.md` architecture 1 now reads \"(Inference; not used)\" with no \"recommended\" left. The `claude-parity.md` orchestration row names `@tintinweb/pi-subagents` as the launcher, with HolyAgent glue only where it falls short. Both Billion Context claims (`caching-and-subagents.md` decided list, `claude-parity.md` compaction row) now say \"meant to replace\", with the standalone route cancelling compaction and the native route to be verified. Diff-file below.\nDecisions recorded: no-confirmation for scripts is stated as decided in `claude-parity.md` section 5 and the section 8 hook row, `orchestration.md` and `auto-mode.md`, and removed from the still-open list. The K2.8 Preview specialists get a new `providers.md` section \"The K2.8 Preview specialists\", with the research URLs, the K2.6/K2.7 guide excluded, and `tool_choice` `required` labelled as from a secondary source. Open item 4 is removed and the list renumbered. The `README.md` Instructions row is updated.\nNon-blocking findings fixed: the Intent count is now nine open with the closed tenth noted (`README.md`, `auto-mode.md`). The API-type dependency is stated in `providers.md` and the cache inference is conditional in `caching-and-subagents.md`. The `providers.md` visual-specialist exception is added. The three Codex traces are gone. The Moonshot tools' enablement is marked to be settled, the API-key limit and `pi-web-kit` fallback are stated, and the rpiv-on-Pi-1.5.0 note is added to `extensions.md`. The pi.dev 1.4.0 reading in `README.md` is dated and marked superseded. First person is replaced across `claude-parity.md`, `installation.md`, `orchestration.md`, `extensions.md`, `providers.md`, `configuration.md`, `approval.md` and `caching-and-subagents.md`. The visual-role wording in `claude-parity.md` is corrected.\nDocs only and links valid: `git status --short` shows only `docs/pi/*` modified; link and anchor check 0 bad.\nVerify passes: `bunx --no-install mise run verify` -> exit 0.\nchecks-run: the three commands under checks above.\nchanged-paths: the ten `docs/pi/*.md` files listed under changed.\ndiff-file: `/home/user/holyagent-work/docs-030-repair.diff`\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "docs-only repair, verify exit 0, link check 0 bad; content goes to re-review",
+    "criteria": [
+      {
+        "criterion": "Blocking findings fixed: the orchestration 'recommended' label and the claude-parity launcher wording state the decided launcher, and both Billion Context compaction claims match the research",
+        "support": "`orchestration.md` architecture 1 now reads \"(Inference; not used)\" with no \"recommended\" left. The `claude-parity.md` orchestration row names `@tintinweb/pi-subagents` as the launcher, with HolyAgent glue only where it falls short. Both Billion Context claims (`caching-and-subagents.md` decided list, `claude-parity.md` compaction row) now say \"meant to replace\", with the standalone route cancelling compaction and the native route to be verified. Diff-file below."
+      },
+      {
+        "criterion": "Decisions recorded: no-confirmation for scripts and the K3/K3.1 guide set for the K2.8 specialists are stated as decided with sources, and removed from the still-open list",
+        "support": "no-confirmation for scripts is stated as decided in `claude-parity.md` section 5 and the section 8 hook row, `orchestration.md` and `auto-mode.md`, and removed from the still-open list. The K2.8 Preview specialists get a new `providers.md` section \"The K2.8 Preview specialists\", with the research URLs, the K2.6/K2.7 guide excluded, and `tool_choice` `required` labelled as from a secondary source. Open item 4 is removed and the list renumbered. The `README.md` Instructions row is updated."
+      },
+      {
+        "criterion": "Non-blocking findings fixed: each listed non-blocking item is fixed or, where the sources leave it unsettled, marked to be verified",
+        "support": "the Intent count is now nine open with the closed tenth noted (`README.md`, `auto-mode.md`). The API-type dependency is stated in `providers.md` and the cache inference is conditional in `caching-and-subagents.md`. The `providers.md` visual-specialist exception is added. The three Codex traces are gone. The Moonshot tools' enablement is marked to be settled, the API-key limit and `pi-web-kit` fallback are stated, and the rpiv-on-Pi-1.5.0 note is added to `extensions.md`. The pi.dev 1.4.0 reading in `README.md` is dated and marked superseded. First person is replaced across `claude-parity.md`, `installation.md`, `orchestration.md`, `extensions.md`, `providers.md`, `configuration.md`, `approval.md` and `caching-and-subagents.md`. The visual-role wording in `claude-parity.md` is corrected."
+      },
+      {
+        "criterion": "Docs only and links valid: only docs/ changes and every relative link and anchor resolves",
+        "support": "`git status --short` shows only `docs/pi/*` modified; link and anchor check 0 bad."
+      },
+      {
+        "criterion": "Verify passes: mise run verify exits 0",
+        "support": "`bunx --no-install mise run verify` -> exit 0."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "the three commands under checks above."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the ten `docs/pi/*.md` files listed under changed."
+      },
+      {
+        "label": "diff-file",
+        "support": "`/home/user/holyagent-work/docs-030-repair.diff`"
+      }
+    ]
   },
   "createdAt": "2026-11-07T18:25:00.653Z"
 }
