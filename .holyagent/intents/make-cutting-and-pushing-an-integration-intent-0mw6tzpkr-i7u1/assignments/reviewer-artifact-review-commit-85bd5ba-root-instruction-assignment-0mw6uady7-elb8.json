@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mw6uady7-elb8",
+  "intentId": "intent-0mw6tzpkr-i7u1",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-commit-85bd5ba-root-instruction",
+  "objective": "Review commit 85bd5ba (root instruction text) which makes cutting and pushing a missing convention-named base a no-approval default, for correctness, consistency with the rest of the root rules and clarity to a model.",
+  "state": "Ready",
+  "scope": [
+    "The diff is at /home/user/holyagent-notes/pr1.diff (the commit on top of release/0.3.0/integration in worktree /home/user/holyagent-0.3.0). Read the changed files in full in that worktree for context: packages/runtime/src/instructions/claude-5.5/root/identity.md, root/stack-plan.md, requirements.md, and skim the other root sections (claude-5.5/root/*.md) for statements that now contradict the change.",
+    "Rules for model-facing text: /root/.claude/plugins/synced/03eb801d-6ff6-4373-b5b1-f94edf359a3e_0f3e6ee9-af2e-4c2c-8d3c-9be25ca27713/holyagent/skills/instruction-writing/SKILL.md."
+  ],
+  "constraints": [
+    "Maintainer (verbatim): \"this integration branch thing should not require approval, it should a holyagent default. always remember that mergeability > holyagent defaults\".",
+    "Intended behavior: a base that the repository conventions name and the remote lacks is cut from the conventions' start and pushed without asking; approval is still required for force-pushes, pushing commits onto an existing base, default or protected branch, merges, publishing and destructive steps.",
+    "Read-only. Report findings marked blocking or non-blocking with file:line and quoted text; report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "Intent met: the text makes creating a missing convention-named base a no-approval default and keeps every other approval",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No contradictions: no other root or requirement text still demands approval for creating that base, or now loosens another approval",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Clarity: a model reading the text cannot mistake pushing commits onto an existing base for creating a missing one",
+      "blocking": true,
+      "dimension": "style"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw6u0jk3-mkyc"
+  ],
+  "createdAt": "2026-11-07T20:11:55.039Z"
+}
