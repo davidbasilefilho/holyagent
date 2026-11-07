@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "record-in-home-user-holyagent-docs-t3",
   "objective": "Record in /home/user/holyagent-docs-t3 (branch release/0.3.0/docs/t3-and-install-scopes, cut from release/0.3.0/integration) the decided 0.3.0 plans for T3 Code as the primary interface of HolyAgent on pi, for local and global installs in Claude Code and pi with a user-level config, and the maintainer-tested support for claude.ai chat and Cowork.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Sources of truth: the last two lines of /home/user/holyagent-work/pi-intents-final.jsonl (objectives \"0.3.0 pi 11/12\" for T3 Code and \"0.3.0 12/12\" for install scopes); the T3, computer-use, settings, user-config, defaults and Cowork lines at the end of /home/user/holyagent-work/pi-decisions.md; research in /home/user/holyagent-work/research/: assignment-0mw6r54ng-kg9r.md (how T3 runs pi), assignment-0mw6r9zxs-l85j.md (T3 tools to keep or deactivate), assignment-0mw6rgzog-2rb3.md (T3 browser, computer use, features and settings), assignment-0mw6rlor5-3o9f.md (Cua Driver), assignment-0mw6rgzw5-cgu7.md (install scopes and claude.ai).",
     "T3 Code: add docs/pi/t3-code.md (Status: planned for 0.3.0) covering: T3 Code as the primary interface, plain pi terminal still supported; how T3 runs pi (`pi --mode rpc`, pi 0.80.5 or newer so the 1.5.0 pin satisfies it, enabled in T3 Settings, the user's own pi install and extensions, T3's MCP bridge); rpc-mode behavior; only T3's dialogs and status, never custom() TUI, with a HolyAgent adapter for rpiv tools where needed; Full access required with a setup-check warning; specialists report through @tintinweb/pi-subagents' own new-turn trigger, verified under T3 by a recorded fixture; the browser (T3 preview_* tools, named) and html_render and html_preview kept and pinned in the fixed tool set; the other mcp__t3-code__ tools deactivated with pi.setActiveTools at session_start (reapplied on before_agent_start and session_tree, tool_call block as backstop) and why; computer use through Cua Driver via the pinned @amaster.ai/pi-computer-use extension, standard mode, confirmations off, only the two visual specialists, per-user driver install and the macOS permissions, and the security note that it can operate any app under Full access; device access enabled where supported; setup writing T3's settings (format to be verified, UI steps as fallback); features relied on as they are; the to-verify list; tests on recorded rpc fixtures in the existing CI jobs. Keep the research's source links; label third-party sources and inference.",
@@ -73,7 +73,57 @@
     "agentId": "workflow:wf_1324e0ea-2a6/assignment-0mw6rz8d6-0qb6",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-07T19:07:15.355Z"
+    "startedAt": "2026-11-07T19:07:15.355Z",
+    "finishedAt": "2026-11-07T19:21:23.415Z"
+  },
+  "result": "result: Docs-only change in /home/user/holyagent-docs-t3 (branch release/0.3.0/docs/t3-and-install-scopes) records the T3 Code plan, the install scopes with the user-level config, and the maintainer-tested claude.ai/Cowork support. `mise run verify` exits 0 and the link check finds no broken links. No git writes were made.\n\nchanged:\n- New: docs/pi/t3-code.md\n- Modified: README.md (one line under install; its six sections are unchanged)\n- Modified, under docs/: README.md, components.md, requirements.md, usage.md\n- Modified, under docs/pi/: README.md, approval.md, auto-mode.md, caching-and-subagents.md, claude-parity.md, configuration.md, extensions.md, installation.md, orchestration.md, providers.md\n\nchecks:\n- `bunx --no-install mise run fmt` -> 0, formatted 7 files\n- `bunx --no-install mise run verify` -> 0 (type-check clean, lint clean, fmt check 279 files, 1596 pass, 0 fail)\n- Link and anchor check over docs/**/*.md and README.md (script: /tmp/claude-0/-home-user-holyagent/70184bfa-8a56-57cb-a6cf-d92f87c7692b/scratchpad/linkcheck.ts) -> 0, 408 relative links, 0 broken. A planted bad anchor was caught.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- Conflict in the Intents: the \"deactivate every other mcp__t3-code__ tool\" rule would also drop `device_*`, `t3_preview_list` and `t3_preview_close`. They are listed under To verify, not decided.\n- Conflict in the research: `@amaster.ai/pi-computer-use` bundles Cua Driver 0.37.0 (latest is 0.41.3), but the Intent says setup installs the driver per user. The docs state the Intent and flag which copy runs, and how the extension's confirmations are turned off, as to verify.\n- Specialists now inherit the parent's project trust: `--approve` only when the parent trusted the project. I changed every page that said children always pass `--approve` (approval, auto-mode, configuration, orchestration, extensions, README).\n- The T3 backstop `tool_call` block contradicted \"no blocking handler\" in auto-mode.md and approval.md. Both now say it is a backstop and not an approval gate.\n- The old claim that T3's MCP server must be registered with Pi was wrong, since T3 injects its own bridge. I corrected it in extensions.md and claude-parity.md.\n- Unknowns stated as to be verified or to be settled: how a session learns T3's mode, whether Pi accepts `--approve` under T3, which scope setup picks when the plugin is installed at several, and how nested objects merge in the user config.\n- I added one Python-scripted insertion to usage.md (the Install scopes section). Everything else used Edit and Write.\n\nevidence:\nT3 plan recorded: docs/pi/t3-code.md covers every Intent requirement with its decided value and source links, and third-party or inference labels (sections The decisions through Sources). The diff is in /home/user/holyagent-work/docs-t3b.diff.\nInstall scopes recorded: docs/usage.md `## Install scopes` (Claude scopes, precedence, team sharing, setup and doctor following the scope, user config); docs/pi/installation.md `## Global and project-local installs`; docs/pi/configuration.md `### The user-level config`; components.md notes.\nclaude.ai corrected: docs/usage.md `## claude.ai` and the claude.ai row of docs/requirements.md state maintainer-tested support in chat and Cowork, per-account install from Customize > Plugins, Owner Installed by default or Required, and skills only in plain chat. `rg 'does not work|how hooks are activated'` finds no match about claude.ai.\nPages agree: docs/pi/README.md says eleven open Intents, with decision rows and index entries for the T3 and install-scope Intents. auto-mode, approval, orchestration, caching-and-subagents, extensions, providers and claude-parity agree with t3-code.md. `delegate_task` appears only as not used or deactivated. Only T3's dialogs and status are used, and Full access is required.\nPlan not shipped and sourced: every new section is marked planned for 0.3.0 or not shipped. Facts and links come from the five research files, with third-party and \"Inference:\" labels.\nScope and links: `git diff --name-only` shows only README.md and docs/**. The README change is one added line, and `rg '^## '` in README.md still finds the six sections. The link check gave 0 broken.\nVerify passes: `bunx --no-install mise run verify` -> exit 0, 1596 pass, 0 fail.\nchecks-run: the fmt, verify and link-check commands above.\nchanged-paths: the 16 paths listed under changed.\ndiff-file: /home/user/holyagent-work/docs-t3b.diff (789 lines; the new-file append exited 1 as expected)\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "docs-only diff, verify exit 0, link check 0 broken; independently reviewed",
+    "criteria": [
+      {
+        "criterion": "T3 plan recorded: docs/pi/t3-code.md states every requirement of the T3 Code Intent with its decided value and sources",
+        "support": "docs/pi/t3-code.md covers every Intent requirement with its decided value and source links, and third-party or inference labels (sections The decisions through Sources). The diff is in /home/user/holyagent-work/docs-t3b.diff."
+      },
+      {
+        "criterion": "Install scopes recorded: Claude Code scopes, pi scopes and the user-level config are documented as the Intent states",
+        "support": "docs/usage.md `## Install scopes` (Claude scopes, precedence, team sharing, setup and doctor following the scope, user config); docs/pi/installation.md `## Global and project-local installs`; docs/pi/configuration.md `### The user-level config`; components.md notes."
+      },
+      {
+        "criterion": "claude.ai corrected: usage.md and requirements.md state the maintainer-tested support for chat and Cowork and no longer say it does not work",
+        "support": "docs/usage.md `## claude.ai` and the claude.ai row of docs/requirements.md state maintainer-tested support in chat and Cowork, per-account install from Customize > Plugins, Owner Installed by default or Required, and skills only in plain chat. `rg 'does not work|how hooks are activated'` finds no match about claude.ai."
+      },
+      {
+        "criterion": "Pages agree: the touched pages, decision table and Intent count agree, and nothing presents T3's delegate_task, custom() TUI or a non-Full-access T3 mode as used",
+        "support": "docs/pi/README.md says eleven open Intents, with decision rows and index entries for the T3 and install-scope Intents. auto-mode, approval, orchestration, caching-and-subagents, extensions, providers and claude-parity agree with t3-code.md. `delegate_task` appears only as not used or deactivated. Only T3's dialogs and status are used, and Full access is required."
+      },
+      {
+        "criterion": "Plan not shipped and sourced: 0.3.0 behavior is stated as planned and facts match the research",
+        "support": "every new section is marked planned for 0.3.0 or not shipped. Facts and links come from the five research files, with third-party and \"Inference:\" labels."
+      },
+      {
+        "criterion": "Scope and links: only docs/ and at most one README install line change, README keeps its six sections, every relative link and anchor resolves",
+        "support": "`git diff --name-only` shows only README.md and docs/**. The README change is one added line, and `rg '^## '` in README.md still finds the six sections. The link check gave 0 broken."
+      },
+      {
+        "criterion": "Verify passes: mise run verify exits 0",
+        "support": "`bunx --no-install mise run verify` -> exit 0, 1596 pass, 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "the fmt, verify and link-check commands above."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the 16 paths listed under changed."
+      },
+      {
+        "label": "diff-file",
+        "support": "/home/user/holyagent-work/docs-t3b.diff (789 lines; the new-file append exited 1 as expected)"
+      }
+    ]
   },
   "createdAt": "2026-11-07T19:07:15.355Z"
 }
