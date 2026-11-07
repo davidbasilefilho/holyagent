@@ -1,0 +1,37 @@
+{
+  "id": "assignment-0mw6nnaf5-57ao",
+  "intentId": "intent-0mw6lz68m-7i26",
+  "intentRevision": 1,
+  "roleTask": "Librarian.research",
+  "slug": "settle-the-factual-open-points-of-the-0",
+  "objective": "Settle the factual open points of the 0.3.0 pi integration plan about pi itself, from pi's current official sources.",
+  "state": "Running",
+  "scope": [
+    "Context: /home/user/holyagent/docs/pi/ (README.md, extensions.md, providers.md, orchestration.md, claude-parity.md, auto-mode.md, installation.md) records research against pi 1.4.0 (earendil-works/pi, packages @earendil-works/pi-*). The open points list: /home/user/holyagent-work/pi-open.md.",
+    "Answer, each with a dated source link: (1.1) pi's current stable version and release cadence, and whether docs/pi's 1.4.0 facts still hold for it (list what changed for extensions, packages, providers, RPC/JSON modes and codemode); (6.21) an existing maintained pi extension or MCP server that gives web search and fetch; (6.22) an existing pi extension or tool that can watch a long-running command such as 'gh pr checks --watch' without blocking (a monitor or background-process tool); (6.23, 6.24) how a pi package can load or depend on pi's example extensions (todo.ts, question.ts, questionnaire.ts) and whether maintained published packages already provide a todo list and an ask/question tool; (7.25) what pi's docs recommend for driving child pi processes (rpc vs json with -p) and any maintained subagent or orchestration extension; (7.27) PI_CODEMODE_MAX_WORKERS default and whether it can be raised; (7.28) the documented effect of PI_OFFLINE, PI_SKIP_VERSION_CHECK and PI_TELEMETRY; (8.31) whether the openai-codex provider uses a documented endpoint; (9.36) whether Bun is a documented or working way to run pi.",
+    "Use pi.dev, the earendil-works/pi repository and its docs, and npm. Separate sourced facts from inference."
+  ],
+  "constraints": [
+    "Read-only: write no files and make no git writes; the full answer goes in the report.",
+    "Keep working until done; stop and report. Report in under 600 words, one short entry per open point id with its answer, source link and date, and 'unknown' where the sources do not say."
+  ],
+  "criteria": [
+    {
+      "text": "Each open point gets a sourced answer or an explicit unknown",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-07T17:05:59.681Z"
+  },
+  "createdAt": "2026-11-07T17:05:59.681Z"
+}
