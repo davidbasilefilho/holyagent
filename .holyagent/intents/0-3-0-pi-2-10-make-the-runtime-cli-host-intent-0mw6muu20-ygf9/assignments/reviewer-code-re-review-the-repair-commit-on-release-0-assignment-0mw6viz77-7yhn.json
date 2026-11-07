@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-the-repair-commit-on-release-0",
   "objective": "Re-review the repair commit on release/0.3.0/refactor/host-neutral-cli against the earlier code and security findings, so the PR can close.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-cli; repair diff (generated bundle excluded): /home/user/holyagent-notes/pr2-repair.diff; the repair commit is HEAD on top of ee51233.",
     "Earlier findings to check closed: help failing on an invalid HOLYAGENT_HOST; PI_SESSION_LINK (and the claude.ai link pattern) swallowing a closing parenthesis; PI_GENERATED_FOOTER quadratic backtracking on 'generated with pi(' plus many ')'; PI_NAME stripping any 'Co-authored-by: Pi' regardless of address; hard-coded 'workflow:'/'pi-workflow:' prefixes duplicated in host.ts; assignment record loading the whole config so a bad HOLYAGENT_REUSE_TTL_MINUTES breaks recording; reconcile reading the host itself (resolved by a stated choice); pi record and reports help still describing Claude hooks and journals."
@@ -38,7 +38,29 @@
     "agentId": "workflow:wf_2509bd7f-b8d/assignment-0mw6viz77-7yhn",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-07T20:46:35.443Z"
+    "startedAt": "2026-11-07T20:46:35.443Z",
+    "finishedAt": "2026-11-07T21:22:59.789Z"
+  },
+  "result": "result: All earlier findings are closed. The repair adds no blocker; 6 optional notes below.\n\nchanged: none (read-only)\n\nchecks:\n- `bun test` in packages/runtime -> exit 0, 928 pass, 0 fail.\n- Ad hoc timing of `cleanMessage` with 20k, 40k and 80k character inputs (\"pi(\" plus many `)` or `(`, many spaces) -> at most 2 ms each and growing linearly, so no backtracking blowup.\n- The generated bundle contains the new symbols (`rg -c` finds 7 matches). I did not rebuild it or run `mise run verify`.\n\nblockers: none\n\nnotes (all optional):\n1. `packages/runtime/src/vcs/message.ts:33` (`SESSION_LINK`, `PI_SESSION_LINK`): a Markdown session link `[text](url)` now leaves `[text]()`, and the new test asserts that residue. The old `\\S*` pattern also left residue (`[text](`), so this is not a regression. Matching the whole `[text](url)` would clean it fully.\n2. `packages/runtime/src/cli/assignment.ts:315`: `assignment record --failed` still fails under an invalid `HOLYAGENT_HOST`. It failed that way before the repair too, because the old code loaded the whole config. The host lookup could move into the `--agent` branch.\n3. `packages/runtime/src/cli/program.ts:92`: help under an invalid `HOLYAGENT_HOST` falls back to Claude's wording, exits 0 and gives no warning. The repair states this choice and tests it, and it matches how `failed()` already behaved.\n4. `packages/runtime/src/domain/host.ts:1`: it imports two constants from `directive.ts` at runtime. There is no cycle: `directive.ts` imports `host.ts` as a type only, and `errors.ts`, `assignment.ts`, `specialists.ts` and `route.ts` do not import `host.ts`. The coupling is cosmetic.\n5. `packages/runtime/src/domain/host.ts:79`: the pi `reportsNote` says reports reads \"Claude workflow journals only for now\", but `journalResults` in `cli/report.ts` makes no host check. It is guidance rather than enforcement, and that is acceptable as a stated choice.\n6. `packages/runtime/src/vcs/message.ts` (`PI_AGENT_NAME`): `Co-authored-by: Pi <x@example.com>` now stays in the message. This is a deliberate, tested narrowing, so I read it as a choice rather than a defect.\n7. `packages/runtime/tests/vcs-message.test.ts:93`: the linear-time test uses a 1000 ms wall-clock bound. The repair measures about 2 ms at 80k characters, so it is unlikely to flake.\n\nevidence:\n- Findings closed: help under a bad host now uses `hostForText` (program.ts:92-139, tested in host.test.ts); the link patterns stop at `)` (message.ts:33-34); the footer regex is linear (timing run above); `PI_AGENT_NAME` requires \"Pi Coding Agent\" or a pi.dev address (message.ts:35-41); the prefixes are now the `directive.ts` constants (host.ts:56,75); `record` reads only the host through `agentHostOf` (assignment.ts:314, test passes with a bad TTL); `reconcile` keeps its host-only read with a comment (overview.ts:178); pi help now has `recordNote` and `reportsNote` (tested).\n- No new issue: the full runtime test run passes (928 pass, 0 fail, exit 0). I found no regression or vulnerability, only optional notes 1-7.\n- findings: none blocking; optional notes 1-7 above.\n",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Earlier findings closed; no blocker; runtime tests 928 pass in the code re-review.",
+    "criteria": [
+      {
+        "criterion": "Findings closed: each earlier finding is fixed or resolved with a sound stated choice",
+        "support": "help under a bad host now uses `hostForText` (program.ts:92-139, tested in host.test.ts); the link patterns stop at `)` (message.ts:33-34); the footer regex is linear (timing run above); `PI_AGENT_NAME` requires \"Pi Coding Agent\" or a pi.dev address (message.ts:35-41); the prefixes are now the `directive.ts` constants (host.ts:56,75); `record` reads only the host through `agentHostOf` (assignment.ts:314, test passes with a bad TTL); `reconcile` keeps its host-only read with a comment (overview.ts:178); pi help now has `recordNote` and `reportsNote` (tested)."
+      },
+      {
+        "criterion": "No new issue: the repair introduces no regression or new vulnerability",
+        "support": "the full runtime test run passes (928 pass, 0 fail, exit 0). I found no regression or vulnerability, only optional notes 1-7."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "none blocking; optional notes 1-7 above."
+      }
+    ]
   },
   "createdAt": "2026-11-07T20:46:35.443Z"
 }
