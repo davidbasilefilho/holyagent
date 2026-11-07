@@ -82,13 +82,28 @@ describe("cleaning", () => {
     )
   })
 
-  test("a session link closing a Markdown link leaves the parenthesis and the text after it", () => {
+  test("a Markdown link to a session goes whole and the text around it stays", () => {
     expect(cleanMessage("fix\n\nSee [session](https://pi.dev/session/#abc) for details")).toBe(
-      "fix\n\nSee [session]() for details",
+      "fix\n\nSee  for details",
     )
     expect(
       cleanMessage("fix\n\nSee [session](https://claude.ai/code/session_01) for details"),
-    ).toBe("fix\n\nSee [session]() for details")
+    ).toBe("fix\n\nSee  for details")
+    expect(cleanMessage("fix\n\n[session](https://claude.ai/code/session_01)")).toBe("fix")
+    expect(cleanMessage("fix\n\n(see https://claude.ai/code/session_01)")).toBe("fix\n\n(see )")
+  })
+
+  test("a Markdown link to another address stays", () => {
+    const text =
+      "fix\n\nSee [docs](https://pi.dev/docs) and [site](https://example.com/claude.ai/x)"
+    expect(cleanMessage(text)).toBe(text)
+  })
+
+  test("a long run of brackets before a session link is cleaned in linear time", () => {
+    const text = `fix\n\n${"[".repeat(50_000)}https://claude.ai/code/session_01`
+    const started = performance.now()
+    expect(cleanMessage(text)).toBe(`fix\n\n${"[".repeat(50_000)}`)
+    expect(performance.now() - started).toBeLessThan(1_000)
   })
 
   test("a long run of parentheses after the pi footer is cleaned in linear time", () => {

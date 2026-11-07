@@ -11490,8 +11490,11 @@ var SESSION_TRAILER = /^\s*claude-session\s*:/i;
 var GENERATED_FOOTER = /^\s*(?:[^\p{L}\p{N}\s]\s*)*generated\s+with\b.*\bclaude\s+code\b/iu;
 var PI_GENERATED_FOOTER = /^\s*(?:[^\p{L}\p{N}\s]\s*)*generated\s+with\s+\[?pi(?:[\s-]coding[\s-]agent)?\]?(?:\([^\s)]*\))?[^\p{L}\p{N}]*$/iu;
 var CO_AUTHOR = /^\s*co-authored-by\s*:\s*(.*)$/i;
-var SESSION_LINK = /https?:\/\/claude\.ai\/[^\s)]*/gi;
-var PI_SESSION_LINK = /https?:\/\/(?:[\w-]+\.)*pi\.dev\/session\/[^\s)]*/gi;
+var CLAUDE_URL = String.raw`https?:\/\/claude\.ai\/[^\s)]*`;
+var PI_URL = String.raw`https?:\/\/(?:[\w-]+\.)*pi\.dev\/session\/[^\s)]*`;
+var sessionLink = (url) => new RegExp(String.raw`\[[^\][]*\]\(${url}\)|${url}`, "gi");
+var SESSION_LINK = sessionLink(CLAUDE_URL);
+var PI_SESSION_LINK = sessionLink(PI_URL);
 var PI_AGENT_NAME = /^pi[\s-]coding[\s-]agent$/i;
 var namesAgent = (coAuthor) => looksLikeAgent({ name: coAuthor.replace(/<.*$/, ""), email: "" }) || /@(?:[\w-]+\.)*(?:anthropic\.com|pi\.dev)\b/i.test(coAuthor) || PI_AGENT_NAME.test(coAuthor.replace(/<.*$/, "").replace(/\s+/g, " ").trim());
 var isAttribution = (line) => {
@@ -12648,10 +12651,11 @@ var ASSIGNMENT_COMMANDS = [
           message: "Give exactly one of --agent and --failed",
           hint: `Usage: holyagent ${RECORD_USAGE}`
         });
-      const host = yield* agentHostOf(env);
-      const problem = agentId === undefined ? undefined : agentIdProblem(agentId, id, host);
-      if (problem !== undefined)
-        return yield* new Usage({ message: problem, hint: `Usage: holyagent ${RECORD_USAGE}` });
+      if (agentId !== undefined) {
+        const problem = agentIdProblem(agentId, id, yield* agentHostOf(env));
+        if (problem !== undefined)
+          return yield* new Usage({ message: problem, hint: `Usage: holyagent ${RECORD_USAGE}` });
+      }
       const assignment = yield* recordLaunch(update, id, agentId);
       return present({
         id,

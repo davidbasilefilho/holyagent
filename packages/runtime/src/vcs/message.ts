@@ -19,15 +19,20 @@ import { looksLikeAgent } from "./identity.ts"
 // "Pi Coding Agent" under any address, and pi.dev session links. A bare "Pi" is a name a person can
 // have, so it goes only with a pi.dev address.
 //
-// Links stop at whitespace and at ')', so a link closing a Markdown "[text](url)" leaves its
-// parenthesis, and the footer pattern cannot backtrack across a run of them.
+// Links stop at whitespace and at ')'. A session link that is the URL of a Markdown "[text](url)"
+// goes with its text and parentheses; a bare one goes alone. The link text excludes brackets, so
+// a run of '[' cannot make the pattern rescan, and the footer pattern cannot backtrack across a
+// run of ')'.
 const SESSION_TRAILER = /^\s*claude-session\s*:/i
 const GENERATED_FOOTER = /^\s*(?:[^\p{L}\p{N}\s]\s*)*generated\s+with\b.*\bclaude\s+code\b/iu
 const PI_GENERATED_FOOTER =
   /^\s*(?:[^\p{L}\p{N}\s]\s*)*generated\s+with\s+\[?pi(?:[\s-]coding[\s-]agent)?\]?(?:\([^\s)]*\))?[^\p{L}\p{N}]*$/iu
 const CO_AUTHOR = /^\s*co-authored-by\s*:\s*(.*)$/i
-const SESSION_LINK = /https?:\/\/claude\.ai\/[^\s)]*/gi
-const PI_SESSION_LINK = /https?:\/\/(?:[\w-]+\.)*pi\.dev\/session\/[^\s)]*/gi
+const CLAUDE_URL = String.raw`https?:\/\/claude\.ai\/[^\s)]*`
+const PI_URL = String.raw`https?:\/\/(?:[\w-]+\.)*pi\.dev\/session\/[^\s)]*`
+const sessionLink = (url: string) => new RegExp(String.raw`\[[^\][]*\]\(${url}\)|${url}`, "gi")
+const SESSION_LINK = sessionLink(CLAUDE_URL)
+const PI_SESSION_LINK = sessionLink(PI_URL)
 const PI_AGENT_NAME = /^pi[\s-]coding[\s-]agent$/i
 
 const namesAgent = (coAuthor: string) =>
