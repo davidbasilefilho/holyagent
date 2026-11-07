@@ -1,0 +1,24 @@
+{
+  "id": "intent-0mw6muv1d-ci3a",
+  "slug": "0-3-0-pi-8-10-add-the-optional-holyagent",
+  "objective": "0.3.0 pi 8/10: Add the optional HolyAgent auto-mode gate for Pi as an extension tool_call handler, so risky operations are reviewed by a model and anything undecided fails closed.",
+  "requirements": [
+    "Maintainer (verbatim): \"please add intents for the next 0.3.0 release where I will implement the pi extension integration\"; the maintainer implements 0.3.0, so these Intents record the work and carry no Assignments until the maintainer starts it.",
+    "Maintainer (verbatim): \"in the docs/pi/ it's supposed to use already existent extensions for required functionality\" and \"the first provider to implement will be kimi for coding global\".",
+    "Release model: work lands on release/0.3.0/integration cut from main, as one release/0.3.0/<type>/<change> branch and one PR per change; the first PR of the release carries the version bump made with mise run bump:minor.",
+    "Done means mise run verify passes with the generated output in sync (mise run build) and CI green on every required check, including the windows job.",
+    "Open: whether the gate belongs in 0.3.0 at all; docs/pi/auto-mode.md is a requirements map and claude-parity.md carries no Claude rule to it and states no write guard is loaded.",
+    "A tool_call handler reviews each call on its content (tool, input, cwd, ownership paths, parentToolCallId, a bounded slice of branch context) with no name-based deny-list; host binaries stay available.",
+    "Only an explicit, schema-valid allow lets a call proceed; deny blocks with the reason; ask, malformed output, timeout, provider error and missing model confirm through ctx.ui.confirm when ctx.hasUI and block otherwise; the reviewer call runs under an AbortSignal deadline.",
+    "A flag with values off and on controls the gate; off returns undefined immediately and leaves the rest of the extension loaded.",
+    "The reviewer prompt treats operation and context as data and requests a typed verdict; each decision is recorded with pi.appendEntry.",
+    "Only the public extension API and ctx.modelRegistry are used; auth.json, getApiKeyForProvider and provider URLs are not touched.",
+    "The gate is loaded explicitly with -e so it cannot fail open when project trust is declined.",
+    "Open: the reviewer model with Kimi for Coding first; the research specifies GPT-6 Luna when the Codex provider is active, otherwise the cheapest suitable available model by catalog cost.",
+    "Open: whether the legacy openai-codex backend is acceptable under the no-undocumented-endpoints rule.",
+    "Open: whether reviewer token cost is attributed to the Assignment; Pi documents no hook."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-07T16:43:53.377Z"
+}
