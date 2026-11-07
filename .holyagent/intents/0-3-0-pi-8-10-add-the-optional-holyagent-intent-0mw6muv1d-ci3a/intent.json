@@ -19,6 +19,7 @@
     "Open: whether reviewer token cost is attributed to the Assignment; Pi documents no hook."
   ],
   "revision": 1,
-  "state": "Open",
+  "state": "Closed",
+  "closeReason": "Maintainer (verbatim): \"there will be no auto-mode, full access shall be the default\". The auto-mode gate is out of 0.3.0.",
   "createdAt": "2026-11-07T16:43:53.377Z"
 }
