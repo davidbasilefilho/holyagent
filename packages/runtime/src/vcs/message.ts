@@ -15,21 +15,25 @@ import { looksLikeAgent } from "./identity.ts"
 // (`PI_ATTRIBUTION` in @earendil-works/pi-ai, dist/utils/identity.js), and its /share command links
 // the session viewer https://pi.dev/session/#<gist> (`getShareViewerUrl` in pi-coding-agent,
 // dist/config.js). A model running in pi copies those forms, so the cleaner also removes the footer
-// "Generated with [pi](https://pi.dev)", a Co-authored-by trailer naming pi or an address at pi.dev,
-// and pi.dev session links.
+// "Generated with [pi](https://pi.dev)", a Co-authored-by trailer for an address at pi.dev or for
+// "Pi Coding Agent" under any address, and pi.dev session links. A bare "Pi" is a name a person can
+// have, so it goes only with a pi.dev address.
+//
+// Links stop at whitespace and at ')', so a link closing a Markdown "[text](url)" leaves its
+// parenthesis, and the footer pattern cannot backtrack across a run of them.
 const SESSION_TRAILER = /^\s*claude-session\s*:/i
 const GENERATED_FOOTER = /^\s*(?:[^\p{L}\p{N}\s]\s*)*generated\s+with\b.*\bclaude\s+code\b/iu
 const PI_GENERATED_FOOTER =
-  /^\s*(?:[^\p{L}\p{N}\s]\s*)*generated\s+with\s+\[?pi(?:[\s-]coding[\s-]agent)?\]?(?:\(\S*\))?[^\p{L}\p{N}]*$/iu
+  /^\s*(?:[^\p{L}\p{N}\s]\s*)*generated\s+with\s+\[?pi(?:[\s-]coding[\s-]agent)?\]?(?:\([^\s)]*\))?[^\p{L}\p{N}]*$/iu
 const CO_AUTHOR = /^\s*co-authored-by\s*:\s*(.*)$/i
-const SESSION_LINK = /https?:\/\/claude\.ai\/\S*/gi
-const PI_SESSION_LINK = /https?:\/\/(?:[\w-]+\.)*pi\.dev\/session\/\S*/gi
-const PI_NAME = /^pi(?:[\s-]coding[\s-]agent)?$/i
+const SESSION_LINK = /https?:\/\/claude\.ai\/[^\s)]*/gi
+const PI_SESSION_LINK = /https?:\/\/(?:[\w-]+\.)*pi\.dev\/session\/[^\s)]*/gi
+const PI_AGENT_NAME = /^pi[\s-]coding[\s-]agent$/i
 
 const namesAgent = (coAuthor: string) =>
   looksLikeAgent({ name: coAuthor.replace(/<.*$/, ""), email: "" }) ||
   /@(?:[\w-]+\.)*(?:anthropic\.com|pi\.dev)\b/i.test(coAuthor) ||
-  PI_NAME.test(coAuthor.replace(/<.*$/, "").replace(/\s+/g, " ").trim())
+  PI_AGENT_NAME.test(coAuthor.replace(/<.*$/, "").replace(/\s+/g, " ").trim())
 
 const isAttribution = (line: string) => {
   if (SESSION_TRAILER.test(line) || GENERATED_FOOTER.test(line) || PI_GENERATED_FOOTER.test(line))

@@ -136,6 +136,26 @@ describe("the host and the workflow switch", () => {
     // A bad host does not hide the failure being reported, which falls back to Claude's words.
     expect((await cli(["help", "nothing"], undefined, { HOLYAGENT_HOST: "codex" })).code).toBe(2)
   })
+
+  test("help under a bad host falls back to Claude's words, as the failures do", async () => {
+    const bad = { HOLYAGENT_HOST: "codex" }
+    for (const argv of [["--help"], ["help", "assignment", "dispatch"], ["assignment", "--help"]]) {
+      const shown = await cli(argv, undefined, bad)
+      expect(shown.code).toBe(0)
+      expect(shown).toEqual(await cli(argv))
+    }
+  })
+
+  test("recording an agent needs only the host, so a bad TTL or workflows setting does not block it", async () => {
+    await createIntent()
+    const id = String(data(await cli(["assignment", "dispatch"], writer)).id)
+    const broken = { HOLYAGENT_REUSE_TTL_MINUTES: "soon", HOLYAGENT_WORKFLOWS: "yes" }
+    expect((await cli(["plan"], undefined, broken)).code).toBe(2)
+    expect(
+      data(await cli(["assignment", "record", id, "--agent", "a-1"], undefined, broken)).agent,
+    ).toBe("a-1")
+    expect((await cli(["reconcile"], undefined, broken)).code).toBe(0)
+  })
 })
 
 describe("plan under the pi host", () => {
@@ -228,6 +248,17 @@ describe("help under each host", () => {
     expect(close).toContain(
       "records nothing: resume the same subagent with the Agent tool and ask for the missing support, then close again",
     )
+  })
+
+  test("under pi no help says a hook records agents, and reports reads Claude journals only", async () => {
+    const record = (await cli(["help", "assignment", "record"], undefined, PI)).stdout
+    expect(record).not.toContain("a hook records")
+    expect(record).toContain("the pi launcher records no agent by hook")
+    const reports = (await cli(["help", "assignment", "reports"], undefined, PI)).stdout
+    expect(reports).toContain("reads Claude workflow journals only for now")
+    const claude = (await cli(["help", "assignment", "record"])).stdout
+    expect(claude).toContain("a hook records an agent spawned from a dispatch prompt")
+    expect((await cli(["help", "assignment", "reports"])).stdout).not.toContain("for now")
   })
 
   test("the Claude hooks are not listed under pi, the git hook is", async () => {

@@ -1,3 +1,5 @@
+import { PI_WORKFLOW_AGENT_PREFIX, WORKFLOW_AGENT_PREFIX } from "./directive.ts"
+
 /**
  * The agent hosts the runtime serves: Claude Code, and pi with the `@tintinweb/pi-subagents`
  * launcher.
@@ -31,6 +33,10 @@ export interface HostWords {
   readonly workflowAgentPrefix: string
   /** What a workflow run's journal is called in the help, with its first letter as the help has it. */
   readonly journal: string
+  /** The help note of `assignment record` on whether a hook records the agent or the root does. */
+  readonly recordNote: string
+  /** A help note of `assignment reports` on the journals it reads, for a host with a limit there. */
+  readonly reportsNote?: string
   /** A help note on how agent ids are recorded, for a host that records them in a form of its own. */
   readonly agentIdNote?: string
 }
@@ -47,8 +53,10 @@ export const CLAUDE_WORDS: HostWords = {
   confirmGone: "SendMessage or transcript",
   askForSupport: "SendMessage the subagent",
   askAgain: "SendMessage the missing support to the same subagent",
-  workflowAgentPrefix: "workflow:",
+  workflowAgentPrefix: WORKFLOW_AGENT_PREFIX,
   journal: "Workflow run's journal",
+  recordNote:
+    "a hook records an agent spawned from a dispatch prompt and says so in its note; record it yourself when the note says it did not, or for a continued agent",
 }
 
 /**
@@ -64,8 +72,11 @@ export const PI_WORDS: HostWords = {
   confirmGone: "get_subagent_result or transcript",
   askForSupport: "Resume the subagent with the Agent tool",
   askAgain: "resume the same subagent with the Agent tool and ask for the missing support",
-  workflowAgentPrefix: "pi-workflow:",
+  workflowAgentPrefix: PI_WORKFLOW_AGENT_PREFIX,
   journal: "workflow run's journal",
+  recordNote:
+    "the pi launcher records no agent by hook: the launcher glue or the root records each agent, with the ID the Agent tool returns, including a continued one",
+  reportsNote: "under the pi host this reads Claude workflow journals only for now",
   agentIdNote:
     "under the pi host an agent is recorded as pi:<agent-id>, the ID the Agent tool returns (strip pi: to message it), and a workflow's agent as pi-workflow:<run-id>/<id>, with the run ID and the label the script gave the agent (the Assignment id); any other form is refused",
 }

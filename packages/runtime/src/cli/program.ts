@@ -87,6 +87,11 @@ const callFor = (args: Call["args"], host: Host, emit: Call["emit"], command: Co
     } satisfies Call
   })
 
+// A host setting that cannot be read is no reason to lose the failure being reported or the help
+// being asked for: Claude's words stand in for it. Commands that load the config still refuse it.
+const hostForText = (env: Host["env"]) =>
+  agentHostOf(env).pipe(Effect.orElseSucceed((): AgentHost => "claude"))
+
 /**
  * `help` is `--help` as a word: alone it is the top help, and `help assignment close` is that
  * command's.
@@ -99,7 +104,7 @@ const execute = (given: ReadonlyArray<string>, host: Host) =>
     const argv = asFlag(given)
     const [first] = argv
     if (first === undefined || first === "--help" || first === "-h") {
-      const agent = yield* agentHostOf(host.env)
+      const agent = yield* hostForText(host.env)
       return { stdout: `${topHelp(agent, wordsFor(agent))}\n`, stderr: "", code: 0 }
     }
     if (first === "--version") return { stdout: `${version}\n`, stderr: "", code: 0 }
@@ -112,7 +117,7 @@ const execute = (given: ReadonlyArray<string>, host: Host) =>
         group.length > 0 &&
         (argv.length === 1 || argv.includes("--help") || argv.includes("-h"))
       ) {
-        const agent = yield* agentHostOf(host.env)
+        const agent = yield* hostForText(host.env)
         const words = wordsFor(agent)
         const shown = listed(agent).filter((candidate) => group.includes(candidate))
         return {
@@ -131,7 +136,7 @@ const execute = (given: ReadonlyArray<string>, host: Host) =>
     }
     const rest = argv.slice(command.path.length)
     if (command.passthrough !== true && (rest.includes("--help") || rest.includes("-h"))) {
-      const agent = yield* agentHostOf(host.env)
+      const agent = yield* hostForText(host.env)
       return { stdout: `${help(command, wordsFor(agent))}\n`, stderr: "", code: 0 }
     }
     const args =
@@ -163,11 +168,8 @@ const execute = (given: ReadonlyArray<string>, host: Host) =>
     return { stdout, stderr: "", code: 0 }
   })
 
-// A host setting that cannot be read is no reason to lose the failure being reported: Claude's
-// words stand in for it.
 const failed = (error: unknown, env: Host["env"]) =>
-  agentHostOf(env).pipe(
-    Effect.orElseSucceed((): AgentHost => "claude"),
+  hostForText(env).pipe(
     Effect.map((agent): Result => {
       const { tag, message, hint, code } = describeFailure(error, wordsFor(agent))
       return { stdout: "", stderr: `error: ${tag}: ${message}\nhint: ${hint}\n`, code }
