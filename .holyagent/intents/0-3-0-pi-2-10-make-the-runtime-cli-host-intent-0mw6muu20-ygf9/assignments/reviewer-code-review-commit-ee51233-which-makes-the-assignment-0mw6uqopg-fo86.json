@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-commit-ee51233-which-makes-the",
   "objective": "Review commit ee51233, which makes the holyagent runtime CLI host-neutral for pi (HOLYAGENT_HOST and HOLYAGENT_WORKFLOWS, pi agent-id forms, host-aware help, exported session-start builders, pi attribution stripping), against the merge-ready bar.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-cli, branch release/0.3.0/refactor/host-neutral-cli; the commit is HEAD on top of 85bd5ba. Diff file: /home/user/holyagent-notes/pr2.diff. The implementer's notes are in the commit message; docs/pi/orchestration.md ('The runtime under Pi') describes the forms.",
     "Requirements it must meet: a pi host setting toggles workflow availability and plan prints the direct-launch fallback; assignment record and directives accept the ids @tintinweb/pi-subagents assigns (source under /home/user/holyagent-notes/pi-probe/node_modules/@tintinweb/pi-subagents); help under pi names no Claude Workflow tool; Claude output unchanged; the commit-message cleaner strips pi attribution; repository rules (Effect and tagged errors, no try/catch, new Promise or async in runtime source, Effect Schema at boundaries with onExcessProperty error, Bun APIs, JSDoc on exports)."
@@ -42,7 +42,33 @@
     "agentId": "workflow:wf_abc599f6-259/assignment-0mw6uqopg-fo86",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-07T20:24:36.588Z"
+    "startedAt": "2026-11-07T20:24:36.588Z",
+    "finishedAt": "2026-11-07T20:39:36.546Z"
+  },
+  "result": "result: no blockers. All requirements hold, Claude output is unchanged, and `mise run verify` passes.\n\nfindings (all non-blocking):\n1. `packages/runtime/src/cli/program.ts:~101,~118,~134` and `cli/config.ts` (`agentHostOf`): a bad `HOLYAGENT_HOST` makes `--help`, `<group> --help` and every command that loads config exit 2.\n   - Repro: `HOLYAGENT_HOST=Pi holyagent --help` prints the usage error with exit 0 from the pipe, and `HOLYAGENT_HOST=Pi holyagent plan` exits 2.\n   - This matches \"any other value is a usage error\" in `docs/pi/orchestration.md`.\n   - `failed()` falls back to Claude for the same bad value, so the help paths are inconsistent with it. `Effect.orElseSucceed(() => \"claude\")` on the help paths would fix it. Optional.\n2. `packages/runtime/src/vcs/message.ts:26`: `PI_SESSION_LINK` uses `\\S*` and swallows a closing `)`.\n   - Repro: `cleanMessage(\"fix\\n\\nSee [session](https://pi.dev/session/#abc) for details\")` returns `\"fix\\n\\nSee [session]( for details\"`.\n   - The existing claude.ai pattern has the same flaw, so this is not a new class of bug.\n3. `packages/runtime/src/vcs/message.ts:27-31`: `PI_NAME` strips a `Co-authored-by` trailer whose name is exactly `Pi`, with no tie to the pi.dev address.\n   - Repro: `Co-authored-by: Pi <pi@example.com>` is removed.\n   - The commit message and the docs state this on purpose. A person actually named Pi is the only loss, and `Pietro` is kept.\n4. `packages/runtime/src/domain/host.ts:50,62`: the `workflow:` and `pi-workflow:` strings are hard-coded and duplicate `WORKFLOW_AGENT_PREFIX` and `PI_WORKFLOW_AGENT_PREFIX` in `directive.ts:28,42`. The code that checks the ids and the code that prints them can drift apart. Optional.\n5. `packages/runtime/src/cli/assignment.ts:229,293`: for dispatch and record, the Claude-form fields and `forHost` repeat the same text. `assignment close` does the same with `closeNotes(CLAUDE_WORDS)` and `forHost`. The two are built from the same function, so they cannot drift today. Optional.\n6. `packages/runtime/src/index.ts:25-37` re-exports `cli/hook.ts` and `cli/overview.ts` internals, and `cli/sessioncontext.ts` and `ROOT_CORE` symbols, which widens the public API. The commit message and docs state it as intended for the Pi extension. Optional.\n7. `packages/runtime/src/cli/overview.ts:178`: `reconcile` calls `agentHostOf(env)` itself instead of reading `host` from `config`. Optional.\n\nThe `/code-review` skill ran on `85bd5ba...ee51233`, and its seven findings are the seven above. I read each cited line and reproduced findings 1 and 2. Finding 3 is confirmed from the code and docs, and 4 to 7 from the code. I rejected nothing, but ranked all seven as non-blocking.\n\nevidence:\nBehavior:\n- Host toggle and plan: the \"pi host setting toggles workflow availability and plan prints the direct-launch fallback\" cases in `packages/runtime/tests/host.test.ts` (lines 101-190) pass. Under pi, unset or `0` prints the direct subagents. `1` prints the workflow with that work as its fallback.\n- Agent ids: the pi id forms `pi:<id>` and `pi-workflow:<run-id>/<id>` match pi-subagents. Its direct agent id is `randomUUID().slice(0,17)` (`agent-manager.ts:528`) and its run id is `wf_<12 hex>` (`workflow/task.ts:26`). Neither contains whitespace or `/`, so both pass the `\\S+` checks.\n- Help under pi: I read the help of every group under `HOLYAGENT_HOST=pi`. None names Claude's Workflow tool, SendMessage or the Read tool. Under pi, `hook` lists only `commit-msg`.\n- Commit-message cleaner: it strips the pi footer, the `pi.dev` co-author trailer and the pi session link in my repro (`cleanMessage`). Findings 2 and 3 are the exceptions.\nRegressions:\n- Claude help output: I diffed the base `85bd5ba` against HEAD with `HOLYAGENT_HOST` unset, across 14 commands and groups, and all are byte-identical.\n- Bundled plugin: it is covered by the plugin freshness test in `packages/integrations/claude/tests/plugin.test.ts`, which passes inside verify.\n- Gate: `bunx --no-install mise run verify` exited 0 with 1626 pass, 0 fail, type check clean, lint and format clean. The log is at `/home/user/holyagent-notes/review-verify.log`.\nRepo standards:\n- The added source lines have no try/catch, `new Promise`, async or await.\n- The host and workflow-switch decodes use Effect Schema, and failures are the tagged `Usage` error.\n- Every new export I read carries JSDoc.\n- The one gap is that `agentHostOf` and `workflowsAvailable` decode plain string literals, so `onExcessProperty` does not apply.\nfindings: the seven findings above.\n",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "No blocking findings; non-blocking ones go to a repair round.",
+    "criteria": [
+      {
+        "criterion": "Behavior: each requirement holds, or a finding shows where it does not",
+        "support": "Host toggle and plan: the \"pi host setting toggles workflow availability and plan prints the direct-launch fallback\" cases in `packages/runtime/tests/host.test.ts` (lines 101-190) pass. Under pi, unset or `0` prints the direct subagents. `1` prints the workflow with that work as its fallback.; Agent ids: the pi id forms `pi:<id>` and `pi-workflow:<run-id>/<id>` match pi-subagents. Its direct agent id is `randomUUID().slice(0,17)` (`agent-manager.ts:528`) and its run id is `wf_<12 hex>` (`workflow/task.ts:26`). Neither contains whitespace or `/`, so both pass the `\\S+` checks.; Help under pi: I read the help of every group under `HOLYAGENT_HOST=pi`. None names Claude's Workflow tool, SendMessage or the Read tool. Under pi, `hook` lists only `commit-msg`.; Commit-message cleaner: it strips the pi footer, the `pi.dev` co-author trailer and the pi session link in my repro (`cleanMessage`). Findings 2 and 3 are the exceptions."
+      },
+      {
+        "criterion": "Regressions: Claude-host behavior and existing commands are unchanged",
+        "support": "Claude help output: I diffed the base `85bd5ba` against HEAD with `HOLYAGENT_HOST` unset, across 14 commands and groups, and all are byte-identical.; Bundled plugin: it is covered by the plugin freshness test in `packages/integrations/claude/tests/plugin.test.ts`, which passes inside verify.; Gate: `bunx --no-install mise run verify` exited 0 with 1626 pass, 0 fail, type check clean, lint and format clean. The log is at `/home/user/holyagent-notes/review-verify.log`."
+      },
+      {
+        "criterion": "Repo standards: the repository's code rules hold in the changed code",
+        "support": "The added source lines have no try/catch, `new Promise`, async or await.; The host and workflow-switch decodes use Effect Schema, and failures are the tagged `Usage` error.; Every new export I read carries JSDoc.; The one gap is that `agentHostOf` and `workflowsAvailable` decode plain string literals, so `onExcessProperty` does not apply."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "the seven findings above."
+      }
+    ]
   },
   "createdAt": "2026-11-07T20:24:35.476Z"
 }
