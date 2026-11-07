@@ -1,0 +1,37 @@
+{
+  "id": "assignment-0mw6nts7x-wy9p",
+  "intentId": "intent-0mw6lz68m-7i26",
+  "intentRevision": 1,
+  "roleTask": "Librarian.research",
+  "slug": "compare-howaboua-s-pi-task-list-and-ask",
+  "objective": "Compare howaboua's pi task-list and ask-the-user packages with @juicesharp/rpiv-todo and @juicesharp/rpiv-ask-user-question, and say which is better for HolyAgent's pi integration.",
+  "state": "Running",
+  "scope": [
+    "Maintainer (verbatim): \"if howaboua is better, use it instead of rpiv, else use rpiv\". howaboua is a pi package author; find their todo or task-list and ask or question packages on pi.dev, npm and GitHub.",
+    "For each package: name and URL, what it offers (for todo: task states, persistence across turns and compaction, how the agent and the user see it; for ask: single and multiple choice, free text, previews, how answers come back to the model), last release date and cadence, downloads, open issues, license, required pi version and whether it works on pi 1.5.0, and how it behaves in non-interactive or RPC child sessions.",
+    "HolyAgent's needs: the root keeps a task list per PR and Assignment and asks the user decisions with options and a recommended default (like Claude Code's TaskCreate/TaskUpdate and AskUserQuestion)."
+  ],
+  "constraints": [
+    "Read-only: write no files and make no git writes; put the full answer in the report.",
+    "Keep working until done; stop and report. Report in under 350 words: a verdict per tool (todo, ask) first, then the evidence with links and dates."
+  ],
+  "criteria": [
+    {
+      "text": "Each verdict compares both authors' packages on dated, linked evidence against HolyAgent's needs",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-07T17:11:02.685Z"
+  },
+  "createdAt": "2026-11-07T17:11:02.685Z"
+}
