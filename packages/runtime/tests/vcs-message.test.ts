@@ -55,6 +55,46 @@ describe("cleaning", () => {
     expect(cleanMessage(`Fix it\n\n${prose}`)).toBe(`Fix it\n\n${prose}`)
   })
 
+  // Pi adds no commit text itself. Its attribution is the name `pi` and https://pi.dev
+  // (PI_ATTRIBUTION in @earendil-works/pi-ai 1.5.0, dist/utils/identity.js), and its /share command
+  // links https://pi.dev/session/#<gist> (getShareViewerUrl in @earendil-works/pi-coding-agent
+  // 1.5.0, dist/config.js).
+  test("pi's generated-with footer, session links and co-author trailers are removed", () => {
+    const dirty = [
+      "Fix the parser",
+      "",
+      "Handle nested input.",
+      "",
+      "🤖 Generated with [pi](https://pi.dev)",
+      "[Generated with Pi coding agent]",
+      "Generated with pi-coding-agent.",
+      "https://pi.dev/session/#0123abcd",
+      "Co-authored-by: pi <noreply@pi.dev>",
+      "Co-authored-by: Pi Coding Agent <agent@example.com>",
+      "Co-Authored-By: Helper <helper@pi.dev>",
+    ].join("\n")
+    expect(cleanMessage(dirty)).toBe("Fix the parser\n\nHandle nested input.")
+  })
+
+  test("a pi session link inside a sentence is cut out and the sentence stays", () => {
+    expect(cleanMessage("Fix it, see https://pi.dev/session/#abc for context")).toBe(
+      "Fix it, see  for context",
+    )
+  })
+
+  test("what only resembles pi's attribution stays", () => {
+    const text = [
+      "Fix it",
+      "",
+      "Generated with a lookup table of pi",
+      "Generated with pi digits",
+      "See https://pi.dev/docs for the setting",
+      "Co-authored-by: Pia Lang <pia@example.com>",
+      "Co-authored-by: Pi Ng <pi.ng@example.com>",
+    ].join("\n")
+    expect(cleanMessage(text)).toBe(text)
+  })
+
   test("ordinary trailers survive", () => {
     expect(cleanMessage("Fix it\n\nSigned-off-by: A <a@b.c>")).toContain("Signed-off-by")
   })

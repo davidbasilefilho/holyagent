@@ -7648,6 +7648,32 @@ var commitFile = (path, content) => {
   return io(path, () => Bun.write(temporary, content)).pipe(andThen2(io(path, () => rename(temporary, path))), tapError2(() => io(temporary, () => rm(temporary, { force: true })).pipe(ignore2)));
 };
 
+var AGENT_HOSTS = ["claude", "pi"];
+var CLAUDE_WORDS = {
+  workflowTool: "Workflow",
+  agentTool: "Agent",
+  readTool: "Read",
+  message: "SendMessage",
+  confirmGone: "SendMessage or transcript",
+  askForSupport: "SendMessage the subagent",
+  askAgain: "SendMessage the missing support to the same subagent",
+  workflowAgentPrefix: "workflow:",
+  journal: "Workflow run's journal"
+};
+var PI_WORDS = {
+  workflowTool: "SubagentWorkflow",
+  agentTool: "Agent",
+  readTool: "read",
+  message: "the Agent tool's resume",
+  confirmGone: "get_subagent_result or transcript",
+  askForSupport: "Resume the subagent with the Agent tool",
+  askAgain: "resume the same subagent with the Agent tool and ask for the missing support",
+  workflowAgentPrefix: "pi-workflow:",
+  journal: "workflow run's journal",
+  agentIdNote: "under the pi host an agent is recorded as pi:<agent-id>, the ID the Agent tool returns (strip pi: to message it), and a workflow's agent as pi-workflow:<run-id>/<id>, with the run ID and the label the script gave the agent (the Assignment id); any other form is refused"
+};
+var wordsFor = (host) => host === "pi" ? PI_WORDS : CLAUDE_WORDS;
+
 class GitFailed extends TaggedError2("GitFailed") {
   get message() {
     return `git ${this.args.join(" ")} exited ${this.code}: ${this.output}`;
@@ -7781,6 +7807,7 @@ var REFUSED_ERRORS = new Set([
   "StateModeRefused",
   ...VCS_REFUSED_ERRORS
 ]);
+var insufficientAcceptanceHint = (words) => `Nothing was recorded. ${words.askForSupport} for the missing support the message names, then run \`holyagent assignment close <id> --outcome success --accept <rationale>\` again with the corrected report on stdin (also for a Succeeded Assignment that is not accepted yet), or \`holyagent assignment accept <id> --rationale <text> --report\` with it; a workflow agent cannot be messaged, so draft a follow-up with followUpOf.`;
 var HINTS = {
   StdinMissing: "Give the input as --input '<json>' or pipe it in, for example: echo '...' | holyagent <command>; see --help.",
   NoActiveIntent: "Pick one with `holyagent intent use <id>`, or start one with `holyagent intent create`.",
@@ -7795,7 +7822,6 @@ var HINTS = {
   InvalidTransition: "Check the state with `holyagent assignment show <id>` and use the command that fits it.",
   OwnershipConflict: "Wait for the Running writer to close, or narrow the ownership paths.",
   DependencyNotAccepted: "Close and accept the dependency first (`holyagent assignment accept <id>`), then dispatch.",
-  InsufficientAcceptance: "Nothing was recorded. SendMessage the subagent for the missing support the message names, then run `holyagent assignment close <id> --outcome success --accept <rationale>` again with the corrected report on stdin (also for a Succeeded Assignment that is not accepted yet), or `holyagent assignment accept <id> --rationale <text> --report` with it; a workflow agent cannot be messaged, so draft a follow-up with followUpOf.",
   SpecialistMismatch: "Record the agent that was actually launched, or dispatch again.",
   SpecialistNotRecorded: "Run `holyagent assignment record <id> --agent <agentId>` first, or close with another outcome.",
   MigrationRefused: "Run `holyagent migrate --dry-run` to see everything that blocks it. Settle a Running legacy Assignment with the legacy tool first; the command never overwrites an existing .holyagent record.",
@@ -7809,13 +7835,13 @@ var HINTS = {
   CorruptRecord: "Fix or delete the file the message names, or restore it from version control.",
   ...VCS_HINTS
 };
-var describeFailure = (error) => {
+var describeFailure = (error, words = CLAUDE_WORDS) => {
   const tag = typeof error === "object" && error !== null && "_tag" in error ? String(error._tag) : "Defect";
   const message = (typeof error === "object" && error !== null && "message" in error ? String(error.message) : String(error)).replace(/\s+/g, " ").trim();
   return {
     tag,
     message,
-    hint: error instanceof Usage ? error.hint : HINTS[tag] ?? "Run `holyagent --help` for the commands.",
+    hint: error instanceof Usage ? error.hint : tag === "InsufficientAcceptance" ? insufficientAcceptanceHint(words) : HINTS[tag] ?? "Run `holyagent --help` for the commands.",
     code: USAGE_ERRORS.has(tag) ? EXIT.usage : REFUSED_ERRORS.has(tag) ? EXIT.refused : EXIT.state
   };
 };
@@ -11380,11 +11406,14 @@ var commit = (request) => gen2(function* () {
 
 var SESSION_TRAILER = /^\s*claude-session\s*:/i;
 var GENERATED_FOOTER = /^\s*(?:[^\p{L}\p{N}\s]\s*)*generated\s+with\b.*\bclaude\s+code\b/iu;
+var PI_GENERATED_FOOTER = /^\s*(?:[^\p{L}\p{N}\s]\s*)*generated\s+with\s+\[?pi(?:[\s-]coding[\s-]agent)?\]?(?:\(\S*\))?[^\p{L}\p{N}]*$/iu;
 var CO_AUTHOR = /^\s*co-authored-by\s*:\s*(.*)$/i;
 var SESSION_LINK = /https?:\/\/claude\.ai\/\S*/gi;
-var namesAgent = (coAuthor) => looksLikeAgent({ name: coAuthor.replace(/<.*$/, ""), email: "" }) || /@(?:[\w-]+\.)*anthropic\.com\b/i.test(coAuthor);
+var PI_SESSION_LINK = /https?:\/\/(?:[\w-]+\.)*pi\.dev\/session\/\S*/gi;
+var PI_NAME = /^pi(?:[\s-]coding[\s-]agent)?$/i;
+var namesAgent = (coAuthor) => looksLikeAgent({ name: coAuthor.replace(/<.*$/, ""), email: "" }) || /@(?:[\w-]+\.)*(?:anthropic\.com|pi\.dev)\b/i.test(coAuthor) || PI_NAME.test(coAuthor.replace(/<.*$/, "").replace(/\s+/g, " ").trim());
 var isAttribution = (line) => {
-  if (SESSION_TRAILER.test(line) || GENERATED_FOOTER.test(line))
+  if (SESSION_TRAILER.test(line) || GENERATED_FOOTER.test(line) || PI_GENERATED_FOOTER.test(line))
     return true;
   const coAuthor = CO_AUTHOR.exec(line);
   return coAuthor !== null && namesAgent(coAuthor[1] ?? "");
@@ -11404,7 +11433,7 @@ var DEFAULT_PHRASES = [
 ];
 var cleanMessage = (text) => text.split(`
 `).filter((line) => !isAttribution(line)).flatMap((line) => {
-  const stripped = line.replace(SESSION_LINK, "");
+  const stripped = line.replace(SESSION_LINK, "").replace(PI_SESSION_LINK, "");
   return stripped === line ? [line] : stripped.trim() === "" ? [] : [stripped.trimEnd()];
 }).join(`
 `).replace(/\n{3,}/g, `
@@ -11945,9 +11974,15 @@ var accept = (project, assignmentId, input) => gen2(function* () {
   return { assignment: accepted, assignments: [accepted] };
 });
 
-var DEFAULT_CONFIG = { ttlMinutes: 55, workflowsAvailable: false };
+var DEFAULT_CONFIG = {
+  ttlMinutes: 55,
+  workflowsAvailable: false,
+  host: "claude"
+};
 var WORKFLOW_AGENT_PREFIX = "workflow:";
-var isWorkflowAgent = (agentId) => agentId.startsWith(WORKFLOW_AGENT_PREFIX);
+var PI_AGENT_PREFIX = "pi:";
+var PI_WORKFLOW_AGENT_PREFIX = "pi-workflow:";
+var isWorkflowAgent = (agentId) => agentId.startsWith(WORKFLOW_AGENT_PREFIX) || agentId.startsWith(PI_WORKFLOW_AGENT_PREFIX);
 var independenceSubjects = (assignment) => isReviewer(assignment.roleTask) ? [...assignment.dependencies, ...assignment.independentFrom] : assignment.independentFrom;
 var touched = (entry, id) => entry.assignments.includes(id) || entry.related.includes(id);
 var STAGES = [
@@ -12328,9 +12363,9 @@ var renderPrompt = (assignment, agent) => [
   "End your report with an `evidence:` line followed by one `<criterion or evidence label>: <support>` line for each blocking criterion and each required evidence label above. A criterion may be named by its text before the first colon."
 ].join(`
 `);
-var dispatchPrompt = (assignment, agent, briefPath) => [
+var dispatchPrompt = (assignment, agent, briefPath, words = CLAUDE_WORDS) => [
   `Role: ${assignment.roleTask} (${agent}). Assignment: ${assignment.id}.`,
-  `Read the brief at ${briefPath} with the Read tool and follow it as your full task.`
+  `Read the brief at ${briefPath} with the ${words.readTool} tool and follow it as your full task.`
 ].join(`
 `);
 var Started = Struct({
@@ -12441,6 +12476,24 @@ var OUTCOMES = {
   interrupted: "Cancelled",
   stopped: "Cancelled"
 };
+var dispatchOutput = (words) => ({
+  output: `TOON fields (id, state, agent/model/effort or continue, reason), then a line \`prompt:\` alone, then a two-line specialist prompt that names the brief file the full Assignment was written to; pass that text as it is: as the prompt of its agent() in your inline workflow script first, to the ${words.agentTool} tool only when the ${words.workflowTool} tool is disabled or unavailable, and by ${words.message} only for a warm continuation. The brief itself is never printed: the specialist reads it with the ${words.readTool} tool`
+});
+var recordHelp = (words) => ({
+  summary: `Record the launch of a dispatched Assignment (a workflow's agent as ${words.workflowAgentPrefix}<run-id>/<id>), or roll it back when the launch failed`,
+  notes: [
+    "the agent id is in the Agent result, or is the continued agent's; --failed returns the Assignment to Ready",
+    "a hook records an agent spawned from a dispatch prompt and says so in its note; record it yourself when the note says it did not, or for a continued agent",
+    ...words.agentIdNote === undefined ? [] : [words.agentIdNote]
+  ]
+});
+var closeNotes = (words) => [
+  "pass the report through a quoted heredoc so it stays intact",
+  "--accept applies to success only and reads the last `evidence:` block: one `<criterion text or evidence label>: <support>` line per blocking criterion and per required label. The text before the colon matches the criterion, or its label (the criterion's text before its first colon, unless two criteria share it), ignoring case, spacing, trailing punctuation, a leading `[blocking]` and a trailing `(dimension)`; a support may continue on indented lines below its entry. Evidence for a different criterion matches nothing. Accept only support you judge true",
+  `an evidence gap (InsufficientAcceptance) records nothing: ${words.askAgain}, then close again with the corrected report, or when the Assignment is already Succeeded and not accepted, close it as success again or run \`assignment accept <id> --rationale <text> --report\` with the corrected report on stdin; a workflow agent cannot be messaged, so draft a follow-up with followUpOf`,
+  "outcomes: success; failure (the work failed); errored (the agent died or returned no report); interrupted (its agent is gone after a resume or compaction); stopped (you stopped it). A report from an inline workflow script is the specialist's own text: pass it verbatim on stdin, with --report-json only for a JSON report object"
+];
+var reportsSummary = (words) => `Write the results of a ${words.journal} to report files named by Assignment id, and list them`;
 var RECORD_USAGE = "assignment record <id> (--agent <agentId> | --failed)";
 var CLOSE_USAGE = "assignment close <id> --outcome success|failure|errored|interrupted|stopped [--accept <rationale>] [--report-json]";
 var LIST_USAGE = "assignment list [--state <state>] [--all] [--full]";
@@ -12455,11 +12508,18 @@ var recordLaunch = (update, id, agentId, launchedAs) => update((snapshot) => gen
   return yield* record2(snapshot.project, snapshot.specialists, id, agentId === undefined ? { launched: false } : { launched: true, agentId, model, effort });
 })).pipe(map4(({ assignment }) => assignment));
 var idArgument = (positionals) => positionals[0] ?? "";
-var workflowAgentProblem = (agentId, id) => {
-  if (!isWorkflowAgent(agentId))
-    return;
-  const [run = "", assignment, ...rest] = agentId.slice(WORKFLOW_AGENT_PREFIX.length).split("/");
-  return /^\S+$/.test(run) && assignment === id && rest.length === 0 ? undefined : `A workflow agent is recorded as workflow:<run-id>/${id}`;
+var piAgentProblem = (id) => `Under the pi host an agent is recorded as ${PI_AGENT_PREFIX}<agent-id>, or as ${PI_WORKFLOW_AGENT_PREFIX}<run-id>/${id} for a workflow's agent`;
+var agentIdProblem = (agentId, id, host) => {
+  const workflowPrefix = [WORKFLOW_AGENT_PREFIX, PI_WORKFLOW_AGENT_PREFIX].find((prefix) => agentId.startsWith(prefix));
+  if (workflowPrefix !== undefined) {
+    if (host === "pi" && workflowPrefix === WORKFLOW_AGENT_PREFIX)
+      return piAgentProblem(id);
+    const [run = "", assignment, ...rest] = agentId.slice(workflowPrefix.length).split("/");
+    return /^\S+$/.test(run) && assignment === id && rest.length === 0 ? undefined : `A workflow agent is recorded as ${workflowPrefix}<run-id>/${id}`;
+  }
+  if (agentId.startsWith(PI_AGENT_PREFIX))
+    return /^\S+$/.test(agentId.slice(PI_AGENT_PREFIX.length)) ? undefined : `A pi agent is recorded as ${PI_AGENT_PREFIX}<agent-id>`;
+  return host === "pi" ? piAgentProblem(id) : undefined;
 };
 var ASSIGNMENT_COMMANDS = [
   {
@@ -12483,7 +12543,8 @@ var ASSIGNMENT_COMMANDS = [
     usage: "assignment dispatch [--input <json>]",
     summary: "Start an Assignment and say how to run it: spawn an agent or continue a warm one. A new draft is created and started in one step",
     input: `{id} for a Ready Assignment, or a new draft ${DRAFT_SHAPE}`,
-    output: "TOON fields (id, state, agent/model/effort or continue, reason), then a line `prompt:` alone, then a two-line specialist prompt that names the brief file the full Assignment was written to; pass that text as it is: as the prompt of its agent() in your inline workflow script first, to the Agent tool only when the Workflow tool is disabled or unavailable, and by SendMessage only for a warm continuation. The brief itself is never printed: the specialist reads it with the Read tool",
+    ...dispatchOutput(CLAUDE_WORDS),
+    forHost: dispatchOutput,
     notes: [...DRAFT_NOTES, 'dispatching a Ready Assignment takes {"id": "<id>"}'],
     flags: { input: "string" },
     positionals: 0,
@@ -12501,7 +12562,10 @@ var ASSIGNMENT_COMMANDS = [
         const dispatched = yield* dispatch(project, snapshot.specialists, id, now, settings, workTreeKey(call.root));
         const agent = `${PLUGIN_NAMESPACE}:${routeFor(dispatched.assignment.roleTask).agent}`;
         const path = yield* writeBrief(call, dispatched.assignment.id, renderPrompt(dispatched.assignment, agent));
-        return { ...dispatched, prompt: dispatchPrompt(dispatched.assignment, agent, path) };
+        return {
+          ...dispatched,
+          prompt: dispatchPrompt(dispatched.assignment, agent, path, wordsFor(settings.host))
+        };
       }));
       return new WithTrailer({
         id: started.assignment.id,
@@ -12513,14 +12577,11 @@ var ASSIGNMENT_COMMANDS = [
   {
     path: ["assignment", "record"],
     usage: RECORD_USAGE,
-    summary: "Record the launch of a dispatched Assignment (a workflow's agent as workflow:<run-id>/<id>), or roll it back when the launch failed",
-    notes: [
-      "the agent id is in the Agent result, or is the continued agent's; --failed returns the Assignment to Ready",
-      "a hook records an agent spawned from a dispatch prompt and says so in its note; record it yourself when the note says it did not, or for a continued agent"
-    ],
+    ...recordHelp(CLAUDE_WORDS),
+    forHost: recordHelp,
     flags: { agent: "string", failed: "boolean" },
     positionals: 1,
-    run: ({ update, args }) => gen2(function* () {
+    run: ({ update, args, config }) => gen2(function* () {
       const id = idArgument(args.positionals);
       const agentId = stringFlag(args, "agent");
       if (agentId !== undefined === booleanFlag(args, "failed"))
@@ -12528,7 +12589,8 @@ var ASSIGNMENT_COMMANDS = [
           message: "Give exactly one of --agent and --failed",
           hint: `Usage: holyagent ${RECORD_USAGE}`
         });
-      const problem = agentId === undefined ? undefined : workflowAgentProblem(agentId, id);
+      const { host } = yield* config;
+      const problem = agentId === undefined ? undefined : agentIdProblem(agentId, id, host);
       if (problem !== undefined)
         return yield* new Usage({ message: problem, hint: `Usage: holyagent ${RECORD_USAGE}` });
       const assignment = yield* recordLaunch(update, id, agentId);
@@ -12544,12 +12606,8 @@ var ASSIGNMENT_COMMANDS = [
     usage: CLOSE_USAGE,
     summary: "Finish an Assignment with the specialist's report on stdin; --accept also accepts it from the report's evidence block",
     input: "the specialist's report as raw text. Required for success; optional for the other outcomes, which store the outcome name when it is empty. With --accept it ends with `evidence:` and one `<criterion or evidence label>: <support>` line per blocking criterion and required label. With --report-json it is a JSON report object returned by an agent() that was given a schema ({status: done|partial|blocked, changed_paths, checks: [{command, exit}], blockers, notes, evidence: [{key, support}]}), which is stored as the text of such a report (fields beyond these are kept in it)",
-    notes: [
-      "pass the report through a quoted heredoc so it stays intact",
-      "--accept applies to success only and reads the last `evidence:` block: one `<criterion text or evidence label>: <support>` line per blocking criterion and per required label. The text before the colon matches the criterion, or its label (the criterion's text before its first colon, unless two criteria share it), ignoring case, spacing, trailing punctuation, a leading `[blocking]` and a trailing `(dimension)`; a support may continue on indented lines below its entry. Evidence for a different criterion matches nothing. Accept only support you judge true",
-      "an evidence gap (InsufficientAcceptance) records nothing: SendMessage the missing support to the same subagent, then close again with the corrected report, or when the Assignment is already Succeeded and not accepted, close it as success again or run `assignment accept <id> --rationale <text> --report` with the corrected report on stdin; a workflow agent cannot be messaged, so draft a follow-up with followUpOf",
-      "outcomes: success; failure (the work failed); errored (the agent died or returned no report); interrupted (its agent is gone after a resume or compaction); stopped (you stopped it). A report from an inline workflow script is the specialist's own text: pass it verbatim on stdin, with --report-json only for a JSON report object"
-    ],
+    notes: closeNotes(CLAUDE_WORDS),
+    forHost: (words) => ({ notes: closeNotes(words) }),
     flags: { outcome: "string", accept: "string", "report-json": "boolean" },
     positionals: 1,
     run: (call) => gen2(function* () {
@@ -12616,7 +12674,8 @@ var ASSIGNMENT_COMMANDS = [
   {
     path: ["assignment", "reports"],
     usage: REPORTS_USAGE,
-    summary: "Write the results of a Workflow run's journal to report files named by Assignment id, and list them",
+    summary: reportsSummary(CLAUDE_WORDS),
+    forHost: (words) => ({ summary: reportsSummary(words) }),
     output: "TOON: `reports` rows of id, path and words, one per Assignment id, and `notAssignmentIds` rows of label and agentId for results whose label is not an Assignment id (not written)",
     notes: [
       "the journal is the run's journal.jsonl: `started` entries (key, agentId, label) and `result` entries (key, agentId, result) joined by key; label each agent() with its Assignment id so its report lands in <id>.md",
@@ -13823,6 +13882,7 @@ var continuations = (rows, beside, registry, now, config) => parallelSet(rows.fi
 var recommend = (project, registry, now, config, workTree) => {
   const ready = project.assignments.filter((row) => row.state === "Ready");
   const dispatchable = ready.filter((row) => dispatchBlock(project, row, undefined, workTree) === undefined && awaited(project, row).length === 0);
+  const words = wordsFor(config.host);
   if (config.workflowsAvailable) {
     const spawns = (row) => directiveFor(row, registry, now, config).action === "spawn";
     const pool = {
@@ -13846,7 +13906,7 @@ var recommend = (project, registry, now, config, workTree) => {
           assignmentIds,
           fallback,
           continues,
-          reason: continues.length === 0 ? reason : `${reason}; the Assignments in continues go by SendMessage to their warm specialists`
+          reason: continues.length === 0 ? reason : `${reason}; the Assignments in continues go by ${words.message} to their warm specialists`
         };
       }
     }
@@ -13861,14 +13921,14 @@ var recommend = (project, registry, now, config, workTree) => {
       action: "continue",
       assignmentIds: continues.map((row) => row.assignmentId),
       continues,
-      reason: "each continues a warm specialist by SendMessage"
+      reason: `each continues a warm specialist by ${words.message}`
     };
   }
   if (chosen.length > 1)
     return {
       action: "subagent",
       assignmentIds,
-      reason: "the Workflow tool is disabled or unavailable"
+      reason: `the ${words.workflowTool} tool is disabled or unavailable`
     };
   const [first] = chosen;
   if (first === undefined)
@@ -13881,6 +13941,57 @@ var recommend = (project, registry, now, config, workTree) => {
     reason: directive.reason
   } : { action: "subagent", assignmentIds, reason: directive.reason };
 };
+
+import { join as join14 } from "path";
+var TTL_VARIABLE = "HOLYAGENT_REUSE_TTL_MINUTES";
+var HOST_VARIABLE = "HOLYAGENT_HOST";
+var WORKFLOWS_VARIABLE = "HOLYAGENT_WORKFLOWS";
+var Minutes = NumberFromString.check(isFinite2(), isGreaterThanOrEqualTo2(0));
+var reuseTtl = (env) => {
+  const raw = env[TTL_VARIABLE];
+  return raw === undefined || raw.trim() === "" ? succeed6(DEFAULT_CONFIG.ttlMinutes) : decodeUnknownEffect2(Minutes)(raw.trim()).pipe(mapError2(() => new Usage({
+    message: `${TTL_VARIABLE} must be a number of minutes, not "${raw}"`,
+    hint: `Unset ${TTL_VARIABLE} for the default of ${DEFAULT_CONFIG.ttlMinutes}.`
+  })));
+};
+var given = (raw) => raw === undefined || raw.trim() === "" ? undefined : raw.trim();
+var agentHostOf = (env) => {
+  const value = given(env[HOST_VARIABLE]);
+  return value === undefined ? succeed6("claude") : decodeUnknownEffect2(Literals(AGENT_HOSTS))(value).pipe(mapError2(() => new Usage({
+    message: `${HOST_VARIABLE} must be ${AGENT_HOSTS.join(" or ")}, not "${value}"`,
+    hint: `Unset ${HOST_VARIABLE} for the default of claude.`
+  })));
+};
+var WorkflowsSwitch = Literals(["0", "1"]);
+var WorkflowSettings = Struct({
+  disableWorkflows: optionalKey2(Boolean3),
+  enableWorkflows: optionalKey2(Boolean3)
+});
+var disablesWorkflows = (path) => readText(path).pipe(flatMap2((text) => text === undefined ? succeed6(false) : decodeUnknownEffect2(fromJsonString2(WorkflowSettings))(text).pipe(map4((settings) => settings.disableWorkflows === true || settings.enableWorkflows === false))), orElseSucceed2(() => false));
+var claudeWorkflowsAvailable = (env, root) => {
+  if (env.CLAUDE_CODE_DISABLE_WORKFLOWS === "1")
+    return succeed6(false);
+  const files = [
+    join14(claudeConfigDirectory(env), "settings.json"),
+    join14(root, ".claude", "settings.json"),
+    join14(root, ".claude", "settings.local.json")
+  ];
+  return forEach2(files, disablesWorkflows).pipe(map4((disabled) => !disabled.includes(true)));
+};
+var workflowsAvailable = (env, root) => {
+  const setting = given(env[WORKFLOWS_VARIABLE]);
+  if (setting !== undefined)
+    return decodeUnknownEffect2(WorkflowsSwitch)(setting).pipe(map4((value) => value === "1"), mapError2(() => new Usage({
+      message: `${WORKFLOWS_VARIABLE} must be 1 or 0, not "${setting}"`,
+      hint: `Unset ${WORKFLOWS_VARIABLE} to let the host decide.`
+    })));
+  return agentHostOf(env).pipe(flatMap2((host) => host === "pi" ? succeed6(false) : claudeWorkflowsAvailable(env, root)));
+};
+var loadConfig = (env, root) => all2({
+  ttlMinutes: reuseTtl(env),
+  workflowsAvailable: workflowsAvailable(env, root),
+  host: agentHostOf(env)
+}).pipe(map4((config) => config));
 
 var statusFrom = (snapshot) => {
   const open = byId(snapshot.project.intents.filter((intent) => intent.state === "Open"));
@@ -13909,7 +14020,7 @@ var statusFrom = (snapshot) => {
   };
 };
 var statusOf = (directory) => readOpenState(directory).pipe(map4(statusFrom));
-var reconcileFrom = ({ project }) => {
+var reconcileFrom = ({ project }, words) => {
   const running = byId(project.assignments.filter((row) => row.state === "Running"));
   return {
     running: running.map((row) => ({
@@ -13919,25 +14030,26 @@ var reconcileFrom = ({ project }) => {
       startedAt: row.specialist?.startedAt ?? null
     })),
     ...present({
-      next: running.length === 0 ? undefined : "close as interrupted only an agent confirmed gone (SendMessage or transcript; an exited parent session proves nothing): holyagent assignment close <id> --outcome interrupted"
+      next: running.length === 0 ? undefined : `close as interrupted only an agent confirmed gone (${words.confirmGone}; an exited parent session proves nothing): holyagent assignment close <id> --outcome interrupted`
     })
   };
 };
-var reconcileOf = (directory) => readOpenState(directory).pipe(map4(reconcileFrom));
-var resumeOf = (directory) => readOpenState(directory).pipe(map4((snapshot) => ({
+var reconcileOf = (directory, words) => readOpenState(directory).pipe(map4((snapshot) => reconcileFrom(snapshot, words)));
+var resumeOf = (directory, words = CLAUDE_WORDS) => readOpenState(directory).pipe(map4((snapshot) => ({
   status: statusFrom(snapshot),
-  reconcile: reconcileFrom(snapshot)
+  reconcile: reconcileFrom(snapshot, words)
 })));
-var PLAN_NOTES = [
+var planNotes = (words) => [
   "`workflow` first: `assignments` are the ids in run order, a writer followed by the review of its work; `assignment dispatch` each for its agent, model, effort and prompt, then write the inline script as the root workflow text says. A single Assignment is a one-entry workflow",
-  "`continues` lists Ready work that continues a warm specialist, by SendMessage beside the workflow. `fallback` is the same work as direct subagents, for a session where the Workflow tool is disabled or unavailable: its writers launch together, and the `afterwards` reviews launch once the writers they depend on are terminal"
+  `\`continues\` lists Ready work that continues a warm specialist, by ${words.message} beside the workflow. \`fallback\` is the same work as direct subagents, for a session where the ${words.workflowTool} tool is disabled or unavailable: its writers launch together, and the \`afterwards\` reviews launch once the writers they depend on are terminal`
 ];
 var OVERVIEW_COMMANDS = [
   {
     path: ["plan"],
     usage: "plan",
     summary: "Say how to run the Ready Assignments of the Intent in use: a workflow first (with the direct subagents as its fallback), else subagents or a warm agent",
-    notes: PLAN_NOTES,
+    notes: planNotes(CLAUDE_WORDS),
+    forHost: (words) => ({ notes: planNotes(words) }),
     flags: {},
     positionals: 0,
     run: ({ directory, config, root }) => gen2(function* () {
@@ -13962,7 +14074,7 @@ var OVERVIEW_COMMANDS = [
         parallel: recommendation.assignmentIds.length > 1 ? true : undefined,
         fallback: recommendation.action === "workflow" ? present({
           action: "subagent",
-          when: "only if the Workflow tool is disabled or unavailable",
+          when: `only if the ${wordsFor(settings.host).workflowTool} tool is disabled or unavailable`,
           assignments: recommendation.fallback.assignmentIds,
           parallel: recommendation.fallback.assignmentIds.length > 1 ? true : undefined,
           afterwards: recommendation.fallback.afterwards
@@ -13985,7 +14097,7 @@ var OVERVIEW_COMMANDS = [
     summary: "List the Running Assignments with their agent ids, to confirm after a resume",
     flags: {},
     positionals: 0,
-    run: ({ directory }) => reconcileOf(directory)
+    run: ({ directory, env }) => agentHostOf(env).pipe(flatMap2((host) => reconcileOf(directory, wordsFor(host))))
   }
 ];
 
@@ -21133,6 +21245,7 @@ var hook = (name, summary, run, stateless) => ({
   path: ["hook", name],
   usage: `hook ${name}`,
   summary,
+  hosts: ["claude"],
   input: "the host's hook payload as JSON",
   output: "the JSON the host reads, or nothing; exit 1 with a stderr line on failure",
   flags: {},
@@ -21317,7 +21430,7 @@ ${cleanedBelow}
   }, true)
 ];
 
-import { join as join14, relative as relative5 } from "path";
+import { join as join15, relative as relative5 } from "path";
 var {$: $4 } = globalThis.Bun;
 class NothingToMigrate extends TaggedError2("NothingToMigrate") {
   get message() {
@@ -21406,7 +21519,7 @@ var mentionsOf = (root, folders) => gen2(function* () {
   const names = yield* io(root, () => Array.fromAsync(new Bun.Glob("*").scan({ cwd: root, dot: true, onlyFiles: true })));
   const hits = [];
   for (const name of names.toSorted()) {
-    const text = yield* readText(join14(root, name));
+    const text = yield* readText(join15(root, name));
     if (text !== undefined && folders.some((folder) => text.includes(folder)))
       hits.push(name);
   }
@@ -21480,7 +21593,7 @@ var MIGRATE_COMMANDS = [
   }
 ];
 
-import { join as join15 } from "path";
+import { join as join16 } from "path";
 var CLOUD_SKIP = "skipped in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true), which has no machine of yours to install it on";
 var neutralDirectory = (env) => homeDirectory(env);
 var ensureGlobal = fn2("ensureGlobal")(function* (env, command, packageName, dryRun) {
@@ -21511,7 +21624,7 @@ var installCtx7 = fn2("installCtx7")(function* (env, dryRun) {
   const global = yield* ensureGlobal(env, "ctx7", "ctx7", dryRun);
   if (!global.usable)
     return global.lines;
-  const skillReady = (yield* fileExists2(join15(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join15(files.claudeDir, "rules", "context7.md")));
+  const skillReady = (yield* fileExists2(join16(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join16(files.claudeDir, "rules", "context7.md")));
   if (skillReady)
     return [...global.lines, present3("ctx7 skill: already installed")];
   const apiKey = env.CONTEXT7_API_KEY === "" ? undefined : env.CONTEXT7_API_KEY;
@@ -21695,14 +21808,14 @@ var STATE_COMMANDS = [
   }
 ];
 
-import { join as join16 } from "path";
+import { join as join17 } from "path";
 var {$: $5 } = globalThis.Bun;
 var TARGETS = [
   { id: "darwin-arm64", platform: "darwin", arch: "arm64", suffix: "" },
   { id: "linux-x64", platform: "linux", arch: "x64", suffix: "" },
   { id: "windows-x64", platform: "win32", arch: "x64", suffix: ".exe" }
 ];
-var BUNDLED_TOOLS = join16(import.meta.dir, "vendor");
+var BUNDLED_TOOLS = join17(import.meta.dir, "vendor");
 
 class UnsupportedPlatform extends TaggedError2("UnsupportedPlatform") {
   get message() {
@@ -21719,7 +21832,7 @@ var selectTarget = (platform, arch) => {
   const target = TARGETS.find((candidate) => candidate.platform === platform && candidate.arch === arch);
   return target === undefined ? fail5(new UnsupportedPlatform({ platform, arch })) : succeed6(target);
 };
-var toolPath = (directory, tool, target) => join16(directory, target.id, `${tool}${target.suffix}`);
+var toolPath = (directory, tool, target) => join17(directory, target.id, `${tool}${target.suffix}`);
 var runTool = (options) => gen2(function* () {
   const path = toolPath(options.directory, options.tool, options.target);
   if (!(yield* promise2(() => Bun.file(path).exists())))
@@ -21770,46 +21883,25 @@ var COMMANDS = [
   ...HOOK_COMMANDS
 ];
 
-import { join as join17 } from "path";
-var TTL_VARIABLE = "HOLYAGENT_REUSE_TTL_MINUTES";
-var Minutes = NumberFromString.check(isFinite2(), isGreaterThanOrEqualTo2(0));
-var reuseTtl = (env) => {
-  const raw = env[TTL_VARIABLE];
-  return raw === undefined || raw.trim() === "" ? succeed6(DEFAULT_CONFIG.ttlMinutes) : decodeUnknownEffect2(Minutes)(raw.trim()).pipe(mapError2(() => new Usage({
-    message: `${TTL_VARIABLE} must be a number of minutes, not "${raw}"`,
-    hint: `Unset ${TTL_VARIABLE} for the default of ${DEFAULT_CONFIG.ttlMinutes}.`
-  })));
-};
-var WorkflowSettings = Struct({
-  disableWorkflows: optionalKey2(Boolean3),
-  enableWorkflows: optionalKey2(Boolean3)
-});
-var disablesWorkflows = (path) => readText(path).pipe(flatMap2((text) => text === undefined ? succeed6(false) : decodeUnknownEffect2(fromJsonString2(WorkflowSettings))(text).pipe(map4((settings) => settings.disableWorkflows === true || settings.enableWorkflows === false))), orElseSucceed2(() => false));
-var workflowsAvailable = (env, root) => {
-  if (env.CLAUDE_CODE_DISABLE_WORKFLOWS === "1")
-    return succeed6(false);
-  const files = [
-    join17(claudeConfigDirectory(env), "settings.json"),
-    join17(root, ".claude", "settings.json"),
-    join17(root, ".claude", "settings.local.json")
-  ];
-  return forEach2(files, disablesWorkflows).pipe(map4((disabled) => !disabled.includes(true)));
-};
-var loadConfig = (env, root) => all2({ ttlMinutes: reuseTtl(env), workflowsAvailable: workflowsAvailable(env, root) }).pipe(map4((config) => config));
-
-var help = (command) => [
-  `${command.usage}  ${command.summary}`,
-  ...command.input === undefined ? [] : [
-    `${INPUT_FLAG in command.flags ? "input (--input '<json>' or stdin)" : "stdin"}: ${command.input}`
-  ],
-  ...command.output === undefined ? [] : [`stdout: ${command.output}`],
-  ...(command.notes ?? []).map((note) => `note: ${note}`)
-].join(`
+var forWords = (command, words) => command.forHost === undefined ? command : { ...command, ...command.forHost(words) };
+var help = (command, words) => {
+  const { usage, summary, input, output, notes, flags } = forWords(command, words);
+  return [
+    `${usage}  ${summary}`,
+    ...input === undefined ? [] : [`${INPUT_FLAG in flags ? "input (--input '<json>' or stdin)" : "stdin"}: ${input}`],
+    ...output === undefined ? [] : [`stdout: ${output}`],
+    ...(notes ?? []).map((note) => `note: ${note}`)
+  ].join(`
 `);
-var topHelp = () => [
+};
+var listed = (host) => COMMANDS.filter((command) => command.hosts === undefined || command.hosts.includes(host));
+var topHelp = (host, words) => [
   "holyagent <command> [args]; JSON inline as `--input '<json>'` or on stdin, TOON on stdout; errors go to stderr as `error:` and `hint:` lines",
   "exit codes: 2 usage, 3 refused by the current state, 4 state or I/O failure; every error's `hint:` says what to do next",
-  ...COMMANDS.map((command) => `${command.usage}  ${command.summary}`),
+  ...listed(host).map((command) => {
+    const { usage, summary } = forWords(command, words);
+    return `${usage}  ${summary}`;
+  }),
   "help [command] or <command> --help shows a command's input shape, stdout and rules"
 ].join(`
 `);
@@ -21836,28 +21928,40 @@ var asFlag = (argv) => argv[0] === "help" ? argv.length === 1 ? ["--help"] : [..
 var execute = (given, host) => gen2(function* () {
   const argv = asFlag(given);
   const [first] = argv;
-  if (first === undefined || first === "--help" || first === "-h")
-    return { stdout: `${topHelp()}
+  if (first === undefined || first === "--help" || first === "-h") {
+    const agent = yield* agentHostOf(host.env);
+    return { stdout: `${topHelp(agent, wordsFor(agent))}
 `, stderr: "", code: 0 };
+  }
   if (first === "--version")
     return { stdout: `${version}
 `, stderr: "", code: 0 };
   const command = COMMANDS.find((candidate) => candidate.path.every((word, index) => argv[index] === word));
   if (command === undefined) {
     const group = COMMANDS.filter((candidate) => candidate.path[0] === first);
-    if (group.length > 0 && (argv.length === 1 || argv.includes("--help") || argv.includes("-h")))
-      return { stdout: `${group.map(help).join(`
+    if (group.length > 0 && (argv.length === 1 || argv.includes("--help") || argv.includes("-h"))) {
+      const agent = yield* agentHostOf(host.env);
+      const words = wordsFor(agent);
+      const shown = listed(agent).filter((candidate) => group.includes(candidate));
+      return {
+        stdout: `${shown.map((entry) => help(entry, words)).join(`
 `)}
-`, stderr: "", code: 0 };
+`,
+        stderr: "",
+        code: 0
+      };
+    }
     return yield* new Usage({
       message: `Unknown command ${argv.slice(0, 2).join(" ")}`,
       hint: group.length > 0 ? `Run \`holyagent ${first} --help\` for its commands.` : "Run `holyagent --help` for the commands."
     });
   }
   const rest = argv.slice(command.path.length);
-  if (command.passthrough !== true && (rest.includes("--help") || rest.includes("-h")))
-    return { stdout: `${help(command)}
+  if (command.passthrough !== true && (rest.includes("--help") || rest.includes("-h"))) {
+    const agent = yield* agentHostOf(host.env);
+    return { stdout: `${help(command, wordsFor(agent))}
 `, stderr: "", code: 0 };
+  }
   const args = command.raw === true ? { positionals: rest, flags: {} } : yield* parseArgs(rest, command.flags, command.usage);
   const count = args.positionals.length;
   if (command.raw !== true && count !== command.positionals && !(command.optional && count === command.positionals - 1))
@@ -21880,13 +21984,13 @@ ${output.text}
 `;
   return { stdout, stderr: "", code: 0 };
 });
-var failed3 = (error) => {
-  const { tag, message, hint, code } = describeFailure(error);
+var failed3 = (error, env) => agentHostOf(env).pipe(orElseSucceed2(() => "claude"), map4((agent) => {
+  const { tag, message, hint, code } = describeFailure(error, wordsFor(agent));
   return { stdout: "", stderr: `error: ${tag}: ${message}
 hint: ${hint}
 `, code };
-};
-var run2 = (argv, host) => execute(argv, host).pipe(catch_2((error) => succeed6(failed3(error))), catchCause2((cause) => succeed6(failed3({ _tag: "Defect", message: pretty(cause) }))));
+}));
+var run2 = (argv, host) => execute(argv, host).pipe(catch_2((error) => failed3(error, host.env)), catchCause2((cause) => failed3({ _tag: "Defect", message: pretty(cause) }, host.env)));
 
 var stdin = suspend2(() => process.stdin.isTTY ? fail5(new StdinMissing({ reason: "stdin is a terminal" })) : tryPromise2({
   try: () => Bun.stdin.text(),

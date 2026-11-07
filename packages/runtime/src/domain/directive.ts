@@ -1,4 +1,5 @@
 import { type Assignment, relatedIds } from "./assignment.ts"
+import type { AgentHost } from "./host.ts"
 import { firstOverlap } from "./paths.ts"
 import { type Effort, isReviewer, type Model, routeFor } from "./route.ts"
 import type { Registry, SpecialistEntry } from "./specialists.ts"
@@ -9,20 +10,43 @@ export interface ExecutionConfig {
   readonly ttlMinutes: number
   /** Whether the host offers the named workflows. */
   readonly workflowsAvailable: boolean
+  /** The host the commands run under, which decides the tool names the output uses. */
+  readonly host: AgentHost
 }
 
 /** The default configuration. */
-export const DEFAULT_CONFIG: ExecutionConfig = { ttlMinutes: 55, workflowsAvailable: false }
+export const DEFAULT_CONFIG: ExecutionConfig = {
+  ttlMinutes: 55,
+  workflowsAvailable: false,
+  host: "claude",
+}
 
 /**
- * The start of the agent id of a specialist a workflow launched:
+ * The start of the agent id of a specialist a Claude workflow launched:
  * `workflow:<run-id>/<assignment-id>`.
  */
 export const WORKFLOW_AGENT_PREFIX = "workflow:"
 
-/** True for a specialist a workflow launched. Nothing can message it, so it is never continued. */
+/**
+ * The start of the agent id of a specialist the pi host launched directly (the `Agent` tool of
+ * `@tintinweb/pi-subagents`): `pi:<agent-id>`, where `<agent-id>` is the ID that tool returns. A
+ * caller that messages the agent strips the prefix.
+ */
+export const PI_AGENT_PREFIX = "pi:"
+
+/**
+ * The start of the agent id of a specialist a pi workflow run (`SubagentWorkflow`) launched:
+ * `pi-workflow:<run-id>/<assignment-id>`, with the run ID the tool returns and the `label` the
+ * script gave the agent, which is the Assignment id.
+ */
+export const PI_WORKFLOW_AGENT_PREFIX = "pi-workflow:"
+
+/**
+ * True for a specialist a workflow launched, on Claude or pi. Nothing can message it, so it is
+ * never continued.
+ */
 export const isWorkflowAgent = (agentId: string): boolean =>
-  agentId.startsWith(WORKFLOW_AGENT_PREFIX)
+  agentId.startsWith(WORKFLOW_AGENT_PREFIX) || agentId.startsWith(PI_WORKFLOW_AGENT_PREFIX)
 
 /** How the root runs an Assignment: message a warm specialist, or launch a new one. */
 export type Directive =
