@@ -10,9 +10,11 @@
     "Tests fail when a model-set file has no requirements file, a requirements file has no file in a model set, or a requirement id is not covered in a model set; the existing requirement-to-phrase coverage map generalizes per model set.",
     "Default (root): the skill is a repository skill for maintainers at .claude/skills/, not shipped in the plugin, since it edits HolyAgent's own sources; it covers create, adjust and remove of requirements and their translation per guide.md, and the regeneration and tests to run.",
     "packages/runtime/AGENTS.md (new) states the requirements-first rule and points to the skill; the root AGENTS.md is left as is unless a pointer is needed.",
-    "Ships in 0.3.0 as its own PR in the release stack before the Kimi instruction set; the Kimi PR adds kimi-k3.1/ with its guide.md and a translation of every requirements file. mise run verify passes."
+    "Ships in 0.3.0 as its own PR in the release stack before the Kimi instruction set; the Kimi PR adds kimi-k3.1/ with its guide.md and a translation of every requirements file. mise run verify passes.",
+    "Maintainer (verbatim): \"there must be a package script in that package to copy the directories and files (same name, but empty) to the model families supported with a relevant name\".",
+    "packages/runtime gets a scaffold script (package.json script instructions:scaffold delegating to a mise task, per the repository rule that mise.toml is the source of commands) that copies the requirements/ tree into every supported model-family directory: each directory and each file with the same name, created empty; it only adds missing paths and never overwrites or deletes a file that has content. The supported families come from one list in code (claude-5.5, kimi-k3.1) that the coverage tests also read. Tests cover create, idempotence and no-overwrite."
   ],
-  "revision": 2,
+  "revision": 3,
   "state": "Open",
   "createdAt": "2026-11-07T20:31:16.693Z"
 }
