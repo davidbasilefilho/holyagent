@@ -1,0 +1,48 @@
+{
+  "id": "assignment-0mw6z4x45-dcg6",
+  "intentId": "intent-0mw6muu20-ygf9",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-merge-of-the-integration",
+  "objective": "Review the merge of the integration-branch rule PR into the host-neutral CLI branch and the small fix on top, before the branch is pushed.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-cli; range d7c4925..HEAD (merge commit 6afe430 and fix b5af9dd); diff without the generated bundle at /home/user/holyagent-notes/pr2-merge.diff. The fix strips a whole Markdown session link [text](url) and lets assignment record --failed run under an invalid HOLYAGENT_HOST.",
+    "Check the merge took both sides correctly (instruction text and sessioncontext budget from the lower branch, host-neutral CLI from this one), the generated bundle matches a fresh build (run bunx --no-install mise run build and confirm git status stays clean), and run bunx --no-install mise run verify."
+  ],
+  "constraints": [
+    "Read-only: no git writes; restore nothing. Findings blocking or non-blocking with file:line and a reproduction. Report in under 250 words."
+  ],
+  "criteria": [
+    {
+      "text": "Merge correct: both sides are intact and the generated bundle matches a fresh build",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Fix correct: the two fixes behave as stated with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Gates: mise run verify exits 0",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw6wv4fj-lrse"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-07T22:27:38.021Z"
+  },
+  "createdAt": "2026-11-07T22:27:38.021Z"
+}
