@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mw6mq279-7wvr",
+  "intentId": "intent-0mw6lz68m-7i26",
+  "intentRevision": 1,
+  "roleTask": "Librarian.research",
+  "slug": "propose-the-set-of-holyagent-intents-for",
+  "objective": "Propose the set of HolyAgent Intents for the 0.3.0 release, in which the maintainer will implement the pi extension integration, from the repository's own pi research and architecture.",
+  "state": "Running",
+  "scope": [
+    "Maintainer request (verbatim): \"please add intents for the next 0.3.0 release where I will implement the pi extension integration\". Later maintainer messages (verbatim): \"btw in the docs/pi/ it's supposed to use already existent extensions for required functionality\" and \"also, the first provider to implement will be kimi for coding global\". The maintainer implements 0.3.0 personally; these Intents only record the work.",
+    "Read docs/pi/ in /home/user/holyagent (every file), plus what you need from README.md, docs/decisions.md, docs/development.md, AGENTS.md and the layout of packages/ (packages/runtime and packages/integrations/claude show how an integration is built today) to understand what a pi integration must provide and how it would sit beside the Claude Code one.",
+    "Binding constraints from the maintainer: (a) wherever docs/pi/ names an existing pi extension or package for a required function, the Intent reuses that extension and does not ask to build the function anew; list each reused extension and what it supplies, and mark as \"Open:\" any required function the docs do not cover with an existing extension; (b) the first model provider is Kimi for Coding (global), so the provider Intent targets it first and leaves other providers as later work; read docs/pi/providers.md for what it says about it, and mark what is missing as \"Open:\".",
+    "An Intent in HolyAgent is {objective: one sentence, requirements: [text]}. Propose one Intent per reviewable deliverable of the integration (for example the package scaffold and build, the extension entry and tool or command surface, instructions and agents, hooks and state, install and docs, CI and Windows), in a sensible work order, as many as the research supports and no more. Each requirement must be checkable and traceable to the research; mark what the research leaves open as an open question inside the requirement text (\"Open: ...\") rather than deciding it. Include in every Intent: the 0.3.0 release model (release/0.3.0/integration from main, one release/0.3.0/<type>/<change> branch and PR per change, the first PR carrying the bump made with mise run bump:minor), and that done means mise run verify passes with the build in sync and CI green including Windows.",
+    "Write the result as JSON to /home/user/holyagent-work/pi-intents-proposal.json: an array of {objective, requirements} objects ready for 'holyagent intent create --input'. Also cite, per Intent, the docs/pi file and section each requirement comes from, in /home/user/holyagent-work/pi-intents-sources.md."
+  ],
+  "constraints": [
+    "Read-only on the repository; write only the two output files named above.",
+    "Use the repository's material as the authority; when you go beyond it (for example pi's own documentation), say so per claim.",
+    "Keep working until done; stop and report. Report in under 300 words: the Intent objectives in order and the open questions."
+  ],
+  "criteria": [
+    {
+      "text": "Each proposed Intent is one reviewable deliverable with checkable requirements traced to the pi research",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Open questions are marked, not decided",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "proposal-file",
+    "sources-file"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw6mon4e-pl24",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-07T16:40:09.381Z"
+  },
+  "createdAt": "2026-11-07T16:40:09.381Z"
+}
