@@ -1,0 +1,10 @@
+{
+  "id": "pull-0mw6zp0pc-zx93",
+  "intentId": "intent-0mw6ry92f-k0w1",
+  "number": 74,
+  "url": "https://github.com/davidbasilefilho/holyagent/pull/74",
+  "branch": "release/0.3.0/feat/holyagent-config",
+  "base": "release/0.3.0/refactor/host-neutral-cli",
+  "created": true,
+  "recordedAt": "2026-11-07T22:43:15.792Z"
+}
