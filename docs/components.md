@@ -16,13 +16,13 @@ Claude Code itself is a prerequisite that none of these install; Anthropic docum
 
 ripgrep and fd ship inside the plugin rather than being installed; see [ripgrep and fd](#ripgrep-and-fd).
 
-Pi is not installed: there is no Pi integration yet ([pi/README.md](pi/README.md)).
+Pi is not installed: there is no Pi integration yet. It is planned for 0.3.0, installed with `pi install` from a release tag ([pi/README.md](pi/README.md), [pi/installation.md](pi/installation.md)).
 
 ## mise, Node, Bun, gh
 
 The WSL installer first installs any missing apt packages (`curl`, `git`, `ca-certificates`, `unzip`) with sudo. Node LTS comes from NodeSource's apt repository, Bun from its official install script into `~/.bun`, and `gh` from GitHub's apt repository. The installer refuses a Node older than 22.13, the floor for ctx7, and puts Bun's global bin directory on `PATH` through a line in `~/.bashrc` (a one-time copy is kept as `~/.bashrc.pre-holyagent`).
 
-The Windows installer (`install/windows-install.ps1`) installs missing `git`, Node LTS and `gh` with `winget`, and Bun from its official install script into `~\.bun`. It refuses a Node older than 22.13 and puts Bun's global bin folder on your user `PATH`.
+The Windows installer (`install/windows-install.ps1`) installs missing `git`, Node LTS and `gh` with `winget`, and Bun from its official install script into `~\.bun`. It refuses a Node older than 22.13 and puts Bun's global bin folder on your user `PATH`. For the planned Pi integration the minimum rises to 22.19 in 0.3.0, because Pi needs it ([pi/installation.md](pi/installation.md#what-setup-and-doctor-do)).
 
 mise is installed only with the development option (`--dev` for the WSL installer, `-Dev` for the Windows one), because only developing this repository needs it. The WSL installer runs mise's official installer into `~/.local/bin/mise` and activates it in `~/.bashrc`. The Windows installer installs `jdx.mise` with `winget` and activates it in your PowerShell profile (`$PROFILE.CurrentUserAllHosts`, with a one-time copy kept as `<profile>.pre-holyagent`). Without the option, neither installer installs or activates mise.
 

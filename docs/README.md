@@ -7,7 +7,7 @@ It has two layers:
 - **Shared runtime** (`packages/runtime`): the domain (Intents, Assignments, the specialist routes, warm reuse), the state under `.holyagent/`, the `vcs` commands, the instruction text and the command surface the root calls.
 - **Per-harness integrations** (`packages/integrations/*`): code that turns the runtime into a plugin for one harness. `packages/integrations/claude` generates the Claude Code plugin.
 
-HolyAgent ships the Claude Code integration only. A Pi integration comes later; its research is in [pi/README.md](pi/README.md).
+HolyAgent ships the Claude Code integration only. A Pi integration is planned for 0.3.0 and is not shipped; the decided plan is in [pi/README.md](pi/README.md).
 
 HolyAgent installs as a plugin with two `claude plugin` commands and nothing else ([usage.md](usage.md#install)). Its one command-line program, `holyagent`, is the runtime CLI inside the plugin; `holyagent vcs`, `holyagent plan` and the like in these pages mean it, started as [How the hooks start](hooks.md#how-the-hooks-start) shows. It is not on your `PATH`. The root agent and the plugin's hooks run `intent`, `assignment`, `plan`, `status`, `reconcile`, `state`, `vcs`, `hook`, `rg`, `fd` and, for legacy state, `migrate`; you run `setup` and `doctor`, usually through `/holyagent:setup`.
 
@@ -24,4 +24,4 @@ HolyAgent installs as a plugin with two `claude plugin` commands and nothing els
 | [development.md](development.md)                 | Repository layout, gates, the generated plugin, versioning                     |
 | [decisions.md](decisions.md)                     | Standing decisions and their reasons                                           |
 | [attributions.md](attributions.md)               | Third-party software HolyAgent uses and the attribution it owes                |
-| [pi/README.md](pi/README.md)                     | Research notes for the future Pi integration                                   |
+| [pi/README.md](pi/README.md)                     | The decided 0.3.0 plan and research for the Pi integration (not shipped)       |

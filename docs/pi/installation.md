@@ -1,6 +1,37 @@
-# Installing Pi (and what is known about Bun)
+# Installing Pi and HolyAgent's Pi package (and what is known about Bun)
 
-Pi 1.4.0, commit `4a080252f06caf63a525d7873c5d94d3c23887e0`. "Inference:" marks my own conclusions. Nothing here was installed or executed; the installer script was only read.
+**Status: planned for 0.3.0. The first three sections are the plan; the sections after them are research on Pi's own install and are not shipped behaviour.**
+
+Pi 1.4.0, commit `4a080252f06caf63a525d7873c5d94d3c23887e0` (the plan pins 1.5.0; see [README.md](README.md#version-risk)). "Inference:" marks a conclusion drawn here, not a stated fact. Nothing here was installed or executed; the installer script was only read.
+
+## How HolyAgent installs
+
+The plan has the user do two things, once each, after the prerequisites:
+
+1. Install Pi: Node.js 22.19 or newer, then the official installer or `npm install -g --ignore-scripts @earendil-works/pi-coding-agent@1.5.0` (see [Official instructions](#official-instructions)).
+2. Install the HolyAgent package from its release tag, where `<version>` is a HolyAgent release:
+
+   ```sh
+   pi install git:github.com/davidbasilefilho/holyagent#holyagent-<version>
+   ```
+
+After that, plain `pi` starts the HolyAgent root, the way the Claude plugin does. Nothing else is needed to start.
+
+- **Distribution is the git tag.** The repository already tags each stable release `holyagent-<version>` ([development.md](../development.md)), and Pi pins git tags and commits ([extensions.md](extensions.md#pi-packages)). There is no npm publishing for the Pi package.
+- **The package is built JavaScript.** The extension is bundled with `bun build` into the generated package, which the sync check keeps in step with its sources ([extensions.md](extensions.md#the-holyagent-package)). Where the package sits in the tag, and how Pi finds it there, is to be settled when the package is built.
+- **Installing the package installs only the dependencies the default `config.json` enables** ([configuration.md](configuration.md#holyagent-configjson)).
+
+## The pin
+
+- **Pi is pinned at 1.5.0** (released 2026-11-02), and every reused extension is pinned with it: `pi-provider-kimi-code`, `@tintinweb/pi-subagents`, `pi-web-kit`, `@aliou/pi-processes`, `@juicesharp/rpiv-todo`, `@juicesharp/rpiv-ask-user-question` and `billion-context`. The versions are chosen when the package is built.
+- **A pin moves only through `mise run deps:update`**, the repository's dependency updater ([development.md](../development.md)). For Pi it re-records the CI fixtures, so a Pi change that breaks the integration's contract shows up as a failing replay, not in a user's session ([orchestration.md](orchestration.md#ci-and-windows)). `mise run deps:check` fails when a pin is behind.
+- **Why pin hard:** Pi released about weekly, and Billion Context releases about daily ([README.md](README.md#version-risk), [caching-and-subagents.md](caching-and-subagents.md#context-compression-with-billion-context)).
+
+## What setup and doctor do
+
+- **`holyagent setup`** for Pi sets Pi's `npmCommand` setting to `bun`, so Pi installs packages with Bun. The maintainer's words: "in the holyagent setup for pi it should set bun as the npmcommand".
+- **`holyagent doctor`** checks that Pi, Node.js 22.19 or newer and the HolyAgent package are present. It only checks and installs nothing.
+- **The Windows installer's Node minimum rises from 22.13 to 22.19** ([components.md](../components.md#mise-node-bun-gh)), because Pi needs Node 22.19. The installers do not install Pi.
 
 ## Official instructions
 
@@ -28,7 +59,9 @@ What the docs say about Bun:
 What the source supports:
 
 - **Bun as an install method for self-update.** `detectInstallMethod()` returns `bun-binary` for a Bun-compiled executable and `bun` when `process.versions.bun` is set or the path contains `/install/global/node_modules/`; the self-update command for `bun` is `bun install -g --ignore-scripts --minimum-release-age=0 <package>` ([config.ts L18-L25, L79-L95, L159-L171](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/src/config.ts#L79-L95)). It locates Bun's global `node_modules` via `bun pm bin -g` and `~/.bun/install/global/node_modules` ([config.ts L246-L252](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/src/config.ts#L246-L252)). Older changelog entries show the Bun path being maintained: "Show `bun install` instead of `npm install` in update notification when running under Bun" (0.46.0, [CHANGELOG.md L4382](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/CHANGELOG.md#L4382)), "Fixed Bun-based package manager startup by locating global `node_modules` relative to Bun's install layout" (0.70.6, [CHANGELOG.md L2382](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/CHANGELOG.md#L2382)), and "Fixed Bun package manager `node_modules` discovery when `npmCommand` is configured to use Bun" (0.71.0, [CHANGELOG.md L2342](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/CHANGELOG.md#L2342)). These entries predate the 1.x line and some link to the old `badlogic/pi-mono` repository.
-- **Bun-compiled standalone binaries.** `build:binary` runs `bun build --compile` ([package.json L35](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/package.json#L35)), and the changelog mentions "Bun release archives" (0.84.3, [CHANGELOG.md L823](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/CHANGELOG.md#L823)), "Bun standalone binaries" (0.84.1, [CHANGELOG.md L956](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/CHANGELOG.md#L956)) and extension loading in the compiled Bun binary (0.45.4, [CHANGELOG.md L4447](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/CHANGELOG.md#L4447)). I could not list GitHub release assets (the API was not reachable), so I cannot confirm which binaries are published for 1.4.0, and the install docs do not point to them.
+- **Bun-compiled standalone binaries.** `build:binary` runs `bun build --compile` ([package.json L35](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/package.json#L35)), and the changelog mentions "Bun release archives" (0.84.3, [CHANGELOG.md L823](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/CHANGELOG.md#L823)), "Bun standalone binaries" (0.84.1, [CHANGELOG.md L956](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/CHANGELOG.md#L956)) and extension loading in the compiled Bun binary (0.45.4, [CHANGELOG.md L4447](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/CHANGELOG.md#L4447)). GitHub release assets could not be listed (the API was not reachable), so it is unconfirmed which binaries are published for 1.4.0, and the install docs do not point to them.
 - **The CLI entry point targets Node.** `bin.pi` is `dist/bundle/cli.js`, whose shebang is `#!/usr/bin/env node` ([bundle/cli.js in the 1.4.0 tarball](https://unpkg.com/@earendil-works/pi-coding-agent@1.4.0/dist/bundle/cli.js), [package.json L9-L11](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/package.json#L9-L11)).
 
-Inference: `bun install -g @earendil-works/pi-coding-agent` is probably installable, because Pi's own updater uses that exact form for Bun-managed installs, but it is not an officially documented install path, and the resulting `pi` script would still run under Node unless Bun is told otherwise. The Bun route would also skip the installer's dependency pinning (only the npm/installer paths are described as pinned). For HolyAgent, whose own toolchain is Bun (`bun.lock`, `bunfig.toml`, `mise.toml` pins `bun = "1.4.4"` and `node = "lts"`), the lowest-risk plan is: treat Node.js >= 22.19 plus the documented installer or `npm install -g --ignore-scripts @earendil-works/pi-coding-agent@<pinned>` as the supported Pi install, and run Pi as a child process (`pi --mode rpc` or `--mode json`) from Bun code. The SDK route inside a Bun process is documented as supported ("Node.js or Bun") but the codemode caveat above applies. If HolyAgent wants a Bun-only install flow, it should verify it against a pinned Pi version before documenting it.
+Inference: `bun install -g @earendil-works/pi-coding-agent` is probably installable, because Pi's own updater uses that exact form for Bun-managed installs. A later check (2026-11-07) found that pi.dev lists `bun add -g --ignore-scripts @earendil-works/pi-coding-agent` as an install command ([pi.dev](https://pi.dev)), but the runtime is still Node: the `cli.js` shebang is `#!/usr/bin/env node`, and the maintainer said in [issue #6237](https://github.com/earendil-works/pi/issues/6237) (6 Jul 2026) "we can't have a shebang that works for all runtimes". No official doc calls Bun a supported way to run Pi. Pi's `npmCommand` setting accepts `["bun"]` for package installs ([issue #4160](https://github.com/earendil-works/pi/issues/4160)).
+
+Decision for 0.3.0: Pi runs on Node, and Bun is used by Pi only as its `npmCommand` for package installs ([What setup and doctor do](#what-setup-and-doctor-do)). Bun is documented as a prerequisite of the HolyAgent CLI, not as a way to install Pi. The documented Pi install is Node.js 22.19 or newer plus the official installer or `npm install -g --ignore-scripts @earendil-works/pi-coding-agent@1.5.0`.

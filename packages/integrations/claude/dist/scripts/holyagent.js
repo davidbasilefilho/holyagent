@@ -9542,7 +9542,7 @@ function resolveOptions(options) {
     replacer: options?.replacer
   };
 }
-var version = "0.2.2";
+var version = "0.3.0";
 
 import { join } from "path";
 
