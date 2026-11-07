@@ -1,0 +1,35 @@
+{
+  "id": "assignment-0mw6v30lt-mlye",
+  "intentId": "intent-0mw6uzaad-grmo",
+  "intentRevision": 2,
+  "roleTask": "Librarian.research",
+  "slug": "list-every-point-of-moonshot-s-official",
+  "objective": "List every point of Moonshot's official guidance for prompting Kimi K3.1 Pro and the kimi-for-coding model (K2.8 Preview), with the source section of each, so a kimi-k3.1/guide.md can carry each point.",
+  "state": "Ready",
+  "scope": [
+    "Sources, in this order: https://platform.kimi.ai/docs/guide/prompt-best-practice ; https://platform.kimi.ai/docs/guide/kimi-k3-1-pro-quickstart ; https://platform.kimi.ai/docs/guide/use-kimi-k3-to-setup-agent ; Moonshot's K3 tool-calling best-practice guide (find it under platform.kimi.ai/docs/guide). Fetch with the web tools you have (for example the Exa fetch tool). Background on what HolyAgent decided is in /home/user/holyagent-0.3.0/docs/pi/providers.md.",
+    "For each page: every recommendation as one line in Moonshot's meaning (paraphrase, short quotes where wording matters), its section heading and URL with anchor where one exists; mark which points are request parameters (reasoning_effort, temperature, passing reasoning_content back, tool_choice) versus prompt-writing guidance. Note anything K2.8 Preview does differently if a page says so."
+  ],
+  "constraints": [
+    "Sourced facts only; label any inference. The list is the deliverable, so the report may run to 2000 words; keep notes outside the list under 150 words."
+  ],
+  "criteria": [
+    {
+      "text": "Coverage: every recommendation on each of the four pages is listed with its section",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Sourced: each point names its URL and section",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "sources"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-07T20:34:10.769Z"
+}
