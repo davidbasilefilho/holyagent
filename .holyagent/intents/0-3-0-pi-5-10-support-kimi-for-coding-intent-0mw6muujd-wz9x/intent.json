@@ -1,0 +1,25 @@
+{
+  "id": "intent-0mw6muujd-wz9x",
+  "slug": "0-3-0-pi-5-10-support-kimi-for-coding",
+  "objective": "0.3.0 pi 5/10: Support Kimi for Coding (global) as the first model provider of the Pi integration, so a Pi session and its specialists run on it, leaving other providers as later work.",
+  "requirements": [
+    "Maintainer (verbatim): \"please add intents for the next 0.3.0 release where I will implement the pi extension integration\"; the maintainer implements 0.3.0, so these Intents record the work and carry no Assignments until the maintainer starts it.",
+    "Maintainer (verbatim): \"in the docs/pi/ it's supposed to use already existent extensions for required functionality\" and \"the first provider to implement will be kimi for coding global\".",
+    "Release model: work lands on release/0.3.0/integration cut from main, as one release/0.3.0/<type>/<change> branch and one PR per change; the first PR of the release carries the version bump made with mise run bump:minor.",
+    "Done means mise run verify passes with the generated output in sync (mise run build) and CI green on every required check, including the windows job.",
+    "The provider is reached only through Pi's own provider layer, with the model chosen by --model <provider/id>:<thinking> or set_model and set_thinking_level; HolyAgent never calls provider URLs, never reads auth.json and never uses pi auth print-api-key or print-bearer-token.",
+    "Before launching a root or specialist, readiness is checked with pi auth check --provider <id> --json (exit 0 ready, 1 not_ready, 2 invalid); a not-ready provider is reported as a blocker with the fix and is never silently replaced.",
+    "Model ids are validated at launch against the user's catalog (pi --list-models or get_available_models), not hard-coded.",
+    "Provider choice is isolated behind one mapping from route-table model and effort to provider/id and thinking level; no other provider is implemented or documented as supported in 0.3.0.",
+    "docs/pi/providers.md (or a new page) gains the Kimi for Coding facts the integration relies on: provider id, login, model ids used, thinking levels, the route-table mapping.",
+    "Open: which Pi provider id is Kimi for Coding (global). The research lists kimi-coding, moonshotai and moonshotai-cn among the 1.4.0 provider ids and describes none; the global versus China split is not documented.",
+    "Open: the facts docs/pi lacks about that provider: model ids, API implementation and base URL, API key (environment variable) or OAuth login, context window, prices, reasoning and image support.",
+    "Open: which Kimi models and thinking levels stand for the route table's haiku/sonnet, medium/high/xhigh and the root's opus.",
+    "Open: whether the Kimi adapter honors PI_CACHE_RETENTION=long and how it keys prompt caching; the research covers other adapters only, and one (openai-codex) ignores the variable.",
+    "Open: whether the Pi version pinned for 0.3.0 still ships the Kimi provider, since the research read 1.4.0 only.",
+    "Open: whether the auto-mode reviewer rule (GPT-6 Luna when Codex is active, else an economical available model) needs a Kimi-specific choice."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-07T16:43:52.730Z"
+}
