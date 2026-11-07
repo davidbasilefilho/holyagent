@@ -12,11 +12,9 @@
     "Child launches and paths work on native Windows, where Pi's built-in tool list includes powershell beside bash.",
     "Workflow and dependency tests still pass: pinned action SHAs with version comments, caret dependency ranges, the path-length test.",
     "A contract test covers the Pi RPC or JSON events the integration consumes (agent_settled, tool events, extension_ui_request) against the pinned Pi version.",
-    "Open: whether CI runs a real Pi process (needs Node 22.19 and network) or a recorded fixture of its events.",
-    "Open: whether a job is added or renamed, in which case the rulesets' required status check names change and an admin must edit them.",
-    "Open: whether Pi behavior on native Windows is verified; the research is source reading only and says nothing about Windows runs."
+    "Decided (maintainer): CI replays recorded pi events for the pinned pi version (fixtures), re-recorded when deps:update moves pi; the pi tests run inside the existing check and windows jobs, so no ruleset change."
   ],
-  "revision": 1,
+  "revision": 2,
   "state": "Open",
   "createdAt": "2026-11-07T16:43:53.791Z"
 }
