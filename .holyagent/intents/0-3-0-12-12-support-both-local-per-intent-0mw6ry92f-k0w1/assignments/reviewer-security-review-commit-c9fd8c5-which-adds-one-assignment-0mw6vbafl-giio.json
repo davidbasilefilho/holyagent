@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "review-commit-c9fd8c5-which-adds-one",
   "objective": "Review commit c9fd8c5, which adds one Effect Schema for HolyAgent config (common settings, pi and claude sections), a loader merging ~/.holyagent/config.json under the project's .holyagent/config.json, and piPackages, against the merge-ready bar.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-config, branch release/0.3.0/feat/holyagent-config; the commit is HEAD on top of ee51233. Diff: /home/user/holyagent-notes/pr3.diff. Decided design: docs/pi/configuration.md ('Keys and defaults' and the merge rules), docs/pi/providers.md (Kimi route table).",
     "Requirements: both files decoded with onExcessProperty error before a key-by-key merge where the project wins; unknown key or invalid value fails naming the field and the file; piPackages excludes disabled features; Kimi route defaults match providers.md; the existing vcs settings behave as before (the implementer notes two intended changes: unknown top-level keys now fail, and user-level vcs settings now apply under the project's); repository code rules (Effect, tagged errors, no try/catch, new Promise or async, Schema, Bun APIs, JSDoc). Known gaps the implementer named: errors reuse the CorruptRecord tag whose message says 'not a valid state file', and src/index.ts does not export the config module."
@@ -42,7 +42,33 @@
     "agentId": "workflow:wf_35b5d5c2-5c8/assignment-0mw6vbafl-giio",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-07T20:40:51.160Z"
+    "startedAt": "2026-11-07T20:40:51.160Z",
+    "finishedAt": "2026-11-07T20:46:51.108Z"
+  },
+  "result": "result: No blocker found. I made no live runs and had no shell, so this is from the diff and source reads.\nThe built-in `/security-review` could not run. The skill failed on `git log origin/HEAD...` with \"unknown revision\", because the checkout has no `origin/HEAD`. Everything below is manual source-to-sink review of `/home/user/holyagent-notes/pr3.diff` plus the files in `/home/user/holyagent-0.3.0-config`.\nchanged: none (read-only)\nchecks: tests, lint and type-check not run (no Bash tool). Tests exist for the merge, errors, defaults, packages and vcs settings, but I did not execute them.\nblockers: none\n\nnotes (non-blocking):\n1. Security: an untrusted project can override user opt-outs. The project config comes from the repo's state folder and wins key by key (`load.ts:575`). A user who sets `pi.features.computerUse: false` in `~/.holyagent` gets it re-enabled by a project file. A project can likewise turn on `web: \"pi-web-kit\"`, set `pi.t3.deviceAccess` or `scope`, and set arbitrary `pi.routes.*.model` strings. `piPackages` only picks from a fixed allowlist (`packages.ts:594-604`), so no arbitrary package can be named. This follows the decided design. Before the Pi integration consumes the config, decide whether security-relevant keys need a trust gate or a user-level lock.\n2. `pi.codemode.maxWorkers` has no upper bound (`schema.ts:790`). A project can set `1e9`, which becomes `PI_CODEMODE_MAX_WORKERS` for every process once consumed. I suggest capping it.\n3. Availability: `readSettings` now reads `~/.holyagent/config.json` on every call, including the `commit-msg` hook (`cli/hook.ts:478`) and `vcs commit`/`pr` (`commands.ts:79,154`). A bad user file, or one holding a key a different HolyAgent version doesn't know, now blocks commits in every repo. This is the stated change's side effect; the error does name the file.\n4. Regression: `\"vcs\": null`, which the old `file[\"vcs\"] ?? {}` tolerated, now fails decoding. Same for `\"pi\": null` and `\"claude\": null`. This is minor and not one of the two stated changes.\n5. Pre-existing, now also reachable through the user file: a `config.json` symlink to another file is read via `Bun.file().text()`. Decode errors can quote file content in the `CorruptRecord` reason. Low impact.\n6. The callers in `hook.ts` and `commands.ts` call `readSettings(...)` without `call.env`. The `process.env` default means `HOLYAGENT_HOME` from the host env is ignored there. Pass `call.env` or `host.env`.\n7. The known gaps stand: the `CorruptRecord` message says \"not a valid state file\", and `src/index.ts` does not export the config module.\n8. When no project file exists, the merged-decode error path is `userPath, projectPath`, and `projectPath` falls back to the last folder tried.\n\nchecked and sound:\n- A `__proto__`, `constructor` or other unknown key is refused as excess. `merge` runs only on decoded output and uses `Object.fromEntries` plus spread, so there is no prototype pollution.\n- Both files are decoded with `onExcessProperty: \"error\"` before the merge, and the errors carry the file path.\n- Lists replace wholesale, and `piPackages` omits disabled features.\n- The Kimi defaults match the providers.md table.\n- `stateBranch` stays accepted and ignored.\n- `userConfigFile` only joins fixed names onto `HOLYAGENT_HOME` or the home directory. It has no user-supplied path segments, and `HOLYAGENT_HOME` needs control of the process environment.\n- Repo code rules: Effect throughout, no try/catch, `new Promise` or async, Bun file APIs, JSDoc on the exports.\n\nevidence:\nBehavior: Strict per-file decode, project-wins merge and `piPackages` hold; Kimi defaults match providers.md (`schema.ts:695`, `load.ts:515-581`, `packages.ts:611`). The security caveats are notes 1 and 2.\nRegressions: Only the two stated changes plus note 4 (`vcs: null`) and the hook-wide effect in note 3 (`vcs/settings.ts`, `cli/hook.ts:478`).\nRepo standards: The Effect and Schema code rules hold in the new files. The known gaps are the `CorruptRecord` message and the missing `src/index.ts` export.\nfindings: notes 1-8 above, none blocking.\n",
+  "acceptance": {
+    "revision": 2,
+    "rationale": "Findings carry file:line and repros; one blocker (call.env) goes to repair.",
+    "criteria": [
+      {
+        "criterion": "Behavior: each requirement holds, or a finding shows where not",
+        "support": "Strict per-file decode, project-wins merge and `piPackages` hold; Kimi defaults match providers.md (`schema.ts:695`, `load.ts:515-581`, `packages.ts:611`). The security caveats are notes 1 and 2."
+      },
+      {
+        "criterion": "Regressions: existing vcs settings and commands behave as before apart from the two stated changes",
+        "support": "Only the two stated changes plus note 4 (`vcs: null`) and the hook-wide effect in note 3 (`vcs/settings.ts`, `cli/hook.ts:478`)."
+      },
+      {
+        "criterion": "Repo standards: the repository code rules hold",
+        "support": "The Effect and Schema code rules hold in the new files. The known gaps are the `CorruptRecord` message and the missing `src/index.ts` export."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "notes 1-8 above, none blocking."
+      }
+    ]
   },
   "createdAt": "2026-11-07T20:40:36.753Z"
 }
