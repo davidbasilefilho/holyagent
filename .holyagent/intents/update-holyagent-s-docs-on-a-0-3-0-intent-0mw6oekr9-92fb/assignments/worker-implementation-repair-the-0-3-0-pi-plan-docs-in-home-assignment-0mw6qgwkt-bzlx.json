@@ -1,0 +1,68 @@
+{
+  "id": "assignment-0mw6qgwkt-bzlx",
+  "intentId": "intent-0mw6oekr9-92fb",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-0-3-0-pi-plan-docs-in-home",
+  "objective": "Repair the 0.3.0 pi plan docs in /home/user/holyagent-docs-pi-plan (commit dab5435 on release/0.3.0/docs/pi-integration-plan) so they fix every finding of the independent review and record two new maintainer decisions.",
+  "state": "Running",
+  "scope": [
+    "The review is /home/user/holyagent-work/review-docs-030-r1.md; line numbers there refer to commit dab5435. Sources of truth are /home/user/holyagent-work/pi-decisions.md, /home/user/holyagent-work/pi-intents-final.jsonl and /home/user/holyagent-work/research/*.md (new: assignment-0mw6qfair-ykt4.md on K2.8 Preview).",
+    "Blocking 1: docs/pi/orchestration.md around line 122 still calls the host-driven architecture 'recommended' although line 120 says it is not used; docs/pi/claude-parity.md around line 26 calls the launcher 'architecture 2 ... with architecture 1's process per Assignment'. The decision makes @tintinweb/pi-subagents the launcher with HolyAgent glue only where it falls short: drop the 'recommended' label and reword claude-parity to say exactly that.",
+    "Blocking 2: docs/pi/caching-and-subagents.md around line 34 and docs/pi/claude-parity.md around line 23 say Billion Context 'replaces Pi's compaction'. The research (assignment-0mw6nzg4o-mmob.md) confirms only that the standalone billion-context-pi cancels Pi's compaction through session_before_compact; the decided native billion-context route is unconfirmed. Reword both to: meant to replace Pi's compaction; the standalone route cancels it, the native route's behavior is to be verified.",
+    "Decision A (maintainer): no workflow script asks for confirmation, whatever agents it calls, consistent with full access as the default. Remove it from the still-open list in claude-parity.md (around lines 106 and 174) and state it as decided; keep auto-mode.md consistent.",
+    "Decision B (maintainer rule \"whichever is more relevant ... it depends on how the model behaves\", resolved by research assignment-0mw6qfair-ykt4.md): the kimi-for-coding (K2.8 Preview) specialists load the same Kimi instruction set written to the K3/K3.1 guides plus Moonshot's K3 tool-calling best-practice guide, because K2.8 Preview behaves like K3 (reasoning_effort low/high/max, up to 1M context, described by Moonshot as close to K3); the K2.6/K2.7 thinking guide does not apply; the text must not rely on tool_choice required, unsupported on K2.8 Preview per a secondary source (label it so). Update providers.md's instructions section and remove item 4 from claude-parity.md's still-open list, with the research URLs.",
+    "Non-blocking, fix all: docs/pi/README.md:3 'ten 0.3.0 Intents' and auto-mode.md:7 'the other nine' must reflect that the auto-mode Intent was closed (nine open Intents); providers.md:24 says nothing depends on the API type while caching-and-subagents.md:17 infers prompt_cache_key behavior that holds only for openai-completions, so make the caching inference conditional on the API type; providers.md:69 'Specialists run on kimi-for-coding ... never at low' must say the two visual specialists are the exception on k3.1-pro at low; remove the remaining Codex traces (the openai-codex.json link at README.md:54, '(and on the Codex-backed provider)' at claude-parity.md:161, the openai-codex-responses row in caching-and-subagents.md); extensions.md:39 says the Moonshot web tools are off by default: add how they get enabled if the Kimi extension research (assignment-0mw6n3f6o-3zwo.md) says so, else mark it to be settled, and note that API-key logins cannot use them so pi-web-kit stays the fallback; note that the research found no evidence the rpiv packages were tested on Pi 1.5.0, so this is to be verified; README.md:44's pi.dev '1.4.0 latest' note: reconcile with the 1.5.0 pin (say when that reading was taken, or drop it); replace first person ('my own conclusions') with neutral voice; claude-parity.md:90 says the visual roles read the platform design skill their criteria name: check packages/integrations/claude/src/agents.ts and packages/runtime/src/instructions/claude-5.5/roles/*visual*/ in this worktree and state accurately what the visual roles carry (their own design text since 0.2.2 and the platform skill), with no mention of vendored frontend-design text."
+  ],
+  "constraints": [
+    "Docs only: change files under docs/ only. The version bump is already committed; change no code, tests, package.json or generated files.",
+    "Keep the plan-not-shipped framing and every Status line; keep source links; state nothing the sources do not support, marking unknowns as to be verified or measured.",
+    "Make no git writes (no add, commit, checkout, stash); the root commits. Write the uncommitted repair diff with `git -C /home/user/holyagent-docs-pi-plan diff -- docs > /home/user/holyagent-work/docs-030-repair.diff` and list it as diff-file evidence.",
+    "Run the format task on your files, then `bunx --no-install mise run verify` in the worktree, and re-run your relative-link and anchor check over docs/**/*.md and README.md.",
+    "Report in under 400 words with one evidence line per criterion."
+  ],
+  "criteria": [
+    {
+      "text": "Blocking findings fixed: the orchestration 'recommended' label and the claude-parity launcher wording state the decided launcher, and both Billion Context compaction claims match the research",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Decisions recorded: no-confirmation for scripts and the K3/K3.1 guide set for the K2.8 specialists are stated as decided with sources, and removed from the still-open list",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Non-blocking findings fixed: each listed non-blocking item is fixed or, where the sources leave it unsettled, marked to be verified",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Docs only and links valid: only docs/ changes and every relative link and anchor resolves",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Verify passes: mise run verify exits 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "docs"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw6oi44g-p1xz",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-07T18:25:00.653Z"
+  },
+  "createdAt": "2026-11-07T18:25:00.653Z"
+}
