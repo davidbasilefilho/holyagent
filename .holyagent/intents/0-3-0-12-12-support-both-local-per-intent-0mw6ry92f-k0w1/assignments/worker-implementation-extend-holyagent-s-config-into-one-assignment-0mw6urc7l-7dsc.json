@@ -1,0 +1,92 @@
+{
+  "id": "assignment-0mw6urc7l-7dsc",
+  "intentId": "intent-0mw6ry92f-k0w1",
+  "intentRevision": 2,
+  "roleTask": "Worker.implementation",
+  "slug": "extend-holyagent-s-config-into-one",
+  "objective": "Extend HolyAgent's config into one Effect Schema with common settings, a pi section and a claude section, loaded from a user-level ~/.holyagent/config.json and the project's .holyagent/config.json merged key by key, so the pi integration and the Claude plugin read their options from one validated source.",
+  "state": "Running",
+  "scope": [
+    "Work only in the git worktree /home/user/holyagent-0.3.0-config (branch release/0.3.0/feat/holyagent-config, whose HEAD already holds the host-neutral CLI commit ee51233). First run `bun install --frozen-lockfile` there. Run gates as `bunx --no-install mise run <task>`.",
+    "Read first: docs/pi/configuration.md (sections 'HolyAgent config.json' and 'The user-level config' give the decided content and defaults), docs/pi/providers.md (the Kimi route table under 'Routing': root k3.1-pro at high, max selectable; specialists on kimi-for-coding at max for Worker.implementation, Worker.debugging, Worker.integration, Reviewer.code, Reviewer.security, Reviewer.testing, Reviewer.artifact, at high for the rest, never low; Worker.visual and Reviewer.visual on k3.1-pro at low), docs/pi/extensions.md, docs/pi/t3-code.md (T3 settings and computer use), and the existing loader packages/runtime/src/vcs/settings.ts (today only the vcs section is decoded and other keys are ignored) plus packages/runtime/src/state/layout.ts. A repository map is at /home/user/holyagent-notes/repo-map.md.",
+    "Build: (1) a config module packages/runtime/src/config/ exporting the schema, the defaults and a loader; common settings outside sections (the existing vcs section keeps its meaning); a `pi` section with: provider (only one value in 0.3.0 for Kimi for Coding global; pick and document the identifier), the route table (root plus all eighteen specialist role tasks of packages/runtime/src/domain/route.ts, each {model, thinking} with the defaults above and the docs' model ids), feature toggles that each name the pi package that supplies it (web: provider tools first with pi-web-kit fallback; processes: @aliou/pi-processes; todo: @juicesharp/rpiv-todo; ask: @juicesharp/rpiv-ask-user-question; computerUse: @amaster.ai/pi-computer-use; contextCompression: billion-context; subagents: @tintinweb/pi-subagents), codemode settings (mode only, maxWorkers 4), and the T3 Code settings the docs name; a `claude` section (an empty object is allowed, holding any existing Claude-only option that belongs there). (2) A function that returns, for a resolved config, the list of pi packages that must be loaded (a disabled feature is neither loaded nor required), with tests. (3) User-level file ~/.holyagent/config.json (home from os.homedir, with an override such as HOLYAGENT_HOME for tests), decoded with onExcessProperty error, then the project file decoded the same way, then a key-by-key deep merge of objects where the project wins; lists replace wholesale (document that choice). An invalid value or unknown key stops with a tagged error naming the field and the file. (4) Route every existing reader of .holyagent/config.json (vcs settings including vcs.allowWords) through the new loader without behavior change. (5) Update docs/pi/configuration.md to document every key and default (replacing the 'key names are to be settled' and 'how nested objects and lists merge is to be settled' sentences), and docs/commit-authorship.md if the vcs section's wording changes."
+  ],
+  "constraints": [
+    "Maintainer (verbatim): \"Add ~/.holyagent config\" and \"alter/extend .holyagent/config.json, pi section and claude section, common stuff should be outside those sections\" and \"the pi extension and integration will use a config.json that will set options, functionality, the provider, which will enable/disable its deps, etc\".",
+    "Repository rules: Effect and tagged errors (no try/catch, new Promise or async functions in runtime source), Effect Schema at every boundary decoded with onExcessProperty error, Bun APIs first, JSDoc on every export, tests for each behavior.",
+    "Existing vcs settings behavior must not change: their tests keep passing, changed only in import paths if needed.",
+    "Another worker edits packages/runtime/src/instructions and cli/sessioncontext.ts in a different worktree; leave those alone.",
+    "Regenerate with `bunx --no-install mise run build` (the bundled CLI changes); never hand-edit generated files.",
+    "No git commits, checkouts, branch changes or edits under .git/ or .holyagent/; report changed paths. Write the diff (git diff HEAD plus each new file via git diff --no-index /dev/null <file>) to /home/user/holyagent-notes/pr3.diff.",
+    "Report in under 400 words; long logs under /home/user/holyagent-notes/."
+  ],
+  "criteria": [
+    {
+      "text": "Schema: one Effect Schema covers common settings, the pi section (provider, route table for root and all eighteen roles, feature toggles with their packages, codemode, T3 settings) and the claude section, with documented defaults",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Merge: user-level and project config files are each decoded with onExcessProperty error and merged key by key with the project winning, with tests for override, nested merge, list replacement and missing files",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Errors: an unknown key or invalid value in either file fails with a tagged error naming the field and the file, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Packages from config: a function lists the pi packages to load for a config, excluding disabled features, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Defaults: the Kimi route table defaults match docs/pi/providers.md exactly, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "vcs unchanged: the existing vcs settings behavior and tests are unchanged",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Docs: docs/pi/configuration.md documents every key, default and the merge rules",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Gates: bunx --no-install mise run verify exits 0",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Repo standards: Effect, Schema, JSDoc and Bun rules hold",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/config",
+    "packages/runtime/src/vcs/settings.ts",
+    "packages/runtime/tests/config",
+    "packages/runtime/tests/vcs-settings.test.ts",
+    "packages/integrations/claude/dist/scripts",
+    "docs/pi/configuration.md",
+    "docs/commit-authorship.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-07T20:25:05.937Z"
+  },
+  "createdAt": "2026-11-07T20:25:05.937Z"
+}
