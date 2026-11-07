@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "add-t3-code-compatibility-to-the-0-3-0",
   "objective": "Add T3 Code compatibility to the 0.3.0 pi plan docs in /home/user/holyagent-docs-t3 (branch release/0.3.0/docs/t3-code, cut from release/0.3.0/integration after the pi plan docs merged), as a plan the maintainer will implement.",
-  "state": "Running",
+  "state": "Cancelled",
   "scope": [
     "Sources of truth: the new T3 Code Intent, the last line of /home/user/holyagent-work/pi-intents-final.jsonl (objective \"0.3.0 pi 11/11\"); the T3 lines at the end of /home/user/holyagent-work/pi-decisions.md; research /home/user/holyagent-work/research/assignment-0mw6r54ng-kg9r.md (how T3 Code runs pi) and /home/user/holyagent-work/research/assignment-0mw6r9zxs-l85j.md (which T3 tools to keep or deactivate and how).",
     "Add docs/pi/t3-code.md: how T3 Code runs pi (built-in provider, `pi --mode rpc`, pi 0.80.5 or newer so the 1.5.0 pin satisfies it, enabled in T3 Settings, the user's own pi install and extensions), and the decided plan: rpc-mode behavior and no launch args for mode or session; only T3's dialogs and status (select, confirm, input, editor, notify, setStatus), never custom() TUI, with a HolyAgent adapter for rpiv tools where needed; Full access required in T3 with a setup-check warning in other modes; specialists report through @tintinweb/pi-subagents' own new-turn trigger, verified under T3 with a recorded fixture; keep html_render, html_preview and preview_*, deactivate the other mcp__t3-code__ tools with pi.setActiveTools at session_start (reapplied on before_agent_start and session_tree, tool_call block as backstop) and why (they duplicate HolyAgent's launcher; a fixed tool set keeps the cached prefix); the to-verify list; tests on recorded rpc fixtures in the existing CI jobs. Keep the research's source links and label inference.",
@@ -60,7 +60,9 @@
     "agentId": "workflow:wf_9145182f-27a/assignment-0mw6rcc9e-1pov",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-07T18:49:27.314Z"
+    "startedAt": "2026-11-07T18:49:27.314Z",
+    "finishedAt": "2026-11-07T18:52:25.838Z"
   },
+  "result": "stopped",
   "createdAt": "2026-11-07T18:49:27.314Z"
 }
