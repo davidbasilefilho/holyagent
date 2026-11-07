@@ -5,7 +5,7 @@
   "roleTask": "Explorer.map",
   "slug": "map-the-parts-of-the-holyagent",
   "objective": "Map the parts of the holyagent repository the 0.3.0 Pi integration must build on, so the root can plan a stacked series of PRs that add packages/integrations/pi.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Read in the worktree /home/user/holyagent-0.3.0 (the release/0.3.0 head). The planned work is described in docs/pi/*.md (README, orchestration, extensions, configuration, providers, installation, caching-and-subagents, claude-parity, t3-code) and docs/usage.md; skim those for what the code must provide.",
     "Map: (1) how packages/integrations/claude/dist is generated from packages/runtime (the generator script and its entry, instruction sources and how sections are assembled, per-model sets like claude-5.5, the generated-path list, the byte-for-byte sync check, the version sync from root package.json, mise.toml tasks build/verify/check, the plugin sync test); (2) the runtime CLI's Claude-specific assumptions (cli/config.ts workflow availability and CLAUDE_CODE_DISABLE_WORKFLOWS, agent-id prefixes and namespaces for workflow agents, help text naming the Workflow tool, hook commands, the commit-message cleaner's attribution patterns); (3) setup and doctor (scopes user/project/local, how the installed scope is found) and the .holyagent/config.json schema and loader; (4) CI: .github/workflows jobs check and windows, scripts/*.test.ts guards (dependency-ranges, repo-paths, workflows, dependency-pins) and the deps:update updater's pin list; (5) the installers under install/ and their Node minimum.",
@@ -32,5 +32,10 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-07T20:04:39.322Z"
+  },
   "createdAt": "2026-11-07T20:04:15.987Z"
 }
