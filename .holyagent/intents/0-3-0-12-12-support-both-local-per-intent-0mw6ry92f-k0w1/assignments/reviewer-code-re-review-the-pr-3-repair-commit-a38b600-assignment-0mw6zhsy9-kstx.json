@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-the-pr-3-repair-commit-a38b600",
   "objective": "Re-review the PR 3 repair commit a38b600 (range 2e1c021..a38b600 on release/0.3.0/feat/holyagent-config, worktree /home/user/holyagent-0.3.0-config; run every command there) and confirm the earlier code-review findings are closed with no new blocker.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Only the repair range 2e1c021..a38b600; its diff is in /home/user/holyagent-notes/pr3-repair.diff.",
     "Earlier findings to check closed: the report /home/user/holyagent/.git/holyagent/reports/assignment-0mw6vba8j-i4s0.md.",
@@ -54,7 +54,41 @@
     "agentId": "workflow:wf_5c6cebf3-a7a/assignment-0mw6zhsy9-kstx",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-07T22:37:39.153Z"
+    "startedAt": "2026-11-07T22:37:39.153Z",
+    "finishedAt": "2026-11-07T22:42:10.602Z"
+  },
+  "result": "result: Closed. The blocker from the earlier code review is fixed, and I found no regression or new blocker. `bunx --no-install mise run verify` exits 0 on a38b600.\n\nThe built-in `/code-review` and `/security-review` were not run, because the brief says they do not work in this worktree. I reviewed `2e1c021..a38b600` myself from `/home/user/holyagent-notes/pr3-repair.diff` and the code.\n\nchanged: none (read-only).\n\nchecks:\n- `bunx --no-install mise run verify` in `/home/user/holyagent-0.3.0-config` -> exit 0, 1709 pass, 0 fail, lint clean on 157 files. Log: `/home/user/holyagent-notes/pr3-rereview-verify.log`.\n- The committed `dist/scripts/holyagent.js` contains `ConfigInvalid` and the new message, and no `contextMeter` or `piProvider`, so it looks regenerated. I did not run `mise run build`.\n- I did not revert the `call.env` fix or the final-off merge to watch the new tests fail. The claim that they fail without the fix rests on reading them.\n\nblockers: none\n\nnotes (all optional):\n- **Final-off is silent.** A project value that would turn a final-off setting back on is ignored, not reported. This matches the maintainer's decision, and the docs say so.\n- **`docs/pi/README.md:26`** still lists \"context meter\" among the T3 settings setup writes. The repair report flagged this; the root should fix it. It contradicts `docs/pi/t3-code.md`.\n- **`pi.enable`** only affects `piPackages` and the docs. No T3 setup code exists in this tree, so the `pi.enable` setup behavior (leave T3's Pi provider alone when it is false) is documented but not implemented. I could only read this, not run it.\n- **`maxWorkers` cap of 16** is a new limit beyond the maintainer's decisions. It closes my earlier note 4, so I judge it fine.\n- **Whole-file decode:** the `vcs` commands still stop on a bad `pi` or `claude` key. The docs now state this, so I treat it as an accepted decision.\n\nEarlier findings:\n- **Finding 1 (blocker): closed.** `vcs/commands.ts` (both sites) and `cli/hook.ts` now pass `call.env`, and no other `readSettings` caller remains. New tests set `HOLYAGENT_HOME` for commit, `vcs pr` and the `commit-msg` hook, and cover a bad home file with exit 4 naming that file.\n- **Finding 2:** documented as intended.\n- **Finding 3:** closed. The dedicated `ConfigInvalid` error reads \"not a valid HolyAgent config\" and has a hint. The merged-decode path now names the project file, else the user file.\n- **Finding 4:** closed. `FINAL_OFF` plus `mergeFiles` make a user-level `false` final for `pi.features.computerUse`, `pi.t3.deviceAccess` and `pi.features.web: \"off\"`. The project can still turn them off, and every other key keeps project-wins. `maxWorkers` is now capped at 1 to 16.\n- **Findings 5 to 8:** closed.\n  - `ROUTE_FIELDS` is built from `KIMI_ROUTES`.\n  - `defaultConfig` is an Effect, so nothing throws at import.\n  - `piPackages` follows the `FEATURE_PACKAGES` order, then `pi-web-kit`.\n  - `index.ts` exports the config module.\n- **Maintainer decisions:** `pi.enable` exists with default true. `piProvider` and `contextMeter` are removed, and tests check they are refused as unknown keys.\n\nevidence:\n- Every blocking finding of the earlier code review is closed by the repair: finding 1 closed per the `call.env` diff in `vcs/commands.ts`, `cli/hook.ts` and the new fixture-home tests; findings 2 to 8 closed or documented, as listed above.\n- The repair introduces no regression or new blocking defect: I read the full diff and found no defect, and verify passes with 1709 pass and 0 fail.\n- Each fixed behavior has a test that fails without the fix: new tests in `tests/vcs-message.test.ts`, `tests/vcs-pr.test.ts`, `tests/config/load.test.ts` (the final-off block, `\"vcs\": null`, the `maxWorkers` cap, `pi.enable`, the removed keys and the `ConfigInvalid` message) and `tests/config/packages.test.ts` (package order, `pi.enable` off). Judged by reading the tests against the diff, not by reverting the fix.\n- bunx --no-install mise run verify exits 0 on a38b600: exit 0, 1709 pass, 0 fail; log at `/home/user/holyagent-notes/pr3-rereview-verify.log`.\n- checks-run: the checks listed above.\n- findings: no blockers; the optional notes are listed above.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Blocker closed per call.env diff and tests; verify exit 0 with 1709 pass run by the reviewer on a38b600.",
+    "criteria": [
+      {
+        "criterion": "Every blocking finding of the earlier code review is closed by the repair",
+        "support": "finding 1 closed per the `call.env` diff in `vcs/commands.ts`, `cli/hook.ts` and the new fixture-home tests; findings 2 to 8 closed or documented, as listed above."
+      },
+      {
+        "criterion": "The repair introduces no regression or new blocking defect",
+        "support": "I read the full diff and found no defect, and verify passes with 1709 pass and 0 fail."
+      },
+      {
+        "criterion": "Each fixed behavior has a test that fails without the fix",
+        "support": "new tests in `tests/vcs-message.test.ts`, `tests/vcs-pr.test.ts`, `tests/config/load.test.ts` (the final-off block, `\"vcs\": null`, the `maxWorkers` cap, `pi.enable`, the removed keys and the `ConfigInvalid` message) and `tests/config/packages.test.ts` (package order, `pi.enable` off). Judged by reading the tests against the diff, not by reverting the fix."
+      },
+      {
+        "criterion": "bunx --no-install mise run verify exits 0 on a38b600",
+        "support": "exit 0, 1709 pass, 0 fail; log at `/home/user/holyagent-notes/pr3-rereview-verify.log`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "the checks listed above."
+      },
+      {
+        "label": "findings",
+        "support": "no blockers; the optional notes are listed above."
+      }
+    ]
   },
   "createdAt": "2026-11-07T22:37:39.153Z"
 }
