@@ -1,0 +1,48 @@
+{
+  "id": "assignment-0mw6r9zxs-l85j",
+  "intentId": "intent-0mw6oekr9-92fb",
+  "intentRevision": 1,
+  "roleTask": "Librarian.research",
+  "slug": "establish-whether-holyagent-s-pi",
+  "objective": "Establish whether HolyAgent's pi extension can disable the T3 Code MCP tools it does not need when pi runs inside T3 Code, which ones those are, and how.",
+  "state": "Running",
+  "scope": [
+    "Maintainer (verbatim): \"t3code can delegate stuff with their mcp, can we disable whatever is unnecessary from it?\". HolyAgent delegates through @tintinweb/pi-subagents, so T3's own delegation tools would duplicate it; T3's html_render, html_preview and preview_* tools are HolyAgent's visual route and stay.",
+    "Prior research: /home/user/holyagent-work/research/assignment-0mw6r54ng-kg9r.md (T3 injects an MCP bridge extension into pi under server key t3-code, exposing html_render, html_preview, preview_*, delegate_task, task_status, task_cancel, t3_thread_*, t3_pending_request).",
+    "Questions: (1) The full list of T3 tools a pi session gets, their exact names as pi sees them, and what each does; cite the T3 source (pingdotgg/t3code, PR #7211 and the orchestrator MCP server docs). (2) Whether a pi extension can remove or hide tools another extension registered: pi.setActiveTools / getActiveTools / getAllTools or similar in pi 1.5.0 (earendil-works/pi docs/extensions.md and types.ts), when it takes effect (session_start, before_agent_start), and whether it is stable across T3's session restarts and resume. (3) Whether T3 itself has a setting or launch option to turn off its delegation or thread tools for a provider, and whether any T3 tool is required for T3 to work (for example t3_pending_request for approvals or questions). (4) Effect on prompt caching: whether changing the active tool set mid-session changes the prompt prefix."
+  ],
+  "constraints": [
+    "Authoritative sources first (T3 Code repository and docs, pi repository at 1.5.0 or main); label inference and third-party claims.",
+    "End with a table: tool, keep or disable, reason, and the mechanism, plus anything to verify later.",
+    "Report in under 450 words."
+  ],
+  "criteria": [
+    {
+      "text": "Tool list: names every T3 tool pi gets, with its purpose and source",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Mechanism: states whether and how a pi extension can disable another extension's tools, with source",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Recommendation: a keep or disable decision per tool with reasons, required tools identified",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-07T18:47:38.032Z"
+  },
+  "createdAt": "2026-11-07T18:47:38.032Z"
+}
