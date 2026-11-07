@@ -4,6 +4,7 @@
   "objective": "0.3.0 pi 10/10: Cover the Pi integration in CI and on Windows, so the required checks fail when the Pi package is stale or broken on any supported platform.",
   "requirements": [
     "Maintainer (verbatim): \"please add intents for the next 0.3.0 release where I will implement the pi extension integration\"; the maintainer implements 0.3.0, so these Intents record the work and carry no Assignments until the maintainer starts it.",
+    "Maintainer, 2026-11-07: implement 0.3.0 now, every part except the dropped auto-mode gate (pi 8/10); test with unit tests and recorded or synthesized fixtures only, no live Kimi runs; merge each PR once it is reviewed and green.",
     "Maintainer (verbatim): \"in the docs/pi/ it's supposed to use already existent extensions for required functionality\" and \"the first provider to implement will be kimi for coding global\".",
     "Release model: work lands on release/0.3.0/integration cut from main, as one release/0.3.0/<type>/<change> branch and one PR per change; the first PR of the release carries the version bump made with mise run bump:minor.",
     "Done means mise run verify passes with the generated output in sync (mise run build) and CI green on every required check, including the windows job.",
@@ -14,7 +15,7 @@
     "A contract test covers the Pi RPC or JSON events the integration consumes (agent_settled, tool events, extension_ui_request) against the pinned Pi version.",
     "Decided (maintainer): CI replays recorded pi events for the pinned pi version (fixtures), re-recorded when deps:update moves pi; the pi tests run inside the existing check and windows jobs, so no ruleset change."
   ],
-  "revision": 2,
+  "revision": 3,
   "state": "Open",
   "createdAt": "2026-11-07T16:43:53.791Z"
 }
