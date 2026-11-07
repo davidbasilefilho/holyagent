@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "update-the-stale-session-start-budget",
   "objective": "Update the stale session-start budget figure in docs/pi/claude-parity.md from 9,300 to 9,400 characters, matching CONTEXT_BUDGET in packages/runtime/src/cli/sessioncontext.ts.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0 (node_modules installed). Change every mention of the 9,300-character budget in docs/pi/claude-parity.md (around line 135) and any other file under docs/ that still says 9,300 for the session-start budget; first confirm CONTEXT_BUDGET is 9400 in packages/runtime/src/cli/sessioncontext.ts and docs/hooks.md already says 9,400.",
     "Run bunx --no-install mise run fmt:check afterwards."
@@ -34,5 +34,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-07T20:40:50.382Z"
+  },
   "createdAt": "2026-11-07T20:40:35.396Z"
 }
