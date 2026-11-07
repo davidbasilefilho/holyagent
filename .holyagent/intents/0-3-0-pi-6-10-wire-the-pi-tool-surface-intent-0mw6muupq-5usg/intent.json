@@ -1,0 +1,24 @@
+{
+  "id": "intent-0mw6muupq-5usg",
+  "slug": "0-3-0-pi-6-10-wire-the-pi-tool-surface",
+  "objective": "0.3.0 pi 6/10: Wire the Pi tool surface from existing Pi tools, extensions and MCP support, adding custom code only where the research finds no existing carrier.",
+  "requirements": [
+    "Maintainer (verbatim): \"please add intents for the next 0.3.0 release where I will implement the pi extension integration\"; the maintainer implements 0.3.0, so these Intents record the work and carry no Assignments until the maintainer starts it.",
+    "Maintainer (verbatim): \"in the docs/pi/ it's supposed to use already existent extensions for required functionality\" and \"the first provider to implement will be kimi for coding global\".",
+    "Release model: work lands on release/0.3.0/integration cut from main, as one release/0.3.0/<type>/<change> branch and one PR per change; the first PR of the release carries the version bump made with mise run bump:minor.",
+    "Done means mise run verify passes with the generated output in sync (mise run build) and CI green on every required check, including the windows job.",
+    "Reused as is: Pi's built-in read, grep, find, ls, write, edit and bash replace Read, Grep, Glob, Write, Edit and Bash, enabled per process with --tools and --exclude-tools; Pi's native skills replace Skill; Pi's native prompt templates carry the review first-pass prompts.",
+    "Reused as is: the built-in builtin:mcp extension carries MCP-served tools, including the T3 Code tools when the user registers that MCP server; without it html_render and html_preview are reported unavailable and the visual roles report the inspection as blocked.",
+    "Reused as is: the built-in builtin:codemode extension hosts the workflow scripts, enabled with defaultTools +codemode or --tools +codemode.",
+    "Reused from the shipped examples, loaded explicitly: todo.ts for the task list (TaskCreate, TaskUpdate, TaskList, TaskGet and /todos).",
+    "The ask tool (AskUserQuestion) is built from the shipped question.ts and questionnaire.ts examples over ctx.ui.select and input; in print and JSON mode it returns an error and the open decision becomes the blocker only the user can clear.",
+    "protected-paths.ts and permission-gate.ts stay unloaded in this Intent, and the experimental pi-durable package is not used.",
+    "Open: the web search and fetch tool for the Librarian roles; the research says only \"a custom tool, or an MCP server\" and names none.",
+    "Open: the monitor tool for the root's CI watch (gh pr checks <n> --watch); the research finds no existing Pi carrier.",
+    "Open: how the example extensions (todo.ts, question.ts, questionnaire.ts) are made loadable from the package; the research says the Pi tarball contains examples/ and names no loading path.",
+    "Open: whether the ask tool can reuse an example unchanged; the research calls the examples only a starting point."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-07T16:43:52.958Z"
+}
