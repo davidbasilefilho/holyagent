@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mw6r54ng-kg9r",
+  "intentId": "intent-0mw6oekr9-92fb",
+  "intentRevision": 1,
+  "roleTask": "Librarian.research",
+  "slug": "establish-what-it-takes-for-holyagent-s",
+  "objective": "Establish what it takes for HolyAgent's planned pi integration (0.3.0) to be compatible with T3 Code, so the maintainer's requirement \"I want holyagent pi to be compatible with t3 code\" can be recorded as concrete, sourced requirements.",
+  "state": "Running",
+  "scope": [
+    "Repository context (read): /home/user/holyagent-docs-pi-plan/README.md, docs/usage.md, docs/decisions.md, docs/requirements.md, docs/pi/extensions.md, docs/pi/claude-parity.md and packages/runtime/src/instructions/claude-5.5/specialist/interface-inspection.md, which already mention T3 Code (for example its html_render and html_preview tools, used by the visual roles). The plan for pi is in /home/user/holyagent-docs-pi-plan/docs/pi/ and /home/user/holyagent-work/pi-decisions.md.",
+    "Questions: (1) What T3 Code is today (pingdotgg/t3code or its current home), which agent providers it runs (Codex, Claude Code, others) and whether it supports pi (pi-coding-agent, earendil-works/pi) natively, through a provider plugin, ACP, or not at all; cite the release or commit. (2) How T3 Code drives a provider (protocol: app-server JSON-RPC, ACP, stream-json, RPC mode), and whether pi offers a matching mode (pi's RPC or JSON mode, an ACP adapter). (3) What T3 Code exposes to the agent: its MCP tools (html_render, html_preview and others), how they are registered, and whether a pi session can reach them through pi's builtin:mcp. (4) Which HolyAgent pi features would interact with T3 Code: background workflows and completion notices, the rpiv ask-user and todo tools (does T3 Code render pi's UI requests, ctx.ui.confirm, custom tool rendering), approvals and full access, Billion Context, codemode, session resume. (5) Any existing community work connecting pi and T3 Code."
+  ],
+  "constraints": [
+    "Use authoritative sources first (the T3 Code repository, its docs and releases; the pi repository and docs at the pinned 1.5.0 where possible); label third-party claims and inference.",
+    "End with: a list of concrete compatibility requirements HolyAgent pi would need, each marked as sourced or inference, and the points that are a real choice for the maintainer (with the options and their consequences), separate from facts to verify later.",
+    "Report in under 600 words."
+  ],
+  "criteria": [
+    {
+      "text": "T3 Code support for pi: states whether and how T3 Code can run pi today, with sources",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Compatibility requirements: lists the concrete requirements for HolyAgent pi, each sourced or labelled inference",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Maintainer choices: separates real choices (with options) from facts to verify",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-07T18:43:50.861Z"
+  },
+  "createdAt": "2026-11-07T18:43:50.861Z"
+}
