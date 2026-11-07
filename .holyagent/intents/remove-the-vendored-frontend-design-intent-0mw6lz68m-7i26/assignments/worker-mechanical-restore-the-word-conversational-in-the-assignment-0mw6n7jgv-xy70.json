@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mw6n7jgv-xy70",
+  "intentId": "intent-0mw6lz68m-7i26",
+  "intentRevision": 1,
+  "roleTask": "Worker.mechanical",
+  "slug": "restore-the-word-conversational-in-the",
+  "objective": "Restore the word \"conversational\" in the copy rule of the shared design core in /home/user/holyagent-drop-frontend-design.",
+  "state": "Running",
+  "scope": [
+    "In packages/runtime/src/instructions/claude-5.5/design-core/core.md line 43, change \"keep the tone in step with the brand and its readers\" to \"keep the tone conversational and in step with the brand and its readers\". Update the phrase packages/integrations/claude/tests/plugin.test.ts pins for that line to the new text.",
+    "Run 'bunx --no-install mise run build' then 'bunx --no-install mise run verify' (run 'bunx --no-install mise run fmt' first if verify fails on formatting)."
+  ],
+  "constraints": [
+    "Change only that line and its test phrase.",
+    "Make no commits or other git writes and no edits under .git/ or .holyagent/.",
+    "Keep working until done; stop and report. Report in under 100 words with the check results."
+  ],
+  "criteria": [
+    {
+      "text": "The core's copy rule says the tone is conversational and mise run verify passes with the build in sync",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions/claude-5.5/design-core",
+    "packages/integrations/claude/dist",
+    "packages/integrations/claude/tests"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-07T16:53:44.911Z"
+  },
+  "createdAt": "2026-11-07T16:53:44.911Z"
+}
