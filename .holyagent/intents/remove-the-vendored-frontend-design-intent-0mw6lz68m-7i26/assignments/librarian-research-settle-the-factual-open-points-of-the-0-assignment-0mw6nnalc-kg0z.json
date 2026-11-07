@@ -1,0 +1,37 @@
+{
+  "id": "assignment-0mw6nnalc-kg0z",
+  "intentId": "intent-0mw6lz68m-7i26",
+  "intentRevision": 1,
+  "roleTask": "Librarian.research",
+  "slug": "settle-the-factual-open-points-of-the-0",
+  "objective": "Settle the factual open points of the 0.3.0 pi integration plan about Kimi for Coding (global) and Kimi K3.1, from Moonshot's and the extensions' official sources.",
+  "state": "Running",
+  "scope": [
+    "Context: /home/user/holyagent/docs/pi/providers.md; the earlier finding that pi-provider-kimi-code (https://github.com/Leechael/pi-provider-kimi-code) layers on pi's built-in kimi-coding provider; the open points list /home/user/holyagent-work/pi-open.md (ids 3.6, 5.11, 5.12, 5.14, 5.15, 5.17, 5.18).",
+    "Answer, each with a dated source link: (5.11, 5.17) which pi provider id and which host serve Kimi for Coding for international (global) users, api.kimi.com or api.kimi.ai, and how KIMI_CODE_REGION selects it; (5.12, 5.18) the Kimi for Coding model ids, which ones are Kimi K3.1 Pro and Kimi K2.8 Preview (the maintainer says kimi-for-coding is K2.8 Preview), their context windows, reasoning or thinking levels, image support, and the subscription's pricing or quota model; login (OAuth, API key and its environment variable); (5.14) how prompt caching works on Kimi for Coding and whether pi's kimi adapter or pi-provider-kimi-code keys it (prompt_cache_key) and honors PI_CACHE_RETENTION; (5.15) whether current pi still ships the kimi-coding provider; (3.6) Moonshot's official Kimi K3.1 prompting or instruction guide: its URL, date or version, and a summary of its recommendations on system prompts, tool use, thinking mode, temperature and output length; (5.19) whether pi-provider-kimi-code issue #16 is fixed and what its Moonshot-side tools send to Moonshot.",
+    "Use Moonshot's platform and Kimi Code documentation, kimi.com, the Kimi Code CLI repository, pi's sources and the extension's repository. Separate sourced facts from inference."
+  ],
+  "constraints": [
+    "Read-only: write no files and make no git writes; the full answer goes in the report.",
+    "Keep working until done; stop and report. Report in under 600 words, one short entry per open point id with its answer, source link and date, and 'unknown' where the sources do not say."
+  ],
+  "criteria": [
+    {
+      "text": "Each open point gets a sourced answer or an explicit unknown",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-07T17:05:59.904Z"
+  },
+  "createdAt": "2026-11-07T17:05:59.904Z"
+}
