@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-the-merge-of-the-integration",
   "objective": "Review the merge of the integration-branch rule PR into the host-neutral CLI branch and the small fix on top, before the branch is pushed.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-cli; range d7c4925..HEAD (merge commit 6afe430 and fix b5af9dd); diff without the generated bundle at /home/user/holyagent-notes/pr2-merge.diff. The fix strips a whole Markdown session link [text](url) and lets assignment record --failed run under an invalid HOLYAGENT_HOST.",
     "Check the merge took both sides correctly (instruction text and sessioncontext budget from the lower branch, host-neutral CLI from this one), the generated bundle matches a fresh build (run bunx --no-install mise run build and confirm git status stays clean), and run bunx --no-install mise run verify."
@@ -43,7 +43,37 @@
     "agentId": "workflow:wf_0da7fafa-4d9/assignment-0mw6z4x45-dcg6",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-07T22:27:38.021Z"
+    "startedAt": "2026-11-07T22:27:38.021Z",
+    "finishedAt": "2026-11-07T22:34:08.457Z"
+  },
+  "result": "result: Merge and both fixes are correct; no blockers. The built-in review is unusable, so this is my own review.\n\nThe built-in `/code-review d7c4925...HEAD` ran in the main checkout, where HEAD is 953b4d5. It found the range empty and reviewed other code. I did not adopt its findings. Its first finding, about session-link debris, is the case `b5af9dd` addresses. The other five concern `d7c4925` code outside this range.\n\nchanged: none (build output was identical to the committed bundle).\n\nchecks:\n- `bunx --no-install mise run build` -> exit 0. `git status --short` stayed empty, so the bundle matches a fresh build.\n- `bunx --no-install mise run verify` -> exit 0. Type-check clean, lint clean, format clean (281 files), 1635 tests pass, 0 fail. Log: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`.\n- Ran `cleanMessage` on edge inputs and timed it. Not executed: the CI jobs `windows`, `installers` and `branch-model`.\n\nblockers: none\n\nnotes (optional, each probed with `cleanMessage`):\n- `packages/runtime/src/vcs/message.ts:35`: a link whose URL contains parentheses leaves a stray `)`. `[S](https://claude.ai/code/abc?x=(1))` becomes `)`. The URL pattern stops at `)`, and the old code behaved the same.\n- Same file: a nested image link `[![i](u)](https://claude.ai/..)` leaves `[![i](u)]()`. The link text excludes brackets, so it cannot match.\n- Same file: `[a\\nb](url)` split across lines keeps `[a`, `b]()`. This is by design of line-wise cleaning.\n- The updated test expects `See  for details` with a double space. It is stable behavior, but cosmetic.\n\nevidence:\nMerge correct: `git diff d7c4925 6afe430` touches only the 9 lower-branch files, which are the 9,400 budget in `sessioncontext.ts`, `hooks.md` and `claude-parity.md`, the instruction texts, and the plugin test. The host-neutral CLI files are unchanged from `d7c4925`. No `9300` remains in the repo. Build left `git status` clean.\nFix correct: `vcs-message.test.ts` covers whole-link removal, a link to another address staying, and a linear-time bracket run (50,000 `[` took 0.6 ms). `host.test.ts` shows `--agent` refused with exit 2 under `HOLYAGENT_HOST=codex` while `--failed` succeeds. That last test would fail on the base, which read the host for `--failed`.\nGates: `mise run verify` exit 0, 1635 pass, 0 fail.\nfindings: no blockers; four optional notes above.\nchecks-run: build exit 0 with clean status; verify exit 0; probe script `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/p.ts`.\n",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Fresh build left status clean; verify exit 0 (1635 pass); merge sides checked; only optional notes.",
+    "criteria": [
+      {
+        "criterion": "Merge correct: both sides are intact and the generated bundle matches a fresh build",
+        "support": "`git diff d7c4925 6afe430` touches only the 9 lower-branch files, which are the 9,400 budget in `sessioncontext.ts`, `hooks.md` and `claude-parity.md`, the instruction texts, and the plugin test. The host-neutral CLI files are unchanged from `d7c4925`. No `9300` remains in the repo. Build left `git status` clean."
+      },
+      {
+        "criterion": "Fix correct: the two fixes behave as stated with tests",
+        "support": "`vcs-message.test.ts` covers whole-link removal, a link to another address staying, and a linear-time bracket run (50,000 `[` took 0.6 ms). `host.test.ts` shows `--agent` refused with exit 2 under `HOLYAGENT_HOST=codex` while `--failed` succeeds. That last test would fail on the base, which read the host for `--failed`."
+      },
+      {
+        "criterion": "Gates: mise run verify exits 0",
+        "support": "`mise run verify` exit 0, 1635 pass, 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "no blockers; four optional notes above."
+      },
+      {
+        "label": "checks-run",
+        "support": "build exit 0 with clean status; verify exit 0; probe script `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/p.ts`."
+      }
+    ]
   },
   "createdAt": "2026-11-07T22:27:38.021Z"
 }
