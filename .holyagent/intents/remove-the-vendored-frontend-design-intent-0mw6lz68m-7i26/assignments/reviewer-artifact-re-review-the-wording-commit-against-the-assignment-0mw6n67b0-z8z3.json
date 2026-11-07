@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "re-review-the-wording-commit-against-the",
   "objective": "Re-review the wording commit against the five blocking wording findings and the two text fixes.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Previous findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw6mvu4s-q1kx.md (blocking 1-5) and findings 1-2 of /home/user/holyagent/.git/holyagent/reports/assignment-0mw6mw1hn-gxrz.md. The commit's diff (without dist): /home/user/holyagent-work/diffs/drop-frontend-design-wording.diff. Original: /home/user/holyagent-work/logs/frontend-design-original.md. Current files: /home/user/holyagent-drop-frontend-design/packages/runtime/src/instructions/claude-5.5/design-core/core.md and skills/web-design/SKILL.md.",
     "Judge only these passages: each no longer shares a run of four or more words or the item order with the original and keeps its meaning; the two text fixes say what was asked."
@@ -34,7 +34,9 @@
     "agentId": "workflow:wf_91267060-74b/assignment-0mw6n67b0-z8z3",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-07T16:52:42.492Z"
+    "startedAt": "2026-11-07T16:52:42.492Z",
+    "finishedAt": "2026-11-07T16:53:44.658Z"
   },
+  "result": "result: Four of five passages are fixed. Passage 1 (`core.md:43`) fails on meaning, so the criterion is not met. Read-only; I found no run of four or more shared words in the five passages.\n\nfindings:\n1. `core.md:43` — meaning loss, blocking. The original says \"Keep the tone conversational\". The line now reads \"keep the tone in step with the brand and its readers\", and \"conversational\" appears nowhere in `design-core` or the skills. My previous review (assignment-0mw6mvu4s-q1kx) listed \"conversational tone\" as a restored directive, so the rewording quietly undid that. The test phrase was changed to match, which hides the loss. Fix: add \"conversational\" back, for example \"in a conversational tone that fits the brand and its readers\". Update the `plugin.test.ts` phrase to match.\n2. `core.md:42`: met. \"Say what a thing is or does without selling it\" shares no four-word run; its longest shared run is \"is or does\".\n3. `core.md:44`: met. The wording is new. The Duplicate/\"Duplicated\" example reuses the original's button-to-past-tense pattern, but with a different verb.\n4. `web-design/SKILL.md:54`: met. \"Feedback motion earns its place by making the change visible\" shares no run with the original.\n5. `web-design/SKILL.md:73`: met. The longest shared run is \"regardless of subject\" (three words), and the items are in reverse of the original order. The reversal is thin, but it is a different order.\n6. Text fix 1 (`core.md:13`): met. It now reads \"confirm them with the user when one can answer, and otherwise state them as a proposal in the plan\", and \"client\" is gone.\n7. Text fix 2 (`web-design/SKILL.md:64`): met. \"The brief's own words win over this list\" is back, and the test pins it.\n8. Non-blocking: \"the brief's own words\" is a four-word run shared with the original at `core.md:13` and `SKILL.md:64`.\n\nevidence:\nThe five passages no longer share wording or item order with the original and keep their meaning: gap. Passages 2-5 are met; `core.md:43` drops \"conversational\".\nfindings: above.\n",
   "createdAt": "2026-11-07T16:52:42.492Z"
 }
