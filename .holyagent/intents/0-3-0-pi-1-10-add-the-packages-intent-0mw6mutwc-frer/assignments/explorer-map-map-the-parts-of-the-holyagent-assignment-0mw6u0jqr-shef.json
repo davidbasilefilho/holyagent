@@ -5,7 +5,7 @@
   "roleTask": "Explorer.map",
   "slug": "map-the-parts-of-the-holyagent",
   "objective": "Map the parts of the holyagent repository the 0.3.0 Pi integration must build on, so the root can plan a stacked series of PRs that add packages/integrations/pi.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read in the worktree /home/user/holyagent-0.3.0 (the release/0.3.0 head). The planned work is described in docs/pi/*.md (README, orchestration, extensions, configuration, providers, installation, caching-and-subagents, claude-parity, t3-code) and docs/usage.md; skim those for what the code must provide.",
     "Map: (1) how packages/integrations/claude/dist is generated from packages/runtime (the generator script and its entry, instruction sources and how sections are assembled, per-model sets like claude-5.5, the generated-path list, the byte-for-byte sync check, the version sync from root package.json, mise.toml tasks build/verify/check, the plugin sync test); (2) the runtime CLI's Claude-specific assumptions (cli/config.ts workflow availability and CLAUDE_CODE_DISABLE_WORKFLOWS, agent-id prefixes and namespaces for workflow agents, help text naming the Workflow tool, hook commands, the commit-message cleaner's attribution patterns); (3) setup and doctor (scopes user/project/local, how the installed scope is found) and the .holyagent/config.json schema and loader; (4) CI: .github/workflows jobs check and windows, scripts/*.test.ts guards (dependency-ranges, repo-paths, workflows, dependency-pins) and the deps:update updater's pin list; (5) the installers under install/ and their Node minimum.",
@@ -36,7 +36,29 @@
     "agentId": "workflow:wf_50dd4143-6ec/assignment-0mw6u0jqr-shef",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-07T20:04:39.322Z"
+    "startedAt": "2026-11-07T20:04:39.322Z",
+    "finishedAt": "2026-11-07T20:11:06.250Z"
+  },
+  "result": "result: Map not written. I could not create /home/user/holyagent-notes/repo-map.md because this session has no Write or Bash tool, and Edit would have to modify the unrelated existing file integration-branch-default-verify.log. The map content below was read and verified; the root or a write-capable worker needs to save it to that path.\n\nchanged: none\nchecks: none run (read-only map; no gates needed)\nblockers: map file not created; no write-capable tool in this session. Re-dispatch the write to a worker with Write, or save the content below.\nquestions: none\nnotes: `plugin.test.ts` 1187-1558, the publish/stable/dev workflows, the claude-5.5 section text, the updater's test files, and docs/pi bodies were not read (listed as gaps).\n\nKey map (worktree /home/user/holyagent-0.3.0):\n\n1. Generation: `packages/integrations/claude/build.ts` L26-56 (build, sync-then-build). `src/generate.ts` L27 GENERATED_PATHS (marketplace + dist), L104-175 hooks, L183 commands, L234-252 skills, L261-276 bundle of `packages/runtime/src/cli/main.ts`, L296-304 generate(). `src/agents.ts` L132-252 section lists, L511-521 builtinsOf, L542-598 specialist/root assembly. `src/files.ts` L19 single `INSTRUCTIONS_DIRECTORY` = claude-5.5 (no second model set). Route table `packages/runtime/src/domain/route.ts` L55 Model is haiku|sonnet only, L109-220 SPECS. Byte-for-byte check `tests/plugin.test.ts` L83-95; staging check L142-150. Version: `scripts/bump-version.ts` L83 source, L91-94 copies, L182-199 sync. `mise.toml` build L61-64, verify L66-68, check L28-31.\n2. Claude assumptions: `cli/config.ts` L57-67 (CLAUDE_CODE_DISABLE_WORKFLOWS, Claude settings files). `domain/directive.ts` L21 `workflow:` prefix, L24-25 isWorkflowAgent. `cli/assignment.ts` L33 `holyagent` namespace, L144-149, L182 help naming Agent/Workflow tools. `cli/workflow-check.ts` L372. `cli/hook.ts` L256-484 hook names, L129-135 agentId of Agent response. `vcs/message.ts` L11-39 attribution regexes and DEFAULT_PHRASES (Claude names only). `vcs/identity.ts` L9. `vcs/commands.ts` L58 CLAUDE_CODE_REMOTE.\n3. Setup/doctor: `setup/scope.ts` L15 SCOPES, L71-105 settingsFile (project/local from git top-level). No installed-scope detection exists; doctor and setup use the given scope, default user (`setup/doctor.ts` L72-75, `cli/setup.ts` L55-68). `setup/settings.ts` L17-19 marketplace/plugin id, L39-51 keys. Config: `vcs/settings.ts` L9-47 (only `vcs` section decoded; other keys ignored). `state/layout.ts` L10. No ~/.holyagent loader exists.\n4. CI: `.github/workflows/validation.yml` branch-model L25, version L61, check L99-151 (stale-build diff L122-132, plugin validate L136-143), windows L153-176, installers L178-202. `scripts/workflows.test.ts` L49-73 (required workflows, SHA pins, read-only permissions). `scripts/repo-paths.ts` L8-20. `scripts/update-dependencies.ts` L104 PinKinds (action, vendor, mise, package), L335-359 mise.toml, L367-380 package.json scan, L552 vendor ASSETS.\n5. Installers: `install/wsl-install.sh` L155-173, Node minimum 22.13 (ctx7), L176 Bun step. `install/windows-install.ps1` L177-187, minimum 22.13 at L185-187, L180 winget. CI only parses both.\n\nExtension points for a Pi package (inference unless cited): add a generator target next to `generate()` and extend GENERATED_PATHS, the lefthook stage and the validation stale-build check; extend route Model beyond haiku|sonnet; a Pi agent-id prefix beside `holyagent:` and `workflow:`; add Pi names to vcs DEFAULT_PHRASES; new `packages/integrations/pi/package.json` is picked up by the updater's workspace scan; a `pi` section in `.holyagent/config.json` is safe because unknown top-level keys are ignored.\n\nevidence:\n[blocking] Map file: /home/user/holyagent-notes/repo-map.md not created; no Write or Bash tool available, and Edit would touch an unrelated file (blocked)\n[blocking] Sourced: every claim above cites a path and line from the worktree (read with Read/Grep); inferences are marked in the content\nmap-file: not created, see blockers\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "The map is in the report itself with cited paths and lines; the file write was impossible for a read-only role.",
+    "criteria": [
+      {
+        "criterion": "Map file: /home/user/holyagent-notes/repo-map.md covers all five areas with paths, line ranges and extension points",
+        "support": "/home/user/holyagent-notes/repo-map.md not created; no Write or Bash tool available, and Edit would touch an unrelated file (blocked)"
+      },
+      {
+        "criterion": "Sourced: each claim cites a file path",
+        "support": "every claim above cites a path and line from the worktree (read with Read/Grep); inferences are marked in the content"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "map-file",
+        "support": "/home/user/holyagent-notes/repo-map.md not created; no Write or Bash tool available, and Edit would touch an unrelated file (blocked)"
+      }
+    ]
   },
   "createdAt": "2026-11-07T20:04:15.987Z"
 }
