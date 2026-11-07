@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "change-the-root-instructions-so-cutting",
   "objective": "Change the root instructions so cutting and pushing an integration branch (or other base) that the target repository's conventions call for, when the remote lacks it, is a default that needs no user approval.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Work only in the git worktree /home/user/holyagent-0.3.0 (branch release/0.3.0/feat/integration-branch-default). First run `bun install --frozen-lockfile` there, since node_modules is not shared between worktrees. Run the gates as `bunx --no-install mise run <task>` from that worktree.",
     "Find every statement of the current rule in the instruction sources under packages/runtime/src/instructions (for example the stack-plan sentence 'a base the convention names but the remote lacks is cut from the start the convention gives, and pushing it is a push to the base, so it needs the user's approval unless the request names it', and any root, core, hook or skill text saying the same), and in docs/ where docs describe it.",
@@ -65,5 +65,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-07T20:04:39.010Z"
+  },
   "createdAt": "2026-11-07T20:04:15.747Z"
 }
