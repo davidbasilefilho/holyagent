@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mw6n67b0-z8z3",
+  "intentId": "intent-0mw6lz68m-7i26",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.artifact",
+  "slug": "re-review-the-wording-commit-against-the",
+  "objective": "Re-review the wording commit against the five blocking wording findings and the two text fixes.",
+  "state": "Running",
+  "scope": [
+    "Previous findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw6mvu4s-q1kx.md (blocking 1-5) and findings 1-2 of /home/user/holyagent/.git/holyagent/reports/assignment-0mw6mw1hn-gxrz.md. The commit's diff (without dist): /home/user/holyagent-work/diffs/drop-frontend-design-wording.diff. Original: /home/user/holyagent-work/logs/frontend-design-original.md. Current files: /home/user/holyagent-drop-frontend-design/packages/runtime/src/instructions/claude-5.5/design-core/core.md and skills/web-design/SKILL.md.",
+    "Judge only these passages: each no longer shares a run of four or more words or the item order with the original and keeps its meaning; the two text fixes say what was asked."
+  ],
+  "constraints": [
+    "Read-only: no edits and no git writes.",
+    "Keep working until done; stop and report. Report in under 200 words."
+  ],
+  "criteria": [
+    {
+      "text": "The five passages no longer share wording or item order with the original and keep their meaning",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw6n1gst-j5rg"
+  ],
+  "followUpOf": "assignment-0mw6mvu4s-q1kx",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-07T16:52:42.492Z"
+  },
+  "createdAt": "2026-11-07T16:52:42.492Z"
+}
