@@ -1,0 +1,81 @@
+{
+  "id": "assignment-0mw6m4mkb-egy5",
+  "intentId": "intent-0mw6lz68m-7i26",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "remove-the-vendored-frontend-design",
+  "objective": "Remove the vendored frontend-design skill from HolyAgent and carry every one of its directives in HolyAgent's own design skills, in /home/user/holyagent-drop-frontend-design.",
+  "state": "Running",
+  "scope": [
+    "Maintainer request (verbatim): \"hey frontend design is still on the codebase, please remove it. make sure its directives are in other skill(s)\".",
+    "Worktree /home/user/holyagent-drop-frontend-design, branch release/0.2.2/refactor/drop-frontend-design (main plus the 0.2.2 bump commit 7a59dd0). Map it first with 'holyagent rg -il frontend.design .' (the plugin's rg; system rg is fine if that is unavailable). Known places: packages/integrations/claude/vendor/frontend-design/SKILL.md (the vendored source); packages/runtime/src/instructions/claude-5.5/roles/worker-visual/frontend-design.md and roles/reviewer-visual/frontend-design.md (embedded into the two visual agents); packages/integrations/claude/src/agents.ts, files.ts, generate.ts (generator and license wiring); dist/licenses/frontend-design; packages/integrations/claude/tests/plugin.test.ts; packages/runtime/src/instructions/requirements.md; the skills web-design and visual-judging under packages/runtime/src/instructions/claude-5.5/skills/; README.md, docs/usage.md, docs/development.md, docs/attributions.md, docs/decisions.md, docs/pi/claude-parity.md.",
+    "1. Inventory every directive in the vendored frontend-design SKILL.md (each instruction, rule, refusal and checklist item). For each, find where HolyAgent's own skills already say it (the shared design core inside the platform design skills, web-design, visual-judging, the visual role files). Add the ones that are missing to the skill where they fit, mostly web-design or the shared design core (if the core is shared text copied into several skills, change it at its single source so every copy stays in sync), in HolyAgent's own words and structure, without duplicating what is already there. Write the mapping (directive -> destination file and section, or 'already covered at <file:section>') to /home/user/holyagent-work/logs/frontend-design-mapping.md.",
+    "2. Remove frontend-design completely: the vendor folder, the two role sections, the generator and license wiring, dist/licenses/frontend-design (through the build), and the references in tests and docs. The visual agents keep their behavior by naming or loading HolyAgent's design skills instead of the embedded section; check how worker-visual and reviewer-visual are told to use web-design and make sure nothing they relied on from the removed section is lost.",
+    "3. Credit: read the vendored skill's license. If carrying its directives over in paraphrase still needs a notice under that license, keep the notice and an attribution in docs/attributions.md; otherwise credit frontend-design as an inspiration in the README's '## Special thanks' section and docs/attributions.md. Say in the report which applied and why.",
+    "4. docs/development.md, the 'Branch protection' paragraph: add that the integration ruleset's required status checks are not enforced on branch creation (do_not_enforce_on_create), because GitHub otherwise refuses to create a new release/<v>/integration branch whose commit has no check results yet.",
+    "Update docs and decisions wherever they describe frontend-design. Add or adjust tests so the generator test checks that no frontend-design file or license is generated and that the visual agents still carry the design guidance they need.",
+    "Finish with 'bunx --no-install mise run build' and 'bunx --no-install mise run verify' (docs/development.md). Write 'git diff HEAD' without dist to /home/user/holyagent-work/diffs/drop-frontend-design.diff."
+  ],
+  "constraints": [
+    "Do not change .claude/CLAUDE.md. Keep the README's fixed sections and their order. Skill descriptions start with the situation. JSDoc on exported items; Effect composition in runtime code.",
+    "Add no behavior the request does not name; name anything else you notice in the report instead of doing it.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on. Do not stop at a summary that announces a next step.",
+    "Make no commits or other git writes and no edits under .git/ or .holyagent/. Work only inside the worktree, plus the mapping, diff and log files named above.",
+    "Report in under 400 words; put long logs in /home/user/holyagent-work/logs/."
+  ],
+  "criteria": [
+    {
+      "text": "No frontend-design file, section, license, generator wiring or reference remains in the repository except its credit",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Every directive of the vendored skill is present in HolyAgent's own skills, shown by the mapping file",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The visual agents still receive the design guidance they used, through HolyAgent's skills",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Credit follows the vendored skill's license",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "The branch protection docs describe the creation exemption",
+      "blocking": false,
+      "dimension": "style"
+    },
+    {
+      "text": "Tests check the removal and the remaining guidance",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "mise run build leaves dist in sync and mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "diff-file",
+    "mapping-file"
+  ],
+  "ownershipPaths": [
+    "packages",
+    "docs",
+    "README.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-07T16:23:29.339Z"
+  },
+  "createdAt": "2026-11-07T16:23:29.339Z"
+}
