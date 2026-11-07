@@ -24,9 +24,11 @@
     "What it supplies, per its README: OAuth login shared with the official kimi-code CLI plus a KIMI_API_KEY fallback, region switching through KIMI_CODE_REGION, Files API uploads for large images, tool-schema dedup under Moonshot's 15 KB per-tool limit, quota display from /usages, prompt-cache key and reasoning-level mapping, and optional Moonshot-side tools (moonshot_search, moonshot_fetch, kimi_datasource).",
     "Open: which host is the global Kimi for Coding endpoint (the extension's README says api.kimi.ai is global and api.kimi.com mainland, while the built-in uses api.kimi.com); verify and set KIMI_CODE_REGION explicitly.",
     "Open: whether Kimi K3.1 is served through Kimi for Coding and under which model id; the sources list k3, kimi-for-coding and kimi-for-coding-highspeed.",
-    "Open: whether to enable the extension's Moonshot-side tools, which send data to Moonshot's services; the extension's open issue #16 on tool schemas; and its single-maintainer risk (fallback: the built-in kimi-coding provider)."
+    "Open: whether to enable the extension's Moonshot-side tools, which send data to Moonshot's services; the extension's open issue #16 on tool schemas; and its single-maintainer risk (fallback: the built-in kimi-coding provider).",
+    "Maintainer (verbatim): \"the pi extension and integration will use a config.json that will set options, functionality, the provider, which will enable/disable its deps, etc\".",
+    "The config.json from Intent 0.3.0 pi 4/10 selects this: the provider (Kimi for Coding global first) and its options; selecting it enables pi-provider-kimi-code, and deselecting it disables that extension."
   ],
-  "revision": 3,
+  "revision": 4,
   "state": "Open",
   "createdAt": "2026-11-07T16:43:52.730Z"
 }
