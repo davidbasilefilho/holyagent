@@ -1,0 +1,20 @@
+{
+  "id": "intent-0mw6rbhv9-c7le",
+  "slug": "0-3-0-pi-11-11-make-holyagent-for-pi",
+  "objective": "0.3.0 pi 11/11: Make HolyAgent for pi work inside T3 Code, which runs pi as a built-in provider through `pi --mode rpc`, using T3's own dialogs and keeping only the T3 tools HolyAgent needs.",
+  "requirements": [
+    "Maintainer (verbatim): \"also I want holyagent pi to be compatible with t3 code\"; scope \"In 0.3.0\". The maintainer implements 0.3.0; this Intent records the plan.",
+    "Facts (research assignment-0mw6r54ng-kg9r, sources pingdotgg/t3code docs/user/providers-pi.md and PR #7211): T3 Code runs the user's own pi install as a built-in provider (Early Access, pi 0.80.5 or newer, enabled in T3 Settings) through `pi --mode rpc` over stdio JSONL, rejects launch args that change mode or session, carries pi's models, auth, extensions, skills and context files, and injects its own MCP bridge extension (prefix mcp__t3-code__).",
+    "HolyAgent pi works in rpc mode (ctx.mode \"rpc\", hasUI true) and sets no launch args for mode or session.",
+    "Decided (maintainer: \"I want tthem to run with t3code's dialogs/ui, no weird tui stuff\"): under T3, every HolyAgent interaction uses only the RPC extension UI that T3 renders (select, confirm, input, editor in T3's composer; notify to the work log; setStatus near the composer) and never custom(), widgets, footer, titles or theme calls; the ask-user and todo tools (rpiv) follow this, with a HolyAgent adapter where a package relies on custom() TUI rendering.",
+    "Decided (maintainer: \"Require Full access\"): HolyAgent threads in T3 run in T3's Full access mode, consistent with the full-access default; the docs and the setup check say so, and HolyAgent warns when a T3 session runs in Supervised or Auto-accept edits, where every extension tool call prompts and background specialists could stall.",
+    "Decided (maintainer: \"pi's stuff\"): specialists report back through @tintinweb/pi-subagents' own new-turn trigger, not T3's delegate_task; a recorded fixture of T3's RPC traffic verifies that a completion notice arriving after agent_settled starts a new root turn in T3.",
+    "Decided (maintainer: \"t3code can delegate stuff with their mcp, can we disable whatever is unnecessary from it?\"; research assignment-0mw6r9zxs-l85j): HolyAgent keeps T3's html_render, html_preview and preview_* tools (its visual route) and deactivates T3's orchestration tools (orchestrator_capabilities, delegate_task, task_status, task_cancel, create_threads, t3_thread_*, schedule_task, list_scheduled_tasks, delete_scheduled_task, t3_pending_request and any other non-preview mcp__t3-code__ tool) with pi.setActiveTools filtered by prefix from getAllTools(), applied once at session_start before the first request and reapplied on before_agent_start and session_tree, with a tool_call block as backstop; there is no T3 setting for this.",
+    "Prompt caching: the active tool set is fixed at session_start and not toggled mid-session, so the cached prefix holds (pi docs: setActiveTools changes provider tools; models without mid-conversation system messages take a cache miss per change).",
+    "To verify during implementation: the T3 release containing PR #7211; the exact preview_* set; whether T3's bridge re-adds tools after HolyAgent filters them; whether deferred tools stay discoverable through tool_search once excluded; pi 1.5.0 against T3's agent_settled and clear_queue assumptions; whether the rpiv packages use custom().",
+    "Tests: CI covers T3 with recorded fixtures of `pi --mode rpc` traffic inside the existing CI jobs, as the other pi tests do."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-07T18:48:47.925Z"
+}
