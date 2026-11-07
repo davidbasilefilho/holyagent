@@ -5,7 +5,7 @@
   "roleTask": "Librarian.research",
   "slug": "list-every-point-of-moonshot-s-official",
   "objective": "List every point of Moonshot's official guidance for prompting Kimi K3.1 Pro and the kimi-for-coding model (K2.8 Preview), with the source section of each, so a kimi-k3.1/guide.md can carry each point.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Sources, in this order: https://platform.kimi.ai/docs/guide/prompt-best-practice ; https://platform.kimi.ai/docs/guide/kimi-k3-1-pro-quickstart ; https://platform.kimi.ai/docs/guide/use-kimi-k3-to-setup-agent ; Moonshot's K3 tool-calling best-practice guide (find it under platform.kimi.ai/docs/guide). Fetch with the web tools you have (for example the Exa fetch tool). Background on what HolyAgent decided is in /home/user/holyagent-0.3.0/docs/pi/providers.md.",
     "For each page: every recommendation as one line in Moonshot's meaning (paraphrase, short quotes where wording matters), its section heading and URL with anchor where one exists; mark which points are request parameters (reasoning_effort, temperature, passing reasoning_content back, tool_choice) versus prompt-writing guidance. Note anything K2.8 Preview does differently if a page says so."
@@ -31,5 +31,10 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-07T20:34:11.446Z"
+  },
   "createdAt": "2026-11-07T20:34:10.769Z"
 }
