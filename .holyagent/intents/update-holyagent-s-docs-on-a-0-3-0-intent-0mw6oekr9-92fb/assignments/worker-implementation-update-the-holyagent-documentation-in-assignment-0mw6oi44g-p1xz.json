@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "update-the-holyagent-documentation-in",
   "objective": "Update the HolyAgent documentation in /home/user/holyagent-docs-pi-plan so docs/pi/ and the docs that point to it state the decided plan for the 0.3.0 pi integration, as a plan the maintainer will implement, with every open question replaced by its decision.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Work only in /home/user/holyagent-docs-pi-plan (branch release/0.3.0/docs/pi-integration-plan). Read the existing docs/pi/*.md (README, approval, auto-mode, caching-and-subagents, claude-parity, configuration, extensions, installation, orchestration, providers) and any docs/ or README.md lines that mention pi.",
     "Sources, in order of authority: /home/user/holyagent-work/pi-decisions.md (the maintainer's decisions, with verbatim quotes); /home/user/holyagent-work/pi-intents-final.jsonl (the ten 0.3.0 Intents with their requirements; the auto-mode Intent was closed because auto-mode was dropped); the sourced research in /home/user/holyagent-work/research/*.md (pi 1.5.0, Kimi models and hosts, the Kimi extension pi-provider-kimi-code, rpiv versus howaboua, codemode and reasoning effort, Billion Context).",
@@ -75,5 +75,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-07T17:30:02.506Z"
+  },
   "createdAt": "2026-11-07T17:29:57.856Z"
 }
