@@ -1,0 +1,54 @@
+{
+  "id": "assignment-0mw6rcjxs-4sg0",
+  "intentId": "intent-0mw6oekr9-92fb",
+  "intentRevision": 2,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-the-t3-code-additions-to-the-0-3",
+  "objective": "Review the T3 Code additions to the 0.3.0 pi plan docs on release/0.3.0/docs/t3-code for correctness and completeness against the T3 Code Intent, the maintainer's decisions and the research.",
+  "state": "Running",
+  "scope": [
+    "The diff: /home/user/holyagent-work/docs-t3.diff (uncommitted changes in /home/user/holyagent-docs-t3, including the new docs/pi/t3-code.md); read the current files there where context matters.",
+    "Sources of truth: the T3 Code Intent (last line of /home/user/holyagent-work/pi-intents-final.jsonl, objective \"0.3.0 pi 11/11\"); the T3 lines at the end of /home/user/holyagent-work/pi-decisions.md; /home/user/holyagent-work/research/assignment-0mw6r54ng-kg9r.md and /home/user/holyagent-work/research/assignment-0mw6r9zxs-l85j.md."
+  ],
+  "constraints": [
+    "A finding is blocking when a T3 decision is missing or stated wrongly, a touched page contradicts it (for example T3's delegate_task or custom() TUI presented as used, or a mode other than Full access presented as supported for HolyAgent threads), the plan is stated as shipped, a fact is not supported by the research, a relative link is broken, or the change goes beyond docs/. Wording preferences are non-blocking.",
+    "For each finding give file, line, quoted text, what the source says (with its file) and the smallest fix.",
+    "Report in under 450 words."
+  ],
+  "criteria": [
+    {
+      "text": "T3 decisions recorded: every decision of the T3 Code Intent appears with its decided value",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Pages agree: no touched page contradicts the T3 decisions",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Plan not shipped and sourced: T3 support is stated as the 0.3.0 plan and facts match the research",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Docs only and links valid: only docs/ changes and relative links resolve",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw6rcc9e-1pov"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-07T18:49:37.264Z"
+  },
+  "createdAt": "2026-11-07T18:49:37.264Z"
+}
