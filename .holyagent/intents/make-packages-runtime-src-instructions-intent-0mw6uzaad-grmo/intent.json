@@ -1,15 +1,18 @@
 {
   "id": "intent-0mw6uzaad-grmo",
   "slug": "make-packages-runtime-src-instructions",
-  "objective": "Make packages/runtime/src/instructions/requirements.md the complete list of behavior requirements that every per-model instruction set (claude-5.5 now, the Kimi K3.1 set next) is translated from with that model's prompting guide, enforced by tests and documented in the requirements file and a packages/runtime/AGENTS.md.",
+  "objective": "Turn the instruction requirements into a requirements/ directory that mirrors the per-model instruction directories file for file, so each requirements .md becomes the same-path file in every model set (claude-5.5, kimi-k3.1) written to that model's guide; add a guide.md per model set listing every point of its guide, a skill for creating, adjusting and removing requirements and translating them, tests that enforce the mirror, and a packages/runtime/AGENTS.md.",
   "requirements": [
     "Maintainer (verbatim): \"btw there is requirements in the instructions dir right? it must list every requirement that will be translated into instructions using the different instructions guide. if you can document that, make it work that way if it isn't, as well as putting it on the package's AGENTS.md\".",
-    "Every rule in a model set traces to a requirement id, and every requirement id is covered by each model set; a test fails when either direction breaks, generalized so a second model set (kimi-k3.1) plugs in with its own coverage map.",
-    "The requirements file says how it is used: one line per requirement, a behavior change starts there, each model set is written from it following that model's guide and cites the guide.",
-    "packages/runtime/AGENTS.md (new) states the same rule for anyone editing the instructions; the root AGENTS.md points to it if needed.",
-    "Ships in 0.3.0 as its own PR in the release stack, before the Kimi instruction set; mise run verify passes."
+    "Maintainer (verbatim): \"okay, it must be a requirements directory, with different directories that reflect the other instruction directories, basically, it will turn each .md file inside those directories onto the relevant directories. create a skill that helps create/adjust/remove requirements and turn them into instructions according to each instruction guide. also, there must be a guide.md in the claude-5.5 and kimi k3.1 directories that includes each point from the equivalent guide\".",
+    "packages/runtime/src/instructions/requirements/ mirrors the model-set tree (root/, specialist/, shared/, roles/<role>/, skills/<skill>/, design-core/, session-reminder and any other file): requirements/<path>.md holds the requirements, each led by its id, that become <model-set>/<path>.md; the existing requirements.md and requirements/*.md (context, cache, mergeability, commit-text) are split into that tree with no requirement lost or reworded in meaning.",
+    "claude-5.5/guide.md lists every point of Anthropic's prompting guidance for Claude models with its source page; kimi-k3.1/guide.md lists every point of Moonshot's prompt best-practice guide, the K3.1 Pro quickstart and the agent-setup guide (plus the K3 tool-calling best-practice guide) with source sections. Each instruction file follows its set's guide.md, and guide.md is not shipped as agent text.",
+    "Tests fail when a model-set file has no requirements file, a requirements file has no file in a model set, or a requirement id is not covered in a model set; the existing requirement-to-phrase coverage map generalizes per model set.",
+    "Default (root): the skill is a repository skill for maintainers at .claude/skills/, not shipped in the plugin, since it edits HolyAgent's own sources; it covers create, adjust and remove of requirements and their translation per guide.md, and the regeneration and tests to run.",
+    "packages/runtime/AGENTS.md (new) states the requirements-first rule and points to the skill; the root AGENTS.md is left as is unless a pointer is needed.",
+    "Ships in 0.3.0 as its own PR in the release stack before the Kimi instruction set; the Kimi PR adds kimi-k3.1/ with its guide.md and a translation of every requirements file. mise run verify passes."
   ],
-  "revision": 1,
+  "revision": 2,
   "state": "Open",
   "createdAt": "2026-11-07T20:31:16.693Z"
 }
