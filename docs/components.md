@@ -16,7 +16,9 @@ Claude Code itself is a prerequisite that none of these install; Anthropic docum
 
 ripgrep and fd ship inside the plugin rather than being installed; see [ripgrep and fd](#ripgrep-and-fd).
 
-Pi is not installed: there is no Pi integration yet. It is planned for 0.3.0, installed with `pi install` from a release tag ([pi/README.md](pi/README.md), [pi/installation.md](pi/installation.md)).
+Pi is not installed: there is no Pi integration yet. It is planned for 0.3.0, installed with `pi install` from a release tag, globally or per project ([pi/README.md](pi/README.md), [pi/installation.md](pi/installation.md#global-and-project-local-installs)), with T3 Code as its primary interface ([pi/t3-code.md](pi/t3-code.md)).
+
+The plugin installs at user, project or local scope ([usage.md](usage.md#install-scopes)). Planned for 0.3.0: a user-level `~/.holyagent/config.json` that the project's `.holyagent/config.json` overrides key by key ([pi/configuration.md](pi/configuration.md#holyagent-configjson)).
 
 ## mise, Node, Bun, gh
 
@@ -64,5 +66,7 @@ In a claude.ai cloud session (`CLAUDE_CODE_REMOTE=true`) there is no machine of 
 - `bun` is on `PATH`;
 - `ctx7` is on `PATH` (it passes in a cloud session, where setup leaves it out);
 - the user settings have the keys `holyagent setup` writes;
+
+Planned for 0.3.0: `--scope` defaults to the scope the plugin is installed at instead of `user` ([usage.md](usage.md#install-scopes)).
 
 `--fix` runs the setup steps behind a failing check and checks again; it never installs Bun. `/holyagent:setup` runs `holyagent setup` from a session, and the session-start hook adds one line suggesting it while `ctx7` or a key is missing ([hooks.md](hooks.md)).

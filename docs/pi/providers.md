@@ -68,6 +68,7 @@ Source for the rows: [Kimi Code models](https://www.kimi.com/code/docs/en/kimi-c
 
 - **Specialists run on `kimi-for-coding`, which is Kimi K2.8 Preview, never at low, except the two visual specialists, which run on `k3.1-pro` at low (below).** The root runs on K3.1 Pro. The sources give no per-role reasons beyond this grouping: the roles that write or judge code run at max, and the mechanical, checking, lookup and research roles run at high.
 - **Both visual specialists run at low** because the root makes the final visual pass. The maintainer's words: "both visual specialists must be low, as root does the final review pass".
+- **Visual tools.** Under T3 Code the two visual specialists use T3's `preview_*` browser, and only they get the computer-use tools of `@amaster.ai/pi-computer-use` ([t3-code.md](t3-code.md#browser), [t3-code.md](t3-code.md#computer-use-through-cua-driver)).
 - **The root's effort is `high`.** `max` is selectable in `config.json`. A later 0.3.x task will measure high against max on real sessions before `max` becomes the default; until then the cost and benefit of `max` for the root are unmeasured.
 - **A session keeps one model and effort.** Each Assignment's specialist is launched on its row and is not switched mid-session, because a switch invalidates Kimi's cache.
 - **Provider-agnostic structure stays.** The table maps a role to a model and an effort through the one mapping described above; other providers would add rows later and are not part of 0.3.0.

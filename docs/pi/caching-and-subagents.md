@@ -21,6 +21,7 @@ What keeps the prefix stable, which the plan follows:
 
 - **A byte-stable prefix.** Static material first, no dates or counters in instruction files, no mid-session roster change, and outputs kept compact ([claude-parity.md](claude-parity.md#6-skills-requirements-and-hooks)). The session context is added as a message, never by changing the system prompt ([claude-parity.md](claude-parity.md#6-skills-requirements-and-hooks)).
 - **One model and one effort per session.** A role is launched on its row of the routing table and stays on it ([providers.md](providers.md#routing)).
+- **One tool set per session, fixed at `session_start`.** Under T3 Code the extension deactivates T3's orchestration tools once, before the first request, and pins the kept T3 tools (HTML, browser preview and device) by name and the visual specialists' computer-use tools in the fixed set; it does not toggle tools mid-session. Pi's docs say a change of the active tools updates the prompt contributions and the provider tools, and models without mid-conversation system messages take a cache miss per change ([extensions](https://pi.dev/docs/latest/extensions), [t3-code.md](t3-code.md#t3s-tools-kept-and-deactivated)). The plan does not rely on the Kimi tolerance of tools added mid-conversation noted above.
 - **Continuations reuse the session.** A warm specialist continues in the same session, within the 300 to 1800 s lifetime; a session reopened after that starts cold ([Sub-agents](#how-a-sub-agents-context-could-be-continued)).
 
 ## Context compression with Billion Context

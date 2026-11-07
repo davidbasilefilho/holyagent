@@ -1,6 +1,6 @@
 # Installing Pi and HolyAgent's Pi package (and what is known about Bun)
 
-**Status: planned for 0.3.0. The first three sections are the plan; the sections after them are research on Pi's own install and are not shipped behaviour.**
+**Status: planned for 0.3.0. The first four sections are the plan; the sections after them are research on Pi's own install and are not shipped behaviour.**
 
 Pi 1.4.0, commit `4a080252f06caf63a525d7873c5d94d3c23887e0` (the plan pins 1.5.0; see [README.md](README.md#version-risk)). "Inference:" marks a conclusion drawn here, not a stated fact. Nothing here was installed or executed; the installer script was only read.
 
@@ -20,17 +20,34 @@ After that, plain `pi` starts the HolyAgent root, the way the Claude plugin does
 - **Distribution is the git tag.** The repository already tags each stable release `holyagent-<version>` ([development.md](../development.md)), and Pi pins git tags and commits ([extensions.md](extensions.md#pi-packages)). There is no npm publishing for the Pi package.
 - **The package is built JavaScript.** The extension is bundled with `bun build` into the generated package, which the sync check keeps in step with its sources ([extensions.md](extensions.md#the-holyagent-package)). Where the package sits in the tag, and how Pi finds it there, is to be settled when the package is built.
 - **Installing the package installs only the dependencies the default `config.json` enables** ([configuration.md](configuration.md#holyagent-configjson)).
+- **T3 Code is the primary interface.** After the install, the user enables Pi in T3 Code's Settings, and T3 runs the same install through `pi --mode rpc` ([t3-code.md](t3-code.md)); the plain terminal stays supported.
+
+## Global and project-local installs
+
+**Status: planned for 0.3.0.** The maintainer's words: "for 0.3.0, we will support both local and global installations for holyagent in claude and pi". Both Pi installs work, and the docs present the global one first (the root's default); the Claude Code scopes are in [usage.md](../usage.md#install-scopes). Facts below are from Pi's `latest` docs ([packages](https://pi.dev/docs/latest/packages), [settings](https://pi.dev/docs/latest/settings), [security](https://pi.dev/docs/latest/security)), which the research read in place of 1.5.0's own copy.
+
+| Install                   | Command                                                                       | Declared in                 | Packages land in   |
+| ------------------------- | ----------------------------------------------------------------------------- | --------------------------- | ------------------ |
+| Global (documented first) | `pi install git:github.com/davidbasilefilho/holyagent#holyagent-<version>`    | `~/.pi/agent/settings.json` | `~/.pi/agent/npm/` |
+| Project-local             | `pi install -l git:github.com/davidbasilefilho/holyagent#holyagent-<version>` | `.pi/settings.json`         | `.pi/npm/`         |
+
+- **Precedence.** Project settings override global ones, nested objects merge, and resource lists are combined, so packages declared in both files load ([configuration.md](configuration.md#precedence)).
+- **The trust step of a project-local install.** Pi gates project packages, `.pi/settings.json` and `.pi/extensions` on project trust. Interactive Pi asks once and saves the answer in `~/.pi/agent/trust.json`. Print, JSON and RPC modes cannot ask, so they skip the project's `.pi` resources unless `--approve` or `defaultProjectTrust: "always"` is set; `defaultProjectTrust` is settable only in the global settings file. Declining skips the project packages, while context files such as `AGENTS.md` and `CLAUDE.md` load regardless ([configuration.md](configuration.md#project-trust)). So a project-local install loads in a terminal session after the user trusts the folder once. Under T3 Code, which runs Pi in RPC mode, it loads only when a saved decision, `defaultProjectTrust` or an `--approve` launch arg applies. Inference: T3 allows `--approve`, since it rejects only launch args that change the mode or pick a session; this is to be verified ([t3-code.md](t3-code.md#how-t3-runs-pi)).
+- **Specialists inherit the parent's trust.** The root's children are started with `--approve` only when the parent session trusted the project (the root's default). A global install needs no trust step for its own loading, because only project resources are trust-gated ([approval.md](approval.md#decision-for-030)).
+- **A package declared at both scopes.** The research found no documentation of what Pi does when the same package is declared globally and locally. The behavior is verified during implementation, and this page records the result.
+- **Resolution (inference).** Both installs install the same package the same way, so resolving its bundled CLI and extension dependencies should not differ between them; the packages doc says a local-path package is not installed for the user.
 
 ## The pin
 
-- **Pi is pinned at 1.5.0** (released 2026-11-02), and every reused extension is pinned with it: `pi-provider-kimi-code`, `@tintinweb/pi-subagents`, `pi-web-kit`, `@aliou/pi-processes`, `@juicesharp/rpiv-todo`, `@juicesharp/rpiv-ask-user-question` and `billion-context`. The versions are chosen when the package is built.
+- **Pi is pinned at 1.5.0** (released 2026-11-02), and every reused extension is pinned with it: `pi-provider-kimi-code`, `@tintinweb/pi-subagents`, `pi-web-kit`, `@aliou/pi-processes`, `@juicesharp/rpiv-todo`, `@juicesharp/rpiv-ask-user-question`, `@amaster.ai/pi-computer-use` (computer use through the Cua Driver it bundles, which moves with this pin, [t3-code.md](t3-code.md#computer-use-through-cua-driver)) and `billion-context`. The versions are chosen when the package is built.
 - **A pin moves only through `mise run deps:update`**, the repository's dependency updater ([development.md](../development.md)). For Pi it re-records the CI fixtures, so a Pi change that breaks the integration's contract shows up as a failing replay, not in a user's session ([orchestration.md](orchestration.md#ci-and-windows)). `mise run deps:check` fails when a pin is behind.
 - **Why pin hard:** Pi released about weekly, and Billion Context releases about daily ([README.md](README.md#version-risk), [caching-and-subagents.md](caching-and-subagents.md#context-compression-with-billion-context)).
 
 ## What setup and doctor do
 
 - **`holyagent setup`** for Pi sets Pi's `npmCommand` setting to `bun`, so Pi installs packages with Bun. The maintainer's words: "in the holyagent setup for pi it should set bun as the npmcommand".
-- **`holyagent doctor`** checks that Pi, Node.js 22.19 or newer and the HolyAgent package are present. It only checks and installs nothing.
+- **`holyagent setup`** also, for T3 Code: walks through the macOS Accessibility and Screen Recording permissions for the Cua Driver that `@amaster.ai/pi-computer-use` bundles (there is no separate driver install), and writes T3's beneficial settings once their format is verified, or prints the T3 Settings steps ([t3-code.md](t3-code.md#computer-use-through-cua-driver), [t3-code.md](t3-code.md#t3-settings-written-by-setup)). Its check states that HolyAgent threads in T3 need Full access ([t3-code.md](t3-code.md#full-access-is-required)).
+- **`holyagent doctor`** checks that Pi, Node.js 22.19 or newer and the HolyAgent package are present. It only checks and installs nothing. Inference: the package counts as present when it is installed at either scope ([Global and project-local installs](#global-and-project-local-installs)).
 - **The Windows installer's Node minimum rises from 22.13 to 22.19** ([components.md](../components.md#mise-node-bun-gh)), because Pi needs Node 22.19. The installers do not install Pi.
 
 ## Official instructions

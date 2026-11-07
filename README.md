@@ -17,6 +17,8 @@ claude plugin install holyagent@holyagent
 
 Restart Claude Code afterwards. The root runs on Opus; [docs/usage.md](docs/usage.md#run-the-root-on-sonnet) shows how to run it on Sonnet instead. Web search needs the Exa connector, which you connect once at [claude.ai/customize/connectors](https://claude.ai/customize/connectors) (see [docs/components.md](docs/components.md#exa)); HolyAgent supports only claude.ai account login. On the first launch, run `/holyagent:setup` once to install ctx7 and to configure Claude Code. The same steps as slash commands, the details and `holyagent doctor` are in [docs/usage.md](docs/usage.md#install), and the status of the other environments (T3 Code, claude.ai) is in [docs/requirements.md](docs/requirements.md#supported-environments).
 
+Those commands install for your user; project and local scope, which a team can share, are in [docs/usage.md](docs/usage.md#install-scopes).
+
 ## Why HolyAgent?
 
 - **It fits the work you have.** From a one-line fix to a stacked multi-PR delivery, through bug hunts, codebase questions, reviews, refactors, UI work and solo or coursework repositories ([docs/usage.md](docs/usage.md#what-it-fits)).
