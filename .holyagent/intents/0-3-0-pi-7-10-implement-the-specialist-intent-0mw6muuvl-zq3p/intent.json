@@ -1,0 +1,27 @@
+{
+  "id": "intent-0mw6muuvl-zq3p",
+  "slug": "0-3-0-pi-7-10-implement-the-specialist",
+  "objective": "0.3.0 pi 7/10: Implement the specialist launcher and workflow tool for Pi, so the root dispatches Assignments to Pi child processes and receives their completion without blocking.",
+  "requirements": [
+    "Maintainer (verbatim): \"please add intents for the next 0.3.0 release where I will implement the pi extension integration\"; the maintainer implements 0.3.0, so these Intents record the work and carry no Assignments until the maintainer starts it.",
+    "Maintainer (verbatim): \"in the docs/pi/ it's supposed to use already existent extensions for required functionality\" and \"the first provider to implement will be kimi for coding global\".",
+    "Release model: work lands on release/0.3.0/integration cut from main, as one release/0.3.0/<type>/<change> branch and one PR per change; the first PR of the release carries the version bump made with mise run bump:minor.",
+    "Done means mise run verify passes with the generated output in sync (mise run build) and CI green on every required check, including the windows job.",
+    "A holy_assign({ agent, prompt, model, effort }) tool accepts only the eighteen specialist names, takes model and effort from the dispatched entry, is exposed to codemode, reports through onUpdate, and its execute() launches one Pi child process per Assignment (architecture 2 of orchestration.md).",
+    "Each child is started with --model <provider/id>:<thinking>, --tools or --exclude-tools from the role, --append-system-prompt with the role file, --session-id derived from the Assignment id (letters, digits, dot, underscore, hyphen, starting and ending alphanumeric), --session-dir and the HolyAgent extension through -e.",
+    "A launch is non-blocking: the root ends its turn and a completion notice starts a new root turn (pi.sendMessage with triggerTurn); the shipped subagent example blocks per child, so it is the source for flags only.",
+    "A warm specialist is continued through the same session id with a new prompt, only when the CLI's directive says continue; a specialist whose review must be independent is never continued.",
+    "Completion is read from agent_settled, never agent_end; failure from stopReason error, aborted or length, a failed auto_retry_end, a process exit or a settle without a report, each mapped to the Assignment status table of orchestration.md.",
+    "After a launch the launcher records the agent id with assignment record under the dispatched-Assignment marker test and says so in its tool result; on failure it hands the step back to the root. It keeps launched agent ids (pid, session id) where a resumed root can read them.",
+    "A workflow script that calls only holy_assign with the eighteen names runs without a prompt; any other script asks through ctx.ui.confirm and is blocked when there is no UI.",
+    "When codemode or holy_assign is not among the active tools, the launcher provides a direct subagent fallback and signals workflows-unavailable to the runtime switch.",
+    "Abort and deadlines are the host's job; the launcher sets PI_CACHE_RETENTION=long on children where the provider's adapter honors it.",
+    "Open: child mode, rpc or json with -p per turn; the research gives both and recommends neither for children.",
+    "Open: whether an assignment_report tool with terminate true is added; the research calls it optional.",
+    "Open: how the two-worker codemode limit (PI_CODEMODE_MAX_WORKERS) is handled for fan-out, and whether scripts that reach bash or write are restricted by parentToolCallId.",
+    "Open: whether children set PI_OFFLINE, PI_SKIP_VERSION_CHECK or PI_TELEMETRY=0 to stop the pi.dev version check and install ping."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-07T16:43:53.169Z"
+}
