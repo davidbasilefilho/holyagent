@@ -16,9 +16,12 @@
     "The package ships code-review and security-review prompt templates in prompts/, which Reviewer.code and Reviewer.security expand as their first pass over the committed range. Open: the text of the two first-pass prompts, which the research does not give.",
     "No path-guard extension is loaded, the version-control boundary stays instruction-only, no autoCompactWindow equivalent is set, no session_before_compact handler is registered.",
     "The instruction files follow the cache requirements: static material first, no dates or counters, no mid-session roster change.",
-    "Open: which Pi model ids and thinking levels stand for the route table's haiku/sonnet, medium/high/xhigh and the root's opus; the first answer is for Kimi for Coding and is decided in the provider Intent."
+    "Open: which Pi model ids and thinking levels stand for the route table's haiku/sonnet, medium/high/xhigh and the root's opus; the first answer is for Kimi for Coding and is decided in the provider Intent.",
+    "Maintainer (verbatim): \"for the pi integration we will need kimi k3.1 specific instructions following its official instruction guide\".",
+    "The Pi instruction text has a Kimi K3.1 variant, a per-model set beside packages/runtime/src/instructions/claude-5.5 (for example kimi-k3.1/), written to Moonshot's official Kimi K3.1 prompting and instruction guide rather than adapted from the Claude 5.5 wording; each rule that departs from the Claude set cites the guide section it follows, the way the Claude set cites Anthropic's guidance.",
+    "Open: the official Kimi K3.1 instruction guide's URL and version, and which of its recommendations (system prompt structure, tool-use format, thinking mode, length and temperature defaults) apply to the root and to each specialist."
   ],
-  "revision": 1,
+  "revision": 2,
   "state": "Open",
   "createdAt": "2026-11-07T16:43:52.310Z"
 }
