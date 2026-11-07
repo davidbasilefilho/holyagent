@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mw6vb9kx-nebz",
+  "intentId": "intent-0mw6tzpkr-i7u1",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.artifact",
+  "slug": "re-review-the-repair-of-the-integration",
+  "objective": "Re-review the repair of the integration-branch rule change (commit on top of 85bd5ba plus an uncommitted doc figure fix) against the three earlier findings, so the PR can close.",
+  "state": "Ready",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0. Repair diff: /home/user/holyagent-notes/pr1-repair.diff; doc figure fix diff: /home/user/holyagent-notes/pr1-docfix.diff. Earlier findings: (1) identity.md:9 'Creating a missing base is no such push.' was unscoped; (2) stack-plan.md:8 'Later commits pushed onto an existing base' was loose and did not say the created base carries only the conventions' start; (3) the mergeability rationale was restated in stack-plan.md and R-BRANCH instead of citing Precedence. The repair also raised CONTEXT_BUDGET from 9,300 to 9,400 (docs/hooks.md and docs/pi/claude-parity.md)."
+  ],
+  "constraints": [
+    "Judge only the repair diffs against those findings and any new issue they introduce. Read-only. Report in under 250 words, findings blocking or non-blocking with file:line."
+  ],
+  "criteria": [
+    {
+      "text": "Findings closed: each of the three earlier findings is fixed",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No new issue: the repair introduces no contradiction or loosened approval",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [
+    "assignment-0mw6vb9dw-jfdy"
+  ],
+  "independentFrom": [
+    "assignment-0mw6uqocp-ehy8"
+  ],
+  "createdAt": "2026-11-07T20:40:35.649Z"
+}
