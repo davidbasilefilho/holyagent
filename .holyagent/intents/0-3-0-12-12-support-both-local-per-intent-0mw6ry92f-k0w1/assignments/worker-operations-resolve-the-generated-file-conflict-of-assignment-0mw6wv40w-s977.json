@@ -1,0 +1,42 @@
+{
+  "id": "assignment-0mw6wv40w-s977",
+  "intentId": "intent-0mw6ry92f-k0w1",
+  "intentRevision": 3,
+  "roleTask": "Worker.operations",
+  "slug": "resolve-the-generated-file-conflict-of",
+  "objective": "Resolve the generated-file conflict of an in-progress merge by rebuilding it, then run the full gates on the merged tree.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-config: a merge of release/0.3.0/refactor/host-neutral-cli into release/0.3.0/feat/holyagent-config is in progress, and the only conflict is the generated packages/integrations/claude/dist/scripts/holyagent.js.",
+    "Run `bunx --no-install mise run build` there, which regenerates that file from the merged sources and replaces the conflict markers; confirm no conflict markers remain anywhere (`git diff --check` and a search for <<<<<<< in the tree). Then run `bunx --no-install mise run verify`."
+  ],
+  "constraints": [
+    "Do not run git add, commit, merge, checkout or any git write; the root stages and commits. Edit no source by hand. Report command, exit code and counts in under 150 words; logs under /home/user/holyagent-notes/."
+  ],
+  "criteria": [
+    {
+      "text": "Rebuilt: mise run build exits 0 and no conflict markers remain",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Gates: mise run verify exits 0 on the merged tree",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/claude/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-07T21:24:01.184Z"
+  },
+  "createdAt": "2026-11-07T21:24:01.184Z"
+}
