@@ -1,0 +1,18 @@
+{
+  "id": "intent-0mw6lz68m-7i26",
+  "slug": "remove-the-vendored-frontend-design",
+  "objective": "Remove the vendored frontend-design skill from HolyAgent and carry its directives in HolyAgent's own design skills, released as 0.2.2.",
+  "requirements": [
+    "Maintainer request (verbatim): \"hey frontend design is still on the codebase, please remove it. make sure its directives are in other skill(s)\" and \"that must be 0.2.2\".",
+    "Remove frontend-design everywhere it is vendored, embedded, generated, licensed, tested or documented: packages/integrations/claude/vendor/frontend-design, the worker-visual and reviewer-visual frontend-design.md role sections, dist/licenses/frontend-design, the generator code in packages/integrations/claude/src, tests, README and docs.",
+    "Every directive frontend-design gives must be present in HolyAgent's own skills afterwards (the shared design core and web-design, or the platform skill it fits), in HolyAgent's own words and structure, without duplicating what those skills already say; the visual agents load or name those skills instead of the removed section.",
+    "Credit and licensing follow frontend-design's license: if carrying its directives over requires a notice, keep that notice and the attribution in docs/attributions.md; otherwise keep it credited as an inspiration in the README's Special thanks.",
+    "Do not change .claude/CLAUDE.md; keep the README's fixed section structure; follow .claude/CLAUDE.md code rules (JSDoc, Effect, skill descriptions start with the situation).",
+    "Release model (repository convention): release/0.2.2/integration cut from main; one release/0.2.2/<type>/<change> branch and PR per reviewable change into it, the first PR carrying the bump to 0.2.2 made with mise run bump:patch as its own commit; then an integration to main PR.",
+    "Done means mise run verify passes with the build in sync and CI green on every PR including Windows.",
+    "Default (maintainer's standing instruction from 0.2.1, \"merge whenever merge ready\"): the root squash-merges each reviewed, green PR, the integration to main PR included, once it is merge-ready."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-07T16:19:14.902Z"
+}
