@@ -1,0 +1,74 @@
+{
+  "id": "assignment-0mw6zq6yu-yip7",
+  "intentId": "intent-0mw6uzaad-grmo",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "turn-the-instruction-requirements-into-a",
+  "objective": "Turn the instruction requirements into a requirements/ tree that mirrors the claude-5.5 instruction tree file for file, add guide.md for claude-5.5 and kimi-k3.1, an instructions:scaffold script, mirror and coverage tests, and packages/runtime/AGENTS.md, in the worktree /home/user/holyagent-0.3.0-req (branch release/0.3.0/feat/requirements-tree).",
+  "state": "Ready",
+  "scope": [
+    "Work only in /home/user/holyagent-0.3.0-req; run every command there. First run `bun install --frozen-lockfile` there (node_modules is per worktree; it installs lefthook hooks, which is expected).",
+    "Today packages/runtime/src/instructions/ holds requirements.md (ids such as R-OUTWARD, R-GIT, R-BRANCH) and requirements/{cache,context,mergeability,commit-text}.md, beside the model set claude-5.5/ (root/, specialist/, shared/, roles/<role>/, skills/<skill>/, design-core/, session-reminder.md, session-cloud-identity.md, root-core.ts). Find every consumer first (packages/integrations/claude/src/{agents,generate}.ts, packages/integrations/claude/tests/plugin.test.ts, the instruction-writing skill, docs/*.md, README.md, install/windows-install.ps1) so nothing breaks.",
+    "Make requirements/ mirror the model-set tree: requirements/<path>.md holds, each led by its id, the requirements that become claude-5.5/<path>.md for every Markdown instruction file of the set. Split the existing requirements.md and requirements/*.md into that tree with no requirement lost and none changed in meaning; a requirement that governs several files is placed in the file it most belongs to and referenced (by id) from the others, so ids stay unique. Non-Markdown files (root-core.ts) and guide.md are not mirrored; state the exclusion rule in code.",
+    "Add claude-5.5/guide.md listing every point of Anthropic's prompting guidance for Claude models with its source page, from /home/user/holyagent-notes/claude-guide-points.md (74 points) and the existing claude-5.5/skills/instruction-writing/SKILL.md rules. Add kimi-k3.1/guide.md listing every point of Moonshot's guides with source sections, from /home/user/holyagent-notes/kimi-guide-points.md (45 points). kimi-k3.1/ gets only guide.md in this PR; its translations come in the Kimi PR.",
+    "One list of supported model families in code (exported from packages/runtime, e.g. src/instructions/families.ts) that the scaffold and the tests read. It holds claude-5.5 now; kimi-k3.1 is added by the Kimi PR together with its translations, and a comment says so. A family directory may hold guide.md before it joins the list.",
+    "Scaffold: a mise task in mise.toml and a packages/runtime package.json script `instructions:scaffold` that delegates to it (mise.toml is the source of commands; see docs/development.md). It copies the requirements/ tree into every listed family directory: each directory, and each file with the same name created empty; it only adds missing paths and never overwrites or deletes a file with content. Effect and Bun APIs per .claude/CLAUDE.md.",
+    "Tests (bun test, in packages/runtime/tests or where the instruction tests live): fail when a family file has no requirements file, when a requirements file has no file in a listed family, and when a requirement id is not covered in a listed family; generalize the existing requirement-to-phrase coverage map per family. Scaffold tests cover create, idempotence and no-overwrite in a temp directory.",
+    "New packages/runtime/AGENTS.md: the requirements-first rule (change requirements/ first, run the scaffold, then translate into each family per its guide.md, then the tests) and a pointer to the repository skill .claude/skills/requirements/SKILL.md, which another writer adds in parallel. Update docs and the instruction-writing skill references that point at the old paths.",
+    "Run `bunx --no-install mise run build`: the generated plugin under packages/integrations/claude/dist must be byte-identical to before (requirements/ and guide.md are not shipped). Then `bunx --no-install mise run verify`."
+  ],
+  "constraints": [
+    "Every maintainer requirement of the Intent in use is binding; add no behavior it does not name.",
+    "Do not touch .claude/ (another writer owns .claude/skills/) or .claude/CLAUDE.md.",
+    "Make no version-control writes (no commit, checkout, stash or edits under .git/ or .holyagent/); report the changed paths.",
+    "Report in under 400 words; put the requirement-id mapping (old file and id to new path) and long logs in /home/user/holyagent-notes/pr4-mapping.md and give paths."
+  ],
+  "criteria": [
+    {
+      "text": "requirements/ mirrors every Markdown instruction file of claude-5.5 and every old requirement id is present exactly once with unchanged meaning",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "claude-5.5/guide.md and kimi-k3.1/guide.md list every point of their guides with sources and are not shipped in the plugin",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "instructions:scaffold copies the tree as empty files into each listed family, is idempotent and never overwrites content, with tests",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Mirror and per-family id coverage tests fail on a missing file in either direction or an uncovered id",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "mise run build leaves the generated plugin byte-identical and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "packages/runtime/AGENTS.md states the requirements-first rule and points to the skill",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime",
+    "packages/integrations/claude",
+    "docs",
+    "README.md",
+    "install",
+    "mise.toml"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-07T22:44:10.567Z"
+}
