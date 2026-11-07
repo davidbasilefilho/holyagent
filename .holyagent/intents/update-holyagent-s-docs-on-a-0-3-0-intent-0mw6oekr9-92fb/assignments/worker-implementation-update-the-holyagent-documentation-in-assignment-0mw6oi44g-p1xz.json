@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "update-the-holyagent-documentation-in",
   "objective": "Update the HolyAgent documentation in /home/user/holyagent-docs-pi-plan so docs/pi/ and the docs that point to it state the decided plan for the 0.3.0 pi integration, as a plan the maintainer will implement, with every open question replaced by its decision.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Work only in /home/user/holyagent-docs-pi-plan (branch release/0.3.0/docs/pi-integration-plan). Read the existing docs/pi/*.md (README, approval, auto-mode, caching-and-subagents, claude-parity, configuration, extensions, installation, orchestration, providers) and any docs/ or README.md lines that mention pi.",
     "Sources, in order of authority: /home/user/holyagent-work/pi-decisions.md (the maintainer's decisions, with verbatim quotes); /home/user/holyagent-work/pi-intents-final.jsonl (the ten 0.3.0 Intents with their requirements; the auto-mode Intent was closed because auto-mode was dropped); the sourced research in /home/user/holyagent-work/research/*.md (pi 1.5.0, Kimi models and hosts, the Kimi extension pi-provider-kimi-code, rpiv versus howaboua, codemode and reasoning effort, Billion Context).",
@@ -79,7 +79,61 @@
     "agentId": "workflow:wf_20f9a7d6-8a1/assignment-0mw6oi44g-p1xz",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-07T17:30:02.506Z"
+    "startedAt": "2026-11-07T17:30:02.506Z",
+    "finishedAt": "2026-11-07T17:47:53.696Z"
+  },
+  "result": "result: docs/pi and the pointing pages now state the decided 0.3.0 Pi plan as planned, not shipped; `bunx --no-install mise run verify` exits 0.\n\nchanged (all under `/home/user/holyagent-docs-pi-plan/`):\n- `docs/pi/`: `README.md`, `approval.md`, `auto-mode.md`, `caching-and-subagents.md`, `claude-parity.md`, `configuration.md`, `extensions.md`, `installation.md`, `orchestration.md`, `providers.md`\n- `docs/README.md`, `docs/components.md`, `docs/development.md`, `docs/requirements.md`\n- `README.md`, `.claude/CLAUDE.md` and `AGENTS.md` are untouched. No new pages.\n\nchecks:\n- `bunx --no-install mise run fmt -- <my 14 files>` -> 0. It formatted 8 of them and touched no other file.\n- `bunx --no-install mise run verify` -> 0: 1596 pass, 0 fail, fmt check clean, lint and type-check clean. Log: `/home/user/holyagent-work/docs-030-verify.log`.\n- Relative-link and anchor check over all `docs/**/*.md` and `README.md` -> 0 broken (script run from the scratchpad).\n\nblockers: none\n\nquestions: none\n\nnotes:\n- **Visual routing:** the brief says Reviewer.visual at high, but `pi-decisions.md` and Intent 5 quote \"both visual specialists must be low\". I followed the decisions file and documented both visual specialists at `k3.1-pro` low.\n- **`holy_assign`:** Intent 7 still names a custom `holy_assign` tool, but the decision uses `@tintinweb/pi-subagents`. The docs make the package the launcher and keep `holy_assign` only for gaps. Which launcher requirements the package covers is marked \"to be verified\".\n- **Kimi API type:** the research disagrees on the built-in provider's API type (`anthropic-messages` at commit `209bc7b9`, `openai-completions` on `main`). `providers.md` lists it as unresolved.\n- **Unsettled points:** these are marked \"to be settled\" or \"to be measured\" and listed in `claude-parity.md`:\n  - root-text carrier\n  - launch-flag name\n  - text of the two review prompts\n  - which instruction set the `kimi-for-coding` specialists load\n  - whether scripts calling non-specialist agents keep a confirmation\n  - Billion Context's cache behavior on Kimi and its license history\n  - whether the subagent and process tools are callable from codemode\n  - whether `max` beats `high` for the root\n- **Left alone:** root `README.md` still says \"Node.js LTS (22.13 or later)\", which is correct today. It will need a change when the Windows installer minimum rises to 22.19.\n- **Provider research removed:** I removed the Codex and `gpt-6-luna` provider research from `providers.md`. It existed only for the dropped auto-mode reviewer.\n\nevidence:\n- Decisions recorded: the table in `docs/pi/README.md` links each decision to its owning page; routing, cache target, Billion Context, config, codemode, CI and installation are in `providers.md`, `caching-and-subagents.md`, `configuration.md`, `orchestration.md` and `installation.md`.\n- Overturned text replaced: `auto-mode.md` rewritten as \"dropped for 0.3.0, full access is the default\"; `approval.md`, `claude-parity.md` and `orchestration.md` carry the decided carriers; the open-question list is replaced by a \"still open\" list. A grep for nicobailon, score-based routing and the old open questions finds only the replacement notes.\n- Plan not shipped: every changed `docs/pi` page opens with a \"Status: planned for 0.3.0\" line; `docs/README.md`, `components.md` and `requirements.md` say planned for 0.3.0.\n- Sourced facts: Kimi, pi-provider-kimi-code, rpiv, aliou, tintinweb, pi-web-kit, Billion Context and Pi 1.5.0 facts carry the research reports' links. Anything unsourced is marked unknown or to be measured.\n- Docs only: the diff covers `docs/` only, and root `README.md` is unchanged, so its six sections are intact.\n- Links valid: the link check reports 0 broken links.\n- Verify passes: `mise run verify` -> exit 0, 1596 pass, 0 fail.\n- Style: pages keep the existing voice, relative links and \"Inference:\" convention.\n- checks-run: see the checks list above.\n- changed-paths: see the changed list above.\n- diff-file: `/home/user/holyagent-work/docs-030.diff`. It has no new-file section because I added no files.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "docs-only diff, verify exit 0, link check 0 broken; content goes to independent review",
+    "criteria": [
+      {
+        "criterion": "Decisions recorded: every decision listed in scope appears in docs/pi with its decided value",
+        "support": "the table in `docs/pi/README.md` links each decision to its owning page; routing, cache target, Billion Context, config, codemode, CI and installation are in `providers.md`, `caching-and-subagents.md`, `configuration.md`, `orchestration.md` and `installation.md`."
+      },
+      {
+        "criterion": "Overturned text replaced: no docs page still presents a decided point as open, keeps score-based or connected-provider routing as the 0.3.0 plan, presents auto-mode as planned, or names nicobailon's pi-subagents as the workflow runner",
+        "support": "`auto-mode.md` rewritten as \"dropped for 0.3.0, full access is the default\"; `approval.md`, `claude-parity.md` and `orchestration.md` carry the decided carriers; the open-question list is replaced by a \"still open\" list. A grep for nicobailon, score-based routing and the old open questions finds only the replacement notes."
+      },
+      {
+        "criterion": "Plan not shipped: the pages state the pi integration as the 0.3.0 plan, not current behavior",
+        "support": "every changed `docs/pi` page opens with a \"Status: planned for 0.3.0\" line; `docs/README.md`, `components.md` and `requirements.md` say planned for 0.3.0."
+      },
+      {
+        "criterion": "Sourced facts: third-party facts match the research reports and keep their source links; nothing is invented",
+        "support": "Kimi, pi-provider-kimi-code, rpiv, aliou, tintinweb, pi-web-kit, Billion Context and Pi 1.5.0 facts carry the research reports' links. Anything unsourced is marked unknown or to be measured."
+      },
+      {
+        "criterion": "Docs only: the diff touches only docs/ and at most a link line in README.md; README keeps its six sections; .claude/CLAUDE.md and AGENTS.md unchanged",
+        "support": "the diff covers `docs/` only, and root `README.md` is unchanged, so its six sections are intact."
+      },
+      {
+        "criterion": "Links valid: every relative link in changed pages resolves to an existing file or heading",
+        "support": "the link check reports 0 broken links."
+      },
+      {
+        "criterion": "Verify passes: mise run verify exits 0 in the worktree",
+        "support": "`mise run verify` -> exit 0, 1596 pass, 0 fail."
+      },
+      {
+        "criterion": "Style: pages follow the existing docs' voice and structure",
+        "support": "pages keep the existing voice, relative links and \"Inference:\" convention."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "see the checks list above."
+      },
+      {
+        "label": "changed-paths",
+        "support": "see the changed list above."
+      },
+      {
+        "label": "diff-file",
+        "support": "`/home/user/holyagent-work/docs-030.diff`. It has no new-file section because I added no files."
+      }
+    ]
   },
   "createdAt": "2026-11-07T17:29:57.856Z"
 }
