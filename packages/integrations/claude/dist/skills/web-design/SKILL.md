@@ -20,7 +20,7 @@ Apply the skill's capture checklist on the final captures: the worker before rep
 
 ### Direction before code
 
-- When the brief leaves out the subject, the audience or the main job, state them as a proposal in the plan and confirm them with the client where one is reachable; remembered preferences or project context are a starting hint. The brief's own words outrank every avoid list below.
+- When the brief leaves out the subject, the audience or the main job, confirm them with the user when one can answer, and otherwise state them as a proposal in the plan; remembered preferences or project context are a starting hint. The brief's own words outrank every avoid list below.
 - Let the subject supply the look: its trade, materials and idiom decide the visual choices, and the brief's real content stays in the work from start to finish. A ferry timetable and a toddler's game should look nothing alike.
 - Choose palette, type and layout on purpose and for this brief alone, accept visual risk when it earns its place, and treat each project as a chance to try something new instead of repeating what you do best.
 - Sketch a plan before building: a small named palette (four to six colors, each with a value and a role), the type roles, a layout idea in a sentence, compared through rough ASCII wireframes, with how the content aligns (left, centered or justified), and two or three principles. Audit it with "would I make this for any similar product?" and the competitor test: drop an idea that still works with a competitor's name on it. Rewrite what fails, note what changed and why, and start coding only from the revised plan.
@@ -49,9 +49,9 @@ Apply the skill's capture checklist on the final captures: the worker before rep
 ### Copy
 
 - Interface text exists to help someone understand and act, so treat it as part of the design. Decide what the screen must convey and the shortest way to convey it, with one job for each piece of text.
-- Speak in the user's terms, calling a thing what the user calls it ("saved searches", not "query presets"). Describe what something is or does instead of selling it; concrete beats clever.
-- Prefer active voice, plain verbs, sentence case (or the platform's own capitalization) and a conversational tone suited to the brand and audience, without filler.
-- A control names its outcome ("Send invoice", not "Submit"), and an action keeps its name through the whole flow: the Archive button leads to an "Archived" confirmation.
+- Speak in the user's terms, calling a thing what the user calls it ("saved searches", not "query presets"). Say what a thing is or does without selling it; concrete beats clever.
+- Set text in sentence case unless the platform sets its own casing, leave out padding, keep the tone in step with the brand and its readers, and write in the active voice with everyday verbs.
+- A control names its outcome ("Send invoice", not "Submit"), and each action carries one name from first label to confirmation: the Duplicate button leads to a "Duplicated" confirmation.
 - When something fails or nothing is there yet, point the way. An error states what happened and how to recover, speaks as the interface and not as a person, and neither apologizes nor stays vague; an empty state invites the first action.
 
 ### Quality floor, unannounced
@@ -102,7 +102,7 @@ Apply the skill's capture checklist on the final captures: the worker before rep
 
 ### Motion
 
-- Spend unprompted motion on one moment, such as a single load sequence or reveal, and do not scatter it: entrance animations on every section and hover effects on every card are the stock look. Motion that follows a user's action is welcome where it shows what changed.
+- Spend unprompted motion on one moment, such as a single load sequence or reveal, and do not scatter it: entrance animations on every section and hover effects on every card are the stock look. Feedback motion earns its place by making the change visible.
 - Only transform and opacity animate, never a blanket "all properties" transition. (behavior check)
 - Animations can be interrupted.
 
@@ -112,7 +112,7 @@ Apply the skill's capture checklist on the final captures: the worker before rep
 
 ## Refuse list
 
-Unless the brief asks for it, and without filling a choice the brief leaves open with one of these defaults:
+The brief's own words win over this list. Unless the brief asks for it, and without filling a choice the brief leaves open with one of these defaults:
 
 - identical icon-card grids and hero metric tiles
 - a card-kit page: look-alike rounded panels, one corner radius whatever an element's rank, the same faint shadow on every panel, and gradients as ornament
@@ -121,7 +121,7 @@ Unless the brief asks for it, and without filling a choice the brief leaves open
 - glass as decoration (preference)
 - emoji as icons
 - a newspaper front page (hairline rules, square corners, dense multi-column text) for a subject that is not editorial (preference)
-- default-kit trimmings that appear whatever the subject: metadata strung together with dots, labels shaped as a capitalized word, a dash and a fragment, off-black fills standing in for true black, monospace captions on small data, and a trailing arrow on links and buttons
+- default-kit trimmings that show up regardless of subject: a trailing arrow on links and buttons, monospace captions on small data, off-black fills used in place of true black, labels shaped as a capitalized word, a dash and a fragment, and metadata strung together with dots
 - a warm paper-cream ground with a high-contrast serif and a terracotta accent, which has become a generated-page signature, or a near-black ground with one lone neon or red-orange accent (preference)
 
 ## Capture checklist

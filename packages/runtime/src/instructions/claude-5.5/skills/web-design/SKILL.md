@@ -51,7 +51,7 @@ Rules for pages and web apps, judged on what renders: the visual direction, the 
 
 ### Motion
 
-- Spend unprompted motion on one moment, such as a single load sequence or reveal, and do not scatter it: entrance animations on every section and hover effects on every card are the stock look. Motion that follows a user's action is welcome where it shows what changed.
+- Spend unprompted motion on one moment, such as a single load sequence or reveal, and do not scatter it: entrance animations on every section and hover effects on every card are the stock look. Feedback motion earns its place by making the change visible.
 - Only transform and opacity animate, never a blanket "all properties" transition. (behavior check)
 - Animations can be interrupted.
 
@@ -61,7 +61,7 @@ Rules for pages and web apps, judged on what renders: the visual direction, the 
 
 ## Refuse list
 
-Unless the brief asks for it, and without filling a choice the brief leaves open with one of these defaults:
+The brief's own words win over this list. Unless the brief asks for it, and without filling a choice the brief leaves open with one of these defaults:
 
 - identical icon-card grids and hero metric tiles
 - a card-kit page: look-alike rounded panels, one corner radius whatever an element's rank, the same faint shadow on every panel, and gradients as ornament
@@ -70,7 +70,7 @@ Unless the brief asks for it, and without filling a choice the brief leaves open
 - glass as decoration (preference)
 - emoji as icons
 - a newspaper front page (hairline rules, square corners, dense multi-column text) for a subject that is not editorial (preference)
-- default-kit trimmings that appear whatever the subject: metadata strung together with dots, labels shaped as a capitalized word, a dash and a fragment, off-black fills standing in for true black, monospace captions on small data, and a trailing arrow on links and buttons
+- default-kit trimmings that show up regardless of subject: a trailing arrow on links and buttons, monospace captions on small data, off-black fills used in place of true black, labels shaped as a capitalized word, a dash and a fragment, and metadata strung together with dots
 - a warm paper-cream ground with a high-contrast serif and a terracotta accent, which has become a generated-page signature, or a near-black ground with one lone neon or red-orange accent (preference)
 
 ## Capture checklist

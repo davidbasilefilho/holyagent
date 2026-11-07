@@ -1018,7 +1018,7 @@ describe("agents", () => {
 
   test("the platform design skills carry the design directives that the visual roles no longer embed", () => {
     const core = [
-      "confirm them with the client where one is reachable",
+      "confirm them with the user when one can answer",
       "Let the subject supply the look",
       "accept visual risk when it earns its place",
       "a small named palette (four to six colors, each with a value and a role)",
@@ -1029,10 +1029,11 @@ describe("agents", () => {
       "An eyebrow over every heading, all-caps labels and labels that say nothing",
       "invent specific copy from the subject",
       '("Send invoice", not "Submit")',
-      'the Archive button leads to an "Archived" confirmation',
+      'the Duplicate button leads to a "Duplicated" confirmation',
+      "each action carries one name from first label to confirmation",
       "An error states what happened and how to recover",
       "an empty state invites the first action",
-      "a conversational tone",
+      "keep the tone in step with the brand and its readers",
       "under reduced motion, movement becomes a fade or nothing",
       "Check your own work as it takes shape",
     ]
@@ -1045,7 +1046,9 @@ describe("agents", () => {
       "entrance animations on every section",
       "a card-kit page",
       "picking out one word or phrase of a headline",
-      "default-kit trimmings that appear whatever the subject",
+      "default-kit trimmings that show up regardless of subject",
+      "Feedback motion earns its place by making the change visible",
+      "The brief's own words win over this list",
       "a warm paper-cream ground",
     ]
     for (const name of ["web-design", "mobile-design", "desktop-design", "tui-design"]) {
