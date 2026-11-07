@@ -19,9 +19,14 @@
     "Open: whether the Pi version pinned for 0.3.0 still ships the Kimi provider, since the research read 1.4.0 only.",
     "Open: whether the auto-mode reviewer rule (GPT-6 Luna when Codex is active, else an economical available model) needs a Kimi-specific choice.",
     "Maintainer (verbatim): \"for the pi integration we will need kimi k3.1 specific instructions following its official instruction guide\".",
-    "Sessions and specialists that run on Kimi K3.1 through Kimi for Coding (global) load the Kimi K3.1 instruction set from Intent 0.3.0 pi 3/10, not the Claude 5.5 set."
+    "Sessions and specialists that run on Kimi K3.1 through Kimi for Coding (global) load the Kimi K3.1 instruction set from Intent 0.3.0 pi 3/10, not the Claude 5.5 set.",
+    "Maintainer (verbatim): \"check if there is any already existent and maintained pi extension for full kimi for coding global integration\". Research (2026-11-07) found pi-provider-kimi-code by Leechael (https://github.com/Leechael/pi-provider-kimi-code, MIT, v0.6.13 on 2026-10-05, about nine releases since 2026-07-16, tracks pi 0.99.2), layered on pi's built-in kimi-coding provider (api.kimi.com/coding, anthropic-messages API, KIMI_API_KEY or Kimi Code OAuth). Per the existing-extensions rule, the integration installs and pins that extension rather than building a provider.",
+    "What it supplies, per its README: OAuth login shared with the official kimi-code CLI plus a KIMI_API_KEY fallback, region switching through KIMI_CODE_REGION, Files API uploads for large images, tool-schema dedup under Moonshot's 15 KB per-tool limit, quota display from /usages, prompt-cache key and reasoning-level mapping, and optional Moonshot-side tools (moonshot_search, moonshot_fetch, kimi_datasource).",
+    "Open: which host is the global Kimi for Coding endpoint (the extension's README says api.kimi.ai is global and api.kimi.com mainland, while the built-in uses api.kimi.com); verify and set KIMI_CODE_REGION explicitly.",
+    "Open: whether Kimi K3.1 is served through Kimi for Coding and under which model id; the sources list k3, kimi-for-coding and kimi-for-coding-highspeed.",
+    "Open: whether to enable the extension's Moonshot-side tools, which send data to Moonshot's services; the extension's open issue #16 on tool schemas; and its single-maintainer risk (fallback: the built-in kimi-coding provider)."
   ],
-  "revision": 2,
+  "revision": 3,
   "state": "Open",
   "createdAt": "2026-11-07T16:43:52.730Z"
 }
