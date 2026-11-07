@@ -1,0 +1,69 @@
+{
+  "id": "assignment-0mw6u0jk3-mkyc",
+  "intentId": "intent-0mw6tzpkr-i7u1",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "change-the-root-instructions-so-cutting",
+  "objective": "Change the root instructions so cutting and pushing an integration branch (or other base) that the target repository's conventions call for, when the remote lacks it, is a default that needs no user approval.",
+  "state": "Ready",
+  "scope": [
+    "Work only in the git worktree /home/user/holyagent-0.3.0 (branch release/0.3.0/feat/integration-branch-default). First run `bun install --frozen-lockfile` there, since node_modules is not shared between worktrees. Run the gates as `bunx --no-install mise run <task>` from that worktree.",
+    "Find every statement of the current rule in the instruction sources under packages/runtime/src/instructions (for example the stack-plan sentence 'a base the convention names but the remote lacks is cut from the start the convention gives, and pushing it is a push to the base, so it needs the user's approval unless the request names it', and any root, core, hook or skill text saying the same), and in docs/ where docs describe it.",
+    "Rewrite it so: when the conventions name an integration branch or other base that the remote lacks, the root cuts it from the start the conventions give and pushes it as part of the stack plan, without asking, because mergeability in the target repository outranks HolyAgent defaults (Precedence). Keep unchanged: approval for force-pushes, for pushing commits onto an existing base, default or protected branch, and for merges, publishing and destructive steps."
+  ],
+  "constraints": [
+    "Maintainer (verbatim): \"this integration branch thing should not require approval, it should a holyagent default. always remember that mergeability > holyagent defaults\".",
+    "Write the instruction text in the existing style of those files (plain, rule plus reason); the instruction-writing skill at /root/.claude/plugins/synced/03eb801d-6ff6-4373-b5b1-f94edf359a3e_0f3e6ee9-af2e-4c2c-8d3c-9be25ca27713/holyagent/skills/instruction-writing/SKILL.md holds the rules for model-facing text; read it before editing.",
+    "Regenerate the plugin with `bunx --no-install mise run build` so packages/integrations/claude/dist matches the sources; never hand-edit generated files.",
+    "Make no git commits, checkouts, branch changes or edits under .git/ or .holyagent/; report changed paths instead.",
+    "Write a diff of your changes (git diff against HEAD, including generated files) to /home/user/holyagent-notes/integration-branch-default.diff and list it as diff-file evidence.",
+    "Report in under 400 words; put long logs in files under /home/user/holyagent-notes/ and give their paths."
+  ],
+  "criteria": [
+    {
+      "text": "Rule changed: every instruction source that required approval to push a convention-named base the remote lacks now makes cutting and pushing it a default with no approval, citing mergeability over HolyAgent defaults",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Approvals kept: force-push, pushing commits onto an existing base or protected branch, merging, publishing and destructive steps still need approval in the text",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Generated output in sync: mise run build leaves packages/integrations/claude/dist matching the sources and the plugin sync test passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Gates: bunx --no-install mise run verify exits 0 in the worktree",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Tests that pin instruction text are updated, not weakened",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Scope: only the rule above changes",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/integrations/claude/dist",
+    "packages/runtime/tests",
+    "packages/integrations/claude/tests",
+    "docs"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-07T20:04:15.747Z"
+}
