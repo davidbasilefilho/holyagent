@@ -17,7 +17,6 @@
     "Open: which Kimi models and thinking levels stand for the route table's haiku/sonnet, medium/high/xhigh and the root's opus.",
     "Open: whether the Kimi adapter honors PI_CACHE_RETENTION=long and how it keys prompt caching; the research covers other adapters only, and one (openai-codex) ignores the variable.",
     "Open: whether the Pi version pinned for 0.3.0 still ships the Kimi provider, since the research read 1.4.0 only.",
-    "Open: whether the auto-mode reviewer rule (GPT-6 Luna when Codex is active, else an economical available model) needs a Kimi-specific choice.",
     "Maintainer (verbatim): \"for the pi integration we will need kimi k3.1 specific instructions following its official instruction guide\".",
     "Sessions and specialists that run on Kimi K3.1 through Kimi for Coding (global) load the Kimi K3.1 instruction set from Intent 0.3.0 pi 3/10, not the Claude 5.5 set.",
     "Maintainer (verbatim): \"check if there is any already existent and maintained pi extension for full kimi for coding global integration\". Research (2026-11-07) found pi-provider-kimi-code by Leechael (https://github.com/Leechael/pi-provider-kimi-code, MIT, v0.6.13 on 2026-10-05, about nine releases since 2026-07-16, tracks pi 0.99.2), layered on pi's built-in kimi-coding provider (api.kimi.com/coding, anthropic-messages API, KIMI_API_KEY or Kimi Code OAuth). Per the existing-extensions rule, the integration installs and pins that extension rather than building a provider.",
@@ -30,9 +29,10 @@
     "Maintainer (verbatim): \"for the kimi provider, currently kimi k3.1 pro should be root and the kimi-for-coding model (which is kimi k2.8 preview) should be the specialists, except stuff like visual stuff that should be kimi k3.1 pro low or something. it really depends on the specialists and the routing should be figured out\".",
     "Kimi route table, starting point: the root runs on Kimi K3.1 Pro; specialists run on the kimi-for-coding model (Kimi K2.8 Preview); visual specialists (Worker.visual, Reviewer.visual) and others that need it run on Kimi K3.1 Pro at a low thinking or effort level.",
     "The Kimi route table maps every specialist role (the eighteen roles of the Claude route table) to a model and thinking level, each choice with a reason, and lives in the config.json defaults so it can be changed without code.",
-    "Open: the per-specialist routing, which the maintainer says depends on each specialist and must be worked out (for example which reviewers and the debugging worker need K3.1 Pro, and what 'low' maps to in the provider's thinking levels); and the exact model ids for Kimi K3.1 Pro and Kimi K2.8 Preview under Kimi for Coding."
+    "Open: the per-specialist routing, which the maintainer says depends on each specialist and must be worked out (for example which reviewers and the debugging worker need K3.1 Pro, and what 'low' maps to in the provider's thinking levels); and the exact model ids for Kimi K3.1 Pro and Kimi K2.8 Preview under Kimi for Coding.",
+    "Maintainer (verbatim): \"there will be no auto-mode, full access shall be the default\"."
   ],
-  "revision": 5,
+  "revision": 6,
   "state": "Open",
   "createdAt": "2026-11-07T16:43:52.730Z"
 }
