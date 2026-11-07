@@ -5,7 +5,7 @@
   "roleTask": "Librarian.research",
   "slug": "establish-which-moonshot-prompting-or",
   "objective": "Establish which Moonshot prompting or instruction guide best fits how the kimi-for-coding model (Kimi K2.8 Preview) behaves, so HolyAgent's pi specialists that run on it load instruction text written to the most relevant guide.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "The maintainer's rule (verbatim): \"separate k2.8 or k2.7, or k2.6, k2.5, whichever is more relevant. if k3 or k3.1 is more relevant, we should use it. it depends on how the model behaves\".",
     "Find Moonshot's official guides for the Kimi K2 line (K2.5, K2.6, K2.7, K2.8 or K2.8 Preview, including any kimi-for-coding or Kimi Code docs) and for K3 and K3.1 (already chosen for the root: https://platform.kimi.ai/docs/guide/prompt-best-practice, https://platform.kimi.ai/docs/guide/kimi-k3-1-pro-quickstart, https://platform.kimi.ai/docs/guide/use-kimi-k3-to-setup-agent).",
@@ -39,7 +39,29 @@
     "agentId": "workflow:wf_f24b4561-826/assignment-0mw6qfair-ykt4",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-07T18:23:45.412Z"
+    "startedAt": "2026-11-07T18:23:45.412Z",
+    "finishedAt": "2026-11-07T18:24:31.117Z"
+  },
+  "result": "result: Recommend the K3/K3.1 guide set (prompt-best-practice, K3.1 Pro quickstart, use-kimi-k3-to-setup-agent), plus the K3 tool-calling best-practice guide. Do not use K2.6 or K2.7 guides for instruction text. Today is 2026-11-07. Moonshot has no K2.8-specific prompting guide, and I found no model card or changelog saying K2.8 shares post-training with K2.x or K3.\n\nchanged: none\nchecks: none run\nblockers: none\nquestions: none\n\nnotes: Reasons tied to documented behavior:\n- Moonshot's Kimi Code docs position K2.8 Preview as \"performance close to K3 with more efficient thinking\". Its effort levels (`low`/`high`/`max`) are \"consistent with K3\". https://www.kimi.com/code/docs/en/kimi-code/models and https://www.kimi.com/code/docs/kimi-code/whats-new.html (Chinese, 2026-09-11 entry).\n- Thinking control matches K3, not K2.x. K2.8 Preview uses the top-level `reasoning_effort` (default `max`). K2.6 and K2.7 use the `thinking` parameter, and K2.7 has no adjustable effort. https://www.kimi.com/code/docs/en/kimi-code/models and https://platform.kimi.ai/docs/api/models-overview\n- A thinking-disabled request to K3 or K2.8 is served by K2.8 Preview without thinking. K2.7 Highspeed gets the same routing. K3.1 Pro rejects it with a 400. https://www.kimi.com/code/docs/en/kimi-code/models\n- Context is up to 1M tokens on K2.8 Preview, like the K3 series. K2.6 and K2.7 are 256K. https://www.kimi.com/code/docs/en/kimi-code/models and https://platform.kimi.ai/docs/api/models-overview\n- Third-party, quoting Moonshot's API table (treat as secondary): K2.8 Preview has fixed sampling (temperature 1.0, top_p 0.95, n 1). It needs the complete assistant message passed back, including `reasoning_content`. It accepts only `tool_choice` `auto` or `none`. https://intl.cloud.tencent.com/document/product/1300/80635\n- Moonshot's own parameter page confirms fixed `temperature` and `top_p` for the K3 series and K2.7, and `required` support only on K3. https://platform.kimi.ai/docs/api/models-overview\n- The `required` limit is the one place K2.8 behaves like K2.7 rather than K3 (inference from the Tencent table). Instruction text should not rely on forcing a first-round tool call.\n- Where K2.8 differs from the K3 guides, leave the guide's request settings out of the instruction text. These differences are only per the Tencent table:\n  - Output cap is `max_tokens` (default 32768) rather than `max_completion_tokens`.\n  - Public image URLs are accepted.\n  - `tool_choice` `required` is unsupported.\n- The agent guide's advice (system prompt limited to role, workflow and quality boundaries, with argument details in the tool schema) is model-agnostic prompt style, so it applies. https://platform.kimi.ai/docs/guide/use-kimi-k3-to-setup-agent\n- The K2.x thinking guide (https://platform.kimi.ai/docs/guide/use-thinking-models) covers only `kimi-k2.7-code` and `kimi-k2.6`. It is the wrong frame for K2.8.\n\nUnknown:\n- Whether K2.8 Preview shares post-training with K2.x or K3. Neither the model card nor the changelog says so.\n- The K2.8 tool-calling and parallel-call specifics. I did not fetch the K3 tool-calling guide this time.\n- Whether the platform.kimi.ai `kimi-k2.8-preview` API behaves exactly as on the Kimi Code `kimi-for-coding` endpoint. The Tencent table covers the platform ID.\n- Moonshot's own page for K2.8 sampling and `reasoning_content`. I only have the Tencent secondary source for those.\n\nevidence:\nRecommendation: K3/K3.1 guide set (prompt-best-practice, kimi-k3-1-pro-quickstart, use-kimi-k3-to-setup-agent, plus the K3 tool-calling best-practice guide), based on the Kimi Code models page and the platform models-overview page cited above.\nSourced: every behavioral claim carries a URL above; Tencent-derived and inference items are labelled.\nsources: https://www.kimi.com/code/docs/en/kimi-code/models ; https://www.kimi.com/code/docs/kimi-code/whats-new.html ; https://platform.kimi.ai/docs/api/models-overview ; https://platform.kimi.ai/docs/guide/use-thinking-models ; https://platform.kimi.ai/docs/guide/use-kimi-k3-to-setup-agent ; https://platform.kimi.ai/docs/guide/prompt-best-practice ; https://intl.cloud.tencent.com/document/product/1300/80635 (third-party)\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "recommendation tied to Moonshot's Kimi Code models page and platform models-overview; third-party items labelled",
+    "criteria": [
+      {
+        "criterion": "Recommendation: names one guide set for the K2.8 Preview specialists with reasons tied to the model's documented behavior",
+        "support": "K3/K3.1 guide set (prompt-best-practice, kimi-k3-1-pro-quickstart, use-kimi-k3-to-setup-agent, plus the K3 tool-calling best-practice guide), based on the Kimi Code models page and the platform models-overview page cited above."
+      },
+      {
+        "criterion": "Sourced: each behavioral claim carries an authoritative URL, and inference is labelled",
+        "support": "every behavioral claim carries a URL above; Tencent-derived and inference items are labelled."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "sources",
+        "support": "https://www.kimi.com/code/docs/en/kimi-code/models ; https://www.kimi.com/code/docs/kimi-code/whats-new.html ; https://platform.kimi.ai/docs/api/models-overview ; https://platform.kimi.ai/docs/guide/use-thinking-models ; https://platform.kimi.ai/docs/guide/use-kimi-k3-to-setup-agent ; https://platform.kimi.ai/docs/guide/prompt-best-practice ; https://intl.cloud.tencent.com/document/product/1300/80635 (third-party)"
+      }
+    ]
   },
   "createdAt": "2026-11-07T18:23:45.412Z"
 }
