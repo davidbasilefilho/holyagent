@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "review-commit-85bd5ba-root-instruction",
   "objective": "Review commit 85bd5ba (root instruction text) which makes cutting and pushing a missing convention-named base a no-approval default, for correctness, consistency with the rest of the root rules and clarity to a model.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "The diff is at /home/user/holyagent-notes/pr1.diff (the commit on top of release/0.3.0/integration in worktree /home/user/holyagent-0.3.0). Read the changed files in full in that worktree for context: packages/runtime/src/instructions/claude-5.5/root/identity.md, root/stack-plan.md, requirements.md, and skim the other root sections (claude-5.5/root/*.md) for statements that now contradict the change.",
     "Rules for model-facing text: /root/.claude/plugins/synced/03eb801d-6ff6-4373-b5b1-f94edf359a3e_0f3e6ee9-af2e-4c2c-8d3c-9be25ca27713/holyagent/skills/instruction-writing/SKILL.md."
@@ -40,5 +40,10 @@
   "independentFrom": [
     "assignment-0mw6u0jk3-mkyc"
   ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-07T20:11:57.664Z"
+  },
   "createdAt": "2026-11-07T20:11:55.039Z"
 }
