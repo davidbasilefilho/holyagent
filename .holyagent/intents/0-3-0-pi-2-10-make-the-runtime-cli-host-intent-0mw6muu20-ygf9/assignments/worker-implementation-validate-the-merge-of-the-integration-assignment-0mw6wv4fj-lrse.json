@@ -1,0 +1,60 @@
+{
+  "id": "assignment-0mw6wv4fj-lrse",
+  "intentId": "intent-0mw6muu20-ygf9",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "validate-the-merge-of-the-integration",
+  "objective": "Validate the merge of the integration-branch rule PR into the host-neutral CLI branch and repair two optional review notes, so the branch is ready to push.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-cli (branch release/0.3.0/refactor/host-neutral-cli, node_modules installed); HEAD is a merge commit of release/0.3.0/feat/integration-branch-default. First run `bunx --no-install mise run build` (the generated bundle may be stale after the merge) and `bunx --no-install mise run verify`, and report both before any edit.",
+    "Then fix: (1) packages/runtime/src/vcs/message.ts SESSION_LINK and PI_SESSION_LINK leave `[text]()` after stripping a Markdown session link; strip the whole `[text](url)` link when its URL is a session link, keeping the surrounding text, and update the test that asserts the residue. (2) packages/runtime/src/cli/assignment.ts:315: `assignment record --failed` fails under an invalid HOLYAGENT_HOST; read the host only on the --agent branch, with a test."
+  ],
+  "constraints": [
+    "Repository rules: Effect, tagged errors, no try/catch, new Promise or async in runtime source; JSDoc on exports; tests for each fix.",
+    "Regenerate with mise run build; no git writes. Write `git diff HEAD` to /home/user/holyagent-notes/pr2-repair2.diff. Report in under 250 words."
+  ],
+  "criteria": [
+    {
+      "text": "Merge validated: build and verify exit 0 on the merge head before edits",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Markdown session link stripped whole, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "record --failed works under an invalid HOLYAGENT_HOST, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Gates: mise run verify exits 0 after the fixes",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/vcs/message.ts",
+    "packages/runtime/src/cli/assignment.ts",
+    "packages/runtime/tests/vcs-message.test.ts",
+    "packages/runtime/tests/host.test.ts",
+    "packages/integrations/claude/dist/scripts/holyagent.js"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw6vb9wy-v7s9",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-07T21:24:01.711Z"
+  },
+  "createdAt": "2026-11-07T21:24:01.711Z"
+}
