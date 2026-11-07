@@ -17,9 +17,11 @@
     "Open: which Kimi models and thinking levels stand for the route table's haiku/sonnet, medium/high/xhigh and the root's opus.",
     "Open: whether the Kimi adapter honors PI_CACHE_RETENTION=long and how it keys prompt caching; the research covers other adapters only, and one (openai-codex) ignores the variable.",
     "Open: whether the Pi version pinned for 0.3.0 still ships the Kimi provider, since the research read 1.4.0 only.",
-    "Open: whether the auto-mode reviewer rule (GPT-6 Luna when Codex is active, else an economical available model) needs a Kimi-specific choice."
+    "Open: whether the auto-mode reviewer rule (GPT-6 Luna when Codex is active, else an economical available model) needs a Kimi-specific choice.",
+    "Maintainer (verbatim): \"for the pi integration we will need kimi k3.1 specific instructions following its official instruction guide\".",
+    "Sessions and specialists that run on Kimi K3.1 through Kimi for Coding (global) load the Kimi K3.1 instruction set from Intent 0.3.0 pi 3/10, not the Claude 5.5 set."
   ],
-  "revision": 1,
+  "revision": 2,
   "state": "Open",
   "createdAt": "2026-11-07T16:43:52.730Z"
 }
