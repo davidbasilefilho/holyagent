@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-non-blocking-review-findings",
   "objective": "Repair the non-blocking review findings on the host-neutral CLI commit ee51233.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-cli (branch release/0.3.0/refactor/host-neutral-cli, node_modules installed). Gates: bunx --no-install mise run <task>.",
     "Fix: (1) program.ts ~101/118/134: an invalid HOLYAGENT_HOST makes --help fail; let help paths fall back to the Claude words like failed() does (commands that load config may still refuse the bad value). (2) vcs/message.ts PI_SESSION_LINK uses \\S* and swallows a closing ')' (repro: cleanMessage(\"fix\\n\\nSee [session](https://pi.dev/session/#abc) for details\") returns \"See [session]( for details\"); also fix the same flaw in the existing claude.ai session-link pattern; add tests. (3) vcs/message.ts PI_GENERATED_FOOTER can backtrack quadratically on 'generated with pi(' followed by many ')' and a letter; use a bounded character class such as [^\\s)]* and add a test with a long crafted line that completes quickly. (4) PI_NAME strips 'Co-authored-by: Pi <any address>'; require the pi.dev address (or pi's noreply form) so a person named Pi is kept; add tests. (5) domain/host.ts:50,62 hard-codes 'workflow:' and 'pi-workflow:'; reuse WORKFLOW_AGENT_PREFIX and PI_WORKFLOW_AGENT_PREFIX from directive.ts. (6) assignment.ts:306: assignment record now loads the whole config, so a bad HOLYAGENT_REUSE_TTL_MINUTES or HOLYAGENT_WORKFLOWS breaks recording; read only the host there (agentHostOf). (7) overview.ts:178 reconcile calls agentHostOf(env) itself; read host from the loaded config where one is loaded, or keep agentHostOf consistently (pick one and say why). (8) assignment.ts:116: under pi, record and reports help still say a hook records agents and describe Claude's journal; give the pi host its own wording (the pi launcher records nothing by hook; the launcher glue or the root records it; reports reads Claude workflow journals only for now)."
@@ -55,7 +55,41 @@
     "agentId": "workflow:wf_35b5d5c2-5c8/assignment-0mw6vb9wy-v7s9",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-07T20:40:50.657Z"
+    "startedAt": "2026-11-07T20:40:50.657Z",
+    "finishedAt": "2026-11-07T20:46:21.625Z"
+  },
+  "result": "Bundle churn comes from module reordering (host.ts now imports directive.ts); the generated output is deterministic from `mise run build`.\n\nresult: All eight findings are fixed, and `bunx --no-install mise run verify` passes. The Claude output change is limited to help on a bad `HOLYAGENT_HOST`.\n\nchanged:\n- /home/user/holyagent-0.3.0-cli/packages/runtime/src/cli/program.ts\n- /home/user/holyagent-0.3.0-cli/packages/runtime/src/cli/assignment.ts\n- /home/user/holyagent-0.3.0-cli/packages/runtime/src/cli/overview.ts\n- /home/user/holyagent-0.3.0-cli/packages/runtime/src/domain/host.ts\n- /home/user/holyagent-0.3.0-cli/packages/runtime/src/vcs/message.ts\n- /home/user/holyagent-0.3.0-cli/packages/runtime/tests/host.test.ts\n- /home/user/holyagent-0.3.0-cli/packages/runtime/tests/vcs-message.test.ts\n- /home/user/holyagent-0.3.0-cli/packages/integrations/claude/dist/scripts/holyagent.js (regenerated)\n\nFixes by finding:\n1. A new `hostForText` helper in `program.ts` is used by the three help paths and by `failed()`. Help under a bad host now prints Claude's text with exit 0. Commands that load the config still refuse the bad value.\n2. Both the pi and the claude.ai session-link patterns now stop at `)` (`[^\\s)]*`). The repro returns `See [session]() for details`.\n3. The pi footer pattern uses `\\([^\\s)]*\\)`. A test with 50,000 `)` characters completes within the 1 second assertion.\n4. The bare `Pi` name rule is gone, so only a `pi.dev` address strips `Pi`. `Pi Coding Agent` still strips under any address, because it is not a person's name.\n5. `host.ts` now uses `WORKFLOW_AGENT_PREFIX` and `PI_WORKFLOW_AGENT_PREFIX`. The `directive.ts` import of `host.ts` is type-only, so there is no runtime cycle.\n6. `assignment record` calls `agentHostOf(env)` only. A test shows `plan` still exits 2 on a bad TTL or workflows value, while `record` and `reconcile` work.\n7. I kept `agentHostOf`, because `reconcile` needs only the host. Loading the whole config would let a bad TTL break it, which is the same flaw as finding 6. I added a comment.\n8. `HostWords` gains `recordNote` and `reportsNote`. Pi's `record` help says the launcher records nothing by hook. Pi's `reports` help adds \"reads Claude workflow journals only for now\". Claude's strings are unchanged.\n\nchecks:\n- `bunx --no-install mise run fmt` and `bunx --no-install mise run build` -> both ran; the build regenerated `holyagent.js`.\n- `bunx --no-install mise run verify` -> exit 0. Type-check 146 files clean, lint 147 files clean, format 281 files clean, tests 1632 pass and 0 fail.\n- I did not run the new tests against the unfixed code to confirm they fail there.\n\nblockers: none\nquestions: none\nnotes:\n- The `holyagent.js` diff is large (about 4,500 lines) because `host.ts` now imports `directive.ts` and the bundler reordered modules. The content is otherwise the same.\n- After the fix, a link inside `[text](url)` leaves `[text]()`.\n- The pi wording in finding 8 is mine, since no pi docs were available. The root should check it.\n- The diff is saved at /home/user/holyagent-notes/pr2-repair.diff.\n\nevidence:\nEach of the eight findings is fixed or, for 7, resolved with a stated choice, each with a test where behavior changes: the tests are in `tests/host.test.ts` (help under a bad host, record and reconcile under a bad TTL, pi wording) and `tests/vcs-message.test.ts` (Markdown-link, crafted-line speed, and Pi co-author cases). Finding 7 is a comment only, with no behavior change.\nClaude unchanged: existing help and output tests pass unchanged; the Claude `record` help text and the existing Claude `reports` help text are unchanged, and a new test checks the Claude record text.\nGates: `bunx --no-install mise run verify` -> exit 0, 1632 pass and 0 fail.\nchanged-paths: listed under `changed:` above.\nchecks-run: listed under `checks:` above.\ndiff-file: /home/user/holyagent-notes/pr2-repair.diff\n",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "verify exit 0 (1632 pass); each finding fixed with a test, 7 resolved with a stated reason.",
+    "criteria": [
+      {
+        "criterion": "Each of the eight findings is fixed or, for 7, resolved with a stated choice, each with a test where behavior changes",
+        "support": "the tests are in `tests/host.test.ts` (help under a bad host, record and reconcile under a bad TTL, pi wording) and `tests/vcs-message.test.ts` (Markdown-link, crafted-line speed, and Pi co-author cases). Finding 7 is a comment only, with no behavior change."
+      },
+      {
+        "criterion": "Claude unchanged: Claude help and outputs are byte-identical for valid settings",
+        "support": "existing help and output tests pass unchanged; the Claude `record` help text and the existing Claude `reports` help text are unchanged, and a new test checks the Claude record text."
+      },
+      {
+        "criterion": "Gates: bunx --no-install mise run verify exits 0",
+        "support": "`bunx --no-install mise run verify` -> exit 0, 1632 pass and 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "listed under `changed:` above."
+      },
+      {
+        "label": "checks-run",
+        "support": "listed under `checks:` above."
+      },
+      {
+        "label": "diff-file",
+        "support": "/home/user/holyagent-notes/pr2-repair.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-07T20:40:36.082Z"
 }
