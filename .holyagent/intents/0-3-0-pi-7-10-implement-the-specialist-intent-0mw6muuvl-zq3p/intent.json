@@ -4,6 +4,7 @@
   "objective": "0.3.0 pi 7/10: Implement the specialist launcher and workflow tool for Pi, so the root dispatches Assignments to Pi child processes and receives their completion without blocking.",
   "requirements": [
     "Maintainer (verbatim): \"please add intents for the next 0.3.0 release where I will implement the pi extension integration\"; the maintainer implements 0.3.0, so these Intents record the work and carry no Assignments until the maintainer starts it.",
+    "Maintainer, 2026-11-07: implement 0.3.0 now, every part except the dropped auto-mode gate (pi 8/10); test with unit tests and recorded or synthesized fixtures only, no live Kimi runs; merge each PR once it is reviewed and green.",
     "Maintainer (verbatim): \"in the docs/pi/ it's supposed to use already existent extensions for required functionality\" and \"the first provider to implement will be kimi for coding global\".",
     "Release model: work lands on release/0.3.0/integration cut from main, as one release/0.3.0/<type>/<change> branch and one PR per change; the first PR of the release carries the version bump made with mise run bump:minor.",
     "Done means mise run verify passes with the generated output in sync (mise run build) and CI green on every required check, including the windows job.",
@@ -21,7 +22,7 @@
     "Decided (maintainer): specialists and workflows run through @tintinweb/pi-subagents; its SubagentWorkflow tool runs Claude-style workflow scripts in the background, so the root stays free and is woken as each specialist finishes.",
     "Decided: no extra report tool; a specialist's final message is its report."
   ],
-  "revision": 5,
+  "revision": 6,
   "state": "Open",
   "createdAt": "2026-11-07T16:43:53.169Z"
 }
