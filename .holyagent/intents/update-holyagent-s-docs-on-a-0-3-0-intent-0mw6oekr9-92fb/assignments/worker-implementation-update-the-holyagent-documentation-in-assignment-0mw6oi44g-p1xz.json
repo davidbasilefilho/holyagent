@@ -1,0 +1,79 @@
+{
+  "id": "assignment-0mw6oi44g-p1xz",
+  "intentId": "intent-0mw6oekr9-92fb",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "update-the-holyagent-documentation-in",
+  "objective": "Update the HolyAgent documentation in /home/user/holyagent-docs-pi-plan so docs/pi/ and the docs that point to it state the decided plan for the 0.3.0 pi integration, as a plan the maintainer will implement, with every open question replaced by its decision.",
+  "state": "Ready",
+  "scope": [
+    "Work only in /home/user/holyagent-docs-pi-plan (branch release/0.3.0/docs/pi-integration-plan). Read the existing docs/pi/*.md (README, approval, auto-mode, caching-and-subagents, claude-parity, configuration, extensions, installation, orchestration, providers) and any docs/ or README.md lines that mention pi.",
+    "Sources, in order of authority: /home/user/holyagent-work/pi-decisions.md (the maintainer's decisions, with verbatim quotes); /home/user/holyagent-work/pi-intents-final.jsonl (the ten 0.3.0 Intents with their requirements; the auto-mode Intent was closed because auto-mode was dropped); the sourced research in /home/user/holyagent-work/research/*.md (pi 1.5.0, Kimi models and hosts, the Kimi extension pi-provider-kimi-code, rpiv versus howaboua, codemode and reasoning effort, Billion Context).",
+    "Decisions the docs must carry (details and quotes in pi-decisions.md): config extends .holyagent/config.json with a pi section and a claude section and common settings outside both; distribution by git tag (pi install git:github.com/davidbasilefilho/holyagent#holyagent-<version>); built JS from bun build; CI on recorded fixtures inside the existing CI jobs; no auto-mode, full access is the default; workflows through @tintinweb/pi-subagents (replacing nicobailon's pi-subagents); pi-web-kit for web, disabled when the provider extension offers web tools (Kimi's moonshot_search and moonshot_fetch) and kept as fallback; @aliou/pi-processes for monitoring; @juicesharp/rpiv-todo and @juicesharp/rpiv-ask-user-question; startup is pi install then pi; pi pinned at 1.5.0 and moved by deps:update, which re-records the fixtures; doctor only checks, and the Windows installer's Node minimum rises from 22.13 to 22.19; K3.1-specific instructions following Moonshot's prompt best-practice, K3.1 Pro quickstart and agent-setup guides with a short per-role prompt; the accepted technical defaults (domain functions called directly, commit cleaner strips pi attribution, children run with PI_SKIP_VERSION_CHECK=1 and PI_TELEMETRY=0, no report tool); setup sets bun as pi's npmCommand; codemode set to only for every agent with PI_CODEMODE_MAX_WORKERS=4; Billion Context (billion-context package, pinned) in the pi integration only, its acp_delegate/subagents off, compressing root and specialists (delegate.forceEnable); cache target of a cached-input share of 95% or more, aiming at 98% or more, and what keeps the prefix stable (Kimi caches exact prefixes; changing model or effort invalidates it); the Kimi for Coding global provider first, built-in kimi-coding plus pi-provider-kimi-code with KIMI_CODE_REGION=global (api.kimi.ai/coding/v1), OAuth login with KIMI_API_KEY fallback; routing: root k3.1-pro at high (max configurable, to be measured later), specialists on kimi-for-coding (K2.8 Preview) at max for implementation, debugging, integration and the code, security, testing and artifact reviewers, at high for mechanical, validation, operations, lookups, maps, audit, research and trace, never low; Worker.visual on k3.1-pro at low and Reviewer.visual on k3.1-pro at high.",
+    "Statements in the current docs that these decisions overturn must change: open-question lists become decisions, score-based or connected-provider routing text is replaced by the decided Kimi routing (keep provider-agnostic structure only where the Intents keep it), auto-mode.md says auto-mode was dropped for 0.3.0 and full access is the default, and nicobailon's pi-subagents is replaced. The docs say to reuse existing pi extensions for required functionality rather than build it."
+  ],
+  "constraints": [
+    "Docs only: change files under docs/ and, only for a link or a one-line pointer, README.md. Change no code, tests, config, package.json or generated files; another worker owns package.json, bun.lock and packages/ in this tree and may be bumping the version as you work.",
+    "Describe everything as the plan for 0.3.0, not as shipped behavior (for example 'will', 'is planned', or a clear 'Status: planned for 0.3.0' line per page), because the maintainer implements 0.3.0 later and the docs must not claim features that do not exist yet.",
+    "State only facts that the sources above support; keep source links that the research reports give for third-party facts (package names, hosts, model names, limits). Mark anything the sources leave unsettled as 'to be measured' or similar instead of inventing a value.",
+    "Keep README.md's six sections exactly as they are (# HolyAgent, ## How do I install it?, ## Why HolyAgent?, ## Development, ## Special thanks, ## License); detail belongs in docs/. Do not change .claude/CLAUDE.md or AGENTS.md.",
+    "Follow the existing docs' style (plain English, short sentences, relative links) and keep every relative link valid; if you add a page, link it from docs/pi/README.md and docs/README.md where pages are indexed.",
+    "Make no git writes (no add, commit, checkout, stash); the root commits. Write the diff of your paths to /home/user/holyagent-work/docs-030.diff: `git -C /home/user/holyagent-docs-pi-plan diff -- docs README.md` for changed files, then append `git diff --no-index /dev/null <file>` for each new file. List that path as diff-file evidence.",
+    "Run `bunx --no-install mise run fmt` (or the repo's format task named in mise.toml) on your files if one exists, then `bunx --no-install mise run verify` in the worktree and report its exit code.",
+    "Report in under 400 words; put long logs in a file under /home/user/holyagent-work/ and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Decisions recorded: every decision listed in scope appears in docs/pi with its decided value",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Overturned text replaced: no docs page still presents a decided point as open, keeps score-based or connected-provider routing as the 0.3.0 plan, presents auto-mode as planned, or names nicobailon's pi-subagents as the workflow runner",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Plan not shipped: the pages state the pi integration as the 0.3.0 plan, not current behavior",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Sourced facts: third-party facts match the research reports and keep their source links; nothing is invented",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Docs only: the diff touches only docs/ and at most a link line in README.md; README keeps its six sections; .claude/CLAUDE.md and AGENTS.md unchanged",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Links valid: every relative link in changed pages resolves to an existing file or heading",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Verify passes: mise run verify exits 0 in the worktree",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Style: pages follow the existing docs' voice and structure",
+      "blocking": false,
+      "dimension": "style"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "docs",
+    "README.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-07T17:29:57.856Z"
+}
