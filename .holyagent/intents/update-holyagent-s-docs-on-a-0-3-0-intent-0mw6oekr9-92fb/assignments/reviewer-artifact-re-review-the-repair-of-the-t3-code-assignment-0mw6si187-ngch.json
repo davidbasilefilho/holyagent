@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mw6si187-ngch",
+  "intentId": "intent-0mw6oekr9-92fb",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.artifact",
+  "slug": "re-review-the-repair-of-the-t3-code",
+  "objective": "Re-review the repair of the T3 Code, install-scope and Cowork docs on release/0.3.0/docs/t3-and-install-scopes and confirm it closes the earlier notes and the two resolved Intent conflicts without new errors.",
+  "state": "Running",
+  "scope": [
+    "Repair diff (uncommitted, on top of 34f3e80): /home/user/holyagent-work/docs-t3b-repair.diff; files in /home/user/holyagent-docs-t3/docs/.",
+    "Earlier review: /home/user/holyagent-work/review-t3b-r1.md (two non-blocking notes: configuration.md --approve line; optional Cowork sentence).",
+    "Resolved conflicts to check: the T3 Code Intent (revision 3, last-but-one line of /home/user/holyagent-work/pi-intents-final.jsonl) keeps html_render, html_preview, preview_*, t3_preview_* and device_* and deactivates every other mcp__t3-code__ tool; Cua Driver is the copy @amaster.ai/pi-computer-use bundles, with no separate install, and setup only handles the macOS permissions. Research: /home/user/holyagent-work/research/assignment-0mw6rlor5-3o9f.md and assignment-0mw6rgzw5-cgu7.md."
+  ],
+  "constraints": [
+    "Judge only the repair: say for each item closed or open with the quoted current text, then report any new blocking error (a decision stated wrongly, plan stated as shipped, unsupported fact, broken link, change outside docs/). Wording preferences are non-blocking.",
+    "Report in under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "Items closed: both conflicts and both notes are closed",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No new errors: the repair adds no blocking error",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw6si119-34df"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-07T19:21:52.567Z"
+  },
+  "createdAt": "2026-11-07T19:21:52.567Z"
+}
