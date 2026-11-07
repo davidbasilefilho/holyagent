@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "review-commit-85bd5ba-root-instruction",
   "objective": "Review commit 85bd5ba (root instruction text) which makes cutting and pushing a missing convention-named base a no-approval default, for correctness, consistency with the rest of the root rules and clarity to a model.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "The diff is at /home/user/holyagent-notes/pr1.diff (the commit on top of release/0.3.0/integration in worktree /home/user/holyagent-0.3.0). Read the changed files in full in that worktree for context: packages/runtime/src/instructions/claude-5.5/root/identity.md, root/stack-plan.md, requirements.md, and skim the other root sections (claude-5.5/root/*.md) for statements that now contradict the change.",
     "Rules for model-facing text: /root/.claude/plugins/synced/03eb801d-6ff6-4373-b5b1-f94edf359a3e_0f3e6ee9-af2e-4c2c-8d3c-9be25ca27713/holyagent/skills/instruction-writing/SKILL.md."
@@ -44,7 +44,33 @@
     "agentId": "workflow:wf_de9bec9b-f7a/assignment-0mw6uady7-elb8",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-07T20:11:57.664Z"
+    "startedAt": "2026-11-07T20:11:57.664Z",
+    "finishedAt": "2026-11-07T20:23:49.857Z"
+  },
+  "result": "result: Intent met and no hard contradiction found. Two non-blocking clarity and consistency issues.\n\n**Findings (all non-blocking)**\n\n1. `claude-5.5/root/identity.md:9`: \"Creating a missing base is no such push.\" This is broader than the intended behavior. The sentence before it defines the base as \"the conventions or the user name\", and the new sentence has no \"convention-named\" or \"remote lacks\" qualifier. The other four statements of the policy do have that qualifier: stack-plan.md:8, R-OUTWARD, R-GIT and R-BRANCH.\n   - A model reading only the identity bullet could treat any absent base, such as a user-named one, as pushable without asking.\n   - \"Creating\" does not say the push is included, and it does not say the pushed ref carries only the start the conventions give.\n   - Suggested wording: \"Cutting and pushing a base the conventions name that the remote lacks is no such push; pushing commits onto an existing base is.\"\n\n2. `claude-5.5/root/stack-plan.md:8`: \"Later commits pushed onto an existing base still need the user's approval.\" The contrast between creating and pushing onto an existing base is correct and exists in stack-plan.md and R-BRANCH. It is missing from the identity bullet (point 1). \"Later\" is also loose, because a model could add commits to the new base in the same step. Say that the created base carries only the start the conventions give.\n\n3. The policy is stated in five places: identity.md:9, stack-plan.md:8, R-OUTWARD, R-GIT and R-BRANCH. Two of them restate the rationale that `shared/precedence.md:3` and R-PRECEDENCE already own. These are the \"mergeability … outranks HolyAgent's defaults\" clause in stack-plan.md:8 and the \"mergeability … outranks HolyAgent defaults\" clause in R-BRANCH.\n   - The clause in R-BRANCH uses \"HolyAgent defaults\" without the possessive, so it already differs from the stack-plan wording.\n   - Dropping the rationale from both and keeping the rule would follow the \"one owner, state once\" bar.\n\n**Checked and consistent**\n- The other approvals stay: force-push, pushing onto an existing base, default or protected branch, merging, publishing and destructive steps (identity.md:9 and :14, R-OUTWARD, R-GIT).\n- The \"unless the request names it\" exemption was removed, and R-NAMED does not conflict with that.\n- `asking.md:13` and the `user-busy` skill park only actions the rules reserve for approval. Base creation is no longer one, so an absent user does not block it.\n- `shared/precedence.md:3` lists \"a protected branch\" as a rule a convention does not waive. Convention-named integration bases are often covered by branch protection. The identity.md exception (\"no such push\") and the R-OUTWARD exception cover this, so it is not a contradiction, but the interplay is implicit.\n- `src/agents.ts:344` maps R-GIT to the phrase \"Never force-push, and never push to the base, default or a protected branch\". That phrase is still present in identity.md.\n- No other root or requirement text found still demands approval for creating the base. I searched the claude-5.5 instruction tree and `requirements.md`.\n- The generated `dist` copies and `plugin.test.ts` match the source edits.\n- I ran no tests, because I had no shell.\n\nevidence:\n- Intent met: stack-plan.md:8 (\"cut it from the start the convention gives and push it as part of this plan without asking\"), R-BRANCH, R-OUTWARD and R-GIT all grant the default. The other approvals are intact in identity.md:9 and :14 and in R-OUTWARD.\n- No contradictions: a search of `claude-5.5` and `requirements.md` for push, approval, base, integration and protected found no remaining demand for approval to create the base. `user-busy` and `asking.md:13` are unaffected. `precedence.md:3` is implicitly handled by the explicit exceptions.\n- Clarity: the creating versus existing-base contrast is explicit in stack-plan.md:8 and R-BRANCH. In identity.md:9 it is only implied and the sentence is unscoped (findings 1 and 2), so I count it met with non-blocking gaps.\n- findings: items 1 to 3 above, all non-blocking.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Three non-blocking findings with file:line; a repair round follows.",
+    "criteria": [
+      {
+        "criterion": "Intent met: the text makes creating a missing convention-named base a no-approval default and keeps every other approval",
+        "support": "stack-plan.md:8 (\"cut it from the start the convention gives and push it as part of this plan without asking\"), R-BRANCH, R-OUTWARD and R-GIT all grant the default. The other approvals are intact in identity.md:9 and :14 and in R-OUTWARD."
+      },
+      {
+        "criterion": "No contradictions: no other root or requirement text still demands approval for creating that base, or now loosens another approval",
+        "support": "a search of `claude-5.5` and `requirements.md` for push, approval, base, integration and protected found no remaining demand for approval to create the base. `user-busy` and `asking.md:13` are unaffected. `precedence.md:3` is implicitly handled by the explicit exceptions."
+      },
+      {
+        "criterion": "Clarity: a model reading the text cannot mistake pushing commits onto an existing base for creating a missing one",
+        "support": "the creating versus existing-base contrast is explicit in stack-plan.md:8 and R-BRANCH. In identity.md:9 it is only implied and the sentence is unscoped (findings 1 and 2), so I count it met with non-blocking gaps."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "items 1 to 3 above, all non-blocking."
+      }
+    ]
   },
   "createdAt": "2026-11-07T20:11:55.039Z"
 }
