@@ -1,0 +1,78 @@
+{
+  "id": "assignment-0mw6uaeb7-w8rw",
+  "intentId": "intent-0mw6muu20-ygf9",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-holyagent-runtime-cli-host",
+  "objective": "Make the holyagent runtime CLI host-neutral wherever it assumes Claude Code, so a pi session can use Intents, Assignments, workflows and hook commands, without changing the generated Claude plugin's behavior.",
+  "state": "Ready",
+  "scope": [
+    "Work only in the git worktree /home/user/holyagent-0.3.0-cli (branch release/0.3.0/refactor/host-neutral-cli). First run `bun install --frozen-lockfile` there. Run gates as `bunx --no-install mise run <task>` from that worktree.",
+    "Context: a repository map with paths and line numbers is at /home/user/holyagent-notes/repo-map.md (area 2 lists the Claude assumptions: cli/config.ts L57-67 workflow availability and CLAUDE_CODE_DISABLE_WORKFLOWS; domain/directive.ts workflow: prefix; cli/assignment.ts namespace and help naming Agent/Workflow tools; cli/workflow-check.ts; cli/hook.ts; vcs/message.ts attribution regexes and DEFAULT_PHRASES). The decided pi design is in docs/pi/*.md in the worktree (orchestration.md, claude-parity.md, caching-and-subagents.md especially). The pi launcher package is @tintinweb/pi-subagents; its README and probe notes are at /home/user/holyagent-notes/pi-probe/readmes/pi-subagents.md and /home/user/holyagent-notes/pi-deps.md, and its installed source at /home/user/holyagent-notes/pi-probe/node_modules/@tintinweb/pi-subagents (read it to learn the agent ids it assigns and the tool names Agent and SubagentWorkflow).",
+    "Requirements: (1) a host-neutral workflow-availability switch: keep the Claude detection, and add a host setting the pi extension can set (for example an environment variable HOLYAGENT_HOST=pi plus HOLYAGENT_WORKFLOWS=0|1, or a documented equivalent); `plan` prints the direct-subagent fallback when workflows are unavailable. (2) Agent ids and namespaces: `assignment record` and the directive logic accept the ids pi-subagents assigns to launched agents and its workflow runs (decide the recorded form, e.g. `pi:<id>` and `pi-workflow:<run>/<label>`, document it in JSDoc and docs/pi/orchestration.md if that page names a form). (3) Help text: under the pi host, help and dispatch output name pi-subagents' tools (Agent, SubagentWorkflow) instead of Claude's Agent/Workflow tool wording; under Claude, output is byte-identical to today. (4) A host-neutral hook entry point is not needed: pi handlers will call domain functions directly, so expose (export with JSDoc) the domain functions behind `hook session-start` context building (status, reconcile, core rules span) for import by the pi extension. (5) The commit-message cleaner (vcs/message.ts) also strips pi's attribution lines; find pi's actual attribution text (search the installed @earendil-works/pi-coding-agent package under /home/user/holyagent-notes/pi-probe/node_modules for Co-Authored-By or 'Generated with' strings) and add tests."
+  ],
+  "constraints": [
+    "Repository rules: Effect for effects and errors with tagged errors, no try/catch, new Promise or async functions in runtime source; Effect Schema at data boundaries with onExcessProperty error; Bun APIs first; JSDoc on every export; tests for every changed behavior.",
+    "The Claude plugin output must stay unchanged except for the bundled CLI script (packages/integrations/claude/dist/scripts/holyagent.js), which `bunx --no-install mise run build` regenerates; the Claude sync test passes.",
+    "Do not run the pi binary or execute pi package code: running it was denied in this environment. Reading its source and docs is fine.",
+    "Make no git commits, checkouts or branch changes and no edits under .git/ or .holyagent/; report changed paths.",
+    "Write `git diff HEAD` (including new untracked files: use `git add -N` is a git write, so instead list new files and include them with `git diff --no-index /dev/null <file>`) to /home/user/holyagent-notes/pr2.diff as diff-file evidence.",
+    "Report in under 400 words; long logs go under /home/user/holyagent-notes/."
+  ],
+  "criteria": [
+    {
+      "text": "Workflow switch: a pi host setting makes workflows available or unavailable, and plan prints the direct-subagent fallback when unavailable, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Agent ids: assignment record and the directive logic accept pi-subagents agent and workflow ids, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Help text: under the pi host no output names Claude's Workflow tool; under Claude output is unchanged, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Exports: the session-start context builders are exported with JSDoc for direct import",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Attribution: the commit-message cleaner strips pi attribution lines, with tests citing where the text comes from",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Claude unchanged: the Claude plugin sync test passes and no Claude-facing output changes",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Gates: bunx --no-install mise run verify exits 0",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Repo standards: Effect, Schema, JSDoc and Bun rules hold in the new code",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src",
+    "packages/runtime/tests",
+    "packages/integrations/claude/dist/scripts",
+    "docs/pi/orchestration.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-07T20:11:55.507Z"
+}
