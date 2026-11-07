@@ -5,7 +5,7 @@
   "roleTask": "Librarian.research",
   "slug": "list-every-t3-code-setting-pingdotgg",
   "objective": "List every T3 Code setting (pingdotgg/t3code) with its key, scope, default and effect, and mark which ones matter for running HolyAgent on pi inside T3, so the maintainer can choose which ones holyagent setup writes.",
-  "state": "Running",
+  "state": "Cancelled",
   "scope": [
     "Sources: the T3 Code repository github.com/pingdotgg/t3code (docs/user/*.md such as project-settings, providers-pi, devices, html-renders, faq; the settings schema and defaults in the source, e.g. packages/contracts or apps/server settings schema, useSettings.ts, any settings.json schema), its releases and changelog, and the T3 docs site if one exists. Fetch with your web tools (for example the Exa fetch and search tools); use raw.githubusercontent.com or GitHub API URLs for source files.",
     "For each setting: the UI location (Settings > ...), the settings.json key path if the source shows it, scope (server global, per environment, per project override, per device), type and default, and one line on what it does. Group by area (providers/Pi, approval and permissions, worktrees, git and PRs, terminal, browser and preview, devices, MCP and orchestration tools, scheduled tasks, notifications, models and effort, context and compaction, appearance, keybindings, other).",
@@ -41,7 +41,9 @@
     "agentId": "a042aae19795bd475",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-07T20:45:25.937Z"
+    "startedAt": "2026-11-07T20:45:25.937Z",
+    "finishedAt": "2026-11-07T21:22:30.650Z"
   },
+  "result": "interrupted",
   "createdAt": "2026-11-07T20:45:25.937Z"
 }
