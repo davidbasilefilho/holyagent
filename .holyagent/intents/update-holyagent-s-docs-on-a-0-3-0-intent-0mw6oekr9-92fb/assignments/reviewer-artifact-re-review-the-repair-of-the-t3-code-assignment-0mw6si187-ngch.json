@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "re-review-the-repair-of-the-t3-code",
   "objective": "Re-review the repair of the T3 Code, install-scope and Cowork docs on release/0.3.0/docs/t3-and-install-scopes and confirm it closes the earlier notes and the two resolved Intent conflicts without new errors.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Repair diff (uncommitted, on top of 34f3e80): /home/user/holyagent-work/docs-t3b-repair.diff; files in /home/user/holyagent-docs-t3/docs/.",
     "Earlier review: /home/user/holyagent-work/review-t3b-r1.md (two non-blocking notes: configuration.md --approve line; optional Cowork sentence).",
@@ -39,7 +39,29 @@
     "agentId": "workflow:wf_f9fc8632-580/assignment-0mw6si187-ngch",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-07T19:21:52.567Z"
+    "startedAt": "2026-11-07T19:21:52.567Z",
+    "finishedAt": "2026-11-07T19:26:11.873Z"
+  },
+  "result": "result: Both conflicts and both notes are closed, and I found no new blocking errors. I had no shell, so I read the diff and the files in `/home/user/holyagent-docs-t3/docs/` and ran no gates.\n\n**Findings**\n1. **Conflict 1, T3 keep list: closed.** The repair keeps `html_render`, `html_preview`, `preview_*`, `t3_preview_*` and `device_*` and deactivates every other `mcp__t3-code__` tool. This matches the T3 Code Intent revision 3 (line 11 of `pi-intents-final.jsonl`).\n   - `t3-code.md:18`: \"Keep `html_render`, `html_preview`, `preview_*`, `t3_preview_*` and `device_*`. Deactivate every other `mcp__t3-code__` tool\".\n   - The keep list reads the same in the `t3-code.md` decision table (lines 80-81, mechanism line 87, devices section, to-verify list), `README.md:24`, `orchestration.md:20`, `claude-parity.md:67` and `claude-parity.md:120`, and `usage.md:263`.\n   - The old \"prefix rule would deactivate\" to-verify bullet is gone, and `caching-and-subagents.md` is updated to match.\n2. **Conflict 2, Cua Driver: closed.** The driver is the copy `@amaster.ai/pi-computer-use` bundles, with no separate install, and setup handles only the macOS permissions.\n   - `t3-code.md:120`: \"There is no driver to install, because the extension carries it. `holyagent setup` for Pi walks through the macOS permissions only\".\n   - `installation.md:49` and the pin line, `extensions.md:37`, `README.md:25` and `README.md:101`, and `t3-code.md:20` and `t3-code.md:125` agree.\n   - The \"which copy runs\" to-verify items are removed from `t3-code.md` and `claude-parity.md:177`. A search of `docs/` found no leftover \"install the driver\" or \"per user\" text for Cua.\n3. **Note 1, `--approve`: closed.** `configuration.md:123`: \"`--exclude-tools` and, when the parent session trusted the project, `--approve`\". It now matches line 116.\n4. **Note 2, Cowork sentence: closed.** `usage.md` claude.ai section ends with: \"Inference: ... the plugin's `agent: holyagent` is such a key, so in Cowork the `agent` setting does not apply and the root there rests on the session-start hook\". It is labelled as inference and matches the research (`assignment-0mw6rgzw5-cgu7.md`, lines 28 and 32).\n\n**New errors:** none.\n- The Cua decision text states 0.37.0 against 0.41.3 as what the research read, so it is not unsupported.\n- The `t3_preview_*` and `device_*` additions are sourced to the Intent and the existing research.\n- No plan is stated as shipped, and I saw no broken anchors.\n- The `t3-code.md` Browser section still counts \"twelve\" `preview_*` tools and now adds `t3_preview_list` and `t3_preview_close` separately. This is non-blocking.\n- The diff touches only `docs/` files.\n\nevidence:\nItems closed: `/home/user/holyagent-docs-t3/docs/pi/t3-code.md` lines 18, 20, 80-81, 87, 120, 125; `/home/user/holyagent-docs-t3/docs/pi/configuration.md:123`; the `/home/user/holyagent-docs-t3/docs/usage.md` Cowork sentence. These were checked against Intent revision 3 and research `3o9f` and `cgu7`.\nNo new errors: `/home/user/holyagent-work/docs-t3b-repair.diff` read in full; a repo-wide grep for stale Cua, device and prefix-rule text found none; the diff touches only `docs/` files.\nfindings: all four items closed; one non-blocking nit (the twelve-tool count wording in `t3-code.md`).\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "all four items closed with quoted text; no new errors; count nit is accurate",
+    "criteria": [
+      {
+        "criterion": "Items closed: both conflicts and both notes are closed",
+        "support": "`/home/user/holyagent-docs-t3/docs/pi/t3-code.md` lines 18, 20, 80-81, 87, 120, 125; `/home/user/holyagent-docs-t3/docs/pi/configuration.md:123`; the `/home/user/holyagent-docs-t3/docs/usage.md` Cowork sentence. These were checked against Intent revision 3 and research `3o9f` and `cgu7`."
+      },
+      {
+        "criterion": "No new errors: the repair adds no blocking error",
+        "support": "`/home/user/holyagent-work/docs-t3b-repair.diff` read in full; a repo-wide grep for stale Cua, device and prefix-rule text found none; the diff touches only `docs/` files."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "all four items closed; one non-blocking nit (the twelve-tool count wording in `t3-code.md`)."
+      }
+    ]
   },
   "createdAt": "2026-11-07T19:21:52.567Z"
 }
