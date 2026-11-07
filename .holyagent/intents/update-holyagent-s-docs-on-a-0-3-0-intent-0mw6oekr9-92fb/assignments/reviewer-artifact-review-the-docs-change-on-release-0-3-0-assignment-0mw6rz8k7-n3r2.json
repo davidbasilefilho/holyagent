@@ -1,0 +1,54 @@
+{
+  "id": "assignment-0mw6rz8k7-n3r2",
+  "intentId": "intent-0mw6oekr9-92fb",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-the-docs-change-on-release-0-3-0",
+  "objective": "Review the docs change on release/0.3.0/docs/t3-and-install-scopes that records T3 Code as the primary interface of HolyAgent on pi, local and global installs with a user-level config, and the maintainer-tested claude.ai chat and Cowork support.",
+  "state": "Running",
+  "scope": [
+    "The diff: /home/user/holyagent-work/docs-t3b.diff (uncommitted changes in /home/user/holyagent-docs-t3, including the new docs/pi/t3-code.md); read the current files where context matters.",
+    "Sources of truth: the last two lines of /home/user/holyagent-work/pi-intents-final.jsonl (T3 Code Intent \"0.3.0 pi 11/12\" and install-scope Intent \"0.3.0 12/12\"); the last lines of /home/user/holyagent-work/pi-decisions.md (T3, computer use, settings, user config, defaults, Cowork); research in /home/user/holyagent-work/research/ (assignment-0mw6r54ng-kg9r, -0mw6r9zxs-l85j, -0mw6rgzog-2rb3, -0mw6rlor5-3o9f, -0mw6rgzw5-cgu7)."
+  ],
+  "constraints": [
+    "A finding is blocking when a decision of either Intent is missing or stated wrongly, a touched page contradicts it (for example T3's delegate_task or custom() TUI presented as used, a non-Full-access mode supported for HolyAgent threads, Cua confirmations on, computer-use tools given to roles other than the two visual ones, or the old claim that HolyAgent does not work in chat/Cowork left in place), 0.3.0 behavior stated as shipped, a fact not supported by the research, a broken relative link, README losing one of its six sections, or a change outside docs/ and one README install line. Wording preferences are non-blocking.",
+    "For each finding give file, line, quoted text, what the source says (with its file) and the smallest fix.",
+    "Report in under 500 words."
+  ],
+  "criteria": [
+    {
+      "text": "Decisions recorded: every requirement of both Intents appears with its decided value",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Pages agree: no touched page contradicts the decisions",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Plan not shipped and sourced: planned behavior is marked planned and facts match the research",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Scope and links: only allowed paths change and relative links resolve",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw6rz8d6-0qb6"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-07T19:07:15.607Z"
+  },
+  "createdAt": "2026-11-07T19:07:15.607Z"
+}
