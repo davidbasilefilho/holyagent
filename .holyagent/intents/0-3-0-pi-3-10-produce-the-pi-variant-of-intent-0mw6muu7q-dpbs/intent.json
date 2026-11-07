@@ -20,9 +20,10 @@
     "The Pi instruction text has a Kimi K3.1 variant, a per-model set beside packages/runtime/src/instructions/claude-5.5 (for example kimi-k3.1/), written to Moonshot's official Kimi K3.1 prompting and instruction guide rather than adapted from the Claude 5.5 wording; each rule that departs from the Claude set cites the guide section it follows, the way the Claude set cites Anthropic's guidance.",
     "Decided (maintainer): the Kimi K3.1 instruction set follows Moonshot's prompt best-practice guide (https://platform.kimi.ai/docs/guide/prompt-best-practice), the K3.1 Pro quickstart (https://platform.kimi.ai/docs/guide/kimi-k3-1-pro-quickstart) and the agent-setup guide (https://platform.kimi.ai/docs/guide/use-kimi-k3-to-setup-agent), citing the section each rule follows; Moonshot has no K3.1-specific prompting guide.",
     "Decided (maintainer): it follows the agent guide's structure: a short per-role system prompt with role, workflow and quality boundaries, and the details in tool descriptions and on-demand skills.",
-    "K3.1 Pro request constraints from the quickstart: thinking is always on and set with reasoning_effort; temperature, top_p and n are fixed and omitted; the whole assistant message, reasoning_content and tool_calls included, is passed back unchanged."
+    "K3.1 Pro request constraints from the quickstart: thinking is always on and set with reasoning_effort; temperature, top_p and n are fixed and omitted; the whole assistant message, reasoning_content and tool_calls included, is passed back unchanged.",
+    "Decided (maintainer rule: \"whichever is more relevant ... it depends on how the model behaves\"; research assignment-0mw6qfair-ykt4): the kimi-for-coding (K2.8 Preview) specialists load the same Kimi instruction set, written to the K3/K3.1 guides plus Moonshot's K3 tool-calling best-practice guide, because K2.8 Preview behaves like K3 (reasoning_effort low/high/max, 1M context, described by Moonshot as close to K3); no K2.6/K2.7 guide applies. The text does not rely on tool_choice required, which K2.8 Preview does not support per a secondary source."
   ],
-  "revision": 3,
+  "revision": 4,
   "state": "Open",
   "createdAt": "2026-11-07T16:43:52.310Z"
 }
