@@ -1,0 +1,53 @@
+{
+  "id": "assignment-0mw6zi8w8-bi8h",
+  "intentId": "intent-0mw6ry92f-k0w1",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.security",
+  "slug": "assess-the-pr-3-repair-commit-a38b600",
+  "objective": "Assess the PR 3 repair commit a38b600 (range 2e1c021..a38b600, worktree /home/user/holyagent-0.3.0-config) for security regressions in the user/project config trust boundary, and confirm the earlier security notes are closed or settled.",
+  "state": "Running",
+  "scope": [
+    "The repair diff is in /home/user/holyagent-notes/pr3-repair.diff; source is readable under /home/user/holyagent-0.3.0-config.",
+    "Earlier security findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw6vbafl-giio.md."
+  ],
+  "constraints": [
+    "Binding maintainer decision: for security-relevant pi features (computer use, T3 device access, the web tools), a false in the user-level ~/.holyagent/config.json is final; a project's .holyagent/config.json can turn them off but never back on. Every other key keeps project-wins.",
+    "Both config files are decoded with Effect Schema and onExcessProperty error before merging; a malformed or hostile project config must fail closed, never widen access.",
+    "Read-only: no edits, no version-control writes.",
+    "Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "A project config cannot re-enable a security-relevant feature the user-level config turned off, on any merge path",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The repair introduces no new vulnerability (path handling of the home directory, environment use, error output leaking content)",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The earlier security notes are closed or settled by a sound stated choice",
+      "blocking": false,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "diff-file"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw6z5chk-1qfm",
+    "assignment-0mw6urc7l-7dsc"
+  ],
+  "followUpOf": "assignment-0mw6vbafl-giio",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-07T22:37:59.816Z"
+  },
+  "createdAt": "2026-11-07T22:37:59.816Z"
+}
