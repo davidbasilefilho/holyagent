@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "review-commit-ee51233-which-makes-the",
   "objective": "Review commit ee51233, which makes the holyagent runtime CLI host-neutral for pi (HOLYAGENT_HOST and HOLYAGENT_WORKFLOWS, pi agent-id forms, host-aware help, exported session-start builders, pi attribution stripping), against the merge-ready bar.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-cli, branch release/0.3.0/refactor/host-neutral-cli; the commit is HEAD on top of 85bd5ba. Diff file: /home/user/holyagent-notes/pr2.diff. The implementer's notes are in the commit message; docs/pi/orchestration.md ('The runtime under Pi') describes the forms.",
     "Requirements it must meet: a pi host setting toggles workflow availability and plan prints the direct-launch fallback; assignment record and directives accept the ids @tintinweb/pi-subagents assigns (source under /home/user/holyagent-notes/pi-probe/node_modules/@tintinweb/pi-subagents); help under pi names no Claude Workflow tool; Claude output unchanged; the commit-message cleaner strips pi attribution; repository rules (Effect and tagged errors, no try/catch, new Promise or async in runtime source, Effect Schema at boundaries with onExcessProperty error, Bun APIs, JSDoc on exports)."
@@ -42,7 +42,33 @@
     "agentId": "workflow:wf_abc599f6-259/assignment-0mw6uqowx-rq4j",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-07T20:24:36.881Z"
+    "startedAt": "2026-11-07T20:24:36.881Z",
+    "finishedAt": "2026-11-07T20:39:36.794Z"
+  },
+  "result": "result: Review by reading the diff and worktree source; the built-in `/security-review` failed (`git log origin/HEAD...` is an unknown revision here). I had no Bash, so I ran no tests, builds or help output. No blocking findings; I found no vulnerability the change introduced.\n\n**What the built-in covered:** nothing. It could not run against `origin/HEAD`, so this is the manual review only, over `/home/user/holyagent-notes/pr2.diff` and `/home/user/holyagent-0.3.0-cli`.\n\n**Findings (all non-blocking, none validated by running):**\n1. `packages/runtime/src/cli/assignment.ts:306`: `assignment record` now yields the whole config, not just the host. Under Claude, a bad `HOLYAGENT_REUSE_TTL_MINUTES` or `HOLYAGENT_WORKFLOWS` makes it fail with a usage error where it used to record. `agentHostOf(env)`, as `reconcile` does, avoids it.\n2. `packages/runtime/src/cli/program.ts:101`: help now fails on an invalid `HOLYAGENT_HOST` (for example `Pi`); `--help` used to always print.\n3. `packages/runtime/src/vcs/message.ts:1574`: `PI_GENERATED_FOOTER` can backtrack quadratically on `generated with pi(` followed by many `)` and then a letter. A crafted line of about 100k characters could hang the commit cleaner. Using `[^\\s)]*` instead of `\\S*` fixes it.\n4. `packages/runtime/src/vcs/message.ts:1578`: `PI_NAME` tests the name only, so `Co-authored-by: Pi <pi@example.org>` from a real person is dropped silently.\n5. `packages/runtime/src/cli/assignment.ts:116`: under pi, the record and reports help still say a hook records agents and describe Claude's journal. This is text only.\n\n**Checked and sound:**\n- **Behavior:**\n  - Host and `HOLYAGENT_WORKFLOWS` parse through Schema literals with a usage error for bad values.\n  - Pi defaults workflows to off, and `plan` prints the direct subagents (or the workflow with a fallback when `HOLYAGENT_WORKFLOWS=1`).\n  - Pi agent-id forms: `pi:` is checked with `\\S+`, and `pi-workflow:<run>/<id>` must name its own Assignment. pi-subagents ids are `randomUUID().slice(0,17)` for agents and `wf_<hex>` for runs, so both fit.\n  - Pi refuses bare ids and `workflow:` ids, and pi-workflow agents are never continued.\n  - Help drops the Claude hooks under pi and keeps `hook commit-msg`.\n  - Hints use the host's words, and an unreadable host falls back to Claude's.\n- **Regressions:** Claude words and defaults are the same strings as before, moved into `CLAUDE_WORDS`, and `resumeOf` and `dispatchPrompt` default to them. Apart from findings 1 and 2, I saw no Claude-host change.\n- **Repo standards:** the changed code has no try/catch, async or `new Promise`; every new export has JSDoc; decodes are Schema literals; no process spawning or paths are newly exposed.\n- **Trust boundaries:** new inputs are two environment variables and `--agent`. They reach only output text and records, never command execution or file paths. No secrets or new dependencies.\n\nevidence:\nfindings: five non-blocking findings above, with file and line; none block\nBehavior: all five requirements hold by reading `config.ts`, `assignment.ts` (`agentIdProblem`), `program.ts`, `plan.ts`, `host.ts` and `message.ts`; the added tests cover each (diff lines 1618-2180); I did not run them\nRegressions: Claude strings and defaults match the pre-change text; the only Claude-side differences are findings 1 and 2; no commands were run\nRepo standards: no try/catch, async or `new Promise` in the changed source; JSDoc on new exports; Schema decode for the env values; gates not run because I had no shell\n",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "No blocking findings; non-blocking ones go to a repair round.",
+    "criteria": [
+      {
+        "criterion": "Behavior: each requirement holds, or a finding shows where it does not",
+        "support": "all five requirements hold by reading `config.ts`, `assignment.ts` (`agentIdProblem`), `program.ts`, `plan.ts`, `host.ts` and `message.ts`; the added tests cover each (diff lines 1618-2180); I did not run them"
+      },
+      {
+        "criterion": "Regressions: Claude-host behavior and existing commands are unchanged",
+        "support": "Claude strings and defaults match the pre-change text; the only Claude-side differences are findings 1 and 2; no commands were run"
+      },
+      {
+        "criterion": "Repo standards: the repository's code rules hold in the changed code",
+        "support": "no try/catch, async or `new Promise` in the changed source; JSDoc on new exports; Schema decode for the env values; gates not run because I had no shell"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "five non-blocking findings above, with file and line; none block"
+      }
+    ]
   },
   "createdAt": "2026-11-07T20:24:35.746Z"
 }
