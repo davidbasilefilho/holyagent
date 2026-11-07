@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mw6viz77-7yhn",
+  "intentId": "intent-0mw6muu20-ygf9",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-repair-commit-on-release-0",
+  "objective": "Re-review the repair commit on release/0.3.0/refactor/host-neutral-cli against the earlier code and security findings, so the PR can close.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-cli; repair diff (generated bundle excluded): /home/user/holyagent-notes/pr2-repair.diff; the repair commit is HEAD on top of ee51233.",
+    "Earlier findings to check closed: help failing on an invalid HOLYAGENT_HOST; PI_SESSION_LINK (and the claude.ai link pattern) swallowing a closing parenthesis; PI_GENERATED_FOOTER quadratic backtracking on 'generated with pi(' plus many ')'; PI_NAME stripping any 'Co-authored-by: Pi' regardless of address; hard-coded 'workflow:'/'pi-workflow:' prefixes duplicated in host.ts; assignment record loading the whole config so a bad HOLYAGENT_REUSE_TTL_MINUTES breaks recording; reconcile reading the host itself (resolved by a stated choice); pi record and reports help still describing Claude hooks and journals."
+  ],
+  "constraints": [
+    "Judge the repair diff against those findings and any new issue it introduces. Read-only. Findings blocking or non-blocking with file:line and a reproduction or trace. Report in under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "Findings closed: each earlier finding is fixed or resolved with a sound stated choice",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No new issue: the repair introduces no regression or new vulnerability",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw6vb9wy-v7s9",
+    "assignment-0mw6uaeb7-w8rw"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-07T20:46:35.443Z"
+  },
+  "createdAt": "2026-11-07T20:46:35.443Z"
+}
