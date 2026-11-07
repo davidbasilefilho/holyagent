@@ -1,0 +1,14 @@
+{
+  "id": "intent-0mw6tzpkr-i7u1",
+  "slug": "make-cutting-and-pushing-an-integration",
+  "objective": "Make cutting and pushing an integration branch that the target repository conventions call for a HolyAgent default that needs no user approval, because mergeability in the target repository outranks HolyAgent defaults.",
+  "requirements": [
+    "Maintainer (verbatim): \"this integration branch thing should not require approval, it should a holyagent default. always remember that mergeability > holyagent defaults\".",
+    "When the repository conventions name an integration branch (or another base the work must target) that the remote lacks, the root cuts it from the start the conventions give and pushes it without asking; pushing an existing protected branch, force-pushing and merging keep their approval rules.",
+    "The change lands in the root instruction sources (packages/runtime/src/instructions) and every generated copy (mise run build), with tests updated where they pin the old text; mise run verify passes.",
+    "Ships in 0.3.0 as its own PR into release/0.3.0/integration."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-07T20:03:36.891Z"
+}
