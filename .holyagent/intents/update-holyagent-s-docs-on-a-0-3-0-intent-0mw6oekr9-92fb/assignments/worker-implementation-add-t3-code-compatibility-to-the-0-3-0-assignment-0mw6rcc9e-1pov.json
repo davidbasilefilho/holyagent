@@ -1,0 +1,65 @@
+{
+  "id": "assignment-0mw6rcc9e-1pov",
+  "intentId": "intent-0mw6oekr9-92fb",
+  "intentRevision": 2,
+  "roleTask": "Worker.implementation",
+  "slug": "add-t3-code-compatibility-to-the-0-3-0",
+  "objective": "Add T3 Code compatibility to the 0.3.0 pi plan docs in /home/user/holyagent-docs-t3 (branch release/0.3.0/docs/t3-code, cut from release/0.3.0/integration after the pi plan docs merged), as a plan the maintainer will implement.",
+  "state": "Running",
+  "scope": [
+    "Sources of truth: the new T3 Code Intent, the last line of /home/user/holyagent-work/pi-intents-final.jsonl (objective \"0.3.0 pi 11/11\"); the T3 lines at the end of /home/user/holyagent-work/pi-decisions.md; research /home/user/holyagent-work/research/assignment-0mw6r54ng-kg9r.md (how T3 Code runs pi) and /home/user/holyagent-work/research/assignment-0mw6r9zxs-l85j.md (which T3 tools to keep or deactivate and how).",
+    "Add docs/pi/t3-code.md: how T3 Code runs pi (built-in provider, `pi --mode rpc`, pi 0.80.5 or newer so the 1.5.0 pin satisfies it, enabled in T3 Settings, the user's own pi install and extensions), and the decided plan: rpc-mode behavior and no launch args for mode or session; only T3's dialogs and status (select, confirm, input, editor, notify, setStatus), never custom() TUI, with a HolyAgent adapter for rpiv tools where needed; Full access required in T3 with a setup-check warning in other modes; specialists report through @tintinweb/pi-subagents' own new-turn trigger, verified under T3 with a recorded fixture; keep html_render, html_preview and preview_*, deactivate the other mcp__t3-code__ tools with pi.setActiveTools at session_start (reapplied on before_agent_start and session_tree, tool_call block as backstop) and why (they duplicate HolyAgent's launcher; a fixed tool set keeps the cached prefix); the to-verify list; tests on recorded rpc fixtures in the existing CI jobs. Keep the research's source links and label inference.",
+    "Update the pages that this touches so they agree: docs/pi/README.md (decision table row and page list; the count of open 0.3.0 Intents rises from nine to ten with the T3 Code Intent), docs/README.md (index), docs/pi/extensions.md (rpiv tools under T3), docs/pi/approval.md and auto-mode.md where approval modes are discussed (T3's modes and the Full access requirement), docs/pi/orchestration.md (completion notices under T3; T3's delegate_task is not used), docs/pi/installation.md (using HolyAgent from T3 Code), docs/pi/caching-and-subagents.md (tool set fixed at session start), docs/pi/claude-parity.md (T3 tools row and the still-open list). Existing T3 Code mentions elsewhere in docs/ (usage.md, decisions.md, requirements.md) describe the Claude plugin; change them only where they would contradict the pi plan."
+  ],
+  "constraints": [
+    "Docs only: change files under docs/ only; no code, tests, package.json or generated files; leave README.md, .claude/CLAUDE.md and AGENTS.md alone.",
+    "Describe everything as the plan for 0.3.0 with a Status line on the new page, matching the existing pi pages' voice (neutral, no first person, relative links, 'Inference:' labels).",
+    "State only facts the sources support; mark unknowns as to be verified.",
+    "Make no git writes (no add, commit, checkout, stash); the root commits. Write the diff to /home/user/holyagent-work/docs-t3.diff: `git -C /home/user/holyagent-docs-t3 diff -- docs` for changed files, then append `git -C /home/user/holyagent-docs-t3 diff --no-index /dev/null docs/pi/t3-code.md` (it exits 1 when files differ; that is expected). List it as diff-file evidence.",
+    "Run the format task on your files, then `bunx --no-install mise run verify` in the worktree, and a relative-link and anchor check over docs/**/*.md and README.md.",
+    "Report in under 400 words with one evidence line per criterion."
+  ],
+  "criteria": [
+    {
+      "text": "T3 plan recorded: docs/pi/t3-code.md states every decision of the T3 Code Intent with its decided value and sources",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Pages agree: the touched pi pages, the decision table and the Intent count agree with the T3 decisions, and nothing presents T3's delegate_task or custom() TUI as used",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Plan not shipped and sourced: the pages state T3 support as the 0.3.0 plan, third-party facts match the research, unknowns are marked to be verified",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Docs only and links valid: only docs/ changes and every relative link and anchor resolves",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Verify passes: mise run verify exits 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "docs"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-07T18:49:27.314Z"
+  },
+  "createdAt": "2026-11-07T18:49:27.314Z"
+}
