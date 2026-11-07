@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "bump-the-holyagent-version-from-0-2-2-to",
   "objective": "Bump the HolyAgent version from 0.2.2 to 0.3.0 in the worktree /home/user/holyagent-docs-pi-plan with the repository's own bump task, and rebuild so every generated copy matches.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Work only in /home/user/holyagent-docs-pi-plan (branch release/0.3.0/docs/pi-integration-plan; dependencies are installed)."
   ],
@@ -44,5 +44,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-07T17:30:02.284Z"
+  },
   "createdAt": "2026-11-07T17:29:57.620Z"
 }
