@@ -1,0 +1,59 @@
+{
+  "id": "assignment-0mw6uqocp-ehy8",
+  "intentId": "intent-0mw6tzpkr-i7u1",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-three-non-blocking-review",
+  "objective": "Repair the three non-blocking review findings on the integration-branch rule change: scope the identity bullet, tighten the creation versus existing-base wording, and state the mergeability rationale once.",
+  "state": "Ready",
+  "scope": [
+    "Work only in the git worktree /home/user/holyagent-0.3.0 (branch release/0.3.0/feat/integration-branch-default, node_modules already installed). Gates: `bunx --no-install mise run <task>`.",
+    "Findings to fix (from the review of commit 85bd5ba): (1) packages/runtime/src/instructions/claude-5.5/root/identity.md:9 'Creating a missing base is no such push.' is unscoped: say it applies to cutting and pushing a base the conventions name that the remote lacks, and that pushing commits onto an existing base still is such a push; a suggested wording is 'Cutting and pushing a base the conventions name that the remote lacks is no such push; pushing commits onto an existing base is.' (2) claude-5.5/root/stack-plan.md:8 'Later commits pushed onto an existing base still need the user's approval' is loose: say the created base carries only the start the conventions give, and that pushing commits onto an existing base needs approval. (3) The mergeability rationale is restated in stack-plan.md:8 and R-BRANCH (requirements.md) while shared/precedence.md:3 and R-PRECEDENCE own it: point to Precedence instead of restating it, keeping the rule.",
+    "Known constraint: the identity bullet is part of the session-start core whose size is limited by CONTEXT_BUDGET in packages/runtime/src/cli/sessioncontext.ts; packages/runtime/tests/sessioncontext.test.ts ('stay whole while the status can still narrow') broke when the earlier addition was 52 characters or longer. If the scoped sentence needs more room, raise CONTEXT_BUDGET by the smallest amount that keeps that test meaningful, and update docs/hooks.md where it states the budget (it names a 9,300-character budget), with the reason."
+  ],
+  "constraints": [
+    "Maintainer (verbatim): \"this integration branch thing should not require approval, it should a holyagent default. always remember that mergeability > holyagent defaults\".",
+    "Follow /root/.claude/plugins/synced/03eb801d-6ff6-4373-b5b1-f94edf359a3e_0f3e6ee9-af2e-4c2c-8d3c-9be25ca27713/holyagent/skills/instruction-writing/SKILL.md.",
+    "Regenerate with `bunx --no-install mise run build`; update pinned phrases in packages/integrations/claude/tests/plugin.test.ts without weakening them.",
+    "No git commits, checkouts or edits under .git/ or .holyagent/. Write `git diff HEAD` to /home/user/holyagent-notes/pr1-repair.diff. Report in under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "Finding 1 fixed: the identity bullet is scoped to a convention-named base the remote lacks and keeps pushes onto an existing base under approval",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Finding 2 fixed: stack-plan says the created base carries only the conventions' start and that pushing commits onto an existing base needs approval",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Finding 3 fixed: the rationale points to Precedence instead of being restated",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "Gates: bunx --no-install mise run verify exits 0 with generated output in sync",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/runtime/src/cli/sessioncontext.ts",
+    "packages/runtime/tests/sessioncontext.test.ts",
+    "packages/integrations/claude/dist",
+    "packages/integrations/claude/tests/plugin.test.ts",
+    "docs/hooks.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw6u0jk3-mkyc",
+  "createdAt": "2026-11-07T20:24:35.017Z"
+}
