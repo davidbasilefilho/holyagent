@@ -1,0 +1,73 @@
+{
+  "id": "assignment-0mw6mmtwn-sjv2",
+  "intentId": "intent-0mw6lz68m-7i26",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-review-findings-on-the",
+  "objective": "Repair the review findings on the frontend-design removal in /home/user/holyagent-drop-frontend-design (branch release/0.2.2/refactor/drop-frontend-design, HEAD a8ccaa5).",
+  "state": "Running",
+  "scope": [
+    "Findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw6mfsbq-lzbz.md (artifact) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw6mfshp-5j7r.md (code). Original skill: /home/user/holyagent-work/logs/frontend-design-original.md. Your mapping: /home/user/holyagent-work/logs/frontend-design-mapping.md.",
+    "1. Wording close to the source (artifact item 1, code note 1): the removed skill is Apache-2.0, and the plugin no longer ships its license, so HolyAgent's text must restate its directives as ideas, not track its sentences. Rewrite every passage that follows the original's wording or sentence order: web-design/SKILL.md around lines 19, 20, 54, 67, 75, 76 and design-core/core.md around 14, 16, 37, 42-45, plus any other passage you find close when you compare against the original. Keep each directive's meaning; change the wording and structure, and describe tell lists by what they look like rather than reproducing the source's exact hex values and phrases. Update the tests in plugin.test.ts that pin source phrases so they check the directives by HolyAgent's own wording.",
+    "2. docs/attributions.md: say the directives were restated in HolyAgent's own words with ideas from frontend-design, without claiming no text was copied, and say it shipped through 0.2.1 (removed in 0.2.2). Keep the credit in README Special thanks.",
+    "3. Weakened directives (artifact item 3): in core.md, propose the subject in the plan and confirm it with the client where one is reachable; restore the permission that one typeface may serve both display and body when it fits; keep the others as they are unless they fit in a clause.",
+    "4. Duplication (artifact item 4): keep each of these in one place, the shared core or web-design, whichever fits: the skill-contents list (worker-visual/design.md vs visual-judging/SKILL.md), the 01/02/03 numbering rule, the eyebrow and label rule, the reduced-motion rule.",
+    "5. Platform fit (code note 5): the shared core is copied into the TUI, mobile and desktop skills, so move directives that only make sense on the web (palette hex values, web-page tells, the competitor-site test if it is web-specific) into web-design, or phrase them so they hold on every platform. Keep the design-skills tests passing (their size bounds included).",
+    "6. docs/development.md:21: remove licenses/ from the dist layout if dist no longer has it.",
+    "7. plugin.test.ts: make 'the visual roles send the design guidance…' fail on 7a59dd0, for example by asserting that the visual role section no longer mentions frontend-design.",
+    "Finish with 'bunx --no-install mise run build' and 'bunx --no-install mise run verify'. Update the mapping file. Write 'git diff HEAD' without dist to /home/user/holyagent-work/diffs/drop-frontend-design-repair.diff."
+  ],
+  "constraints": [
+    "Do not change .claude/CLAUDE.md; keep the README's fixed sections.",
+    "Add no behavior the request does not name; name anything else in the report.",
+    "Keep working until everything asked is done; stop to ask only when you cannot go on.",
+    "Make no commits or other git writes and no edits under .git/ or .holyagent/. Work only inside the worktree, plus the mapping and diff files.",
+    "Report in under 350 words; put long logs in /home/user/holyagent-work/logs/."
+  ],
+  "criteria": [
+    {
+      "text": "No passage tracks the source's wording; every directive keeps its meaning",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "The attribution is accurate",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "The weakened directives, duplicates and web-only core directives are repaired",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Every new test fails without its change",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "mise run build leaves dist in sync and mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "diff-file",
+    "mapping-file"
+  ],
+  "ownershipPaths": [
+    "packages",
+    "docs",
+    "README.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw6m4mkb-egy5",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-07T16:37:38.663Z"
+  },
+  "createdAt": "2026-11-07T16:37:38.663Z"
+}
