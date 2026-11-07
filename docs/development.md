@@ -24,7 +24,7 @@ packages/
 scripts/                        Bun scripts behind the mise tasks: toolchain, hooks, vendoring, versions, the dependency updater, PR checks
 install/wsl-install.sh          prerequisites installer (WSL Ubuntu): Bun, Node LTS, git, gh; --dev adds mise
 install/windows-install.ps1     the same for native Windows (PowerShell; -Dev adds mise)
-docs/                           these pages; docs/pi holds the Pi research
+docs/                           these pages; docs/pi holds the 0.3.0 Pi plan and its research
 mise.toml  bunfig.toml  lefthook.yml
 ```
 

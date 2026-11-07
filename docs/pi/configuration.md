@@ -1,6 +1,37 @@
 # Pi configuration: files, locations, precedence, keys
 
-Pi 1.4.0, commit `4a080252f06caf63a525d7873c5d94d3c23887e0`. "Inference:" marks my own conclusions.
+**Status: planned for 0.3.0. The first section is the plan for HolyAgent's own configuration; the sections after it are research on Pi's configuration and are not shipped behaviour.**
+
+Pi 1.4.0, commit `4a080252f06caf63a525d7873c5d94d3c23887e0` (the plan pins 1.5.0; see [README.md](README.md#version-risk)). "Inference:" marks my own conclusions.
+
+## HolyAgent config.json
+
+HolyAgent already reads `.holyagent/config.json`; today the file holds the `vcs` section ([commit-authorship.md](../commit-authorship.md)). The maintainer decided that the Pi integration uses this same file ("alter/extend .holyagent/config.json, pi section and claude section, common stuff should be outside those sections"). In 0.3.0 it will have three kinds of content:
+
+- a `pi` section, read only by the Pi integration;
+- a `claude` section, read only by the Claude plugin;
+- settings common to both hosts, outside both sections (the existing `vcs` section is one).
+
+The file is the one place that sets the Pi integration's options, which functionality is on, and the model provider. Turning a function or the provider on or off turns on or off the existing Pi extensions and packages that supply it, and a disabled one is neither loaded nor required.
+
+What the `pi` section will set, with the default each decision gives:
+
+| Setting                   | Default                                                                                                                                 | Detail                                                                                        |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Provider                  | Kimi for Coding (global); selecting it enables `pi-provider-kimi-code`, and deselecting it disables that extension                      | [providers.md](providers.md#kimi-for-coding-global)                                           |
+| Route table               | The Kimi table: model and effort for every specialist role, so a change needs no code. The root's effort is `high`; `max` is selectable | [providers.md](providers.md#routing)                                                          |
+| Web search and fetch      | Kimi's `moonshot_search` and `moonshot_fetch`; `pi-web-kit` is the fallback, disabled while the provider extension offers web tools     | [extensions.md](extensions.md#tool-surface-for-030)                                           |
+| Long-command watching     | `@aliou/pi-processes` on                                                                                                                | [extensions.md](extensions.md#tool-surface-for-030)                                           |
+| Task list and questions   | `@juicesharp/rpiv-todo` and `@juicesharp/rpiv-ask-user-question` on                                                                     | [extensions.md](extensions.md#tool-surface-for-030)                                           |
+| Context compression       | Billion Context on, for the root and the specialists                                                                                    | [caching-and-subagents.md](caching-and-subagents.md#context-compression-with-billion-context) |
+| Workflows and specialists | `@tintinweb/pi-subagents`                                                                                                               | [orchestration.md](orchestration.md#decision-for-030)                                         |
+
+Rules for the file:
+
+- It is decoded with Effect Schema and `onExcessProperty: "error"` when it loads, and every option has a documented default.
+- An invalid file stops the run with a message that names the field. It never falls back silently.
+- Installing the package installs only the dependencies that the default `config.json` enables.
+- The key names are to be settled when the schema is written. That change also documents every option with its default on this page.
 
 ## Files and locations
 
@@ -56,13 +87,26 @@ Full reference: [settings.md](https://github.com/earendil-works/pi/blob/4a080252
 | `packages`, `extensions`, `skills`, `prompts`, `themes`                           | resource and package lists                                                                  | [L154-L158](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/docs/settings.md#L154-L158) |
 | `enableInstallTelemetry`                                                          | anonymous install/update ping, default true                                                 | [L170](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/docs/settings.md#L170)           |
 
+The plan sets two of these: `npmCommand` to `bun` (by `holyagent setup`) and `codemode.mode` to `only` for the root and every specialist. How `only` reaches each process, through settings or the launch, is to be settled at implementation ([How HolyAgent launches Pi](#how-holyagent-launches-pi)).
+
 There is **no** settings key for prompt-cache retention or for tool approval: the only keys mentioning caches are `cacheWarming` and `showCacheMissNotices` ([settings.md L7-L25](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/docs/settings.md#L7-L25)). Cache retention is an environment variable (see [caching-and-subagents.md](caching-and-subagents.md)).
 
 ## Environment variables relevant to a host
 
-`PI_CODING_AGENT_DIR`, `PI_CODING_AGENT_SESSION_DIR`, `PI_OFFLINE`, `PI_SKIP_VERSION_CHECK`, `PI_TELEMETRY`, `PI_CODEMODE_MAX_WORKERS` (default 2), `PI_CACHE_RETENTION` ([environment-variables.md L81-L88](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/docs/environment-variables.md#L81-L88)). Pi marks child processes with `AI_AGENT=pi` and `PI_CODING_AGENT=true`, and the `bash` tool exports `PI_SESSION_ID`, `PI_SESSION_FILE`, `PI_PROVIDER`, `PI_MODEL`, `PI_REASONING_LEVEL` ([environment-variables.md L15-L16, L20-L30](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/docs/environment-variables.md#L20-L30)). At startup Pi contacts `pi.dev` for a version check and an anonymous install ping unless `PI_OFFLINE=1`, `PI_SKIP_VERSION_CHECK=1` or `PI_TELEMETRY=0` ([environment-variables.md L84-L86](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/docs/environment-variables.md#L84-L86), [settings.md L170](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/docs/settings.md#L170)).
+`PI_CODING_AGENT_DIR`, `PI_CODING_AGENT_SESSION_DIR`, `PI_OFFLINE`, `PI_SKIP_VERSION_CHECK`, `PI_TELEMETRY`, `PI_CODEMODE_MAX_WORKERS` (default 2; the plan sets 4), `PI_CACHE_RETENTION` ([environment-variables.md L81-L88](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/docs/environment-variables.md#L81-L88)). Pi marks child processes with `AI_AGENT=pi` and `PI_CODING_AGENT=true`, and the `bash` tool exports `PI_SESSION_ID`, `PI_SESSION_FILE`, `PI_PROVIDER`, `PI_MODEL`, `PI_REASONING_LEVEL` ([environment-variables.md L15-L16, L20-L30](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/docs/environment-variables.md#L20-L30)). At startup Pi contacts `pi.dev` for a version check and an anonymous install ping unless `PI_OFFLINE=1`, `PI_SKIP_VERSION_CHECK=1` or `PI_TELEMETRY=0` ([environment-variables.md L84-L86](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/docs/environment-variables.md#L84-L86), [settings.md L170](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/docs/settings.md#L170)).
 
-## Inference for HolyAgent
+## How HolyAgent launches Pi
 
-- Inference: to keep HolyAgent-driven Pi sessions reproducible, launch Pi with an explicit agent directory (`PI_CODING_AGENT_DIR`), explicit `--session-dir`, `--model provider/id:thinking`, `--tools`/`--exclude-tools`, `-e <holyagent extension>`, and `--approve`/`--no-approve`, rather than relying on the user's `~/.pi/agent/settings.json`. All of those are documented flags/variables (links above, [cli.md L55-L110](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/docs/cli.md#L55-L110)).
-- Inference: HolyAgent's own state (Intent revisions, Assignment status) has no place in Pi's settings; Pi offers `pi.appendEntry()` for session-attached data ([extensions.md L337-L355](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/docs/extensions.md#L337-L355)), but the Intent store should stay in HolyAgent.
+**Status: planned for 0.3.0.** Decided:
+
+- Pi starts as plain `pi` after the one-time `pi install` ([installation.md](installation.md#how-holyagent-installs)); that session is the root. The root launches specialists as child Pi processes through `@tintinweb/pi-subagents` ([orchestration.md](orchestration.md#decision-for-030)).
+- Specialists run with `--approve` (full access, see [auto-mode.md](auto-mode.md)), `PI_SKIP_VERSION_CHECK=1` and `PI_TELEMETRY=0`. They are not run fully offline: the 1.5.0 docs word `PI_OFFLINE` as disabling automatic network activity, including model catalog refreshes.
+- The root and every specialist run codemode in mode `only`, and `PI_CODEMODE_MAX_WORKERS` is 4 ([orchestration.md](orchestration.md#codemode-in-030)).
+- `holyagent setup` sets Pi's `npmCommand` setting to `bun`, so Pi installs its packages with Bun ([installation.md](installation.md#what-setup-and-doctor-do)).
+- Model and thinking level reach Pi as `--model <provider/id>:<thinking>` from the route table in `config.json` ([providers.md](providers.md#routing)).
+
+Still to be settled at implementation: the name and values of the launch flag that tells the extension whether a session is the root, a specialist or another session, and whether the extension also loads in children by `-e` or by the user-level install.
+
+Inference: to keep HolyAgent-driven Pi sessions reproducible, a launch should pass an explicit session directory, `--model`, `--tools` or `--exclude-tools` and `--approve` rather than rely on the user's `~/.pi/agent/settings.json`. All of those are documented flags and variables (links above, [cli.md L55-L110](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/docs/cli.md#L55-L110)).
+
+HolyAgent's own state (Intent revisions, Assignment status) has no place in Pi's settings; Pi offers `pi.appendEntry()` for session-attached data ([extensions.md L337-L355](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/docs/extensions.md#L337-L355)), but the Intent store stays in HolyAgent.

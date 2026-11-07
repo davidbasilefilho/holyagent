@@ -1,6 +1,8 @@
 # Pi approval and permissions
 
-Pi 1.4.0, commit `4a080252f06caf63a525d7873c5d94d3c23887e0`. "Inference:" marks my own conclusions.
+**Status: research behind a decided 0.3.0 plan. The plan is to run with full access and load no approval gate ([Decision for 0.3.0](#decision-for-030)); nothing here is shipped.**
+
+Pi 1.4.0, commit `4a080252f06caf63a525d7873c5d94d3c23887e0` (the plan pins 1.5.0; see [README.md](README.md#version-risk)). "Inference:" marks my own conclusions.
 
 ## Pi deliberately has no native approval mechanism
 
@@ -49,8 +51,12 @@ What looks like approval but is not: **project trust**. It decides which project
 | "Undecided, let Pi decide" | **not available**                                               | Pi has no native tool approval to delegate to                   |
 | Headless (print/JSON)      | no UI                                                           | the official gate blocks                                        |
 
-## Inference for HolyAgent
+## Decision for 0.3.0
 
-- Inference: "undecided goes to Pi's native approval" cannot be implemented literally for tool calls, because Pi has no native approval. The faithful mapping is: undecided becomes an extension-driven `ctx.ui.confirm` (interactive TUI, or the host over RPC), and where no UI exists (print/JSON), undecided becomes a block, which matches the official gate's fail-closed pattern.
-- Inference: "off means full access" is Pi's default behaviour (no gate loaded), so `off` is simply "do not load the HolyAgent gate extension" ([security.md L3](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/docs/security.md#L3)).
-- Sourced: project `.pi/extensions` load only after trust is granted, and declining trust skips them ([security.md L35-L55](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/docs/security.md#L35-L55)); `-e/--extension` loads an extension from a CLI path ([cli.md L194](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/docs/cli.md#L194)). Inference: a project-level gate would therefore be skipped when trust is declined, which fails open, while an explicit `-e` gate does not depend on the project folder, so load it explicitly. Also a different extension loaded earlier could allow-and-mutate before HolyAgent's handler runs; handlers run in load order ([extensions.md L197](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/docs/extensions.md#L197)).
+The maintainer decided there will be no auto-mode and that full access is the default ([auto-mode.md](auto-mode.md)). So the table above is background, and HolyAgent will use none of its approval rows:
+
+- The HolyAgent package loads no `tool_call` gate and no reviewer. "Off means full access" is Pi's own default, and it is the only mode.
+- Specialists the root launches pass `--approve`, so project trust is granted and `.pi/` resources load without a prompt. Print, JSON and RPC modes cannot show the trust prompt, and without an override `ask` skips project resources ([configuration.md](configuration.md#project-trust)).
+- The package is installed at user level with `pi install`, not placed in a project's `.pi/extensions`, so Pi does not gate its loading on project trust (Inference from [security.md L35-L55](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/docs/security.md#L35-L55): only project resources are trust-gated).
+- The version-control and state boundary stays instruction text. No path guard is loaded ([claude-parity.md](claude-parity.md#1-rules-that-cut-across-the-rest)).
+- The one `tool_call` fact that still matters to the plan: calls made from codemode scripts pass the same pipeline and carry `parentToolCallId`, so any extension that did add a handler later would see them.
