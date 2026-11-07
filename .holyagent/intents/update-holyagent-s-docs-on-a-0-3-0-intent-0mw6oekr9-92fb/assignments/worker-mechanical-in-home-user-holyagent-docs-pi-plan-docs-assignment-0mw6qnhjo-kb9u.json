@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mw6qnhjo-kb9u",
+  "intentId": "intent-0mw6oekr9-92fb",
+  "intentRevision": 1,
+  "roleTask": "Worker.mechanical",
+  "slug": "in-home-user-holyagent-docs-pi-plan-docs",
+  "objective": "In /home/user/holyagent-docs-pi-plan/docs/pi, reword the three statements that say the 0.3.0 Intent text still names holy_assign or still lists a script confirmation, because the Intents now record the decisions.",
+  "state": "Running",
+  "scope": [
+    "docs/pi/orchestration.md line 15: replace 'The Intent text still names a custom `holy_assign` tool (architecture 2 below). With this decision the launcher is the package, and HolyAgent writes' with 'The launcher is the package (architecture 2 below describes the custom alternative), and HolyAgent writes'. Keep the rest of the line.",
+    "docs/pi/orchestration.md line 16: replace '(decided by the maintainer; the Intent text still lists a confirmation for other agents, which the decision overrides)' with '(decided by the maintainer)'.",
+    "docs/pi/claude-parity.md line 106: delete the sentence 'The Intent text for the launcher still lists a confirmation for scripts that call anything other than the 18 specialists; the decision overrides it, and that text is not edited here.' (with its following space).",
+    "Then search docs/ for any other sentence saying an Intent 'still names' or 'still lists' holy_assign or a confirmation, and report each one with file and line without editing it."
+  ],
+  "constraints": [
+    "Change only those three passages; keep table alignment by running `bunx --no-install mise run fmt -- docs/pi` afterwards, then `bunx --no-install mise run verify`.",
+    "Make no git writes. Write `git -C /home/user/holyagent-docs-pi-plan diff dab5435 -- docs > /home/user/holyagent-work/docs-030-repair.diff` at the end (this covers the committed repair and your edit) and list it as diff-file.",
+    "Report in under 150 words."
+  ],
+  "criteria": [
+    {
+      "text": "Edits applied: the three passages read as specified",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Verify passes: mise run verify exits 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "docs"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-07T18:30:07.765Z"
+  },
+  "createdAt": "2026-11-07T18:30:07.765Z"
+}
