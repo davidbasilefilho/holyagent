@@ -1,0 +1,48 @@
+{
+  "id": "assignment-0mw6rgzog-2rb3",
+  "intentId": "intent-0mw6oekr9-92fb",
+  "intentRevision": 2,
+  "roleTask": "Librarian.research",
+  "slug": "establish-which-t3-code-features",
+  "objective": "Establish which T3 Code features HolyAgent's pi integration can rely on and enable, now that T3 Code is to be the primary interface for HolyAgent on pi, and where each is turned on (globally or per project).",
+  "state": "Running",
+  "scope": [
+    "Maintainer (verbatim): \"t3code shall be the primary interface for the pi integration, so we will deeply integrate with it. that means we can rely on its integrated browser, computer use, as well as enable anything beneficial we can from it globally or locally\". Earlier decisions stand: Full access in T3, T3's own dialogs only, HolyAgent's own launcher (@tintinweb/pi-subagents) instead of T3's delegation tools, a fixed tool set from session start.",
+    "Prior research: /home/user/holyagent-work/research/assignment-0mw6r54ng-kg9r.md and assignment-0mw6r9zxs-l85j.md. Existing repo text on T3 Code with the Claude plugin: /home/user/holyagent-docs-t3/docs/usage.md section '## T3 Code' (preview_*, device_*, html_render, html_preview, auto-compact) and packages/runtime/src/instructions/claude-5.5/specialist/interface-inspection.md.",
+    "Questions: (1) T3's integrated browser (preview_* tools): the full tool set, what it can do (navigate, click, type, screenshot, console, network), and whether a pi session gets it. (2) Computer use in T3 Code: does T3 offer computer use or desktop control (device_* simulator tools, a computer-use toolkit, OS-level control), on which platforms, and how it is enabled. (3) Other T3 features that would benefit HolyAgent on pi: worktrees, terminals, diff and git or PR tools, checkpoints and rollback, scheduling, notifications, html_render visual replies, context meter, auto-compact, model and effort pickers, project scripts, skills or slash commands, MCP server management. For each: what it is, whether a pi provider gets it, and whether HolyAgent should rely on it, enable it or leave it (note the earlier decision to deactivate T3's delegation, thread and scheduling tools; say whether anything here argues to revisit that). (4) Where T3 settings live: global (user-level T3 settings) versus per-project or per-thread, and whether anything outside T3's UI can set them (a config file, environment variable, launch argument, provider instance settings), so HolyAgent's setup could enable them globally or locally. (5) How T3 starts pi with respect to pi's global (~/.pi) and project (.pi/) settings and packages."
+  ],
+  "constraints": [
+    "Authoritative sources first: the pingdotgg/t3code repository (docs/, packages/, PRs), its releases and docs site; label third-party and inference.",
+    "End with a table: feature, available to pi (yes/no/unknown), recommendation (rely on, enable, leave off) with reason, where it is enabled (global, project, thread) and how; then real choices for the maintainer with options, separate from facts to verify.",
+    "Report in under 650 words."
+  ],
+  "criteria": [
+    {
+      "text": "Browser and computer use: states what T3 offers for each, whether pi gets it, and how it is enabled, with sources",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Feature table: covers the listed features with availability, recommendation and enablement scope",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Choices separated: real maintainer choices with options, apart from facts to verify",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-07T18:53:04.289Z"
+  },
+  "createdAt": "2026-11-07T18:53:04.289Z"
+}
