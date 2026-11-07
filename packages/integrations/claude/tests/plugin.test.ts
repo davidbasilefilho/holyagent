@@ -925,7 +925,9 @@ describe("agents", () => {
       "check it against the conventions' rules on which branches may open PRs into which",
       "if the check bars the stack's top, start from the base",
       "which also decides any other branch the plan needs (an integration branch, where it is cut from and who cuts it)",
-      "pushing it is a push to the base, so it needs the user's approval unless the request names it",
+      "cut from the start the convention gives, carrying only that start, and pushed as part of this plan without asking (Precedence)",
+      "Pushing commits onto an existing base needs the user's approval",
+      "Cutting and pushing a base the conventions name that the remote lacks is no such push; pushing commits onto an existing base is",
       "`git diff <target>...HEAD` (the PR's actual target: its predecessor in the stack or the base)",
     ])
       expect({ part, found: text.includes(part) }).toEqual({ part, found: true })
