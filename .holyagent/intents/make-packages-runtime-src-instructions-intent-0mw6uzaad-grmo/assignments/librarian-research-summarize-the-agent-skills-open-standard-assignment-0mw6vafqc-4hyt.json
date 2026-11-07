@@ -1,0 +1,35 @@
+{
+  "id": "assignment-0mw6vafqc-4hyt",
+  "intentId": "intent-0mw6uzaad-grmo",
+  "intentRevision": 4,
+  "roleTask": "Librarian.research",
+  "slug": "summarize-the-agent-skills-open-standard",
+  "objective": "Summarize the Agent Skills open standard (the SKILL.md format) precisely enough to write a repository skill that teaches how to author standard-conformant skills, with sources.",
+  "state": "Running",
+  "scope": [
+    "Sources: the Agent Skills specification and docs (agentskills.io: the specification page, what-are-skills, integrate-skills, and the best-practices or authoring pages if any), the reference repository (github.com/agentskills/agentskills, including skills-ref validation rules), and Anthropic's skill authoring best practices page (platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices) for complementary guidance. Fetch with your web tools (for example the Exa fetch tool).",
+    "Cover: directory layout; SKILL.md frontmatter fields with their exact constraints (name: allowed characters, length, matching the directory; description: length and what it must say; optional fields such as license, compatibility, metadata, allowed-tools); body content guidance and size limits; progressive disclosure (metadata, instructions, resources) and the optional scripts/, references/, assets/ directories; how file references should be written (relative paths, depth); validation (skills-ref validate); and any guidance about portability across agents and models. Quote exact limits."
+  ],
+  "constraints": [
+    "Sourced facts only, with URL and section per point; label inference. The summary is the deliverable and may run to 1500 words."
+  ],
+  "criteria": [
+    {
+      "text": "Spec coverage: layout, every frontmatter field with exact constraints, body guidance, progressive disclosure, optional directories, file references and validation are each covered with a source",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-07T20:39:56.965Z"
+  },
+  "createdAt": "2026-11-07T20:39:56.965Z"
+}
