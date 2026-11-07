@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-three-non-blocking-review",
   "objective": "Repair the three non-blocking review findings on the integration-branch rule change: scope the identity bullet, tighten the creation versus existing-base wording, and state the mergeability rationale once.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Work only in the git worktree /home/user/holyagent-0.3.0 (branch release/0.3.0/feat/integration-branch-default, node_modules already installed). Gates: `bunx --no-install mise run <task>`.",
     "Findings to fix (from the review of commit 85bd5ba): (1) packages/runtime/src/instructions/claude-5.5/root/identity.md:9 'Creating a missing base is no such push.' is unscoped: say it applies to cutting and pushing a base the conventions name that the remote lacks, and that pushing commits onto an existing base still is such a push; a suggested wording is 'Cutting and pushing a base the conventions name that the remote lacks is no such push; pushing commits onto an existing base is.' (2) claude-5.5/root/stack-plan.md:8 'Later commits pushed onto an existing base still need the user's approval' is loose: say the created base carries only the start the conventions give, and that pushing commits onto an existing base needs approval. (3) The mergeability rationale is restated in stack-plan.md:8 and R-BRANCH (requirements.md) while shared/precedence.md:3 and R-PRECEDENCE own it: point to Precedence instead of restating it, keeping the rule.",
@@ -59,7 +59,45 @@
     "agentId": "workflow:wf_abc599f6-259/assignment-0mw6uqocp-ehy8",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-07T20:24:36.280Z"
+    "startedAt": "2026-11-07T20:24:36.280Z",
+    "finishedAt": "2026-11-07T20:39:34.569Z"
+  },
+  "result": "result: All three findings are fixed and `mise run verify` exits 0. `CONTEXT_BUDGET` rose from 9,300 to 9,400 because the scoped identity sentence is longer.\n\nchanged:\n- `/home/user/holyagent-0.3.0/packages/runtime/src/instructions/claude-5.5/root/identity.md`\n- `/home/user/holyagent-0.3.0/packages/runtime/src/instructions/claude-5.5/root/stack-plan.md`\n- `/home/user/holyagent-0.3.0/packages/runtime/src/instructions/requirements.md`\n- `/home/user/holyagent-0.3.0/packages/runtime/src/cli/sessioncontext.ts`\n- `/home/user/holyagent-0.3.0/docs/hooks.md`\n- `/home/user/holyagent-0.3.0/packages/integrations/claude/tests/plugin.test.ts`\n- `/home/user/holyagent-0.3.0/packages/integrations/claude/dist/agents/holyagent.md` (regenerated)\n- `/home/user/holyagent-0.3.0/packages/integrations/claude/dist/scripts/holyagent.js` (regenerated)\n\nchecks:\n- `bunx --no-install mise run build` -> exit 0.\n- `bunx --no-install mise run verify` -> exit 0. Type-check and lint are clean, and the tests show 1596 pass, 0 fail. The full log is at `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`.\n- The 'stay whole while the status can still narrow' test failed at 9,300. It passes at 9,390 and fails at 9,380. I set 9,400, leaving a few characters of slack and 600 under the host's 10,000 cut.\n\nblockers: none\nquestions: none\n\nnotes:\n- `docs/pi/claude-parity.md:135` still says \"9,300-character budget\". It is outside my ownership paths, so I left it. The root should update it to 9,400.\n- I reworded the pinned phrases in `plugin.test.ts` to match the new text and kept the same three claims. The \"since mergeability ... outranks\" pin is gone on purpose. The rationale now lives only in Precedence, and `stack-plan.md` and R-BRANCH point to it.\n\nevidence:\nFinding 1 fixed: the identity bullet is scoped to a convention-named base the remote lacks and keeps pushes onto an existing base under approval: `identity.md` line 9 now reads \"Cutting and pushing a base the conventions name that the remote lacks is no such push; pushing commits onto an existing base is.\"\nFinding 2 fixed: stack-plan says the created base carries only the conventions' start and that pushing commits onto an existing base needs approval: `stack-plan.md` line 8 says the base is \"cut from the start the convention gives, carrying only that start, and pushed ... (Precedence). Pushing commits onto an existing base needs the user's approval.\"\nFinding 3 fixed: the rationale points to Precedence instead of being restated: `stack-plan.md` now cites \"(Precedence)\" and R-BRANCH cites \"(R-PRECEDENCE)\". Neither restates the mergeability rationale.\nGates: bunx --no-install mise run verify exits 0 with generated output in sync: `mise run build` ran before `verify`, and `verify` exited 0 with 1596 pass.\nchanged-paths: see `changed:` above.\nchecks-run: see `checks:` above.\ndiff-file: `/home/user/holyagent-notes/pr1-repair.diff`\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "verify exit 0 (1596 pass); each finding fixed at the cited line.",
+    "criteria": [
+      {
+        "criterion": "Finding 1 fixed: the identity bullet is scoped to a convention-named base the remote lacks and keeps pushes onto an existing base under approval",
+        "support": "`identity.md` line 9 now reads \"Cutting and pushing a base the conventions name that the remote lacks is no such push; pushing commits onto an existing base is.\""
+      },
+      {
+        "criterion": "Finding 2 fixed: stack-plan says the created base carries only the conventions' start and that pushing commits onto an existing base needs approval",
+        "support": "`stack-plan.md` line 8 says the base is \"cut from the start the convention gives, carrying only that start, and pushed ... (Precedence). Pushing commits onto an existing base needs the user's approval.\""
+      },
+      {
+        "criterion": "Finding 3 fixed: the rationale points to Precedence instead of being restated",
+        "support": "`stack-plan.md` now cites \"(Precedence)\" and R-BRANCH cites \"(R-PRECEDENCE)\". Neither restates the mergeability rationale."
+      },
+      {
+        "criterion": "Gates: bunx --no-install mise run verify exits 0 with generated output in sync",
+        "support": "`mise run build` ran before `verify`, and `verify` exited 0 with 1596 pass."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "see `changed:` above."
+      },
+      {
+        "label": "checks-run",
+        "support": "see `checks:` above."
+      },
+      {
+        "label": "diff-file",
+        "support": "`/home/user/holyagent-notes/pr1-repair.diff`"
+      }
+    ]
   },
   "createdAt": "2026-11-07T20:24:35.017Z"
 }
