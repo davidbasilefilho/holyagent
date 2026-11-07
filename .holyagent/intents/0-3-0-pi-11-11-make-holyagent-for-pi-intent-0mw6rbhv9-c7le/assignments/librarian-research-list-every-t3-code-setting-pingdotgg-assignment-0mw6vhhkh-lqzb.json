@@ -38,6 +38,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "a042aae19795bd475",
     "model": "sonnet",
     "effort": "medium",
     "startedAt": "2026-11-07T20:45:25.937Z"
