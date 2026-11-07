@@ -4,6 +4,7 @@
   "objective": "0.3.0 pi 6/10: Wire the Pi tool surface from existing Pi tools, extensions and MCP support, adding custom code only where the research finds no existing carrier.",
   "requirements": [
     "Maintainer (verbatim): \"please add intents for the next 0.3.0 release where I will implement the pi extension integration\"; the maintainer implements 0.3.0, so these Intents record the work and carry no Assignments until the maintainer starts it.",
+    "Maintainer, 2026-11-07: implement 0.3.0 now, every part except the dropped auto-mode gate (pi 8/10); test with unit tests and recorded or synthesized fixtures only, no live Kimi runs; merge each PR once it is reviewed and green.",
     "Maintainer (verbatim): \"in the docs/pi/ it's supposed to use already existent extensions for required functionality\" and \"the first provider to implement will be kimi for coding global\".",
     "Release model: work lands on release/0.3.0/integration cut from main, as one release/0.3.0/<type>/<change> branch and one PR per change; the first PR of the release carries the version bump made with mise run bump:minor.",
     "Done means mise run verify passes with the generated output in sync (mise run build) and CI green on every required check, including the windows job.",
@@ -20,7 +21,7 @@
     "Decided (maintainer: rpiv unless howaboua is better; research found it is not): @juicesharp/rpiv-todo provides the task list and @juicesharp/rpiv-ask-user-question the ask tool.",
     "Decided (maintainer): Billion Context is installed in the pi integration only: the billion-context package, pinned, compressing the root and specialist sessions (delegate.forceEnable), with its own acp_delegate subagents off (pi.subagents false); it replaces pi's compaction."
   ],
-  "revision": 3,
+  "revision": 4,
   "state": "Open",
   "createdAt": "2026-11-07T16:43:52.958Z"
 }
