@@ -1,0 +1,60 @@
+{
+  "id": "assignment-0mw6si119-34df",
+  "intentId": "intent-0mw6oekr9-92fb",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-t3-code-install-scope-and",
+  "objective": "Repair the T3 Code, install-scope and Cowork docs in /home/user/holyagent-docs-t3 (committed as 34f3e80 on release/0.3.0/docs/t3-and-install-scopes) so they carry two resolved Intent conflicts and the review's two non-blocking notes.",
+  "state": "Running",
+  "scope": [
+    "Resolved conflict 1 (T3 Code Intent, now revision 3; last-but-one line of /home/user/holyagent-work/pi-intents-final.jsonl): HolyAgent keeps T3's html_render, html_preview, preview_*, t3_preview_* (t3_preview_list, t3_preview_close) and device_* tools and deactivates every other mcp__t3-code__ tool. Update docs/pi/t3-code.md and every page that lists the kept or deactivated tools, and remove device_* and t3_preview_* from the to-verify list as a conflict (whether pi reaches device_* stays to verify).",
+    "Resolved conflict 2: Cua Driver is the copy that @amaster.ai/pi-computer-use bundles; there is no separate driver install, the bundled version moves with the extension pin, and setup only walks through the macOS Accessibility and Screen Recording permissions. Update docs/pi/t3-code.md, docs/pi/extensions.md, docs/pi/installation.md and any page saying setup installs the driver; keep the to-verify item on how the extension's confirmations are turned off.",
+    "Review note 1: docs/pi/configuration.md around line 123 still says a launch passes `--approve` unconditionally; make it 'and `--approve` when the parent session trusted the project', matching line 116.",
+    "Review note 2: in docs/usage.md section '## claude.ai', add one sentence labelled 'Inference:' that in Cowork the plugin's `agent` setting is ignored (Anthropic's platform-support page says a plugin `settings` key is ignored in Cowork), so the root there rests on the session-start hook, as in cloud sessions; source: /home/user/holyagent-work/research/assignment-0mw6rgzw5-cgu7.md."
+  ],
+  "constraints": [
+    "Docs only: change files under docs/ only. Make no git writes; the root commits.",
+    "Keep the planned-not-shipped framing, sources and labels; neutral voice.",
+    "Write `git -C /home/user/holyagent-docs-t3 diff -- docs > /home/user/holyagent-work/docs-t3b-repair.diff` and list it as diff-file evidence.",
+    "Run the format task on your files, `bunx --no-install mise run verify`, and the relative-link and anchor check over docs/**/*.md and README.md.",
+    "Report in under 250 words with one evidence line per criterion."
+  ],
+  "criteria": [
+    {
+      "text": "Conflicts resolved: the kept T3 tool families and the bundled Cua Driver read as the Intent states on every page that mentions them",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Review notes fixed: configuration.md --approve line and the Cowork inference sentence are in place",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Scope and links: only docs/ changes and every relative link and anchor resolves",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Verify passes: mise run verify exits 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "docs"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw6rz8d6-0qb6",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-07T19:21:52.317Z"
+  },
+  "createdAt": "2026-11-07T19:21:52.317Z"
+}
