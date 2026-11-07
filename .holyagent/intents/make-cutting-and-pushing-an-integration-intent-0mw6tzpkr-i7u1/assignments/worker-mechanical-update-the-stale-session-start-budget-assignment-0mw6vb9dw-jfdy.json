@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "update-the-stale-session-start-budget",
   "objective": "Update the stale session-start budget figure in docs/pi/claude-parity.md from 9,300 to 9,400 characters, matching CONTEXT_BUDGET in packages/runtime/src/cli/sessioncontext.ts.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0 (node_modules installed). Change every mention of the 9,300-character budget in docs/pi/claude-parity.md (around line 135) and any other file under docs/ that still says 9,300 for the session-start budget; first confirm CONTEXT_BUDGET is 9400 in packages/runtime/src/cli/sessioncontext.ts and docs/hooks.md already says 9,400.",
     "Run bunx --no-install mise run fmt:check afterwards."
@@ -38,7 +38,33 @@
     "agentId": "workflow:wf_35b5d5c2-5c8/assignment-0mw6vb9dw-jfdy",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-07T20:40:50.382Z"
+    "startedAt": "2026-11-07T20:40:50.382Z",
+    "finishedAt": "2026-11-07T20:46:18.832Z"
+  },
+  "result": "result: Changed the session-start budget in docs/pi/claude-parity.md from 9,300 to 9,400 characters, matching CONTEXT_BUDGET = 9400 in packages/runtime/src/cli/sessioncontext.ts. No other 9,300 mention remains under docs/. Only the figure changed.\n\nchanged: /home/user/holyagent-0.3.0/docs/pi/claude-parity.md\n\nchecks:\n- `grep -rn \"9,300\\|9300\" docs` -> exit 1 (no matches)\n- `bunx --no-install mise run fmt:check` -> exit 0, \"All 279 files are formatted.\"\n\nblockers: none\nquestions: none\nnotes: The diff is scoped to docs/pi, as the ownership paths say. It is at /home/user/holyagent-notes/pr1-docfix.diff, not the full `git diff HEAD`, which the brief did not ask for. docs/hooks.md already says 9,400.\n\nevidence:\nFigure updated: no doc under docs/ states 9,300 for the session-start budget: `grep -rn \"9,300\\|9300\" docs` exit 1, no matches; edit at docs/pi/claude-parity.md:135\nFormat: bunx --no-install mise run fmt:check exits 0: exit 0, 279 files formatted\nchanged-paths: /home/user/holyagent-0.3.0/docs/pi/claude-parity.md (diff: /home/user/holyagent-notes/pr1-docfix.diff)\nchecks-run: fmt:check exit 0; doc grep exit 1 (no matches)\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "grep shows no 9,300 left; fmt:check exit 0.",
+    "criteria": [
+      {
+        "criterion": "Figure updated: no doc under docs/ states 9,300 for the session-start budget",
+        "support": "`grep -rn \"9,300\\|9300\" docs` exit 1, no matches; edit at docs/pi/claude-parity.md:135"
+      },
+      {
+        "criterion": "Format: bunx --no-install mise run fmt:check exits 0",
+        "support": "exit 0, 279 files formatted"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "/home/user/holyagent-0.3.0/docs/pi/claude-parity.md (diff: /home/user/holyagent-notes/pr1-docfix.diff)"
+      },
+      {
+        "label": "checks-run",
+        "support": "fmt:check exit 0; doc grep exit 1 (no matches)"
+      }
+    ]
   },
   "createdAt": "2026-11-07T20:40:35.396Z"
 }
