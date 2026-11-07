@@ -16,9 +16,11 @@
     "Open: the web search and fetch tool for the Librarian roles; the research says only \"a custom tool, or an MCP server\" and names none.",
     "Open: the monitor tool for the root's CI watch (gh pr checks <n> --watch); the research finds no existing Pi carrier.",
     "Open: how the example extensions (todo.ts, question.ts, questionnaire.ts) are made loadable from the package; the research says the Pi tarball contains examples/ and names no loading path.",
-    "Open: whether the ask tool can reuse an example unchanged; the research calls the examples only a starting point."
+    "Open: whether the ask tool can reuse an example unchanged; the research calls the examples only a starting point.",
+    "Maintainer (verbatim): \"the pi extension and integration will use a config.json that will set options, functionality, the provider, which will enable/disable its deps, etc\".",
+    "The config.json from Intent 0.3.0 pi 4/10 selects this: each tool and the existing extension that carries it is on or off per config.json, and a disabled one is not loaded."
   ],
-  "revision": 1,
+  "revision": 2,
   "state": "Open",
   "createdAt": "2026-11-07T16:43:52.958Z"
 }
