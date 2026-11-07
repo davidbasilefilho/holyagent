@@ -1,0 +1,49 @@
+{
+  "id": "assignment-0mw6mfsbq-lzbz",
+  "intentId": "intent-0mw6lz68m-7i26",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-whether-commit-a8ccaa5-carries",
+  "objective": "Review whether commit a8ccaa5 carries every directive of the removed frontend-design skill into HolyAgent's own design skills, as instruction text a model can follow.",
+  "state": "Running",
+  "scope": [
+    "Maintainer request (verbatim): \"hey frontend design is still on the codebase, please remove it. make sure its directives are in other skill(s)\".",
+    "Original skill: /home/user/holyagent-work/logs/frontend-design-original.md. The removed role sections the visual agents embedded: /home/user/holyagent-work/logs/fd-old-worker-visual.md and fd-old-reviewer-visual.md. The writer's mapping: /home/user/holyagent-work/logs/frontend-design-mapping.md. The diff (without dist): /home/user/holyagent-work/diffs/drop-frontend-design-a8ccaa5.diff. Current files in /home/user/holyagent-drop-frontend-design: packages/runtime/src/instructions/claude-5.5/design-core/core.md, skills/web-design/SKILL.md, skills/visual-judging/SKILL.md, roles/worker-visual/design.md, roles/reviewer-visual/design.md, and the generated packages/integrations/claude/dist/agents/worker-visual.md, reviewer-visual.md and dist/skills/*-design/SKILL.md.",
+    "Judge independently of the mapping: (1) every directive of the original and of the two removed role sections is present somewhere the visual agents will read it, with its meaning kept; (2) the new text is in HolyAgent's own words and structure and does not duplicate what the skills already said; (3) the visual agents are still told which skill to load and lose no guidance they relied on; (4) the credit in README.md Special thanks and docs/attributions.md fits an Apache-2.0 source whose text was paraphrased, not copied; (5) no stale frontend-design mention remains outside the credit and the removal test. Use the instruction-writing rules if the skill is available to you."
+  ],
+  "constraints": [
+    "Read-only: no edits and no git writes.",
+    "Keep working until the review is done; stop and report. Report in under 400 words: blocking findings first with file:line and the smallest fix, then non-blocking ones."
+  ],
+  "criteria": [
+    {
+      "text": "Every directive of the removed skill and role sections is carried with its meaning into text the visual agents read",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The new text is HolyAgent's own, follows the instruction-writing rules and duplicates nothing",
+      "blocking": false,
+      "dimension": "style"
+    },
+    {
+      "text": "No stale frontend-design mention remains outside the credit",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw6m4mkb-egy5"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-07T16:32:10.023Z"
+  },
+  "createdAt": "2026-11-07T16:32:10.023Z"
+}
