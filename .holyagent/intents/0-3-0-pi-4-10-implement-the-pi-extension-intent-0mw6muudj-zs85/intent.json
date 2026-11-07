@@ -14,16 +14,18 @@
     "In a non-root session the extension adds the marked core span of the root rules; the root process gets the full text in its system prompt and only the status.",
     "Handlers are short and fail closed; the extension works in TUI, RPC, JSON and print modes.",
     "The extension reaches the runtime through the scripts/holyagent wrapper shipped in the package, unchanged.",
-    "Open: how the root process is started (the research says a launch with --append-system-prompt and -e; it names no launcher).",
-    "Open: whether the extension loads with -e (the research's recommendation), by a global pi install (the Claude-parity assumption), or both.",
     "Maintainer (verbatim): \"the pi extension and integration will use a config.json that will set options, functionality, the provider, which will enable/disable its deps, etc\".",
     "The Pi extension reads one config.json that sets the integration's options, which functionality is on, and the model provider; enabling or disabling a function or provider in it enables or disables the existing pi extensions and packages that supply it, so a disabled one is neither loaded nor required.",
     "config.json is decoded with Effect Schema (onExcessProperty: \"error\") at load, with documented defaults; an invalid file stops with a message naming the field instead of falling back silently.",
-    "Open: where config.json lives (project, user or both, and which wins), whether it is the existing .holyagent/config.json extended or a separate file, its full option list, and how a change takes effect (restart or reload).",
     "Maintainer (verbatim): \"there will be no auto-mode, full access shall be the default\".",
-    "Pi sessions and the specialists the root launches run with full access by default: no auto-mode gate or approval reviewer is loaded, and project trust is granted (children pass --approve)."
+    "Pi sessions and the specialists the root launches run with full access by default: no auto-mode gate or approval reviewer is loaded, and project trust is granted (children pass --approve).",
+    "Decided (maintainer): config.json is the existing .holyagent/config.json, extended with a pi section and a claude section; settings common to both hosts sit outside those sections.",
+    "Decided: users run pi install git:...#holyagent-<version> once, and plain pi then starts the HolyAgent root, like the Claude plugin.",
+    "Decided (maintainer): codemode runs in mode \"only\" for the root and every specialist; tools registered model-only (such as rpiv-ask-user-question) stay directly callable; PI_CODEMODE_MAX_WORKERS is 4.",
+    "Decided: specialists run with PI_SKIP_VERSION_CHECK=1 and PI_TELEMETRY=0, not fully offline.",
+    "Decided (maintainer: \"in the holyagent setup for pi it should set bun as the npmcommand\"): holyagent setup for pi sets pi's npmCommand to bun."
   ],
-  "revision": 3,
+  "revision": 4,
   "state": "Open",
   "createdAt": "2026-11-07T16:43:52.519Z"
 }
