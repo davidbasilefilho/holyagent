@@ -16,9 +16,13 @@
     "The extension reaches the runtime through the scripts/holyagent wrapper shipped in the package, unchanged.",
     "Open: how the root process is started (the research says a launch with --append-system-prompt and -e; it names no launcher).",
     "Open: whether the extension loads with -e (the research's recommendation), by a global pi install (the Claude-parity assumption), or both.",
-    "Open: whether children launched by the root pass --approve or --no-approve for project trust."
+    "Open: whether children launched by the root pass --approve or --no-approve for project trust.",
+    "Maintainer (verbatim): \"the pi extension and integration will use a config.json that will set options, functionality, the provider, which will enable/disable its deps, etc\".",
+    "The Pi extension reads one config.json that sets the integration's options, which functionality is on, and the model provider; enabling or disabling a function or provider in it enables or disables the existing pi extensions and packages that supply it, so a disabled one is neither loaded nor required.",
+    "config.json is decoded with Effect Schema (onExcessProperty: \"error\") at load, with documented defaults; an invalid file stops with a message naming the field instead of falling back silently.",
+    "Open: where config.json lives (project, user or both, and which wins), whether it is the existing .holyagent/config.json extended or a separate file, its full option list, and how a change takes effect (restart or reload)."
   ],
-  "revision": 1,
+  "revision": 2,
   "state": "Open",
   "createdAt": "2026-11-07T16:43:52.519Z"
 }
