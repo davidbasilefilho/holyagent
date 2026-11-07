@@ -13,10 +13,12 @@
     "A second generator reads the same instruction sources as the Claude build and writes the Pi package; its paths join the generated-path list so the existing byte-for-byte sync check covers them, every generated file carries a note naming its source, and the version is synced from the root package.json by mise run build.",
     "A sync test for the Pi output exists, modelled on packages/integrations/claude/tests/plugin.test.ts.",
     "Every tracked path in the new package stays within the 120-character limit enforced by scripts/repo-paths.test.ts.",
-    "Open: which Pi version the package is built and tested against (the research read 1.4.0 only; Pi releases about weekly) and how the pin is recorded.",
-    "Open: whether extension code ships as TypeScript (Pi loads .ts through jiti) or built JavaScript, and whether the Effect-only lint override of packages/runtime/src applies to it."
+    "Decided: pi 1.5.0 is the pinned version (released 2026-11-02); pi and every reused extension are pinned and move only through mise run deps:update, which re-records the CI fixtures.",
+    "Decided (maintainer: \"built js, use bun build\"): the extension ships as JavaScript bundled with bun build into the generated package, guarded by the sync check.",
+    "Decided: users install with pi install git:github.com/davidbasilefilho/holyagent#holyagent-<version>, from the release tags; no npm publishing.",
+    "Decided: host modules are peerDependencies with range \"*\" as pi 1.5.0's package docs require; scripts/dependency-ranges.test.ts gains that exception for pi peer dependencies."
   ],
-  "revision": 1,
+  "revision": 2,
   "state": "Open",
   "createdAt": "2026-11-07T16:43:51.900Z"
 }
