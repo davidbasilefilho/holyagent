@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mw6mw1hn-gxrz",
+  "intentId": "intent-0mw6lz68m-7i26",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-repair-commit-ac29cf1-on",
+  "objective": "Re-review repair commit ac29cf1 on release/0.2.2/refactor/drop-frontend-design against the previous code findings.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-drop-frontend-design; review only 'git diff a8ccaa5 ac29cf1'. Previous findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw6mfshp-5j7r.md (notes 2 and 4 to 5; note 3, the branch-protection sentence, stays by decision).",
+    "Run 'bunx --no-install mise run verify' on a scratch copy of HEAD (git archive HEAD, git init plus git add -A so tests that need an index work, then bun install --frozen-lockfile) and confirm 'mise run build' leaves it unchanged; confirm the changed tests in plugin.test.ts fail on a8ccaa5 where the writer says they do and that no test was weakened."
+  ],
+  "constraints": [
+    "Read-only on the worktree: no repository edits and no git writes; scratch copies go in the scratchpad.",
+    "Keep working until the review is done; stop and report. Report in under 300 words, findings ranked with file:line and the smallest fix."
+  ],
+  "criteria": [
+    {
+      "text": "The repair closes the previous findings without a regression and mise run verify passes with the build in sync",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw6mmtwn-sjv2"
+  ],
+  "followUpOf": "assignment-0mw6mfshp-5j7r",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-07T16:44:48.395Z"
+  },
+  "createdAt": "2026-11-07T16:44:48.395Z"
+}
