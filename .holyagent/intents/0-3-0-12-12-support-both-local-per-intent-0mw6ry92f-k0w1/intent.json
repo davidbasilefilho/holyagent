@@ -4,6 +4,7 @@
   "objective": "0.3.0 12/12: Support both local (per-project) and global (per-user) installations of HolyAgent in Claude Code and in pi, with a user-level HolyAgent config, and document that HolyAgent works in claude.ai chat and Cowork.",
   "requirements": [
     "Maintainer (verbatim): \"for 0.3.0, we will support both local and global installations for holyagent in claude and pi\" and \"also document that holyagent in claude chat/cowork (they're now unified) works correctly\". The maintainer implements 0.3.0; this Intent records the plan.",
+    "Maintainer, 2026-11-07: implement 0.3.0 now, every part except the dropped auto-mode gate (pi 8/10); test with unit tests and recorded or synthesized fixtures only, no live Kimi runs; merge each PR once it is reviewed and green.",
     "Facts (research assignment-0mw6rgzw5-cgu7): Claude Code installs plugins at user, project or local scope (enabledPlugins in ~/.claude/settings.json, .claude/settings.json, .claude/settings.local.json; local over project over user); a committed project entry enables but does not download, so each collaborator runs `claude plugin install --scope project` once; managed settings also exist. pi installs globally with `pi install` (~/.pi/agent/settings.json) or per project with `pi install -l` (.pi/settings.json); project settings override global ones, and project packages load only after project trust (print, JSON and RPC modes need --approve or defaultProjectTrust \"always\").",
     "Claude Code: install, setup, doctor and the session-start setup check work the same at user, project and local scope; setup and doctor default to the scope the plugin is installed at, and the docs give the commands for each scope, including how a team shares a project-scope install.",
     "pi: global and project-local installs both work; the docs present both, global first (root default); a project-local install documents the trust step, and specialists of a project-local install inherit the parent session's project trust (--approve only when the parent trusted the project; root default). The behavior when HolyAgent is declared at both scopes is verified during implementation.",
@@ -11,7 +12,7 @@
     "claude.ai chat and Cowork (one Claude since 2026-09-16): plugins install per account from Customize > Plugins (no local or global notion there; an organization Owner can set a plugin to Installed by default or Required). The docs state, as tested by the maintainer, that HolyAgent works correctly there, replacing the earlier statement in docs/usage.md and docs/requirements.md that it does not work because of how hooks are activated; plain chat still loads skills only.",
     "Tests cover install scope resolution for setup and doctor and the user/project config merge inside the existing CI jobs."
   ],
-  "revision": 1,
+  "revision": 2,
   "state": "Open",
   "createdAt": "2026-11-07T19:06:29.608Z"
 }
