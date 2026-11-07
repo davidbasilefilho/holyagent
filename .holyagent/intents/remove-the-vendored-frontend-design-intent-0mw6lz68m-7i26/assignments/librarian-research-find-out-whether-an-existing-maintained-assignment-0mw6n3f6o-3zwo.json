@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mw6n3f6o-3zwo",
+  "intentId": "intent-0mw6lz68m-7i26",
+  "intentRevision": 1,
+  "roleTask": "Librarian.research",
+  "slug": "find-out-whether-an-existing-maintained",
+  "objective": "Find out whether an existing, maintained pi (pi coding agent) extension or package already provides a full Kimi for Coding (global) integration.",
+  "state": "Running",
+  "scope": [
+    "Maintainer question (verbatim): \"btw for the kimi provider in pi, check if there is any already existent and maintained pi extension for full kimi for coding global integration\".",
+    "Context: pi is the coding agent researched in /home/user/holyagent/docs/pi/ (read docs/pi/README.md, extensions.md and providers.md first for its package names, extension and provider APIs and the built-in provider ids kimi-coding, moonshotai and moonshotai-cn). Kimi for Coding is Moonshot AI's coding subscription; 'global' means the international service, not the China one.",
+    "Search the web (Exa search and fetch tools if you have them), npm, GitHub and pi's own documentation, package lists or examples for: (1) whether pi's built-in kimi-coding provider already is the full global Kimi for Coding integration (endpoint, auth, models, thinking, caching); (2) third-party pi extensions or pi packages for Kimi for Coding or Moonshot. For each candidate give: name and URL, what it supplies (provider registration, login or OAuth, model list, thinking levels, prompt caching, usage or quota display), global vs China endpoint, last release or commit date, maintainer, open issues, license, and whether it targets the pi version family the repo pins.",
+    "Judge 'maintained' by evidence: releases or commits in the last few months, responses to issues. Separate sourced facts from inference."
+  ],
+  "constraints": [
+    "Read-only: write no files and make no git writes. Put your full answer in the report itself.",
+    "Keep working until done; stop and report. Report in under 450 words: a verdict line first (use existing X / built-in is enough / nothing maintained exists), then the candidates with their evidence and URLs, then what a pi integration would still need to build."
+  ],
+  "criteria": [
+    {
+      "text": "The verdict on an existing maintained pi extension for Kimi for Coding global is backed by dated, linked evidence",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-07T16:50:32.736Z"
+  },
+  "createdAt": "2026-11-07T16:50:32.736Z"
+}
