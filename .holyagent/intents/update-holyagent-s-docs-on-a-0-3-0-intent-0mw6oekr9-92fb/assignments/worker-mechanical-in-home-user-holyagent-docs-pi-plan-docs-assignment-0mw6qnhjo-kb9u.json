@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "in-home-user-holyagent-docs-pi-plan-docs",
   "objective": "In /home/user/holyagent-docs-pi-plan/docs/pi, reword the three statements that say the 0.3.0 Intent text still names holy_assign or still lists a script confirmation, because the Intents now record the decisions.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "docs/pi/orchestration.md line 15: replace 'The Intent text still names a custom `holy_assign` tool (architecture 2 below). With this decision the launcher is the package, and HolyAgent writes' with 'The launcher is the package (architecture 2 below describes the custom alternative), and HolyAgent writes'. Keep the rest of the line.",
     "docs/pi/orchestration.md line 16: replace '(decided by the maintainer; the Intent text still lists a confirmation for other agents, which the decision overrides)' with '(decided by the maintainer)'.",
@@ -42,7 +42,33 @@
     "agentId": "workflow:wf_03cc0062-946/assignment-0mw6qnhjo-kb9u",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-07T18:30:07.765Z"
+    "startedAt": "2026-11-07T18:30:07.765Z",
+    "finishedAt": "2026-11-07T18:33:52.564Z"
+  },
+  "result": "result: Three passages edited and verified. `mise run verify` exits 0. No Intent-\"still names/lists\" sentence about holy_assign or confirmation remains in docs, apart from the near-misses noted below.\nchanged: docs/pi/orchestration.md (lines 15, 16); docs/pi/claude-parity.md (line 106, deleted sentence; fmt also realigned that table row)\nchecks: `bunx --no-install mise run fmt -- docs/pi` -> 0 (1 file reformatted); `bunx --no-install mise run verify` -> 0 (278 files formatted, no type errors in 144 files, no lint problems in 145 files, 1596 pass / 0 fail)\nblockers: none\nquestions: none\nnotes: Not edited, for the root to judge: docs/pi/orchestration.md:16 still says \"The Intent for the launcher still asks for\" (not names/lists, so out of pattern). docs/decisions.md:33 says \"its instruction text still names the specialists\" (not holy_assign or a confirmation). docs/pi/orchestration.md:123-124 describe holy_assign as an alternative, not as the Intent's current text.\ndiff-file: /home/user/holyagent-work/docs-030-repair.diff\nevidence:\nEdits applied: orchestration.md:15-16 and claude-parity.md:106 read as specified; `rg -n \"still names|still lists|holy_assign|confirmation\" docs` re-run after edits\nVerify passes: `bunx --no-install mise run verify` exit 0\nchecks-run: fmt exit 0, verify exit 0 (outputs above)\ndiff-file: /home/user/holyagent-work/docs-030-repair.diff\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "three passages edited; verify exit 0",
+    "criteria": [
+      {
+        "criterion": "Edits applied: the three passages read as specified",
+        "support": "orchestration.md:15-16 and claude-parity.md:106 read as specified; `rg -n \"still names|still lists|holy_assign|confirmation\" docs` re-run after edits"
+      },
+      {
+        "criterion": "Verify passes: mise run verify exits 0",
+        "support": "`bunx --no-install mise run verify` exit 0"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "fmt exit 0, verify exit 0 (outputs above)"
+      },
+      {
+        "label": "diff-file",
+        "support": "/home/user/holyagent-work/docs-030-repair.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-07T18:30:07.765Z"
 }
