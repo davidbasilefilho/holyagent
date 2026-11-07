@@ -1,0 +1,20 @@
+{
+  "id": "intent-0mw6muu20-ygf9",
+  "slug": "0-3-0-pi-2-10-make-the-runtime-cli-host",
+  "objective": "0.3.0 pi 2/10: Make the runtime CLI host-neutral wherever it assumes Claude Code, so a Pi session can use Intents, Assignments, workflows and hook commands without Claude-specific behavior.",
+  "requirements": [
+    "Maintainer (verbatim): \"please add intents for the next 0.3.0 release where I will implement the pi extension integration\"; the maintainer implements 0.3.0, so these Intents record the work and carry no Assignments until the maintainer starts it.",
+    "Maintainer (verbatim): \"in the docs/pi/ it's supposed to use already existent extensions for required functionality\" and \"the first provider to implement will be kimi for coding global\".",
+    "Release model: work lands on release/0.3.0/integration cut from main, as one release/0.3.0/<type>/<change> branch and one PR per change; the first PR of the release carries the version bump made with mise run bump:minor.",
+    "Done means mise run verify passes with the generated output in sync (mise run build) and CI green on every required check, including the windows job.",
+    "The workflow-availability check in cli/config.ts (Claude settings, CLAUDE_CODE_DISABLE_WORKFLOWS) becomes a host-neutral switch the Pi extension can set; the plan prints the direct-subagent fallback when workflows are unavailable.",
+    "The agent-id prefix and namespace for workflow-launched specialists accept the Pi holy_assign tool, and CLI help shown to a Pi session does not name Claude's Workflow tool.",
+    "The Claude plugin output is unchanged by this work: the Claude sync test passes.",
+    "Open: whether Pi handlers call the hook commands with a synthesized Claude-style payload (source, agent_type, tool_name, tool_input, tool_response) or call the domain functions directly.",
+    "Open: whether the commit-message cleaner needs a Pi-specific attribution pattern.",
+    "New runtime code follows the repository rules: Effect and tagged errors, Effect Schema at boundaries, JSDoc on exports, tests for each changed behavior."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-07T16:43:52.104Z"
+}
