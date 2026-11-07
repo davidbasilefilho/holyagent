@@ -13,14 +13,14 @@
     "Reused from the shipped examples, loaded explicitly: todo.ts for the task list (TaskCreate, TaskUpdate, TaskList, TaskGet and /todos).",
     "The ask tool (AskUserQuestion) is built from the shipped question.ts and questionnaire.ts examples over ctx.ui.select and input; in print and JSON mode it returns an error and the open decision becomes the blocker only the user can clear.",
     "protected-paths.ts and permission-gate.ts stay unloaded in this Intent, and the experimental pi-durable package is not used.",
-    "Open: the web search and fetch tool for the Librarian roles; the research says only \"a custom tool, or an MCP server\" and names none.",
-    "Open: the monitor tool for the root's CI watch (gh pr checks <n> --watch); the research finds no existing Pi carrier.",
-    "Open: how the example extensions (todo.ts, question.ts, questionnaire.ts) are made loadable from the package; the research says the Pi tarball contains examples/ and names no loading path.",
-    "Open: whether the ask tool can reuse an example unchanged; the research calls the examples only a starting point.",
     "Maintainer (verbatim): \"the pi extension and integration will use a config.json that will set options, functionality, the provider, which will enable/disable its deps, etc\".",
-    "The config.json from Intent 0.3.0 pi 4/10 selects this: each tool and the existing extension that carries it is on or off per config.json, and a disabled one is not loaded."
+    "The config.json from Intent 0.3.0 pi 4/10 selects this: each tool and the existing extension that carries it is on or off per config.json, and a disabled one is not loaded.",
+    "Decided (maintainer): web search and fetch come from pi-web-kit, disabled when the provider extension offers web tools (Kimi's moonshot_search and moonshot_fetch).",
+    "Decided: @aliou/pi-processes watches long commands such as gh pr checks --watch.",
+    "Decided (maintainer: rpiv unless howaboua is better; research found it is not): @juicesharp/rpiv-todo provides the task list and @juicesharp/rpiv-ask-user-question the ask tool.",
+    "Decided (maintainer): Billion Context is installed in the pi integration only: the billion-context package, pinned, compressing the root and specialist sessions (delegate.forceEnable), with its own acp_delegate subagents off (pi.subagents false); it replaces pi's compaction."
   ],
-  "revision": 2,
+  "revision": 3,
   "state": "Open",
   "createdAt": "2026-11-07T16:43:52.958Z"
 }
