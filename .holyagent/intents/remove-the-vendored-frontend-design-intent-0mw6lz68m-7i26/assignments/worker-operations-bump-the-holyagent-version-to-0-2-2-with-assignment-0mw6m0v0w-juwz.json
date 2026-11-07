@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mw6m0v0w-juwz",
+  "intentId": "intent-0mw6lz68m-7i26",
+  "intentRevision": 1,
+  "roleTask": "Worker.operations",
+  "slug": "bump-the-holyagent-version-to-0-2-2-with",
+  "objective": "Bump the HolyAgent version to 0.2.2 with the repository's bump task in /home/user/holyagent-drop-frontend-design.",
+  "state": "Running",
+  "scope": [
+    "Run 'bunx --no-install mise run bump:patch' in /home/user/holyagent-drop-frontend-design (branch release/0.2.2/refactor/drop-frontend-design, at main 3bcefd3, version 0.2.1). It edits the root package.json and rebuilds, which copies the version everywhere. Then run 'bunx --no-install mise run verify' there.",
+    "Report 'git status --short' and confirm the root package.json version reads 0.2.2."
+  ],
+  "constraints": [
+    "Run only those commands; edit no file by hand.",
+    "Make no commits or other git writes and no edits under .git/ or .holyagent/.",
+    "Keep working until done; stop and report. Report in under 150 words."
+  ],
+  "criteria": [
+    {
+      "text": "The version is 0.2.2 in every copy and mise run verify passes",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "git-status"
+  ],
+  "ownershipPaths": [
+    "package.json",
+    "packages",
+    "bun.lock",
+    ".claude-plugin"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-07T16:20:33.680Z"
+  },
+  "createdAt": "2026-11-07T16:20:33.680Z"
+}
