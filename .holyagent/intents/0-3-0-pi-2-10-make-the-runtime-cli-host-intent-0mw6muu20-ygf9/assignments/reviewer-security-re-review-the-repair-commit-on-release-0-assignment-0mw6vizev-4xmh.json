@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "re-review-the-repair-commit-on-release-0",
   "objective": "Re-review the repair commit on release/0.3.0/refactor/host-neutral-cli against the earlier code and security findings, so the PR can close.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-cli; repair diff (generated bundle excluded): /home/user/holyagent-notes/pr2-repair.diff; the repair commit is HEAD on top of ee51233.",
     "Earlier findings to check closed: help failing on an invalid HOLYAGENT_HOST; PI_SESSION_LINK (and the claude.ai link pattern) swallowing a closing parenthesis; PI_GENERATED_FOOTER quadratic backtracking on 'generated with pi(' plus many ')'; PI_NAME stripping any 'Co-authored-by: Pi' regardless of address; hard-coded 'workflow:'/'pi-workflow:' prefixes duplicated in host.ts; assignment record loading the whole config so a bad HOLYAGENT_REUSE_TTL_MINUTES breaks recording; reconcile reading the host itself (resolved by a stated choice); pi record and reports help still describing Claude hooks and journals."
@@ -38,7 +38,29 @@
     "agentId": "workflow:wf_2509bd7f-b8d/assignment-0mw6vizev-4xmh",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-07T20:46:35.719Z"
+    "startedAt": "2026-11-07T20:46:35.719Z",
+    "finishedAt": "2026-11-07T21:23:00.079Z"
+  },
+  "result": "result: both criteria are met. All eight earlier findings are closed or settled by a sound stated choice. I found no new vulnerability, and two minor non-blocking notes.\n\nThe built-in `/security-review` could not run. The skill failed on its `git log origin/HEAD...` step because this worktree has no `origin/HEAD`. I reviewed `/home/user/holyagent-notes/pr2-repair.diff` and the worktree sources by reading them. I had no shell, so I ran no tests and checks, and the regex timing below is by analysis only.\n\n**Findings (all closed)**\n- **Help on an invalid `HOLYAGENT_HOST`:** closed. `hostForText` in `program.ts:92-95` falls back to Claude's words. It is used by `--help`, group help, command help and `failed()`. Commands that load the config still refuse a bad host.\n- **Link patterns swallowing `)`:** closed. `SESSION_LINK` and `PI_SESSION_LINK` in `message.ts:29-30` now use `[^\\s)]*`.\n- **`PI_GENERATED_FOOTER` backtracking:** closed. The group is `\\([^\\s)]*\\)`. On `generated with pi(` plus 50,000 `)` it makes one pass with linear backtracking in the trailing `[^\\p{L}\\p{N}]*$`. The leading symbol group is unambiguous.\n- **`PI_NAME` stripping any \"Pi\":** closed. `PI_AGENT_NAME` (`message.ts:31`) matches only \"Pi Coding Agent\". A bare \"Pi\" goes only with a `@pi.dev` address, via the address regex at `message.ts:35`. The comment states this choice.\n- **Duplicated prefixes in `host.ts`:** closed. `host.ts` imports `WORKFLOW_AGENT_PREFIX` and `PI_WORKFLOW_AGENT_PREFIX` from `directive.ts`. There is no import cycle: `directive.ts` imports only the type from `host.ts`, and neither `assignment`, `route`, `specialists` nor `paths` reaches `host`. So there is no TDZ risk at module load.\n- **`assignment record` loading the whole config:** closed. `assignment.ts:315` calls `agentHostOf(env)` only, so a bad TTL or workflows setting no longer blocks recording.\n- **`reconcile` reading the host:** resolved by a stated choice, with a comment at `overview.ts:178`. It reads the host alone.\n- **pi help text for `record` and `reports`:** closed. `recordNote` and `reportsNote` live in `HostWords`, and the pi text says no hook records and that reports read Claude journals only.\n\n**New issues:** none.\n\n**Non-blocking notes**\n- `assignment record --failed` still needs a valid `HOLYAGENT_HOST` (`assignment.ts:315`), although only `--agent` needs the host. This is unchanged from before and harmless.\n- A `claude.ai` URL containing `)` now leaves its tail in the message. Session URLs do not contain `)`, so this has no practical effect.\n\nevidence:\nFindings closed: each of the eight earlier findings is fixed or settled by a stated choice, at program.ts:92-139, message.ts:22-36, host.ts:1-80, assignment.ts:305-325 and overview.ts:178.\nNo new issue: no regression or vulnerability introduced. I checked the module cycle, the regex backtracking and the host-only config path, by reading only; no tests were run.\nfindings: none blocking; the two notes above are non-blocking.\n",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Earlier findings closed; no blocker; runtime tests 928 pass in the code re-review.",
+    "criteria": [
+      {
+        "criterion": "Findings closed: each earlier finding is fixed or resolved with a sound stated choice",
+        "support": "each of the eight earlier findings is fixed or settled by a stated choice, at program.ts:92-139, message.ts:22-36, host.ts:1-80, assignment.ts:305-325 and overview.ts:178."
+      },
+      {
+        "criterion": "No new issue: the repair introduces no regression or new vulnerability",
+        "support": "no regression or vulnerability introduced. I checked the module cycle, the regex backtracking and the host-only config path, by reading only; no tests were run."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "none blocking; the two notes above are non-blocking."
+      }
+    ]
   },
   "createdAt": "2026-11-07T20:46:35.719Z"
 }
