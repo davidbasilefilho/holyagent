@@ -13,7 +13,7 @@
     "A warm specialist is continued through the same session id with a new prompt, only when the CLI's directive says continue; a specialist whose review must be independent is never continued.",
     "Completion is read from agent_settled, never agent_end; failure from stopReason error, aborted or length, a failed auto_retry_end, a process exit or a settle without a report, each mapped to the Assignment status table of orchestration.md.",
     "After a launch the launcher records the agent id with assignment record under the dispatched-Assignment marker test and says so in its tool result; on failure it hands the step back to the root. It keeps launched agent ids (pid, session id) where a resumed root can read them.",
-    "A workflow script that calls only holy_assign with the eighteen names runs without a prompt; any other script asks through ctx.ui.confirm and is blocked when there is no UI.",
+    "Decided (maintainer): no workflow script asks for confirmation, whatever agents it calls, consistent with full access as the default (\"No confirmation\"); the earlier ctx.ui.confirm gate for scripts that call agents other than the eighteen specialists is dropped.",
     "When codemode or holy_assign is not among the active tools, the launcher provides a direct subagent fallback and signals workflows-unavailable to the runtime switch.",
     "Abort and deadlines are the host's job; the launcher sets PI_CACHE_RETENTION=long on children where the provider's adapter honors it.",
     "Maintainer (verbatim): \"for the kimi provider, currently kimi k3.1 pro should be root and the kimi-for-coding model (which is kimi k2.8 preview) should be the specialists, except stuff like visual stuff that should be kimi k3.1 pro low or something. it really depends on the specialists and the routing should be figured out\".",
@@ -21,7 +21,7 @@
     "Decided (maintainer): specialists and workflows run through @tintinweb/pi-subagents; its SubagentWorkflow tool runs Claude-style workflow scripts in the background, so the root stays free and is woken as each specialist finishes.",
     "Decided: no extra report tool; a specialist's final message is its report."
   ],
-  "revision": 3,
+  "revision": 4,
   "state": "Open",
   "createdAt": "2026-11-07T16:43:53.169Z"
 }
