@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "re-review-the-repair-of-the-integration",
   "objective": "Re-review the repair of the integration-branch rule change (commit on top of 85bd5ba plus an uncommitted doc figure fix) against the three earlier findings, so the PR can close.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0. Repair diff: /home/user/holyagent-notes/pr1-repair.diff; doc figure fix diff: /home/user/holyagent-notes/pr1-docfix.diff. Earlier findings: (1) identity.md:9 'Creating a missing base is no such push.' was unscoped; (2) stack-plan.md:8 'Later commits pushed onto an existing base' was loose and did not say the created base carries only the conventions' start; (3) the mergeability rationale was restated in stack-plan.md and R-BRANCH instead of citing Precedence. The repair also raised CONTEXT_BUDGET from 9,300 to 9,400 (docs/hooks.md and docs/pi/claude-parity.md)."
   ],
@@ -38,7 +38,29 @@
     "agentId": "workflow:wf_2509bd7f-b8d/assignment-0mw6vb9kx-nebz",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-07T20:46:21.120Z"
+    "startedAt": "2026-11-07T20:46:21.120Z",
+    "finishedAt": "2026-11-07T21:22:59.269Z"
+  },
+  "result": "Both blocking criteria are met; I found no blocking issues. I judged this from the two diffs plus a grep of the worktree, and I did not run the tests or gates.\n\n**Findings**\n1. Closed. `identity.md:9` is now scoped: \"Cutting and pushing a base the conventions name that the remote lacks is no such push; pushing commits onto an existing base is.\" Both halves are explicit.\n2. Closed. `stack-plan.md:8` now says the missing base is \"cut from the start the convention gives, carrying only that start\". The loose \"Later commits pushed onto an existing base\" is replaced by \"Pushing commits onto an existing base needs the user's approval.\"\n3. Closed. The restated \"mergeability ... outranks HolyAgent's defaults\" is gone from `stack-plan.md:8`, which now cites `(Precedence)`. That is the same convention `stack-plan.md:3` and `version-control.md:7` use for the shared precedence text.\n   - `requirements.md:49` R-BRANCH cites `R-PRECEDENCE`, which exists at `requirements.md:12`.\n\n**New issues**\n- None blocking.\n- The figure fix is consistent. `docs/hooks.md`, `docs/pi/claude-parity.md`, `packages/runtime/src/cli/sessioncontext.ts` and the generated `dist/scripts/holyagent.js` all say 9,400. A repo-wide search for `9,300` or `9300` finds nothing left.\n- Approval is not loosened. A base that already exists still needs approval, and the created base carries only the convention's start. The `plugin.test.ts` phrases were updated to match the new text.\n- Non-blocking: `identity.md:9` omits \"carrying only that start\", which `stack-plan.md:8` and R-BRANCH state. It is a summary line, so this is acceptable.\n\nevidence:\nFindings closed: `packages/runtime/src/instructions/claude-5.5/root/identity.md:9` (scoped), `packages/runtime/src/instructions/claude-5.5/root/stack-plan.md:8` (carrying only that start, existing base needs approval, cites Precedence), `packages/runtime/src/instructions/requirements.md:49` (cites R-PRECEDENCE, defined at line 12). Source is `/home/user/holyagent-notes/pr1-repair.diff`.\nNo new issue: the budget is 9,400 in all five places, and a grep for 9,300 and 9300 returns nothing. Approval for existing bases is kept in `identity.md:9`, `stack-plan.md:8` and R-BRANCH.\nfindings: none blocking; one non-blocking note (`identity.md:9` omits \"carrying only that start\").\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "All three findings closed with quoted lines; no new issue.",
+    "criteria": [
+      {
+        "criterion": "Findings closed: each of the three earlier findings is fixed",
+        "support": "`packages/runtime/src/instructions/claude-5.5/root/identity.md:9` (scoped), `packages/runtime/src/instructions/claude-5.5/root/stack-plan.md:8` (carrying only that start, existing base needs approval, cites Precedence), `packages/runtime/src/instructions/requirements.md:49` (cites R-PRECEDENCE, defined at line 12). Source is `/home/user/holyagent-notes/pr1-repair.diff`."
+      },
+      {
+        "criterion": "No new issue: the repair introduces no contradiction or loosened approval",
+        "support": "the budget is 9,400 in all five places, and a grep for 9,300 and 9300 returns nothing. Approval for existing bases is kept in `identity.md:9`, `stack-plan.md:8` and R-BRANCH."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "none blocking; one non-blocking note (`identity.md:9` omits \"carrying only that start\")."
+      }
+    ]
   },
   "createdAt": "2026-11-07T20:40:35.649Z"
 }
