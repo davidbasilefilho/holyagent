@@ -16,14 +16,14 @@ A discrepancy is material, and starts a repair whatever its size, when it affect
 
 A number is binding only where a platform guideline fixes it; every other number is a default, marked `(default)`, that the design may override with a stated reason.
 
-Apply the skill's capture checklist on the final captures: the worker before reporting, the reviewer in its findings and the root in its own final pass. Critique your own work while you build, with captures wherever the environment can take them. Report only checks actually run, and name each check not run.
+Apply the skill's capture checklist on the final captures: the worker before reporting, the reviewer in its findings and the root in its own final pass. Check your own work as it takes shape, from captures wherever the environment can produce them. Report only checks actually run, and name each check not run.
 
 ### Direction before code
 
-- Name the subject, the audience and the main job, and propose them in the plan when the brief omits them, taking any known preferences or project context as a hint. The brief's own words outrank every avoid list below.
-- Draw distinctive choices from the subject itself, its industry, materials and vernacular, and build with the brief's real content throughout: a toy for eight-year-olds and a dashboard for financial analysts should not look related.
-- Make deliberate, opinionated choices on palette, type and layout that are specific to this brief, and take aesthetic risk when it is justified.
-- Write a compact plan before building: four to six named palette colors with values and roles, type roles, a layout concept in one-sentence prose with ASCII wireframes to compare options and its alignment (left, centered or justified), and two or three principles. Test it with "would I make this for any similar product?" and the competitor test: drop an idea that still works with a competitor's name on it. Revise every part that fails, say what changed and why, and only then write code.
+- When the brief leaves out the subject, the audience or the main job, state them as a proposal in the plan and confirm them with the client where one is reachable; remembered preferences or project context are a starting hint. The brief's own words outrank every avoid list below.
+- Let the subject supply the look: its trade, materials and idiom decide the visual choices, and the brief's real content stays in the work from start to finish. A ferry timetable and a toddler's game should look nothing alike.
+- Choose palette, type and layout on purpose and for this brief alone, accept visual risk when it earns its place, and treat each project as a chance to try something new instead of repeating what you do best.
+- Sketch a plan before building: a small named palette (four to six colors, each with a value and a role), the type roles, a layout idea in a sentence, compared through rough ASCII wireframes, with how the content aligns (left, centered or justified), and two or three principles. Audit it with "would I make this for any similar product?" and the competitor test: drop an idea that still works with a competitor's name on it. Rewrite what fails, note what changed and why, and start coding only from the revised plan.
 - Say whether this is a refinement, which preserves the existing design, or a redesign, which replaces it.
 
 ### Platform fidelity over invention
@@ -34,31 +34,31 @@ Apply the skill's capture checklist on the final captures: the worker before rep
 
 ### Design record
 
-- Read `DESIGN.md` at the project root before UI work and create or update it after: platform and stack, direction, color roles, type roles, spacing and shape, components and states, do and don't, and a short note of what you tried, so later passes try something new. Note a changed decision instead of silently overwriting it. (behavior check)
+- Read `DESIGN.md` at the project root before UI work and create or update it after: platform and stack, direction, color roles, type roles, spacing and shape, components and states, do and don't, and a brief log of the options already tried, so later passes explore new ground. Note a changed decision instead of silently overwriting it. (behavior check)
 
 ### Spend boldness in one place
 
-- One signature detail per screen; everything around it stays quiet and disciplined. Cut decoration that does not serve the brief, remove one accessory before finishing, and replace it with scale, real content or a real image, so the screen is not left thin. (preference)
+- Make one detail per screen the memorable one and keep the rest calm and restrained. Strip ornament that does nothing for the brief, and before finishing remove one accessory more, filling the gap with scale, real content or a real image so the screen is not left thin. (preference)
 - A labeled gray placeholder beats drawn art or emoji used as icons. (preference)
 
 ### Structure and content
 
-- A structural device (outline, border, divider, eyebrow, label or number) encodes something true about the content and is not decoration. Number items only when the content is a sequence, such as steps or a timeline; check before adding numbers.
-- When the brief has no real content, write specific copy and placeholder content from the subject: generic copy makes a design read as templated as generic layout does.
+- A border, divider, outline, label, eyebrow or number belongs only where it tells the reader something true about the content. Numbers mark a real sequence (steps, a timeline) and nothing else, so confirm it is one first. An eyebrow over every heading, all-caps labels and labels that say nothing are decoration, not structure.
+- With no real content in the brief, invent specific copy from the subject: generic words flatten a design as much as a generic layout does.
 
 ### Copy
 
-- Words are design content, not decoration. Before writing, ask what the screen has to say and the simplest way to say it; each written element does one job.
-- Write from the user's side, naming things as users understand them (notifications, not webhook config). Say what something is or does and do not sell it; specific and legible beats clever.
-- Use active voice, plain verbs, sentence case (or the platform's own capitalization) and no filler, with a tone that fits the brand and the audience.
-- A control says exactly what happens ("Save changes", not "Submit"), and an action keeps one name through the whole flow: the Archive button leads to an "Archived" confirmation.
-- Failure and emptiness give direction. An error says what went wrong and how to fix it, in the interface's voice and without apology or vagueness; an empty screen invites the next action.
+- Interface text exists to help someone understand and act, so treat it as part of the design. Decide what the screen must convey and the shortest way to convey it, with one job for each piece of text.
+- Speak in the user's terms, calling a thing what the user calls it ("saved searches", not "query presets"). Describe what something is or does instead of selling it; concrete beats clever.
+- Prefer active voice, plain verbs, sentence case (or the platform's own capitalization) and a conversational tone suited to the brand and audience, without filler.
+- A control names its outcome ("Send invoice", not "Submit"), and an action keeps its name through the whole flow: the Archive button leads to an "Archived" confirmation.
+- When something fails or nothing is there yet, point the way. An error states what happened and how to recover, speaks as the interface and not as a person, and neither apologizes nor stays vague; an empty state invites the first action.
 
 ### Quality floor, unannounced
 
-- Text contrast is at least 4.5:1 and non-text control contrast at least 3:1. Color is never the only signal, and the palette is harmonious.
+- Text contrast is at least 4.5:1 and non-text control contrast at least 3:1. Color is never the only signal, and the colors work together as a palette.
 - Every state exists and is captured where reachable: hover or press, focus, disabled, loading, empty, error and long content.
-- The system's reduced-motion, larger-text and high-contrast settings, where the platform has them, change the render.
+- The system's reduced-motion, larger-text and high-contrast settings, where the platform has them, change the render; under reduced motion, movement becomes a fade or nothing.
 
 ## Web rules
 
@@ -67,9 +67,9 @@ Apply the skill's capture checklist on the final captures: the worker before rep
 
 ### Hero and typography
 
-- The hero is the first thing a visitor sees. Open with the most characteristic thing in the subject's world, in the form that suits it: a headline, an image, an animation, a live demo or an interactive moment. A big number with a small label, supporting stats and a gradient accent is the default hero, so use it only when it is truly the best option.
-- Type carries the page's personality. Use one family or two, and if two, clearly distinct ones. Choose typefaces for this brief and not the families you would reach for on any project, and set a clear type scale in the tradition of The Elements of Typographic Style, with intentional weights, widths and spacing. (preference)
-- When type is a headline or a visual element, its treatment is part of the design and not a neutral vehicle for the words.
+- Fill the hero with what is most distinctive about the subject, then pick the form that shows it best: a headline, an image, motion, a live demo or an interaction. The stock hero (one big figure over a small caption, a row of supporting stats, a gradient accent) needs a reason to be chosen.
+- Typography is where a page gets its character. One family may carry both display and body when it suits the brief; two work if they differ plainly. Pick faces for this brief and not the ones you reach for every time, and build a clear scale on the conventions of The Elements of Typographic Style, with weights, widths and spacing set on purpose. (preference)
+- Treat headline and display type as a design element in its own right and not a transparent carrier for the words.
 
 ### Systems, not values
 
@@ -77,8 +77,8 @@ Apply the skill's capture checklist on the final captures: the worker before rep
 - More space surrounds a group than sits inside it, so groups read at a glance.
 - Two font weights. Hierarchy comes from weight and color before size, with at most three text colors. (default)
 - The layout holds its hierarchy in grayscale before color is added. (preference)
-- Body text measure is 65 to 75 characters, and a line never spans a wide screen. Serif body text may run slightly longer and takes more line height than sans serif. (default)
-- Section spacing is set in one place and selector specificity stays flat, so a class like `.section` and a rule on an element like `.cta` do not cancel each other's padding or margin. Symptom: uneven or doubled gaps between sections.
+- Body text measure is 65 to 75 characters, and a line never spans a wide screen. A serif body face tolerates a somewhat longer measure but wants extra leading compared with a sans. (default)
+- Set section spacing in one place and keep selector specificity flat, so a class rule and an element rule never override each other's padding or margin. Symptom: uneven or doubled gaps between sections.
 - The layout holds from phone width to desktop with no horizontal scroll or clipped content.
 
 ### Actions and hierarchy
@@ -102,9 +102,9 @@ Apply the skill's capture checklist on the final captures: the worker before rep
 
 ### Motion
 
-- Motion nobody triggered is sparing and aimed at one moment, such as a single page-load sequence or one reveal. Fade-and-slide entrances on every section and hover transitions on every card are the generic default. Motion that answers an action (opening, expanding, confirming) is welcome when it shows what changed.
+- Spend unprompted motion on one moment, such as a single load sequence or reveal, and do not scatter it: entrance animations on every section and hover effects on every card are the stock look. Motion that follows a user's action is welcome where it shows what changed.
 - Only transform and opacity animate, never a blanket "all properties" transition. (behavior check)
-- Animations can be interrupted, and under reduced motion movement is replaced by a fade or nothing. Capture with the setting on.
+- Animations can be interrupted.
 
 ### Themed browser surfaces
 
@@ -112,19 +112,17 @@ Apply the skill's capture checklist on the final captures: the worker before rep
 
 ## Refuse list
 
-Unless the brief asks for it (its own words win, even when they name one of these looks), and without spending an axis the brief leaves free on one of these defaults:
+Unless the brief asks for it, and without filling a choice the brief leaves open with one of these defaults:
 
 - identical icon-card grids and hero metric tiles
-- the SaaS-card kit: content chopped into identical rounded cards, one corner radius on everything whatever its rank, the same soft gray shadow under each, and gradient washes as decoration
-- an eyebrow label over every heading, all-caps labels, and other labels above content that say nothing
-- accenting a single word or phrase of a headline with italic, bold or another color
+- a card-kit page: look-alike rounded panels, one corner radius whatever an element's rank, the same faint shadow on every panel, and gradients as ornament
+- picking out one word or phrase of a headline with italics, bold or another color
 - gradient text and side-stripe borders
 - glass as decoration (preference)
 - emoji as icons
-- "01 / 02 / 03" numbering without a real sequence
-- a broadsheet layout of hairline rules, square corners and dense newspaper columns for a subject that is not editorial (preference)
-- template chrome whatever the subject: meta strings joined with middle dots, labels built as "WORD — fragment" with a spaced em dash, a tinted near-black such as #0B0B0B or #111 standing in for black, a monospace face for small data labels, and "→" appended to link and button text
-- cream (near #F4F1EA) with a high-contrast serif and a clay accent (near #D97757, which reads as a generated-page tell), or near-black with one acid-green or vermilion accent (preference)
+- a newspaper front page (hairline rules, square corners, dense multi-column text) for a subject that is not editorial (preference)
+- default-kit trimmings that appear whatever the subject: metadata strung together with dots, labels shaped as a capitalized word, a dash and a fragment, off-black fills standing in for true black, monospace captions on small data, and a trailing arrow on links and buttons
+- a warm paper-cream ground with a high-contrast serif and a terracotta accent, which has become a generated-page signature, or a near-black ground with one lone neon or red-orange accent (preference)
 
 ## Capture checklist
 

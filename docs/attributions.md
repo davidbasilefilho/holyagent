@@ -19,7 +19,7 @@
 
 ## Design skill sources
 
-The `web-design`, `mobile-design`, `desktop-design` and `tui-design` skills take ideas from the sources below. No text was copied from any of them; the skills are written in this project's own words. Anthropic's `frontend-design` skill was embedded in the visual specialists until 0.2.2; it is no longer vendored, and its directives are restated in the shared core and `web-design`, so no copy of its license or text travels with the plugin. The skills' shared core is a single source file, `packages/runtime/src/instructions/claude-5.5/design-core/core.md`.
+The `web-design`, `mobile-design`, `desktop-design` and `tui-design` skills take ideas from the sources below and restate them in this project's own words. Anthropic's `frontend-design` skill (Apache-2.0) was embedded in the visual specialists through 0.2.1, with its license shipped alongside. From 0.2.2 it is no longer vendored and neither its text nor its license travels with the plugin; its directives live on as HolyAgent's own restatement in the shared core and `web-design`. The skills' shared core is a single source file, `packages/runtime/src/instructions/claude-5.5/design-core/core.md`.
 
 | Source                                                                                                 | Inspired                                                                                     | License                                              |
 | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- | ---------------------------------------------------- |

@@ -18,7 +18,7 @@ packages/
   integrations/claude/          turns the runtime into the Claude Code plugin
     build.ts, src/              the generator and the wrapper source
     tests/
-    dist/                       generated: the built plugin (.claude-plugin/, settings.json, agents/, commands/, skills/, hooks/, licenses/, scripts/)
+    dist/                       generated: the built plugin (.claude-plugin/, settings.json, agents/, commands/, skills/, hooks/, scripts/)
 .claude-plugin/marketplace.json generated; the marketplace entry for the plugin
 .github/                        the CI, publish and release workflows and the tag-release action
 scripts/                        Bun scripts behind the mise tasks: toolchain, hooks, vendoring, versions, the dependency updater, PR checks

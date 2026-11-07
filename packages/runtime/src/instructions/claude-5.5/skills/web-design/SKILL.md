@@ -16,9 +16,9 @@ Rules for pages and web apps, judged on what renders: the visual direction, the 
 
 ### Hero and typography
 
-- The hero is the first thing a visitor sees. Open with the most characteristic thing in the subject's world, in the form that suits it: a headline, an image, an animation, a live demo or an interactive moment. A big number with a small label, supporting stats and a gradient accent is the default hero, so use it only when it is truly the best option.
-- Type carries the page's personality. Use one family or two, and if two, clearly distinct ones. Choose typefaces for this brief and not the families you would reach for on any project, and set a clear type scale in the tradition of The Elements of Typographic Style, with intentional weights, widths and spacing. (preference)
-- When type is a headline or a visual element, its treatment is part of the design and not a neutral vehicle for the words.
+- Fill the hero with what is most distinctive about the subject, then pick the form that shows it best: a headline, an image, motion, a live demo or an interaction. The stock hero (one big figure over a small caption, a row of supporting stats, a gradient accent) needs a reason to be chosen.
+- Typography is where a page gets its character. One family may carry both display and body when it suits the brief; two work if they differ plainly. Pick faces for this brief and not the ones you reach for every time, and build a clear scale on the conventions of The Elements of Typographic Style, with weights, widths and spacing set on purpose. (preference)
+- Treat headline and display type as a design element in its own right and not a transparent carrier for the words.
 
 ### Systems, not values
 
@@ -26,8 +26,8 @@ Rules for pages and web apps, judged on what renders: the visual direction, the 
 - More space surrounds a group than sits inside it, so groups read at a glance.
 - Two font weights. Hierarchy comes from weight and color before size, with at most three text colors. (default)
 - The layout holds its hierarchy in grayscale before color is added. (preference)
-- Body text measure is 65 to 75 characters, and a line never spans a wide screen. Serif body text may run slightly longer and takes more line height than sans serif. (default)
-- Section spacing is set in one place and selector specificity stays flat, so a class like `.section` and a rule on an element like `.cta` do not cancel each other's padding or margin. Symptom: uneven or doubled gaps between sections.
+- Body text measure is 65 to 75 characters, and a line never spans a wide screen. A serif body face tolerates a somewhat longer measure but wants extra leading compared with a sans. (default)
+- Set section spacing in one place and keep selector specificity flat, so a class rule and an element rule never override each other's padding or margin. Symptom: uneven or doubled gaps between sections.
 - The layout holds from phone width to desktop with no horizontal scroll or clipped content.
 
 ### Actions and hierarchy
@@ -51,9 +51,9 @@ Rules for pages and web apps, judged on what renders: the visual direction, the 
 
 ### Motion
 
-- Motion nobody triggered is sparing and aimed at one moment, such as a single page-load sequence or one reveal. Fade-and-slide entrances on every section and hover transitions on every card are the generic default. Motion that answers an action (opening, expanding, confirming) is welcome when it shows what changed.
+- Spend unprompted motion on one moment, such as a single load sequence or reveal, and do not scatter it: entrance animations on every section and hover effects on every card are the stock look. Motion that follows a user's action is welcome where it shows what changed.
 - Only transform and opacity animate, never a blanket "all properties" transition. (behavior check)
-- Animations can be interrupted, and under reduced motion movement is replaced by a fade or nothing. Capture with the setting on.
+- Animations can be interrupted.
 
 ### Themed browser surfaces
 
@@ -61,19 +61,17 @@ Rules for pages and web apps, judged on what renders: the visual direction, the 
 
 ## Refuse list
 
-Unless the brief asks for it (its own words win, even when they name one of these looks), and without spending an axis the brief leaves free on one of these defaults:
+Unless the brief asks for it, and without filling a choice the brief leaves open with one of these defaults:
 
 - identical icon-card grids and hero metric tiles
-- the SaaS-card kit: content chopped into identical rounded cards, one corner radius on everything whatever its rank, the same soft gray shadow under each, and gradient washes as decoration
-- an eyebrow label over every heading, all-caps labels, and other labels above content that say nothing
-- accenting a single word or phrase of a headline with italic, bold or another color
+- a card-kit page: look-alike rounded panels, one corner radius whatever an element's rank, the same faint shadow on every panel, and gradients as ornament
+- picking out one word or phrase of a headline with italics, bold or another color
 - gradient text and side-stripe borders
 - glass as decoration (preference)
 - emoji as icons
-- "01 / 02 / 03" numbering without a real sequence
-- a broadsheet layout of hairline rules, square corners and dense newspaper columns for a subject that is not editorial (preference)
-- template chrome whatever the subject: meta strings joined with middle dots, labels built as "WORD — fragment" with a spaced em dash, a tinted near-black such as #0B0B0B or #111 standing in for black, a monospace face for small data labels, and "→" appended to link and button text
-- cream (near #F4F1EA) with a high-contrast serif and a clay accent (near #D97757, which reads as a generated-page tell), or near-black with one acid-green or vermilion accent (preference)
+- a newspaper front page (hairline rules, square corners, dense multi-column text) for a subject that is not editorial (preference)
+- default-kit trimmings that appear whatever the subject: metadata strung together with dots, labels shaped as a capitalized word, a dash and a fragment, off-black fills standing in for true black, monospace captions on small data, and a trailing arrow on links and buttons
+- a warm paper-cream ground with a high-contrast serif and a terracotta accent, which has become a generated-page signature, or a near-black ground with one lone neon or red-orange accent (preference)
 
 ## Capture checklist
 

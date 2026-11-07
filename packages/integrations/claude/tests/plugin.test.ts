@@ -1011,38 +1011,42 @@ describe("agents", () => {
         expect(text).toContain(section)
         expect(section).toContain("the platform design skill whose file your criteria name")
         expect(section).toContain("checklist")
+        expect(section).not.toMatch(/frontend.design/i)
       }
     }
   })
 
   test("the platform design skills carry the design directives that the visual roles no longer embed", () => {
     const core = [
-      "Draw distinctive choices from the subject itself",
-      "take aesthetic risk when it is justified",
-      "four to six named palette colors",
-      "ASCII wireframes",
-      "Revise every part that fails, say what changed and why, and only then write code",
-      "Cut decoration that does not serve the brief",
-      "Number items only when the content is a sequence",
-      "write specific copy and placeholder content",
-      '("Save changes", not "Submit")',
+      "confirm them with the client where one is reachable",
+      "Let the subject supply the look",
+      "accept visual risk when it earns its place",
+      "a small named palette (four to six colors, each with a value and a role)",
+      "rough ASCII wireframes",
+      "start coding only from the revised plan",
+      "Strip ornament that does nothing for the brief",
+      "Numbers mark a real sequence",
+      "An eyebrow over every heading, all-caps labels and labels that say nothing",
+      "invent specific copy from the subject",
+      '("Send invoice", not "Submit")',
       'the Archive button leads to an "Archived" confirmation',
-      "An error says what went wrong and how to fix it",
-      "an empty screen invites the next action",
-      "Critique your own work while you build",
+      "An error states what happened and how to recover",
+      "an empty state invites the first action",
+      "a conversational tone",
+      "under reduced motion, movement becomes a fade or nothing",
+      "Check your own work as it takes shape",
     ]
     const web = [
-      "The hero is the first thing a visitor sees",
-      "Type carries the page's personality",
+      "Fill the hero with what is most distinctive about the subject",
+      "One family may carry both display and body when it suits the brief",
       "The Elements of Typographic Style",
-      "Serif body text may run slightly longer",
-      "do not cancel each other's padding or margin",
-      "Fade-and-slide entrances on every section",
-      "the SaaS-card kit",
-      "accenting a single word or phrase of a headline",
-      "template chrome whatever the subject",
-      "#F4F1EA",
-      "its own words win",
+      "A serif body face tolerates a somewhat longer measure",
+      "never override each other's padding or margin",
+      "entrance animations on every section",
+      "a card-kit page",
+      "picking out one word or phrase of a headline",
+      "default-kit trimmings that appear whatever the subject",
+      "a warm paper-cream ground",
     ]
     for (const name of ["web-design", "mobile-design", "desktop-design", "tui-design"]) {
       const text = read(`packages/integrations/claude/dist/skills/${name}/SKILL.md`)
@@ -1052,6 +1056,19 @@ describe("agents", () => {
     const skill = read("packages/integrations/claude/dist/skills/web-design/SKILL.md")
     for (const phrase of web)
       expect({ phrase, has: skill.includes(phrase) }).toEqual({ phrase, has: true })
+    for (const name of ["mobile-design", "desktop-design", "tui-design"]) {
+      const text = read(`packages/integrations/claude/dist/skills/${name}/SKILL.md`)
+      for (const phrase of web)
+        expect({ name, phrase, has: text.includes(phrase) }).toEqual({ name, phrase, has: false })
+    }
+    for (const word of [/\beyebrow/i, /Numbers mark a real sequence/, /fade or nothing/])
+      expect({
+        word: String(word),
+        copies: skill.split("\n").filter((l) => word.test(l)).length,
+      }).toEqual({
+        word: String(word),
+        copies: 1,
+      })
   })
 
   test("each agent description stands alone, without pointing at text below it", () => {
