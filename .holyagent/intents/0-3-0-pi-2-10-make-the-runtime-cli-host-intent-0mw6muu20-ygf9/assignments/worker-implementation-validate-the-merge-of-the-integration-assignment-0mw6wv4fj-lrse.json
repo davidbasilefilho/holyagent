@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "validate-the-merge-of-the-integration",
   "objective": "Validate the merge of the integration-branch rule PR into the host-neutral CLI branch and repair two optional review notes, so the branch is ready to push.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-cli (branch release/0.3.0/refactor/host-neutral-cli, node_modules installed); HEAD is a merge commit of release/0.3.0/feat/integration-branch-default. First run `bunx --no-install mise run build` (the generated bundle may be stale after the merge) and `bunx --no-install mise run verify`, and report both before any edit.",
     "Then fix: (1) packages/runtime/src/vcs/message.ts SESSION_LINK and PI_SESSION_LINK leave `[text]()` after stripping a Markdown session link; strip the whole `[text](url)` link when its URL is a session link, keeping the surrounding text, and update the test that asserts the residue. (2) packages/runtime/src/cli/assignment.ts:315: `assignment record --failed` fails under an invalid HOLYAGENT_HOST; read the host only on the --agent branch, with a test."
@@ -55,7 +55,45 @@
     "agentId": "workflow:wf_80c1fd61-9c0/assignment-0mw6wv4fj-lrse",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-07T21:24:01.711Z"
+    "startedAt": "2026-11-07T21:24:01.711Z",
+    "finishedAt": "2026-11-07T21:33:32.368Z"
+  },
+  "result": "result: Merge validated, both fixes made with tests, and `mise run verify` exits 0 (1635 pass).\n\nchanged:\n- /home/user/holyagent-0.3.0-cli/packages/runtime/src/vcs/message.ts\n- /home/user/holyagent-0.3.0-cli/packages/runtime/src/cli/assignment.ts\n- /home/user/holyagent-0.3.0-cli/packages/runtime/tests/vcs-message.test.ts\n- /home/user/holyagent-0.3.0-cli/packages/runtime/tests/host.test.ts\n- /home/user/holyagent-0.3.0-cli/packages/integrations/claude/dist/scripts/holyagent.js (regenerated)\n\nchecks:\n- Before edits, `bunx --no-install mise run build` -> 0 (38 files).\n- Before edits, `bunx --no-install mise run verify` -> 0 (1632 pass, 0 fail).\n- After edits, `bun test` on `vcs-message.test.ts` and `host.test.ts` -> 48 pass.\n- The first post-edit verify failed the format check on `vcs-message.test.ts`. I ran `mise run fmt`, then `mise run build` again.\n- Final `bunx --no-install mise run verify` -> 0 (1635 pass, 0 fail).\n\nblockers: none\nquestions: none\nnotes: The `host.test.ts` test failed on the first run, before the `assignment.ts` fix. It fails without the fix and passes with it.\n\nevidence:\nMerge validated: `mise run build` and `mise run verify` both exited 0 on the merge head before any edit (1632 tests pass).\nMarkdown session link stripped whole, with a test: `message.ts` now matches `[text](session-url)` as one link, and a bare URL alone. The test \"a Markdown link to a session goes whole and the text around it stays\" replaces the old assertion of `[session]()`. Added tests that a link to another address stays and that a long run of `[` is cleaned in linear time.\nrecord --failed works under an invalid HOLYAGENT_HOST, with a test: `assignment.ts` reads the host only when `--agent` is given. The `host.test.ts` test shows `--agent` under `HOLYAGENT_HOST=codex` is refused with code 2 and `--failed` records the launch.\nGates: `mise run verify` exited 0 after the fixes, with 1635 pass and 0 fail.\nchanged-paths: the five files listed under changed.\nchecks-run: the build and verify runs listed under checks.\ndiff-file: /home/user/holyagent-notes/pr2-repair2.diff\n",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Merge head verified before edits (1632 pass); fixes tested; verify exit 0 (1635 pass).",
+    "criteria": [
+      {
+        "criterion": "Merge validated: build and verify exit 0 on the merge head before edits",
+        "support": "`mise run build` and `mise run verify` both exited 0 on the merge head before any edit (1632 tests pass)."
+      },
+      {
+        "criterion": "Markdown session link stripped whole, with a test",
+        "support": "`message.ts` now matches `[text](session-url)` as one link, and a bare URL alone. The test \"a Markdown link to a session goes whole and the text around it stays\" replaces the old assertion of `[session]()`. Added tests that a link to another address stays and that a long run of `[` is cleaned in linear time."
+      },
+      {
+        "criterion": "record --failed works under an invalid HOLYAGENT_HOST, with a test",
+        "support": "`assignment.ts` reads the host only when `--agent` is given. The `host.test.ts` test shows `--agent` under `HOLYAGENT_HOST=codex` is refused with code 2 and `--failed` records the launch."
+      },
+      {
+        "criterion": "Gates: mise run verify exits 0 after the fixes",
+        "support": "`mise run verify` exited 0 after the fixes, with 1635 pass and 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "the five files listed under changed."
+      },
+      {
+        "label": "checks-run",
+        "support": "the build and verify runs listed under checks."
+      },
+      {
+        "label": "diff-file",
+        "support": "/home/user/holyagent-notes/pr2-repair2.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-07T21:24:01.711Z"
 }
