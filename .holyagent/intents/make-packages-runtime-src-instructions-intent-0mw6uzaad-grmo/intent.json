@@ -1,0 +1,15 @@
+{
+  "id": "intent-0mw6uzaad-grmo",
+  "slug": "make-packages-runtime-src-instructions",
+  "objective": "Make packages/runtime/src/instructions/requirements.md the complete list of behavior requirements that every per-model instruction set (claude-5.5 now, the Kimi K3.1 set next) is translated from with that model's prompting guide, enforced by tests and documented in the requirements file and a packages/runtime/AGENTS.md.",
+  "requirements": [
+    "Maintainer (verbatim): \"btw there is requirements in the instructions dir right? it must list every requirement that will be translated into instructions using the different instructions guide. if you can document that, make it work that way if it isn't, as well as putting it on the package's AGENTS.md\".",
+    "Every rule in a model set traces to a requirement id, and every requirement id is covered by each model set; a test fails when either direction breaks, generalized so a second model set (kimi-k3.1) plugs in with its own coverage map.",
+    "The requirements file says how it is used: one line per requirement, a behavior change starts there, each model set is written from it following that model's guide and cites the guide.",
+    "packages/runtime/AGENTS.md (new) states the same rule for anyone editing the instructions; the root AGENTS.md points to it if needed.",
+    "Ships in 0.3.0 as its own PR in the release stack, before the Kimi instruction set; mise run verify passes."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-07T20:31:16.693Z"
+}
