@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "apply-the-five-wording-fixes-and-two",
   "objective": "Apply the five wording fixes and two small text fixes from the re-reviews to the design core and web-design skill in /home/user/holyagent-drop-frontend-design.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-drop-frontend-design (branch release/0.2.2/refactor/drop-frontend-design, HEAD ac29cf1). Findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw6mvu4s-q1kx.md, blocking items 1-5, each with its suggested replacement; source to stay away from: /home/user/holyagent-work/logs/frontend-design-original.md. Files: packages/runtime/src/instructions/claude-5.5/design-core/core.md (lines 42-44) and packages/runtime/src/instructions/claude-5.5/skills/web-design/SKILL.md (lines 54 and 73).",
     "Apply each fix as suggested, or an equivalent rewording that keeps the meaning and shares no run of four or more words, and no item order, with the original. For item 3, replace the example pair with a different action and its past-tense label of your own.",
@@ -43,7 +43,9 @@
     "agentId": "workflow:wf_51c3a94c-e02/assignment-0mw6n1gst-j5rg",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-07T16:49:01.517Z"
+    "startedAt": "2026-11-07T16:49:01.517Z",
+    "finishedAt": "2026-11-07T16:52:42.155Z"
   },
+  "result": "result: Five wording fixes and two text fixes applied in the worktree; build and verify pass with dist in sync.\nchanged: packages/runtime/src/instructions/claude-5.5/design-core/core.md; packages/runtime/src/instructions/claude-5.5/skills/web-design/SKILL.md; packages/integrations/claude/tests/plugin.test.ts; packages/integrations/claude/dist/skills/{web,mobile,desktop,tui}-design/SKILL.md (generated)\n- core.md:13 \"state them as a proposal in the plan and confirm them with the client where one is reachable\" -> \"confirm them with the user when one can answer, and otherwise state them as a proposal in the plan\" (leading duplicate clause dropped)\n- core.md:42 \"Describe what something is or does instead of selling it\" -> \"Say what a thing is or does without selling it\"\n- core.md:43 -> \"Set text in sentence case unless the platform sets its own casing, leave out padding, keep the tone in step with the brand and its readers, and write in the active voice with everyday verbs\"\n- core.md:44 \"keeps its name through the whole flow ... Archive ... Archived\" -> \"carries one name from first label to confirmation ... Duplicate ... Duplicated\"\n- web SKILL:54 \"Motion that follows a user's action is welcome where it shows what changed\" -> \"Feedback motion earns its place by making the change visible\"\n- web SKILL:64 preamble gains \"The brief's own words win over this list.\"\n- web SKILL:73 items reordered; \"that appear whatever the subject\" -> \"that show up regardless of subject\"; \"standing in for true black\" -> \"used in place of true black\"\nchecks: `mise run build` -> exit 0, 38 files; `mise run verify` -> exit 0, type-check, lint, fmt clean, 1596 pass, 0 fail\nblockers: none\nquestions: none\nnotes: I did not read the original source, so the no-shared-four-word-run check rests on the reviewer's flags.\nevidence:\nThe five passages no longer share wording or item order with the original and keep their meaning: core.md:42-44, web SKILL:54 and :73 read as above; old phrases return zero matches in source, dist and tests (repo-standards)\nmise run build leaves dist in sync and mise run verify passes: build exit 0 (dist regenerated, 4 skill files), verify exit 0, 1596 pass, 0 fail (regressions)\nchecks-run: build and verify as above; log at /tmp/claude-0/verify.log\n",
   "createdAt": "2026-11-07T16:49:01.517Z"
 }
