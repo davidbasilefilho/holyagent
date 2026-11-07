@@ -82,6 +82,31 @@ describe("cleaning", () => {
     )
   })
 
+  test("a session link closing a Markdown link leaves the parenthesis and the text after it", () => {
+    expect(cleanMessage("fix\n\nSee [session](https://pi.dev/session/#abc) for details")).toBe(
+      "fix\n\nSee [session]() for details",
+    )
+    expect(
+      cleanMessage("fix\n\nSee [session](https://claude.ai/code/session_01) for details"),
+    ).toBe("fix\n\nSee [session]() for details")
+  })
+
+  test("a long run of parentheses after the pi footer is cleaned in linear time", () => {
+    const line = `Generated with pi(${")".repeat(50_000)}a`
+    const started = performance.now()
+    expect(cleanMessage(`Fix it\n\n${line}`)).toBe(`Fix it\n\n${line}`)
+    expect(performance.now() - started).toBeLessThan(1_000)
+  })
+
+  test("a co-author named Pi stays unless the address is at pi.dev", () => {
+    const person = "Co-authored-by: Pi <pi@example.com>"
+    expect(cleanMessage(`Fix it\n\n${person}`)).toBe(`Fix it\n\n${person}`)
+    expect(cleanMessage("Fix it\n\nCo-authored-by: Pi <pi@pi.dev>")).toBe("Fix it")
+    expect(cleanMessage("Fix it\n\nCo-authored-by: Pi Coding Agent <agent@example.com>")).toBe(
+      "Fix it",
+    )
+  })
+
   test("what only resembles pi's attribution stays", () => {
     const text = [
       "Fix it",

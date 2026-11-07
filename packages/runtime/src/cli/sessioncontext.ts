@@ -7,7 +7,7 @@ import reminder from "../instructions/claude-5.5/session-reminder.md" with { typ
  * The most characters of context a SessionStart hook adds. The host cuts additionalContext at
  * 10,000, and a cut would drop the tail unannounced, so the text stays below with room to spare.
  */
-export const CONTEXT_BUDGET = 9300
+export const CONTEXT_BUDGET = 9400
 
 /**
  * The block of the rules the root rules leave out, which ends the context on every session start so

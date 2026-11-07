@@ -27,6 +27,7 @@ import { workTreeKey } from "../state/local.ts"
 import { readState, type Snapshot } from "../state/store.ts"
 import { booleanFlag, choiceFlag, requiredFlag, stringFlag } from "./args.ts"
 import { writeBrief, writeReport } from "./brief.ts"
+import { agentHostOf } from "./config.ts"
 import { nowIso } from "./context.ts"
 import { AgentMismatch, Usage } from "./errors.ts"
 import { resolveIntent } from "./intent.ts"
@@ -113,7 +114,7 @@ const recordHelp = (words: HostWords) => ({
   summary: `Record the launch of a dispatched Assignment (a workflow's agent as ${words.workflowAgentPrefix}<run-id>/<id>), or roll it back when the launch failed`,
   notes: [
     "the agent id is in the Agent result, or is the continued agent's; --failed returns the Assignment to Ready",
-    "a hook records an agent spawned from a dispatch prompt and says so in its note; record it yourself when the note says it did not, or for a continued agent",
+    words.recordNote,
     ...(words.agentIdNote === undefined ? [] : [words.agentIdNote]),
   ],
 })
@@ -127,6 +128,13 @@ const closeNotes = (words: HostWords): ReadonlyArray<string> => [
 
 const reportsSummary = (words: HostWords) =>
   `Write the results of a ${words.journal} to report files named by Assignment id, and list them`
+
+const reportsNotes = (words: HostWords): ReadonlyArray<string> => [
+  "the journal is the run's journal.jsonl: `started` entries (key, agentId, label) and `result` entries (key, agentId, result) joined by key; label each agent() with its Assignment id so its report lands in <id>.md",
+  "reports go to holyagent/reports in the git common directory (local/reports of the state folder outside git), beside the briefs; a repeated label keeps its last result; closing the Intent removes the brief and report files of its Assignments. Read a report there, or close from it: `assignment close <id> --outcome success --accept <rationale> < <report-file>`",
+  "a journal line that is not JSON, or a started or result entry without its fields, refuses the whole journal and writes nothing",
+  ...(words.reportsNote === undefined ? [] : [words.reportsNote]),
+]
 
 const RECORD_USAGE = "assignment record <id> (--agent <agentId> | --failed)"
 const CLOSE_USAGE =
@@ -294,7 +302,7 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
     forHost: recordHelp,
     flags: { agent: "string", failed: "boolean" },
     positionals: 1,
-    run: ({ update, args, config }) =>
+    run: ({ update, args, env }) =>
       Effect.gen(function* () {
         const id = idArgument(args.positionals)
         const agentId = stringFlag(args, "agent")
@@ -303,7 +311,8 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
             message: "Give exactly one of --agent and --failed",
             hint: `Usage: holyagent ${RECORD_USAGE}`,
           })
-        const { host } = yield* config
+        // Only the host decides the id form; a bad TTL or workflows setting must not block recording.
+        const host = yield* agentHostOf(env)
         const problem = agentId === undefined ? undefined : agentIdProblem(agentId, id, host)
         if (problem !== undefined)
           return yield* new Usage({ message: problem, hint: `Usage: holyagent ${RECORD_USAGE}` })
@@ -444,14 +453,10 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
     path: ["assignment", "reports"],
     usage: REPORTS_USAGE,
     summary: reportsSummary(CLAUDE_WORDS),
-    forHost: (words) => ({ summary: reportsSummary(words) }),
+    forHost: (words) => ({ summary: reportsSummary(words), notes: reportsNotes(words) }),
     output:
       "TOON: `reports` rows of id, path and words, one per Assignment id, and `notAssignmentIds` rows of label and agentId for results whose label is not an Assignment id (not written)",
-    notes: [
-      "the journal is the run's journal.jsonl: `started` entries (key, agentId, label) and `result` entries (key, agentId, result) joined by key; label each agent() with its Assignment id so its report lands in <id>.md",
-      "reports go to holyagent/reports in the git common directory (local/reports of the state folder outside git), beside the briefs; a repeated label keeps its last result; closing the Intent removes the brief and report files of its Assignments. Read a report there, or close from it: `assignment close <id> --outcome success --accept <rationale> < <report-file>`",
-      "a journal line that is not JSON, or a started or result entry without its fields, refuses the whole journal and writes nothing",
-    ],
+    notes: reportsNotes(CLAUDE_WORDS),
     flags: {},
     positionals: 1,
     state: "peek",

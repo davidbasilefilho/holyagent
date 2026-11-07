@@ -175,6 +175,7 @@ export const OVERVIEW_COMMANDS: ReadonlyArray<Command> = [
     summary: "List the Running Assignments with their agent ids, to confirm after a resume",
     flags: {},
     positionals: 0,
+    // Reads the host alone, not the whole config: a bad TTL or workflows setting must not refuse it.
     run: ({ directory, env }) =>
       agentHostOf(env).pipe(Effect.flatMap((host) => reconcileOf(directory, wordsFor(host)))),
   },
