@@ -1,0 +1,48 @@
+{
+  "id": "assignment-0mw6n1gst-j5rg",
+  "intentId": "intent-0mw6lz68m-7i26",
+  "intentRevision": 1,
+  "roleTask": "Worker.mechanical",
+  "slug": "apply-the-five-wording-fixes-and-two",
+  "objective": "Apply the five wording fixes and two small text fixes from the re-reviews to the design core and web-design skill in /home/user/holyagent-drop-frontend-design.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-drop-frontend-design (branch release/0.2.2/refactor/drop-frontend-design, HEAD ac29cf1). Findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw6mvu4s-q1kx.md, blocking items 1-5, each with its suggested replacement; source to stay away from: /home/user/holyagent-work/logs/frontend-design-original.md. Files: packages/runtime/src/instructions/claude-5.5/design-core/core.md (lines 42-44) and packages/runtime/src/instructions/claude-5.5/skills/web-design/SKILL.md (lines 54 and 73).",
+    "Apply each fix as suggested, or an equivalent rewording that keeps the meaning and shares no run of four or more words, and no item order, with the original. For item 3, replace the example pair with a different action and its past-tense label of your own.",
+    "Also, from /home/user/holyagent/.git/holyagent/reports/assignment-0mw6mw1hn-gxrz.md: finding 1, in core.md 'Direction before code', replace 'confirm them with the client where one is reachable' with 'confirm them with the user when one can answer, and otherwise state them as a proposal in the plan'; finding 2, restore in the web-design refuse-list preamble that the brief's own words win over the list.",
+    "Update the phrases plugin.test.ts pins for these lines to the new wording, so the tests still check each directive. Run 'bunx --no-install mise run build' then 'bunx --no-install mise run verify'; if verify fails on formatting, run 'bunx --no-install mise run fmt' and verify again."
+  ],
+  "constraints": [
+    "Change only the lines named and the matching test phrases.",
+    "Make no commits or other git writes and no edits under .git/ or .holyagent/.",
+    "Keep working until done; stop and report. Report in under 150 words: the changed lines (old -> new, one line each) and the check results."
+  ],
+  "criteria": [
+    {
+      "text": "The five passages no longer share wording or item order with the original and keep their meaning",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "mise run build leaves dist in sync and mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions/claude-5.5",
+    "packages/integrations/claude/dist",
+    "packages/integrations/claude/tests"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-07T16:49:01.517Z"
+  },
+  "createdAt": "2026-11-07T16:49:01.517Z"
+}
