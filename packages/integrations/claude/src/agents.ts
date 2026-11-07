@@ -5,7 +5,6 @@ import {
 } from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
 import {
   DIST_DIRECTORY,
-  FRONTEND_DESIGN_DIRECTORY,
   type GeneratedFile,
   generatedNote,
   INSTRUCTIONS_DIRECTORY,
@@ -222,11 +221,10 @@ export const CONDITIONAL_SECTIONS: ReadonlyArray<{
 ]
 
 /**
- * The role section that opens the embedded `frontend-design` guidance: the file holds the framing
- * and the generator appends the vendored text after it, so the guidance stays as Anthropic ships
- * it.
+ * The role section of the visual roles that sends them to the platform design skill named in their
+ * criteria, which holds the design guidance.
  */
-export const FRONTEND_DESIGN_SECTION = "frontend-design.md"
+export const DESIGN_SECTION = "design.md"
 
 /**
  * The sections of each role, as files of `roles/<agent>/` in prompt order. The first is the
@@ -243,14 +241,14 @@ export const ROLE_SECTIONS: Readonly<Record<string, ReadonlyArray<string>>> = {
   "reviewer-code": ["purpose.md", "builtin-review.md", "range.md"],
   "reviewer-security": ["purpose.md", "builtin-review.md", "trust-boundaries.md", "findings.md"],
   "reviewer-testing": ["purpose.md", "method.md"],
-  "reviewer-visual": ["purpose.md", "captures.md", FRONTEND_DESIGN_SECTION],
+  "reviewer-visual": ["purpose.md", "captures.md", DESIGN_SECTION],
   "worker-debugging": ["purpose.md", "phases.md", "escalation.md"],
   "worker-implementation": ["purpose.md", "method.md", "refactor.md", "instruction-text.md"],
   "worker-integration": ["purpose.md", "method.md"],
   "worker-mechanical": ["purpose.md", "method.md", "refactor.md"],
   "worker-operations": ["purpose.md", "method.md", "dev-server.md"],
   "worker-validation": ["purpose.md", "method.md", "baseline.md"],
-  "worker-visual": ["purpose.md", "method.md", FRONTEND_DESIGN_SECTION],
+  "worker-visual": ["purpose.md", "method.md", DESIGN_SECTION],
 }
 
 /**
@@ -448,7 +446,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
     phrase: "Report the inspection as blocked when no captures are supplied",
   },
   "R-RV-DESIGN": {
-    section: "roles/reviewer-visual/frontend-design.md",
+    section: "roles/reviewer-visual/design.md",
     phrase: "read that file and judge against its checklist",
   },
   "R-INSPECT": {
@@ -482,7 +480,7 @@ export const REQUIREMENT_SECTIONS: Readonly<
     phrase: "The Assignment names the repair round",
   },
   "R-WVI-DESIGN": {
-    section: "roles/worker-visual/frontend-design.md",
+    section: "roles/worker-visual/design.md",
     phrase: "read that file first, then build and inspect against its checklist and capture list",
   },
 }
@@ -534,33 +532,17 @@ const describe = (route: Route, role: string): string =>
 const frontmatter = (source: string, lines: ReadonlyArray<string>): string =>
   ["---", `# ${generatedNote(source)}`, ...lines, "---"].join("\n")
 
-/**
- * The text of the vendored `frontend-design` skill without its frontmatter, with its headings moved
- * down two levels so that they sit under the role's own heading; that is all the visual roles
- * embed, and the vendored file stays as Anthropic ships it.
- */
-const frontendDesign = async (): Promise<string> => {
-  const [, , ...body] = (await readSource(`${FRONTEND_DESIGN_DIRECTORY}/SKILL.md`)).split(/^---$/m)
-  return body
-    .join("---")
-    .trim()
-    .replace(/^(#{1,4}) /gm, "$1## ")
-}
-
 /** What the specialists of the roles share, read once for all of them. */
 interface Shared {
   readonly conduct: ReadonlyArray<string>
   /** The text of each of {@link CONDITIONAL_SECTIONS}, by file. */
   readonly conditional: Readonly<Record<string, string>>
-  readonly design: string
 }
 
 const specialist = async (route: Route, shared: Shared): Promise<GeneratedFile> => {
   const source = `${INSTRUCTIONS_DIRECTORY}/roles/${route.agent}`
   const sections = ROLE_SECTIONS[route.agent] ?? []
-  const [role = "", ...rest] = (await readSections(source, sections)).map((text, at) =>
-    sections[at] === FRONTEND_DESIGN_SECTION ? `${text}\n\n${shared.design}` : text,
-  )
+  const [role = "", ...rest] = await readSections(source, sections)
   const head = frontmatter(source, [
     `name: ${route.agent}`,
     `description: ${JSON.stringify(describe(route, role))}`,
@@ -619,10 +601,9 @@ const rootAgent = async (): Promise<GeneratedFile> => {
 export const agentFiles = async (): Promise<ReadonlyArray<GeneratedFile>> => {
   const directory = `${INSTRUCTIONS_DIRECTORY}/specialist`
   const files = CONDITIONAL_SECTIONS.map(({ file }) => file)
-  const [conduct, texts, design, materiality] = await Promise.all([
+  const [conduct, texts, materiality] = await Promise.all([
     readSections(directory, SPECIALIST_SECTIONS),
     readSections(directory, files),
-    frontendDesign(),
     readSource(MATERIALITY_FILE),
   ])
   const conditional = Object.fromEntries(
@@ -634,7 +615,6 @@ export const agentFiles = async (): Promise<ReadonlyArray<GeneratedFile>> => {
   const shared: Shared = {
     conduct,
     conditional,
-    design,
   }
   return [
     await rootAgent(),

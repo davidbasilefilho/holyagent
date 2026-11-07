@@ -5,7 +5,6 @@ import packageJson from "../package.json" with { type: "json" }
 import { agentFiles, embedMateriality, MATERIALITY_FILE, PLUGIN_NAME } from "./agents.ts"
 import {
   DIST_DIRECTORY,
-  FRONTEND_DESIGN_DIRECTORY,
   type GeneratedFile,
   generatedNote,
   INSTRUCTIONS_DIRECTORY,
@@ -252,17 +251,6 @@ const skills = async (): Promise<ReadonlyArray<GeneratedFile>> => {
   )
 }
 
-/**
- * The license of the `frontend-design` text that the visual roles embed, byte for byte, because the
- * Apache License asks for it to travel with the text.
- */
-const licenses = async (): Promise<ReadonlyArray<GeneratedFile>> => [
-  {
-    path: inPlugin("licenses/frontend-design/LICENSE.txt"),
-    content: await readSource(`${FRONTEND_DESIGN_DIRECTORY}/LICENSE.txt`),
-  },
-]
-
 const BUNDLE_MARKER = /^\/\/ \S+\.(?:[cm]?[jt]s|json|md)$\n/gm
 
 /**
@@ -312,6 +300,5 @@ export const generate = async (): Promise<ReadonlyArray<GeneratedFile>> =>
     ...(await agentFiles()),
     ...(await commands()),
     ...(await skills()),
-    ...(await licenses()),
     ...(await scripts()),
   ].toSorted((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))

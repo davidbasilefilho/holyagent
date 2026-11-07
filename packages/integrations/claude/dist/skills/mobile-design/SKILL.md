@@ -16,12 +16,14 @@ A discrepancy is material, and starts a repair whatever its size, when it affect
 
 A number is binding only where a platform guideline fixes it; every other number is a default, marked `(default)`, that the design may override with a stated reason.
 
-Apply the skill's capture checklist on the final captures: the worker before reporting, the reviewer in its findings and the root in its own final pass. Report only checks actually run, and name each check not run.
+Apply the skill's capture checklist on the final captures: the worker before reporting, the reviewer in its findings and the root in its own final pass. Check your own work as it takes shape, from captures wherever the environment can produce them. Report only checks actually run, and name each check not run.
 
 ### Direction before code
 
-- Name the subject, the audience and the main job, and propose them when the brief omits them. The brief's own words outrank every avoid list below.
-- Write a compact plan before building: palette roles, type roles, a layout concept and two or three principles. Test it with "would I make this for any similar product?" and the competitor test: drop an idea that still works with a competitor's name on it.
+- When the brief leaves out the subject, the audience or the main job, confirm them with the user when one can answer, and otherwise state them as a proposal in the plan; remembered preferences or project context are a starting hint. The brief's own words outrank every avoid list below.
+- Let the subject supply the look: its trade, materials and idiom decide the visual choices, and the brief's real content stays in the work from start to finish. A ferry timetable and a toddler's game should look nothing alike.
+- Choose palette, type and layout on purpose and for this brief alone, accept visual risk when it earns its place, and treat each project as a chance to try something new instead of repeating what you do best.
+- Sketch a plan before building: a small named palette (four to six colors, each with a value and a role), the type roles, a layout idea in a sentence, compared through rough ASCII wireframes, with how the content aligns (left, centered or justified), and two or three principles. Audit it with "would I make this for any similar product?" and the competitor test: drop an idea that still works with a competitor's name on it. Rewrite what fails, note what changed and why, and start coding only from the revised plan.
 - Say whether this is a refinement, which preserves the existing design, or a redesign, which replaces it.
 
 ### Platform fidelity over invention
@@ -32,19 +34,31 @@ Apply the skill's capture checklist on the final captures: the worker before rep
 
 ### Design record
 
-- Read `DESIGN.md` at the project root before UI work and create or update it after: platform and stack, direction, color roles, type roles, spacing and shape, components and states, do and don't. Note a changed decision instead of silently overwriting it. (behavior check)
+- Read `DESIGN.md` at the project root before UI work and create or update it after: platform and stack, direction, color roles, type roles, spacing and shape, components and states, do and don't, and a brief log of the options already tried, so later passes explore new ground. Note a changed decision instead of silently overwriting it. (behavior check)
 
 ### Spend boldness in one place
 
-- One signature detail per screen, and remove one accessory before finishing. Replace removed ornament with scale, real content or a real image, so the screen is not left thin. (preference)
+- Make one detail per screen the memorable one and keep the rest calm and restrained. Strip ornament that does nothing for the brief, and before finishing remove one accessory more, filling the gap with scale, real content or a real image so the screen is not left thin. (preference)
 - A labeled gray placeholder beats drawn art or emoji used as icons. (preference)
+
+### Structure and content
+
+- A border, divider, outline, label, eyebrow or number belongs only where it tells the reader something true about the content. Numbers mark a real sequence (steps, a timeline) and nothing else, so confirm it is one first. An eyebrow over every heading, all-caps labels and labels that say nothing are decoration, not structure.
+- With no real content in the brief, invent specific copy from the subject: generic words flatten a design as much as a generic layout does.
+
+### Copy
+
+- Interface text exists to help someone understand and act, so treat it as part of the design. Decide what the screen must convey and the shortest way to convey it, with one job for each piece of text.
+- Speak in the user's terms, calling a thing what the user calls it ("saved searches", not "query presets"). Say what a thing is or does without selling it; concrete beats clever.
+- Set text in sentence case unless the platform sets its own casing, leave out padding, keep the tone conversational and in step with the brand and its readers, and write in the active voice with everyday verbs.
+- A control names its outcome ("Send invoice", not "Submit"), and each action carries one name from first label to confirmation: the Duplicate button leads to a "Duplicated" confirmation.
+- When something fails or nothing is there yet, point the way. An error states what happened and how to recover, speaks as the interface and not as a person, and neither apologizes nor stays vague; an empty state invites the first action.
 
 ### Quality floor, unannounced
 
-- Text contrast is at least 4.5:1 and non-text control contrast at least 3:1. Color is never the only signal.
+- Text contrast is at least 4.5:1 and non-text control contrast at least 3:1. Color is never the only signal, and the colors work together as a palette.
 - Every state exists and is captured where reachable: hover or press, focus, disabled, loading, empty, error and long content.
-- The system's reduced-motion, larger-text and high-contrast settings, where the platform has them, change the render.
-- Copy uses the user's words, specific verbs and one name per action, and an error says how to fix it.
+- The system's reduced-motion, larger-text and high-contrast settings, where the platform has them, change the render; under reduced motion, movement becomes a fade or nothing.
 
 ## Shared mobile rules
 

@@ -15,14 +15,14 @@
     },
     "packages/integrations/claude": {
       "name": "@holyagent/claude",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "dependencies": {
         "@holyagent/runtime": "workspace:*",
       },
     },
     "packages/runtime": {
       "name": "@holyagent/runtime",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "dependencies": {
         "@toon-format/toon": "^4.0.0",
         "acorn": "^8.0.0",
