@@ -2,7 +2,7 @@
 
 **Status: planned for 0.3.0. The first three sections are the plan for the Kimi provider, the routing and the instructions; the sections after them are research on Pi's provider layer and are not shipped behaviour.**
 
-Pi 1.4.0, commit `4a080252f06caf63a525d7873c5d94d3c23887e0` for the Pi source facts (the plan pins 1.5.0; see [README.md](README.md#version-risk)). Kimi facts are from the research of 2026-11-07, and the pages it fetched carried no dates unless a line says so. "Inference:" marks my own conclusions.
+Pi 1.4.0, commit `4a080252f06caf63a525d7873c5d94d3c23887e0` for the Pi source facts (the plan pins 1.5.0; see [README.md](README.md#version-risk)). Kimi facts are from the research of 2026-11-07, and the pages it fetched carried no dates unless a line says so. "Inference:" marks a conclusion drawn here, not a stated fact.
 
 ## Kimi for Coding (global)
 
@@ -21,7 +21,7 @@ Kimi for Coding (global) is the first and, in 0.3.0, the only supported provider
 
 Points the research leaves open, to be settled when the package is built:
 
-- **The built-in provider's API type.** One read of the source at commit `209bc7b9` gives `api.kimi.com/coding` with the `anthropic-messages` API ([kimi-coding.ts](https://github.com/earendil-works/pi/blob/209bc7b9/packages/ai/src/providers/kimi-coding.ts)); another read of `main` gives `https://api.kimi.com/coding/v1` over `openai-completions`. Nothing in the plan depends on which; confirm it against the pinned Pi.
+- **The built-in provider's API type.** One read of the source at commit `209bc7b9` gives `api.kimi.com/coding` with the `anthropic-messages` API ([kimi-coding.ts](https://github.com/earendil-works/pi/blob/209bc7b9/packages/ai/src/providers/kimi-coding.ts)); another read of `main` gives `https://api.kimi.com/coding/v1` over `openai-completions`. Which one holds matters only for the caching inference in [caching-and-subagents.md](caching-and-subagents.md#cache-target), which is conditional on the API type; confirm it against the pinned Pi.
 - **Pi 1.5.0 compatibility of the extension.** Its v0.6.13 is bumped to Pi 0.99.2. Whether it works unchanged on 1.5.0, and whether Pi's catalog lists `k3.1-pro` for the extension, is checked by the launch-time catalog validation and by the recorded fixtures. The extension's own fallback model list omits `k3.1-pro`; its README says the live catalog `https://api.kimi.com/coding/v1/models` is authoritative.
 - **The extension overrides the built-in** `kimi-coding` registration of the same id (its legacy registration), which the pin has to be checked for.
 - **Single-maintainer risk** of the extension, and the data the Moonshot-side tools send to Moonshot's services (they are off by default).
@@ -66,7 +66,7 @@ Source for the rows: [Kimi Code models](https://www.kimi.com/code/docs/en/kimi-c
 | Explorer.map, Explorer.lookup, Explorer.trace, Librarian.lookup, Librarian.research, Reviewer.audit | `kimi-for-coding` | high   |
 | Worker.visual, Reviewer.visual                                                                      | `k3.1-pro`        | low    |
 
-- **Specialists run on `kimi-for-coding`, which is Kimi K2.8 Preview, never at low.** The root runs on K3.1 Pro. The sources give no per-role reasons beyond this grouping: the roles that write or judge code run at max, and the mechanical, checking, lookup and research roles run at high.
+- **Specialists run on `kimi-for-coding`, which is Kimi K2.8 Preview, never at low, except the two visual specialists, which run on `k3.1-pro` at low (below).** The root runs on K3.1 Pro. The sources give no per-role reasons beyond this grouping: the roles that write or judge code run at max, and the mechanical, checking, lookup and research roles run at high.
 - **Both visual specialists run at low** because the root makes the final visual pass. The maintainer's words: "both visual specialists must be low, as root does the final review pass".
 - **The root's effort is `high`.** `max` is selectable in `config.json`. A later 0.3.x task will measure high against max on real sessions before `max` becomes the default; until then the cost and benefit of `max` for the root are unmeasured.
 - **A session keeps one model and effort.** Each Assignment's specialist is launched on its row and is not switched mid-session, because a switch invalidates Kimi's cache.
@@ -77,10 +77,27 @@ Source for the rows: [Kimi Code models](https://www.kimi.com/code/docs/en/kimi-c
 **Status: decided for 0.3.0.** The maintainer's words: "for the pi integration we will need kimi k3.1 specific instructions following its official instruction guide".
 
 - **Moonshot has no K3.1-specific prompting guide.** The instruction set follows three Moonshot guides and cites the section each rule follows, the way the Claude 5.5 set cites Anthropic's guidance: the [prompt best-practice guide](https://platform.kimi.ai/docs/guide/prompt-best-practice) (undated; clear instructions, roles, explicit steps, few-shot examples, length by paragraphs or bullets, reference text, summarizing long histories), the [K3.1 Pro quickstart](https://platform.kimi.ai/docs/guide/kimi-k3-1-pro-quickstart) and the [agent-setup guide](https://platform.kimi.ai/docs/guide/use-kimi-k3-to-setup-agent).
-- **It is a separate set.** A per-model folder of the Pi instruction text sits beside `packages/runtime/src/instructions/claude-5.5` (for example `kimi-k3.1/`) and is written to Moonshot's guides, not adapted from the Claude 5.5 wording. Sessions that run on K3.1 through Kimi for Coding (global) load it. Which set the `kimi-for-coding` (K2.8 Preview) specialists load is not settled by the sources and is to be settled when the instructions are written.
+- **It is a separate set.** A per-model folder of the Pi instruction text sits beside `packages/runtime/src/instructions/claude-5.5` (for example `kimi-k3.1/`) and is written to Moonshot's guides, not adapted from the Claude 5.5 wording. Sessions that run on K3.1 through Kimi for Coding (global) load it. The `kimi-for-coding` (K2.8 Preview) specialists load the same set; see [the K2.8 Preview specialists](#the-k28-preview-specialists).
 - **It follows the agent guide's structure.** Each role gets a short system prompt that keeps to the role, the workflow and the quality boundaries; argument details go in tool descriptions and the rest in on-demand skills.
 - **Request constraints from the quickstart** ([quickstart](https://platform.kimi.ai/docs/guide/kimi-k3-1-pro-quickstart), [reasoning effort](https://platform.kimi.ai/docs/guide/use-reasoning-effort)): thinking is always on and is set with the top-level `reasoning_effort`, so a request does not send `thinking`; `temperature` (1.0), `top_p` (0.95) and `n` (1) are fixed and are omitted; `max_completion_tokens` defaults to 131072 and can go up to 1048576; the whole assistant message, `reasoning_content` and `tool_calls` included, is passed back unchanged; vision does not accept public image URLs. Inference: Pi's provider layer and the extension build the request, so HolyAgent sets only the model and the effort.
 - Moonshot's [tool-calling guide](https://platform.kimi.ai/docs/guide/kimi-k3-tool-calling-best-practice) says to pick the effort before the conversation starts, which matches the one-effort-per-session rule.
+
+### The K2.8 Preview specialists
+
+**Status: decided for 0.3.0.** The maintainer's rule: "separate k2.8 or k2.7, or k2.6, k2.5, whichever is more relevant. if k3 or k3.1 is more relevant, we should use it. it depends on how the model behaves". Research of 2026-11-07 resolved it: the specialists on `kimi-for-coding` (K2.8 Preview) load the same Kimi instruction set, written to the K3/K3.1 guides above plus Moonshot's [K3 tool-calling best-practice guide](https://platform.kimi.ai/docs/guide/kimi-k3-tool-calling-best-practice). The K2.6/K2.7 [thinking guide](https://platform.kimi.ai/docs/guide/use-thinking-models) does not apply; it covers only `kimi-k2.7-code` and `kimi-k2.6`.
+
+Why K2.8 Preview counts as K3-like, from how it behaves:
+
+- Moonshot describes K2.8 Preview as "performance close to K3 with more efficient thinking", with efforts `low`, `high` and `max` "consistent with K3" ([Kimi Code models](https://www.kimi.com/code/docs/en/kimi-code/models), [what's new](https://www.kimi.com/code/docs/kimi-code/whats-new.html), Chinese, 2026-09-11 entry).
+- It is controlled with the top-level `reasoning_effort` (default `max`), as K3 is; K2.6 and K2.7 use the `thinking` parameter, and K2.7 has no adjustable effort ([Kimi Code models](https://www.kimi.com/code/docs/en/kimi-code/models), [models overview](https://platform.kimi.ai/docs/api/models-overview)).
+- Its context is up to 1,048,576 tokens, like the K3 series; K2.6 and K2.7 have 256K ([Kimi Code models](https://www.kimi.com/code/docs/en/kimi-code/models), [models overview](https://platform.kimi.ai/docs/api/models-overview)).
+
+Limits of that finding:
+
+- Moonshot has no K2.8-specific prompting guide, and no model card or changelog says whether K2.8 Preview shares post-training with K2.x or K3. The choice rests on documented behavior, not on lineage.
+- The instruction text must not rely on forcing a first-round tool call with `tool_choice` `required`. A secondary source, not Moonshot, says K2.8 Preview accepts only `auto` or `none` ([Tencent Cloud](https://intl.cloud.tencent.com/document/product/1300/80635)); Moonshot's own parameter page confirms `required` only on K3 ([models overview](https://platform.kimi.ai/docs/api/models-overview)).
+- The request constraints above are written for K3.1 Pro. For K2.8 Preview the same secondary source gives `max_tokens` (default 32768) in place of `max_completion_tokens` and accepts public image URLs, so the instruction text leaves request settings out; Pi's provider layer and the extension build the request.
+- To be verified: the tool-calling and parallel-call specifics on K2.8 Preview, and whether the platform's `kimi-k2.8-preview` behaves as the Kimi Code `kimi-for-coding` endpoint does (the secondary source covers the platform id).
 
 ## Provider model in one paragraph
 

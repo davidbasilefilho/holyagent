@@ -2,7 +2,7 @@
 
 **Status: planned for 0.3.0. The first section is the plan for HolyAgent's own configuration; the sections after it are research on Pi's configuration and are not shipped behaviour.**
 
-Pi 1.4.0, commit `4a080252f06caf63a525d7873c5d94d3c23887e0` (the plan pins 1.5.0; see [README.md](README.md#version-risk)). "Inference:" marks my own conclusions.
+Pi 1.4.0, commit `4a080252f06caf63a525d7873c5d94d3c23887e0` (the plan pins 1.5.0; see [README.md](README.md#version-risk)). "Inference:" marks a conclusion drawn here, not a stated fact.
 
 ## HolyAgent config.json
 
