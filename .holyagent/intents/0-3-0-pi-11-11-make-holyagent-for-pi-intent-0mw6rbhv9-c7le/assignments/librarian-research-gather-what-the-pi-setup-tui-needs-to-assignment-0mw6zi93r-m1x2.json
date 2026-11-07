@@ -1,0 +1,50 @@
+{
+  "id": "assignment-0mw6zi93r-m1x2",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 9,
+  "roleTask": "Librarian.research",
+  "slug": "gather-what-the-pi-setup-tui-needs-to",
+  "objective": "Gather what the pi setup TUI needs to copy the exact style of the last released holycodex TUI using OpenTUI Solid and tuiparts, and settle whether T3 Code's agent browser is a right-side pane and what browserAutoShowFloatingPreview does.",
+  "state": "Running",
+  "scope": [
+    "holycodex: a read-only clone is at /home/user/davidbasilefilho/holycodex (depth 1, default branch). The last non-dev release tag appears to be v0.16.9-2 (commit 7b803e5d); confirm from the tag list (git -C that clone ls-remote --tags origin, or the files) and read the TUI source at that tag. If the tag's tree differs from the clone, fetch only that tag into the same clone (git fetch --depth 1 origin tag v0.16.9-2) and read it with git show/ls-tree; make no other writes.",
+    "From that TUI: its framework and versions (package.json), component structure, layout, colors and theme tokens (exact hex values), borders and box styles, typography/emphasis, spacing, key bindings, selection and checkbox glyphs, focus and disabled states, header/footer and help line, and any helper modules worth reusing. Give file paths and short excerpts.",
+    "OpenTUI Solid (@opentui/solid) and tuiparts: current versions on npm, install and peer requirements (Bun version, Solid version, JSX config such as jsxImportSource or a preload), the components needed for a checklist form with flags (select/multiselect, checkbox, text, buttons, focus handling), how to render, exit cleanly, and test it headlessly (any test renderer or snapshot helper), and whether it runs on Windows. Cite the npm pages or repos.",
+    "T3 Code (pingdotgg/t3code): whether the agent's integrated browser shows in a right-side pane of the thread view, what browserAutoShowFloatingPreview (or the nearest setting name) controls and its default, citing source files."
+  ],
+  "constraints": [
+    "Separate sourced facts from inference.",
+    "Read-only except the single tag fetch into the existing holycodex clone; write long excerpts to /home/user/holyagent-notes/holycodex-tui.md and give its path.",
+    "Report in under 600 words."
+  ],
+  "criteria": [
+    {
+      "text": "The holycodex release tag used is confirmed and its TUI style is captured with exact values and file paths",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "OpenTUI Solid and tuiparts setup, components, headless testing and Windows support are stated with sources",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The T3 browser pane and floating-preview setting are answered from T3 source",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources",
+    "notes-file"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-07T22:38:00.087Z"
+  },
+  "createdAt": "2026-11-07T22:38:00.087Z"
+}
