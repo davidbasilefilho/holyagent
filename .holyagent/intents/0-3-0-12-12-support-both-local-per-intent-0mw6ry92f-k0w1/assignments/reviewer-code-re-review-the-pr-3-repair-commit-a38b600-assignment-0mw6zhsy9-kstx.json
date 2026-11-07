@@ -1,0 +1,59 @@
+{
+  "id": "assignment-0mw6zhsy9-kstx",
+  "intentId": "intent-0mw6ry92f-k0w1",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-pr-3-repair-commit-a38b600",
+  "objective": "Re-review the PR 3 repair commit a38b600 (range 2e1c021..a38b600 on release/0.3.0/feat/holyagent-config, worktree /home/user/holyagent-0.3.0-config; run every command there) and confirm the earlier code-review findings are closed with no new blocker.",
+  "state": "Running",
+  "scope": [
+    "Only the repair range 2e1c021..a38b600; its diff is in /home/user/holyagent-notes/pr3-repair.diff.",
+    "Earlier findings to check closed: the report /home/user/holyagent/.git/holyagent/reports/assignment-0mw6vba8j-i4s0.md.",
+    "The repair's own report: /home/user/holyagent/.git/holyagent/reports/assignment-0mw6z5chk-1qfm.md (claims only; judge from the diff and checks)."
+  ],
+  "constraints": [
+    "The maintainer's decisions are binding: a false in the user-level ~/.holyagent/config.json is final for security-relevant pi features (computer use, T3 device access, web tools) and a project config cannot turn them back on; every other key keeps project-wins; pi.enable exists with default true; the config has no key for T3's context meter.",
+    "Read-only: make no edits and no version-control writes.",
+    "The built-in /security-review and /code-review do not work in this worktree (no origin/HEAD); review the range yourself.",
+    "Report in under 400 words; put long logs in a file under /home/user/holyagent-notes/ and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Every blocking finding of the earlier code review is closed by the repair",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The repair introduces no regression or new blocking defect",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Each fixed behavior has a test that fails without the fix",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "bunx --no-install mise run verify exits 0 on a38b600",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw6z5chk-1qfm",
+    "assignment-0mw6urc7l-7dsc"
+  ],
+  "followUpOf": "assignment-0mw6vba8j-i4s0",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-07T22:37:39.153Z"
+  },
+  "createdAt": "2026-11-07T22:37:39.153Z"
+}
