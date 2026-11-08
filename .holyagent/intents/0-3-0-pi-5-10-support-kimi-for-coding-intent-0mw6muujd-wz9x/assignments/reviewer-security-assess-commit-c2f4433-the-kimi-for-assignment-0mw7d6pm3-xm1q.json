@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "assess-commit-c2f4433-the-kimi-for",
   "objective": "Assess commit c2f4433 (the Kimi for Coding provider mapping, readiness and catalog checks) for security issues around credentials, command execution and supply-chain pinning.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Diff: /home/user/holyagent-notes/kimi-provider.diff; worktree /home/user/holyagent-0.3.0-provider. Requirements in /home/user/holyagent-notes/intent-kimi-provider.txt: HolyAgent never calls provider URLs, never reads auth.json, never uses pi auth print-api-key or print-bearer-token; readiness runs pi auth check --provider <id> --json; the provider package is pinned (pi-provider-kimi-code@0.6.13)."
   ],
@@ -40,7 +40,33 @@
     "agentId": "workflow:wf_7eab5e13-2e8/assignment-0mw7d6pm3-xm1q",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T05:00:56.235Z"
+    "startedAt": "2026-11-08T05:00:56.235Z",
+    "finishedAt": "2026-11-08T05:06:02.035Z"
+  },
+  "result": "result: No credential, injection or pinning blocker in c2f4433. One non-blocking pinning gap: `piPackages` still returns the bare, unpinned package name.\n\nThe built-in `/security-review` could not run. Its `git diff origin/HEAD...` failed with an unknown revision, and the review session has no shell. I reviewed `/home/user/holyagent-notes/kimi-provider.diff` by reading it and the worktree `/home/user/holyagent-0.3.0-provider`. Evidence is read-only; I ran no checks.\n\nblockers: none\n\nnotes:\n- **Pinning gap (suspicion).** `providerSource()` returns `npm:pi-provider-kimi-code@0.6.13`, an exact pin. `piPackages()` in `packages/runtime/src/config/packages.ts` returns the bare `pi-provider-kimi-code` (`PROVIDERS[provider].package`, asserted by `packages.test.ts`). Nothing in this commit consumes either function. A future launcher that installs from `piPackages` would take an unpinned latest from npm, so it should use `providerSource`. The other `FEATURE_PACKAGES` entries and `pi-web-kit` were already unpinned before this commit and are out of scope here.\n- **Model id (future risk).** `ModelId` is `Schema.NonEmptyString`, so a user config can hold any string, including whitespace or `:`. It reaches only `spec`, which starts with `kimi-coding/`, so it cannot begin with `-`. Nothing launches Pi with it yet. The launcher must pass it as one argv element and never interpolate it into a shell string.\n- **Catalog output.** `parseModelCatalog` output is only compared with the route table. It is never passed to a command or path.\n- **Error text.** Readiness and catalog errors carry at most 400 characters of Pi's stdout or stderr. Pi's `auth check --json` prints status and reason only (per the fixtures), so no secret is expected there.\n- **Docs wording.** The docs and a test title say \"0.6 line\" although the pin is exact. This is cosmetic.\n\nFound sound:\n- Both Pi commands use literal argv: `pi auth check --provider <id> --json` and `pi --list-models`. `<id>` is `PROVIDERS[...].id`, a static `kimi-coding`, and no config value reaches argv.\n- The runner is the Bun Shell with `$\\`${command} ${args}\\``, which escapes each argv element. The tests assert the exact calls.\n- There is no call to `auth.json`, `print-api-key` or `print-bearer-token`. The only matches in the worktree are docs prohibiting them.\n- No `fetch` or provider URL appears in the new code.\n- `providerEnv` sets only `KIMI_CODE_REGION=global`, a constant.\n\nevidence:\n- No credential is read, printed, logged or passed on, and no provider URL is called: Met. `packages/runtime/src/pi/readiness.ts` and `catalog.ts` only run `pi auth check` and `pi --list-models`. A repo-wide grep finds no `auth.json`, `print-*` or HTTP use outside docs.\n- The readiness and catalog commands take fixed arguments with no injection from config or catalog output: Met. `readiness.ts:70` uses `[\"auth\",\"check\",\"--provider\",id,\"--json\"]` with a static id, and `catalog.ts:65` uses `[\"--list-models\"]`. `shell.ts:112` escapes argv.\n- The provider package source is pinned to an exact version: Met for `providerSource` (`provider.ts:68-71`, `0.6.13`, asserted in `provider.test.ts`). The `piPackages` caveat is in notes.\n- diff-file: `/home/user/holyagent-notes/kimi-provider.diff`\n",
+  "acceptance": {
+    "revision": 9,
+    "rationale": "No credential use, fixed argv, exact providerSource pin; piPackages gap carried to the repair",
+    "criteria": [
+      {
+        "criterion": "No credential is read, printed, logged or passed on, and no provider URL is called",
+        "support": "Met. `packages/runtime/src/pi/readiness.ts` and `catalog.ts` only run `pi auth check` and `pi --list-models`. A repo-wide grep finds no `auth.json`, `print-*` or HTTP use outside docs."
+      },
+      {
+        "criterion": "The readiness and catalog commands take fixed arguments with no injection from config or catalog output",
+        "support": "Met. `readiness.ts:70` uses `[\"auth\",\"check\",\"--provider\",id,\"--json\"]` with a static id, and `catalog.ts:65` uses `[\"--list-models\"]`. `shell.ts:112` escapes argv."
+      },
+      {
+        "criterion": "The provider package source is pinned to an exact version",
+        "support": "Met for `providerSource` (`provider.ts:68-71`, `0.6.13`, asserted in `provider.test.ts`). The `piPackages` caveat is in notes."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff-file",
+        "support": "`/home/user/holyagent-notes/kimi-provider.diff`"
+      }
+    ]
   },
   "createdAt": "2026-11-08T05:00:56.235Z"
 }
