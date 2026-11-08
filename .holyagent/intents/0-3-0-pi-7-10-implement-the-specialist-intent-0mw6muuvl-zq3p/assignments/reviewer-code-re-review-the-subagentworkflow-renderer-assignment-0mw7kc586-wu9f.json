@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-the-subagentworkflow-renderer",
   "objective": "Re-review the SubagentWorkflow renderer mitigation for correctness and integration.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Previous finding to verify closed (security, pre-existing in @tintinweb/pi-subagents 0.23.1): the SubagentWorkflow renderCall (index.ts:2743) calls extractMeta (meta.ts:319, 250) and evaluates the meta fragment in vm createContext({}) during Pi interactive rendering of streamed calls (interactive-mode.js:2904-2916, 3320), before the tool_call gate, so `export const meta = { description: this.constructor.constructor(\\\"return process\\\")() }` reached the host process. The repair registers a tool renderer through pi.registerToolRenderer that replaces renderCall for SubagentWorkflow with a plain line naming the workflow only when literalWorkflowName (workflow-check.ts) vets the fragment, keeping the package renderResult and renderShell; the extension now imports @earendil-works/pi-tui at runtime. Review only d8fcbdf..HEAD in /home/user/holyagent-0.3.0-launcher (source diff at /home/user/holyagent-notes/launcher-repair4.diff; package and Pi sources under /home/user/holyagent-notes/pi-probe/node_modules). Do not run pi or any live model.",
     "Check that the renderer registration follows the Pi API, that the runtime import of @earendil-works/pi-tui resolves when Pi loads the installed HolyAgent package (dependency or peer declared, or provided by Pi) and that the build bundles or externalises it correctly, and that the tests prove no evaluation."
@@ -38,7 +38,24 @@
     "agentId": "workflow:wf_2298ca85-3a0/assignment-0mw7kc586-wu9f",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T08:21:07.062Z"
+    "startedAt": "2026-11-08T08:21:07.062Z",
+    "finishedAt": "2026-11-08T08:26:33.215Z"
+  },
+  "result": "result: The mitigation works and I found no new defects. It is merge-ready on the behavior and regressions criteria.\n\nchanged: none (read-only review).\n\nchecks:\n- `bunx --no-install mise run verify` exited 0: 2143 pass, 0 fail, 14034 expect() calls across 71 files. Type-check reported no errors in 199 files, lint no problems in 200 files, and the format check passed all 519 files.\n- I read the Pi and package sources only. I did not run pi or a live model.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- The built-in `/code-review` ran on `d8fcbdf...HEAD` and returned 7 findings. None is in the range: they cite `session_start`/`session_compact`, `catalog.ts`, `topOf`, `pi-entry.ts`, `tools.ts` and `pi-context.ts`, which the diff does not touch. I rejected all seven as out of scope. The findings on `extension.ts:487` and `extension.ts:359` are optional follow-ups for the base.\n- The renderer registers through `pi.registerToolRenderer` with a `(toolName, next)` resolver. That matches `ToolRendererResolver` in `types.d.ts:545,1279`, `loader.js:293` and `runner.js:542`.\n- All three interactive call sites build their component from `getRegisteredToolDefinition`, which goes through `resolveToolRenderers`. They are `interactive-mode.js:2904`, `2975` and `3320`. The package's `renderCall` cannot be reached from the interactive path.\n- `...base` keeps the package's `renderResult` and `renderShell`.\n- `literalWorkflowName` cuts and vets the fragment with the same function as the gate, `metaFragment`, and it only parses. It returns the last string `name` and never fails.\n- The import `@earendil-works/pi-tui` resolves in Pi. It is a declared peer dependency in both `package.json` files, and the build externalises it (`HOST_MODULES` is read from the peer list). Pi supplies it as a virtual module (`virtual-modules.js`). In the dist it stays `import { Text } from \"@earendil-works/pi-tui\"`.\n- The tests show nothing is evaluated: the package's `renderCall` throws if called, and a global sentinel stays unset for the call, getter, IIFE and constructor-chain exploits. The extension test also checks registration, a literal name, control-character stripping and the length cut.\n- `docs/pi/extensions.md` mentions the one remaining bypass: a resolver of another extension that loads earlier and does not call `next()`.\n\nevidence:\nThe mitigation works as intended without new defects: Pi sources `runner.js:542`, `interactive-mode.js:1793,2904,3320` and `tool-execution.js:65`; `src/extension.ts` `workflowRenderers`; `src/generate.ts:61`; dist `holyagent.js` line 4; new tests in `extension.test.ts` and `workflow-check.test.ts`, all passing.\nmise run verify exits 0: `bunx --no-install mise run verify` exited 0, 2143 pass and 0 fail, log at `/tmp/claude-0/verify.log`.\n",
+  "acceptance": {
+    "revision": 7,
+    "rationale": "Mitigation correct, pi-tui is a peer resolved by Pi; verify exit 0 with 2143 pass.",
+    "criteria": [
+      {
+        "criterion": "The mitigation works as intended without new defects",
+        "support": "Pi sources `runner.js:542`, `interactive-mode.js:1793,2904,3320` and `tool-execution.js:65`; `src/extension.ts` `workflowRenderers`; `src/generate.ts:61`; dist `holyagent.js` line 4; new tests in `extension.test.ts` and `workflow-check.test.ts`, all passing."
+      },
+      {
+        "criterion": "mise run verify exits 0",
+        "support": "`bunx --no-install mise run verify` exited 0, 2143 pass and 0 fail, log at `/tmp/claude-0/verify.log`."
+      }
+    ],
+    "evidence": []
   },
   "createdAt": "2026-11-08T08:21:07.062Z"
 }
