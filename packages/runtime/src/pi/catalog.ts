@@ -46,6 +46,8 @@ export class ListingNotRecognised extends Data.TaggedError("ListingNotRecognised
   }
 }
 
+const MODELS_FIX = "Change the model in pi.routes of config.json or log in to a plan that has it."
+
 /** Route-table models the user's catalog does not list, with the rows that use each. */
 export class ModelsNotInCatalog extends Data.TaggedError("ModelsNotInCatalog")<{
   readonly provider: string
@@ -59,7 +61,16 @@ export class ModelsNotInCatalog extends Data.TaggedError("ModelsNotInCatalog")<{
     const list = this.missing
       .map(({ model, routes }) => `${model} (used by ${routes.join(", ")})`)
       .join("; ")
-    return `Provider ${this.provider} does not list: ${list}. Change the model in pi.routes of config.json or log in to a plan that has it.`
+    return `Provider ${this.provider} does not list: ${list}. ${MODELS_FIX}`
+  }
+
+  /**
+   * The same blocker with the models only, not the rows that use them: short enough for a one-line
+   * notice that must still end with the fix.
+   */
+  get brief() {
+    const list = this.missing.map(({ model }) => model).join(", ")
+    return `Provider ${this.provider} does not list: ${list}. ${MODELS_FIX}`
   }
 }
 

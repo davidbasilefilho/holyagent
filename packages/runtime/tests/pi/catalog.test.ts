@@ -204,3 +204,20 @@ describe("validateModelCatalog", () => {
     expect(error).toMatchObject({ _tag: "CatalogUnavailable", detail: "pi: not found" })
   })
 })
+
+describe("ModelsNotInCatalog.brief", () => {
+  test("names the models without their rows and ends with the fix, within a notice's length", () => {
+    const error = new ModelsNotInCatalog({
+      provider: "kimi-coding",
+      missing: [
+        { model: "k3.1-pro", routes: ["root", "Worker.visual"] },
+        { model: "kimi-for-coding", routes: ["Explorer.map", "Explorer.lookup"] },
+      ],
+    })
+    expect(error.brief).toBe(
+      "Provider kimi-coding does not list: k3.1-pro, kimi-for-coding. Change the model in pi.routes of config.json or log in to a plan that has it.",
+    )
+    expect(error.message).toContain("(used by root, Worker.visual)")
+    expect(error.message.endsWith(error.brief.slice(error.brief.indexOf("Change")))).toBe(true)
+  })
+})

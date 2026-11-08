@@ -10,9 +10,11 @@ import {
   CODEMODE_MAX_WORKERS_ENV,
   COMPUTER_USE_TOOLS,
   PI_SETTINGS_FILE,
+  rootActiveTools,
   SUBAGENTS_SETTINGS_FILE,
   T3_VISUAL_TOOLS,
   toolArgs,
+  toolMatches,
   toolSettings,
 } from "../../src/pi/tools.ts"
 import { DEFAULT_CONFIG } from "../config/defaults.ts"
@@ -372,5 +374,65 @@ describe("toolSettings", () => {
   test("pi.enable off writes nothing", () => {
     const off: Config = { ...DEFAULT_CONFIG, pi: { ...DEFAULT_CONFIG.pi, enable: false } }
     expect(toolSettings(off)).toEqual([])
+  })
+})
+
+describe("rootActiveTools", () => {
+  const root = toolArgs(DEFAULT_CONFIG, "root")
+  const registered = [
+    "read",
+    "bash",
+    "write",
+    "edit",
+    "todo",
+    "codemode",
+    "moonshot_search",
+    "moonshot_fetch",
+    "computer_use_click",
+    "computer_use_type",
+    "mcp__t3_code__preview_open",
+  ]
+
+  test("toolMatches takes an exact name or a pattern whose * is any run of characters", () => {
+    expect(toolMatches("write", "write")).toBe(true)
+    expect(toolMatches("write", "rewrite")).toBe(false)
+    expect(toolMatches("computer_use_*", "computer_use_click")).toBe(true)
+    expect(toolMatches("computer_use_*", "xcomputer_use_click")).toBe(false)
+    expect(toolMatches("mcp__t3*code__preview_*", "mcp__t3-code__preview_open")).toBe(true)
+    expect(toolMatches("a.b", "axb")).toBe(false)
+  })
+
+  test("is the active selection plus the root's tools, minus the excluded ones", () => {
+    expect(
+      rootActiveTools(
+        root,
+        ["read", "bash", "write", "edit", "todo", "moonshot_search"],
+        registered,
+      ),
+    ).toEqual(["read", "bash", "todo", "codemode"])
+  })
+
+  test("a pattern excludes every active tool it matches, and keeps the rest", () => {
+    expect(
+      rootActiveTools(
+        root,
+        ["read", "computer_use_click", "computer_use_type", "todo"],
+        registered,
+      ),
+    ).toEqual(["read", "todo", "codemode"])
+  })
+
+  test("a pattern in tools adds every registered tool it matches", () => {
+    expect(
+      rootActiveTools(
+        { tools: ["+computer_use_*", "plain"], excludeTools: ["computer_use_type"] },
+        ["read"],
+        registered,
+      ),
+    ).toEqual(["read", "computer_use_click", "plain"])
+  })
+
+  test("a tool in both the selection and the additions appears once", () => {
+    expect(rootActiveTools(root, ["codemode", "read"], registered)).toEqual(["codemode", "read"])
   })
 })

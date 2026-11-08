@@ -29,7 +29,11 @@ import {
 } from "../../../runtime/src/hooks/pi-context.ts"
 import { PI_PROJECT_FLAG } from "../../../runtime/src/hooks/pi-project.ts"
 import { hasStateFolder } from "../../../runtime/src/hooks/state-folder.ts"
-import { toolArgs } from "../../../runtime/src/pi/tools.ts"
+import { validateModelCatalog } from "../../../runtime/src/pi/catalog.ts"
+import { providerEnv } from "../../../runtime/src/pi/provider.ts"
+import { type CommandRunner, requireProviderReady } from "../../../runtime/src/pi/readiness.ts"
+import { PI_ROOT_PROMPT } from "../../../runtime/src/pi/root-prompt.ts"
+import { rootActiveTools, type ToolArgs, toolArgs } from "../../../runtime/src/pi/tools.ts"
 import { STATE_DIRECTORY } from "../../../runtime/src/state/layout.ts"
 import { SPECIALIST_NAMES } from "./specialists.ts"
 
@@ -382,6 +386,17 @@ interface Collected {
    * config is read and `pi.enable` is on.
    */
   readonly environment?: Readonly<Record<string, string>>
+  /**
+   * The variables the selected provider needs (its region), present with `environment`; they apply
+   * to the root and to every child, since the provider is used by both.
+   */
+  readonly providerEnvironment?: Readonly<Record<string, string>>
+  /** True for the root once the config is read and `pi.enable` is on: it gets the root prompt. */
+  readonly rootPrompt?: true
+  /** The root's tool selection, present for the root once the config is read and `pi.enable` is on. */
+  readonly tools?: Pick<ToolArgs, "tools" | "excludeTools">
+  /** The config the provider checks read, present for the root after a collection that ended well. */
+  readonly config?: Config
 }
 
 /**
@@ -397,6 +412,12 @@ interface Held {
    * could not be read, and a project config that says off alone, leave the gates on.
    */
   gatesOff: boolean
+  /** True once a collection has found the root with `pi.enable` on: every run gets the root prompt. */
+  rootPrompt: boolean
+  /** Stops the provider checks of the session. */
+  probe: AbortController | undefined
+  /** The notice the provider checks produced, until the next run delivers it. */
+  readiness: Delivery | undefined
 }
 
 /** Where the extension finds what it runs. */
@@ -592,8 +613,11 @@ export const createExtension =
       onExcessProperty: "error",
     })
 
-    const collect = (cwd: string, signal: AbortSignal, reason: Reason) =>
-      Effect.gen(function* () {
+    const collect = (cwd: string, signal: AbortSignal, reason: Reason) => {
+      // What the config decided, kept once known so a later failure of the collection (the status
+      // command, the deadline) still leaves the root its prompt, tools and provider settings.
+      let configured: Collected = {}
+      return Effect.gen(function* () {
         // Every command starts in the package's folder, so a relative `cwd` would resolve against
         // that folder, not the project's: it is made absolute here, once.
         const project = resolve(cwd)
@@ -628,6 +652,17 @@ export const createExtension =
         const role = yield* Schema.decodeUnknownEffect(PiRoleSchema)(flag).pipe(
           Effect.mapError(() => new UnknownRole({ value: String(flag) })),
         )
+        const rootArgs = toolArgs(config, "root")
+        configured = {
+          environment: rootArgs.env,
+          providerEnvironment: providerEnv(config),
+          ...(role === "root"
+            ? {
+                rootPrompt: true,
+                tools: { tools: rootArgs.tools, excludeTools: rootArgs.excludeTools },
+              }
+            : {}),
+        } satisfies Collected
         // Status first, then reconcile: for a project that keeps state, status makes the state
         // worktree that the next calls read.
         const status = yield* holyagent(signal, project, "status").pipe(
@@ -644,12 +679,14 @@ export const createExtension =
             ? { status, ...(reconcile === undefined ? {} : { reconcile }) }
             : undefined
         const content = piContext(role, root, state)
-        const environment = toolArgs(config, "root").env
+        // The provider is checked only after a collection that ended well: a failed one already
+        // carries a notice, and the checks would start commands after its deadline.
+        const ended = { ...configured, ...(role === "root" ? { config } : {}) }
         return content === undefined
-          ? ({ environment } satisfies Collected)
+          ? ({ ...ended } satisfies Collected)
           : ({
+              ...ended,
               delivery: { customType: CONTEXT_MESSAGE, content, display: false },
-              environment,
             } satisfies Collected)
       }).pipe(
         // Every command of the collection shares one deadline, as the Claude hook has one timeout.
@@ -659,12 +696,16 @@ export const createExtension =
         }),
         // A failure adds one line and nothing else, and never reaches Pi.
         Effect.catch((error) =>
-          Effect.succeed<Collected | undefined>({ delivery: notice(error.message) }),
+          Effect.succeed<Collected | undefined>({ ...configured, delivery: notice(error.message) }),
         ),
         Effect.catchCause((cause) =>
-          Effect.succeed<Collected | undefined>({ delivery: notice(Cause.pretty(cause)) }),
+          Effect.succeed<Collected | undefined>({
+            ...configured,
+            delivery: notice(Cause.pretty(cause)),
+          }),
         ),
       )
+    }
 
     // Safe to call twice, and with nothing held. The promise settles once every collection ever
     // started has ended, the ones of an older start or compaction included, and every child they
@@ -673,6 +714,7 @@ export const createExtension =
       const taken = held
       held = undefined
       taken?.current?.abort()
+      taken?.probe?.abort()
       return Effect.runPromise(
         Effect.forEach([...running], (ended) => Effect.promise(() => ended), {
           concurrency: "unbounded",
@@ -681,8 +723,80 @@ export const createExtension =
       )
     }
 
+    // The notice for a provider that is not ready or lacks a route's model, or undefined when the
+    // provider is fine or could not be asked. The checks are Pi's own CLI probes (`pi auth check`,
+    // `pi --list-models`), run through `pi.exec` since the extension runs under Node and has no
+    // Bun Shell. A probe that did not start, was stopped or timed out says nothing about the
+    // provider, so it adds no notice; the deadline bounds both probes together.
+    const checkProvider = (signal: AbortSignal, config: Config) => {
+      let unanswered = false
+      const run: CommandRunner = (command, args) =>
+        exec(signal, command, args).pipe(
+          Effect.map((result) => {
+            unanswered ||= result.killed
+            return { exitCode: result.code, stdout: result.stdout, stderr: result.stderr }
+          }),
+          Effect.catch(() => {
+            unanswered = true
+            return Effect.succeed({ exitCode: 127, stdout: "", stderr: "" })
+          }),
+        )
+      return requireProviderReady(run, config).pipe(
+        Effect.andThen(validateModelCatalog(run, config)),
+        Effect.as<Delivery | undefined>(undefined),
+        // Only the provider's own blockers are reported; a listing that failed or was not
+        // recognised is not a statement about the provider.
+        Effect.catch((error) =>
+          Effect.succeed(
+            !unanswered &&
+              (error._tag === "ProviderNotReady" ||
+                error._tag === "ProviderInvalid" ||
+                error._tag === "ModelsNotInCatalog")
+              ? notice(error._tag === "ModelsNotInCatalog" ? error.brief : error.message)
+              : undefined,
+          ),
+        ),
+        Effect.timeoutOrElse({ duration: deadlineMs, orElse: () => Effect.succeed(undefined) }),
+      )
+    }
+
+    // Runs the provider checks beside the session: startup never waits for them, and the notice
+    // reaches the first run that starts after they end.
+    const startProviderCheck = (taken: Held, config: Config) => {
+      taken.probe?.abort()
+      const own = new AbortController()
+      taken.probe = own
+      const ended = Effect.runPromise(checkProvider(own.signal, config)).then((delivery) => {
+        if (!own.signal.aborted) taken.readiness = delivery
+      })
+      running.add(ended)
+      void ended.then(() => running.delete(ended))
+    }
+
+    // The root's tools: its active selection plus its own tools, minus its excluded ones. A
+    // failure is a notice, not an error that reaches Pi.
+    const applyRootTools = (tools: NonNullable<Collected["tools"]>): Delivery | undefined =>
+      Effect.runSync(
+        Effect.try({
+          try: () =>
+            pi.setActiveTools([
+              ...rootActiveTools(
+                tools,
+                pi.getActiveTools(),
+                pi.getAllTools().map(({ name }) => name),
+              ),
+            ]),
+          catch: (cause) => notice(`the root's tools were not applied: ${String(cause)}`),
+        }).pipe(
+          Effect.as<Delivery | undefined>(undefined),
+          Effect.catch((failure) => Effect.succeed(failure)),
+        ),
+      )
+
     // A newer collection stops the older one, and the result of a stopped one is dropped: nobody
-    // reads it, and a session that ended has nothing to be told.
+    // reads it, and a session that ended has nothing to be told. The root's tools and provider
+    // checks belong to a session's start, not to a compaction, which must not undo a change the
+    // user made to the tools since.
     const gather = (taken: Held, ctx: ExtensionContext, reason: Reason): Promise<void> => {
       taken.current?.abort()
       const own = new AbortController()
@@ -694,7 +808,14 @@ export const createExtension =
       taken.pending = collected.then((result) => {
         if (own.signal.aborted) return undefined
         taken.gatesOff = result?.gatesOff === true
-        return result
+        if (result?.rootPrompt === true) taken.rootPrompt = true
+        else if (result?.enabled === false) taken.rootPrompt = false
+        if (reason === "compact") return result
+        if (result?.config !== undefined) startProviderCheck(taken, result.config)
+        const failure = result?.tools === undefined ? undefined : applyRootTools(result.tools)
+        return failure === undefined || result === undefined
+          ? result
+          : { ...result, delivery: result.delivery ?? failure }
       })
       return taken.pending.then(() => undefined)
     }
@@ -707,7 +828,14 @@ export const createExtension =
 
     pi.on("session_start", (event, ctx) => {
       void release()
-      held = { current: undefined, pending: undefined, gatesOff: false }
+      held = {
+        current: undefined,
+        pending: undefined,
+        gatesOff: false,
+        rootPrompt: false,
+        probe: undefined,
+        readiness: undefined,
+      }
       return gather(held, ctx, event.reason)
     })
 
@@ -716,11 +844,15 @@ export const createExtension =
     )
 
     // The message is delivered once: the run that reads it takes it, and the next start or
-    // compaction brings a new one. The system prompt of the root and of other sessions is never
-    // touched. Before each run of the root the host variables are written, since the `holyagent`
-    // calls of the run read them and the active tools can change; the settings the config decides
-    // are written once, when the config is known. A child fills the package folder into its
-    // prompt instead and leaves the process environment to the root.
+    // compaction brings a new one. The root's system prompt is the HolyAgent root prompt, in front
+    // of Pi's own, on every run; the prompt of other sessions is never touched. It goes in front
+    // rather than in place of Pi's, because Pi's prompt carries what the Claude root keeps through
+    // its memory files: the project's AGENTS.md, the skills list, the date and the working folder.
+    // Before each run of the root the host variables are written, since the `holyagent` calls of
+    // the run read them and the active tools can change; the settings the config decides are
+    // written once, when the config is known, and a variable the user set stays. The provider's
+    // variables go to every session, root or child, since both use the provider. A child fills the
+    // package folder into its prompt instead and leaves the rest of the environment to the root.
     pi.on(
       "before_agent_start",
       (
@@ -734,16 +866,23 @@ export const createExtension =
         const filled = child
           ? fillPackageRoot(event.systemPrompt, packageRoot, platformPath)
           : undefined
-        const override =
-          filled === undefined || filled === event.systemPrompt ? {} : { systemPrompt: filled }
         const taken = held
         const pending = taken?.pending
         if (taken !== undefined) taken.pending = undefined
         const result = (
           collected: Collected | undefined,
         ): BeforeAgentStartEventResult | undefined => {
+          if (collected?.providerEnvironment !== undefined)
+            applyEnvironment(env, collected.providerEnvironment, true)
           if (!child && collected?.environment !== undefined)
             applyEnvironment(env, { ...collected.environment, [CACHE_RETENTION_ENV]: "long" }, true)
+          const rooted =
+            !child && taken?.rootPrompt === true
+              ? `${fillPackageRoot(PI_ROOT_PROMPT, packageRoot, platformPath)}\n\n${event.systemPrompt}`
+              : undefined
+          const prompt = rooted ?? filled
+          const override =
+            prompt === undefined || prompt === event.systemPrompt ? {} : { systemPrompt: prompt }
           const message = collected?.delivery
           return message === undefined && Object.keys(override).length === 0
             ? undefined
@@ -752,6 +891,14 @@ export const createExtension =
         return pending === undefined ? result(undefined) : pending.then(result)
       },
     )
+
+    // The provider notice is its own message, so it never replaces the context. The checks run
+    // beside the session, so it reaches the first run that starts after they end, and once.
+    pi.on("before_agent_start", (): BeforeAgentStartEventResult | undefined => {
+      const message = isChild() ? undefined : held?.readiness
+      if (held !== undefined) held.readiness = undefined
+      return message === undefined ? undefined : { message }
+    })
 
     // Only a specialist the package launched is held to a complete report.
     pi.on("message_end", (event) => {
