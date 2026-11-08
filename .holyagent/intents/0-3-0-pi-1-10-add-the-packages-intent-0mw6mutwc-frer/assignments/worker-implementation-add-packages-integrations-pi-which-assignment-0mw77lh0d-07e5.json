@@ -1,0 +1,83 @@
+{
+  "id": "assignment-0mw77lh0d-07e5",
+  "intentId": "intent-0mw6mutwc-frer",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "add-packages-integrations-pi-which",
+  "objective": "Add packages/integrations/pi, which generates a Pi package (pi 1.5.0) from the shared runtime beside the Claude plugin, with a bun-built extension stub, a build step, a byte-for-byte sync check and a sync test, in the worktree /home/user/holyagent-0.3.0-pi (branch release/0.3.0/feat/pi-package).",
+  "state": "Running",
+  "scope": [
+    "Work only in /home/user/holyagent-0.3.0-pi; run every command there, starting with bun install --frozen-lockfile (node_modules is per worktree).",
+    "Read first: AGENTS.md and .claude/CLAUDE.md (rules), docs/development.md, packages/integrations/claude/src/generate.ts and its tests/plugin.test.ts (the model to follow), mise.toml (build task), scripts/ (the generated-path list and byte-for-byte sync check, scripts/repo-paths.test.ts with its 120-character path limit, scripts/dependency-ranges.test.ts, scripts/bump-version.test.ts), /home/user/holyagent-notes/repo-map.md and /home/user/holyagent-notes/pi-deps.md. Pi's package docs are in /home/user/holyagent-notes/pi-probe/docs (packages.md, extensions.md, settings.md and others) and its type definitions in /home/user/holyagent-notes/pi-probe/node_modules/@earendil-works/pi-coding-agent.",
+    "The package: packages/integrations/pi/ with src/ (a generator and the extension source) and a generated output folder (follow the Claude package's dist convention). The output is a Pi package: package.json with the pi-package keyword and a pi key listing extensions/ and skills/ (and prompts/ if used). The version comes from the root package.json through mise run build, like the other workspace package.json files.",
+    "Extension: src/extension.ts is a default-exported factory taking pi's ExtensionAPI that registers nothing yet (the extension entry is a later PR); it is bundled to JavaScript with bun build (Bun.build) into the output's extensions/, with the host modules external. Every generated file carries a note naming its source.",
+    "Skills: the generator reads the same instruction sources as the Claude build (packages/runtime/src/instructions/<family>/skills) through the families list in packages/runtime/src/instructions/families.ts; the family is a parameter, claude-5.5 for now, because the kimi-k3.1 set arrives in a later PR that switches it. Share code with the Claude generator through the runtime rather than copying it.",
+    "Peer dependencies: @earendil-works/pi-ai, @earendil-works/pi-agent-core, @earendil-works/pi-coding-agent, @earendil-works/pi-tui and typebox are peerDependencies with range \"*\" (pi 1.5.0's package docs require it) and are not bundled; add that exception for pi peer dependencies to scripts/dependency-ranges.test.ts with a test. For type-checking, add @earendil-works/pi-coding-agent (pinned to 1.5.0 per the Intent) and whatever else the types need as devDependencies with bun add, at the caret range the dependency rule requires, then run bunx --no-install mise run deps:check; never hand-edit bun.lock.",
+    "Install path: users run pi install git:github.com/davidbasilefilho/holyagent#holyagent-<version>, which installs the repository root. Establish from pi's docs (packages.md) how pi finds a package's resources in a git install (the root package.json pi key, or conventional directories) and make the root point at the generated pi output so that command works; cite the doc lines in the report.",
+    "Sync: the output's paths join the generated-path list so the existing byte-for-byte check covers them, and a sync test modelled on packages/integrations/claude/tests/plugin.test.ts fails when the output is stale. All tracked paths stay within 120 characters."
+  ],
+  "constraints": [
+    "The maintainer's requirements in the Intent in use are binding; add no behavior they do not name (no extension handlers, provider or tools yet).",
+    "Repository rules: Effect and Effect Schema, Bun APIs and Bun Shell, JSDoc on exports, mise.toml as the command source, no new tool beyond what Bun and the toolchain cover.",
+    "Do not run the pi binary (running it is not permitted here); verify from docs, types and tests.",
+    "Make no version-control writes; report changed paths.",
+    "Finish with bunx --no-install mise run build then bunx --no-install mise run verify; write git diff (including new files, e.g. git add -N is a version-control write so use git diff plus a listing of untracked files) to /home/user/holyagent-notes/pi1.diff.",
+    "Report in under 450 words."
+  ],
+  "criteria": [
+    {
+      "text": "packages/integrations/pi generates a Pi package with the pi-package keyword, a pi key, a bun-built extension stub and the skills from the shared instructions, with the version synced by mise run build",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "pi install from a release tag resolves the generated package, as shown from pi's docs",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The host modules are peerDependencies with range * and are not bundled, with the dependency-ranges exception tested",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The byte-for-byte sync check covers the pi output and a sync test fails on stale output",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The Claude plugin output is unchanged and no existing behavior breaks",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "mise run build and mise run verify exit 0 and every tracked path is within 120 characters",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi",
+    "packages/integrations/claude",
+    "packages/runtime",
+    "scripts",
+    "mise.toml",
+    "package.json",
+    "bun.lock",
+    "docs",
+    "lefthook.yml"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T02:24:27.230Z"
+  },
+  "createdAt": "2026-11-08T02:24:27.230Z"
+}
