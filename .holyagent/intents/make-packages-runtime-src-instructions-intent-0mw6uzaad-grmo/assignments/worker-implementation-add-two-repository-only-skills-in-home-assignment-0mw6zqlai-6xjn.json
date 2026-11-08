@@ -52,5 +52,29 @@
     "finishedAt": "2026-11-08T00:22:51.333Z"
   },
   "result": "result: Added the `requirements` and `write-skills` skills under `.claude/skills/` only. They are not distributed, and nothing under `packages/` was touched.\nchanged:\n- `/home/user/holyagent-0.3.0-req/.claude/skills/requirements/SKILL.md`\n- `/home/user/holyagent-0.3.0-req/.claude/skills/write-skills/SKILL.md`\n- `/home/user/holyagent-0.3.0-req/.claude/skills/write-skills/references/agent-skills-standard.md`\n- `/home/user/holyagent-0.3.0-req/.claude/skills/write-skills/references/model-guides.md`\n\nchecks:\n- `bunx --no-install mise run fmt:check` -> exit 0 (it failed first on the two reference files; I ran `bun fmt` on those two files only, then it passed, 295 files formatted).\n- `bunx --no-install mise run lint` -> exit 0 (no problems in 157 files).\n- Not run: `mise run verify`, `mise run build` and the scaffold (`instructions:scaffold`). The parallel writer's scaffold script, guide files and tests are not in the worktree yet. I named the scaffold command in the skill as the brief gives it.\n\nblockers: none\nquestions: none\nnotes:\n- The requirements skill refers to the id-coverage and mirror tests and to each family's `guide.md`. It does not say how an id appears inside a family file, because that format is not decided yet. Check it against the parallel writer's final tree.\n- The `model-guides.md` reference cites the Claude and Kimi pages from the two guide-point notes, not the `guide.md` files, which do not exist yet. Re-check it once `claude-5.5/guide.md` and `kimi-k3.1/guide.md` land.\n- The build copies every file under a skill directory, so `references/` ships fine in the generated plugin. I read that from `generate.ts`; I did not run the build.\n- Diff for review: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/skills.diff`\n\nevidence:\n- The requirements skill covers create, adjust and remove, runs the scaffold script before translating, translates per each family's guide.md, and names the build and verify gates: `requirements/SKILL.md` has the sections Create, Adjust, Move or remove, Scaffold (`bunx --no-install mise run instructions:scaffold` before translating), Translate per family (reads `guide.md` first) and Gates (`mise run build`, `mise run verify`).\n- The write-skills skill follows the Agent Skills standard with its relevant parts in reference files with sources, and draws on the shared and complementary model-guide points so skills work on every supported family: `references/agent-skills-standard.md` (sources S1-S5) and `references/model-guides.md` (shared points, a table of where the guides differ with text that satisfies both, and sources). `SKILL.md` links both.\n- Both skills live only under .claude/skills/, are not distributed, and their descriptions start with the situation: both paths are under `.claude/skills/`, and both descriptions start \"Use when ...\".\n- changed-paths: the four files above.\n",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Independent code and artifact reviews and re-reviews accept the work; verify exit 0 on f2323fd run by the reviewer.",
+    "criteria": [
+      {
+        "criterion": "The requirements skill covers create, adjust and remove, runs the scaffold script before translating, translates per each family's guide.md, and names the build and verify gates",
+        "support": "`requirements/SKILL.md` has the sections Create, Adjust, Move or remove, Scaffold (`bunx --no-install mise run instructions:scaffold` before translating), Translate per family (reads `guide.md` first) and Gates (`mise run build`, `mise run verify`)."
+      },
+      {
+        "criterion": "The write-skills skill follows the Agent Skills standard with its relevant parts in reference files with sources, and draws on the shared and complementary model-guide points so skills work on every supported family",
+        "support": "`references/agent-skills-standard.md` (sources S1-S5) and `references/model-guides.md` (shared points, a table of where the guides differ with text that satisfies both, and sources). `SKILL.md` links both."
+      },
+      {
+        "criterion": "Both skills live only under .claude/skills/, are not distributed, and their descriptions start with the situation",
+        "support": "both paths are under `.claude/skills/`, and both descriptions start \"Use when ...\"."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "the four files above."
+      }
+    ]
+  },
   "createdAt": "2026-11-07T22:44:29.130Z"
 }
