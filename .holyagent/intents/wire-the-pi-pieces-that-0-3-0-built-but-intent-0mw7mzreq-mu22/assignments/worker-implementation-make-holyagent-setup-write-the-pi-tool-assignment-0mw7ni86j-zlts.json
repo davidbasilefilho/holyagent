@@ -1,0 +1,89 @@
+{
+  "id": "assignment-0mw7ni86j-zlts",
+  "intentId": "intent-0mw7mzreq-mu22",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "make-holyagent-setup-write-the-pi-tool",
+  "objective": "Make holyagent setup write the Pi tool settings that toolSettings builds, and holyagent doctor report them, in /home/user/holyagent-0.3.0-settings (branch release/0.3.0/feat/pi-tool-settings, head 5307d43).",
+  "state": "Running",
+  "scope": [
+    "Gap (trace): toolSettings (packages/runtime/src/pi/tools.ts:221) has no non-test caller. It returns codemode.mode=only for ~/.pi/agent/settings.json, the subagents.json settings (disableDefaultAgents, fallbackSubagent), the Billion Context setting {pi:{subagents:false}}, the Moonshot tools config and the computer-use settings. Intended wiring: docs/pi/extensions.md:130-142, docs/pi/configuration.md:155-179, docs/pi/installation.md (setup and doctor section).",
+    "Add a setup step (beside the existing Pi package step in packages/runtime/src/setup/pi-install.ts and steps.ts, same gating: Pi in use, not a cloud session, pi.enable on, not --undo semantics unless you add a matching undo) that deep-merges each settings file toolSettings returns, at the scope's location (user: Pi's global agent dir from PI_CODING_AGENT_DIR or ~/.pi/agent; project/local: the project .pi), with --dry-run showing and writing nothing and one report line per file.",
+    "Merge rules (maintainer decision for settings): write a key only where it is unset and the value differs from the tool's own default; never overwrite a value the user set; a user's off wins for risky settings. Read each package's default from its source in node_modules (codemode, pi-subagents, billion-context, the Moonshot tools package, the computer-use package) and skip keys whose value equals the default. Malformed JSON is a failed line and is left untouched; write atomically (temp file then rename) through the existing file services.",
+    "Doctor: report each file whose HolyAgent keys are missing, as a ~ line with the setup command as the fix, only when Pi is in use (reuse piInUse and piPresenceFiles scope logic).",
+    "--undo: remove only keys whose current value still equals what setup would write, or leave the settings and say so; pick one, document it, test it.",
+    "Docs: docs/pi/extensions.md:130-142 status, docs/pi/configuration.md, docs/pi/installation.md, docs/components.md and docs/usage.md setup step list."
+  ],
+  "constraints": [
+    "Change only the ownership paths; no version-control writes and no edits under .git/ or .holyagent/.",
+    "Follow .claude/CLAUDE.md (Effect, tagged errors, Effect Schema with onExcessProperty error where you decode, Bun APIs, JSDoc on exports). Every behavior gets a test that fails without it; do not weaken tests.",
+    "Never run pi; test with temp directories and stubs.",
+    "Run bunx --no-install mise run build and bunx --no-install mise run verify before reporting.",
+    "Report in under 400 words; long logs to /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad; diff-file (dist excluded) at /home/user/holyagent-notes/wire-b.diff."
+  ],
+  "criteria": [
+    {
+      "text": "holyagent setup writes each toolSettings key only where it is unset and differs from the package default, never overwrites a user value, and leaves a malformed file untouched with a failed line",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The step follows the Pi step's gating and scopes, and --dry-run writes nothing",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Doctor reports missing HolyAgent settings with the fix only when Pi is in use",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "--undo behavior is defined, documented and tested",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Existing setup and doctor output for Claude-only users is unchanged",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Each new behavior has a test that fails without it",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The docs describe the step as built and match the code",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build and mise run verify exit 0",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/setup",
+    "packages/runtime/src/pi/tools.ts",
+    "packages/runtime/tests/setup-pi.test.ts",
+    "packages/runtime/tests/setup-pi-settings.test.ts",
+    "packages/runtime/tests/setup.test.ts",
+    "packages/integrations/claude/dist/scripts/holyagent.js",
+    "packages/integrations/pi/dist/scripts/holyagent.js",
+    "docs/pi/configuration.md",
+    "docs/pi/installation.md",
+    "docs/components.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T09:49:49.676Z"
+  },
+  "createdAt": "2026-11-08T09:49:49.676Z"
+}
