@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-commit-7b935ff-on-release-0-3-0",
   "objective": "Review commit 7b935ff on release/0.3.0/feat/pi-review-prompts (worktree /home/user/holyagent-0.3.0-prompts, range 74d9379..7b935ff) for correctness and regressions.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Diff: /home/user/holyagent-notes/wire-c.diff (the Claude dist and the Pi CLI bundle excluded; the generated Pi prompts, agents and package.json included).",
     "Intended behavior: the Pi package ships prompts/code-review.md and prompts/security-review.md (original text) as Pi prompt templates listed under the pi key of the generated and root package.json; assignment dispatch under Pi writes the matching first-pass prompt first in a Reviewer.code or Reviewer.security brief file (briefText in cli/brief.ts); the printed dispatch prompt, other roles briefs and every Claude brief are unchanged.",
@@ -44,7 +44,33 @@
     "agentId": "workflow:wf_9fc8b367-fb8/assignment-0mw7preh2-7yi0",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T10:52:56.967Z"
+    "startedAt": "2026-11-08T10:52:56.967Z",
+    "finishedAt": "2026-11-08T11:00:40.764Z"
+  },
+  "result": "result: No blockers. The Pi prompt-template wiring and the brief change are correct against Pi 1.5.0, and `mise run verify` passes (log: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log).\nchanged: none (read-only)\nchecks: `bunx --no-install mise run verify` in /home/user/holyagent-0.3.0-prompts -> exit 0; type-check, lint, format and 2327 tests pass, 0 fail.\nblockers: none\nquestions: none\n\nnotes:\n- The built-in `/code-review` on `74d9379...7b935ff` ran and returned six claims. I classified each below.\n- Rejected: `${@:-default}` is not valid Pi syntax. Pi 1.5.0's `substituteArgs` (`dist/core/prompt-templates.js`) documents and implements `${@:-default}`. The run with no args falls back to the default. `firstPassPrompt` strips the placeholder, and a test asserts no `${` remains in the brief.\n- Optional: `parseTemplate` in `packages/integrations/pi/src/prompts/index.ts` throws a bare `Error` and its regex accepts only `\\n`. `.gitattributes` sets `eol=lf`, and the frontmatter is a repo constant exercised by the tests. The throw does not follow the tagged-error rule, but lint passes.\n- Optional: `packages/runtime/src/cli/brief.ts` imports from `integrations/pi/src`, the first runtime-to-integration source import. This bundles the Pi prompt text into the Claude plugin's `holyagent.js`, which does not use it. Injecting the text or moving it into runtime would keep the dependency one-way.\n- Optional: the Reviewer.security brief says \"diff file the Assignment names\", and `briefText` does not add a diff file. This matches the role's own no-shell rule, so the root has to name one in the Assignment. The root can verify that when it dispatches.\n- Optional nits:\n  - `firstPassPrompt` resolves a template through a name table and then `find`. A direct roleTask-to-template record would be simpler.\n  - `String.replace` with `\"$1\"` would misread a `$` in a future default.\n  - `promptFiles` rebuilds the frontmatter and adds a `frontmatter` import from the Claude package.\n\nPi 1.5.0 checks:\n- The `prompts` manifest key is in Pi's resource-type list (`package-manager.js` line 71, `RESOURCE_TYPES`).\n- Pi reads `*.md` files from a package's `pi.prompts` folder.\n- Pi's YAML frontmatter parser accepts the generated file's `# Generated` comment line.\n\nJournal key and dispatch:\n- The printed dispatch prompt is still the two-line `dispatchPrompt`.\n- The brief file is read only by the specialist. `dispatchedAssignment` reads the first line of the printed prompt, not the brief.\n- Briefs for other roles, and every Claude brief, are the Assignment alone. A test covers both.\n\nRoot `package.json` sync: the existing test \"the root pi key points at the build\" compares the root `pi` key to the generated manifest and passes, now including `prompts`.\n\nTests: `packages/runtime/tests/cli/brief.test.ts` (`briefText` and the dispatch end to end) and `packages/integrations/pi/tests/prompts.test.ts` (templates and `firstPassPrompt`) would fail without the change. `pi.test.ts` also asserts the new `prompts` manifest key and package file.\n\nRepo rules: the Effect, JSDoc and `mise run verify` rules hold; the generated `dist` matches the generator because the verify tests pass. I could only read, not run, the end-to-end behavior of Pi's `/code-review` slash command in a live Pi session.\n\nevidence:\nPi reviewer briefs start with the matching prompt, other briefs and Claude output are unchanged, and Pi loads the templates: `briefText` in `packages/runtime/src/cli/brief.ts:52`; `brief.test.ts` passes under verify (exit 0); Pi 1.5.0 `prompt-templates.js` supports `${@:-}`, and `package-manager.js:71` lists `prompts` as a resource type.\nEach new behavior has a test that would fail without it: `packages/runtime/tests/cli/brief.test.ts`, `packages/integrations/pi/tests/prompts.test.ts` and `packages/integrations/pi/tests/pi.test.ts` (root `pi` key sync); all pass.\nThe change follows the repository's code rules: `mise run verify` exit 0 (fmt, lint, check, 2327 tests); no violation of CLAUDE.md or AGENTS.md found.\nreview-findings: six built-in findings classified above (1 rejected, 5 optional, 0 blockers).\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "No blocker; Pi 1.5.0 prompt loading and brief path checked; verify 2327 pass",
+    "criteria": [
+      {
+        "criterion": "Pi reviewer briefs start with the matching prompt, other briefs and Claude output are unchanged, and Pi loads the templates",
+        "support": "`briefText` in `packages/runtime/src/cli/brief.ts:52`; `brief.test.ts` passes under verify (exit 0); Pi 1.5.0 `prompt-templates.js` supports `${@:-}`, and `package-manager.js:71` lists `prompts` as a resource type."
+      },
+      {
+        "criterion": "Each new behavior has a test that would fail without it",
+        "support": "`packages/runtime/tests/cli/brief.test.ts`, `packages/integrations/pi/tests/prompts.test.ts` and `packages/integrations/pi/tests/pi.test.ts` (root `pi` key sync); all pass."
+      },
+      {
+        "criterion": "The change follows the repository's code rules",
+        "support": "`mise run verify` exit 0 (fmt, lint, check, 2327 tests); no violation of CLAUDE.md or AGENTS.md found."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "review-findings",
+        "support": "six built-in findings classified above (1 rejected, 5 optional, 0 blockers)."
+      }
+    ]
   },
   "createdAt": "2026-11-08T10:52:56.967Z"
 }
