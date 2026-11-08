@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "add-one-bullet-to-docs-hooks-md",
   "objective": "Add one bullet to docs/hooks.md describing the refusals the shared workflow check now makes because the Pi runtime runs scripts as classic scripts.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Work only in /home/user/holyagent-0.3.0-launcher. In docs/hooks.md, section ## `workflow`, the bullet list after the paragraph that starts \"The hook parses the script (with [acorn]\" ends with the bullet that starts \"- **`agent()`.**\". Insert this bullet directly before the \"- **`agent()`.**\" bullet, as written: \"- **Script-mode differences.** The same check gates `SubagentWorkflow` scripts under Pi, where `@tintinweb/pi-subagents` runs the body as a classic script, not a module, so it refuses what the two modes read differently: an HTML-like comment (`<!--`, or `-->` at the start of a line), a function declared inside a block rather than at the top level or in a function body, and any line matching `export const meta =` other than the one vetted `meta` export, which the package evaluates before the script runs. Under Pi the `agentType` names the specialist without the `holyagent:` prefix ([pi/extensions.md](pi/extensions.md)).\" Reason: the Claude hook now prompts for such scripts, and the doc should say why."
   ],
@@ -37,7 +37,24 @@
     "agentId": "workflow:wf_617f01b0-625/assignment-0mw7j2q3s-inz5",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-08T07:45:47.944Z"
+    "startedAt": "2026-11-08T07:45:47.944Z",
+    "finishedAt": "2026-11-08T07:48:56.803Z"
+  },
+  "result": "result: Inserted the \"Script-mode differences\" bullet in docs/hooks.md directly before the `agent()` bullet, as written. Diff is one added line.\nchanged: docs/hooks.md\nchecks: `bunx --no-install mise run verify` -> exit 0; type-check 199 files no errors; lint 200 files no problems; 2106 pass, 0 fail, 13953 expect() calls across 71 files.\nblockers: none\nquestions: none\nnotes: verify log is at /tmp/claude-0/verify.log (outside the repo); diff is at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/hooks-md.diff.\nevidence:\n[blocking] The bullet is inserted as given before the agent() bullet: docs/hooks.md line 75 (diff shows a single insertion before \"- **`agent()`.**\")\n[blocking] mise run verify exits 0: `bunx --no-install mise run verify` exit=0, 2106 pass, 0 fail\n",
+  "acceptance": {
+    "revision": 7,
+    "rationale": "One-line insertion as given; verify exit 0.",
+    "criteria": [
+      {
+        "criterion": "The bullet is inserted as given before the agent() bullet",
+        "support": "docs/hooks.md line 75 (diff shows a single insertion before \"- **`agent()`.**\")"
+      },
+      {
+        "criterion": "mise run verify exits 0",
+        "support": "`bunx --no-install mise run verify` exit=0, 2106 pass, 0 fail"
+      }
+    ],
+    "evidence": []
   },
   "createdAt": "2026-11-08T07:45:47.944Z"
 }
