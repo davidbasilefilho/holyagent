@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-repair-commit-13f357f-on",
   "objective": "Re-review repair commit 13f357f on release/0.3.0/feat/pi-root-wiring (worktree /home/user/holyagent-0.3.0-wiring, range 5307d43..13f357f) against the findings it repairs.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Diff: /home/user/holyagent-notes/wire-a-repair.diff (dist excluded).",
     "Findings repaired: (1) provider probes ran before KIMI_CODE_REGION was applied; (2) notice text could carry C0/C1 control characters from a project model id or probe output, now stripped, and ModelId restricted to ^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$; (3) the root's exclusions and prompt failed open when the config could not be read, now from the defaults; codemode scripts could call deferred excluded tools (computer-use beyond the core set, web_search/web_fetch), now refused by a tool_call gate; optional: a missing pi binary gave a false login notice, a failed setActiveTools was dropped when the status was the delivery, a compaction during the start collection skipped the start work.",
@@ -39,7 +39,29 @@
     "agentId": "workflow:wf_153bab69-df7/assignment-0mw7oobai-8ld4",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T10:22:33.258Z"
+    "startedAt": "2026-11-08T10:22:33.258Z",
+    "finishedAt": "2026-11-08T10:32:11.013Z"
+  },
+  "result": "result: Repair 13f357f clears both blocking criteria. I found no blockers, and `mise run verify` passes.\n\n**Built-in `/code-review`:** it ran on `5307d43...13f357f` through the Skill tool and returned 8 claims. I read the code for each and classified them below.\n- Rejected: \"provider env is applied with override=true, so a failed collection clobbers the real provider env\". The third argument of `applyEnvironment` is `keep`, so `true` leaves a user-set variable alone. There is also only one provider profile, so the defaults' and the config's provider env are identical.\n- Rejected: \"two `before_agent_start` handlers lose a notice\". Pi 1.5.0 `emitBeforeAgentStart` (`dist/core/extensions/runner.js:1121`) runs the handlers in order and pushes every `result.message`. The first handler awaits `pending`, so both notice slots are filled before the later handlers run.\n- Rejected: \"a failed start consumes `started`, so tools and probes never re-run\". Before the repair a failed collection never ran probes either, and a compaction never ran them. Applying the defaults' exclusions is the fail-closed behavior the repair asks for. The defaults exclude the most: `computerUse` is on and `web` is `provider`.\n- Optional: the `ModelId` pattern refuses `@`, `+` and `=`, which some providers use (Vertex ids use `@`). Every shipped route id (`k3.1-pro`, `kimi-for-coding`) and every doc id passes, and only Kimi ships. `docs/pi/providers.md:41` states the restriction.\n- Optional: with the user's `pi.enable: false` and an undecodable project config, `failed()` now returns the root prompt and exclusions, and `gatesOff` stays false. This is fail-closed by design.\n- Optional: `toolMatches` builds a RegExp for every pattern on every call.\n- Optional: `SPAWN_FAILURE` (`/^spawn \\S+ E…$/`) misses a program path with spaces. The probes run the bare `pi`, so it is theoretical.\n- Optional: `printable` handles zero-width and NEL characters differently. This is cosmetic.\n\n**Tool_call gate against Pi 1.5.0:**\n- A codemode script's call goes through `_executeNestedToolCall`, which runs `_beforeToolCall(context, parentId)`. That emits `tool_call` with `parentToolCallId`, and `_getCallableTools()` includes non-active tools with `codemode` or `deferred` exposure.\n- `emitToolCall` returns the first `{block:true}`. The agent loop turns it into an error tool result containing `reason`.\n- So `{block, reason}` refuses the nested call and the script sees an error result.\n- Not run: `pi-web-kit` is not installed in the tree, so I did not check the real `web_search` and `web_fetch` names against the patterns.\n\n**Finding-by-finding:**\n- Probe env order: `gather` applies `providerEnvironment` before `startProviderCheck`. A test covers this, and it fails on the base.\n- Control characters: `oneLine` now uses `printable`. The schema test refuses ESC, C1, newline and bidi (12 of 24 cases fail on the base). A notice test covers it.\n- Fail-open config: `closedSettings` plus the `tool_call` gate. Tests cover an unreadable config, a failing git or status, and other sessions or `pi.enable` off.\n- Optional items: tests exist for the missing `pi`, the `setActiveTools` throw, and compaction during the start.\n\n**Tests that fail without the repair:** I put the base src with the new tests in the scratchpad and stubbed the one missing export. `extension.test.ts` then fails in many cases, and `schema.test.ts` fails in 11.\n\nchecks:\n- `bunx --no-install mise run verify` -> exit 0. Type-check clean in 204 files, lint clean in 205, 2283 tests pass, 0 fail.\n- `bun test packages/integrations/pi/tests packages/runtime/tests/config` -> 319 pass, 0 fail.\n- Log: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log\n\nblockers: none\nquestions: none\nnotes: the `docs/pi/README.md` diff is mostly table realignment.\n\nevidence:\nEach finding is repaired with a test that fails without it, and nothing else regresses: base src with the new tests fails many `extension.test.ts` cases and 11 `schema.test.ts` cases; `mise run verify` exit 0, 2283 pass; gate semantics read in Pi 1.5.0 `agent-session.js:339-428` and `runner.js:957`.\nThe repair follows the repository's code rules: JSDoc on `refuseExcludedTool`; Effect composition with no new try/catch or Promise statics; lint and type-check clean in `mise run verify`.\nreview-findings: no blockers, five optional (`ModelId` `@`/`+`, `pi.enable` off with a broken project config, per-call RegExp, `SPAWN_FAILURE` with spaces, `printable` cosmetics); three built-in claims rejected (env clobber, dropped notice, `started` consumption).\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "All findings repaired with tests that fail on the base; gate semantics checked in Pi 1.5.0; verify 2283 pass",
+    "criteria": [
+      {
+        "criterion": "Each finding is repaired with a test that fails without it, and nothing else regresses",
+        "support": "base src with the new tests fails many `extension.test.ts` cases and 11 `schema.test.ts` cases; `mise run verify` exit 0, 2283 pass; gate semantics read in Pi 1.5.0 `agent-session.js:339-428` and `runner.js:957`."
+      },
+      {
+        "criterion": "The repair follows the repository's code rules",
+        "support": "JSDoc on `refuseExcludedTool`; Effect composition with no new try/catch or Promise statics; lint and type-check clean in `mise run verify`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "review-findings",
+        "support": "no blockers, five optional (`ModelId` `@`/`+`, `pi.enable` off with a broken project config, per-call RegExp, `SPAWN_FAILURE` with spaces, `printable` cosmetics); three built-in claims rejected (env clobber, dropped notice, `started` consumption)."
+      }
+    ]
   },
   "createdAt": "2026-11-08T10:22:33.258Z"
 }
