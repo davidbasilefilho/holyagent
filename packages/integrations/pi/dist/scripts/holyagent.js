@@ -14576,17 +14576,31 @@ var init_lifecycle = __esm(() => {
   });
 });
 
-var init_pi_packages = () => {};
+var pi_packages_default;
+var init_pi_packages = __esm(() => {
+  pi_packages_default = {
+    "pi-provider-kimi-code": "0.6.13",
+    "@tintinweb/pi-subagents": "0.23.1",
+    "billion-context": "0.1.212",
+    "@juicesharp/rpiv-todo": "2.15.0",
+    "@juicesharp/rpiv-ask-user-question": "2.15.0",
+    "@aliou/pi-processes": "0.13.6",
+    "@amaster.ai/pi-computer-use": "0.1.36",
+    "pi-web-kit": "0.5.0"
+  };
+});
 
+var PI_PACKAGE_VERSIONS, piPackageSource = (name) => `npm:${name}@${PI_PACKAGE_VERSIONS[name]}`;
 var init_pi_packages2 = __esm(() => {
   init_pi_packages();
+  PI_PACKAGE_VERSIONS = pi_packages_default;
 });
 
 var PROVIDERS, providerProfile = (config) => PROVIDERS[config.pi.provider], routeModel = (config, key) => {
   const { id } = providerProfile(config);
   const { model, thinking } = config.pi.routes[key];
   return { key, provider: id, model, thinking, spec: `${id}/${model}:${thinking}` };
-}, subagentModel = ({ provider, model }) => `${provider}/${model}`;
+}, subagentModel = ({ provider, model }) => `${provider}/${model}`, WEB_KIT_TOOLS, webChoice = (profile, mode) => mode === "off" ? { source: "off", tools: [] } : mode === "provider" && profile.webTools.length > 0 ? { source: "provider", tools: profile.webTools } : { source: "pi-web-kit", tools: WEB_KIT_TOOLS };
 var init_provider = __esm(() => {
   init_pi_packages2();
   PROVIDERS = {
@@ -14599,6 +14613,7 @@ var init_provider = __esm(() => {
       toolsFile: "~/.pi/providers/kimi-coding/config.json"
     }
   };
+  WEB_KIT_TOOLS = ["web_search", "web_fetch"];
 });
 
 import { join as join8 } from "path";
@@ -15709,7 +15724,7 @@ var added = (text) => `+ ${text}`, present3 = (text) => `= ${text}`, skipped = (
   const detail = (result.stderr || result.stdout).trim().split(`
 `)[0] ?? "";
   return `! ${what}: failed (exit ${result.exitCode})${detail === "" ? "" : `: ${detail}`}`;
-}, show = (value) => JSON.stringify(value) ?? String(value);
+}, show = (value) => JSON.stringify(value) ?? String(value), pass = (name, detail) => `ok   ${name}: ${detail}`, fail6 = (name, detail) => `FAIL ${name}: ${detail}`;
 
 var MARKETPLACE, PLUGIN_ID, CACHE_TTLS, ROOT_MODEL = "claude-opus-5-5", userSettingsDefaults = (subagentCacheTtl) => [
   { path: ["attribution", "commit"], value: "" },
@@ -24342,13 +24357,238 @@ var init_migrate = __esm(() => {
   ];
 });
 
+var FEATURE_PACKAGES, WEB_KIT_PACKAGE = "pi-web-kit", piPackages = (config, profile = providerProfile(config)) => {
+  const { enable, features } = config.pi;
+  if (!enable)
+    return [];
+  const names = [
+    profile.package,
+    ...Object.keys(FEATURE_PACKAGES).filter((feature) => features[feature]).map((feature) => FEATURE_PACKAGES[feature]),
+    ...webChoice(profile, features.web).source === "pi-web-kit" ? [WEB_KIT_PACKAGE] : []
+  ];
+  return names.map((name) => piPackageSource(name));
+};
+var init_packages = __esm(() => {
+  init_provider();
+  init_pi_packages2();
+  FEATURE_PACKAGES = {
+    subagents: "@tintinweb/pi-subagents",
+    contextCompression: "billion-context",
+    todo: "@juicesharp/rpiv-todo",
+    ask: "@juicesharp/rpiv-ask-user-question",
+    processes: "@aliou/pi-processes",
+    computerUse: "@amaster.ai/pi-computer-use"
+  };
+});
+
 import { join as join16 } from "path";
+var PI_HOST_VERSION = "1.5.0", PI_MINIMUM_NODE = "22.19.0", PI_INSTALL, NODE_FIX, PI_FIX, PACKAGE_FIX, VERSION, releaseIn = (text) => {
+  const [, major, minor, patch] = VERSION.exec(text) ?? [];
+  return major === undefined || minor === undefined || patch === undefined ? undefined : [Number(major), Number(minor), Number(patch)];
+}, compareReleases = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2], PINNED_PI, MINIMUM_NODE, checkVersioned = (env, name, command, texts) => gen2(function* () {
+  const shell = yield* Shell;
+  const found = yield* shell.which(command);
+  if (isNone2(found))
+    return fail6(name, `not found on PATH; ${texts.fix}`);
+  const result = yield* shell.run(command, ["--version"], { cwd: homeDirectory(env) });
+  const output = `${result.stdout}
+${result.stderr}`;
+  const release = result.exitCode === 0 ? releaseIn(output) : undefined;
+  if (release === undefined)
+    return fail6(name, `${found.value} did not report a version for --version (exit ${result.exitCode}); ${texts.fix}`);
+  const shown = release.join(".");
+  const verdict = texts.judge(release, shown, found.value);
+  return verdict.ok ? pass(name, verdict.detail) : fail6(name, verdict.detail);
+}), checkPi = (env) => checkVersioned(env, "pi", "pi", {
+  fix: PI_FIX,
+  judge: (release, shown, path) => compareReleases(release, PINNED_PI) < 0 ? {
+    ok: false,
+    detail: `${shown} at ${path} is older than ${PI_HOST_VERSION}, the release HolyAgent is built against; ${PI_FIX}`
+  } : {
+    ok: true,
+    detail: compareReleases(release, PINNED_PI) === 0 ? `${shown} (${path})` : `${shown} (${path}; newer than the ${PI_HOST_VERSION} HolyAgent is built against)`
+  }
+}), checkNode = (env) => checkVersioned(env, "node", "node", {
+  fix: NODE_FIX,
+  judge: (release, shown, path) => compareReleases(release, MINIMUM_NODE) < 0 ? {
+    ok: false,
+    detail: `${shown} at ${path} is older than ${PI_MINIMUM_NODE}, which Pi needs; ${NODE_FIX}`
+  } : { ok: true, detail: `${shown} (${path})` }
+}), Open, PackageEntry, PiSettings, sourceName = (source) => {
+  const bare = source.startsWith("npm:") ? source.slice("npm:".length) : source;
+  if (source.startsWith("npm:") && bare.startsWith("@"))
+    return;
+  const last = bare.split(/[/\\:]/).filter(Boolean).at(-1) ?? "";
+  return (last.split("@")[0] ?? "").replace(/\.git$/, "");
+}, isHolyagentSource = (source) => {
+  const normal = source.replaceAll("\\", "/").replace(/\/+$/, "");
+  return sourceName(source) === "holyagent" || normal.endsWith("/packages/integrations/pi/dist");
+}, piAgentDirectory = (env) => {
+  const home = homeDirectory(env);
+  const set = firstNonEmpty(env["PI_CODING_AGENT_DIR"]);
+  if (set === undefined)
+    return join16(home, ".pi", "agent");
+  return set === "~" ? home : /^~[/\\]/.test(set) ? join16(home, set.slice(2)) : set;
+}, piSettingsSources = (file) => gen2(function* () {
+  const exists = yield* fileOperation(file, "read", () => Bun.file(file).exists());
+  if (!exists)
+    return [];
+  const text = yield* fileOperation(file, "read", () => Bun.file(file).text());
+  if (text.trim() === "")
+    return [];
+  const settings = yield* decodeUnknownEffect2(fromJsonString2(PiSettings))(text, {
+    onExcessProperty: "error"
+  }).pipe(mapError2((error) => new SetupFailure({ message: `${file} is not valid Pi settings: ${error.message}` })));
+  return (settings.packages ?? []).map((entry) => typeof entry === "string" ? entry : entry.source);
+}), piSettingsFiles = (env, cwd) => [join16(piAgentDirectory(env), "settings.json"), join16(cwd, ".pi", "settings.json")], parseNpmSource = (source) => {
+  if (!source.startsWith("npm:"))
+    return;
+  const spec = source.slice("npm:".length);
+  const at = spec.indexOf("@", 1);
+  return at < 0 ? { name: spec, version: undefined } : { name: spec.slice(0, at), version: spec.slice(at + 1) };
+}, listsAtPin = (listed, wanted) => {
+  const want = parseNpmSource(wanted);
+  return listed.some((source) => {
+    const found = parseNpmSource(source);
+    return found !== undefined && found.name === want?.name && found.version === want.version;
+  });
+}, piInUse = (env) => gen2(function* () {
+  if (firstNonEmpty(env["HOLYAGENT_HOST"]) === "pi")
+    return true;
+  return isSome2(yield* (yield* Shell).which("pi"));
+}), loadPiConfig = (env, cwd) => loadConfig({ projectDirectories: [stateDirectory(cwd)], env }).pipe(mapError2((error) => new SetupFailure({ message: error.message }))), checkPackage = (env, cwd) => gen2(function* () {
+  const files = piSettingsFiles(env, cwd);
+  const outcomes = yield* forEach2(files, (file) => piSettingsSources(file).pipe(map5((sources) => ({
+    file,
+    listed: sources.some(isHolyagentSource),
+    problem: undefined
+  })), catchTag2("SetupFailure", (error) => succeed6({ file, listed: false, problem: error.message }))));
+  const found = outcomes.find((outcome) => outcome.listed);
+  if (found !== undefined)
+    return pass("pi package", `listed in ${found.file}`);
+  const problems = outcomes.flatMap((outcome) => outcome.problem === undefined ? [] : [outcome.problem]);
+  return fail6("pi package", problems.length > 0 ? `${problems.join("; ")}; fix the file, or ${PACKAGE_FIX}` : `not in the packages of ${files.join(" or ")}; ${PACKAGE_FIX}`);
+}), checkFeatures = (env, cwd, config) => gen2(function* () {
+  const files = piSettingsFiles(env, cwd);
+  const listed = (yield* forEach2(files, (file) => piSettingsSources(file).pipe(orElseSucceed2(() => [])))).flat();
+  const wanted = piPackages(config);
+  const missing = wanted.filter((source) => !listsAtPin(listed, source));
+  if (missing.length === 0)
+    return [pass("pi features", `${wanted.length} enabled packages listed at their pins`)];
+  return missing.map((source) => fail6(`pi feature ${parseNpmSource(source)?.name ?? source}`, `not listed at ${source} in the packages of ${files.join(" or ")}; install it with \`pi install ${source}\` (add -l for this project only), or re-run \`holyagent setup\``));
+}), piChecks = (env, cwd) => gen2(function* () {
+  if (!(yield* piInUse(env)))
+    return [
+      hint("pi: not in use (HOLYAGENT_HOST is not pi and pi is not on PATH); Pi checks skipped")
+    ];
+  return yield* loadPiConfig(env, cwd).pipe(matchEffect3({
+    onFailure: (error) => succeed6([fail6("pi config", error.message)]),
+    onSuccess: (config) => config.pi.enable ? all2([
+      checkPi(env),
+      checkNode(env),
+      checkPackage(env, cwd),
+      checkFeatures(env, cwd, config)
+    ]).pipe(map5(([pi, node, pkg, features]) => [pi, node, pkg, ...features])) : succeed6([])
+  }));
+});
+var init_pi_check = __esm(() => {
+  init_dist();
+  init_package();
+  init_load();
+  init_packages();
+  init_layout();
+  init_environment();
+  init_errors6();
+  init_json_file();
+  init_shell();
+  PI_INSTALL = `npm install -g --ignore-scripts @earendil-works/pi-coding-agent@${PI_HOST_VERSION}`;
+  NODE_FIX = `install Node.js ${PI_MINIMUM_NODE} or newer (https://nodejs.org)`;
+  PI_FIX = `install Pi with \`${PI_INSTALL}\` (Node.js ${PI_MINIMUM_NODE} or newer), or with the official installer (https://pi.dev)`;
+  PACKAGE_FIX = `install it with \`pi install git:github.com/davidbasilefilho/holyagent@holyagent-${version}\` (add -l for this project only)`;
+  VERSION = /(\d+)\.(\d+)\.(\d+)/;
+  PINNED_PI = releaseIn(PI_HOST_VERSION) ?? [0, 0, 0];
+  MINIMUM_NODE = releaseIn(PI_MINIMUM_NODE) ?? [0, 0, 0];
+  Open = Record(String6, Unknown2);
+  PackageEntry = Union2([
+    String6,
+    StructWithRest(Struct({ source: String6 }), [Open])
+  ]);
+  PiSettings = StructWithRest(Struct({ packages: optionalKey2(ArraySchema(PackageEntry)) }), [Open]);
+});
+
+import { join as join17 } from "path";
+var MANAGED_NAMES, installPiPackages;
+var init_pi_install = __esm(() => {
+  init_dist();
+  init_packages();
+  init_environment();
+  init_pi_check();
+  init_shell();
+  MANAGED_NAMES = new Set([
+    ...Object.values(FEATURE_PACKAGES),
+    WEB_KIT_PACKAGE
+  ]);
+  installPiPackages = fn2("installPiPackages")(function* (env, options) {
+    const shell = yield* Shell;
+    const config = yield* loadPiConfig(env, options.cwd);
+    if (!config.pi.enable)
+      return [skipped("pi packages: pi.enable is off in the HolyAgent config")];
+    const projectLevel = options.scope !== "user";
+    const file = projectLevel ? join17(options.cwd, ".pi", "settings.json") : join17(piAgentDirectory(env), "settings.json");
+    const listed = yield* piSettingsSources(file);
+    const wanted = piPackages(config);
+    const wantedNames = new Set(wanted.map((source) => parseNpmSource(source)?.name));
+    const installs = wanted.filter((source) => !listsAtPin(listed, source));
+    const removals = [
+      ...new Set(listed.flatMap((source) => {
+        const name = parseNpmSource(source)?.name;
+        return name !== undefined && MANAGED_NAMES.has(name) && !wantedNames.has(name) ? [name] : [];
+      }))
+    ];
+    const lines = wanted.filter((source) => listsAtPin(listed, source)).map((source) => present3(`pi ${source}: already listed in ${file}`));
+    if (installs.length === 0 && removals.length === 0)
+      return lines;
+    if (isNone2(yield* shell.which("pi"))) {
+      return [
+        ...lines,
+        `! pi packages: pi not found on PATH, so the changes to ${file} cannot run; install Pi (\`holyagent doctor\` names the command), then re-run`
+      ];
+    }
+    const cwd = projectLevel ? options.cwd : homeDirectory(env);
+    const withScope = (args) => projectLevel ? [...args, "-l"] : args;
+    for (const source of installs) {
+      const args = withScope(["install", source]);
+      const command = `pi ${args.join(" ")}`;
+      if (options.dryRun) {
+        lines.push(added(`pi ${source}: would install with ${command}`));
+        continue;
+      }
+      const result = yield* shell.run("pi", args, { cwd });
+      lines.push(result.exitCode === 0 ? added(`pi ${source}: installed with ${command}`) : failed2(command, result));
+    }
+    for (const name of removals) {
+      const args = withScope(["remove", `npm:${name}`]);
+      const command = `pi ${args.join(" ")}`;
+      if (options.dryRun) {
+        lines.push(skipped(`pi npm:${name}: would remove with ${command}; its feature is off`));
+        continue;
+      }
+      const result = yield* shell.run("pi", args, { cwd });
+      lines.push(result.exitCode === 0 ? skipped(`pi npm:${name}: removed with ${command}; its feature is off`) : failed2(command, result));
+    }
+    return lines;
+  });
+});
+
+import { join as join18 } from "path";
 var CLOUD_SKIP = "skipped in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true), which has no machine of yours to install it on", neutralDirectory = (env) => homeDirectory(env), ensureGlobal, installCtx7, asStep = (label, step) => step.pipe(catchTag2("SetupFailure", (error) => succeed6([`! ${label}: ${error.message}`]))), setup;
 var init_steps = __esm(() => {
   init_dist();
   init_identity();
   init_environment();
   init_json_file();
+  init_pi_check();
+  init_pi_install();
   init_scope();
   init_settings2();
   init_shell();
@@ -24380,7 +24620,7 @@ var init_steps = __esm(() => {
     const global = yield* ensureGlobal(env, "ctx7", "ctx7", dryRun);
     if (!global.usable)
       return global.lines;
-    const skillReady = (yield* fileExists2(join16(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join16(files.claudeDir, "rules", "context7.md")));
+    const skillReady = (yield* fileExists2(join18(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join18(files.claudeDir, "rules", "context7.md")));
     if (skillReady)
       return [...global.lines, present3("ctx7 skill: already installed")];
     const apiKey = env.CONTEXT7_API_KEY === "" ? undefined : env.CONTEXT7_API_KEY;
@@ -24419,6 +24659,11 @@ var init_steps = __esm(() => {
     const cloud = inCloudSession(env);
     const lines = [
       ...options.skipCtx7 ? [skipped("ctx7: skipped by flag")] : cloud ? [skipped(`ctx7: ${CLOUD_SKIP}`)] : yield* asStep("ctx7", installCtx7(env, options.dryRun)),
+      ...!cloud && (yield* piInUse(env)) ? yield* asStep("pi packages", installPiPackages(env, {
+        scope,
+        cwd: options.cwd ?? process.cwd(),
+        dryRun: options.dryRun
+      })) : [],
       ...yield* onSettings((file) => mergeUserSettings({
         env,
         file,
@@ -24430,7 +24675,7 @@ var init_steps = __esm(() => {
   });
 });
 
-var FIX = "run /holyagent:setup, or `holyagent doctor --fix`", pass = (name, detail) => `ok   ${name}: ${detail}`, fail6 = (name, detail) => `FAIL ${name}: ${detail}`, checkBun, checkCommand = (env, command) => gen2(function* () {
+var FIX = "run /holyagent:setup, or `holyagent doctor --fix`", checkBun, checkCommand = (env, command) => gen2(function* () {
   if (inCloudSession(env))
     return pass(command, "not installed in a claude.ai cloud session, by design");
   const shell = yield* Shell;
@@ -24444,6 +24689,7 @@ var init_doctor = __esm(() => {
   init_dist();
   init_identity();
   init_errors6();
+  init_pi_check();
   init_scope();
   init_settings2();
   init_shell();
@@ -24455,14 +24701,16 @@ var init_doctor = __esm(() => {
   });
   doctor = fn2("doctor")(function* (env, options) {
     const scope = options.scope ?? "user";
-    const located = yield* settingsFile(env, scope, options.cwd ?? process.cwd()).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
+    const cwd = options.cwd ?? process.cwd();
+    const pi = inCloudSession(env) ? [] : yield* piChecks(env, cwd);
+    const located = yield* settingsFile(env, scope, cwd).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
     if (located instanceof SetupFailure) {
       const lines = yield* all2([
         checkBun,
         checkCommand(env, "ctx7"),
         succeed6(fail6("settings", located.message))
       ]);
-      return { lines, ok: false };
+      return { lines: [...lines, ...pi], ok: false };
     }
     const { file, notice } = located;
     const noted = (lines) => notice === undefined ? lines : [hint(`${scope} settings: ${notice}`), ...lines];
@@ -24471,7 +24719,10 @@ var init_doctor = __esm(() => {
     const fixes = options.fix && !inCloudSession(env) ? [...failing("ctx7") ? yield* asStep("ctx7", installCtx7(env, false)) : []] : [];
     const settingsFixes = options.fix && failing("settings") ? yield* asStep(`${scope} settings`, mergeUserSettings({ env, file, subagentCacheTtl: "1h", dryRun: false })) : [];
     const ran = [...fixes, ...settingsFixes];
-    const lines = noted(ran.length === 0 ? before : [...ran, ...yield* checks(env, file, scope)]);
+    const lines = noted([
+      ...ran.length === 0 ? before : [...ran, ...yield* checks(env, file, scope)],
+      ...pi
+    ]);
     return { lines, ok: lines.every((line) => !line.startsWith("FAIL ")) };
   });
 });
@@ -24497,10 +24748,11 @@ var init_setup = __esm(() => {
       output: "report lines: `+` added, `=` already in place, `-` skipped (with --undo: removed), `~` kept or needs you, `!` failed; exit 1 when any step failed",
       notes: [
         "installs ctx7 with the Context7 skill (needs CONTEXT7_API_KEY or a saved login)",
+        "when Pi is in use (HOLYAGENT_HOST=pi, or pi on PATH; not in a cloud session), makes Pi's packages match the HolyAgent config: `pi install npm:<name>@<pin>` for each package the config enables that Pi's settings do not list at that pin, and `pi remove npm:<name>` for each feature package the settings list but the config turns off; scope user works on Pi's global settings, project and local on the project's .pi/settings.json with -l; nothing runs while pi.enable is off; re-run setup after changing pi.features or pi.web in the config",
         "merges these keys into the settings file of --scope without changing any value already set: attribution, includeGitInstructions, subagentPromptCacheTtl, modelSettings.claude-opus-5-5 (effortLevel high and autoCompactWindow 450000 for the root), extraKnownMarketplaces, enabledPlugins and permissions.deny for WebSearch and WebFetch",
         "--scope picks the file like Claude Code's scopes: user (default) is CLAUDE_CONFIG_DIR/settings.json, else ~/.claude/settings.json; project is .claude/settings.json and local is .claude/settings.local.json, both in the git top-level of the current directory when that is the current directory or above it and holds a .git entry, else in the current directory (a `~` line says so, outside a repository too); project and local refuse a symlinked settings file or .claude folder with a `!` line; ctx7 is installed for the user whatever the scope",
         "setup records the keys it adds, per settings file, in holyagent/setup-records.json under CLAUDE_CONFIG_DIR (else ~/.claude), outside the project",
-        "--undo removes from the --scope file only what that record says setup added, and only while the value still equals what setup wrote: a changed value, and a key with no record (set before setup or by an earlier version), is kept and reported with `~`, so remove it by hand; permissions.deny loses only the entries setup added, and parent objects left empty are dropped; removed keys print `-` lines (`= nothing to remove` when absent); the file's record is cleared; ctx7 stays installed; honors --dry-run",
+        "--undo removes from the --scope file only what that record says setup added, and only while the value still equals what setup wrote: a changed value, and a key with no record (set before setup or by an earlier version), is kept and reported with `~`, so remove it by hand; permissions.deny loses only the entries setup added, and parent objects left empty are dropped; removed keys print `-` lines (`= nothing to remove` when absent); the file's record is cleared; ctx7 and the Pi packages stay installed; honors --dry-run",
         "a failed step is reported and the rest still run; in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) ctx7 is skipped and the settings are still merged"
       ],
       flags: {
@@ -24529,11 +24781,12 @@ var init_setup = __esm(() => {
     {
       path: ["doctor"],
       usage: DOCTOR_USAGE,
-      summary: "Check bun, ctx7 and the settings of a scope; exit 1 when a check fails",
+      summary: "Check bun, ctx7 and the settings of a scope, and, when Pi is in use, pi, node and the Pi packages the config enables; exit 1 when a check fails",
       output: "one line per check, `ok   <name>: \u2026` or `FAIL <name>: \u2026`; exit 1 when any check failed",
       notes: [
         "--scope picks the settings file to check, as for setup (user by default); --fix then merges into that file",
-        "--fix runs the setup steps behind a failing check, prints their lines, then checks again; it never installs Bun"
+        "the Pi checks run when HOLYAGENT_HOST=pi or pi is on PATH and pi.enable is on; otherwise one `~ pi: not in use` line is printed and nothing fails; a missing Pi package line names its `pi install` command, and `holyagent setup` installs them",
+        "--fix runs the setup steps behind a failing check, prints their lines, then checks again; it never installs Bun, Pi, Node or Pi packages"
       ],
       flags: { scope: "string", fix: "boolean" },
       stateless: true,
@@ -24582,12 +24835,12 @@ var init_state = __esm(() => {
   ];
 });
 
-import { join as join17 } from "path";
+import { join as join19 } from "path";
 var {$: $5 } = globalThis.Bun;
 var TARGETS, BUNDLED_TOOLS, UnsupportedPlatform, ToolMissing, selectTarget = (platform, arch) => {
   const target = TARGETS.find((candidate) => candidate.platform === platform && candidate.arch === arch);
   return target === undefined ? fail5(new UnsupportedPlatform({ platform, arch })) : succeed6(target);
-}, toolPath = (directory, tool, target) => join17(directory, target.id, `${tool}${target.suffix}`), runTool = (options) => gen2(function* () {
+}, toolPath = (directory, tool, target) => join19(directory, target.id, `${tool}${target.suffix}`), runTool = (options) => gen2(function* () {
   const path = toolPath(options.directory, options.tool, options.target);
   if (!(yield* promise2(() => Bun.file(path).exists())))
     return yield* new ToolMissing({ tool: options.tool, path });
@@ -24627,7 +24880,7 @@ var init_tools = __esm(() => {
     { id: "linux-x64", platform: "linux", arch: "x64", suffix: "" },
     { id: "windows-x64", platform: "win32", arch: "x64", suffix: ".exe" }
   ];
-  BUNDLED_TOOLS = join17(import.meta.dir, "vendor");
+  BUNDLED_TOOLS = join19(import.meta.dir, "vendor");
   UnsupportedPlatform = class UnsupportedPlatform extends TaggedError2("UnsupportedPlatform") {
     get message() {
       return `No bundled search tools exist for ${this.platform} ${this.arch}; they exist for ${TARGETS.map((target) => target.id).join(", ")}`;

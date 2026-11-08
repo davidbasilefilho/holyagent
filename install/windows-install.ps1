@@ -181,9 +181,9 @@ try {
   $nodeVersion = Get-FirstLine node --version
   if (-not $nodeVersion) { throw 'node did not report a version after the install; open a new window and re-run' }
   Note "node $nodeVersion"
-  # ctx7 requires Node >= 22.13; an older node found on PATH would fail later and obscurely.
-  if ([version]($nodeVersion.TrimStart('v')) -lt [version]'22.13') {
-    throw "node $nodeVersion is older than 22.13 (needed by ctx7); run: winget upgrade --id OpenJS.NodeJS.LTS"
+  # Pi requires Node >= 22.19 (ctx7 needs 22.13); an older node found on PATH would fail later and obscurely.
+  if ([version]($nodeVersion.TrimStart('v')) -lt [version]'22.19') {
+    throw "node $nodeVersion is older than 22.19 (needed by Pi; ctx7 needs 22.13); run: winget upgrade --id OpenJS.NodeJS.LTS"
   }
 
   # ---------------------------------------------------------------------------------------------
