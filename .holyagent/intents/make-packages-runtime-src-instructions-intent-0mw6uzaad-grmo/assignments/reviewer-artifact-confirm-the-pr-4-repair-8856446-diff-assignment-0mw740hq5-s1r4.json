@@ -1,0 +1,49 @@
+{
+  "id": "assignment-0mw740hq5-s1r4",
+  "intentId": "intent-0mw6uzaad-grmo",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.artifact",
+  "slug": "confirm-the-pr-4-repair-8856446-diff",
+  "objective": "Confirm the PR 4 repair 8856446 (diff a10b630..8856446 in /home/user/holyagent-0.3.0-req) closes the earlier artifact findings and adds no new gap.",
+  "state": "Running",
+  "scope": [
+    "Repair diff: /home/user/holyagent-notes/pr4-repair.diff. Earlier findings: .git/holyagent/reports/assignment-0mw7393ui-i0k7.md (items 1-9). Repair report (claims only): .git/holyagent/reports/assignment-0mw73qt7v-lmp8.md.",
+    "Only judge the repair; the rest of PR 4 was reviewed. The merge commits a10b630 and f2323fd change no file relative to their first parent's content beyond the already-merged base."
+  ],
+  "constraints": [
+    "Read-only.",
+    "Report in under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "The blocking finding on the requirements skill's coverage step is closed and the skill matches coverage.ts, requirements.ts and families.ts",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The repair changes no requirement's meaning and adds no new gap",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The optional notes are closed",
+      "blocking": false,
+      "dimension": "style"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw73qt7v-lmp8"
+  ],
+  "followUpOf": "assignment-0mw7393ui-i0k7",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T00:44:09.533Z"
+  },
+  "createdAt": "2026-11-08T00:44:09.533Z"
+}
