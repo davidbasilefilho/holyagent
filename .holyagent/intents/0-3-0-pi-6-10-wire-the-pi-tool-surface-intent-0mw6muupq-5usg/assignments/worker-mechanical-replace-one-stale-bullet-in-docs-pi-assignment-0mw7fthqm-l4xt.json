@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "replace-one-stale-bullet-in-docs-pi",
   "objective": "Replace one stale bullet in docs/pi/caching-and-subagents.md of the worktree /home/user/holyagent-0.3.0-tools so it matches the Billion Context setting the code now writes.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Work only in /home/user/holyagent-0.3.0-tools (branch release/0.3.0/feat/pi-tools). Line 33 of docs/pi/caching-and-subagents.md currently reads: \"- It compresses the root and the specialists, through `delegate.forceEnable`, because specialists started by a subagent extension get no compression otherwise.\" Replace that whole line with exactly this line: \"- It is meant to compress the root and the specialists. Setup writes only the one setting its README gives, `{\"pi\":{\"subagents\":false}}`, which turns its own subagents off and keeps compression on ([extensions.md](extensions.md#settings-that-setup-writes)); no `delegate.forceEnable` is set. Whether the specialists that `@tintinweb/pi-subagents` starts are compressed too is to be verified with recorded fixtures before the pin is trusted.\" Change nothing else; the reason is that the code dropped forceEnable after the README showed the single setting suffices, and this line still claims the old setting."
   ],
@@ -38,7 +38,29 @@
     "agentId": "workflow:wf_f5d8a525-d44/assignment-0mw7fthqm-l4xt",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-08T06:14:44.066Z"
+    "startedAt": "2026-11-08T06:14:44.066Z",
+    "finishedAt": "2026-11-08T06:19:27.663Z"
+  },
+  "result": "result: Line 33 of docs/pi/caching-and-subagents.md in the worktree now carries the given replacement text, and nothing else changed. `mise run verify` exits 0.\n\nchanged: docs/pi/caching-and-subagents.md\n\nchecks:\n- `bunx --no-install mise run verify` -> exit 0; check: no type errors in 192 files; lint: no problems in 193 files; fmt:check: all 512 files formatted; test: 1961 pass, 0 fail, 1961 tests across 67 files\n- `git diff --stat` -> 1 file, 1 insertion, 1 deletion\n\nblockers: none\nquestions: none\nnotes: none\n\nevidence:\nLine 33 replaced with the given text and nothing else changed: `git diff --stat` shows 1+/1-; diff at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/caching-diff.patch\nmise run verify exits 0: exit=0, log at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/caching-diff.patch\n",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Diff is the one given line; verify exit 0 with 1961 pass.",
+    "criteria": [
+      {
+        "criterion": "Line 33 replaced with the given text and nothing else changed",
+        "support": "`git diff --stat` shows 1+/1-; diff at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/caching-diff.patch"
+      },
+      {
+        "criterion": "mise run verify exits 0",
+        "support": "exit=0, log at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/caching-diff.patch"
+      }
+    ]
   },
   "createdAt": "2026-11-08T06:14:38.350Z"
 }
