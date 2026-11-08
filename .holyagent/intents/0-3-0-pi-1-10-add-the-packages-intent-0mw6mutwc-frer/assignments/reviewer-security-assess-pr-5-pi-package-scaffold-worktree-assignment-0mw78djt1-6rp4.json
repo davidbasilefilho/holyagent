@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "assess-pr-5-pi-package-scaffold-worktree",
   "objective": "Assess PR 5 (pi package scaffold, worktree /home/user/holyagent-0.3.0-pi, range origin/release/0.3.0/integration..b6781ee) for security regressions on its privileged surfaces: the root prepare lifecycle script, the CI workflow change, the install path pi runs on a consumer machine, and the dependency rule exception.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Diff: /home/user/holyagent-notes/pi1-full.diff. Files: scripts/prepare-dev.ts, package.json (prepare, pi key, trustedDependencies), .github/workflows/validation.yml, scripts/dependency-pins.ts and scripts/dependency-ranges.test.ts (the * peer exception), packages/integrations/pi/package.json and its generated dist/package.json, lefthook.yml.",
     "Context: pi install git:...@holyagent-<version> clones the repository and runs npm install --omit=dev --legacy-peer-deps (or bun) at the clone root on the user's machine, which runs lifecycle scripts; pi's code is in /home/user/holyagent-notes/pi-probe/node_modules/@earendil-works/pi-coding-agent (dist/core/package-manager.js around L1566-1660)."
@@ -46,7 +46,37 @@
     "agentId": "workflow:wf_702cbdc7-c23/assignment-0mw78djt1-6rp4",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T02:46:17.221Z"
+    "startedAt": "2026-11-08T02:46:17.221Z",
+    "finishedAt": "2026-11-08T02:52:05.931Z"
+  },
+  "result": "result: no blockers; the three blocking criteria hold, with two hardening notes on the consumer install.\n\n**Built-in review:** `/security-review` failed to run. Its `git diff --name-only origin/HEAD...` has no `origin/HEAD` in this checkout, so it covered nothing. I reviewed `/home/user/holyagent-notes/pi1-full.diff` (1515 lines, read in full) by hand. I had no shell, so nothing was executed. Pi's install code and the worktree files were read directly.\n\n**Consumer install (pi runs `npm install --omit=dev --legacy-peer-deps --no-audit --no-fund` at the clone root)**\n- The only lifecycle script is the root `prepare` (`bun scripts/prepare-dev.ts`). `prepare-dev.ts` calls `Bun.which(\"mise\", {PATH: <root>/node_modules/.bin})`, so it ignores the consumer's own PATH. Without mise it prints one line and exits 0, with no process spawn and no network. This is validated.\n- With mise present (a dev clone only), it runs `bunx --no-install mise run prepare`, which runs `bunx lefthook install`. That second call lacks `--no-install` but was already there, and lefthook is a devDependency in that case.\n- The workspaces (`runtime`, `claude`, `pi`) declare no lifecycle scripts. Production dependencies are `@toon-format/toon`, `acorn` and `effect`. The pi peers `*` are not installed under `--legacy-peer-deps` or bun's `--omit=peer`, so nothing outside the declared dependencies is fetched.\n- Suspicion, not a regression: npm ignores `bun.lock` and the tag has no `package-lock.json`. A consumer's npm resolves the caret ranges fresh and runs install scripts of whatever release (and transitive dependency) it picks. Bun skips untrusted scripts. Hardening: commit an `.npmrc` with `ignore-scripts=true`, or a lockfile npm reads.\n- Availability, not security: `prepare` needs `bun` on PATH, so a Node-only consumer's install fails with 127. `installation.md` says the CLI needs Bun, but pi's own install does not check for it.\n- `bunfig.toml` has no `preload` and the tree has no tracked `.env` or `.npmrc`, so bun running in the clone loads nothing unexpected. All of it is tag-controlled content anyway.\n\n**CI change:** only the freshness-check path list and the error text changed. Top-level `permissions: contents: read` is untouched. `contents: write` stays only in `stable.yml`, `dev.yml` and their `publish.yml` callers. All 12 `uses:` lines keep full-SHA pins with a `# vX.Y.Z` comment (checked across `validation.yml`, `stable.yml`, `dev.yml`). The `check` job still installs with `--frozen-lockfile` and has no secrets. `mise run build` now also runs the pi generator, which is repo code in the same unprivileged job.\n\n**`*` peer exception:** `isPiHostPeer` requires all three of `field === \"peerDependencies\"`, `range === \"*\"` and a name in the five-name `PI_HOST_PACKAGES` list. Tests in `scripts/dependency-ranges.test.ts` reject `other: \"*\"`, `typebox` as a dependency or devDependency, and `>=1.0.0`. In `scripts/dependency-pins.ts`, `packageDependencies` skips the same predicate, so the updater cannot rewrite them. Nested override tables keep the outer field name, so they cannot use it. Widening needs an edit to the list, which `docs/development.md` and the tests would expose.\n\n**Notes**\n- A plain `npm install` (npm 7 or later, without `--legacy-peer-deps`) in a dev clone would auto-install the latest pi-* peers. Dev only.\n\nblockers: none\nquestions: none\n\nevidence:\nThe consumer install runs no lifecycle script that can execute unexpected code or reach the network beyond the declared dependencies: `scripts/prepare-dev.ts` (diff L1482-1514) is a no-op without `node_modules/.bin/mise`; pi's install args are at `package-manager.js` L1563-1580 and L1657; workspace `package.json` files declare no lifecycle scripts. Caveat: floating npm resolution with no npm lockfile.\nThe CI change keeps action pinning and least-privilege permissions: `validation.yml` diff L16-37 touches only the path list and message; `permissions: contents: read` at L12; every `uses:` is SHA-pinned with a version comment; `contents: write` only in `stable.yml`, `dev.yml` and `publish.yml`.\nThe * peer-dependency exception is limited to pi's host modules and cannot widen to other packages: `scripts/dependency-pins.ts` `isPiHostPeer` (diff L1357-1359) and the negative tests at `scripts/dependency-ranges.test.ts` (diff L1424-1431).\nfindings: no blockers; two non-blocking suspicions (floating npm resolution without a lockfile; bun required on PATH for `prepare`). The built-in `/security-review` could not run (no `origin/HEAD`).\ndiff-file: /home/user/holyagent-notes/pi1-full.diff\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Install lifecycle, CI pins and permissions, and the peer exception traced to source lines and tests.",
+    "criteria": [
+      {
+        "criterion": "The consumer install runs no lifecycle script that can execute unexpected code or reach the network beyond the declared dependencies",
+        "support": "`scripts/prepare-dev.ts` (diff L1482-1514) is a no-op without `node_modules/.bin/mise`; pi's install args are at `package-manager.js` L1563-1580 and L1657; workspace `package.json` files declare no lifecycle scripts. Caveat: floating npm resolution with no npm lockfile."
+      },
+      {
+        "criterion": "The CI change keeps action pinning and least-privilege permissions",
+        "support": "`validation.yml` diff L16-37 touches only the path list and message; `permissions: contents: read` at L12; every `uses:` is SHA-pinned with a version comment; `contents: write` only in `stable.yml`, `dev.yml` and `publish.yml`."
+      },
+      {
+        "criterion": "The * peer-dependency exception is limited to pi's host modules and cannot widen to other packages",
+        "support": "`scripts/dependency-pins.ts` `isPiHostPeer` (diff L1357-1359) and the negative tests at `scripts/dependency-ranges.test.ts` (diff L1424-1431)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "no blockers; two non-blocking suspicions (floating npm resolution without a lockfile; bun required on PATH for `prepare`). The built-in `/security-review` could not run (no `origin/HEAD`)."
+      },
+      {
+        "label": "diff-file",
+        "support": "/home/user/holyagent-notes/pi1-full.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-08T02:46:17.221Z"
 }
