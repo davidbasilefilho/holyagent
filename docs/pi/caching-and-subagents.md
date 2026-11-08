@@ -30,7 +30,7 @@ What keeps the prefix stable, which the plan follows:
 
 - It is installed in the Pi integration only, not in the Claude plugin.
 - The package is `billion-context` (the main package), pinned and moved only through `mise run deps:update` ([installation.md](installation.md#the-pin)).
-- It compresses the root and the specialists, through `delegate.forceEnable`, because specialists started by a subagent extension get no compression otherwise.
+- It is meant to compress the root and the specialists. Setup writes only the one setting its README gives, `{"pi":{"subagents":false}}`, which turns its own subagents off and keeps compression on ([extensions.md](extensions.md#settings-that-setup-writes)); no `delegate.forceEnable` is set. Whether the specialists that `@tintinweb/pi-subagents` starts are compressed too is to be verified with recorded fixtures before the pin is trusted.
 - Its own `acp_delegate` subagent tools are off (`pi.subagents` false, set as `{"pi":{"subagents":false}}` in `~/.config/billion-context/billion-context.json`) (`@tintinweb/pi-subagents` runs the specialists, see [orchestration.md](orchestration.md#decision-for-030)).
 - It is meant to replace Pi's compaction: the standalone `billion-context-pi` route cancels it, and the native `billion-context` route's behavior is to be verified (see below). HolyAgent itself registers no `session_before_compact` handler and sets no `autoCompactWindow` equivalent.
 

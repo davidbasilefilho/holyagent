@@ -10644,6 +10644,7 @@ var init_schema = __esm(() => {
       processes: defaulted(Enabled, true),
       todo: defaulted(Enabled, true),
       ask: defaulted(Enabled, true),
+      mcp: defaulted(Enabled, true),
       computerUse: defaulted(Enabled, true),
       contextCompression: defaulted(Enabled, true),
       subagents: defaulted(Enabled, true)

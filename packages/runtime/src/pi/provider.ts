@@ -11,6 +11,16 @@ export interface ProviderProfile {
   readonly env: Readonly<Record<string, string>>
   /** What the user does to make the provider ready when Pi reports it has no credentials. */
   readonly loginFix: string
+  /**
+   * The web tools the provider extension offers, in Pi's tool names (empty when it offers none).
+   * While it offers some, the `provider` web mode uses them and `pi-web-kit` is not loaded.
+   */
+  readonly webTools: ReadonlyArray<string>
+  /**
+   * The provider extension's own settings file, where those web tools are switched on (they are off
+   * until a setting enables them), as a path under the user's home.
+   */
+  readonly toolsFile: string
 }
 
 /**
@@ -25,6 +35,8 @@ export const PROVIDERS: Readonly<Record<PiProvider, ProviderProfile>> = {
     package: "pi-provider-kimi-code",
     env: { KIMI_CODE_REGION: "global" },
     loginFix: "Run /login kimi-coding in Pi, or set KIMI_API_KEY",
+    webTools: ["moonshot_search", "moonshot_fetch"],
+    toolsFile: "~/.pi/providers/kimi-coding/config.json",
   },
 }
 
@@ -66,3 +78,28 @@ export const providerEnv = (config: Config): Readonly<Record<string, string>> =>
 /** The Pi package source of the selected provider's extension, with its pinned release. */
 export const providerSource = (config: Config): string =>
   piPackageSource(providerProfile(config).package)
+
+/** Where a session's web tools come from, as `pi.features.web` and the provider decide. */
+export type WebChoice =
+  | { readonly source: "provider"; readonly tools: ReadonlyArray<string> }
+  | { readonly source: "pi-web-kit"; readonly tools: ReadonlyArray<string> }
+  | { readonly source: "off"; readonly tools: readonly [] }
+
+/** The tools `pi-web-kit` adds: search and page fetch. */
+export const WEB_KIT_TOOLS: ReadonlyArray<string> = ["web_search", "web_fetch"]
+
+/**
+ * Chooses the web tools. `off` has none. `pi-web-kit` loads that package, the fallback for a login
+ * that cannot use the provider's tools. `provider` uses the provider extension's tools while it
+ * offers some, and loads `pi-web-kit` only when it offers none, so the two never run together. The
+ * profile is a parameter so a provider without web tools can be tested.
+ */
+export const webChoice = (
+  profile: ProviderProfile,
+  mode: Config["pi"]["features"]["web"],
+): WebChoice =>
+  mode === "off"
+    ? { source: "off", tools: [] }
+    : mode === "provider" && profile.webTools.length > 0
+      ? { source: "provider", tools: profile.webTools }
+      : { source: "pi-web-kit", tools: WEB_KIT_TOOLS }
