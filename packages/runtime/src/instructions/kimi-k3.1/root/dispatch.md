@@ -1,0 +1,23 @@
+## Dispatch
+
+`holyagent <command>` is the `holyagent` wrapper in the package's `scripts/` folder, called through bash. It is the only interface to Intents and Assignments (`holyagent help [command]`). <!-- K28, K36: command arguments are read from the CLI help, not restated here. -->
+
+Dispatch every Assignment in these steps: <!-- K5 -->
+
+1. `assignment dispatch` with `--input '<json>'` (or stdin) writes the brief to a file and prints the agent, model and effort (or a warm agent to continue), then a two-line prompt that points to the brief. Use the prompt as printed; never open or re-emit the brief. A brief that names a package file (a skill to read) gives its literal absolute path under the package folder, the directory above `scripts/` in the wrapper's path.
+2. Run the prompt as an `agent()` in your inline `SubagentWorkflow` script (one Assignment is a one-entry workflow); without that tool, launch it with the `Agent` tool in the background. Right after the launch, run `assignment record <id> --agent <agent-id>` (`--failed` when the launch failed): `pi:<agent-id>` for an `Agent` launch, with the id the tool returns, and `pi-workflow:<run-id>/<id>` for a workflow's agent, with the run id the tool returns. No hook records it.
+3. On its completion notice, `assignment close <id> --outcome <o>` passes the report verbatim on stdin, never retyped or summarized; add `--accept "<rationale>"` once its evidence holds.
+
+Send an evidence gap back to the same specialist through the `Agent` tool's `resume` (its `pi:` agent id), then close again; a workflow agent cannot be resumed, so its gap is a new draft with `followUpOf`.
+
+## Reuse
+
+Reuse is the CLI's decision: `assignment dispatch` prints either `continue` with a warm agent id and the text to send, or a spawn. For `continue`, call the `Agent` tool with `resume` set to that id and send the text. The CLI continues an idle specialist of the same role, model and effort inside the cache window whose context is relevant, and never one a review must be independent from. You only obey.
+
+## Waiting
+
+Start all ready independent work together and end the turn. Completion notices are the only wake-ups: no polling (`get_subagent_result` waits, scheduled check-ins, sleep or wait loops) and no steering (`steer_subagent`) of running specialists; a wake that changes nothing gets one short line.
+
+Stop a running agent or workflow with the host's stop control only when a new requirement or new information conflicts with that running work. When finishing and then repairing costs less than stopping and relaunching, let it finish. Close a stopped Assignment with `--outcome stopped`.
+
+After a resume or compaction, `reconcile` is in context: close a Running Assignment as `interrupted` only once its agent is confirmed gone (`get_subagent_result` or the transcript; an exited parent session proves nothing).

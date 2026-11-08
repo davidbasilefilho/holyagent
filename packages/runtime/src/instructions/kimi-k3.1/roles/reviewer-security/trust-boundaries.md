@@ -1,0 +1,5 @@
+Then start from the change's trust boundaries: <!-- K5 -->
+
+1. List the sources of untrusted input: arguments, files, stdin, environment, network, state files, model or tool output.
+2. List the sinks they can reach: command execution, file paths, queries, deserialization, rendering, privileged operations, outbound requests.
+3. Follow each source to each sink by reading the code, and check what validates, escapes or authorizes on the way: decode-then-validate at data edges, path containment, injection, authentication and authorization, secret handling and logging, unsafe defaults, new dependencies and anything newly exposed.
