@@ -1,0 +1,73 @@
+{
+  "id": "assignment-0mw7p1c61-4dr1",
+  "intentId": "intent-0mw7mzreq-mu22",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-last-repair-round-on-the-pi",
+  "objective": "Make the last repair round on the Pi root wiring in /home/user/holyagent-0.3.0-wiring (branch release/0.3.0/feat/pi-root-wiring, head 13f357f): a project config cannot lift the root's exclusions, and notices carry no invisible characters.",
+  "state": "Running",
+  "scope": [
+    "1 (blocking, recorded default of the launcher work: the gates stand down only when the home-level config has pi.enable off): extension.ts ~899 sets excluded = [] when the merged config has pi.enable false, so a project's .holyagent/config.json with pi.enable false lifts the tool_call gate and the exclusions; the comment at ~1011 says a project cannot lift the gates. Make the root's exclusions, the tool_call gate and the root prompt stand down only for the home-level pi.enable off, as the existing gates do; test that a project pi.enable false keeps them.",
+    "2 (blocking): a project's pi.features.computerUse false or a different pi.features.web mode drops those exclusion patterns while the packages stay installed. Compute the root's excluded set as the union of the defaults' exclusions, the home-level config's and the merged config's, so a project can add exclusions but never remove one; test it.",
+    "3: every session_start builds held with excluded: [] (~925), leaving a run in flight across a reload, resume or fork ungated until the collection ends; start from the defaults' exclusions; test it.",
+    "4: printable() misses invisible format characters that reach the user and the model: strip Unicode format characters (general category Cf, including U+2060-2064, U+061C, U+180E, the tag block U+E0000-E007F) and variation selectors U+FE00-FE0F, keeping ordinary text; test it.",
+    "5 (optional): ModelId ^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$ refuses @ and +, which some providers' ids use; allow @ and + after the first character, keep refusing whitespace, controls and a leading -; update docs/pi/providers.md:41 and docs/pi/configuration.md where they state the set.",
+    "Docs: docs/pi/extensions.md where it says the gate stands down with pi.enable off: say home-level only, and that a project can add but not remove exclusions."
+  ],
+  "constraints": [
+    "Change only the ownership paths; no version-control writes and no edits under .git/ or .holyagent/.",
+    "Follow .claude/CLAUDE.md code rules; every behavior gets a test that fails without it; do not weaken tests.",
+    "Never run pi.",
+    "Run bunx --no-install mise run build and bunx --no-install mise run verify before reporting.",
+    "Report in under 400 words; put long logs in a file under /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path. Write a diff-file (dist excluded) at /home/user/holyagent-notes/wire-a-last.diff."
+  ],
+  "criteria": [
+    {
+      "text": "A project config cannot lift the root's exclusions, gate or prompt, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A session start begins with the defaults' exclusions, with a test",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Notice text carries no Unicode format characters or variation selectors, with a test",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Model ids may contain @ and + after the first character, with a test and the docs updated",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build and mise run verify exit 0",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi/src",
+    "packages/integrations/pi/tests",
+    "packages/integrations/pi/dist",
+    "packages/integrations/claude/dist",
+    "packages/runtime/src/config/schema.ts",
+    "packages/runtime/tests/config",
+    "docs/pi/extensions.md",
+    "docs/pi/providers.md",
+    "docs/pi/configuration.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T10:32:40.921Z"
+  },
+  "createdAt": "2026-11-08T10:32:40.921Z"
+}
