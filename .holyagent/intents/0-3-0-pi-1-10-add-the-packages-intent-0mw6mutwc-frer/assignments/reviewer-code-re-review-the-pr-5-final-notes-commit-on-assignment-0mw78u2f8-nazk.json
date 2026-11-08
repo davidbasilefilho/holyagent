@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-the-pr-5-final-notes-commit-on",
   "objective": "Re-review the PR 5 final-notes commit on release/0.3.0/feat/pi-package (range b6781ee..HEAD, worktree /home/user/holyagent-0.3.0-pi; run commands there) and confirm it closes the earlier optional notes with no regression.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Diff: /home/user/holyagent-notes/pi1-final.diff. Earlier review: /home/user/holyagent/.git/holyagent/reports/assignment-0mw78djln-wu4j.md (notes 2-5). Writer report (claims only): /home/user/holyagent/.git/holyagent/reports/assignment-0mw78l1k3-89dh.md."
   ],
@@ -39,7 +39,33 @@
     "agentId": "workflow:wf_b4556b0b-e77/assignment-0mw78u2f8-nazk",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T02:59:07.844Z"
+    "startedAt": "2026-11-08T02:59:07.844Z",
+    "finishedAt": "2026-11-08T03:02:42.314Z"
+  },
+  "result": "result: the final-notes commit e6d8130 closes earlier notes 2 to 5, plus the note 1 hidden-file filter, with no blocker; four optional findings remain.\n\nchecks: in /home/user/holyagent-0.3.0-pi at e6d8130:\n- `bunx --no-install mise run verify` exits 0, 1750 pass and 0 fail. Log: /home/user/holyagent-notes/pi1-final-verify.log.\n- `mise run build` exits 0 and `git status --short` is empty afterwards.\n- `git diff b6781ee HEAD --stat -- packages/integrations/claude/dist packages/integrations/pi/dist .claude-plugin` is empty, so the Claude and pi outputs are unchanged.\n- The built-in `/code-review` returned `[]` on `b6781ee...HEAD`. That run read HEAD in another checkout, so it checked an empty range. I re-ran it on `b6781ee...e6d8130` and got 6 findings.\n- Not run: the pi binary and Windows behavior.\n\nnotes closed: `listTree` now skips dotfiles and symlinks, and a fixture test covers it. The shared `generated.ts` replaces the duplicated helpers. The module-comment regex handles space paths, and a real `Bun.build` test under a `my repo` folder covers it. The lefthook test now parses the YAML and finds the job by name. A test pins the `prepare` script wiring.\n\nfindings (all optional):\n1. `generated.ts:22`: a whole-line comment such as `// see docs/foo.md` is now stripped from the bundles, which the old `\\S+` regex kept. No current output contains one, as the empty dist diff shows. It is a narrow regression risk.\n2. `skills.ts:126`: with a custom `root`, `source` and the note still use the real instructions folder. Test-only impact.\n3. `agents.ts:358`: `runPromise` inside `agentFiles` wraps the typed error in a FiberFailure. The error message tests still pass.\n4. `requirements.ts:74`: the `plain` filter is O(n*m). The trees are tiny, so it does not matter.\n\nThe CRLF finding was rejected: the old regexes had the same `$\\n`, so it is not a regression. The `Bun.YAML` and job-name dependence in the lefthook test was also rejected, since the test is clear and the repository requires Bun.\n\nevidence:\n- The notes are closed and the change introduces no regression, with the Claude and pi outputs unchanged: the dist and `.claude-plugin` diff is empty, and verify passes with the new tests.\n- bunx --no-install mise run verify exits 0 on HEAD and mise run build leaves the tree clean: verify exit 0 (1750 pass), build exit 0, status empty.\n- checks-run: verify, build, the dist diff, the built-in `/code-review` (re-run on the explicit range) and a read of the diff.\n- findings: 0 blockers, 4 optional.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Reviewer ran verify (exit 0, 1750 pass), build (clean) and an empty dist diff on e6d8130.",
+    "criteria": [
+      {
+        "criterion": "The notes are closed and the change introduces no regression, with the Claude and pi outputs unchanged",
+        "support": "the dist and `.claude-plugin` diff is empty, and verify passes with the new tests."
+      },
+      {
+        "criterion": "bunx --no-install mise run verify exits 0 on HEAD and mise run build leaves the tree clean",
+        "support": "verify exit 0 (1750 pass), build exit 0, status empty."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "verify, build, the dist diff, the built-in `/code-review` (re-run on the explicit range) and a read of the diff."
+      },
+      {
+        "label": "findings",
+        "support": "0 blockers, 4 optional."
+      }
+    ]
   },
   "createdAt": "2026-11-08T02:59:07.844Z"
 }
