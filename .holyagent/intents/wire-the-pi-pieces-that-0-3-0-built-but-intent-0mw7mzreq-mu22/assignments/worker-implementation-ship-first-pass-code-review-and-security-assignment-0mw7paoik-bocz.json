@@ -1,0 +1,85 @@
+{
+  "id": "assignment-0mw7paoik-bocz",
+  "intentId": "intent-0mw7mzreq-mu22",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "ship-first-pass-code-review-and-security",
+  "objective": "Ship first-pass code-review and security-review prompts in the Pi package and put them at the start of the Pi Reviewer.code and Reviewer.security task, in /home/user/holyagent-0.3.0-prompts (branch release/0.3.0/feat/pi-review-prompts, head 74d9379).",
+  "state": "Running",
+  "scope": [
+    "Gap (trace): packages/integrations/pi has no prompts/ folder in src or dist (docs/pi/extensions.md:13,17 say the code-review and security-review templates are not built; docs/pi/claude-parity.md:171 lists it open). The Kimi text expects them: packages/runtime/src/instructions/kimi-k3.1/roles/reviewer-code/builtin-review.md:1,5 and roles/reviewer-security/builtin-review.md:1,5 say the launcher puts the first-pass prompt at the start of the task. On Claude these reviewers run the built-in /code-review and /security-review; read how the Claude role text and briefs refer to them (packages/runtime/src/instructions/claude-5.5/roles/reviewer-code and reviewer-security, and how assignment dispatch writes briefs in packages/runtime/src/cli) so the Pi path mirrors the Claude contract.",
+    "Write the two prompts as original text (do not copy Claude Code's built-in prompts): a code-review first pass (correctness bugs, regressions, error paths, with each finding traced to a realistic failure and rated) and a security-review first pass (sources to sinks, validated versus suspected, severity), both taking the review range from the brief, following .claude/skills/write-skills and the Kimi guide (packages/runtime/src/instructions/kimi-k3.1/guide.md) for model-facing text. Ship them as Pi prompt templates in the package (dist/prompts, listed under the pi key of the generated package.json; read Pi 1.5.0 docs for the prompts resource) so a person can also run them, and have the Pi launch path put the matching prompt at the start of the reviewer's task: decide by reading the code whether that belongs in assignment dispatch's Pi brief (cli) or in the extension's child before_agent_start, and say why.",
+    "If the change alters Kimi instruction text, update the mirrored requirements file under packages/runtime/src/instructions/requirements and coverage.ts as .claude/skills/requirements/SKILL.md directs.",
+    "Docs: docs/pi/extensions.md:13,17 and the prompts resource line ~230, docs/pi/claude-parity.md:171, docs/pi/README.md status row."
+  ],
+  "constraints": [
+    "Change only the ownership paths; no version-control writes and no edits under .git/ or .holyagent/.",
+    "Follow .claude/CLAUDE.md code rules; every behavior gets a test that fails without it; do not weaken tests.",
+    "Never run pi or a live model.",
+    "Run bunx --no-install mise run build and bunx --no-install mise run verify before reporting.",
+    "Report in under 400 words; long logs to /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad; diff-file (dist excluded) at /home/user/holyagent-notes/wire-c.diff."
+  ],
+  "criteria": [
+    {
+      "text": "The Pi package ships code-review and security-review prompt templates that Pi loads, with a test on the generated package",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A Pi Reviewer.code or Reviewer.security task starts with the matching first-pass prompt and other roles' tasks are unchanged, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The Claude plugin's output is unchanged",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Requirements and coverage stay in sync with any changed instruction text",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "The docs describe the prompts as built",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build and mise run verify exit 0",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi/src/generate.ts",
+    "packages/integrations/pi/src/prompts",
+    "packages/integrations/pi/src/agents.ts",
+    "packages/integrations/pi/tests/pi.test.ts",
+    "packages/integrations/pi/tests/prompts.test.ts",
+    "packages/integrations/pi/dist/prompts",
+    "packages/integrations/pi/dist/package.json",
+    "packages/integrations/pi/dist/agents",
+    "packages/integrations/pi/dist/scripts/holyagent.js",
+    "packages/integrations/claude/dist/scripts/holyagent.js",
+    "packages/runtime/src/cli/assignment.ts",
+    "packages/runtime/src/cli/brief.ts",
+    "packages/runtime/tests/cli",
+    "packages/runtime/src/instructions/kimi-k3.1/roles",
+    "packages/runtime/src/instructions/requirements/kimi-k3.1",
+    "packages/runtime/src/instructions/coverage.ts",
+    "packages/runtime/tests/instructions",
+    "docs/pi/claude-parity.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T10:39:56.829Z"
+  },
+  "createdAt": "2026-11-08T10:39:56.829Z"
+}
