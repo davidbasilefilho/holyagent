@@ -1,0 +1,54 @@
+{
+  "id": "assignment-0mw7jum0q-27k7",
+  "intentId": "intent-0mw6muuvl-zq3p",
+  "intentRevision": 7,
+  "roleTask": "Worker.implementation",
+  "slug": "stop-the-pi-tui-from-evaluating-a",
+  "objective": "Stop the Pi TUI from evaluating a SubagentWorkflow script meta fragment on the host before the HolyAgent gate runs, in /home/user/holyagent-0.3.0-launcher (head d8fcbdf).",
+  "state": "Running",
+  "scope": [
+    "Security finding (validated by reading, pre-existing in @tintinweb/pi-subagents 0.23.1, package source /home/user/holyagent-notes/pi-probe/node_modules/@tintinweb/pi-subagents, Pi 1.5.0 at /home/user/holyagent-notes/pi-probe/node_modules/@earendil-works/pi-coding-agent): the SubagentWorkflow tool renderCall (index.ts:2743) calls workflowCallName(args), which calls extractMeta(args.script) (meta.ts:319, 250) and evaluates the meta fragment with vm in createContext({}), where this.constructor.constructor(\"return process\")() reaches the host process. Pi interactive mode renders a ToolExecutionComponent on every streamed message_update (dist interactive-mode.js:2904-2916, and on history reload 3320; renderers/index.js:43 uses definition.renderCall ?? the built-in), so this runs before the tool_call event that the HolyAgent gate (refuseNonSpecialistWorkflow in packages/integrations/pi/src/extension.ts) handles. A streamed `export const meta = { description: this.constructor.constructor(\"return process\")() }` reaches process even though the gate later refuses the call.",
+    "Read the Pi extension API and renderer code to find a supported way for the HolyAgent extension to make the SubagentWorkflow call render safely: for example, wrap or replace the tool definition renderCall with one that shows the call without evaluating anything (reusing HolyAgent own literal-only meta check from packages/runtime/src/cli/workflow-check.ts to show the name only when the fragment is a vetted literal), through whatever Pi offers (tool definition hooks, re-registration order, a renderer registry, an event before render). Implement the smallest supported mitigation with a test that drives the renderer with the exploit script and asserts no evaluation happens (e.g. a fragment with a getter or call that would throw or set a flag). If Pi offers no supported way, do not patch node_modules or monkey-patch Pi internals; instead report exactly what is missing, and add the risk with the conditions (interactive TUI rendering and history reload, not print or RPC mode) to docs/pi/extensions.md where the workflow gate is described."
+  ],
+  "constraints": [
+    "Edit only the ownership paths; no version-control writes and no edits under .git/ or .holyagent/.",
+    "Effect and JSDoc per .claude/CLAUDE.md; the extension runs on Node inside Pi.",
+    "Do not run pi or any live model; tests with fixtures only.",
+    "Run bunx --no-install mise run build, then bunx --no-install mise run verify; report each exit code (echo $?) and counts.",
+    "Write the source diff (no dist bundles) to /home/user/holyagent-notes/launcher-j.diff and give it as diff-file evidence.",
+    "Start each evidence line with the criterion text, then a colon.",
+    "Report in under 350 words."
+  ],
+  "criteria": [
+    {
+      "text": "Rendering a SubagentWorkflow call evaluates no script code on the host, with a test, or the missing Pi support is reported and the risk documented",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build exits 0 with dist in sync and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi/src",
+    "packages/integrations/pi/tests",
+    "packages/integrations/pi/dist",
+    "packages/integrations/claude/dist",
+    "packages/runtime/src/cli/workflow-check.ts",
+    "packages/runtime/tests/workflow-check.test.ts",
+    "docs/pi/extensions.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T08:07:29.019Z"
+  },
+  "createdAt": "2026-11-08T08:07:29.019Z"
+}
