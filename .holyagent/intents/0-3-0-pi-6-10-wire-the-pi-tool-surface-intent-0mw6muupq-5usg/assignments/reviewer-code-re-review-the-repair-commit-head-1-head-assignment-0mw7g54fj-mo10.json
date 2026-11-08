@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-the-repair-commit-head-1-head",
   "objective": "Re-review the repair commit HEAD~1..HEAD on release/0.3.0/feat/pi-tools in /home/user/holyagent-0.3.0-tools, which addresses the earlier review's root tool-set finding.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Previous finding to verify closed: the Pi root (`toolArgs(config, \"root\")` in packages/runtime/src/pi/tools.ts, `--tools +codemode`) kept Pi's default selection, so it directly held the computer-use tools and the web choice's tools; the Claude root has neither. The repair adds those to the root's --exclude-tools while each is enabled, keeping write and edit excluded.",
     "Earlier finding settled by the root, not to reopen: Reviewer.code keeps bash, mirroring packages/integrations/claude/src/agents.ts:265.",
@@ -47,7 +47,33 @@
     "agentId": "workflow:wf_729c608d-ad4/assignment-0mw7g54fj-mo10",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T06:23:48.072Z"
+    "startedAt": "2026-11-08T06:23:48.072Z",
+    "finishedAt": "2026-11-08T06:28:14.078Z"
+  },
+  "result": "result: The root tool-set finding is closed with no new defects, and `mise run verify` exits 0.\n\nchanged: none (read-only review)\n\nchecks:\n- `bunx --no-install mise run verify` in `/home/user/holyagent-0.3.0-tools` -> exit 0. Type-check found no errors in 192 files, lint no problems in 193 files, the format check passed on 512 files, and tests ran 1963 pass and 0 fail across 67 files. Full log: `/tmp/claude-0/verify.log`.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- The built-in `/code-review` (the loaded skill text was the built-in's) returned 8 findings, all on earlier commits and not in `HEAD~1..HEAD`. Under the re-review rule they are optional, not blockers. The skill ran in the primary checkout, not the worktree, so I did not map them to the worktree range.\n  - Stale `delegate.forceEnable` wording in `docs/pi/caching-and-subagents.md:33`.\n  - The unverified `codemode` in specialist allowlists, and the unverified pi-subagents and todo calls from codemode scripts.\n  - `ToolArgs.env` is not in `argv` and I found no consumer in the files I read.\n  - Two patches for one settings file.\n  - README line numbers cited in JSDoc.\n  - `model-only` is asserted in the docs from third-party sources.\n  - A weak hardcoded `todo`/`ask_user_question`/`process` test.\n- Not run: any live Pi. I could only read that `--exclude-tools` patterns such as `computer_use_*` apply on top of `+codemode`. The docs already say this is untested.\n\nevidence:\n- The root tool-set finding is closed without new defects: `toolArgs` in `packages/runtime/src/pi/tools.ts` (root branch) now excludes `write`, `edit`, `COMPUTER_USE_TOOLS` when `features.computerUse` is on, and `webChoice(profile, features.web).tools`. For pi-web-kit that is `web_search` and `web_fetch`. For a provider with web tools it is `moonshot_search` and `moonshot_fetch`. For a provider without web tools it falls back to the pi-web-kit pair. For `off` it is none. This matches the `webChoice` logic in `provider.ts`. The JSDoc and the `docs/pi/extensions.md` table and bullet agree with the code. Reviewer.code still keeps `bash`.\n- The new tests fail without the repair and cover each toggle: `packages/runtime/tests/pi/tools.test.ts` asserts `excludeTools` and `argv` for the default config, computerUse on and off, and web pi-web-kit, provider with Kimi, provider without web tools, and off. The pre-repair root returned only `write,edit`, so each of those assertions would fail on it. I did not run the tests against the base.\n- mise run verify exits 0: `bunx --no-install mise run verify` -> exit 0; 1963 pass, 0 fail, 67 files; type-check, lint and format check clean.\n- verify-run: `bunx --no-install mise run verify` -> exit 0; 1963 pass, 0 fail, 67 files; type-check, lint and format check clean.\n",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Repair closes the root tool-set finding; verify exit 0, 1963 pass.",
+    "criteria": [
+      {
+        "criterion": "The root tool-set finding is closed without new defects",
+        "support": "`toolArgs` in `packages/runtime/src/pi/tools.ts` (root branch) now excludes `write`, `edit`, `COMPUTER_USE_TOOLS` when `features.computerUse` is on, and `webChoice(profile, features.web).tools`. For pi-web-kit that is `web_search` and `web_fetch`. For a provider with web tools it is `moonshot_search` and `moonshot_fetch`. For a provider without web tools it falls back to the pi-web-kit pair. For `off` it is none. This matches the `webChoice` logic in `provider.ts`. The JSDoc and the `docs/pi/extensions.md` table and bullet agree with the code. Reviewer.code still keeps `bash`."
+      },
+      {
+        "criterion": "The new tests fail without the repair and cover each toggle",
+        "support": "`packages/runtime/tests/pi/tools.test.ts` asserts `excludeTools` and `argv` for the default config, computerUse on and off, and web pi-web-kit, provider with Kimi, provider without web tools, and off. The pre-repair root returned only `write,edit`, so each of those assertions would fail on it. I did not run the tests against the base."
+      },
+      {
+        "criterion": "mise run verify exits 0",
+        "support": "`bunx --no-install mise run verify` -> exit 0; 1963 pass, 0 fail, 67 files; type-check, lint and format check clean."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "verify-run",
+        "support": "`bunx --no-install mise run verify` -> exit 0; 1963 pass, 0 fail, 67 files; type-check, lint and format check clean."
+      }
+    ]
   },
   "createdAt": "2026-11-08T06:23:40.975Z"
 }
