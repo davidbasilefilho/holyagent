@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-commit-d8bfcab-on-release-0-3-0",
   "objective": "Review commit d8bfcab on release/0.3.0/feat/pi-tool-settings (worktree /home/user/holyagent-0.3.0-settings, range 5307d43..d8bfcab) for correctness and regressions.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Diff: /home/user/holyagent-notes/wire-b.diff (dist excluded).",
     "Intended behavior: holyagent setup deep-merges the toolSettings output (codemode mode, pi-subagents subagents.json, Billion Context, Moonshot tools, computer-use) into Pi settings at the scope location, writing a key only where unset and different from the package default, never over a user value; malformed files are a failed line and untouched; --dry-run writes nothing; --undo removes only recorded keys whose value still equals what setup wrote; doctor reports missing HolyAgent settings only when Pi is in use; gating as the Pi package step.",
@@ -44,7 +44,33 @@
     "agentId": "workflow:wf_fc64bab5-cce/assignment-0mw7o2o2g-1nfu",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T10:05:43.384Z"
+    "startedAt": "2026-11-08T10:05:43.384Z",
+    "finishedAt": "2026-11-08T10:21:59.415Z"
+  },
+  "result": "result: No blockers. The code-review run found 7 findings; I read the cited code for each and classed 6 as optional and 1 as rejected. `mise run verify` passes on d8bfcab.\n\nchanged: none (read-only review)\n\nchecks:\n- `bunx --no-install mise run verify` -> exit 0. Type-check shows no errors in 206 files, lint finds no problems in 207 files, format is clean, and 2271 tests pass with 0 failing. The worktree stayed clean. Log: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`.\n- `bun test packages/runtime/tests/setup-pi-settings.test.ts packages/runtime/tests/setup-pi.test.ts` plus the other setup tests -> 186 pass, 0 fail.\n\nI downloaded the pinned package tarballs to check `PACKAGE_DEFAULTS` and the layering. I could only read them, not run them under Pi.\n- **Defaults:** all four match the pinned sources.\n  - `pi-computer-use@0.1.36` `dist/config.js`: both confirmations default to `true`.\n  - `pi-subagents@0.23.1`: `disableDefaultAgents` is a boolean with no truthy default. `fallbackSubagent` unset means the fallback, so leaving it out of `PACKAGE_DEFAULTS` is right.\n  - `pi-provider-kimi-code@0.6.13` `src/config.ts` line 117: each Moonshot tool is `enabled: false`.\n  - Pi `docs/settings.md`: `codemode.mode` defaults to `on`.\n- **Project locations:** `.pi/subagents.json` and `.pi/providers/kimi-coding/config.json` are read at project scope, and for subagents the project file overrides the global one. Billion Context has no project file, so skipping it there is correct.\n\nblockers: none\n\nnotes (optional; the first six are code-review findings I read and kept as optional):\n1. **Defaults and layering (`pi-settings.ts` line 119):** leaving out a key equal to the package default ignores the global layer. This only bites when a project explicitly sets `pi.codemode.mode: on` while the global file holds `only`. The package-default omission is the stated intent, so I class it as optional. Writing the key at project scope would close the gap.\n2. **Write then record (line 191):** if `addRecorded` fails after the file write, the keys are never recorded, and the next run reports them as `already set`, so `--undo` skips them. `settings.ts` has the same order, and the record is read before the write, which narrows the window.\n3. **Symlinks at project/local scope:** the tool-settings step writes through a symlinked `.pi` path, where the Claude settings step refuses. `pi-install.ts` already writes `.pi/settings.json` the same way, so the new step matches the existing Pi step.\n4. **Undo lookup (line 244):** `--undo` finds files by recomputing `locate()` from the current environment. If `BILI_CONFIG_FILE` or `XDG_CONFIG_HOME` changed since setup, a recorded file is missed without a line. Iterating the record's own keys would fix it.\n5. **Doctor hint:** `doctor --fix` ignores the `~` tool-settings hint and the exit code stays 0. The docs say so.\n6. **`planAt`:** it hides config-load errors, but the packages step still prints them, since `piUsed` gates both steps.\n7. **Rejected:** the claim that mark `-` is ambiguous. `skipped()` already uses `-` for the other setup lines, so the tool-settings step follows that convention.\n\nevidence:\n- Setup writes, skips, keeps and undoes settings as intended across scopes, and Claude-only output is unchanged: `pi-settings.ts` lines 113-300 (planFor, mergeTarget, undo) and `steps.ts` gating on `piUsed`, checked against package sources. `setup-pi-settings.test.ts` covers write, idempotence, keeping user values, defaults left out, malformed files, dry-run, user/project/local scope, undo, and the Claude-only machine (line 370). `verify` exit 0.\n- Each new behavior has a test that would fail without it: 24 tests in `setup-pi-settings.test.ts`, listed by `grep -n \"test(\"`, across setup, doctor and undo. Each asserts file contents, record state or report lines. I did not run them against the base.\n- The change follows the repository's code rules: `verify` exit 0 (check, lint, fmt). The new code uses Effect.fn, Effect.gen and tagged `SetupFailure`, and the writes go through `writeJsonObject`. JSDoc is on the exported functions, and the generated dist is rebuilt in the commit.\n- review-findings: the 7 code-review findings are classed above, 6 optional and 1 rejected, with 0 blockers. All the code-review findings were in `/home/user/holyagent-0.3.0-settings/packages/runtime/src/setup/pi-settings.ts` or `doctor.ts`.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "No blocker; seven built-in findings triaged against the code and pinned package sources; verify 2271 pass",
+    "criteria": [
+      {
+        "criterion": "Setup writes, skips, keeps and undoes settings as intended across scopes, and Claude-only output is unchanged",
+        "support": "`pi-settings.ts` lines 113-300 (planFor, mergeTarget, undo) and `steps.ts` gating on `piUsed`, checked against package sources. `setup-pi-settings.test.ts` covers write, idempotence, keeping user values, defaults left out, malformed files, dry-run, user/project/local scope, undo, and the Claude-only machine (line 370). `verify` exit 0."
+      },
+      {
+        "criterion": "Each new behavior has a test that would fail without it",
+        "support": "24 tests in `setup-pi-settings.test.ts`, listed by `grep -n \"test(\"`, across setup, doctor and undo. Each asserts file contents, record state or report lines. I did not run them against the base."
+      },
+      {
+        "criterion": "The change follows the repository's code rules",
+        "support": "`verify` exit 0 (check, lint, fmt). The new code uses Effect.fn, Effect.gen and tagged `SetupFailure`, and the writes go through `writeJsonObject`. JSDoc is on the exported functions, and the generated dist is rebuilt in the commit."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "review-findings",
+        "support": "the 7 code-review findings are classed above, 6 optional and 1 rejected, with 0 blockers. All the code-review findings were in `/home/user/holyagent-0.3.0-settings/packages/runtime/src/setup/pi-settings.ts` or `doctor.ts`."
+      }
+    ]
   },
   "createdAt": "2026-11-08T10:05:43.384Z"
 }
