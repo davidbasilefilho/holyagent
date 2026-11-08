@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "assess-commits-c991ae6-and-b9877c1-on",
   "objective": "Assess commits c991ae6 and b9877c1 on release/0.3.0/feat/pi-install for security vulnerabilities, chiefly the new setup step that runs pi install and pi remove.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read the diff file /home/user/holyagent-notes/install-code.diff (range 7846c9b..b9877c1, dist excluded); source files are in /home/user/holyagent-0.3.0-install.",
     "Trace from the config sources (home-level ~/.holyagent config, project config, Pi settings JSON files, environment such as HOLYAGENT_HOST and PATH) to the process sink in packages/runtime/src/setup/pi-install.ts and the checks in pi-check.ts: argument injection into pi install/remove, package names or pins taken from untrusted project files, removal of packages HolyAgent does not own, and malformed settings files."
@@ -45,7 +45,33 @@
     "agentId": "workflow:wf_d86ee99c-f44/assignment-0mw7lt4ly-jmnn",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T09:02:19.031Z"
+    "startedAt": "2026-11-08T09:02:19.031Z",
+    "finishedAt": "2026-11-08T09:08:18.904Z"
+  },
+  "result": "result: No validated vulnerability and no blocker. I found one suspicion and two hardening items.\n\n**Built-in /security-review:** it could not run. The Skill call failed with `fatal: ambiguous argument 'origin/HEAD...'` because this checkout has no `origin/HEAD`. The review below is manual, read from `/home/user/holyagent-notes/install-code.diff` and the sources in `/home/user/holyagent-0.3.0-install`. I read the Pi 1.5.0 package manager and settings manager in that checkout's `node_modules`, but I did not run anything, so the project-trust points below are read from the code only.\n\n**Validated, sound**\n- **Command line:** `pi install` and `pi remove` get their arguments only from `piPackages(config)`, which builds `npm:<name>@<version>` from fixed enums. The names are `FEATURE_PACKAGES`, `WEB_KIT_PACKAGE` and the provider profile package. The versions come from the repo-bundled `config/pi-packages.json`.\n  - Neither project config nor Pi settings can supply a name, a version or a flag.\n  - The only flag is the literal `-l`.\n  - `Shell.run` uses Bun `$` array interpolation, so there is no shell and no argument splitting.\n- **Removals:** `removals` only contains names that are in `MANAGED_NAMES` (the seven feature packages plus `pi-web-kit`) and not wanted by the config. The name comes from the fixed set, not from the settings string.\n  - Other packages, the HolyAgent package (git, path or `npm:holyagent`), the provider package and scoped lookalikes are never removed.\n- **Malformed files:** `piSettingsSources` returns a `SetupFailure` for unreadable files, bad JSON, a non-object top level or a non-array `packages`. `setup` turns that into a `!` line through `asStep`, and `doctor` turns it into a `FAIL` line. No command runs in either case. A bad config gives a `!` or `FAIL pi config` line the same way.\n- **Gating:** nothing runs in a cloud session, with `pi.enable` off, under `--undo`, or on a dry run. `--fix` never installs anything.\n\n**Suspicion (not validated; I did not run Pi)**\n- **Project scope runs `pi install -l` in the project directory.** That directory is attacker-controlled when the repo is untrusted, so the repo's `.npmrc` and `.pi/settings.json` sit where the install reads them.\n  - A `.npmrc` registry or `ignore-scripts=false` setting could swap what the pinned names resolve to.\n  - A project `npmCommand` in `.pi/settings.json` could run an arbitrary command. Pi 1.5.0 appears to drop project settings for an untrusted project (`setProjectTrusted`), and I did not verify how that behaves without a terminal.\n  - This contradicts the `Shell` doc comment, which says the working directory is neutral so project files cannot steer an install.\n  - Precondition: the user runs `holyagent setup --scope project|local` inside a hostile repo.\n\n**Hardening**\n1. **Project config steers the user-scope install.** `loadPiConfig` merges the cwd's `.holyagent/config.json` even for `--scope user`. A cloned repo can therefore turn features off, so `holyagent setup` removes the matching managed packages from the user's global Pi settings. It can also turn on features that are on by default anyway, and the user-level lock (`FINAL_OFF`) only covers a setting the user has turned off. It cannot add an unexpected package. Using only the user config for the user scope would close this.\n2. **Removal is by name only.** There is no ownership record. A user who installed `@juicesharp/rpiv-todo` on their own, possibly with an object entry that narrows its resources, loses it when `todo` is off. The message says it is removed because the feature is off, which makes this visible.\n3. **Packages install without `--ignore-scripts`.** The packages are pinned HolyAgent-chosen names, but Pi's npm install runs their lifecycle scripts.\n\nevidence:\n- No untrusted input reaches the pi install or pi remove command line as an option or an unexpected package: Name and version come from enums and `pi-packages.json`. The only flag is the literal `-l`, and the call uses Bun `$` array interpolation. See `pi-install.ts` lines 561-588 in the diff and `config/packages.ts`. The one reservation is the project-scope working-directory suspicion above.\n- Setup removes only HolyAgent's own feature packages: Removal is limited to `MANAGED_NAMES` through `parseNpmSource` (`pi-install.ts` lines 537-544). Hardening item 2 notes that ownership is by name only.\n- Malformed Pi settings or config files fail safely: Schema decode errors become a `SetupFailure`, then a `!` or `FAIL` line, with no command run (`pi-check.ts` lines 312-329, `steps.ts` line 112).\n- security-findings: the sections above. There are no validated vulnerabilities, one suspicion and three hardening items.\n",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "No validated vulnerability; sources traced to the pi install sink; hardening items taken into the repair",
+    "criteria": [
+      {
+        "criterion": "No untrusted input reaches the pi install or pi remove command line as an option or an unexpected package",
+        "support": "Name and version come from enums and `pi-packages.json`. The only flag is the literal `-l`, and the call uses Bun `$` array interpolation. See `pi-install.ts` lines 561-588 in the diff and `config/packages.ts`. The one reservation is the project-scope working-directory suspicion above."
+      },
+      {
+        "criterion": "Setup removes only HolyAgent's own feature packages",
+        "support": "Removal is limited to `MANAGED_NAMES` through `parseNpmSource` (`pi-install.ts` lines 537-544). Hardening item 2 notes that ownership is by name only."
+      },
+      {
+        "criterion": "Malformed Pi settings or config files fail safely",
+        "support": "Schema decode errors become a `SetupFailure`, then a `!` or `FAIL` line, with no command run (`pi-check.ts` lines 312-329, `steps.ts` line 112)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "security-findings",
+        "support": "the sections above. There are no validated vulnerabilities, one suspicion and three hardening items."
+      }
+    ]
   },
   "createdAt": "2026-11-08T09:02:19.031Z"
 }
