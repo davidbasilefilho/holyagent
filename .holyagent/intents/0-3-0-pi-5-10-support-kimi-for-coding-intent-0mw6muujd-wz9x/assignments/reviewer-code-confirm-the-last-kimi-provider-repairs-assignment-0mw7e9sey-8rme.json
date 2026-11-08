@@ -1,0 +1,49 @@
+{
+  "id": "assignment-0mw7e9sey-8rme",
+  "intentId": "intent-0mw6muujd-wz9x",
+  "intentRevision": 9,
+  "roleTask": "Reviewer.code",
+  "slug": "confirm-the-last-kimi-provider-repairs",
+  "objective": "Confirm the last Kimi provider repairs on release/0.3.0/feat/kimi-provider (range 9c8da25..HEAD, worktree /home/user/holyagent-0.3.0-provider; run commands there) close the previous review's findings.",
+  "state": "Running",
+  "scope": [
+    "Previous blocking finding: docs claimed the updater never moves the Pi host, while @earendil-works/pi-coding-agent is a ^1.0.0 devDependency that bun update moves; docs/pi/installation.md said fixtures are re-recorded with a move. Optional: outputDetail preferred stdout; CatalogRow required lowercase provider ids; an unparseable listing was blamed on credentials. The repairs reword AGENTS.md, docs/development.md and docs/pi/{README,installation,orchestration,t3-code,providers}.md, lead failure details with stderr, accept any provider id, and add ListingNotRecognised.",
+    "Full repair diff from the first review's head: /home/user/holyagent-notes/kimi-provider-repair.diff."
+  ],
+  "constraints": [
+    "Fixtures only: no network, no pi binary.",
+    "Read-only: no edits and no version-control writes.",
+    "Report in under 300 words; start each evidence line with the exact criterion text (no backticks), a colon, then the support."
+  ],
+  "criteria": [
+    {
+      "text": "Each previous finding is closed and the docs match the code and the updater",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "The catalog and readiness changes are correct and tested",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "bunx --no-install mise run verify exits 0 and mise run build leaves the tree clean on HEAD",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7dy75y-jk0q"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T05:31:19.450Z"
+  },
+  "createdAt": "2026-11-08T05:31:19.450Z"
+}
