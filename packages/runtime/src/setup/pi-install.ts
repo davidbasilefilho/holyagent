@@ -7,6 +7,7 @@ import {
   listsAtPin,
   loadPiConfig,
   parseNpmSource,
+  piPresenceFiles,
   piSettingsFiles,
   piSettingsSources,
 } from "./pi-check.ts"
@@ -60,8 +61,9 @@ export interface PiInstallOptions {
 
 /**
  * The Pi step of `holyagent setup`: makes the packages of Pi's settings match the HolyAgent config.
- * It runs `pi install npm:<name>@<pin>` for each source {@link piPackages} returns that neither the
- * global nor the project settings list at that pin (doctor accepts either file too), and `pi remove
+ * It runs `pi install npm:<name>@<pin>` for each source {@link piPackages} returns that the
+ * settings of the scope do not list at that pin (the global file for scope `user`; the project's
+ * file or the global one for `project` and `local`, as doctor counts them), and `pi remove
  * npm:<name>` for each managed package (the values of {@link FEATURE_PACKAGES}, the web kit and the
  * provider profile packages) that the settings of the chosen scope list but the config no longer
  * selects, because only those two commands write the `packages` list that Pi loads from. Removal
@@ -85,13 +87,21 @@ export const installPiPackages = Effect.fn("installPiPackages")(function* (
   const projectLevel = options.scope !== "user"
   const [globalFile, projectFile] = piSettingsFiles(env, options.cwd)
   const file = projectLevel ? projectFile : globalFile
-  const otherFile = projectLevel ? globalFile : projectFile
   const listed = yield* piSettingsSources(file)
-  const elsewhere = yield* piSettingsSources(otherFile).pipe(
-    Effect.orElseSucceed((): ReadonlyArray<string> => []),
+  // Project and local scope also count the global file (Pi loads global packages in a project);
+  // user scope counts the global file only, so a repository's .pi/settings.json cannot suppress
+  // a global install. The global file is ignored here when it is not valid Pi settings.
+  const counted = piPresenceFiles(env, options.cwd, options.scope).filter((other) => other !== file)
+  const elsewhere = yield* Effect.forEach(counted, (other) =>
+    piSettingsSources(other).pipe(
+      Effect.map((sources) => ({ file: other, sources })),
+      Effect.orElseSucceed(() => ({ file: other, sources: [] as ReadonlyArray<string> })),
+    ),
   )
   const listedIn = (source: string) =>
-    listsAtPin(listed, source) ? file : listsAtPin(elsewhere, source) ? otherFile : undefined
+    listsAtPin(listed, source)
+      ? file
+      : elsewhere.find((other) => listsAtPin(other.sources, source))?.file
 
   const wanted = piPackages(config)
   const installs = wanted.filter((source) => listedIn(source) === undefined)

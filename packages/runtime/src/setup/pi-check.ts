@@ -27,7 +27,16 @@ export const PI_MINIMUM_NODE = "22.19.0"
 const PI_INSTALL = `npm install -g --ignore-scripts @earendil-works/pi-coding-agent@${PI_HOST_VERSION}`
 const NODE_FIX = `install Node.js ${PI_MINIMUM_NODE} or newer (https://nodejs.org)`
 const PI_FIX = `install Pi with \`${PI_INSTALL}\` (Node.js ${PI_MINIMUM_NODE} or newer), or with the official installer (https://pi.dev)`
-const PACKAGE_FIX = `install it with \`pi install git:github.com/davidbasilefilho/holyagent@holyagent-${holyagentVersion}\` (add -l for this project only)`
+const PACKAGE_COMMAND = `pi install git:github.com/davidbasilefilho/holyagent@holyagent-${holyagentVersion}`
+
+/**
+ * How a missing HolyAgent package is installed: for this project only (`-l`) when the scope counts
+ * the project's file.
+ */
+const packageFix = (scope: Scope) =>
+  scope === "user"
+    ? `install it with \`${PACKAGE_COMMAND}\``
+    : `install it with \`${PACKAGE_COMMAND}\` (add -l for this project only)`
 
 const VERSION = /(\d+)\.(\d+)\.(\d+)/
 
@@ -200,6 +209,17 @@ export const piSettingsFiles = (env: Env, cwd: string) =>
   [join(piAgentDirectory(env), "settings.json"), join(cwd, ".pi", "settings.json")] as const
 
 /**
+ * The Pi settings files whose packages count as present at a scope, global first. Scope `user`
+ * counts Pi's global file only, so a repository's `.pi/settings.json` cannot make setup or doctor
+ * believe a global install is there; `project` and `local` also count the project's file, since Pi
+ * loads the global packages in a project as well.
+ */
+export const piPresenceFiles = (env: Env, cwd: string, scope: Scope): ReadonlyArray<string> => {
+  const [globalFile, projectFile] = piSettingsFiles(env, cwd)
+  return scope === "user" ? [globalFile] : [globalFile, projectFile]
+}
+
+/**
  * The name and version of an `npm:<name>[@<version>]` package source, or `undefined` for any other
  * source (a git URL, a path). A scoped name keeps its leading `@`.
  */
@@ -251,12 +271,12 @@ export const loadPiConfig = (
   )
 
 /**
- * Whether Pi has the HolyAgent package, at either scope: the global `settings.json` of Pi's agent
- * folder or the project's `.pi/settings.json` in `cwd`. Reads files only.
+ * Whether Pi has the HolyAgent package in the files that count at the scope ({@link
+ * piPresenceFiles}). Reads files only.
  */
-const checkPackage = (env: Env, cwd: string) =>
+const checkPackage = (env: Env, cwd: string, scope: Scope) =>
   Effect.gen(function* () {
-    const files = piSettingsFiles(env, cwd)
+    const files = piPresenceFiles(env, cwd, scope)
     const outcomes = yield* Effect.forEach(files, (file) =>
       piSettingsSources(file).pipe(
         Effect.map((sources) => ({
@@ -277,19 +297,20 @@ const checkPackage = (env: Env, cwd: string) =>
     return fail(
       "pi package",
       problems.length > 0
-        ? `${problems.join("; ")}; fix the file, or ${PACKAGE_FIX}`
-        : `not in the packages of ${files.join(" or ")}; ${PACKAGE_FIX}`,
+        ? `${problems.join("; ")}; fix the file, or ${packageFix(scope)}`
+        : `not in the packages of ${files.join(" or ")}; ${packageFix(scope)}`,
     )
   })
 
 /**
- * One line per Pi package the config enables ({@link piPackages}) that neither Pi settings file
- * lists at its pinned release, each with the `pi install` command that fixes it; one `ok` line when
- * none is missing. A settings file that cannot be read lists nothing here; `pi package` names it.
+ * One line per Pi package the config enables ({@link piPackages}) that the files counting at the
+ * scope ({@link piPresenceFiles}) do not list at its pinned release, each with the `pi install`
+ * command that fixes it; one `ok` line when none is missing. A settings file that cannot be read
+ * lists nothing here; `pi package` names it.
  */
-const checkFeatures = (env: Env, cwd: string, config: Config) =>
+const checkFeatures = (env: Env, cwd: string, scope: Scope, config: Config) =>
   Effect.gen(function* () {
-    const files = piSettingsFiles(env, cwd)
+    const files = piPresenceFiles(env, cwd, scope)
     const listed = (yield* Effect.forEach(files, (file) =>
       piSettingsSources(file).pipe(Effect.orElseSucceed((): ReadonlyArray<string> => [])),
     )).flat()
@@ -300,7 +321,7 @@ const checkFeatures = (env: Env, cwd: string, config: Config) =>
     return missing.map((source) =>
       fail(
         `pi feature ${parseNpmSource(source)?.name ?? source}`,
-        `not listed at ${source} in the packages of ${files.join(" or ")}; install it with \`pi install ${source}\` (add -l for this project only), or re-run \`holyagent setup\``,
+        `not listed at ${source} in the packages of ${files.join(" or ")}; install it with \`pi install ${source}\`${scope === "user" ? "" : " (add -l for this project only)"}, or re-run \`holyagent setup\``,
       ),
     )
   })
@@ -309,9 +330,10 @@ const checkFeatures = (env: Env, cwd: string, config: Config) =>
  * The Pi checks of `holyagent doctor`, one line each: `pi` on PATH at the release HolyAgent is
  * built against ({@link PI_HOST_VERSION}) or newer, `node` on PATH at {@link PI_MINIMUM_NODE} or
  * newer, `pi package`, the HolyAgent package in the `packages` of Pi's global settings (Pi's agent
- * folder, `PI_CODING_AGENT_DIR` honored) or the project's `.pi/settings.json`, and each package the
- * config enables ({@link piPackages}) that those files do not list at its pin. Every failing line
- * ends with the command that fixes it, and nothing is installed or written. The config is the one
+ * folder, `PI_CODING_AGENT_DIR` honored), and each package the config enables ({@link piPackages})
+ * that those settings do not list at its pin. Scope `project` and `local` also count the project's
+ * `.pi/settings.json` ({@link piPresenceFiles}); scope `user` does not. Every failing line ends
+ * with the command that fixes it, and nothing is installed or written. The config is the one
  * `setup` reads at the same scope ({@link loadPiConfig}). The checks run only while Pi is in use
  * ({@link piInUse}) and `pi.enable` is on in that config; when Pi is not in use there is one
  * informational `~` line saying so, with `pi.enable` off there are no lines, and a config that
@@ -336,8 +358,8 @@ export const piChecks = (
             ? Effect.all([
                 checkPi(env),
                 checkNode(env),
-                checkPackage(env, cwd),
-                checkFeatures(env, cwd, config),
+                checkPackage(env, cwd, scope),
+                checkFeatures(env, cwd, scope, config),
               ]).pipe(Effect.map(([pi, node, pkg, features]) => [pi, node, pkg, ...features]))
             : Effect.succeed<ReadonlyArray<string>>([]),
       }),

@@ -22281,7 +22281,8 @@ var PI_MINIMUM_NODE = "22.19.0";
 var PI_INSTALL = `npm install -g --ignore-scripts @earendil-works/pi-coding-agent@${PI_HOST_VERSION}`;
 var NODE_FIX = `install Node.js ${PI_MINIMUM_NODE} or newer (https://nodejs.org)`;
 var PI_FIX = `install Pi with \`${PI_INSTALL}\` (Node.js ${PI_MINIMUM_NODE} or newer), or with the official installer (https://pi.dev)`;
-var PACKAGE_FIX = `install it with \`pi install git:github.com/davidbasilefilho/holyagent@holyagent-${version}\` (add -l for this project only)`;
+var PACKAGE_COMMAND = `pi install git:github.com/davidbasilefilho/holyagent@holyagent-${version}`;
+var packageFix = (scope) => scope === "user" ? `install it with \`${PACKAGE_COMMAND}\`` : `install it with \`${PACKAGE_COMMAND}\` (add -l for this project only)`;
 var VERSION = /(\d+)\.(\d+)\.(\d+)/;
 var releaseIn = (text) => {
   const [, major, minor, patch] = VERSION.exec(text) ?? [];
@@ -22361,6 +22362,10 @@ var piSettingsSources = (file) => gen2(function* () {
   return (settings.packages ?? []).map((entry) => typeof entry === "string" ? entry : entry.source);
 });
 var piSettingsFiles = (env, cwd) => [join16(piAgentDirectory(env), "settings.json"), join16(cwd, ".pi", "settings.json")];
+var piPresenceFiles = (env, cwd, scope) => {
+  const [globalFile, projectFile] = piSettingsFiles(env, cwd);
+  return scope === "user" ? [globalFile] : [globalFile, projectFile];
+};
 var parseNpmSource = (source) => {
   if (!source.startsWith("npm:"))
     return;
@@ -22381,8 +22386,8 @@ var piInUse = (env) => gen2(function* () {
   return isSome2(yield* (yield* Shell).which("pi"));
 });
 var loadPiConfig = (env, cwd, scope) => loadConfig({ projectDirectories: scope === "user" ? [] : [stateDirectory(cwd)], env }).pipe(mapError2((error) => new SetupFailure({ message: error.message })));
-var checkPackage = (env, cwd) => gen2(function* () {
-  const files = piSettingsFiles(env, cwd);
+var checkPackage = (env, cwd, scope) => gen2(function* () {
+  const files = piPresenceFiles(env, cwd, scope);
   const outcomes = yield* forEach2(files, (file) => piSettingsSources(file).pipe(map4((sources) => ({
     file,
     listed: sources.some(isHolyagentSource),
@@ -22392,16 +22397,16 @@ var checkPackage = (env, cwd) => gen2(function* () {
   if (found !== undefined)
     return pass("pi package", `listed in ${found.file}`);
   const problems = outcomes.flatMap((outcome) => outcome.problem === undefined ? [] : [outcome.problem]);
-  return fail6("pi package", problems.length > 0 ? `${problems.join("; ")}; fix the file, or ${PACKAGE_FIX}` : `not in the packages of ${files.join(" or ")}; ${PACKAGE_FIX}`);
+  return fail6("pi package", problems.length > 0 ? `${problems.join("; ")}; fix the file, or ${packageFix(scope)}` : `not in the packages of ${files.join(" or ")}; ${packageFix(scope)}`);
 });
-var checkFeatures = (env, cwd, config) => gen2(function* () {
-  const files = piSettingsFiles(env, cwd);
+var checkFeatures = (env, cwd, scope, config) => gen2(function* () {
+  const files = piPresenceFiles(env, cwd, scope);
   const listed = (yield* forEach2(files, (file) => piSettingsSources(file).pipe(orElseSucceed2(() => [])))).flat();
   const wanted = piPackages(config);
   const missing = wanted.filter((source) => !listsAtPin(listed, source));
   if (missing.length === 0)
     return [pass("pi features", `${wanted.length} enabled packages listed at their pins`)];
-  return missing.map((source) => fail6(`pi feature ${parseNpmSource(source)?.name ?? source}`, `not listed at ${source} in the packages of ${files.join(" or ")}; install it with \`pi install ${source}\` (add -l for this project only), or re-run \`holyagent setup\``));
+  return missing.map((source) => fail6(`pi feature ${parseNpmSource(source)?.name ?? source}`, `not listed at ${source} in the packages of ${files.join(" or ")}; install it with \`pi install ${source}\`${scope === "user" ? "" : " (add -l for this project only)"}, or re-run \`holyagent setup\``));
 });
 var piChecks = (env, cwd, scope) => gen2(function* () {
   if (!(yield* piInUse(env)))
@@ -22413,8 +22418,8 @@ var piChecks = (env, cwd, scope) => gen2(function* () {
     onSuccess: (config) => config.pi.enable ? all2([
       checkPi(env),
       checkNode(env),
-      checkPackage(env, cwd),
-      checkFeatures(env, cwd, config)
+      checkPackage(env, cwd, scope),
+      checkFeatures(env, cwd, scope, config)
     ]).pipe(map4(([pi, node, pkg, features]) => [pi, node, pkg, ...features])) : succeed6([])
   }));
 });
@@ -22443,10 +22448,10 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
   const projectLevel = options.scope !== "user";
   const [globalFile, projectFile] = piSettingsFiles(env, options.cwd);
   const file = projectLevel ? projectFile : globalFile;
-  const otherFile = projectLevel ? globalFile : projectFile;
   const listed = yield* piSettingsSources(file);
-  const elsewhere = yield* piSettingsSources(otherFile).pipe(orElseSucceed2(() => []));
-  const listedIn = (source) => listsAtPin(listed, source) ? file : listsAtPin(elsewhere, source) ? otherFile : undefined;
+  const counted = piPresenceFiles(env, options.cwd, options.scope).filter((other) => other !== file);
+  const elsewhere = yield* forEach2(counted, (other) => piSettingsSources(other).pipe(map4((sources) => ({ file: other, sources })), orElseSucceed2(() => ({ file: other, sources: [] }))));
+  const listedIn = (source) => listsAtPin(listed, source) ? file : elsewhere.find((other) => listsAtPin(other.sources, source))?.file;
   const wanted = piPackages(config);
   const installs = wanted.filter((source) => listedIn(source) === undefined);
   const removals = staleManagedNames(listed, wanted);
