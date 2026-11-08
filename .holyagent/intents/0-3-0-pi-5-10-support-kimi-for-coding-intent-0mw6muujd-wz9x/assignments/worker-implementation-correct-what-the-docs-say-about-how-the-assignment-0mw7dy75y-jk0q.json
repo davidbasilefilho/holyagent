@@ -59,5 +59,33 @@
     "finishedAt": "2026-11-08T05:26:52.171Z"
   },
   "result": "result: Docs now say the Pi host moves with the lockfile and a user's own Pi is theirs. Notes (a), (b) and (c) are done, with tests. `verify` and `build` pass.\n\nchanged:\n- AGENTS.md\n- docs/development.md\n- docs/pi/README.md\n- docs/pi/installation.md\n- docs/pi/orchestration.md\n- docs/pi/t3-code.md\n- packages/runtime/src/pi/catalog.ts\n- packages/runtime/src/pi/readiness.ts\n- packages/runtime/tests/pi/catalog.test.ts\n- packages/runtime/tests/pi/readiness.test.ts\n\nchecks:\n- `bunx --no-install mise run verify` -> exit 0, 1890 pass, 0 fail. I ran `bun fmt` on 4 changed files first, and its reflow also touched table rows in README.md and t3-code.md.\n- `bunx --no-install mise run build` -> exit 0, and `git status` was unchanged afterwards.\n\nblockers: none\nquestions: none\n\nnotes:\n- `docs/pi/providers.md:45` still says failure detail is \"standard output, else standard error\". It is outside my ownership paths and needs reword to \"standard error, then standard output\".\n- `docs/pi/installation.md` lines 11 and 85 still show `npm install -g ...@1.5.0`. I left them as the documented install of the version the research read.\n- Recognising Pi's own \"No models ...\" message (existing test: `No models matching \"kimi\"`) as an empty listing is my inference. Any other non-table output now gives `ListingNotRecognised`.\n- `ListingNotRecognised` is a new exported error and a new member of the error union of `listModelCatalog` and `validateModelCatalog`.\n- The Pi docs outside the named files still carry research text dated to 1.4.0 and 1.5.0, which I left as written.\n\nevidence:\nNo doc claims the updater never moves the Pi host or that fixtures are re-recorded by a move, and the host version is not stated as fixed: AGENTS.md:43, docs/development.md:94, docs/pi/orchestration.md:61 and docs/pi/t3-code.md:177 are reworded. docs/pi/installation.md:43-44 and docs/pi/README.md:19 and :40 are reworded, and docs/pi/t3-code.md:14 and :35 no longer pin 1.5.0. The only 1.5.0 left is the user install command (docs/pi/installation.md:11, :85) and research text in other docs pages.\nFailed-command details lead with stderr, any provider id decodes, and an unrecognised listing is reported as such, with tests: `outputDetail` in readiness.ts is stderr then stdout. The `CatalogRow` provider pattern is `\\S+`. `ListingNotRecognised` is raised in `listModelCatalog`. The new tests are in catalog.test.ts and readiness.test.ts and pass.\nbunx --no-install mise run verify exits 0 and mise run build leaves generated output in sync: verify exit 0 with 1890 pass, build exit 0 and the status was identical before and after.\nchanged-paths: the ten paths listed under `changed`.\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/assignment-0mw7dy75y-jk0q.diff\n",
+  "acceptance": {
+    "revision": 9,
+    "rationale": "Provider work confirmed by reviews 3xjk, xm1q, nb2j and 8rme; the last doc mismatch fixed in 6de0371 (diff read); verify 1890 pass",
+    "criteria": [
+      {
+        "criterion": "No doc claims the updater never moves the Pi host or that fixtures are re-recorded by a move, and the host version is not stated as fixed",
+        "support": "AGENTS.md:43, docs/development.md:94, docs/pi/orchestration.md:61 and docs/pi/t3-code.md:177 are reworded. docs/pi/installation.md:43-44 and docs/pi/README.md:19 and :40 are reworded, and docs/pi/t3-code.md:14 and :35 no longer pin 1.5.0. The only 1.5.0 left is the user install command (docs/pi/installation.md:11, :85) and research text in other docs pages."
+      },
+      {
+        "criterion": "Failed-command details lead with stderr, any provider id decodes, and an unrecognised listing is reported as such, with tests",
+        "support": "`outputDetail` in readiness.ts is stderr then stdout. The `CatalogRow` provider pattern is `\\S+`. `ListingNotRecognised` is raised in `listModelCatalog`. The new tests are in catalog.test.ts and readiness.test.ts and pass."
+      },
+      {
+        "criterion": "bunx --no-install mise run verify exits 0 and mise run build leaves generated output in sync",
+        "support": "verify exit 0 with 1890 pass, build exit 0 and the status was identical before and after."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "the ten paths listed under `changed`."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/assignment-0mw7dy75y-jk0q.diff"
+      }
+    ]
+  },
   "createdAt": "2026-11-08T05:22:18.694Z"
 }
