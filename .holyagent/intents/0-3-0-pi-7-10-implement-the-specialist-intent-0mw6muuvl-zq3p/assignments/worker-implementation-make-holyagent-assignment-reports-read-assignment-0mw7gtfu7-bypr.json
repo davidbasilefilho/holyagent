@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "make-holyagent-assignment-reports-read",
   "objective": "Make holyagent assignment reports read the @tintinweb/pi-subagents workflow journal and direct-agent records under HOLYAGENT_HOST=pi, so the Pi root closes each Assignment from a report file instead of taking reports into its context.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Work only in the worktree /home/user/holyagent-0.3.0-launcher (branch release/0.3.0/feat/pi-launcher, cut from release/0.3.0/integration at 7bae86c). Read /home/user/holyagent-notes/launcher-research.md first: it holds the research on @tintinweb/pi-subagents 0.23.1 with source paths and lines, and the installed package source is at /home/user/holyagent-notes/pi-probe/node_modules/@tintinweb/pi-subagents (Pi 1.5.0 at /home/user/holyagent-notes/pi-probe/node_modules/@earendil-works/pi-coding-agent). Open the source before relying on any claim; do not guess about code you have not read. The Intent requirements given in your brief are binding: the maintainer decided the launcher is @tintinweb/pi-subagents and that HolyAgent adds glue only where the package does not meet a requirement.",
     "Today packages/runtime/src/cli/report.ts (about lines 259-327) reads only the Claude workflow journal (started and result entries) and docs/pi/orchestration.md (The runtime under Pi, Not covered) says a Pi script returns its reports to the root. The pi-subagents journal (<run id>.workflow.jsonl, src/journal.ts:50-70 of the package) has one entry type {index, key, ok, text?, resumed?}, where key is the first 32 hex characters of sha256 over the JSON of [prompt, label, model, agentType, effort, isolation, gate, resume, schema?]; it carries no label. Read journal.ts and the code that builds the key to get the exact serialization (absent vs null fields, order).",
@@ -65,5 +65,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T06:42:44.058Z"
+  },
   "createdAt": "2026-11-08T06:42:35.503Z"
 }
