@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync, statSync } from "node:fs"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp, rm, symlink } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
@@ -385,11 +385,18 @@ describe("the extension", () => {
     const root = await mkdtemp(join(tmpdir(), "holyagent-pi-extension-"))
     const path = join(root, "extension.mjs")
     await Bun.write(path, extension?.content ?? "")
+    // The host modules are peers Pi provides; here the package's own copies stand in for them.
+    await symlink(
+      join(REPOSITORY, "packages", "integrations", "pi", "node_modules"),
+      join(root, "node_modules"),
+      "junction",
+    )
     const loaded = (await import(path)) as { default: (pi: unknown) => unknown }
     const used: Array<string> = []
     const api = {
       registerFlag: (name: string) => void used.push(`registerFlag ${name}`),
       on: (event: string) => void used.push(`on ${event}`),
+      registerToolRenderer: () => void used.push("registerToolRenderer"),
     }
     expect(typeof loaded.default).toBe("function")
     expect(loaded.default(api)).toBeUndefined()
@@ -401,6 +408,7 @@ describe("the extension", () => {
       "on session_start",
       "on tool_call",
       "registerFlag holyagent-role",
+      "registerToolRenderer",
     ])
     await rm(root, { recursive: true, force: true })
   })

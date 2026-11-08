@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import { Effect } from "effect"
 
-import { workflowRefusal } from "../src/cli/workflow-check.ts"
+import { literalWorkflowName, workflowRefusal } from "../src/cli/workflow-check.ts"
 
 const META = 'export const meta = { name: "w", description: "d" }'
 const AGENT = "await agent('p', { agentType: 'holyagent:worker-implementation' })"
@@ -1022,5 +1022,33 @@ describe("HTML-like text in a string is plain under both hosts", () => {
     ).toBeUndefined()
     expect(await refusalOf(`/*\n${META}\n*/\n${META}\n${AGENT}`)).toBeUndefined()
     expect(await refusalOf(AGENT)).toBeUndefined()
+  })
+})
+
+describe("the literal workflow name", () => {
+  test.each<readonly [string, string, string | undefined]>([
+    ["a literal name", "export const meta = { name: 'w', description: 'd' }\nreturn 1", "w"],
+    ["a quoted key", "export const meta = { 'name': \"q\" }", "q"],
+    ["the last of two names", "export const meta = { name: 'a', name: 'b' }", "b"],
+    ["a name that is no string", "export const meta = { name: 2 }", undefined],
+    ["no name", "export const meta = { description: 'd' }", undefined],
+    ["no meta", "return 1", undefined],
+    [
+      "two metas",
+      "export const meta = { name: 'a' }\nexport const meta = { name: 'b' }",
+      undefined,
+    ],
+    ["a call in the fragment", "export const meta = { name: String('a') }", undefined],
+    ["a call elsewhere in the fragment", "export const meta = { name: 'a', x: f() }", undefined],
+    ["a getter", "export const meta = { get name() { return 'a' } }", undefined],
+    [
+      "a constructor chain",
+      'export const meta = { name: this.constructor.constructor("return 1")() }',
+      undefined,
+    ],
+    ["an interpolated template", "export const meta = { name: `${x}` }", undefined],
+    ["a syntax error", "export const meta = { name: ", undefined],
+  ])("%s", (_label, script, expected) => {
+    expect(Effect.runSync(literalWorkflowName(script))).toBe(expected)
   })
 })

@@ -3,7 +3,13 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { isAbsolute, join, resolve, win32 } from "node:path"
 
-import type { ExecResult, ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent"
+import type {
+  ExecResult,
+  ExtensionAPI,
+  ExtensionContext,
+  ToolRendererResolver,
+  ToolRenderers,
+} from "@earendil-works/pi-coding-agent"
 import { Effect } from "effect"
 
 import { PLUGIN_NAMESPACE } from "../../../runtime/src/cli/assignment.ts"
@@ -40,6 +46,8 @@ import {
   ROLE_FLAG,
   SESSION_DEADLINE_MS,
   WORKFLOW_TOOL,
+  workflowCallLine,
+  workflowRenderers,
   WORKFLOWS_ENV,
   wrapperPath,
 } from "../src/extension.ts"
@@ -116,12 +124,14 @@ const fakeApi = (
   const calls: Array<Call> = []
   const sent: Array<unknown> = []
   const touched: Array<string> = []
+  const renderers: Array<ToolRendererResolver> = []
   // The commands started and not yet settled: a process that is still running.
   const running = { count: 0 }
   const api = {
     registerFlag: (name: string, options: { type: string; default?: string }) =>
       void flags.set(name, options),
     getFlag: (name: string) => value ?? flags.get(name)?.default,
+    registerToolRenderer: (resolver: ToolRendererResolver) => void renderers.push(resolver),
     getSessionName: () => session.name,
     getActiveTools: () => [...(session.activeTools ?? [])],
     on: (event: string, handler: (...args: Array<never>) => unknown) => {
@@ -166,6 +176,7 @@ const fakeApi = (
     pi: api as unknown as ExtensionAPI,
     flags,
     handlers,
+    renderers,
     calls,
     sent,
     touched,
@@ -1623,5 +1634,110 @@ describe("a child that settles without a usable report", () => {
     const root = fakeApi(healthy("/missing"))
     createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(root.pi)
     expect(await root.emit("message_end", { message })).toEqual([undefined])
+  })
+})
+
+/** A theme that marks nothing, so a drawn line reads as plain text. */
+const PLAIN_THEME = { fg: (_color: string, text: string) => text, bold: (text: string) => text }
+
+/** The tool's own renderers, as the package registers them: drawing a call evaluates its script. */
+const evaluatingRenderers = (evaluated: Array<string>): ToolRenderers => ({
+  renderCall: (args) => {
+    evaluated.push(String((args as { script?: unknown }).script))
+    throw new Error("the package drew the call")
+  },
+  renderResult: () => ({ render: () => ["card"], invalidate: () => undefined }),
+})
+
+/** The lines the resolved renderers draw for a workflow call with `script`. */
+const drawnCall = (script: unknown, evaluated: Array<string> = []): ReadonlyArray<string> => {
+  const resolved = workflowRenderers(WORKFLOW_TOOL, () => evaluatingRenderers(evaluated))
+  const component = resolved?.renderCall?.({ script }, PLAIN_THEME as never, {} as never)
+  return component?.render(120) ?? []
+}
+
+describe("drawing a SubagentWorkflow call", () => {
+  // The package draws a call by evaluating the meta fragment on the host, and Pi draws a call on
+  // every streamed update, before the tool_call gate: nothing in the script may run.
+  const EXPLOITS: ReadonlyArray<readonly [string, string]> = [
+    [
+      "a constructor chain to process",
+      'export const meta = { description: this.constructor.constructor("return process")() }',
+    ],
+    [
+      "a call that records itself",
+      'export const meta = { name: (globalThis.__holyagentEvaluated = "call", "x") }',
+    ],
+    [
+      "a getter that records itself",
+      'export const meta = { get name() { globalThis.__holyagentEvaluated = "getter"; return "x" } }',
+    ],
+    [
+      "an immediately invoked function that records itself",
+      'export const meta = { name: (() => { globalThis.__holyagentEvaluated = "iife"; return "x" })() }',
+    ],
+  ]
+
+  test.each(EXPLOITS)("%s is not evaluated and draws the default line", (_label, meta) => {
+    const globals = globalThis as { __holyagentEvaluated?: string }
+    delete globals.__holyagentEvaluated
+    const evaluated: Array<string> = []
+    const lines = drawnCall(
+      `${meta}\nawait agent('p', { agentType: 'worker-implementation' })`,
+      evaluated,
+    )
+    expect(globals.__holyagentEvaluated).toBeUndefined()
+    expect(evaluated).toEqual([])
+    expect(lines.join("\n")).toContain(`${WORKFLOW_TOOL}`)
+    expect(lines.join("\n")).toContain("workflow")
+  })
+
+  test("a literal meta shows its name, and the package's own call drawing is never used", () => {
+    const evaluated: Array<string> = []
+    const lines = drawnCall(
+      "export const meta = { name: 'release-check', description: 'd' }\nreturn 1",
+      evaluated,
+    )
+    expect(lines.join("\n")).toContain("release-check")
+    expect(evaluated).toEqual([])
+  })
+
+  test("a later name wins, and a name that is no string is not shown", () => {
+    const line = (script: string) => workflowCallLine({ script }, PLAIN_THEME)
+    expect(line("export const meta = { name: 'first', name: 'second' }")).toMatch(/second$/)
+    expect(line("export const meta = { name: 'first', name: 2 }")).toMatch(/workflow$/)
+  })
+
+  test("control characters of a name are removed and a long name is cut", () => {
+    const line = workflowCallLine(
+      { script: `export const meta = { name: '\\x1b[2Jevil\\n${"x".repeat(200)}' }` },
+      PLAIN_THEME,
+    )
+    expect(line).not.toContain("\u001b")
+    expect(line).not.toContain("\n")
+    expect(line.length).toBeLessThan(WORKFLOW_TOOL.length + 100)
+  })
+
+  test("a call without a string script draws the default line", () => {
+    for (const script of [undefined, 3, "", "no meta here"])
+      expect(drawnCall(script).join("\n")).toMatch(/workflow\s*$/)
+    expect(workflowCallLine(undefined, PLAIN_THEME)).toMatch(/workflow$/)
+  })
+
+  test("the result card and every other tool keep what Pi would use", () => {
+    const base = evaluatingRenderers([])
+    const resolved = workflowRenderers(WORKFLOW_TOOL, () => base)
+    expect(resolved?.renderResult).toBe(base.renderResult)
+    expect(workflowRenderers("bash", () => base)).toBe(base)
+    expect(workflowRenderers("bash", () => undefined)).toBeUndefined()
+    expect(workflowRenderers(WORKFLOW_TOOL, () => undefined)).toBeUndefined()
+  })
+
+  test("the extension registers the resolver in every session, a child's and a disabled one's too", () => {
+    for (const session of [{}, { name: "worker-debugging#a1b2c3d4" }]) {
+      const api = fakeApi(healthy("/missing"), undefined, SESSION_CWD, session)
+      createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
+      expect(api.renderers).toEqual([workflowRenderers])
+    }
   })
 })

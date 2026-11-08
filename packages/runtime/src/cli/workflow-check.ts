@@ -985,23 +985,16 @@ const WRAPPER_OPEN = "(async () => {"
 const WRAPPER_PRELUDE = "const Date = void 0;"
 
 /**
- * The program the Pi package runs for `script`, as a tree for the check to walk, or the reason the
- * package would run something the check cannot vet.
- *
- * First the meta fragment, computed as `extractMeta` does (`meta.ts:216-247`): the package takes
- * the first match of the meta pattern, the first `{` after it and the brace-scanned fragment from
- * there, and evaluates `(fragment)` on the host thread, where `this.constructor.constructor`
+ * The meta fragment of `script`, computed as `extractMeta` does (`meta.ts:216-247`): the package
+ * takes the first match of the meta pattern, the first `{` after it and the brace-scanned fragment
+ * from there, and evaluates `(fragment)` on the host thread, where `this.constructor.constructor`
  * reaches `process`. The fragment is accepted only as an object expression of literals that is the
- * whole fragment, and a script with no match, or more than one, is refused. Then the body the
- * worker compiles (`meta.ts:289-290`, `worker-source.ts:757`): the script with the first match's
- * `export` blanked, wrapped as `(async () => {` prelude `\n` body `\n})()`, parsed as a classic
- * script, so HTML-like comments and Annex B function hoisting read as they do at run time. The tree
- * is returned as a program of the statements of the wrapper's body, after the prelude, and only
- * when the wrapper stands as built (the body did not close it and open another).
+ * whole fragment, and a script with no match, or more than one, is refused. Returns where the match
+ * starts and the vetted object expression, or the refusal. Nothing is evaluated.
  */
-const workerProgram = (
+const metaFragment = (
   script: string,
-): { readonly program: JsNode } | { readonly refusal: string } => {
+): { readonly at: number; readonly value: JsNode } | { readonly refusal: string } => {
   const matches = [...script.matchAll(META_DECLARATION)]
   const found = matches[0]
   if (found === undefined)
@@ -1021,16 +1014,65 @@ const workerProgram = (
   const statement = wrapped.body[0] as unknown as JsNode | undefined
   const value = statement === undefined ? undefined : nodeAt(statement, "expression")
   if (
+    value === undefined ||
     wrapped.body.length !== 1 ||
     statement?.type !== "ExpressionStatement" ||
-    value?.type !== "ObjectExpression" ||
+    value.type !== "ObjectExpression" ||
     startOf(value) !== 1 ||
     endOf(value) !== fragment.length + 1 ||
     !literalOnly(value, 1)
   )
     return { refusal: "has a `meta` that is not an object literal of plain literals" }
+  return { at: found.index ?? 0, value }
+}
 
-  const exportAt = script.indexOf("export", found.index)
+/**
+ * The `name` of the workflow `script` declares, read from its meta fragment without evaluating
+ * anything, or undefined when the fragment is not a vetted object of literals, cannot be parsed or
+ * has no string `name`. It never fails and runs synchronously. The Pi extension draws a
+ * `SubagentWorkflow` call with it, because the package's own drawing evaluates the fragment on the
+ * host while the call is still being streamed, before any gate runs.
+ */
+export const literalWorkflowName = (script: string): Effect.Effect<string | undefined> =>
+  Effect.try({
+    try: () => {
+      const meta = metaFragment(script)
+      if ("refusal" in meta) return undefined
+      let found: string | undefined
+      for (const property of nodesAt(meta.value, "properties")) {
+        const key = nodeAt(property ?? { type: "" }, "key")
+        const name =
+          key?.type === "Literal" && typeof key["value"] === "string" ? key["value"] : nameOf(key)
+        const value = nodeAt(property ?? { type: "" }, "value")
+        // A later `name` wins, as it does when the object is built.
+        if (name === "name")
+          found =
+            value?.type === "Literal" && typeof value["value"] === "string"
+              ? value["value"]
+              : undefined
+      }
+      return found
+    },
+    catch: String,
+  }).pipe(Effect.catch(() => Effect.succeed<string | undefined>(undefined)))
+
+/**
+ * The program the Pi package runs for `script`, as a tree for the check to walk, or the reason the
+ * package would run something the check cannot vet.
+ *
+ * First the vetted meta fragment ({@link metaFragment}). Then the body the worker compiles
+ * (`meta.ts:289-290`, `worker-source.ts:757`): the script with the first match's `export` blanked,
+ * wrapped as `(async () => {` prelude `\n` body `\n})()`, parsed as a classic script, so HTML-like
+ * comments and Annex B function hoisting read as they do at run time. The tree is returned as a
+ * program of the statements of the wrapper's body, after the prelude, and only when the wrapper
+ * stands as built (the body did not close it and open another).
+ */
+const workerProgram = (
+  script: string,
+): { readonly program: JsNode } | { readonly refusal: string } => {
+  const meta = metaFragment(script)
+  if ("refusal" in meta) return meta
+  const exportAt = script.indexOf("export", meta.at)
   const body = `${script.slice(0, exportAt)}${" ".repeat(6)}${script.slice(exportAt + 6)}`
   const prefix = `${WRAPPER_OPEN}${WRAPPER_PRELUDE}\n`
   const source = `${prefix}${body}\n})()`

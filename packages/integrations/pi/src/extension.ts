@@ -8,11 +8,14 @@ import type {
   ExtensionContext,
   MessageEndEvent,
   MessageEndEventResult,
+  Theme,
   ToolCallEventResult,
+  ToolRenderers,
 } from "@earendil-works/pi-coding-agent"
+import { Text } from "@earendil-works/pi-tui"
 import { Cause, Data, Effect, Exit, Schema } from "effect"
 
-import { workflowRefusal } from "../../../runtime/src/cli/workflow-check.ts"
+import { literalWorkflowName, workflowRefusal } from "../../../runtime/src/cli/workflow-check.ts"
 import { Config } from "../../../runtime/src/config/schema.ts"
 import { toPosix } from "../../../runtime/src/domain/paths.ts"
 import {
@@ -200,6 +203,45 @@ export const refuseNonSpecialistWorkflow = (event: {
       why === undefined ? undefined : refuse(`The workflow script is refused: it ${why}.`),
     ),
   )
+}
+
+/** The longest workflow name the call line shows. */
+const WORKFLOW_NAME_LIMIT = 80
+
+/**
+ * The line that draws a `SubagentWorkflow` call: the tool's name and, when the script's meta
+ * fragment is a vetted object of literals, the workflow's `name`, read without evaluating anything.
+ * The package draws the call by evaluating that fragment on the host thread (`workflowCallName`),
+ * and Pi draws a call on every streamed update and when a session is reloaded, before the
+ * `tool_call` gate sees the script, so the script is untrusted here. The name loses its control
+ * characters, which could move the cursor or restyle the terminal, and is cut to
+ * {@link WORKFLOW_NAME_LIMIT} characters.
+ */
+export const workflowCallLine = (args: unknown, theme: Pick<Theme, "fg" | "bold">): string => {
+  const script = (args as { readonly script?: unknown } | null | undefined)?.script
+  const raw = typeof script === "string" ? Effect.runSync(literalWorkflowName(script)) : undefined
+  // eslint-disable-next-line no-control-regex
+  const name = raw?.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, " ").trim()
+  const shown = name === undefined || name === "" ? "workflow" : name.slice(0, WORKFLOW_NAME_LIMIT)
+  return `${theme.fg("toolTitle", "\u25b8 ")}${theme.bold(theme.fg("toolTitle", WORKFLOW_TOOL))}  ${theme.fg("muted", shown)}`
+}
+
+/**
+ * Chooses how Pi draws calls to the `SubagentWorkflow` tool: the package's result card and shell
+ * stay, and the call line is {@link workflowCallLine}'s, which evaluates no script code. Any other
+ * tool, and a workflow tool that is not registered, keep what the remaining resolvers and the
+ * registered tool would use.
+ */
+export const workflowRenderers = (
+  toolName: string,
+  next: () => ToolRenderers | undefined,
+): ToolRenderers | undefined => {
+  const base = next()
+  if (toolName !== WORKFLOW_TOOL || base === undefined) return base
+  return {
+    ...base,
+    renderCall: (args, theme) => new Text(workflowCallLine(args, theme), 0, 0),
+  }
 }
 
 /** Why a specialist whose last message has no text failed. */
@@ -674,6 +716,11 @@ export const createExtension =
       const message = failedFinalMessage(event.message)
       return message === undefined ? undefined : { message }
     })
+
+    // Pi draws a call while the model still streams it, before the gate below sees the script, and
+    // the package's own drawing of a workflow call evaluates the script's meta fragment on the host.
+    // The drawing is replaced for every session, since the render path runs ahead of any gate.
+    pi.registerToolRenderer(workflowRenderers)
 
     // The gates stand down only for the user's own `pi.enable: false`; a project's cannot lift them.
     pi.on("tool_call", (event) =>

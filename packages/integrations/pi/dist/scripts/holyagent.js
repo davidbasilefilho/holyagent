@@ -22502,7 +22502,7 @@ var isNode = (value) => typeof value === "object" && value !== null && ("type" i
     const name = key?.type === "Literal" && typeof key["value"] === "string" ? key["value"] : nameOf(key);
     return property?.type === "Property" && property["computed"] === false && property["kind"] === "init" && property["method"] !== true && name !== undefined && !DENIED_NAMES.has(name) && literalOnly(nodeAt(property, "value"), depth + 1);
   });
-}, WRAPPER_OPEN = "(async () => {", WRAPPER_PRELUDE = "const Date = void 0;", workerProgram = (script) => {
+}, WRAPPER_OPEN = "(async () => {", WRAPPER_PRELUDE = "const Date = void 0;", metaFragment = (script) => {
   const matches = [...script.matchAll(META_DECLARATION)];
   const found = matches[0];
   if (found === undefined)
@@ -22523,9 +22523,14 @@ var isNode = (value) => typeof value === "object" && value !== null && ("type" i
   const wrapped = parse2(`(${fragment})`, { ecmaVersion: "latest", sourceType: "script" });
   const statement = wrapped.body[0];
   const value = statement === undefined ? undefined : nodeAt(statement, "expression");
-  if (wrapped.body.length !== 1 || statement?.type !== "ExpressionStatement" || value?.type !== "ObjectExpression" || startOf(value) !== 1 || endOf(value) !== fragment.length + 1 || !literalOnly(value, 1))
+  if (value === undefined || wrapped.body.length !== 1 || statement?.type !== "ExpressionStatement" || value.type !== "ObjectExpression" || startOf(value) !== 1 || endOf(value) !== fragment.length + 1 || !literalOnly(value, 1))
     return { refusal: "has a `meta` that is not an object literal of plain literals" };
-  const exportAt = script.indexOf("export", found.index);
+  return { at: found.index ?? 0, value };
+}, workerProgram = (script) => {
+  const meta = metaFragment(script);
+  if ("refusal" in meta)
+    return meta;
+  const exportAt = script.indexOf("export", meta.at);
   const body = `${script.slice(0, exportAt)}${" ".repeat(6)}${script.slice(exportAt + 6)}`;
   const prefix = `${WRAPPER_OPEN}${WRAPPER_PRELUDE}
 `;
