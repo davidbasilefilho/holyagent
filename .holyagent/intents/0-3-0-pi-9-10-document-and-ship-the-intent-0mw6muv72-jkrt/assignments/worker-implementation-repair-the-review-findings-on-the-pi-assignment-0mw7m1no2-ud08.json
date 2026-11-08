@@ -1,0 +1,85 @@
+{
+  "id": "assignment-0mw7m1no2-ud08",
+  "intentId": "intent-0mw6muv72-jkrt",
+  "intentRevision": 5,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-review-findings-on-the-pi",
+  "objective": "Repair the review findings on the Pi setup step and doctor in /home/user/holyagent-0.3.0-install (branch release/0.3.0/feat/pi-install, head 67723bc), with tests and matching docs.",
+  "state": "Running",
+  "scope": [
+    "Code: packages/runtime/src/setup/pi-install.ts, pi-check.ts, steps.ts, doctor.ts, packages/runtime/src/config/ as needed, packages/runtime/tests/setup-pi.test.ts and related setup tests; docs: docs/pi/installation.md, docs/pi/README.md, docs/usage.md, docs/components.md.",
+    "1 (security hardening, blocking): for --scope user, the Pi package install and remove must decide from the home-level HolyAgent config only, not merged with the current directory's .holyagent/config.json. Why: today running holyagent setup inside a cloned repository lets that repo's config turn features off, which removes packages from the user's global Pi settings. Project and local scope keep reading the project config, since that is what they set up. Make doctor's user-scope expectation consistent.",
+    "2 (blocking, accuracy): the Shell doc comment claims the working directory is neutral so project files cannot steer an install, but the project-scope pi install -l runs in the project directory, where its .npmrc and .pi/settings.json are read. Make the comment state the truth, and add one sentence to docs/pi/installation.md that --scope project or local installs in the project directory and reads its npm and Pi settings, so run it only in a repository you trust.",
+    "3 (optional): when pi.provider changes, setup leaves the old provider profile package listed; remove HolyAgent provider profile packages that the config no longer selects, the same way as feature packages (never the HolyAgent package itself or packages HolyAgent does not ship).",
+    "4 (optional): setup reads one settings scope while doctor accepts either; treat a package as present when it is listed at its pin in either the global or the project settings, in setup as doctor does, and say in the docs which scope removal touches.",
+    "5 (optional): pi-check.ts sourceName takes the last path segment, so git:github.com/o/holyagent@release/0.3.0/integration (a ref with slashes) is not recognized as the HolyAgent package; strip the @ref before taking the repository name.",
+    "6 (docs): docs/pi/README.md lists the root's system prompt on Pi as Planned although packages/integrations/pi/src/extension.ts sets it in before_agent_start; verify and correct that row and any other row the merged launcher (#81) made stale."
+  ],
+  "constraints": [
+    "Change only the ownership paths; make no version-control writes and no edits under .git/ or .holyagent/.",
+    "Follow .claude/CLAUDE.md: Effect and tagged errors (no try/catch, new Promise or async functions in runtime source), Effect Schema with onExcessProperty error at data boundaries, Bun Shell $, JSDoc on exports.",
+    "Every behavior change gets a test that fails without it; do not weaken existing tests.",
+    "Default kept: with pi.enable off setup removes nothing; never pass flags to pi other than -l.",
+    "Run bunx --no-install mise run build and bunx --no-install mise run verify before reporting; dist bundles under packages/integrations/*/dist/scripts are yours to regenerate.",
+    "Report in under 400 words; put long logs in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give the path; list a diff-file of your changes (dist excluded) at /home/user/holyagent-notes/install-repair.diff."
+  ],
+  "criteria": [
+    {
+      "text": "A user-scope setup or doctor decides the Pi packages from the home-level config only, with a test where a project config turning a feature off removes nothing globally",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The Shell comment and docs/pi/installation.md state that project-scope installs run in the project directory and read its npm and Pi settings",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Provider profile packages the config no longer selects are removed, with a test",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Setup and doctor agree on presence across both settings scopes, with a test",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A git source whose ref contains slashes is recognized as the HolyAgent package, with a test",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "docs/pi/README.md status rows match the shipped code",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build and mise run verify exit 0",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/setup",
+    "packages/runtime/src/config",
+    "packages/runtime/tests",
+    "packages/integrations/claude/dist/scripts/holyagent.js",
+    "packages/integrations/pi/dist/scripts/holyagent.js",
+    "docs/pi/installation.md",
+    "docs/pi/README.md",
+    "docs/usage.md",
+    "docs/components.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T09:08:56.978Z"
+  },
+  "createdAt": "2026-11-08T09:08:56.978Z"
+}
