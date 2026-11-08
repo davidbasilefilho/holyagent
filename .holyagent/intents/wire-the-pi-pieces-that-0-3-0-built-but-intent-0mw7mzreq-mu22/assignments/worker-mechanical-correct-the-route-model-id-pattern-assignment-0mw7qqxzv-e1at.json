@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "correct-the-route-model-id-pattern",
   "objective": "Correct the route model id pattern stated in docs/pi/configuration.md in /home/user/holyagent-0.3.0-settings so it matches the code.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "docs/pi/configuration.md line ~43 states the pi.routes.<row>.model pattern as ^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$ with the characters . _ : / -; packages/runtime/src/config/schema.ts (~line 51) is ^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$. Update the pattern and the listed characters to include @ and +, matching the code exactly, and nothing else."
   ],
@@ -33,7 +33,25 @@
     "agentId": "workflow:wf_b09475e7-693/assignment-0mw7qqxzv-e1at",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-08T11:20:35.228Z"
+    "startedAt": "2026-11-08T11:20:35.228Z",
+    "finishedAt": "2026-11-08T11:21:31.176Z"
+  },
+  "result": "result: docs/pi/configuration.md line 43 now states `^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$` and lists `@` and `+`, matching schema.ts:51 exactly. The diff is one line.\nchanged: docs/pi/configuration.md\nchecks:\n- `bunx --no-install mise run fmt:check` (before the edit) -> exit 0, 526 files formatted\n- `bunx --no-install mise run fmt:check` (after the edit, before formatting) -> exit 1, table row needed realignment\n- `bunx --no-install bun fmt docs/pi/configuration.md` -> exit 0, reformatted only that file\n- `bunx --no-install mise run fmt:check` (final) -> exit 0, 526 files formatted\n- Not run: `mise run verify` (only the format gate was asked for)\nblockers: none\nquestions: none\nnotes: The file changed on disk after my last read. Re-checking the diff, it still shows only the line-43 change, so I left it as is.\nevidence:\n[blocking] docs/pi/configuration.md states the model id pattern and characters exactly as schema.ts defines them: rg shows the same regex at docs/pi/configuration.md:43 and packages/runtime/src/config/schema.ts:51; the `@` and `+` characters are listed\nDiff: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/mech-diff.patch\nfmt:check: exit 0 (log at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/fmt2.log)\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "One-line diff matches schema.ts:51 exactly; fmt:check exit 0",
+    "criteria": [
+      {
+        "criterion": "docs/pi/configuration.md states the model id pattern and characters exactly as schema.ts defines them",
+        "support": "rg shows the same regex at docs/pi/configuration.md:43 and packages/runtime/src/config/schema.ts:51; the `@` and `+` characters are listed"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/mech-diff.patch"
+      }
+    ]
   },
   "createdAt": "2026-11-08T11:20:35.228Z"
 }
