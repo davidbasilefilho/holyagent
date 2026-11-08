@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mw7kc4z3-bkds",
+  "intentId": "intent-0mw6muuvl-zq3p",
+  "intentRevision": 7,
+  "roleTask": "Reviewer.security",
+  "slug": "re-assess-the-subagentworkflow-renderer",
+  "objective": "Re-assess the SubagentWorkflow renderer mitigation for whether any Pi path still evaluates a script meta fragment before the gate, and for new vulnerabilities.",
+  "state": "Running",
+  "scope": [
+    "Previous finding to verify closed (security, pre-existing in @tintinweb/pi-subagents 0.23.1): the SubagentWorkflow renderCall (index.ts:2743) calls extractMeta (meta.ts:319, 250) and evaluates the meta fragment in vm createContext({}) during Pi interactive rendering of streamed calls (interactive-mode.js:2904-2916, 3320), before the tool_call gate, so `export const meta = { description: this.constructor.constructor(\\\"return process\\\")() }` reached the host process. The repair registers a tool renderer through pi.registerToolRenderer that replaces renderCall for SubagentWorkflow with a plain line naming the workflow only when literalWorkflowName (workflow-check.ts) vets the fragment, keeping the package renderResult and renderShell; the extension now imports @earendil-works/pi-tui at runtime. Review only d8fcbdf..HEAD in /home/user/holyagent-0.3.0-launcher (source diff at /home/user/holyagent-notes/launcher-repair4.diff; package and Pi sources under /home/user/holyagent-notes/pi-probe/node_modules). Do not run pi or any live model.",
+    "Trace every Pi and package path that calls renderCall, workflowCallName or extractMeta on model-supplied script text before or without the tool_call gate (streaming, history reload, session export or share, RPC or JSON event emission, the completion notice, the package widget or status line), and whether the registered resolver reliably wins (order of extension load, registration timing relative to the first render)."
+  ],
+  "constraints": [
+    "Read-only: no edits and no version-control writes.",
+    "Substantiate each finding with a source-to-sink path.",
+    "Start each evidence line with the criterion text, then a colon.",
+    "Report in under 350 words."
+  ],
+  "criteria": [
+    {
+      "text": "No Pi path evaluates model-supplied workflow script code on the host before the gate, and the repair adds no vulnerability",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7jum0q-27k7"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T08:21:06.735Z"
+  },
+  "createdAt": "2026-11-08T08:21:06.735Z"
+}
