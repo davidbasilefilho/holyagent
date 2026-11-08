@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "write-the-kimi-k3-1-instruction-set-for",
   "objective": "Write the Kimi K3.1 instruction set for root/ (16 files) and the two session-*.md files of packages/runtime/src/instructions, from the requirements tree and kimi-k3.1/guide.md, for HolyAgent under pi.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Work only in /home/user/holyagent-0.3.0-kimi (branch release/0.3.0/feat/kimi-instructions). Three other writers translate the other parts of the tree in parallel in the same worktree; write only your paths.",
     "Read first: packages/runtime/AGENTS.md, .claude/skills/requirements/SKILL.md (the procedure; follow its translation and coverage sections), packages/runtime/src/instructions/kimi-k3.1/guide.md (K1-K45, the guide every file follows), packages/runtime/src/instructions/families.ts and coverage.ts, and the instruction-writing skill packages/runtime/src/instructions/claude-5.5/skills/instruction-writing/SKILL.md for the house style.",
@@ -54,5 +54,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T03:03:55.915Z"
+  },
   "createdAt": "2026-11-08T03:03:47.588Z"
 }
