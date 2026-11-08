@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test"
 
-import { KIMI_ROUTES } from "../../src/config/schema.ts"
+import { Effect, Schema } from "effect"
+
+import { Config, KIMI_ROUTES } from "../../src/config/schema.ts"
 import { RoleTask } from "../../src/domain/route.ts"
 import { DEFAULT_CONFIG } from "./defaults.ts"
 
@@ -71,5 +73,53 @@ describe("default config", () => {
     })
     expect(DEFAULT_CONFIG.claude).toEqual({})
     expect(DEFAULT_CONFIG.vcs).toEqual({})
+  })
+})
+
+describe("a route's model id", () => {
+  const decode = (model: string) =>
+    Effect.runPromise(
+      Effect.result(
+        Schema.decodeUnknownEffect(Config)(
+          { pi: { routes: { root: { model } } } },
+          { onExcessProperty: "error" },
+        ),
+      ),
+    )
+
+  test.each([
+    "kimi-for-coding",
+    "k3.1-pro",
+    "kimi-coding/kimi-for-coding",
+    "anthropic.claude-sonnet-v1:0",
+    "meta-llama/Llama-3.1-70B:free",
+    "gpt_5",
+    "claude-sonnet-4@20250514",
+    "gpt-5+reasoning",
+    "a".repeat(128),
+  ])("%s is accepted", async (model) => {
+    const result = await decode(model)
+    expect(result._tag).toBe("Success")
+  })
+
+  test.each([
+    ["empty", ""],
+    ["an escape sequence", "kimi\u001b[2J"],
+    ["a C1 control", "kimi\u009b2J"],
+    ["a newline", "kimi\nfor-coding"],
+    ["a bell", "kimi\u0007"],
+    ["a space", "kimi for-coding"],
+    ["a leading dash, which reads as a flag", "--model"],
+    ["a leading @", "@kimi"],
+    ["a leading +", "+kimi"],
+    ["a space after an @", "kimi@ 1"],
+    ["markup", "x](https://example.test)"],
+    ["a backtick", "`kimi`"],
+    ["a bidi override", "kimi\u202egnidoc"],
+    ["a non-ASCII letter", "kimi-k\u00e4"],
+    ["too long", "a".repeat(129)],
+  ])("%s is refused", async (_label, model) => {
+    const result = await decode(model)
+    expect(result._tag).toBe("Failure")
   })
 })

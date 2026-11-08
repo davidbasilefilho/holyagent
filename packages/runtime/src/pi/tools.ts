@@ -150,6 +150,37 @@ export const toolArgs = (
   )
 }
 
+const escapeRegExp = (text: string): string => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+
+/**
+ * Whether a tool name matches a `--tools` or `--exclude-tools` entry: an exact name, or a pattern
+ * whose `*` stands for any run of characters (`computer_use_*`).
+ */
+export const toolMatches = (pattern: string, name: string): boolean =>
+  new RegExp(`^${pattern.split("*").map(escapeRegExp).join(".*")}$`).test(name)
+
+/**
+ * The tools the root has active, for `pi.setActiveTools`, which takes names only: Pi's current
+ * selection (`active`), plus the root's `+name` entries (a pattern adds every registered tool it
+ * matches, and a name no tool has is ignored by Pi), minus what its `excludeTools` entries match.
+ * The command-line flags do this at launch; an extension has no flag, so it does the same sum after
+ * the session starts. `--no-mcp` has no equivalent here: it decides which extensions load, and
+ * `pi.features.mcp` off is only honoured by a launch that passes the flag.
+ */
+export const rootActiveTools = (
+  args: Pick<ToolArgs, "tools" | "excludeTools">,
+  active: ReadonlyArray<string>,
+  registered: ReadonlyArray<string>,
+): ReadonlyArray<string> => {
+  const added = args.tools.flatMap((entry) => {
+    const name = entry.startsWith("+") ? entry.slice(1) : entry
+    return name.includes("*") ? registered.filter((tool) => toolMatches(name, tool)) : [name]
+  })
+  return [...new Set([...active, ...added])].filter(
+    (tool) => !args.excludeTools.some((pattern) => toolMatches(pattern, tool)),
+  )
+}
+
 /** The arguments of the root and each of the 18 specialists, the root first. */
 export const allToolArgs = (
   config: Config,
