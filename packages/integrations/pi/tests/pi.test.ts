@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync, statSync } from "node:fs"
-import { mkdtemp, rm, symlink } from "node:fs/promises"
+import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
@@ -20,7 +20,7 @@ import { CONDITIONAL_SECTIONS } from "../../claude/src/agents.ts"
 import { build } from "../build.ts"
 import packageJson from "../package.json" with { type: "json" }
 import { agentTools } from "../src/agents.ts"
-import { DIST_DIRECTORY, REPOSITORY } from "../src/files.ts"
+import { DIST_DIRECTORY, PACKAGE_DIRECTORY, REPOSITORY } from "../src/files.ts"
 import {
   bundleExtension,
   DESCRIPTION,
@@ -382,35 +382,35 @@ describe("the extension", () => {
   const extension = generated.find((file) => file.path.endsWith(EXTENSION_OUTPUT))
 
   test("is a default-exported factory that registers the role flag and handlers and starts nothing", async () => {
-    const root = await mkdtemp(join(tmpdir(), "holyagent-pi-extension-"))
+    // Inside the package, so the host peers resolve by the plain walk up to its node_modules, as
+    // they do for the built extension. A temp folder linked to that node_modules with a junction
+    // made Bun on Windows fail with "Cannot find module" for the peer.
+    const root = await mkdtemp(join(REPOSITORY, PACKAGE_DIRECTORY, "extension-test-"))
     const path = join(root, "extension.mjs")
-    await Bun.write(path, extension?.content ?? "")
-    // The host modules are peers Pi provides; here the package's own copies stand in for them.
-    await symlink(
-      join(REPOSITORY, "packages", "integrations", "pi", "node_modules"),
-      join(root, "node_modules"),
-      "junction",
-    )
-    const loaded = (await import(path)) as { default: (pi: unknown) => unknown }
-    const used: Array<string> = []
-    const api = {
-      registerFlag: (name: string) => void used.push(`registerFlag ${name}`),
-      on: (event: string) => void used.push(`on ${event}`),
-      registerToolRenderer: () => void used.push("registerToolRenderer"),
+    try {
+      await Bun.write(path, extension?.content ?? "")
+      const loaded = (await import(path)) as { default: (pi: unknown) => unknown }
+      const used: Array<string> = []
+      const api = {
+        registerFlag: (name: string) => void used.push(`registerFlag ${name}`),
+        on: (event: string) => void used.push(`on ${event}`),
+        registerToolRenderer: () => void used.push("registerToolRenderer"),
+      }
+      expect(typeof loaded.default).toBe("function")
+      expect(loaded.default(api)).toBeUndefined()
+      expect(used.toSorted()).toEqual([
+        "on before_agent_start",
+        "on message_end",
+        "on session_compact",
+        "on session_shutdown",
+        "on session_start",
+        "on tool_call",
+        "registerFlag holyagent-role",
+        "registerToolRenderer",
+      ])
+    } finally {
+      await rm(root, { recursive: true, force: true })
     }
-    expect(typeof loaded.default).toBe("function")
-    expect(loaded.default(api)).toBeUndefined()
-    expect(used.toSorted()).toEqual([
-      "on before_agent_start",
-      "on message_end",
-      "on session_compact",
-      "on session_shutdown",
-      "on session_start",
-      "on tool_call",
-      "registerFlag holyagent-role",
-      "registerToolRenderer",
-    ])
-    await rm(root, { recursive: true, force: true })
   })
 
   test("loads under Node, which has no Bun global", async () => {
