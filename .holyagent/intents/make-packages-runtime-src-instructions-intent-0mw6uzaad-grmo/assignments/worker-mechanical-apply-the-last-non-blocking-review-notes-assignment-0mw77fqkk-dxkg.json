@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "apply-the-last-non-blocking-review-notes",
   "objective": "Apply the last non-blocking review notes to PR 4 in /home/user/holyagent-0.3.0-req (head f2323fd).",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Run every command in /home/user/holyagent-0.3.0-req.",
     "1. .claude/skills/requirements/SKILL.md, Gates section: add that requirements/ and each guide.md are not shipped in the plugin, so a rebuild after a change to claude-5.5/ is what updates the plugin.",
@@ -54,7 +54,41 @@
     "agentId": "workflow:wf_4f2fc0b4-de6/assignment-0mw77fqkk-dxkg",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-08T02:19:59.684Z"
+    "startedAt": "2026-11-08T02:19:59.684Z",
+    "finishedAt": "2026-11-08T02:23:19.048Z"
+  },
+  "result": "result: all four notes applied; verify exits 0 (1723 pass, 0 fail). The CRLF test was added and checked against an LF-only split. Nothing committed.\nchanged: .claude/skills/requirements/SKILL.md, .claude/skills/write-skills/references/model-guides.md, docs/development.md, packages/runtime/tests/requirements.test.ts\nchecks:\n- `bunx --no-install mise run verify` -> exit 0, 1723 pass, 0 fail, 56 files (log: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify-pr4.log)\n- LF-only split check: `/^- See: (.+)$/.exec(\"- See: R-A\\r\")` -> null, so the CRLF test's `references` assertion fails under an LF-only split\nblockers: none\nquestions: none\nnotes: model-guides.md changes. G33 was kept for the over-verify point because guide.md G33 says \"causes over-verification\" and G25 does not. Line \"Add constraints in small steps\" now cites G74 (G1 did not match). Line \"Keep the tool set small\" lost its Claude citation, since no Claude point supports it; it is Kimi-only now.\nevidence:\n[blocking] The four notes are applied as described: diff at /home/user/holyagent-notes/pr4-final.diff\n[blocking] The CRLF test passes and fails if the parser split on LF only: verify exit 0; LF-only regex check above\n[blocking] bunx --no-install mise run verify exits 0: exit 0, 1723 pass\nchecks-run: verify (exit 0); LF-only regex probe (null)\nchanged-paths: .claude/skills/requirements/SKILL.md, .claude/skills/write-skills/references/model-guides.md, docs/development.md, packages/runtime/tests/requirements.test.ts\ndiff-file: /home/user/holyagent-notes/pr4-final.diff\n",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Diff read: four notes applied as described; verify exit 0 with 1723 pass run by the worker; LF-only probe shows the test bites.",
+    "criteria": [
+      {
+        "criterion": "The four notes are applied as described",
+        "support": "diff at /home/user/holyagent-notes/pr4-final.diff"
+      },
+      {
+        "criterion": "The CRLF test passes and fails if the parser split on LF only",
+        "support": "verify exit 0; LF-only regex check above"
+      },
+      {
+        "criterion": "bunx --no-install mise run verify exits 0",
+        "support": "exit 0, 1723 pass"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "verify (exit 0); LF-only regex probe (null)"
+      },
+      {
+        "label": "changed-paths",
+        "support": ".claude/skills/requirements/SKILL.md, .claude/skills/write-skills/references/model-guides.md, docs/development.md, packages/runtime/tests/requirements.test.ts"
+      },
+      {
+        "label": "diff-file",
+        "support": "/home/user/holyagent-notes/pr4-final.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-08T02:19:59.684Z"
 }
