@@ -54,10 +54,13 @@ export class ProviderInvalid extends Data.TaggedError("ProviderInvalid")<{
   }
 }
 
-const detailOf = ({ exitCode, stdout, stderr }: ShellResult): string => {
-  const text = (stdout.trim() || stderr.trim()).slice(0, DETAIL_CHARS)
-  return text === "" ? `pi auth check exited with code ${exitCode}` : text
-}
+/**
+ * What a failed Pi command printed, for an error report: its standard output, else its standard
+ * error, trimmed and cut to {@link DETAIL_CHARS}; `fallback` when it printed neither. Every error
+ * detail of the integration comes from here, so they show the same stream and the same length.
+ */
+export const outputDetail = ({ stdout, stderr }: ShellResult, fallback: string): string =>
+  (stdout.trim() || stderr.trim()).slice(0, DETAIL_CHARS) || fallback
 
 /**
  * Asks Pi whether the selected provider has working credentials, with `pi auth check --provider
@@ -75,7 +78,11 @@ export const providerReadiness = (run: CommandRunner, config: Config): Effect.Ef
         case 1:
           return { status: "not_ready", provider: id, fix: loginFix }
         default:
-          return { status: "invalid", provider: id, detail: detailOf(result) }
+          return {
+            status: "invalid",
+            provider: id,
+            detail: outputDetail(result, `pi auth check exited with code ${result.exitCode}`),
+          }
       }
     }),
   )

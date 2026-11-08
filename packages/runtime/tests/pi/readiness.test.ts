@@ -4,6 +4,7 @@ import { Effect } from "effect"
 
 import {
   type CommandRunner,
+  DETAIL_CHARS,
   ProviderInvalid,
   ProviderNotReady,
   providerReadiness,
@@ -55,6 +56,17 @@ describe("providerReadiness", () => {
         provider: "kimi-coding",
       })
     }
+  })
+
+  test("the detail is stdout, else stderr, cut to the report length, else the exit code", async () => {
+    const detail = async (result: ReturnType<typeof fake>) => {
+      const readiness = await Effect.runPromise(providerReadiness(result.run, DEFAULT_CONFIG))
+      return readiness.status === "invalid" ? readiness.detail : undefined
+    }
+    expect(await detail(fake(2, "out", "err"))).toBe("out")
+    expect(await detail(fake(2, "", "err"))).toBe("err")
+    expect(await detail(fake(2, "y".repeat(1000)))).toBe("y".repeat(DETAIL_CHARS))
+    expect(await detail(fake(2))).toBe("pi auth check exited with code 2")
   })
 
   test("asks Pi once about the selected provider only, whatever the answer", async () => {

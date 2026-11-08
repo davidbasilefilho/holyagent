@@ -1,13 +1,12 @@
+import { type PiPackageName, piPackageSource } from "../config/pi-packages.ts"
 import type { Config, PiProvider, RouteKey, Thinking } from "../config/schema.ts"
 
 /** What the integration knows about one model provider: the only place a provider is named. */
 export interface ProviderProfile {
   /** The provider id in Pi's catalog, the `<provider>` of `--model <provider>/<id>`. */
   readonly id: string
-  /** The Pi package that supplies the provider; selecting the provider loads it. */
-  readonly package: string
-  /** The release of {@link ProviderProfile.package} the integration is tested against. */
-  readonly version: string
+  /** The Pi package that supplies the provider; selecting the provider loads it, at its pin. */
+  readonly package: PiPackageName
   /** The variables the launcher sets on every Pi process, so the provider reaches its region. */
   readonly env: Readonly<Record<string, string>>
   /** What the user does to make the provider ready when Pi reports it has no credentials. */
@@ -16,14 +15,14 @@ export interface ProviderProfile {
 
 /**
  * The provider profiles, one per value of `pi.provider`. Kimi for Coding (global) is Pi's built-in
- * `kimi-coding` provider with `pi-provider-kimi-code` on top, pinned at its 0.6 line, and
- * `KIMI_CODE_REGION=global`, which sends requests to Moonshot's overseas host.
+ * `kimi-coding` provider with `pi-provider-kimi-code` on top, at the exact release
+ * `pi-packages.json` pins, and `KIMI_CODE_REGION=global`, which sends requests to Moonshot's
+ * overseas host.
  */
 export const PROVIDERS: Readonly<Record<PiProvider, ProviderProfile>> = {
   "kimi-coding-global": {
     id: "kimi-coding",
     package: "pi-provider-kimi-code",
-    version: "0.6.13",
     env: { KIMI_CODE_REGION: "global" },
     loginFix: "Run /login kimi-coding in Pi, or set KIMI_API_KEY",
   },
@@ -65,7 +64,5 @@ export const providerEnv = (config: Config): Readonly<Record<string, string>> =>
   providerProfile(config).env
 
 /** The Pi package source of the selected provider's extension, with its pinned release. */
-export const providerSource = (config: Config): string => {
-  const { package: name, version } = providerProfile(config)
-  return `npm:${name}@${version}`
-}
+export const providerSource = (config: Config): string =>
+  piPackageSource(providerProfile(config).package)

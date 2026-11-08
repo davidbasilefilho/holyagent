@@ -8,7 +8,7 @@ import {
   parseModelCatalog,
   validateModelCatalog,
 } from "../../src/pi/catalog.ts"
-import type { CommandRunner } from "../../src/pi/readiness.ts"
+import { type CommandRunner, DETAIL_CHARS } from "../../src/pi/readiness.ts"
 import { DEFAULT_CONFIG } from "../config/defaults.ts"
 
 /** The table `pi --list-models` prints (columns padded, two spaces apart), synthesized. */
@@ -50,6 +50,17 @@ describe("parseModelCatalog", () => {
   test("text without the table header is an empty catalog", () => {
     expect(parseModelCatalog("")).toEqual([])
     expect(parseModelCatalog('No models matching "kimi"\n')).toEqual([])
+  })
+
+  test("ignores lines that are not rows: a footer, a note, a short line", () => {
+    const text = `${FULL}\n3 models listed\nShowing 3 of 3 models (1 hidden by --search)\nnote: kimi-coding\n`
+    expect(parseModelCatalog(text)).toEqual(parseModelCatalog(FULL))
+    expect(parseModelCatalog(text)).toHaveLength(3)
+  })
+
+  test("ignores a row whose provider or model is not an id", () => {
+    const text = `${FULL}Not-A-Provider  some-model  1M  64K  yes  yes\n`
+    expect(parseModelCatalog(text)).toHaveLength(3)
   })
 })
 
@@ -102,6 +113,42 @@ describe("validateModelCatalog", () => {
       Effect.flip(validateModelCatalog(runner(0, table([["kimi-coding", "k3"]])), DEFAULT_CONFIG)),
     )
     expect(error._tag).toBe("ModelsNotInCatalog")
+  })
+
+  test("a listing without a model is NoModelsListed, not a list of missing ids", async () => {
+    for (const stdout of ["", 'No models matching "kimi"\n', table([])]) {
+      const error = await Effect.runPromise(
+        Effect.flip(validateModelCatalog(runner(0, stdout), DEFAULT_CONFIG)),
+      )
+      expect(error._tag).toBe("NoModelsListed")
+      expect(error.message).toContain("credentials")
+    }
+  })
+
+  test("a footer after the rows does not hide a missing id", async () => {
+    const error = await Effect.runPromise(
+      Effect.flip(
+        validateModelCatalog(
+          runner(0, `${table([["kimi-coding", "kimi-for-coding"]])}\n1 model listed\n`),
+          DEFAULT_CONFIG,
+        ),
+      ),
+    )
+    expect(error._tag).toBe("ModelsNotInCatalog")
+  })
+
+  test("a failing pi reports the same detail as the readiness check: stdout first, cut short", async () => {
+    const error = await Effect.runPromise(
+      Effect.flip(validateModelCatalog(runner(1, "x".repeat(1000), "ignored"), DEFAULT_CONFIG)),
+    )
+    expect(error).toMatchObject({ _tag: "CatalogUnavailable", detail: "x".repeat(DETAIL_CHARS) })
+  })
+
+  test("a failing pi that prints nothing reports its exit code", async () => {
+    const error = await Effect.runPromise(
+      Effect.flip(validateModelCatalog(runner(3, " \n", " "), DEFAULT_CONFIG)),
+    )
+    expect(error).toMatchObject({ _tag: "CatalogUnavailable", detail: "pi exited with code 3" })
   })
 
   test("a failing pi is a CatalogUnavailable, not an empty catalog", async () => {

@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test"
 import { Effect, Schema } from "effect"
 
 import { piPackages } from "../../src/config/packages.ts"
+import { PI_PACKAGE_VERSIONS } from "../../src/config/pi-packages.ts"
 import { Config, PiProvider } from "../../src/config/schema.ts"
 import { RoleTask } from "../../src/domain/route.ts"
 import {
@@ -95,13 +96,16 @@ describe("the provider profile", () => {
     expect(providerEnv(DEFAULT_CONFIG)).toEqual({ KIMI_CODE_REGION: "global" })
   })
 
-  test("the extension is pinned to its 0.6 release line", () => {
+  test("the extension is pinned to an exact release, the one the pin table holds", () => {
+    expect(providerSource(DEFAULT_CONFIG)).toBe(
+      `npm:pi-provider-kimi-code@${PI_PACKAGE_VERSIONS["pi-provider-kimi-code"]}`,
+    )
     expect(providerSource(DEFAULT_CONFIG)).toBe("npm:pi-provider-kimi-code@0.6.13")
   })
 
-  test("selecting the provider loads its extension; pi.enable off loads nothing", () => {
-    expect(piPackages(DEFAULT_CONFIG)[0]).toBe("pi-provider-kimi-code")
+  test("selecting the provider loads its pinned extension; pi.enable off loads nothing", () => {
+    expect(piPackages(DEFAULT_CONFIG)[0]).toBe(providerSource(DEFAULT_CONFIG))
     const off: Config = { ...DEFAULT_CONFIG, pi: { ...DEFAULT_CONFIG.pi, enable: false } }
-    expect(piPackages(off)).not.toContain("pi-provider-kimi-code")
+    expect(piPackages(off)).not.toContain(providerSource(DEFAULT_CONFIG))
   })
 })
