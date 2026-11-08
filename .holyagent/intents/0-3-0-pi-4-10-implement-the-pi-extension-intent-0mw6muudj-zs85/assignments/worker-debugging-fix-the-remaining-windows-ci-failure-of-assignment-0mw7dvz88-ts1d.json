@@ -1,0 +1,54 @@
+{
+  "id": "assignment-0mw7dvz88-ts1d",
+  "intentId": "intent-0mw6muudj-zs85",
+  "intentRevision": 6,
+  "roleTask": "Worker.debugging",
+  "slug": "fix-the-remaining-windows-ci-failure-of",
+  "objective": "Fix the remaining windows CI failure of PR 78 (branch release/0.3.0/feat/pi-extension, head 2cfba72, worktree /home/user/holyagent-0.3.0-ext): the test 'a bad .holyagent/config.json is reported with the field it names' fails with EBUSY removing its temp project.",
+  "state": "Running",
+  "scope": [
+    "Log: /home/user/holyagent-notes/win78b.log (failure around lines 2205-2225; it is the only failing test). The cleanup rm of the temp project fails with EBUSY on Windows, which means a process still has the project folder open when the test finishes.",
+    "Likely cause to confirm from the code: in packages/integrations/pi/src/extension.ts, config and `state mode` run together; when config fails, collect returns the notice while the sibling `state mode` process, which chdirs into the project through --project in packages/runtime/src/hooks/pi-entry.ts, may still be running. If so this is a code defect, not only a test issue: the extension leaves a child process running after it delivers. Make the extension stop and wait for every child it started before a gather completes, on success, failure and deadline (abort the sibling's signal and await its exit), and add a test that asserts no exec is still pending when the delivered result is returned, including the config-failure case. If the cause is different, state it from the evidence and fix that.",
+    "Do not 'fix' it by retrying or ignoring the rm error in the test."
+  ],
+  "constraints": [
+    "Never skip, disable, weaken or retry-loop a test to get green.",
+    "Make no version-control writes; report changed paths.",
+    "Run bunx --no-install mise run verify and bunx --no-install mise run build in the worktree.",
+    "Report in under 300 words; start each evidence line with the exact criterion text, a colon, then the support."
+  ],
+  "criteria": [
+    {
+      "text": "The EBUSY cause is stated from the evidence and fixed in the code, so no child process outlives a gather",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A test asserts no exec is pending when a gather delivers, including when config fails",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "bunx --no-install mise run verify exits 0 and mise run build leaves generated output in sync",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi",
+    "packages/runtime/src/hooks"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw7d6ayz-wjls",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T05:20:35.096Z"
+  },
+  "createdAt": "2026-11-08T05:20:35.096Z"
+}
