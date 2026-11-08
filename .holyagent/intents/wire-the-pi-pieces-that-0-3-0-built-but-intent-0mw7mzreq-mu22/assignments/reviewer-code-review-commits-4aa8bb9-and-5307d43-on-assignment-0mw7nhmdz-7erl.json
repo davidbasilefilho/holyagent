@@ -1,0 +1,54 @@
+{
+  "id": "assignment-0mw7nhmdz-7erl",
+  "intentId": "intent-0mw7mzreq-mu22",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.code",
+  "slug": "review-commits-4aa8bb9-and-5307d43-on",
+  "objective": "Review commits 4aa8bb9 and 5307d43 on release/0.3.0/feat/pi-root-wiring (worktree /home/user/holyagent-0.3.0-wiring, range 20049b6..5307d43) for correctness and regressions.",
+  "state": "Running",
+  "scope": [
+    "Diff: /home/user/holyagent-notes/wire-a.diff (dist excluded).",
+    "Intended behavior: the root on Pi (not a child) gets a system prompt built from the Kimi root instructions (packages/runtime/src/instructions/kimi-k3.1/root) with ${HOLYAGENT_PI_ROOT} filled, placed in front of Pi own prompt; at session start the root active tools become its selection plus toolArgs(config,root).tools minus excludeTools via pi.setActiveTools; providerEnv is applied for root and children; the provider readiness and catalog probes run through pi.exec beside the session and report a not-ready provider or missing model as a notice without delaying startup; none of it runs with the home-level pi.enable off or for a child (except provider env for children).",
+    "Check against Pi 1.5.0 behavior in node_modules/@earendil-works/pi-coding-agent: before_agent_start chaining with several handlers and extensions, setActiveTools timing at session_start versus tools registered later by other extensions (codemode, pi-subagents), pi.exec semantics, notice delivery, and the compaction path."
+  ],
+  "constraints": [
+    "Read-only; no edits and no version-control writes.",
+    "Report in under 400 words; put long logs in a file under /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "The root gets its prompt, tools, provider environment and readiness notice as intended, and children and pi.enable off are unaffected",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Existing extension behavior (gates, child detection, renderers, failed final message) is unchanged",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Each new behavior has a test that would fail without it",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The change follows the repository's code rules",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "review-findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7n0fi7-2ywh"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T09:49:21.431Z"
+  },
+  "createdAt": "2026-11-08T09:49:21.431Z"
+}
