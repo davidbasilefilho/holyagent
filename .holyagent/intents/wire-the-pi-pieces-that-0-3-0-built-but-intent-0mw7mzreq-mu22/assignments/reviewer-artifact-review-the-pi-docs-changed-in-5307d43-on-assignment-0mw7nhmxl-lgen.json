@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mw7nhmxl-lgen",
+  "intentId": "intent-0mw7mzreq-mu22",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-the-pi-docs-changed-in-5307d43-on",
+  "objective": "Review the Pi docs changed in 5307d43 on release/0.3.0/feat/pi-root-wiring for accuracy against the code of 4aa8bb9.",
+  "state": "Running",
+  "scope": [
+    "Docs diff is in /home/user/holyagent-notes/wire-a.diff (docs/pi/README.md, docs/pi/extensions.md, docs/pi/providers.md, docs/usage.md); code in /home/user/holyagent-0.3.0-wiring (packages/integrations/pi/src/extension.ts, packages/runtime/src/pi/).",
+    "Intended behavior: the root on Pi (not a child) gets a system prompt built from the Kimi root instructions (packages/runtime/src/instructions/kimi-k3.1/root) with ${HOLYAGENT_PI_ROOT} filled, placed in front of Pi own prompt; at session start the root active tools become its selection plus toolArgs(config,root).tools minus excludeTools via pi.setActiveTools; providerEnv is applied for root and children; the provider readiness and catalog probes run through pi.exec beside the session and report a not-ready provider or missing model as a notice without delaying startup; none of it runs with the home-level pi.enable off or for a child (except provider env for children)."
+  ],
+  "constraints": [
+    "Read-only; no edits.",
+    "Report in under 400 words; put long logs in a file under /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Each changed statement about the root's prompt, tools, provider environment and readiness check matches the code",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No changed doc describes unbuilt behavior as built or built behavior as planned",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "review-findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7n0fi7-2ywh"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T09:49:22.137Z"
+  },
+  "createdAt": "2026-11-08T09:49:22.137Z"
+}
