@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-the-exact-replication-repair",
   "objective": "Re-review the exact-replication repair of the workflow gate for correctness, false refusals and regressions on both hosts.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Previous findings to verify closed. Security (blocking): extractMeta in the package (src/workflow/meta.ts) takes the first { after `export const meta =`, which may sit inside a comment, and evaluates that fragment on the host thread where this.constructor.constructor reaches process; the checker compared only positions, so `export const meta = /* { description: this.constructor.constructor(\\\"return process\\\")()... } */ { name: \\\"a\\\", description: \\\"d\\\" }` (and a // variant) passed. Code (blocking): the raw-source /<!--|-->/ rule refused ordinary Claude scripts with --> in strings, and docs/hooks.md disagreed with the code. The repair adds a Pi mode to workflowRefusal (host argument) that ports the package meta scan (scanObjectLiteral, isRegexPosition) and accepts the fragment only as a literal object, builds the worker source the package runs and parses it as a classic script, and restores the Claude hook to its module reading. Review only ddd4616..HEAD in /home/user/holyagent-0.3.0-launcher (source diff at /home/user/holyagent-notes/launcher-repair3.diff; package source at /home/user/holyagent-notes/pi-probe/node_modules/@tintinweb/pi-subagents). Do not run pi or any live model.",
     "Check that the Claude verdicts match those before ddd4616, that a normal Pi workflow script (with the meta export the package expects, agent() calls with bare specialist names, parallel and pipeline) is allowed, whether requiring a meta line under Pi matches what the package requires, and that docs/hooks.md and docs/pi/extensions.md match the code."
@@ -38,7 +38,24 @@
     "agentId": "workflow:wf_91ebe871-10c/assignment-0mw7jm02z-2594",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T08:00:47.339Z"
+    "startedAt": "2026-11-08T08:00:47.339Z",
+    "finishedAt": "2026-11-08T08:07:28.208Z"
+  },
+  "result": "result: The repair closes both previous findings. I found no new defects or false refusals, and `mise run verify` exits 0.\n\nchanged: none (read-only)\n\nchecks:\n- `bunx --no-install mise run verify` -> exit 0. Type-check clean on 199 files, lint clean on 200 files, format check clean on 519 files, tests 2120 pass / 0 fail across 71 files.\n- Ad-hoc script run with bun, reading only (not part of the gates):\n  - Both exploit variants (block-comment and line-comment before the meta object) are refused under Pi with \"has a `meta` that is not an object literal of plain literals\".\n  - A Pi script with a literal meta, bare specialist names, and `parallel`, `pipeline` and `-->` / `<!--` in strings returns undefined, so it is allowed.\n  - Pi refuses a script with no meta line, and the package requires one (`extractMeta` fails without the match).\n  - Claude mode returns undefined for `log(\"a --> b\")` and for a function declared inside a block.\n  - Claude mode takes no HTML-comment or meta-line path any more, so its verdicts match 58671ec, the commit before the ddd4616 change.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- The `/code-review` built-in returned 10 findings, none about files in `ddd4616..HEAD`. I did not read the cited files, so all are rejected here as out of range for this re-review. The most notable is `packages/runtime/src/pi/tools.ts:217`, where `toolSettings` turns computer-use confirmations off in the user's global Pi settings. That is worth a separate look.\n- Optional: Pi refuses a `meta` that uses a template literal without `${}`, such as `` name: `a` ``, although the package accepts it. Claude already refused this, the package asks for a pure literal, and it is rare.\n- Optional: Pi also refuses a script that has two `export const meta =` lines. The package would take the first, but the second would then fail to parse as a classic script anyway.\n- `docs/hooks.md` and `docs/pi/extensions.md` match the code.\n\nevidence:\n- The repair closes the findings without new defects or false refusals: both exploit variants are refused, a normal Pi script passes, Claude verdicts match 58671ec, and the docs match the code (`packages/runtime/src/cli/workflow-check.ts`, `packages/runtime/tests/workflow-check.test.ts`).\n- mise run verify exits 0: `bunx --no-install mise run verify` -> exit 0, 2120 pass / 0 fail. The log is at `/tmp/claude-0/verify.log`.\n",
+  "acceptance": {
+    "revision": 7,
+    "rationale": "Both findings closed, no false refusals; verify exit 0 with 2120 pass.",
+    "criteria": [
+      {
+        "criterion": "The repair closes the findings without new defects or false refusals",
+        "support": "both exploit variants are refused, a normal Pi script passes, Claude verdicts match 58671ec, and the docs match the code (`packages/runtime/src/cli/workflow-check.ts`, `packages/runtime/tests/workflow-check.test.ts`)."
+      },
+      {
+        "criterion": "mise run verify exits 0",
+        "support": "`bunx --no-install mise run verify` -> exit 0, 2120 pass / 0 fail. The log is at `/tmp/claude-0/verify.log`."
+      }
+    ],
+    "evidence": []
   },
   "createdAt": "2026-11-08T08:00:47.339Z"
 }
