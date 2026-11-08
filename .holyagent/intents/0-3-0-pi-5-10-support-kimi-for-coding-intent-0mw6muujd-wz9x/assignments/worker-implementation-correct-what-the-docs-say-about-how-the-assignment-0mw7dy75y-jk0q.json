@@ -1,0 +1,60 @@
+{
+  "id": "assignment-0mw7dy75y-jk0q",
+  "intentId": "intent-0mw6muujd-wz9x",
+  "intentRevision": 9,
+  "roleTask": "Worker.implementation",
+  "slug": "correct-what-the-docs-say-about-how-the",
+  "objective": "Correct what the docs say about how the Pi host version moves and close the last provider review notes, in /home/user/holyagent-0.3.0-provider (branch release/0.3.0/feat/kimi-provider, head 9c8da25).",
+  "state": "Running",
+  "scope": [
+    "Work only in /home/user/holyagent-0.3.0-provider; gates bunx --no-install mise run verify and bunx --no-install mise run build.",
+    "Blocking (review): AGENTS.md:43, docs/development.md:94, docs/pi/orchestration.md:61 and docs/pi/t3-code.md:177 say the updater does not move the Pi host, and docs/pi/installation.md and docs/pi/README.md state Pi as 1.5.0 in the same terms. In fact @earendil-works/pi-coding-agent is a ^1.0.0 devDependency in packages/integrations/pi/package.json, and the updater's package kind runs bun update, which moves bun.lock to the newest 1.x. Reword each place to say what is true: the Pi host used for development and tests moves with the lockfile through mise run deps:update, and a user's own Pi install is theirs; do not hardcode 1.5.0 where it will go stale, or say it is the version the lockfile resolves today. Also docs/pi/installation.md around line 44 ('The pin') still says the recorded fixtures are to be re-recorded with a move; say what the code does (the updater does not re-record them).",
+    "Optional notes to close: (a) packages/runtime/src/pi/catalog.ts and readiness.ts outputDetail prefers stdout; for a failed command include stderr first, then stdout, so a banner on stdout cannot hide the error, with a test; (b) CatalogRow requires lowercase provider ids; accept any provider id the header row format allows, with a test; (c) when no row decodes but the listing is non-empty, report that the listing format was not recognised instead of blaming credentials, with a test."
+  ],
+  "constraints": [
+    "Fixtures only; no network, no pi binary.",
+    "Do not edit .claude/CLAUDE.md, bun.lock or dependency ranges.",
+    "Make no version-control writes; report changed paths.",
+    "Report in under 300 words; start each evidence line with the exact criterion text (no backticks), a colon, then the support."
+  ],
+  "criteria": [
+    {
+      "text": "No doc claims the updater never moves the Pi host or that fixtures are re-recorded by a move, and the host version is not stated as fixed",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "Failed-command details lead with stderr, any provider id decodes, and an unrecognised listing is reported as such, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "bunx --no-install mise run verify exits 0 and mise run build leaves generated output in sync",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "AGENTS.md",
+    "docs/development.md",
+    "docs/pi/orchestration.md",
+    "docs/pi/t3-code.md",
+    "docs/pi/installation.md",
+    "docs/pi/README.md",
+    "packages/runtime/src/pi",
+    "packages/runtime/tests/pi"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw7ddvts-lf2f",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T05:22:18.694Z"
+  },
+  "createdAt": "2026-11-08T05:22:18.694Z"
+}
