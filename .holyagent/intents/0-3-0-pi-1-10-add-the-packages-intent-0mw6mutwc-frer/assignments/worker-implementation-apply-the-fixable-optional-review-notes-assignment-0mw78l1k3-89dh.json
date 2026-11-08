@@ -1,0 +1,61 @@
+{
+  "id": "assignment-0mw78l1k3-89dh",
+  "intentId": "intent-0mw6mutwc-frer",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "apply-the-fixable-optional-review-notes",
+  "objective": "Apply the fixable optional review notes to PR 5 in /home/user/holyagent-0.3.0-pi (head b6781ee).",
+  "state": "Running",
+  "scope": [
+    "Run every command in /home/user/holyagent-0.3.0-pi. Notes: .git/holyagent/reports/assignment-0mw78djln-wu4j.md (notes 2-5) and .git/holyagent/reports/assignment-0mw78djt1-6rp4.md.",
+    "1. packages/runtime/src/instructions/skills.ts: listTree now ships dotfiles and follows symlinks under skills/, unlike the old Bun.Glob; skip dotfiles and symlinks as before, with a test.",
+    "2. packages/integrations/claude/src/agents.ts around L361: keep the typed error in Effect rather than Effect.runSync inside the async generator, if that fits the surrounding code; otherwise leave it and say why.",
+    "3. Duplication: share jsonText, GeneratedFile, generatedNote and Bun's module-comment regex between the Claude and pi generators (in the runtime or a shared module both import by relative path), and make the module-comment regex handle a repository path containing a space, with a test.",
+    "4. lefthook.yml and its test: make the test find the pi job's paths without relying on split(\"git add -A --\")[2], for example by parsing the YAML job by name.",
+    "5. Add a test that the root package.json prepare script runs scripts/prepare-dev.ts.",
+    "The Claude output must stay byte-identical (git diff of packages/integrations/claude/dist and .claude-plugin empty after build)."
+  ],
+  "constraints": [
+    "No new dependency. Make no version-control writes; report changed paths.",
+    "Finish with bunx --no-install mise run build and bunx --no-install mise run verify; write git diff b6781ee to /home/user/holyagent-notes/pi1-final.diff.",
+    "Report in under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "The five notes are applied or, for note 2, left with a stated reason",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Each change has a test that fails without it and the Claude output is unchanged",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "mise run build and mise run verify exit 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime",
+    "packages/integrations",
+    "scripts",
+    "lefthook.yml",
+    "package.json"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw786u16-gi9a",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T02:52:06.819Z"
+  },
+  "createdAt": "2026-11-08T02:52:06.819Z"
+}
