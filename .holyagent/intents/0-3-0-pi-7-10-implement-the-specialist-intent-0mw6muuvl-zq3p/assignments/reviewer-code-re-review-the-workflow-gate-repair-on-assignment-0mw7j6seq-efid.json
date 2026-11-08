@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mw7j6seq-efid",
+  "intentId": "intent-0mw6muuvl-zq3p",
+  "intentRevision": 7,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-workflow-gate-repair-on",
+  "objective": "Re-review the workflow gate repair on release/0.3.0/feat/pi-launcher for correctness and regressions, including the Claude Workflow hook that shares the check.",
+  "state": "Running",
+  "scope": [
+    "Previous findings to verify closed. Security (blocking): workflowRefusal in packages/runtime/src/cli/workflow-check.ts parsed scripts as a module while @tintinweb/pi-subagents runs them as a classic script (worker-source.ts:757), so `n <!--n; function workflow() { return 1 }` hid a declaration and let a script reach the package global workflow() and run an unchecked script; the repair refuses HTML-like comments, block-level function declarations (Annex B) and any `export const meta =` line other than the vetted one (the package extractMeta evaluates it on the host thread before the script runs). Code review (optional): SubagentWorkflow with both script and name passed; now only script and args are allowed. Security hardening: a project config with pi.enable false turned the gates off; now only the user-level config can. Review only the repair range 58671ec..HEAD in /home/user/holyagent-0.3.0-launcher (source diff without dist bundles at /home/user/holyagent-notes/launcher-repair2.diff; package source at /home/user/holyagent-notes/pi-probe/node_modules/@tintinweb/pi-subagents). Do not run pi or any live model.",
+    "Check that ordinary scripts the Claude hook allowed before are still allowed (no false refusals from the new rules, e.g. a comparison like a < b or a string containing --> inside a template), and that the docs/hooks.md bullet matches the code."
+  ],
+  "constraints": [
+    "Read-only: no edits and no version-control writes.",
+    "Run bunx --no-install mise run verify and report exit code and counts.",
+    "Start each evidence line with the criterion text, then a colon.",
+    "Report in under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "The repair closes the findings without new defects or false refusals",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7irnkk-pt46",
+    "assignment-0mw7j2q3s-inz5"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T07:48:57.554Z"
+  },
+  "createdAt": "2026-11-08T07:48:57.554Z"
+}
