@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mw7gcj50-vb1h",
+  "intentId": "intent-0mw6muuvl-zq3p",
+  "intentRevision": 6,
+  "roleTask": "Librarian.research",
+  "slug": "establish-from-the-installed-source-of",
+  "objective": "Establish, from the installed source of @tintinweb/pi-subagents 0.23.1 and Pi 1.5.0, exactly how HolyAgent's eighteen specialists and workflow scripts must be configured and glued to meet each launcher requirement, and write the design to /home/user/holyagent-notes/launcher-research.md.",
+  "state": "Running",
+  "scope": [
+    "Sources, already on disk (read them; do not guess about code you have not opened): /home/user/holyagent-notes/pi-probe/node_modules/@tintinweb/pi-subagents (README.md, docs/, examples/, src/, dist/ — 0.23.1) and /home/user/holyagent-notes/pi-probe/node_modules/@earendil-works/pi-coding-agent (1.5.0, docs/ and dist/). The current HolyAgent Pi integration is in /home/user/holyagent-0.3.0-tools: packages/integrations/pi/src/{extension.ts,files.ts,generate.ts}, packages/runtime/src/pi/{tools.ts,provider.ts,catalog.ts,readiness.ts}, packages/runtime/src/domain/route.ts, and docs/pi/orchestration.md, claude-parity.md, caching-and-subagents.md and extensions.md.",
+    "For each requirement below, state whether the package meets it as is, through configuration (name the exact file format, location and fields, e.g. custom agent definition files, settings, env), or needs HolyAgent glue (name the event, API or hook the glue would use), each with the file and line that shows it. Requirements: (1) only the eighteen specialist names are launchable (and whether the package's default agents can be turned off); (2) per-agent model and thinking level, taken from the dispatched entry and the route table; (3) per-agent tool allowlist and exclusions equivalent to toolArgs (--tools/--exclude-tools), and per-agent env such as PI_CODEMODE_MAX_WORKERS and PI_CACHE_RETENTION; (4) a per-agent appended system prompt from a role file, and how the HolyAgent extension and skills reach a child (separate process with -e, or in-process session); (5) a session id derived from the Assignment id, a session dir, and continuing a warm specialist through the same session (the Agent tool's resume) while never continuing a workflow agent; (6) non-blocking launch with a completion notice that starts a new root turn (pi.sendMessage with triggerTurn or the package's own mechanism); (7) completion from agent_settled, never agent_end, and failure from stopReason error, aborted or length, a failed auto_retry_end, a process exit, or a settle without a report, mapped to the Assignment status table in orchestration.md; (8) what the Agent tool and SubagentWorkflow return (agent id, run id, labels) and how they fit the runtime's `pi:<agent-id>` and `pi-workflow:<run-id>/<assignment-id>` forms; where the package persists launched agents so a resumed root can read them; (9) whether workflow scripts ever ask for confirmation and how to make them never ask; (10) whether the package's tools are callable from codemode scripts under codemode mode only, and what to do when SubagentWorkflow or codemode is inactive (direct subagent fallback, HOLYAGENT_WORKFLOWS=0); (11) the exact shape of the `<run id>.workflow.jsonl` journal, so `holyagent assignment reports` could read it, with a short real or synthesized example line per entry type; (12) how a workflow agent's final message (its report) is returned.",
+    "Then propose the smallest implementation for HolyAgent 0.3.0: which files to generate into packages/integrations/pi/dist (e.g. agent definition files per specialist, prompt templates), what code to add to the extension, and what runtime changes (e.g. a pi journal reader for assignment reports), each tied to the requirement it serves, with the tests that would prove it using fixtures only. Mark every point as Sourced (with path:line) or Inference."
+  ],
+  "constraints": [
+    "Read-only on the repository; write only /home/user/holyagent-notes/launcher-research.md.",
+    "Do not run pi or any live model.",
+    "Start each evidence line with the criterion text, then a colon.",
+    "Report in under 500 words; the full design goes in the file."
+  ],
+  "criteria": [
+    {
+      "text": "Each of the twelve requirements is answered as met, configured or glue, with source path and line",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A minimal implementation plan tied to the requirements, with fixture-based tests, is in the file",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "research-file"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-08T06:29:26.628Z"
+  },
+  "createdAt": "2026-11-08T06:29:26.628Z"
+}
