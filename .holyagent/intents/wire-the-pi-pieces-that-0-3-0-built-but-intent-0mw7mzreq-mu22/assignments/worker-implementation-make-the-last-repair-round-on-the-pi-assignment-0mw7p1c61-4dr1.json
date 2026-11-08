@@ -72,5 +72,25 @@
     "finishedAt": "2026-11-08T10:39:20.183Z"
   },
   "result": "result: all five items are done. `mise run build` and `mise run verify` both exit 0.\n\nchanged:\n- `/home/user/holyagent-0.3.0-wiring/packages/integrations/pi/src/extension.ts`\n- `/home/user/holyagent-0.3.0-wiring/packages/integrations/pi/tests/extension.test.ts`\n- `/home/user/holyagent-0.3.0-wiring/packages/runtime/src/config/schema.ts`\n- `/home/user/holyagent-0.3.0-wiring/packages/runtime/tests/config/schema.test.ts`\n- `/home/user/holyagent-0.3.0-wiring/docs/pi/extensions.md`\n- `/home/user/holyagent-0.3.0-wiring/docs/pi/providers.md`\n- the rebuilt `dist` files for the Pi and Claude integrations\n\n`docs/pi/configuration.md` is unchanged because it does not state the model-id set.\n\nchecks:\n- `bunx --no-install mise run build` exited 0.\n- `bunx --no-install mise run verify` exited 0: 2296 pass, 0 fail, and type-check, lint and format are clean. The log is `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`.\n- With the old `extension.ts` and `schema.ts` temporarily restored, 10 of the new or updated tests fail. All pass with the fix.\n\nblockers: none.\n\nquestions: none.\n\nnotes:\n- Every collection now makes one extra `holyagent config` call, which reads the home-level config alone, in parallel with the merged one. The union needs it.\n- A project's `pi.enable: false` now keeps the root's prompt, exclusions and `tool_call` gate. It still adds no context, settings or provider check. It does not run `setActiveTools`, so the gate is the only enforcement in that case.\n- I changed one existing assertion, in \"the deferred tools stay refused ... pi-web-kit's follow the config\". `moonshot_search` is now blocked under the `pi-web-kit` web mode, because the defaults' exclusions are always in the union.\n- I changed two existing tests so a project-off root still gets its prompt: `delivered` must now have no message, not be undefined.\n- `\\p{Variation_Selector}` also strips U+E0100-E01EF and the Mongolian selectors U+180B-180D, which is wider than the brief's FE00-FE0F. I used it because ESLint's `no-misleading-character-class` rejected the `\\ufe00-\\ufe0f` range.\n- Variation selectors are dropped from workflow names too, so a name like ❤️ loses its VS16.\n- The `unsafeCharacters` helper in the tests still checks the old narrow set. The new test asserts exact output instead.\n\nevidence:\n- A project config cannot lift the root's exclusions, gate or prompt, with tests: in `extension.test.ts`, \"a project's pi.enable false keeps the exclusions, the gate and the root prompt\", \"a project can add an exclusion but not take one away\" and \"the user's own exclusions stay whatever the project says\" fail on the base and pass now. The implementation is in `extension.ts` (`rootExclusions`, `settingsFor`, the project-off branch of `collect`).\n- mise run build and mise run verify exit 0: build exit 0; verify exit 0 with 2296 pass and 0 fail.\n- diff-file: `/home/user/holyagent-notes/wire-a-last.diff` (462 lines, `dist` excluded).\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Independent code, security and artifact reviews accepted the branch head after the repair rounds",
+    "criteria": [
+      {
+        "criterion": "A project config cannot lift the root's exclusions, gate or prompt, with tests",
+        "support": "in `extension.test.ts`, \"a project's pi.enable false keeps the exclusions, the gate and the root prompt\", \"a project can add an exclusion but not take one away\" and \"the user's own exclusions stay whatever the project says\" fail on the base and pass now. The implementation is in `extension.ts` (`rootExclusions`, `settingsFor`, the project-off branch of `collect`)."
+      },
+      {
+        "criterion": "mise run build and mise run verify exit 0",
+        "support": "build exit 0; verify exit 0 with 2296 pass and 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff-file",
+        "support": "`/home/user/holyagent-notes/wire-a-last.diff` (462 lines, `dist` excluded)."
+      }
+    ]
+  },
   "createdAt": "2026-11-08T10:32:40.921Z"
 }
