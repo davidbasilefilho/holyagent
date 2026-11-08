@@ -1,0 +1,87 @@
+{
+  "id": "assignment-0mw7cxri6-6lgy",
+  "intentId": "intent-0mw6muujd-wz9x",
+  "intentRevision": 9,
+  "roleTask": "Worker.implementation",
+  "slug": "add-kimi-for-coding-global-as-the-first",
+  "objective": "Add Kimi for Coding (global) as the first and only model provider of the HolyAgent Pi integration: the route table, the readiness and catalog checks, the provider package selection and its docs, in /home/user/holyagent-0.3.0-provider (branch release/0.3.0/feat/kimi-provider).",
+  "state": "Running",
+  "scope": [
+    "Work only in /home/user/holyagent-0.3.0-provider and run every command there; node_modules is installed. Gates: bunx --no-install mise run verify and bunx --no-install mise run build.",
+    "The full requirements of this change are in /home/user/holyagent-notes/intent-kimi-provider.txt (the Intent); read it first and treat its requirements and 'Decided' entries as binding. Also read AGENTS.md, .claude/CLAUDE.md, docs/pi/providers.md, docs/pi/configuration.md, docs/pi/caching-and-subagents.md, docs/pi/installation.md, packages/runtime/src/config/{schema,load,packages}.ts (the config with its pi section and the package list it enables), packages/integrations/pi/src/*, and the pi package probes in /home/user/holyagent-notes/pi-deps.md and /home/user/holyagent-notes/pi-probe/ (README of pi-provider-kimi-code and pi-coding-agent under pi-probe/readmes/). Do not run the pi binary.",
+    "Build: (1) one mapping module (for example packages/runtime/src/pi/provider.ts or under config/) from route-table role and effort to provider/id and thinking level, the only place provider choice lives; (2) the Kimi route table as config.json defaults in the pi section, every one of the eighteen specialist roles plus the root mapped to a model and thinking level with a one-line reason each, exactly as the Intent's 'Decided routing' entry says (root kimi-coding k3.1 pro at high, max selectable; the listed specialists on the kimi-for-coding model at max or high, never low; Worker.visual and Reviewer.visual on k3.1 pro at low), decoded with Effect Schema and overridable per role; use the provider id and model ids the probes and the pi-provider-kimi-code README give, and where a fact is not in those files say so in the report rather than guessing; (3) a readiness check that runs `pi auth check --provider <id> --json` through an injected command runner and maps exit 0 to ready, 1 to not_ready (a blocker carrying the login fix, /login kimi-coding or KIMI_API_KEY) and 2 to invalid, never replacing the provider; (4) a catalog check that validates the mapped model ids against the output of `pi --list-models` (parse its format from the probe notes or pi-coding-agent README; use a synthesized fixture), reporting unknown ids as a blocker; (5) the provider environment the launcher will set on Pi processes (KIMI_CODE_REGION=global) exported from the mapping; (6) provider selection in config: selecting kimi-for-coding enables pi-provider-kimi-code in the package list from packages.ts, pinned at its current release line, and deselecting it disables it; no other provider is implemented or documented as supported; (7) docs/pi/providers.md gains the Kimi for Coding facts the integration relies on: provider id, login, region and host, model ids, thinking levels and the route-table mapping with reasons, and the cache rule that each session keeps one model and effort.",
+    "Out of scope: launching processes (the specialist launcher change uses these functions), the web tools (tool-surface change), setup and doctor, cache-rate reporting from provider usage. Name what they need in the report."
+  ],
+  "constraints": [
+    "Unit tests and synthesized fixtures only; no live pi or Kimi runs, no network calls.",
+    "HolyAgent never calls provider URLs, never reads auth.json, and never uses pi auth print-api-key or print-bearer-token.",
+    "Dependencies change only through the updater (mise run deps:update); if pinning pi-provider-kimi-code needs a package.json or bun.lock change, add it the way the existing pi packages in packages.ts are handled and say how.",
+    "Keep the Claude generated output unchanged.",
+    "Make no version-control writes and no edits under .git/ or .holyagent/; report changed paths.",
+    "Follow .claude/CLAUDE.md (Effect, Schema with onExcessProperty error, JSDoc, Bun APIs).",
+    "Report in under 450 words; start each evidence line with the exact criterion text (no backticks), a colon, then the support; put long logs in a file outside the repository."
+  ],
+  "criteria": [
+    {
+      "text": "One mapping module is the only place provider choice lives, and it maps every role and the root as the Intent's decided routing says, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The route table lives in config defaults, decodes with Effect Schema, and can be overridden per role, with tests including an invalid override",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The readiness check maps exit 0, 1 and 2 to ready, not_ready with the login fix, and invalid, without replacing the provider, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The catalog check rejects model ids missing from the pi --list-models output, with fixture tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Selecting the provider enables pi-provider-kimi-code and deselecting it disables it, and no other provider is offered",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "docs/pi/providers.md states the provider id, login, region and host, model ids, thinking levels and the route table with reasons",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "No provider URL, auth.json read or print-api-key or print-bearer-token use anywhere in the change",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "bunx --no-install mise run verify exits 0 and mise run build leaves generated output in sync",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/config",
+    "packages/runtime/src/pi",
+    "packages/runtime/src/index.ts",
+    "packages/runtime/tests",
+    "packages/integrations/pi",
+    "docs/pi/providers.md",
+    "docs/pi/configuration.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T04:53:58.783Z"
+  },
+  "createdAt": "2026-11-08T04:53:58.783Z"
+}
