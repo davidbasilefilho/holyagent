@@ -78,5 +78,49 @@
     "finishedAt": "2026-11-08T00:22:51.075Z"
   },
   "result": "result: The requirements/ tree mirrors claude-5.5, both guides, the scaffold, the tests and `packages/runtime/AGENTS.md` are in. `mise run build` left the plugin byte-identical, and `mise run verify` exits 0.\n\nchanged (under `/home/user/holyagent-0.3.0-req/`; edit the requirements and family files by path, nothing is in git yet):\n- `packages/runtime/src/instructions/`:\n  - Removed `requirements.md` and `requirements/{cache,commit-text,context,mergeability}.md`.\n  - Added the `requirements/<path>.md` tree, 90 files for the 90 claude-5.5 Markdown files; 28 are empty because no old requirement named their file.\n  - Added `claude-5.5/guide.md`, `kimi-k3.1/guide.md`, `families.ts`, `coverage.ts`, `requirements.ts` and `scaffold.ts`.\n- `packages/runtime/scripts/instructions-scaffold.ts`, `packages/runtime/package.json`, `packages/runtime/src/index.ts` (exports families and coverage), `packages/runtime/AGENTS.md`\n- `packages/runtime/tests/{requirements,scaffold}.test.ts` (new), `packages/runtime/tests/instructions.test.ts`\n- `packages/integrations/claude/src/agents.ts` (the coverage map moved out), `packages/integrations/claude/tests/plugin.test.ts`\n- `mise.toml`, `docs/development.md`\n\nchecks:\n- `bunx --no-install mise run build` -> 0; `git diff` is empty for `dist/` and `.claude-plugin`.\n- `bunx --no-install mise run verify` -> 0; 1722 pass, 0 fail (type-check, lint, format check, tests).\n- `bunx --no-install mise run instructions:scaffold` -> 0; 0 files created, so the mirror is complete.\n- Mutation runs of `requirements.test.ts`, each restored afterwards:\n  - A removed requirements file made the mirror test and the coverage test fail.\n  - An extra requirements file made the mirror test fail.\n  - A new id with no coverage entry made the coverage test fail.\n\nblockers: none\n\nquestions:\n- `claude-5.5/skills/instruction-writing/SKILL.md` ships in the plugin and still says \"from `requirements.md`\", and `plugin.test.ts` asserts that string. Changing it would alter `dist/`, which the brief requires byte-identical, so I left it. Should a later PR reword it?\n- The four old input files had no ids, so I gave them R-CACHE-*, R-COMMIT-*, R-CTX-* and R-MERGE-* ids. `coverage.ts` has a `carriedBy` entry form for ids that code or docs carry rather than prompt text; four ids use it: R-CACHE-STATIC, R-CACHE-WINDOW, R-CTX-EFFORT and R-CTX-ENV.\n\nnotes:\n- Root `CLAUDE.md` imports `AGENTS.md`, but `packages/runtime/AGENTS.md` has no `CLAUDE.md` importing it, so Claude may not load it automatically.\n- The `.claude/skills/` entry in `git status` is the other writer's; I did not touch it.\n- Mapping of old ids to new paths, and the \"See:\" cross-references: `/home/user/holyagent-notes/pr4-mapping.md`.\n\nevidence:\nrequirements/ mirrors every Markdown instruction file of claude-5.5 and every old requirement id is present exactly once with unchanged meaning: all 90 old id lines are byte-identical in the tree, 103 ids with no duplicates, 90 mirrored files. Mapping: `/home/user/holyagent-notes/pr4-mapping.md`.\nclaude-5.5/guide.md and kimi-k3.1/guide.md list every point of their guides with sources and are not shipped in the plugin: claude has G1 to G74 and kimi has K1 to K45, each with its page and section. The `dist/` diff is empty, and a test checks that unlisted family folders hold only `guide.md`.\ninstructions:scaffold copies the tree as empty files into each listed family, is idempotent and never overwrites content, with tests: `packages/runtime/tests/scaffold.test.ts`, 5 pass, covering create, idempotence, no-overwrite and the failure cases.\nMirror and per-family id coverage tests fail on a missing file in either direction or an uncovered id: `packages/runtime/tests/requirements.test.ts`, confirmed by the three mutation runs above.\nmise run build leaves the generated plugin byte-identical and mise run verify exits 0: `git diff` of `dist/` and `.claude-plugin` is empty after build, and verify exits 0 with 1722 pass. Log: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`.\npackages/runtime/AGENTS.md states the requirements-first rule and points to the skill: `/home/user/holyagent-0.3.0-req/packages/runtime/AGENTS.md`, with the four-step order and a pointer to `.claude/skills/requirements/SKILL.md`.\nchecks-run: build, verify, scaffold and the mutation runs above.\nchanged-paths: listed under `changed`.\ndiff-file: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/pr4-requirements-tree.diff`; it omits the 28 empty requirements files.\n",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Independent code and artifact reviews and re-reviews accept the work; verify exit 0 on f2323fd run by the reviewer.",
+    "criteria": [
+      {
+        "criterion": "requirements/ mirrors every Markdown instruction file of claude-5.5 and every old requirement id is present exactly once with unchanged meaning",
+        "support": "all 90 old id lines are byte-identical in the tree, 103 ids with no duplicates, 90 mirrored files. Mapping: `/home/user/holyagent-notes/pr4-mapping.md`."
+      },
+      {
+        "criterion": "claude-5.5/guide.md and kimi-k3.1/guide.md list every point of their guides with sources and are not shipped in the plugin",
+        "support": "claude has G1 to G74 and kimi has K1 to K45, each with its page and section. The `dist/` diff is empty, and a test checks that unlisted family folders hold only `guide.md`."
+      },
+      {
+        "criterion": "instructions:scaffold copies the tree as empty files into each listed family, is idempotent and never overwrites content, with tests",
+        "support": "`packages/runtime/tests/scaffold.test.ts`, 5 pass, covering create, idempotence, no-overwrite and the failure cases."
+      },
+      {
+        "criterion": "Mirror and per-family id coverage tests fail on a missing file in either direction or an uncovered id",
+        "support": "`packages/runtime/tests/requirements.test.ts`, confirmed by the three mutation runs above."
+      },
+      {
+        "criterion": "mise run build leaves the generated plugin byte-identical and mise run verify exits 0",
+        "support": "`git diff` of `dist/` and `.claude-plugin` is empty after build, and verify exits 0 with 1722 pass. Log: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`."
+      },
+      {
+        "criterion": "packages/runtime/AGENTS.md states the requirements-first rule and points to the skill",
+        "support": "`/home/user/holyagent-0.3.0-req/packages/runtime/AGENTS.md`, with the four-step order and a pointer to `.claude/skills/requirements/SKILL.md`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "build, verify, scaffold and the mutation runs above."
+      },
+      {
+        "label": "changed-paths",
+        "support": "listed under `changed`."
+      },
+      {
+        "label": "diff-file",
+        "support": "`/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/pr4-requirements-tree.diff`; it omits the 28 empty requirements files."
+      }
+    ]
+  },
   "createdAt": "2026-11-07T22:44:10.567Z"
 }
