@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mw7l9fcn-1cg4",
+  "intentId": "intent-0mw6muuvl-zq3p",
+  "intentRevision": 7,
+  "roleTask": "Worker.debugging",
+  "slug": "fix-the-two-tests-that-fail-only-on-the",
+  "objective": "Fix the two tests that fail only on the windows CI job of davidbasilefilho/holyagent#81, in /home/user/holyagent-0.3.0-launcher (branch release/0.3.0/feat/pi-launcher, head 7846c9b).",
+  "state": "Running",
+  "scope": [
+    "The full Windows job log is /home/user/holyagent-notes/win81.log (the windows job runs bun test on Windows Server; check .github/workflows/validation.yml for how). Failures: (1) packages/integrations/pi/tests/extension.test.ts:352, test \"the role flag > root and specialist get the status without the core; session adds the core\": it expects `${PACKAGE_ROOT}/scripts/holyagent` where PACKAGE_ROOT is join(REPOSITORY, DIST_DIRECTORY) with backslashes on Windows, while the extension now writes the package root with forward slashes (toPosix, extension.ts:135 and :437). Make the expectation use the same forward-slash form the code produces (toPosix is already imported in the test). (2) packages/integrations/pi/tests/pi.test.ts around line 385-395, test \"the extension > is a default-exported factory that registers the role flag and handlers and starts nothing\": it writes the built extension to a temp dir and links node_modules there with a junction, and on Windows Bun reports Cannot find module @earendil-works/pi-tui from that temp extension.mjs (log line 2429). Find the cause from the log, the bun.lock layout (where Bun installs @earendil-works/pi-tui for this workspace: the package node_modules or the root node_modules) and how Bun resolves through a junction on Windows, and fix the test so it resolves the peer the same way on Linux and Windows (for example by writing the temp file inside the package tree, linking the folder that actually holds the module, or mapping the import), keeping what the test proves. Do not skip or weaken either test.",
+    "Linux cannot reproduce Windows, so state the cause you established and why the fix holds on Windows; make the fix platform-neutral and keep both tests passing on Linux."
+  ],
+  "constraints": [
+    "Edit only the two test files; no version-control writes and no edits under .git/ or .holyagent/.",
+    "Run bunx --no-install mise run verify and report the exit code (echo $?) and counts.",
+    "Start each evidence line with the criterion text, then a colon.",
+    "Report in under 250 words."
+  ],
+  "criteria": [
+    {
+      "text": "Both Windows failures are fixed for an established cause without weakening the tests",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [
+    "packages/integrations/pi/tests/extension.test.ts",
+    "packages/integrations/pi/tests/pi.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T08:46:59.831Z"
+  },
+  "createdAt": "2026-11-08T08:46:59.831Z"
+}
