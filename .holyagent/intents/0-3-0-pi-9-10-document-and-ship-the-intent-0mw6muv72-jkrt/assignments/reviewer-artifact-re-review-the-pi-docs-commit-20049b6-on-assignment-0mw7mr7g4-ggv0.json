@@ -1,0 +1,50 @@
+{
+  "id": "assignment-0mw7mr7g4-ggv0",
+  "intentId": "intent-0mw6muv72-jkrt",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.artifact",
+  "slug": "re-review-the-pi-docs-commit-20049b6-on",
+  "objective": "Re-review the Pi docs commit 20049b6 on release/0.3.0/feat/pi-install against the earlier artifact findings it repairs.",
+  "state": "Running",
+  "scope": [
+    "Diff: /home/user/holyagent-notes/install-last-docs.diff (56a18a2..20049b6, docs and README.md); files and code in /home/user/holyagent-0.3.0-install.",
+    "Earlier findings: docs/README.md lines 10, 27, 28 called the Pi integration planned and not shipped (blocking); docs/pi/extensions.md lines 3, 9, 14, 21, 64, the status banners of docs/pi/orchestration.md and docs/pi/caching-and-subagents.md, docs/pi/README.md finding 2, README.md's Node wording (Pi needs 22.19 on every OS), and nothing documented doctor's output with pi.enable off.",
+    "The writer also marked as planned or not built: provider readiness and catalog checks and providerEnv (not called), the root's --tools arguments (not applied), toolSettings (not written), the prompts/ templates (absent), the root's system prompt. Check each such claim against the code."
+  ],
+  "constraints": [
+    "Read-only; no edits.",
+    "Report in under 400 words; put long logs in a file under /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "docs/README.md describes the Pi integration as shipped in 0.3.0 and names what remains planned",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Every changed statement about Pi matches the code: shipped things are described as shipped and unbuilt things as planned",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "README.md keeps exactly its six sections in order and any Pi mention there is a link into docs/",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "review-findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7mhhpb-1bj2",
+    "assignment-0mw7lszlt-yqxn"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T09:28:49.012Z"
+  },
+  "createdAt": "2026-11-08T09:28:49.012Z"
+}
