@@ -1,15 +1,17 @@
 import { join } from "node:path"
 
+import { Effect } from "effect"
+
 import { ROUTES } from "../../../runtime/src/domain/route.ts"
+import { DESIGN_CORE_PATH, skillFiles } from "../../../runtime/src/instructions/skills.ts"
 import packageJson from "../package.json" with { type: "json" }
-import { agentFiles, embedMateriality, MATERIALITY_FILE, PLUGIN_NAME } from "./agents.ts"
+import { agentFiles, PLUGIN_NAME } from "./agents.ts"
 import {
   DIST_DIRECTORY,
   type GeneratedFile,
   generatedNote,
   INSTRUCTIONS_DIRECTORY,
   jsonText,
-  listFiles,
   noteInFrontmatter,
   PLUGIN_DIRECTORY,
   readSource,
@@ -191,65 +193,17 @@ const commands = async (): Promise<ReadonlyArray<GeneratedFile>> => {
 }
 
 /**
- * The one source of the shared design core, relative to the repository root. The generator embeds
- * its text into each of the {@link DESIGN_SKILLS}, so every one of them is self-contained and the
- * core still has a single source. The core itself embeds the materiality definition first.
+ * The one source of the shared design core, relative to the repository root: the Claude family's
+ * copy of the runtime's {@link DESIGN_CORE_PATH}.
  */
-export const DESIGN_CORE_FILE = `${INSTRUCTIONS_DIRECTORY}/design-core/core.md`
+export const DESIGN_CORE_FILE = `${INSTRUCTIONS_DIRECTORY}/${DESIGN_CORE_PATH}`
 
-/** The line of a design skill's source that the generator replaces with the shared design core. */
-export const DESIGN_CORE_MARKER = "<!-- design-core -->"
-
-/** The platform design skills, which carry the shared design core. */
-export const DESIGN_SKILLS: ReadonlyArray<string> = [
-  "web-design",
-  "mobile-design",
-  "desktop-design",
-  "tui-design",
-]
-
-/**
- * A design skill's source with the marker line replaced by the shared design core. A source without
- * exactly one marker line is an error, because the skill would ship without its core.
- */
-const withDesignCore = (text: string, core: string, source: string): string => {
-  const lines = text.split("\n")
-  const at = lines.indexOf(DESIGN_CORE_MARKER)
-  if (at === -1 || lines.indexOf(DESIGN_CORE_MARKER, at + 1) !== -1)
-    throw new Error(`${source} must hold the line ${DESIGN_CORE_MARKER} exactly once`)
-  return [...lines.slice(0, at), core.trim(), ...lines.slice(at + 1)].join("\n")
-}
-
-/**
- * A skill's generated body. A design skill gets the shared core; any other skill holding the marker
- * line is an error, because the marker would ship as literal text with no core.
- */
-export const skillBody = (path: string, text: string, core: string, source: string): string => {
-  if (DESIGN_SKILLS.includes(path.split("/")[0] ?? "")) return withDesignCore(text, core, source)
-  if (text.split("\n").includes(DESIGN_CORE_MARKER))
-    throw new Error(`${source} holds ${DESIGN_CORE_MARKER} but is not listed in DESIGN_SKILLS`)
-  return text
-}
-
-const skills = async (): Promise<ReadonlyArray<GeneratedFile>> => {
-  const root = `${INSTRUCTIONS_DIRECTORY}/skills`
-  const materiality = await readSource(MATERIALITY_FILE)
-  const core = embedMateriality(await readSource(DESIGN_CORE_FILE), materiality, DESIGN_CORE_FILE)
-  return Promise.all(
-    (await listFiles(root)).map(async (path) => {
-      const source = `${root}/${path}`
-      const text = await readSource(source)
-      if (!path.endsWith("SKILL.md")) return { path: inPlugin(`skills/${path}`), content: text }
-      return {
-        path: inPlugin(`skills/${path}`),
-        content: noteInFrontmatter(
-          skillBody(path, embedMateriality(text, materiality, source), core, source),
-          source,
-        ),
-      }
-    }),
-  )
-}
+/** The skills of the Claude family, from the runtime's shared skill generator. */
+const skills = async (): Promise<ReadonlyArray<GeneratedFile>> =>
+  (await Effect.runPromise(skillFiles("claude-5.5", generatedNote))).map(({ path, content }) => ({
+    path: inPlugin(`skills/${path}`),
+    content,
+  }))
 
 const BUNDLE_MARKER = /^\/\/ \S+\.(?:[cm]?[jt]s|json|md)$\n/gm
 

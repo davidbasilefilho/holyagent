@@ -3,7 +3,7 @@ import { join } from "node:path"
 
 import { Effect, Schema } from "effect"
 
-import { DEPENDENCY_FIELDS } from "./dependency-pins.ts"
+import { DEPENDENCY_FIELDS, isPiHostPeer, PI_HOST_PACKAGES } from "./dependency-pins.ts"
 import { manifestFiles } from "./update-dependencies.ts"
 
 const repository = join(import.meta.dir, "..")
@@ -32,7 +32,8 @@ const uses = (manifest: Record<string, unknown>): Array<Use> =>
 
 /**
  * What breaks the rule in a manifest: any specifier that is not a boundary caret range, and a
- * `workspace:*` that does not name a workspace package.
+ * `workspace:*` that does not name a workspace package. A Pi host package may be a peer with the
+ * range `*`, which Pi's package documentation requires.
  */
 const problems = (
   file: string,
@@ -42,7 +43,9 @@ const problems = (
   uses(manifest).flatMap(({ field, name, range }) => {
     const ok =
       typeof range === "string" &&
-      (BOUNDARY_RANGE.test(range) || (range === "workspace:*" && workspaces.has(name)))
+      (BOUNDARY_RANGE.test(range) ||
+        (range === "workspace:*" && workspaces.has(name)) ||
+        isPiHostPeer(field, name, range))
     return ok ? [] : [`${file} ${field} ${name}: ${JSON.stringify(range)}`]
   })
 
@@ -93,6 +96,15 @@ describe("the rule", () => {
 
   test.each(DEPENDENCY_FIELDS)("a bad range in %s is found", (field) => {
     expect(problems("f", { [field]: { x: "1.2.3" } }, workspaces)).toHaveLength(1)
+  })
+
+  test("a Pi host package may be a peer with the range *, and nothing else may", () => {
+    for (const name of PI_HOST_PACKAGES)
+      expect(problems("f", { peerDependencies: { [name]: "*" } }, workspaces)).toEqual([])
+    expect(problems("f", { peerDependencies: { other: "*" } }, workspaces)).toHaveLength(1)
+    expect(problems("f", { dependencies: { typebox: "*" } }, workspaces)).toHaveLength(1)
+    expect(problems("f", { devDependencies: { typebox: "*" } }, workspaces)).toHaveLength(1)
+    expect(problems("f", { peerDependencies: { typebox: ">=1.0.0" } }, workspaces)).toHaveLength(1)
   })
 
   test("a bad range in a nested override is found", () => {

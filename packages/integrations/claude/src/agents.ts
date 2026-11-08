@@ -1,8 +1,11 @@
+import { Effect } from "effect"
+
 import { type Route, ROUTES } from "../../../runtime/src/domain/route.ts"
 import {
   PRECEDENCE_FILE,
   ROOT_CORE_FILES,
 } from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
+import { embedMateriality, MATERIALITY_PATH } from "../../../runtime/src/instructions/skills.ts"
 import {
   DIST_DIRECTORY,
   type GeneratedFile,
@@ -175,30 +178,10 @@ export const MERGE_READY_SECTION = "merge-ready.md"
 export const CODE_QUALITY_SECTION = "code-quality.md"
 
 /**
- * The one source of the materiality definition (which visual discrepancies are repaired and which
- * stay preference), relative to the repository root. The generator embeds its text wherever a
- * source holds {@link MATERIALITY_MARKER}, so the definition has a single source and each generated
- * file still carries it whole.
+ * The one source of the materiality definition, relative to the repository root: the Claude
+ * family's copy of the runtime's {@link MATERIALITY_PATH}.
  */
-export const MATERIALITY_FILE = `${INSTRUCTIONS_DIRECTORY}/shared/materiality.md`
-
-/** The line of an instruction source that the generator replaces with the materiality definition. */
-export const MATERIALITY_MARKER = "<!-- materiality -->"
-
-/**
- * A source with its {@link MATERIALITY_MARKER} line replaced by the definition. The marker line is
- * matched after trimming. A source without the marker is returned as it is; one with the marker
- * twice is an error, because the definition would ship twice in one file.
- */
-export const embedMateriality = (text: string, materiality: string, source: string): string => {
-  const lines = text.split("\n")
-  const isMarker = (line: string) => line.trim() === MATERIALITY_MARKER
-  const at = lines.findIndex(isMarker)
-  if (at === -1) return text
-  if (lines.findIndex((line, index) => index > at && isMarker(line)) !== -1)
-    throw new Error(`${source} must hold the line ${MATERIALITY_MARKER} at most once`)
-  return [...lines.slice(0, at), materiality.trim(), ...lines.slice(at + 1)].join("\n")
-}
+export const MATERIALITY_FILE = `${INSTRUCTIONS_DIRECTORY}/${MATERIALITY_PATH}`
 
 /** The interface inspection rules, a file of `specialist/` for the roles that inspect renders. */
 export const INSPECTION_SECTION = "interface-inspection.md"
@@ -375,7 +358,7 @@ export const agentFiles = async (): Promise<ReadonlyArray<GeneratedFile>> => {
   const conditional = Object.fromEntries(
     files.map((file, at) => [
       file,
-      embedMateriality(texts[at] ?? "", materiality, `${directory}/${file}`),
+      Effect.runSync(embedMateriality(texts[at] ?? "", materiality, `${directory}/${file}`)),
     ]),
   )
   const shared: Shared = {

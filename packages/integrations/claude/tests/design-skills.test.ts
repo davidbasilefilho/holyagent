@@ -2,16 +2,19 @@ import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
+import { Effect } from "effect"
+
 import { toPosix } from "../../../runtime/src/domain/paths.ts"
-import { embedMateriality, MATERIALITY_FILE, MATERIALITY_MARKER } from "../src/agents.ts"
-import { INSTRUCTIONS_DIRECTORY } from "../src/files.ts"
 import {
-  DESIGN_CORE_FILE,
   DESIGN_CORE_MARKER,
   DESIGN_SKILLS,
-  generate,
+  embedMateriality,
+  MATERIALITY_MARKER,
   skillBody,
-} from "../src/generate.ts"
+} from "../../../runtime/src/instructions/skills.ts"
+import { MATERIALITY_FILE } from "../src/agents.ts"
+import { INSTRUCTIONS_DIRECTORY } from "../src/files.ts"
+import { DESIGN_CORE_FILE, generate } from "../src/generate.ts"
 import { ROOT } from "./built.ts"
 
 const read = (path: string) => readFileSync(join(ROOT, path), "utf8")
@@ -25,7 +28,10 @@ const INSTRUCTION_FILES = (
   .map((path) => toPosix(`packages/runtime/src/instructions/${path}`))
   .toSorted()
 const materiality = read(MATERIALITY_FILE).trim()
-const core = embedMateriality(read(DESIGN_CORE_FILE), materiality, DESIGN_CORE_FILE).trim()
+const core = Effect.runSync(
+  embedMateriality(read(DESIGN_CORE_FILE), materiality, DESIGN_CORE_FILE),
+).trim()
+const run = Effect.runSync
 const skill = (name: string) =>
   generated.find((file) => file.path.endsWith(`skills/${name}/SKILL.md`))?.content ?? ""
 
@@ -139,11 +145,11 @@ describe("the platform design skills", () => {
 
   test("fail the build when a skill outside the design list holds the core marker", () => {
     const text = `---\nname: other\n---\n${DESIGN_CORE_MARKER}\n`
-    expect(() => skillBody("other/SKILL.md", text, core, "other")).toThrow("DESIGN_SKILLS")
-    expect(skillBody("other/SKILL.md", "---\nname: other\n---\nbody\n", core, "other")).toContain(
-      "body",
-    )
-    expect(skillBody("web-design/SKILL.md", text, core, "web")).toContain("### Spend boldness")
+    expect(() => run(skillBody("other/SKILL.md", text, core, "other"))).toThrow("DESIGN_SKILLS")
+    expect(
+      run(skillBody("other/SKILL.md", "---\nname: other\n---\nbody\n", core, "other")),
+    ).toContain("body")
+    expect(run(skillBody("web-design/SKILL.md", text, core, "web"))).toContain("### Spend boldness")
   })
 
   test("name no framework, library, component kit or API", () => {
@@ -235,21 +241,21 @@ describe("the materiality definition", () => {
   })
 
   test("embeds nothing into a source without the marker and fails on a second marker", () => {
-    expect(embedMateriality("body\n", "definition", "a")).toBe("body\n")
-    expect(embedMateriality(`one\n${MATERIALITY_MARKER}\ntwo`, " definition \n", "a")).toBe(
+    expect(run(embedMateriality("body\n", "definition", "a"))).toBe("body\n")
+    expect(run(embedMateriality(`one\n${MATERIALITY_MARKER}\ntwo`, " definition \n", "a"))).toBe(
       "one\ndefinition\ntwo",
     )
     expect(() =>
-      embedMateriality(`${MATERIALITY_MARKER}\n${MATERIALITY_MARKER}`, "definition", "a"),
+      run(embedMateriality(`${MATERIALITY_MARKER}\n${MATERIALITY_MARKER}`, "definition", "a")),
     ).toThrow("at most once")
   })
 
   test("matches the marker line after trimming, so a stray space cannot ship it as a comment", () => {
-    expect(embedMateriality(`one\n  ${MATERIALITY_MARKER} \ntwo`, "definition", "a")).toBe(
+    expect(run(embedMateriality(`one\n  ${MATERIALITY_MARKER} \ntwo`, "definition", "a"))).toBe(
       "one\ndefinition\ntwo",
     )
     expect(() =>
-      embedMateriality(`${MATERIALITY_MARKER}\n\t${MATERIALITY_MARKER}  `, "definition", "a"),
+      run(embedMateriality(`${MATERIALITY_MARKER}\n\t${MATERIALITY_MARKER}  `, "definition", "a")),
     ).toThrow("at most once")
   })
 })

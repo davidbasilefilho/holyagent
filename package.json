@@ -30,6 +30,14 @@
     "lefthook": "^2.0.0",
     "mise": "^2026.0.0"
   },
+  "pi": {
+    "extensions": [
+      "./packages/integrations/pi/dist/extensions"
+    ],
+    "skills": [
+      "./packages/integrations/pi/dist/skills"
+    ]
+  },
   "trustedDependencies": [
     "@anthropic-ai/claude-code",
     "lefthook",

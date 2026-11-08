@@ -295,6 +295,24 @@ export const DEPENDENCY_FIELDS: ReadonlyArray<string> = [
   "resolutions",
 ]
 
+/**
+ * The packages Pi supplies to every extension and skill. Pi's package documentation (`packages.md`,
+ * "Declare dependencies") has a package list them in `peerDependencies` with the range `*` and not
+ * bundle them, so that range is the one exception to the caret-range rule, for these names in that
+ * field only.
+ */
+export const PI_HOST_PACKAGES: ReadonlyArray<string> = [
+  "@earendil-works/pi-ai",
+  "@earendil-works/pi-agent-core",
+  "@earendil-works/pi-coding-agent",
+  "@earendil-works/pi-tui",
+  "typebox",
+]
+
+/** Whether a dependency is a Pi host package declared as Pi requires: a peer with the range `*`. */
+export const isPiHostPeer = (field: string, name: string, range: unknown): boolean =>
+  field === "peerDependencies" && range === "*" && PI_HOST_PACKAGES.includes(name)
+
 /** A package dependency read from a manifest. */
 export interface PackageDependency {
   readonly field: string
@@ -304,8 +322,8 @@ export interface PackageDependency {
 
 /**
  * The registry dependencies of a parsed `package.json`, field by field. Workspace references, other
- * protocols (`npm:`, `file:`, git) and nested override tables are not registry ranges the updater
- * can move, so they are left out.
+ * protocols (`npm:`, `file:`, git), nested override tables and the Pi host peers (see
+ * {@link isPiHostPeer}) are not registry ranges the updater can move, so they are left out.
  */
 export const packageDependencies = (
   manifest: Readonly<Record<string, unknown>>,
@@ -314,7 +332,9 @@ export const packageDependencies = (
     const table = manifest[field]
     if (table === null || typeof table !== "object" || Array.isArray(table)) return []
     return Object.entries(table).flatMap(([name, range]) =>
-      typeof range === "string" && !range.includes(":") ? [{ field, name, range }] : [],
+      typeof range === "string" && !range.includes(":") && !isPiHostPeer(field, name, range)
+        ? [{ field, name, range }]
+        : [],
     )
   })
 

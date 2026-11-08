@@ -5,6 +5,7 @@ import { tmpdir } from "node:os"
 import { join, normalize, win32 } from "node:path"
 
 import { $ } from "bun"
+import { Effect } from "effect"
 
 import { LOCKFILE, VERSION_COPIES } from "../../../../scripts/bump-version.ts"
 import { Dimension } from "../../../runtime/src/domain/assignment.ts"
@@ -17,13 +18,13 @@ import {
 } from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
 import { REQUIREMENT_COVERAGE } from "../../../runtime/src/instructions/coverage.ts"
 import { parseRequirements } from "../../../runtime/src/instructions/requirements.ts"
+import { embedMateriality } from "../../../runtime/src/instructions/skills.ts"
 import { build } from "../build.ts"
 import packageJson from "../package.json" with { type: "json" }
 import {
   BUILTIN_TOOLS,
   CONDITIONAL_SECTIONS,
   DESIGN_SECTION,
-  embedMateriality,
   HISTORY_RULES_FILE,
   INSPECTION_SECTION,
   MATERIALITY_FILE,
@@ -963,10 +964,8 @@ describe("agents", () => {
 
   test("the mergeability bar and the inspection rules are fixed text in exactly the roles that need them, once", () => {
     for (const { file, applies } of CONDITIONAL_SECTIONS) {
-      const section = embedMateriality(
-        read(`${CLAUDE}/specialist`, file),
-        read(MATERIALITY_FILE),
-        file,
+      const section = Effect.runSync(
+        embedMateriality(read(`${CLAUDE}/specialist`, file), read(MATERIALITY_FILE), file),
       ).trim()
       for (const route of ROUTES) {
         const text = agent(route.agent)?.content ?? ""
@@ -992,10 +991,12 @@ describe("agents", () => {
       ].toSorted(),
     )
     expect(MERGE_READY_SECTION).toBe("merge-ready.md")
-    const inspection = embedMateriality(
-      read(`${CLAUDE}/specialist`, INSPECTION_SECTION),
-      read(MATERIALITY_FILE),
-      INSPECTION_SECTION,
+    const inspection = Effect.runSync(
+      embedMateriality(
+        read(`${CLAUDE}/specialist`, INSPECTION_SECTION),
+        read(MATERIALITY_FILE),
+        INSPECTION_SECTION,
+      ),
     ).trim()
     const inspecting = ROUTES.filter((route) =>
       agent(route.agent)?.content.includes(inspection),

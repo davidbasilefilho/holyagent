@@ -1,6 +1,10 @@
 import { join } from "node:path"
 
 import { toPosix } from "../../../runtime/src/domain/paths.ts"
+import {
+  instructionsDirectory,
+  noteInFrontmatter as noteInMarkdown,
+} from "../../../runtime/src/instructions/skills.ts"
 
 /** The plugin's folder, relative to the repository root. */
 export const PLUGIN_DIRECTORY = "packages/integrations/claude"
@@ -16,7 +20,7 @@ export const DIST_DIRECTORY = `${PLUGIN_DIRECTORY}/dist`
 export const VENDOR_DIRECTORY = `${DIST_DIRECTORY}/scripts/vendor`
 
 /** The instruction sources the plugin is built from, relative to the repository root. */
-export const INSTRUCTIONS_DIRECTORY = "packages/runtime/src/instructions/claude-5.5"
+export const INSTRUCTIONS_DIRECTORY = instructionsDirectory("claude-5.5")
 
 /** The repository root. */
 export const REPOSITORY = join(import.meta.dir, "../../../..")
@@ -45,11 +49,6 @@ export const generatedNote = (source: string): string =>
 /** Text as JSON with a two-space indent and a final newline. */
 export const jsonText = (value: unknown): string => `${JSON.stringify(value, null, 2)}\n`
 
-/**
- * Puts a note into Markdown that starts with frontmatter as a YAML comment on the line after the
- * opening `---`, so the body, which is the prompt, stays as it was.
- */
-export const noteInFrontmatter = (text: string, source: string): string => {
-  const [opening = "", ...rest] = text.split("\n")
-  return [opening, `# ${generatedNote(source)}`, ...rest].join("\n")
-}
+/** Puts the note of a generated file into Markdown that starts with frontmatter. */
+export const noteInFrontmatter = (text: string, source: string): string =>
+  noteInMarkdown(text, generatedNote(source))
