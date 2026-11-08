@@ -70,6 +70,33 @@ describe("stripCitations", () => {
     expect(stripCitations("one\n<!-- K3,\nK4 -->\ntwo\n")).toBe("one\ntwo\n")
   })
 
+  test("leaves no extra blank lines when own-line comments are removed, for LF and CRLF", () => {
+    const cases: ReadonlyArray<readonly [string, string]> = [
+      ["x\n<!-- K1 -->\n<!-- K2 -->\n\ny", "x\n\ny"],
+      ["x\n\n<!-- K1 -->\n<!-- K2 -->\n\ny", "x\n\ny"],
+      ["x\n\n<!-- K1 -->\n\n<!-- K2 -->\n\ny", "x\n\ny"],
+      ["x\n<!-- K1 -->\n\ny", "x\n\ny"],
+      ["x\n\n<!-- K1 -->\ny", "x\n\ny"],
+      ["<!-- K1 -->\n<!-- K2 -->\n\ny", "y"],
+      ["x\n\n\n<!-- K1 -->\n\ny", "x\n\n\ny"],
+    ]
+    for (const [input, expected] of cases) {
+      expect(stripCitations(input)).toBe(expected)
+      expect(stripCitations(input.replaceAll("\n", "\r\n"))).toBe(expected.replaceAll("\n", "\r\n"))
+    }
+  })
+
+  test("leaves a comment inside an inline code span or a fenced code block as it is", () => {
+    const probe = "a `<!--` x\n```\n<!-- keep? -->\n```\nb --> c"
+    expect(stripCitations(probe)).toBe(probe)
+    expect(stripCitations("use `<!-- K1 -->` here <!-- K2 -->\n")).toBe("use `<!-- K1 -->` here\n")
+    expect(stripCitations("``a <!-- k --> ` b``\n")).toBe("``a <!-- k --> ` b``\n")
+    const tilde = "~~~md\n<!-- keep -->\n```\n<!-- keep too -->\n~~~\n<!-- gone -->\nend\n"
+    expect(stripCitations(tilde)).toBe("~~~md\n<!-- keep -->\n```\n<!-- keep too -->\n~~~\nend\n")
+    const open = "<!-- gone -->\n````\n<!-- keep -->\n```\n<!-- keep too -->\n"
+    expect(stripCitations(open)).toBe("````\n<!-- keep -->\n```\n<!-- keep too -->\n")
+  })
+
   test("keeps the marker lines that a generator embeds shared text at", () => {
     const text = `one\n${MATERIALITY_MARKER}\n  ${DESIGN_CORE_MARKER}\ntwo <!-- K1 -->\n`
     expect(stripCitations(text)).toBe(`one\n${MATERIALITY_MARKER}\n  ${DESIGN_CORE_MARKER}\ntwo\n`)
