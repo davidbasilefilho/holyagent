@@ -80,5 +80,37 @@
     "finishedAt": "2026-11-08T07:28:42.185Z"
   },
   "result": "result: items 1-3 done, item 4 documented. `mise run build` exit 0 and `mise run verify` exit 0 (2084 pass, 0 fail, 71 files).\n\nchanged:\n- `packages/integrations/claude/src/agents.ts`\n- `packages/integrations/pi/src/agents.ts`\n- `packages/integrations/pi/src/extension.ts`\n- `packages/integrations/pi/tests/extension.test.ts`\n- `packages/runtime/src/cli/workflow-check.ts`\n- `docs/pi/extensions.md`\n- regenerated: `packages/integrations/claude/dist/scripts/holyagent.js`, `packages/integrations/pi/dist/extensions/holyagent.js`, `packages/integrations/pi/dist/scripts/holyagent.js`\n\nchecks:\n- `bunx --no-install mise run build` -> exit 0.\n- `bunx --no-install mise run verify` -> exit 0; type-check, lint and format clean.\n- The `git diff` of the `agents` and `skills` folders under both `dist` trees is empty, so the Claude plugin's agents and skills are byte-identical.\n- `node --check` on the Pi extension bundle -> ok. The bundle contains no Bun-only API.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- The tree also holds changes I did not make: `docs/pi/orchestration.md`, `packages/runtime/src/cli/report.ts` and `packages/runtime/tests/cli/report.test.ts`. They are left out of the diff file, but the report change reaches the regenerated Claude runtime bundle (`holyagent.js`).\n- The workflow check keeps its own `PLUGIN_NAMESPACE = \"holyagent\"`. Importing `assignment.ts` would pull Bun-only state code into the Node bundle. A test pins it equal to `assignment.ts`'s value.\n- The reused check allows only the `agent()` options `agentType`, `model`, `effort`, `label` and `phase`. Scripts using `schema`, `gate`, `isolation` or `resume`, or a nested `workflow()`, are refused. Widening that is your call.\n- `scriptPath` and saved-`name` workflows are refused, because they cannot be vetted before the package reads them.\n- When the config cannot be read, both gates stay on; they stand down only after a successful read that finds `pi.enable` off.\n- The Pi extension bundle grew by about 7,100 lines, mostly acorn.\n- Item 4: the package has no setting that ignores same-name project or global agents, so I documented the risk in `docs/pi/extensions.md` and added no test.\n- The \"builder exists once\" change is guarded by the existing byte-for-byte dist tests; I added no new test for it.\n\nevidence:\nThe specialist prompt assembly exists once and the Claude dist is byte-identical: `specialistFiles` and `SpecialistHost` in `packages/integrations/claude/src/agents.ts`, and the Pi `agentFiles` calls it. The `git diff` of the `agents` and `skills` folders under both dist trees is empty; only the runtime bundles changed.\nA SubagentWorkflow script launches only the eighteen specialists by literal agentType, without asking for confirmation: `refuseNonSpecialistWorkflow` and the `tool_call` handler in `packages/integrations/pi/src/extension.ts`. The \"SubagentWorkflow tool\" tests in `packages/integrations/pi/tests/extension.test.ts` pass under verify, exit 0.\nThe gates are inactive with pi.enable off: `Collected.enabled` and `Held.disabled` in `extension.ts`. The \"gates and pi.enable\" tests (off, on, unreadable config, re-enabled by a later collection) pass.\nTests cover each change and fail without it: the 125 tests in `packages/integrations/pi/tests/extension.test.ts` pass, including the new gate tests (the Agent and SubagentWorkflow blocks and the pi.enable-off no-op). They would fail on the base because `refuseNonSpecialistWorkflow` does not exist there and the old handler ignores `pi.enable`.\nmise run build exits 0 with dist in sync and mise run verify exits 0: build exit 0, verify exit 0, 2084 pass and 0 fail; the log is `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`.\ndiff-file: `/home/user/holyagent-notes/launcher-f.diff`\n",
+  "acceptance": {
+    "revision": 7,
+    "rationale": "Launcher work reviewed by code and security reviewers through four repair rounds; final head 7846c9b passes verify with 2146 tests and no open blocker.",
+    "criteria": [
+      {
+        "criterion": "The specialist prompt assembly exists once and the Claude dist is byte-identical",
+        "support": "`specialistFiles` and `SpecialistHost` in `packages/integrations/claude/src/agents.ts`, and the Pi `agentFiles` calls it. The `git diff` of the `agents` and `skills` folders under both dist trees is empty; only the runtime bundles changed."
+      },
+      {
+        "criterion": "A SubagentWorkflow script launches only the eighteen specialists by literal agentType, without asking for confirmation",
+        "support": "`refuseNonSpecialistWorkflow` and the `tool_call` handler in `packages/integrations/pi/src/extension.ts`. The \"SubagentWorkflow tool\" tests in `packages/integrations/pi/tests/extension.test.ts` pass under verify, exit 0."
+      },
+      {
+        "criterion": "The gates are inactive with pi.enable off",
+        "support": "`Collected.enabled` and `Held.disabled` in `extension.ts`. The \"gates and pi.enable\" tests (off, on, unreadable config, re-enabled by a later collection) pass."
+      },
+      {
+        "criterion": "Tests cover each change and fail without it",
+        "support": "the 125 tests in `packages/integrations/pi/tests/extension.test.ts` pass, including the new gate tests (the Agent and SubagentWorkflow blocks and the pi.enable-off no-op). They would fail on the base because `refuseNonSpecialistWorkflow` does not exist there and the old handler ignores `pi.enable`."
+      },
+      {
+        "criterion": "mise run build exits 0 with dist in sync and mise run verify exits 0",
+        "support": "build exit 0, verify exit 0, 2084 pass and 0 fail; the log is `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff-file",
+        "support": "`/home/user/holyagent-notes/launcher-f.diff`"
+      }
+    ]
+  },
   "createdAt": "2026-11-08T07:22:13.549Z"
 }
