@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mw7q8ocw-l9rz",
+  "intentId": "intent-0mw7mzreq-mu22",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.artifact",
+  "slug": "re-review-repair-commit-95a9099-on",
+  "objective": "Re-review repair commit 95a9099 on release/0.3.0/feat/pi-review-prompts (worktree /home/user/holyagent-0.3.0-prompts) against the findings it repairs.",
+  "state": "Running",
+  "scope": [
+    "Diff: /home/user/holyagent-notes/wire-c-fix.diff (range 7b935ff..95a9099). Prompts now at packages/runtime/src/prompts/code-review.md and security-review.md; role text at packages/runtime/src/instructions/kimi-k3.1/roles/reviewer-code and reviewer-security.",
+    "Findings: (1, blocking) the prompts gave their own final report and labels that disagreed with the role text (verify each finding, one final report with the evidence block, blocker/optional/rejected; security: a validated vulnerability the change introduced or worsened is a blocker); (2, blocking) docs/development.md:28 and docs/pi/installation.md:31 missed the prompts folder and key; optional: argument handling with a literal or missing range, one example entry each, the runtime-to-integration import, the bare Error in parseTemplate."
+  ],
+  "constraints": [
+    "Read-only; no edits.",
+    "Report in under 400 words; put long logs in a file under /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Each prompt agrees with the Kimi reviewer role text on where the range comes from, what its findings are and how they are labeled",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The changed docs match the code",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "review-findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7q1d60-nvyf",
+    "assignment-0mw7paoik-bocz"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T11:06:22.928Z"
+  },
+  "createdAt": "2026-11-08T11:06:22.928Z"
+}
