@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mw7oobm3-k632",
+  "intentId": "intent-0mw7mzreq-mu22",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.security",
+  "slug": "re-assess-repair-commit-13f357f-on",
+  "objective": "Re-assess repair commit 13f357f on release/0.3.0/feat/pi-root-wiring against the two security blockers it repairs.",
+  "state": "Running",
+  "scope": [
+    "Read /home/user/holyagent-notes/wire-a-repair.diff; sources in /home/user/holyagent-0.3.0-wiring; Pi 1.5.0 sources under its node_modules/@earendil-works/pi-coding-agent.",
+    "Blocker 1: unsanitized text reached notice() from a project config pi.routes.*.model and from pi auth check output. Repair: printable() in oneLine/notice and a ModelId pattern.",
+    "Blocker 2: the root's exclusion was weaker than --exclude-tools (setActiveTools only deactivates; _getCallableTools lets codemode call deferred tools) and failed open when the config or role could not be read. Repair: closedSettings fallback to defaults and refuseExcludedTool on tool_call.",
+    "Check whether any path still lets the root call an excluded tool (a tool registered after session start, a renamed or aliased tool, a different event order), and whether the stripping covers every notice path and the ModelsNotInCatalog brief."
+  ],
+  "constraints": [
+    "Read-only; no edits and no version-control writes.",
+    "Report in under 400 words; put long logs in a file under /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "No untrusted input reaches the notice text with control characters",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The root cannot call an excluded tool, including when the config cannot be read",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "security-findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7o2nti-ylx1"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T10:22:33.675Z"
+  },
+  "createdAt": "2026-11-08T10:22:33.675Z"
+}
