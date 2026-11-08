@@ -1,0 +1,50 @@
+{
+  "id": "assignment-0mw7dnnux-nb2j",
+  "intentId": "intent-0mw6muujd-wz9x",
+  "intentRevision": 9,
+  "roleTask": "Reviewer.code",
+  "slug": "confirm-the-kimi-provider-repair-on",
+  "objective": "Confirm the Kimi provider repair on release/0.3.0/feat/kimi-provider (range c2f4433..HEAD, worktree /home/user/holyagent-0.3.0-provider; run commands there) closes the earlier review findings and adds no regression.",
+  "state": "Ready",
+  "scope": [
+    "Earlier blocking finding: the pi-provider-kimi-code pin was a hardcoded constant the updater never moved, and piPackages returned bare names. Optional: catalog parsing without Schema (footer becomes an entry), empty listing reported as missing ids, readiness and catalog error details inconsistent, docs describing launcher use of functions with no caller. Security note: piPackages unpinned.",
+    "The repair (160c191): packages/runtime/src/config/pi-packages.json and pi-packages.ts hold exact pins that piPackages, providerSource and scripts/dependency-pins.ts / update-dependencies.ts read; deps:check fails when one is behind; catalog rows decoded with Schema (CatalogRow), NoModelsListed for an empty listing, one outputDetail helper. A following commit updates AGENTS.md, docs/development.md and four docs/pi pages about what the updater moves.",
+    "Requirements: /home/user/holyagent-notes/intent-kimi-provider.txt."
+  ],
+  "constraints": [
+    "Fixtures only: no network, no pi binary, no live model. To exercise the updater, use its tests or --dry-run with fixtures only.",
+    "Read-only: no edits and no version-control writes.",
+    "Report in under 400 words; start each evidence line with the exact criterion text (no backticks), a colon, then the support."
+  ],
+  "criteria": [
+    {
+      "text": "Each earlier finding is closed by the repair",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The updater change keeps its existing pin kinds working and adds the Pi package kind with fixture tests",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Docs, AGENTS.md included, match what the updater and the pins do",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "bunx --no-install mise run verify exits 0 and mise run build leaves the tree clean on HEAD",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7ddvts-lf2f"
+  ],
+  "createdAt": "2026-11-08T05:14:07.113Z"
+}
