@@ -53,5 +53,33 @@
     "finishedAt": "2026-11-08T05:26:41.916Z"
   },
   "result": "result: cause confirmed and fixed; verify and build both pass.\n\nCause: in `collect`, `config` and `state mode` run under `Effect.all`. When config fails, Effect interrupts the sibling. `Effect.tryPromise` does not wait for the promise on interrupt. The gather therefore delivered the notice while the `state mode` process (which chdirs into the project) was still exiting, and on Windows that held the project folder open (EBUSY). I did not reproduce the Windows EBUSY itself. The red tests below show the extension returning with an exec still pending; the Windows folder lock is inferred.\n\nFix: in `packages/integrations/pi/src/extension.ts`, `exec` is now `Effect.callback`. On interruption it aborts the command's signal and waits for `pi.exec` to settle before the effect ends. This covers the config-failure sibling and the deadline. A shutdown or a newer gather aborts the signal, and the gather ends when the exec settles.\n\nI also changed the real-process test responder (`realExec`) to pass the signal to `Bun.spawn`, as Pi's exec kills on abort. The test cleanup is unchanged.\n\nTests: a new describe \"no command outlives a gather\" in `extension.test.ts` counts execs started and not yet settled, with stopped commands exiting 60 ms after the abort.\n- Config failure: red before the fix (count 1), green after.\n- Deadline: red before the fix (count 1), green after.\n- Success and shutdown: pass before and after the fix.\n\nnotes: an older gather aborted by a compaction is not awaited by the newer one, so its children can still be exiting briefly. No instrumentation was added.\n\nchanged: packages/integrations/pi/src/extension.ts, packages/integrations/pi/tests/extension.test.ts, packages/integrations/pi/dist/extensions/holyagent.js (generated)\nchecks: `bunx --no-install mise run verify` -> exit 0 (1842 pass, 0 fail); `bunx --no-install mise run build` -> exit 0, only the dist file above changed; a second build left the tree unchanged.\nblockers: none\nquestions: none\n\nevidence:\nThe EBUSY cause is stated from the evidence and fixed in the code, so no child process outlives a gather: the cause is above; the fix is at `extension.ts:166-190`; `win78b.log` shows the failure at lines 2205-2225.\nA test asserts no exec is pending when a gather delivers, including when config fails: `extension.test.ts`, describe \"no command outlives a gather\"; red before the fix (config failure and deadline), green after.\nbunx --no-install mise run verify exits 0 and mise run build leaves generated output in sync: verify exit 0 (1842 pass), build exit 0, and the second build changed nothing.\nchanged-paths: see `changed:` above.\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/pi-exec.diff\n",
+  "acceptance": {
+    "revision": 6,
+    "rationale": "Confirmed by review assignment-0mw7eh9ak-4omc of 425f035",
+    "criteria": [
+      {
+        "criterion": "The EBUSY cause is stated from the evidence and fixed in the code, so no child process outlives a gather",
+        "support": "the cause is above; the fix is at `extension.ts:166-190`; `win78b.log` shows the failure at lines 2205-2225."
+      },
+      {
+        "criterion": "A test asserts no exec is pending when a gather delivers, including when config fails",
+        "support": "`extension.test.ts`, describe \"no command outlives a gather\"; red before the fix (config failure and deadline), green after."
+      },
+      {
+        "criterion": "bunx --no-install mise run verify exits 0 and mise run build leaves generated output in sync",
+        "support": "verify exit 0 (1842 pass), build exit 0, and the second build changed nothing."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "see `changed:` above."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/pi-exec.diff"
+      }
+    ]
+  },
   "createdAt": "2026-11-08T05:20:35.096Z"
 }
