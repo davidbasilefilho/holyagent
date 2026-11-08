@@ -61,12 +61,14 @@ const checks = (env: Env, file: string, scope: Scope) =>
  * Checks the environment HolyAgent needs, one line per check: `bun` and `ctx7` on PATH, the
  * recommended keys of the settings of the chosen scope (`user` unless set; `project` and `local`
  * are found from `cwd`, the process directory when absent), then the Pi checks of {@link piChecks}
- * when Pi is in use and `pi.enable` is on in the HolyAgent config (a machine without Pi gets one
- * informational line instead; a cloud session runs no Pi). In a claude.ai cloud session `ctx7`
- * passes, since setup leaves it out there. With `fix`, the setup steps behind a failing check run
- * first, their lines come before the checks, and the checks then run again; Bun, Pi, Node and the
- * Pi packages are never installed, so the Pi lines are read once and name the command that fixes
- * them. The report is ok when no check fails.
+ * when Pi is in use and `pi.enable` is on in the HolyAgent config of that scope (the user's file
+ * for `user`, so a repository's own config cannot change what doctor expects of the global install;
+ * the project's over it for `project` and `local`). A machine without Pi gets one informational
+ * line instead, and a cloud session runs no Pi. In a claude.ai cloud session `ctx7` passes, since
+ * setup leaves it out there. With `fix`, the setup steps behind a failing check run first, their
+ * lines come before the checks, and the checks then run again; Bun, Pi, Node and the Pi packages
+ * are never installed, so the Pi lines are read once and name the command that fixes them. The
+ * report is ok when no check fails.
  */
 export const doctor = Effect.fn("doctor")(function* (
   env: Env,
@@ -74,7 +76,7 @@ export const doctor = Effect.fn("doctor")(function* (
 ) {
   const scope = options.scope ?? "user"
   const cwd = options.cwd ?? process.cwd()
-  const pi = inCloudSession(env) ? [] : yield* piChecks(env, cwd)
+  const pi = inCloudSession(env) ? [] : yield* piChecks(env, cwd, scope)
   const located = yield* settingsFile(env, scope, cwd).pipe(
     Effect.catchTag("SetupFailure", (error) => Effect.succeed(error)),
   )

@@ -15,6 +15,7 @@ import {
   PI_MINIMUM_NODE,
   piAgentDirectory,
 } from "../src/setup/pi-check.ts"
+import { staleManagedNames } from "../src/setup/pi-install.ts"
 import { setup } from "../src/setup/steps.ts"
 import { fakeShell, scratch, writeCompleteSettings } from "./setup-fixture.ts"
 
@@ -47,7 +48,11 @@ const projectSettings = () => join(project, ".pi", "settings.json")
 const FULL = () => ({ packages: [SOURCE, ...DEFAULT_SOURCES] })
 const FEATURES_OK = `ok   pi features: ${DEFAULT_SOURCES.length} enabled packages listed at their pins`
 const IN_USE = { HOLYAGENT_HOST: "pi" }
-const setConfig = (config: unknown) => write(join(project, ".holyagent", "config.json"), config)
+/** The user's own HolyAgent config, which a user-scope setup and doctor decide from. */
+const setConfig = (config: unknown) => write(join(home, ".holyagent", "config.json"), config)
+/** The project's HolyAgent config, which project and local scope read over the user's. */
+const setProjectConfig = (config: unknown) =>
+  write(join(project, ".holyagent", "config.json"), config)
 
 /** A fake shell where `pi`, `node` and `bun` are installed and print the given versions. */
 const shellWith = (
@@ -66,12 +71,13 @@ const shellWith = (
 
 const check = (
   shell: ReturnType<typeof fakeShell>,
-  extra: { env?: Record<string, string>; fix?: boolean } = {},
+  extra: { env?: Record<string, string>; fix?: boolean; scope?: "user" | "project" | "local" } = {},
 ) =>
   Effect.runPromise(
-    doctor({ HOME: home, ...extra.env }, { fix: extra.fix ?? false, cwd: project }).pipe(
-      Effect.provide(shell.layer),
-    ),
+    doctor(
+      { HOME: home, ...extra.env },
+      { fix: extra.fix ?? false, cwd: project, scope: extra.scope ?? "user" },
+    ).pipe(Effect.provide(shell.layer)),
   )
 
 /** The lines the Pi checks added, which come after the three of bun, ctx7 and the settings. */
@@ -215,7 +221,7 @@ describe("holyagent doctor, Pi checks", () => {
     expect(report.ok).toBe(false)
     expect(piLines(report)).toHaveLength(1)
     expect(piLines(report)[0]).toStartWith("FAIL pi config: ")
-    expect(piLines(report)[0]).toContain(join(project, ".holyagent", "config.json"))
+    expect(piLines(report)[0]).toContain(join(home, ".holyagent", "config.json"))
   })
 
   test("a machine without Pi gets one informational line and no failure, whatever its Pi files hold", async () => {
@@ -289,6 +295,30 @@ describe("holyagent doctor, Pi checks", () => {
     expect(missing[0]).toStartWith("FAIL pi feature pi-web-kit: ")
   })
 
+  test("a user-scope doctor expects what the user's config selects, not what the repository's config does", async () => {
+    await setProjectConfig({ pi: { features: { todo: false, computerUse: false } } })
+    await write(globalSettings(), FULL())
+    const user = await check(shellWith())
+    expect(piLines(user)[3]).toBe(FEATURES_OK)
+
+    const off = DEFAULT_SOURCES.filter((source) => !source.includes("rpiv-todo"))
+    await write(globalSettings(), { packages: [SOURCE, ...off] })
+    const missing = piLines(await check(shellWith())).slice(3)
+    expect(missing.map((line) => line.split(":")[0])).toEqual([
+      "FAIL pi feature @juicesharp/rpiv-todo",
+    ])
+    // A project-scope doctor prefixes a notice line, so the feature line is found by its name.
+    const project = (await check(shellWith(), { scope: "project" })).lines
+    expect(project.find((line) => line.includes("pi features"))).toContain(
+      "enabled packages listed",
+    )
+
+    await setProjectConfig({ pi: { enable: false } })
+    expect(piLines(await check(shellWith())).length).toBe(4)
+    const local = (await check(shellWith(), { scope: "local" })).lines
+    expect(local.filter((line) => /pi[ :]/.test(line) && !line.includes("settings"))).toEqual([])
+  })
+
   test("a cloud session runs no Pi check", async () => {
     const shell = fakeShell({ commands: ["bun", "pi"] })
     const report = await check(shell, { env: { CLAUDE_CODE_REMOTE: "true", ...IN_USE } })
@@ -303,6 +333,10 @@ describe("which package sources name the HolyAgent package", () => {
     "npm:holyagent@0.3.0",
     "git:github.com/davidbasilefilho/holyagent@holyagent-0.3.0",
     "git:github.com/davidbasilefilho/holyagent",
+    "git:github.com/davidbasilefilho/holyagent@release/0.3.0/integration",
+    "git:git@github.com:davidbasilefilho/holyagent@release/0.3.0/integration",
+    "https://github.com/davidbasilefilho/holyagent.git@release/0.3.0/integration",
+    "ssh://git@github.com/davidbasilefilho/holyagent.git@feature/x",
     "https://github.com/davidbasilefilho/holyagent.git",
     "git@github.com:davidbasilefilho/holyagent.git",
     "/work/holyagent",
@@ -318,10 +352,33 @@ describe("which package sources name the HolyAgent package", () => {
     "npm:holyagent-extras@1.0.0",
     "npm:pi-web-kit@0.5.0",
     "git:github.com/someone/holyagent-fork@main",
+    "git:github.com/someone/other@release/holyagent",
+    "https://github.com/someone/other.git@feature/holyagent",
     "/work/other/dist",
     "",
   ])("not %s", (source) => {
     expect(isHolyagentSource(source)).toBe(false)
+  })
+})
+
+describe("which listed packages setup removes", () => {
+  const OTHER = "npm:pi-provider-other@1.0.0"
+
+  test("a provider profile package the config no longer selects goes, a selected one stays", () => {
+    const managed = new Set(["pi-provider-kimi-code", "pi-provider-other", "pi-web-kit"])
+    const listed = [SOURCE, OTHER, DEFAULT_SOURCES[0] as string, "npm:some-other-package@1.0.0"]
+    expect(staleManagedNames(listed, [DEFAULT_SOURCES[0] as string], managed)).toEqual([
+      "pi-provider-other",
+    ])
+    expect(staleManagedNames(listed, [OTHER], managed)).toEqual(["pi-provider-kimi-code"])
+  })
+
+  test("the shipped provider package is managed, the HolyAgent package and strangers are not", () => {
+    const kimi = DEFAULT_SOURCES[0] as string
+    expect(kimi.startsWith("npm:pi-provider-kimi-code@")).toBe(true)
+    expect(staleManagedNames([kimi, SOURCE, "npm:holyagent@0.3.0", "npm:x@1"], [])).toEqual([
+      "pi-provider-kimi-code",
+    ])
   })
 })
 
@@ -444,7 +501,6 @@ describe("holyagent setup, Pi packages", () => {
   })
 
   test("project scope works on the project's settings with -l, run in the project", async () => {
-    await write(globalSettings(), { packages: DEFAULT_SOURCES })
     await write(projectSettings(), { packages: [SOURCE] })
     for (const scope of ["project", "local"] as const) {
       const shell = withPi()
@@ -454,6 +510,73 @@ describe("holyagent setup, Pi packages", () => {
         shell.calls.filter((call) => call.command === "pi").every((call) => call.cwd === project),
       ).toBe(true)
     }
+  })
+
+  test("a user-scope setup decides from the user's config only, so a repository's config removes nothing globally", async () => {
+    await setProjectConfig({
+      pi: { features: { todo: false, computerUse: false, web: "off" }, enable: true },
+    })
+    await write(globalSettings(), FULL())
+    const shell = withPi()
+    const report = await runSetup(shell)
+    expect(shell.calls).toEqual([])
+    expect(piStep(report)).toEqual(
+      DEFAULT_SOURCES.map((source) => `= pi ${source}: already listed in ${globalSettings()}`),
+    )
+
+    await setProjectConfig({ pi: { enable: false } })
+    const disabled = withPi()
+    await runSetup(disabled)
+    expect(disabled.calls).toEqual([])
+
+    // The same project config does decide a project-scope setup, which works on the project.
+    await write(projectSettings(), FULL())
+    const scoped = withPi()
+    await runSetup(scoped, { scope: "project" })
+    expect(piCommands(scoped)).toEqual([])
+    expect(piStep(await runSetup(withPi(), { scope: "project" }))).toEqual([
+      "- pi packages: pi.enable is off in the HolyAgent config",
+    ])
+  })
+
+  test("a project-scope setup removes what the project's config turns off, from the project's settings", async () => {
+    await setProjectConfig({ pi: { features: { todo: false } } })
+    await write(projectSettings(), FULL())
+    const shell = withPi()
+    await runSetup(shell, { scope: "project" })
+    expect(piCommands(shell)).toEqual(["pi remove npm:@juicesharp/rpiv-todo -l"])
+  })
+
+  test("a package listed at its pin in either settings file counts as present, in setup as in doctor", async () => {
+    const [first, ...others] = DEFAULT_SOURCES
+    await write(globalSettings(), { packages: [SOURCE, ...others] })
+    await write(projectSettings(), { packages: [{ source: first }] })
+    for (const scope of ["user", "project"] as const) {
+      const shell = withPi()
+      const report = await runSetup(shell, { scope })
+      expect(piCommands(shell)).toEqual([])
+      expect(piStep(report)).toHaveLength(DEFAULT_SOURCES.length)
+    }
+    expect(piStep(await runSetup(withPi())).at(0)).toBe(
+      `= pi ${first}: already listed in ${projectSettings()}`,
+    )
+    expect(piLines(await check(shellWith()))[3]).toBe(FEATURES_OK)
+
+    // A stale pin in one file does not count, and the other scope's invalid file is ignored.
+    await write(projectSettings(), { packages: "broken" })
+    const stale = withPi()
+    await runSetup(stale)
+    expect(piCommands(stale)).toEqual([`pi install ${first}`])
+  })
+
+  test("removal touches the chosen scope's settings only", async () => {
+    await setConfig({ pi: { features: { todo: false } } })
+    await write(globalSettings(), FULL())
+    await write(projectSettings(), FULL())
+    const shell = withPi()
+    await runSetup(shell)
+    expect(piCommands(shell)).toEqual(["pi remove npm:@juicesharp/rpiv-todo"])
+    expect(shell.calls.every((call) => call.cwd === home)).toBe(true)
   })
 
   test("a failing command is a failed line and the others still run", async () => {

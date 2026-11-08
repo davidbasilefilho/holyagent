@@ -11,6 +11,7 @@ import { type Env, firstNonEmpty, homeDirectory } from "./environment.ts"
 import { SetupFailure } from "./errors.ts"
 import { fileOperation } from "./json-file.ts"
 import { fail, hint, pass } from "./report.ts"
+import type { Scope } from "./scope.ts"
 import { Shell } from "./shell.ts"
 
 /**
@@ -125,15 +126,24 @@ const PiSettings = Schema.StructWithRest(
 )
 
 /**
+ * What leads a git source up to its repository path: the `git:` prefix or a URL scheme with an
+ * optional `user@` and, for the scp form, `user@host:`. The `@` that follows the repository path
+ * starts the ref, which may hold slashes (`release/0.3.0/integration`).
+ */
+const GIT_LEAD = /^(?:git:|[a-z][a-z0-9+.-]*:\/\/)(?:[^/@]*@)?|^[^/@:\s]+@[^/@:\s]+:/i
+
+/**
  * The name a package source ends in, or `undefined` for a source that is not a package name: the
- * last path segment without its `@ref` or `@version`, `.git` and an `npm:` scope check (a scoped
- * npm package is somebody else's, even when it is named `holyagent`).
+ * last path segment without its `@ref` or `@version` and `.git`, and an `npm:` scope check (a
+ * scoped npm package is somebody else's, even when it is named `holyagent`). A git source loses its
+ * ref first, whole, so a ref with slashes cannot stand in for the name; a path is read as it is.
  */
 const sourceName = (source: string): string | undefined => {
   const bare = source.startsWith("npm:") ? source.slice("npm:".length) : source
   if (source.startsWith("npm:") && bare.startsWith("@")) return undefined
+  const path = GIT_LEAD.test(bare) ? (bare.replace(GIT_LEAD, "").split("@")[0] ?? "") : bare
   const last =
-    bare
+    path
       .split(/[/\\:]/)
       .filter(Boolean)
       .at(-1) ?? ""
@@ -225,11 +235,18 @@ export const piInUse = (env: Env) =>
   })
 
 /**
- * The HolyAgent config for the project in `cwd` (the user's file under the project's
- * `.holyagent/config.json`), or a {@link SetupFailure} naming the bad file.
+ * The HolyAgent config that decides the Pi packages at a scope, or a {@link SetupFailure} naming the
+ * bad file. Scope `user` works on Pi's global settings and reads the user's own file only, so a
+ * `.holyagent/config.json` of the directory it runs in cannot turn a feature off and have a package
+ * removed from them; `project` and `local` work on the project, so they read the user's file with
+ * the project's over it, the config the project runs with.
  */
-export const loadPiConfig = (env: Env, cwd: string): Effect.Effect<Config, SetupFailure> =>
-  loadConfig({ projectDirectories: [stateDirectory(cwd)], env }).pipe(
+export const loadPiConfig = (
+  env: Env,
+  cwd: string,
+  scope: Scope,
+): Effect.Effect<Config, SetupFailure> =>
+  loadConfig({ projectDirectories: scope === "user" ? [] : [stateDirectory(cwd)], env }).pipe(
     Effect.mapError((error) => new SetupFailure({ message: error.message })),
   )
 
@@ -294,21 +311,23 @@ const checkFeatures = (env: Env, cwd: string, config: Config) =>
  * newer, `pi package`, the HolyAgent package in the `packages` of Pi's global settings (Pi's agent
  * folder, `PI_CODING_AGENT_DIR` honored) or the project's `.pi/settings.json`, and each package the
  * config enables ({@link piPackages}) that those files do not list at its pin. Every failing line
- * ends with the command that fixes it, and nothing is installed or written. The checks run only
- * while Pi is in use ({@link piInUse}) and `pi.enable` is on in the HolyAgent config; when Pi is
- * not in use there is one informational `~` line saying so, with `pi.enable` off there are no
- * lines, and a config that cannot be loaded gives one failing `pi config` line.
+ * ends with the command that fixes it, and nothing is installed or written. The config is the one
+ * `setup` reads at the same scope ({@link loadPiConfig}). The checks run only while Pi is in use
+ * ({@link piInUse}) and `pi.enable` is on in that config; when Pi is not in use there is one
+ * informational `~` line saying so, with `pi.enable` off there are no lines, and a config that
+ * cannot be loaded gives one failing `pi config` line.
  */
 export const piChecks = (
   env: Env,
   cwd: string,
+  scope: Scope,
 ): Effect.Effect<ReadonlyArray<string>, never, Shell> =>
   Effect.gen(function* () {
     if (!(yield* piInUse(env)))
       return [
         hint("pi: not in use (HOLYAGENT_HOST is not pi and pi is not on PATH); Pi checks skipped"),
       ]
-    return yield* loadPiConfig(env, cwd).pipe(
+    return yield* loadPiConfig(env, cwd, scope).pipe(
       Effect.matchEffect({
         onFailure: (error) =>
           Effect.succeed<ReadonlyArray<string>>([fail("pi config", error.message)]),
