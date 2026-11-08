@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mw7d6pm3-xm1q",
+  "intentId": "intent-0mw6muujd-wz9x",
+  "intentRevision": 9,
+  "roleTask": "Reviewer.security",
+  "slug": "assess-commit-c2f4433-the-kimi-for",
+  "objective": "Assess commit c2f4433 (the Kimi for Coding provider mapping, readiness and catalog checks) for security issues around credentials, command execution and supply-chain pinning.",
+  "state": "Running",
+  "scope": [
+    "Diff: /home/user/holyagent-notes/kimi-provider.diff; worktree /home/user/holyagent-0.3.0-provider. Requirements in /home/user/holyagent-notes/intent-kimi-provider.txt: HolyAgent never calls provider URLs, never reads auth.json, never uses pi auth print-api-key or print-bearer-token; readiness runs pi auth check --provider <id> --json; the provider package is pinned (pi-provider-kimi-code@0.6.13)."
+  ],
+  "constraints": [
+    "Read-only: no edits and no version-control writes.",
+    "Report in under 350 words; start each evidence line with the exact criterion text, a colon, then the support."
+  ],
+  "criteria": [
+    {
+      "text": "No credential is read, printed, logged or passed on, and no provider URL is called",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The readiness and catalog commands take fixed arguments with no injection from config or catalog output",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The provider package source is pinned to an exact version",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "diff-file"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T05:00:56.235Z"
+  },
+  "createdAt": "2026-11-08T05:00:56.235Z"
+}
