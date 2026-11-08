@@ -1,0 +1,62 @@
+{
+  "id": "assignment-0mw78djln-wu4j",
+  "intentId": "intent-0mw6mutwc-frer",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.code",
+  "slug": "review-pr-5-the-pi-package-scaffold",
+  "objective": "Review PR 5, the pi package scaffold (range origin/release/0.3.0/integration..b6781ee on release/0.3.0/feat/pi-package, worktree /home/user/holyagent-0.3.0-pi; run commands there), for correctness and regressions against the merge-ready bar.",
+  "state": "Running",
+  "scope": [
+    "Diff without the generated dist and bun.lock: /home/user/holyagent-notes/pi1-full.diff; changed paths: /home/user/holyagent-notes/pi1-paths.txt. Writer reports (claims only): .git/holyagent/reports/assignment-0mw77lh0d-07e5.md and .git/holyagent/reports/assignment-0mw786u16-gi9a.md.",
+    "Requirements of the Intent in use bind: a Pi package beside the Claude plugin from the shared runtime; pi-package keyword and pi key; extension bundled with bun build, host modules as peerDependencies with range * and not bundled; generated paths in the byte-for-byte sync check with a sync test; version synced from the root package.json; install from release tags with no npm publishing; paths within 120 characters.",
+    "Check in particular: the generator shared with the Claude build (packages/runtime/src/instructions/skills.ts) leaves the Claude output byte-identical; the bundle really excludes the host modules; the pi key paths resolve from the repository root in a git install (pi's package-manager.js in /home/user/holyagent-notes/pi-probe/node_modules/@earendil-works/pi-coding-agent); scripts/prepare-dev.ts behaves in dev and consumer installs and on Windows; the dependency-pins and updater changes keep deps:update correct; the stale-build CI step."
+  ],
+  "constraints": [
+    "Repository rules in .claude/CLAUDE.md and AGENTS.md bind (Effect, Schema, Bun APIs, Bun Shell, JSDoc, mise as command source).",
+    "Do not run the pi binary. Read-only: no edits, no version-control writes. The built-in /code-review may not work in this worktree; review the range yourself if it fails.",
+    "Report in under 450 words; long logs in /home/user/holyagent-notes/."
+  ],
+  "criteria": [
+    {
+      "text": "The pi package generator, bundle, manifest and root pi key behave as specified",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The Claude output and existing build, updater and hook behavior are unchanged",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The sync, externals, dependency-range and prepare tests fail without the code they cover",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The code follows the repository rules",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "bunx --no-install mise run verify exits 0 on b6781ee and mise run build leaves the tree clean",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw77lh0d-07e5",
+    "assignment-0mw786u16-gi9a"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T02:46:16.955Z"
+  },
+  "createdAt": "2026-11-08T02:46:16.955Z"
+}
