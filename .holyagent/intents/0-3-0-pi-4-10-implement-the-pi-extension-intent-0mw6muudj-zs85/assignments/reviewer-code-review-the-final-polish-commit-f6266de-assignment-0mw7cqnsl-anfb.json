@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-the-final-polish-commit-f6266de",
   "objective": "Review the final polish commit f6266de of the Pi extension entry (range 3ddedda..f6266de on release/0.3.0/feat/pi-extension, worktree /home/user/holyagent-0.3.0-ext; run commands there) for correctness and regressions.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Notes it answers: topOf treated any git failure as non-git; ctx.cwd was passed unresolved; the --project handoff via Bun.argv.splice was a hidden coupling; Bun.build failures surfaced as String(cause); ordering tests used fixed 30ms sleeps; the wrapper comment and docs said Bun starts in the project under Pi.",
     "Diff without bundles: /home/user/holyagent-notes/pi-ext-polish.diff. The Claude dist changes only in the wrapper comment, which is accepted."
@@ -49,7 +49,37 @@
     "agentId": "workflow:wf_563820a1-f67/assignment-0mw7cqnsl-anfb",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T04:48:27.381Z"
+    "startedAt": "2026-11-08T04:48:27.381Z",
+    "finishedAt": "2026-11-08T04:52:35.675Z"
+  },
+  "result": "result: No blockers. All four criteria are met. The built-in `/code-review` skill ran as the built-in on `3ddedda...f6266de`. Its findings are classified below.\n\nchanged: none (read-only review)\n\nchecks:\n- `bunx --no-install mise run verify` -> exit 0; 1837 pass, 0 fail; type-check, lint and format check clean.\n- `mise run build` -> exit 0. `git status --short` was empty before and after, so the tree stays clean.\n- Not run: the pi binary and live models (per constraints).\n\nblockers: none\n\nquestions: none\n\nnotes:\n- Built-in review findings, classified:\n  - `extension.ts` topOf matches English text only. REJECTED as a blocker. It is the intended fail-closed design the criterion names and is documented in the code comment. It was read and tested only for English, timeout, dubious-ownership and bare-exit-1 cases, not run under a localized git. Optional: docs/pi/extensions.md could say that a localized git fails closed.\n  - Git failure aborts collection before the config load, so `pi.enable:false` still shows one notice. OPTIONAL. This is the consequence of failing closed and was read, not run.\n  - The `Bun.argv.splice` global mutation. REJECTED. The splice is a no-op without `--project`. The coupling is now documented in the code and covered by a real-entry test.\n  - `bundle.test.ts` asserts Bun's error wording and exactly two lines. OPTIONAL. It passes now, but a Bun upgrade could break it.\n  - `messagesOf` falls back to `String()` for a non-Error entry. OPTIONAL. Bun's BuildMessage is an Error subclass, and the unresolved-import test shows readable text.\n  - `session-context.test.ts` spawns a literal `bun`. OPTIONAL. `stdin.test.ts` and `pipe.test.ts` use `process.execPath` instead. `process.execPath` would be more robust here.\n- I found nothing else on my own review.\n\nevidence:\n- Each note is closed and the change is correct, including the English-only not-a-repository match failing closed: topOf in `packages/integrations/pi/src/extension.ts:175-195` succeeds as non-git only for exit 128, not killed, and a stderr match of /not a git repository/i. Every other failure becomes a `CommandFailed` notice. `collect` resolves `cwd` once. `pi-entry.ts` uses the splice of `rest`. `bundle.ts` has `messagesOf`. The ordering tests await gates. The wrapper comment and docs were corrected. Tests: timeout, dubious ownership and exit 1 each fail closed with nothing else run.\n- No regression in the Claude hook, CLI or dist beyond the wrapper comment: the diff of `packages/integrations/claude/dist` is the `scripts/holyagent` comment only. `src/wrapper.sh` changes only the comment. The `exec` line is unchanged. `pi-entry.ts` is not part of the Claude bundle.\n- Tests cover the changes without fixed sleeps in ordering tests: `settle = Bun.sleep(30)` is removed. The ordering tests await `hold.entered` and `folderAsked.entered`. New tests cover the relative cwd, the three non-\"not a repository\" git failures, the entry handoff with `--project`, and the BundleFailed messages (missing entry, and two unresolved imports).\n- bunx --no-install mise run verify exits 0 and mise run build leaves the tree clean: verify exit 0 with 1837 pass and 0 fail (log `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`). Build exit 0, and `git status --short` was empty before and after.\n- checks-run: `bunx --no-install mise run verify` -> 0 (1837 pass, 0 fail); `bunx --no-install mise run build` -> 0, tree clean. The skill `/code-review 3ddedda...f6266de` ran as the built-in. Not run: the pi binary and live models.\n",
+  "acceptance": {
+    "revision": 6,
+    "rationale": "All criteria met at f6266de; verify 1837 pass; build clean; remaining notes optional",
+    "criteria": [
+      {
+        "criterion": "Each note is closed and the change is correct, including the English-only not-a-repository match failing closed",
+        "support": "topOf in `packages/integrations/pi/src/extension.ts:175-195` succeeds as non-git only for exit 128, not killed, and a stderr match of /not a git repository/i. Every other failure becomes a `CommandFailed` notice. `collect` resolves `cwd` once. `pi-entry.ts` uses the splice of `rest`. `bundle.ts` has `messagesOf`. The ordering tests await gates. The wrapper comment and docs were corrected. Tests: timeout, dubious ownership and exit 1 each fail closed with nothing else run."
+      },
+      {
+        "criterion": "No regression in the Claude hook, CLI or dist beyond the wrapper comment",
+        "support": "the diff of `packages/integrations/claude/dist` is the `scripts/holyagent` comment only. `src/wrapper.sh` changes only the comment. The `exec` line is unchanged. `pi-entry.ts` is not part of the Claude bundle."
+      },
+      {
+        "criterion": "Tests cover the changes without fixed sleeps in ordering tests",
+        "support": "`settle = Bun.sleep(30)` is removed. The ordering tests await `hold.entered` and `folderAsked.entered`. New tests cover the relative cwd, the three non-\"not a repository\" git failures, the entry handoff with `--project`, and the BundleFailed messages (missing entry, and two unresolved imports)."
+      },
+      {
+        "criterion": "bunx --no-install mise run verify exits 0 and mise run build leaves the tree clean",
+        "support": "verify exit 0 with 1837 pass and 0 fail (log `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`). Build exit 0, and `git status --short` was empty before and after."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bunx --no-install mise run verify` -> 0 (1837 pass, 0 fail); `bunx --no-install mise run build` -> 0, tree clean. The skill `/code-review 3ddedda...f6266de` ran as the built-in. Not run: the pi binary and live models."
+      }
+    ]
   },
   "createdAt": "2026-11-08T04:48:27.381Z"
 }
