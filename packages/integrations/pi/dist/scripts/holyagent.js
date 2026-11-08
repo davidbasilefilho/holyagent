@@ -13899,6 +13899,495 @@ var init_context = __esm(() => {
   LITERAL_RUN = /(?:"[^"]*" \| ){4,}"[^"]*"/g;
 });
 
+var code_review_default = `---
+description: First-pass code review of a committed range, each finding traced to a realistic failure and labeled
+argument-hint: "[<start>...<head>]"
+---
+
+First pass: code-review.
+
+You are the first pass of a code review. Find defects in the committed range and prove each one. The review is read-only: write no comments and no fixes, and change no file, branch or index.
+
+Range: \${@:-the refs the Assignment below names}. A range is two refs joined by \`...\`, such as \`main...my-branch\`: the target of the pull request and the head, or for a re-review the reviewed commit and the repaired one. Review that range and no other, and leave the uncommitted changes of the shared tree out. If no Assignment follows and the range names no refs, ask which range to review and stop. If a ref does not resolve, say which one and stop. A guessed range reviews the wrong code.
+
+Steps:
+
+1. Read the whole diff of the range with \`git diff\`, quoting the ref names for the shell.
+2. Read the code around each change: the callers, the callees and the tests that cover it. A change is judged in its context, not alone.
+3. List candidate defects the change introduces or exposes. Look at wrong results, regressions of existing behavior, unhandled error and failure paths, empty, null and boundary input, ordering and concurrency, leaked resources, broken compatibility of an interface or stored data, and tests that cannot fail.
+4. Trace each candidate to a realistic failure: the input or state, the path through the code, and the wrong result a user or caller sees. Drop a candidate you cannot trace to one.
+5. Label each remaining finding.
+   - blocker: a realistic failure in normal use, data loss, or a break of existing behavior.
+   - optional: a real but unlikely or minor failure.
+
+Your findings are working input to the next step, not a final report: a reviewer role that runs this prompt verifies each one, then reviews on its own and reports. When you run it alone, the list is the result.
+
+List one entry per finding:
+
+- the file, the line and the symbol;
+- the failure, in one or two sentences, as input, path and result;
+- the label;
+- how you know: what you read, or the command you ran and its result.
+
+Example entry:
+
+- \`src/cart.ts:42\`, \`total\`: an empty cart divides by \`items.length\`, so \`checkout\` shows "NaN" as the price. blocker. Read \`total\` and its caller \`checkout\`; \`bun test cart\` with an empty cart fails.
+
+Then list what you checked and found sound, in one line. With no finding, say "No findings" and what the review covered. Leave style, naming and taste out.
+`;
+var init_code_review = () => {};
+
+var security_review_default = `---
+description: First-pass security review of a committed range, tracing sources to sinks and labeling validated findings
+argument-hint: "[<start>...<head>]"
+---
+
+First pass: security-review.
+
+You are the first pass of a security review. Find vulnerabilities the committed range introduces or worsens, and separate the ones you validated from the ones you only suspect. The review is read-only: change no file, branch or index, write no comments and no fixes, run no exploit against a live system, and keep every secret you meet out of the report.
+
+Range: \${@:-the refs the Assignment below names}. A range is two refs joined by \`...\`, such as \`main...my-branch\`: the target of the pull request and the head, or for a re-review the reviewed commit and the repaired one. Review that range and no other. Take its diff from \`git diff\` when you have a shell, otherwise from the diff file the Assignment names. If no Assignment follows and the range names no refs, ask which range to review and stop. If a ref does not resolve or neither source gives you the diff, say so and stop. A guessed range reviews the wrong code.
+
+Steps:
+
+1. Read the whole diff, then list the trust boundaries it touches: where data enters (requests, files, environment, arguments, stored data, output of tools and models) and what privilege the code runs with.
+2. For each source, follow the data to every sink it reaches: a shell or process call, a query, a file path, a deserializer, rendered output, an outgoing request, an authentication or authorization decision, a secret store or log, a cryptographic call.
+3. Read each check on the path. A check counts only if it covers this source and this sink.
+4. Validate. A finding is validated when you read the whole path, the attacker controls the source, and their precondition can hold. It is suspected when one link of the path is unread or depends on something you could not see.
+5. Rate each finding by impact, given the precondition: critical, high, medium or low. Name the precondition the attacker needs.
+6. Label each finding. A validated finding the range introduced or worsened is a blocker; a suspected one is optional.
+
+Your findings are working input to the next step, not a final report: a reviewer role that runs this prompt verifies each one and reports. When you run it alone, the list is the result.
+
+List one entry per finding:
+
+- the source, the sink and the path between them, with files and lines;
+- the precondition;
+- the impact rating;
+- validated or suspected, with what is missing for a suspicion;
+- the label.
+
+Example entry:
+
+- Source \`GET /files?name=\` in \`src/routes/files.ts:18\`; sink \`readFile\` in \`src/files.ts:31\`; \`name\` is joined to the upload root with no check for \`..\`. Precondition: any signed-in user. Impact: high, reads any file the service can read. Validated: read the whole path, and no check covers \`name\`. blocker.
+
+Then list what you checked and found sound, in one line. With no finding, say "No findings" and what the review covered.
+`;
+var init_security_review = () => {};
+
+var FRONTMATTER, parseTemplate = (name, text) => {
+  const match = FRONTMATTER.exec(text);
+  return match === null ? { name, head: [], body: text.trim() } : { name, head: (match[1] ?? "").split(`
+`), body: (match[2] ?? "").trim() };
+}, CODE_REVIEW, SECURITY_REVIEW, FIRST_PASS, ARGUMENTS_DEFAULT, firstPassPrompt = (roleTask) => FIRST_PASS[roleTask]?.body.replace(ARGUMENTS_DEFAULT, (_match, fallback) => fallback);
+var init_prompts = __esm(() => {
+  init_code_review();
+  init_security_review();
+  FRONTMATTER = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/;
+  CODE_REVIEW = parseTemplate("code-review", code_review_default);
+  SECURITY_REVIEW = parseTemplate("security-review", security_review_default);
+  FIRST_PASS = {
+    "Reviewer.code": CODE_REVIEW,
+    "Reviewer.security": SECURITY_REVIEW
+  };
+  ARGUMENTS_DEFAULT = /\$\{@:-([^}]*)\}/g;
+});
+
+var KEY_LENGTH = 32, journalKey = (input) => new Bun.CryptoHasher("sha256").update(JSON.stringify([
+  input.prompt,
+  input.label ?? null,
+  input.model ?? null,
+  input.agentType ?? null,
+  input.effort ?? null,
+  input.isolation ?? null,
+  input.gate ?? null,
+  input.resume ?? null,
+  ...input.schema !== undefined ? [input.schema] : []
+])).digest("hex").slice(0, KEY_LENGTH), InvalidPiRecord, JournalEntry, JournalLine, decodePiJournal = (journal, source) => gen2(function* () {
+  const entries = [];
+  for (const [at, line] of journal.split(/\r?\n/).entries()) {
+    if (line.trim() === "")
+      continue;
+    entries.push(yield* decodeUnknownEffect2(JournalLine)(line, { onExcessProperty: "error" }).pipe(mapError2((error) => new InvalidPiRecord({
+      source,
+      detail: `line ${at + 1} is not a workflow journal entry: ${error.message}`
+    }))));
+  }
+  return entries.toSorted((a, b) => a.index - b.index);
+}), nonEmpty = (text) => text !== undefined && text.trim() !== "", matchJournal = (entries, expected) => {
+  const idOf = new Map(expected.map(({ id, key }) => [key, id]));
+  const last = new Map;
+  const unmatched = [];
+  for (const entry of entries) {
+    const id = idOf.get(entry.key);
+    if (id !== undefined)
+      last.set(id, entry);
+    else
+      unmatched.push({
+        index: entry.index,
+        id: undefined,
+        reason: !entry.ok ? "failed" : nonEmpty(entry.text) ? "unmatched" : "empty"
+      });
+  }
+  const reports = [];
+  const notReported = [...unmatched];
+  for (const [id, entry] of last)
+    if (entry.ok && nonEmpty(entry.text))
+      reports.push({ id, index: entry.index, report: entry.text });
+    else
+      notReported.push({ index: entry.index, id, reason: entry.ok ? "empty" : "failed" });
+  return {
+    reports: reports.toSorted((a, b) => a.index - b.index),
+    notReported: notReported.toSorted((a, b) => a.index - b.index)
+  };
+}, AGENT_RECORD_ENTRY_TYPE = "subagents:record", AgentRecordData, RecordEntry, RecordLine, SessionLine, PiRecordMissing, agentRecordIn = (session, source, agentId) => gen2(function* () {
+  let found;
+  for (const [at, line] of session.split(/\r?\n/).entries()) {
+    if (!line.includes(AGENT_RECORD_ENTRY_TYPE))
+      continue;
+    const probe = yield* decodeUnknownEffect2(SessionLine)(line).pipe(option2);
+    if (probe._tag === "None" || probe.value.type !== "custom" || probe.value.customType !== AGENT_RECORD_ENTRY_TYPE)
+      continue;
+    const { data } = yield* decodeUnknownEffect2(RecordLine)(line, {
+      onExcessProperty: "error"
+    }).pipe(mapError2((error) => new InvalidPiRecord({
+      source,
+      detail: `line ${at + 1} is not a ${AGENT_RECORD_ENTRY_TYPE} entry: ${error.message}`
+    })));
+    if (data.id === agentId)
+      found = data;
+  }
+  return found ?? (yield* new PiRecordMissing({ source, agentId }));
+}), STATUS_OF, assignmentStatusOf = (outcome) => STATUS_OF[outcome], outcomeOfRecord = (record) => {
+  switch (record.status) {
+    case "completed":
+    case "steered":
+      return nonEmpty(record.result) ? "ok" : "empty";
+    case "error":
+    case "aborted":
+    case "stopped":
+      return record.status;
+    case "queued":
+    case "running":
+      return "exit";
+  }
+}, piRecordReport = (session, source, agentId) => agentRecordIn(session, source, agentId).pipe(map5((record) => {
+  const outcome = outcomeOfRecord(record);
+  return {
+    ended: outcome,
+    ...assignmentStatusOf(outcome),
+    report: outcome === "ok" ? record.result : undefined,
+    error: record.error
+  };
+}));
+var init_journal = __esm(() => {
+  init_dist();
+  InvalidPiRecord = class InvalidPiRecord extends TaggedError2("InvalidPiRecord") {
+    get message() {
+      return `${this.source}: ${this.detail}`;
+    }
+  };
+  JournalEntry = Struct({
+    index: Int.check(isGreaterThanOrEqualTo2(0)),
+    key: String6,
+    ok: Boolean3,
+    text: optionalKey2(String6),
+    resumed: optionalKey2(Literal2(true))
+  });
+  JournalLine = fromJsonString2(JournalEntry);
+  AgentRecordData = Struct({
+    id: String6,
+    type: String6,
+    description: String6,
+    status: Literals([
+      "queued",
+      "running",
+      "completed",
+      "steered",
+      "aborted",
+      "stopped",
+      "error"
+    ]),
+    result: optionalKey2(String6),
+    error: optionalKey2(String6),
+    startedAt: Number6,
+    completedAt: optionalKey2(Number6),
+    sessionFile: optionalKey2(String6),
+    handle: optionalKey2(String6),
+    alias: optionalKey2(String6),
+    worktreeLost: optionalKey2(Boolean3)
+  });
+  RecordEntry = Struct({
+    type: Literal2("custom"),
+    customType: Literal2(AGENT_RECORD_ENTRY_TYPE),
+    data: AgentRecordData,
+    id: String6,
+    parentId: NullOr(String6),
+    timestamp: String6
+  });
+  RecordLine = fromJsonString2(RecordEntry);
+  SessionLine = fromJsonString2(Struct({ type: String6, customType: optionalKey2(String6) }));
+  PiRecordMissing = class PiRecordMissing extends TaggedError2("PiRecordMissing") {
+    get message() {
+      return `${this.source} holds no ${AGENT_RECORD_ENTRY_TYPE} entry for agent ${this.agentId}: it is still running, was evicted before it was persisted, or belongs to another session`;
+    }
+  };
+  STATUS_OF = {
+    ok: { status: "done", close: "success" },
+    error: { status: "failed", close: "errored" },
+    length: { status: "failed", close: "errored" },
+    empty: { status: "failed", close: "errored" },
+    exit: { status: "failed", close: "errored" },
+    aborted: { status: "failed", close: "errored" },
+    stopped: { status: "interrupted", close: "stopped" }
+  };
+});
+
+var REPORT_FIELDS, JsonReport, section = (heading, lines) => lines.length === 0 ? [] : [`${heading}:`, ...lines.map((line) => `- ${oneLine(line)}`)], KNOWN, extraLines = (report) => Object.entries(report).filter(([name]) => !KNOWN.has(name)).map(([name, value]) => `${name}: ${oneLine(typeof value === "string" ? value : JSON.stringify(value) ?? "")}`), renderJsonReport = (report) => [
+  `status: ${report.status}`,
+  ...section("changed", report.changed_paths),
+  ...section("checks", report.checks.map(({ command, exit }) => `${command} -> exit ${exit}`)),
+  ...section("blockers", report.blockers),
+  ...section("notes", report.notes),
+  ...extraLines(report),
+  ...section("evidence", report.evidence.map(({ key, support }) => `${oneLine(key)}: ${support}`))
+].join(`
+`);
+var init_jsonreport = __esm(() => {
+  init_dist();
+  init_views();
+  REPORT_FIELDS = Struct({
+    status: Literals(["done", "partial", "blocked"]),
+    changed_paths: ArraySchema(String6),
+    checks: ArraySchema(Struct({ command: String6, exit: Int })),
+    blockers: ArraySchema(String6),
+    notes: ArraySchema(String6),
+    evidence: ArraySchema(Struct({ key: String6, support: String6 }))
+  });
+  JsonReport = StructWithRest(REPORT_FIELDS, [
+    Record(String6, Unknown2)
+  ]);
+  KNOWN = new Set(Object.keys(REPORT_FIELDS.fields));
+});
+
+import { basename as basename2 } from "path";
+var EVIDENCE_HEADING, indentOf = (line) => line.length - line.trimStart().length, LIST_MARKER, evidenceEntries = (report) => {
+  const lines = report.split(/\r?\n/);
+  const heading = lines.findLastIndex((line) => EVIDENCE_HEADING.test(line));
+  if (heading === -1)
+    return [];
+  const base = indentOf(lines.slice(heading + 1).find((line) => line.trim() !== "") ?? "");
+  const entries = [];
+  let gap = false;
+  for (const line of lines.slice(heading + 1)) {
+    if (line.trim() === "") {
+      gap = true;
+      continue;
+    }
+    const trimmed = line.trim();
+    const text = trimmed.replace(LIST_MARKER, "");
+    const last = entries.length - 1;
+    const above = entries[last];
+    if (indentOf(line) > base && above !== undefined && !gap)
+      entries[last] = {
+        ...above,
+        text: `${above.text}${above.text.endsWith(":") ? " " : "; "}${text}`
+      };
+    else
+      entries.push({ text, list: LIST_MARKER.test(trimmed), gap });
+    gap = false;
+  }
+  return entries;
+}, MARKER, DIMENSION, TRAILING, LEADING, normalized = (text) => text.replace(LEADING, "").replace(MARKER, "").replace(/\s+/g, " ").replace(TRAILING, "").replace(DIMENSION, "").replace(TRAILING, "").replace(/[-_\s]+/g, " ").toLowerCase(), HAS_TEXT, ownerOf = (entry, known) => {
+  let bare;
+  for (let at = entry.lastIndexOf(":");at > 0; at = entry.lastIndexOf(":", at - 1)) {
+    const keys = known.get(normalized(entry.slice(0, at)));
+    if (keys === undefined)
+      continue;
+    const support = entry.slice(at + 1).trim();
+    if (HAS_TEXT.test(support))
+      return { keys, support };
+    bare ??= keys;
+  }
+  return bare === undefined ? undefined : { keys: bare, support: "" };
+}, labelOf = (text) => {
+  const colon = text.indexOf(":");
+  return colon > 0 ? text.slice(0, colon) : text;
+}, acceptanceFrom = (assignment, report, rationale, carryForward) => {
+  const keys = [
+    ...new Set([...assignment.criteria.map(({ text }) => text), ...assignment.evidence])
+  ];
+  const known = new Map;
+  const name = (text, key) => known.set(text, (known.get(text) ?? new Set).add(key));
+  for (const key of keys)
+    name(normalized(key), key);
+  const labels = new Map;
+  for (const { text } of assignment.criteria) {
+    const label = normalized(labelOf(text));
+    if (label !== "")
+      labels.set(label, (labels.get(label) ?? new Set).add(text));
+  }
+  for (const [label, texts] of labels)
+    if (texts.size === 1)
+      for (const text of texts)
+        name(label, text);
+  const supports = new Map;
+  const addSupport = (keys, text) => {
+    if (HAS_TEXT.test(text)) {
+      for (const key of keys)
+        if (!supports.has(key))
+          supports.set(key, text);
+    }
+  };
+  let open;
+  const close = () => {
+    if (open !== undefined)
+      addSupport(open.keys, open.lines.join("; "));
+    open = undefined;
+  };
+  for (const entry of evidenceEntries(report)) {
+    const owner = ownerOf(entry.text, known);
+    if (owner === undefined) {
+      if (open !== undefined && entry.list && !entry.gap)
+        open.lines.push(entry.text);
+      else
+        close();
+      continue;
+    }
+    close();
+    open = owner.support === "" ? { keys: owner.keys, lines: [] } : undefined;
+    addSupport(owner.keys, owner.support);
+  }
+  close();
+  const supportFor = (key) => supports.get(key);
+  const criteria = assignment.criteria.map((criterion) => ({
+    criterion,
+    support: supportFor(criterion.text)
+  }));
+  const evidence = assignment.evidence.map((label) => ({ label, support: supportFor(label) }));
+  const missing = [
+    ...criteria.filter(({ criterion, support }) => criterion.blocking && support === undefined).map(({ criterion }) => `criterion "${criterion.text}"`),
+    ...evidence.filter(({ support }) => support === undefined).map(({ label }) => `evidence label "${label}"`)
+  ];
+  if (missing.length > 0)
+    return fail5(new InsufficientAcceptance({
+      id: assignment.id,
+      detail: `the report's evidence: block has no support for ${missing.join(", ")}`
+    }));
+  return succeed6({
+    rationale,
+    criteria: criteria.flatMap(({ criterion, support }) => support === undefined ? [] : [{ criterion: criterion.text, support }]),
+    evidence: evidence.flatMap(({ label, support }) => support === undefined ? [] : [{ label, support }]),
+    ...carryForward ? { carryForward: true } : {}
+  });
+}, section2 = (heading, items) => items.length === 0 ? [] : [`${heading}:`, ...items.map((item) => `- ${item}`)], PROMPT_LINE, dispatchedAssignment = (prompt) => PROMPT_LINE.exec(prompt.split(`
+`, 1)[0] ?? "")?.[1], renderPrompt = (assignment, agent) => [
+  `Role: ${assignment.roleTask} (${agent}). Assignment: ${assignment.id}.`,
+  `Objective: ${assignment.objective}`,
+  ...section2("Scope", assignment.scope),
+  ...section2("Constraints", assignment.constraints),
+  ...section2("Ownership paths (write only here)", assignment.ownershipPaths),
+  ...section2("Acceptance criteria", assignment.criteria.map(({ text, blocking, dimension }) => `[${blocking ? "blocking" : "non-blocking"}] ${text} (${dimension})`)),
+  ...section2("Required evidence", assignment.evidence),
+  "End your report with an `evidence:` line followed by one `<criterion or evidence label>: <support>` line for each blocking criterion and each required evidence label above. A criterion may be named by its text before the first colon."
+].join(`
+`), dispatchPrompt = (assignment, agent, briefPath, words = CLAUDE_WORDS) => [
+  `Role: ${assignment.roleTask} (${agent}). Assignment: ${assignment.id}.`,
+  `Read the brief at ${briefPath} with the ${words.readTool} tool and follow it as your full task.`
+].join(`
+`), Started, Resulted, Other, JournalLine2, journalResults = (journal, source) => gen2(function* () {
+  const labels = new Map;
+  const results = [];
+  const lines = journal.split(/\r?\n/);
+  for (const [index, line] of lines.entries()) {
+    if (line.trim() === "")
+      continue;
+    const entry = yield* decodeUnknownEffect2(JournalLine2)(line, {
+      onExcessProperty: "ignore"
+    }).pipe(mapError2((error) => new Usage({
+      message: `Line ${index + 1} of the journal ${source} is not a started or result entry: ${error.message}`,
+      hint: "Pass the journal.jsonl of the Workflow run, unedited."
+    })));
+    if ("label" in entry)
+      labels.set(entry.key, entry.label);
+    else if ("result" in entry && entry.result !== null) {
+      const json = yield* decodeUnknownEffect2(JsonReport)(entry.result).pipe(option2);
+      const report = typeof entry.result === "string" ? entry.result : json._tag === "Some" ? renderJsonReport(json.value) : JSON.stringify(entry.result, null, 2) ?? "";
+      if (report.trim() !== "")
+        results.push({ label: labels.get(entry.key), agentId: entry.agentId, report });
+    }
+  }
+  return results;
+}), dispatchedCall = (assignment, agent, briefPath, launch) => ({
+  id: assignment.id,
+  key: journalKey({
+    prompt: dispatchPrompt(assignment, agent, briefPath, PI_WORDS),
+    label: assignment.id,
+    model: launch.model,
+    agentType: routeFor(assignment.roleTask).agent,
+    effort: launch.effort
+  })
+}), refused = (hint) => (error) => new Usage({ message: error.message, hint }), piJournalReports = (journal, source, calls) => decodePiJournal(journal, source).pipe(mapError2(refused("Pass the <run id>.workflow.jsonl of the workflow run, unedited.")), map5((entries) => {
+  const { reports, notReported } = matchJournal(entries, calls);
+  const run = basename2(source).replace(/\.workflow\.jsonl$/, "");
+  return {
+    reports: reports.map(({ id, report }) => ({ id, report })),
+    notAssignmentIds: notReported.map(({ id, index, reason }) => ({
+      label: id ?? "",
+      agentId: `${run}#${index} ${reason}`
+    }))
+  };
+})), piRecordReports = (session, source, agents) => gen2(function* () {
+  const reports = [];
+  const notAssignmentIds = [];
+  for (const { id, agentId } of agents) {
+    if (agentId.startsWith(PI_WORKFLOW_AGENT_PREFIX)) {
+      notAssignmentIds.push({ label: id, agentId: `${agentId} not in a session file` });
+      continue;
+    }
+    const found = yield* piRecordReport(session, source, agentId.replace(/^pi:/, "")).pipe(catchTag2("PiRecordMissing", () => succeed6(undefined)));
+    if (found?.report !== undefined)
+      reports.push({ id, report: found.report });
+    else
+      notAssignmentIds.push({ label: id, agentId: `${agentId} ${found?.ended ?? "missing"}` });
+  }
+  return { reports, notAssignmentIds };
+}).pipe(mapError2(refused("Pass the root session file of the Pi session, unedited.")));
+var init_report = __esm(() => {
+  init_dist();
+  init_directive();
+  init_errors();
+  init_host();
+  init_route();
+  init_journal();
+  init_errors3();
+  init_jsonreport();
+  EVIDENCE_HEADING = /^\s*evidence:\s*$/i;
+  LIST_MARKER = /^(?:[-*+\u2022]\s+|\d+[.)]\s+|\[[ xX]\]\s+)+/;
+  MARKER = /^\[(?:non-)?blocking\]\s*/i;
+  DIMENSION = /\s*\((?:behavior|regressions|tests|scope|style|repo-standards)\)$/i;
+  TRAILING = /[\s.,;:!?*_`]+$/;
+  LEADING = /^(?:[\s*_`>\u2022+-]+|\d+[.)]\s+|\[[ xX]\](?=\s))+/;
+  HAS_TEXT = /[\p{L}\p{N}]/u;
+  PROMPT_LINE = /^Role: \S+ \(\S+\)\. Assignment: (assignment-[a-z0-9]+(?:-[a-z0-9]+)*)\.$/;
+  Started = Struct({
+    type: Literal2("started"),
+    key: String6,
+    agentId: String6,
+    label: String6
+  });
+  Resulted = Struct({
+    type: Literal2("result"),
+    key: String6,
+    agentId: String6,
+    result: Unknown2
+  });
+  Other = Struct({
+    type: String6.check(isPattern2(/^(?!(?:started|result)$)/))
+  });
+  JournalLine2 = fromJsonString2(Union2([Started, Resulted, Other]));
+});
+
 import { rm as rm4 } from "fs/promises";
 import { isAbsolute, join as join6, resolve as resolve3 } from "path";
 var folderFor = (call, name) => gitMaybe(["rev-parse", "--path-format=absolute", "--git-common-dir"]).pipe(provide4(call.vcs), map5((common) => common !== undefined && isAbsolute(common) ? join6(resolve3(common), "holyagent", name) : localFile(call.directory, name))), pathIn = (call, name, assignmentId) => folderFor(call, name).pipe(map5((folder) => join6(folder, `${assignmentId}.md`))), writeNamed = (call, name, assignmentId, text) => gen2(function* () {
@@ -13906,12 +14395,22 @@ var folderFor = (call, name) => gitMaybe(["rev-parse", "--path-format=absolute",
   yield* io(path, () => Bun.write(path, `${text}
 `));
   return path;
-}), briefPath = (call, assignmentId) => pathIn(call, "briefs", assignmentId), writeBrief = (call, assignmentId, brief) => writeNamed(call, "briefs", assignmentId, brief), writeReport = (call, assignmentId, report) => writeNamed(call, "reports", assignmentId, report), removeFiles = (call, assignmentIds) => forEach2(["briefs", "reports"], (name) => folderFor(call, name)).pipe(flatMap2((folders) => forEach2(folders.flatMap((folder) => assignmentIds.map((id) => join6(folder, `${id}.md`))), (path) => io(path, () => rm4(path, { force: true })).pipe(as2(undefined), catch_2((error) => succeed6(error.message))))), map5((lines) => lines.filter((line) => line !== undefined)));
+}), briefText = (assignment, agent, host) => {
+  const assignmentText = renderPrompt(assignment, agent);
+  const firstPass = host === "pi" ? firstPassPrompt(assignment.roleTask) : undefined;
+  return firstPass === undefined ? assignmentText : `${firstPass}
+
+## Assignment
+
+${assignmentText}`;
+}, briefPath = (call, assignmentId) => pathIn(call, "briefs", assignmentId), writeBrief = (call, assignmentId, brief) => writeNamed(call, "briefs", assignmentId, brief), writeReport = (call, assignmentId, report) => writeNamed(call, "reports", assignmentId, report), removeFiles = (call, assignmentIds) => forEach2(["briefs", "reports"], (name) => folderFor(call, name)).pipe(flatMap2((folders) => forEach2(folders.flatMap((folder) => assignmentIds.map((id) => join6(folder, `${id}.md`))), (path) => io(path, () => rm4(path, { force: true })).pipe(as2(undefined), catch_2((error) => succeed6(error.message))))), map5((lines) => lines.filter((line) => line !== undefined)));
 var init_brief = __esm(() => {
   init_dist();
+  init_prompts();
   init_files();
   init_layout();
   init_git();
+  init_report();
 });
 
 var openIntents = (snapshot) => byId(snapshot.project.intents.filter((intent) => intent.state === "Open")), chosenIntent = (snapshot) => {
@@ -14678,401 +15177,6 @@ var init_config = __esm(() => {
   });
 });
 
-var REPORT_FIELDS, JsonReport, section = (heading, lines) => lines.length === 0 ? [] : [`${heading}:`, ...lines.map((line) => `- ${oneLine(line)}`)], KNOWN, extraLines = (report) => Object.entries(report).filter(([name]) => !KNOWN.has(name)).map(([name, value]) => `${name}: ${oneLine(typeof value === "string" ? value : JSON.stringify(value) ?? "")}`), renderJsonReport = (report) => [
-  `status: ${report.status}`,
-  ...section("changed", report.changed_paths),
-  ...section("checks", report.checks.map(({ command, exit }) => `${command} -> exit ${exit}`)),
-  ...section("blockers", report.blockers),
-  ...section("notes", report.notes),
-  ...extraLines(report),
-  ...section("evidence", report.evidence.map(({ key, support }) => `${oneLine(key)}: ${support}`))
-].join(`
-`);
-var init_jsonreport = __esm(() => {
-  init_dist();
-  init_views();
-  REPORT_FIELDS = Struct({
-    status: Literals(["done", "partial", "blocked"]),
-    changed_paths: ArraySchema(String6),
-    checks: ArraySchema(Struct({ command: String6, exit: Int })),
-    blockers: ArraySchema(String6),
-    notes: ArraySchema(String6),
-    evidence: ArraySchema(Struct({ key: String6, support: String6 }))
-  });
-  JsonReport = StructWithRest(REPORT_FIELDS, [
-    Record(String6, Unknown2)
-  ]);
-  KNOWN = new Set(Object.keys(REPORT_FIELDS.fields));
-});
-
-var KEY_LENGTH = 32, journalKey = (input) => new Bun.CryptoHasher("sha256").update(JSON.stringify([
-  input.prompt,
-  input.label ?? null,
-  input.model ?? null,
-  input.agentType ?? null,
-  input.effort ?? null,
-  input.isolation ?? null,
-  input.gate ?? null,
-  input.resume ?? null,
-  ...input.schema !== undefined ? [input.schema] : []
-])).digest("hex").slice(0, KEY_LENGTH), InvalidPiRecord, JournalEntry, JournalLine, decodePiJournal = (journal, source) => gen2(function* () {
-  const entries = [];
-  for (const [at, line] of journal.split(/\r?\n/).entries()) {
-    if (line.trim() === "")
-      continue;
-    entries.push(yield* decodeUnknownEffect2(JournalLine)(line, { onExcessProperty: "error" }).pipe(mapError2((error) => new InvalidPiRecord({
-      source,
-      detail: `line ${at + 1} is not a workflow journal entry: ${error.message}`
-    }))));
-  }
-  return entries.toSorted((a, b) => a.index - b.index);
-}), nonEmpty = (text) => text !== undefined && text.trim() !== "", matchJournal = (entries, expected) => {
-  const idOf = new Map(expected.map(({ id, key }) => [key, id]));
-  const last = new Map;
-  const unmatched = [];
-  for (const entry of entries) {
-    const id = idOf.get(entry.key);
-    if (id !== undefined)
-      last.set(id, entry);
-    else
-      unmatched.push({
-        index: entry.index,
-        id: undefined,
-        reason: !entry.ok ? "failed" : nonEmpty(entry.text) ? "unmatched" : "empty"
-      });
-  }
-  const reports = [];
-  const notReported = [...unmatched];
-  for (const [id, entry] of last)
-    if (entry.ok && nonEmpty(entry.text))
-      reports.push({ id, index: entry.index, report: entry.text });
-    else
-      notReported.push({ index: entry.index, id, reason: entry.ok ? "empty" : "failed" });
-  return {
-    reports: reports.toSorted((a, b) => a.index - b.index),
-    notReported: notReported.toSorted((a, b) => a.index - b.index)
-  };
-}, AGENT_RECORD_ENTRY_TYPE = "subagents:record", AgentRecordData, RecordEntry, RecordLine, SessionLine, PiRecordMissing, agentRecordIn = (session, source, agentId) => gen2(function* () {
-  let found;
-  for (const [at, line] of session.split(/\r?\n/).entries()) {
-    if (!line.includes(AGENT_RECORD_ENTRY_TYPE))
-      continue;
-    const probe = yield* decodeUnknownEffect2(SessionLine)(line).pipe(option2);
-    if (probe._tag === "None" || probe.value.type !== "custom" || probe.value.customType !== AGENT_RECORD_ENTRY_TYPE)
-      continue;
-    const { data } = yield* decodeUnknownEffect2(RecordLine)(line, {
-      onExcessProperty: "error"
-    }).pipe(mapError2((error) => new InvalidPiRecord({
-      source,
-      detail: `line ${at + 1} is not a ${AGENT_RECORD_ENTRY_TYPE} entry: ${error.message}`
-    })));
-    if (data.id === agentId)
-      found = data;
-  }
-  return found ?? (yield* new PiRecordMissing({ source, agentId }));
-}), STATUS_OF, assignmentStatusOf = (outcome) => STATUS_OF[outcome], outcomeOfRecord = (record) => {
-  switch (record.status) {
-    case "completed":
-    case "steered":
-      return nonEmpty(record.result) ? "ok" : "empty";
-    case "error":
-    case "aborted":
-    case "stopped":
-      return record.status;
-    case "queued":
-    case "running":
-      return "exit";
-  }
-}, piRecordReport = (session, source, agentId) => agentRecordIn(session, source, agentId).pipe(map5((record) => {
-  const outcome = outcomeOfRecord(record);
-  return {
-    ended: outcome,
-    ...assignmentStatusOf(outcome),
-    report: outcome === "ok" ? record.result : undefined,
-    error: record.error
-  };
-}));
-var init_journal = __esm(() => {
-  init_dist();
-  InvalidPiRecord = class InvalidPiRecord extends TaggedError2("InvalidPiRecord") {
-    get message() {
-      return `${this.source}: ${this.detail}`;
-    }
-  };
-  JournalEntry = Struct({
-    index: Int.check(isGreaterThanOrEqualTo2(0)),
-    key: String6,
-    ok: Boolean3,
-    text: optionalKey2(String6),
-    resumed: optionalKey2(Literal2(true))
-  });
-  JournalLine = fromJsonString2(JournalEntry);
-  AgentRecordData = Struct({
-    id: String6,
-    type: String6,
-    description: String6,
-    status: Literals([
-      "queued",
-      "running",
-      "completed",
-      "steered",
-      "aborted",
-      "stopped",
-      "error"
-    ]),
-    result: optionalKey2(String6),
-    error: optionalKey2(String6),
-    startedAt: Number6,
-    completedAt: optionalKey2(Number6),
-    sessionFile: optionalKey2(String6),
-    handle: optionalKey2(String6),
-    alias: optionalKey2(String6),
-    worktreeLost: optionalKey2(Boolean3)
-  });
-  RecordEntry = Struct({
-    type: Literal2("custom"),
-    customType: Literal2(AGENT_RECORD_ENTRY_TYPE),
-    data: AgentRecordData,
-    id: String6,
-    parentId: NullOr(String6),
-    timestamp: String6
-  });
-  RecordLine = fromJsonString2(RecordEntry);
-  SessionLine = fromJsonString2(Struct({ type: String6, customType: optionalKey2(String6) }));
-  PiRecordMissing = class PiRecordMissing extends TaggedError2("PiRecordMissing") {
-    get message() {
-      return `${this.source} holds no ${AGENT_RECORD_ENTRY_TYPE} entry for agent ${this.agentId}: it is still running, was evicted before it was persisted, or belongs to another session`;
-    }
-  };
-  STATUS_OF = {
-    ok: { status: "done", close: "success" },
-    error: { status: "failed", close: "errored" },
-    length: { status: "failed", close: "errored" },
-    empty: { status: "failed", close: "errored" },
-    exit: { status: "failed", close: "errored" },
-    aborted: { status: "failed", close: "errored" },
-    stopped: { status: "interrupted", close: "stopped" }
-  };
-});
-
-import { basename as basename2 } from "path";
-var EVIDENCE_HEADING, indentOf = (line) => line.length - line.trimStart().length, LIST_MARKER, evidenceEntries = (report) => {
-  const lines = report.split(/\r?\n/);
-  const heading = lines.findLastIndex((line) => EVIDENCE_HEADING.test(line));
-  if (heading === -1)
-    return [];
-  const base = indentOf(lines.slice(heading + 1).find((line) => line.trim() !== "") ?? "");
-  const entries = [];
-  let gap = false;
-  for (const line of lines.slice(heading + 1)) {
-    if (line.trim() === "") {
-      gap = true;
-      continue;
-    }
-    const trimmed = line.trim();
-    const text = trimmed.replace(LIST_MARKER, "");
-    const last = entries.length - 1;
-    const above = entries[last];
-    if (indentOf(line) > base && above !== undefined && !gap)
-      entries[last] = {
-        ...above,
-        text: `${above.text}${above.text.endsWith(":") ? " " : "; "}${text}`
-      };
-    else
-      entries.push({ text, list: LIST_MARKER.test(trimmed), gap });
-    gap = false;
-  }
-  return entries;
-}, MARKER, DIMENSION, TRAILING, LEADING, normalized = (text) => text.replace(LEADING, "").replace(MARKER, "").replace(/\s+/g, " ").replace(TRAILING, "").replace(DIMENSION, "").replace(TRAILING, "").replace(/[-_\s]+/g, " ").toLowerCase(), HAS_TEXT, ownerOf = (entry, known) => {
-  let bare;
-  for (let at = entry.lastIndexOf(":");at > 0; at = entry.lastIndexOf(":", at - 1)) {
-    const keys = known.get(normalized(entry.slice(0, at)));
-    if (keys === undefined)
-      continue;
-    const support = entry.slice(at + 1).trim();
-    if (HAS_TEXT.test(support))
-      return { keys, support };
-    bare ??= keys;
-  }
-  return bare === undefined ? undefined : { keys: bare, support: "" };
-}, labelOf = (text) => {
-  const colon = text.indexOf(":");
-  return colon > 0 ? text.slice(0, colon) : text;
-}, acceptanceFrom = (assignment, report, rationale, carryForward) => {
-  const keys = [
-    ...new Set([...assignment.criteria.map(({ text }) => text), ...assignment.evidence])
-  ];
-  const known = new Map;
-  const name = (text, key) => known.set(text, (known.get(text) ?? new Set).add(key));
-  for (const key of keys)
-    name(normalized(key), key);
-  const labels = new Map;
-  for (const { text } of assignment.criteria) {
-    const label = normalized(labelOf(text));
-    if (label !== "")
-      labels.set(label, (labels.get(label) ?? new Set).add(text));
-  }
-  for (const [label, texts] of labels)
-    if (texts.size === 1)
-      for (const text of texts)
-        name(label, text);
-  const supports = new Map;
-  const addSupport = (keys, text) => {
-    if (HAS_TEXT.test(text)) {
-      for (const key of keys)
-        if (!supports.has(key))
-          supports.set(key, text);
-    }
-  };
-  let open;
-  const close = () => {
-    if (open !== undefined)
-      addSupport(open.keys, open.lines.join("; "));
-    open = undefined;
-  };
-  for (const entry of evidenceEntries(report)) {
-    const owner = ownerOf(entry.text, known);
-    if (owner === undefined) {
-      if (open !== undefined && entry.list && !entry.gap)
-        open.lines.push(entry.text);
-      else
-        close();
-      continue;
-    }
-    close();
-    open = owner.support === "" ? { keys: owner.keys, lines: [] } : undefined;
-    addSupport(owner.keys, owner.support);
-  }
-  close();
-  const supportFor = (key) => supports.get(key);
-  const criteria = assignment.criteria.map((criterion) => ({
-    criterion,
-    support: supportFor(criterion.text)
-  }));
-  const evidence = assignment.evidence.map((label) => ({ label, support: supportFor(label) }));
-  const missing = [
-    ...criteria.filter(({ criterion, support }) => criterion.blocking && support === undefined).map(({ criterion }) => `criterion "${criterion.text}"`),
-    ...evidence.filter(({ support }) => support === undefined).map(({ label }) => `evidence label "${label}"`)
-  ];
-  if (missing.length > 0)
-    return fail5(new InsufficientAcceptance({
-      id: assignment.id,
-      detail: `the report's evidence: block has no support for ${missing.join(", ")}`
-    }));
-  return succeed6({
-    rationale,
-    criteria: criteria.flatMap(({ criterion, support }) => support === undefined ? [] : [{ criterion: criterion.text, support }]),
-    evidence: evidence.flatMap(({ label, support }) => support === undefined ? [] : [{ label, support }]),
-    ...carryForward ? { carryForward: true } : {}
-  });
-}, section2 = (heading, items) => items.length === 0 ? [] : [`${heading}:`, ...items.map((item) => `- ${item}`)], PROMPT_LINE, dispatchedAssignment = (prompt) => PROMPT_LINE.exec(prompt.split(`
-`, 1)[0] ?? "")?.[1], renderPrompt = (assignment, agent) => [
-  `Role: ${assignment.roleTask} (${agent}). Assignment: ${assignment.id}.`,
-  `Objective: ${assignment.objective}`,
-  ...section2("Scope", assignment.scope),
-  ...section2("Constraints", assignment.constraints),
-  ...section2("Ownership paths (write only here)", assignment.ownershipPaths),
-  ...section2("Acceptance criteria", assignment.criteria.map(({ text, blocking, dimension }) => `[${blocking ? "blocking" : "non-blocking"}] ${text} (${dimension})`)),
-  ...section2("Required evidence", assignment.evidence),
-  "End your report with an `evidence:` line followed by one `<criterion or evidence label>: <support>` line for each blocking criterion and each required evidence label above. A criterion may be named by its text before the first colon."
-].join(`
-`), dispatchPrompt = (assignment, agent, briefPath, words = CLAUDE_WORDS) => [
-  `Role: ${assignment.roleTask} (${agent}). Assignment: ${assignment.id}.`,
-  `Read the brief at ${briefPath} with the ${words.readTool} tool and follow it as your full task.`
-].join(`
-`), Started, Resulted, Other, JournalLine2, journalResults = (journal, source) => gen2(function* () {
-  const labels = new Map;
-  const results = [];
-  const lines = journal.split(/\r?\n/);
-  for (const [index, line] of lines.entries()) {
-    if (line.trim() === "")
-      continue;
-    const entry = yield* decodeUnknownEffect2(JournalLine2)(line, {
-      onExcessProperty: "ignore"
-    }).pipe(mapError2((error) => new Usage({
-      message: `Line ${index + 1} of the journal ${source} is not a started or result entry: ${error.message}`,
-      hint: "Pass the journal.jsonl of the Workflow run, unedited."
-    })));
-    if ("label" in entry)
-      labels.set(entry.key, entry.label);
-    else if ("result" in entry && entry.result !== null) {
-      const json = yield* decodeUnknownEffect2(JsonReport)(entry.result).pipe(option2);
-      const report = typeof entry.result === "string" ? entry.result : json._tag === "Some" ? renderJsonReport(json.value) : JSON.stringify(entry.result, null, 2) ?? "";
-      if (report.trim() !== "")
-        results.push({ label: labels.get(entry.key), agentId: entry.agentId, report });
-    }
-  }
-  return results;
-}), dispatchedCall = (assignment, agent, briefPath, launch) => ({
-  id: assignment.id,
-  key: journalKey({
-    prompt: dispatchPrompt(assignment, agent, briefPath, PI_WORDS),
-    label: assignment.id,
-    model: launch.model,
-    agentType: routeFor(assignment.roleTask).agent,
-    effort: launch.effort
-  })
-}), refused = (hint) => (error) => new Usage({ message: error.message, hint }), piJournalReports = (journal, source, calls) => decodePiJournal(journal, source).pipe(mapError2(refused("Pass the <run id>.workflow.jsonl of the workflow run, unedited.")), map5((entries) => {
-  const { reports, notReported } = matchJournal(entries, calls);
-  const run = basename2(source).replace(/\.workflow\.jsonl$/, "");
-  return {
-    reports: reports.map(({ id, report }) => ({ id, report })),
-    notAssignmentIds: notReported.map(({ id, index, reason }) => ({
-      label: id ?? "",
-      agentId: `${run}#${index} ${reason}`
-    }))
-  };
-})), piRecordReports = (session, source, agents) => gen2(function* () {
-  const reports = [];
-  const notAssignmentIds = [];
-  for (const { id, agentId } of agents) {
-    if (agentId.startsWith(PI_WORKFLOW_AGENT_PREFIX)) {
-      notAssignmentIds.push({ label: id, agentId: `${agentId} not in a session file` });
-      continue;
-    }
-    const found = yield* piRecordReport(session, source, agentId.replace(/^pi:/, "")).pipe(catchTag2("PiRecordMissing", () => succeed6(undefined)));
-    if (found?.report !== undefined)
-      reports.push({ id, report: found.report });
-    else
-      notAssignmentIds.push({ label: id, agentId: `${agentId} ${found?.ended ?? "missing"}` });
-  }
-  return { reports, notAssignmentIds };
-}).pipe(mapError2(refused("Pass the root session file of the Pi session, unedited.")));
-var init_report = __esm(() => {
-  init_dist();
-  init_directive();
-  init_errors();
-  init_host();
-  init_route();
-  init_journal();
-  init_errors3();
-  init_jsonreport();
-  EVIDENCE_HEADING = /^\s*evidence:\s*$/i;
-  LIST_MARKER = /^(?:[-*+\u2022]\s+|\d+[.)]\s+|\[[ xX]\]\s+)+/;
-  MARKER = /^\[(?:non-)?blocking\]\s*/i;
-  DIMENSION = /\s*\((?:behavior|regressions|tests|scope|style|repo-standards)\)$/i;
-  TRAILING = /[\s.,;:!?*_`]+$/;
-  LEADING = /^(?:[\s*_`>\u2022+-]+|\d+[.)]\s+|\[[ xX]\](?=\s))+/;
-  HAS_TEXT = /[\p{L}\p{N}]/u;
-  PROMPT_LINE = /^Role: \S+ \(\S+\)\. Assignment: (assignment-[a-z0-9]+(?:-[a-z0-9]+)*)\.$/;
-  Started = Struct({
-    type: Literal2("started"),
-    key: String6,
-    agentId: String6,
-    label: String6
-  });
-  Resulted = Struct({
-    type: Literal2("result"),
-    key: String6,
-    agentId: String6,
-    result: Unknown2
-  });
-  Other = Struct({
-    type: String6.check(isPattern2(/^(?!(?:started|result)$)/))
-  });
-  JournalLine2 = fromJsonString2(Union2([Started, Resulted, Other]));
-});
-
 class WithTrailer {
   fields;
   label;
@@ -15260,7 +15364,7 @@ var init_assignment2 = __esm(() => {
           const project = "id" in request ? snapshot.project : yield* withPlanned(snapshot, request, id, now);
           const dispatched = yield* dispatch(project, snapshot.specialists, id, now, settings, workTreeKey(call.root));
           const agent = agentTypeFor(settings.host, routeFor(dispatched.assignment.roleTask).agent);
-          const path = yield* writeBrief(call, dispatched.assignment.id, renderPrompt(dispatched.assignment, agent));
+          const path = yield* writeBrief(call, dispatched.assignment.id, briefText(dispatched.assignment, agent, settings.host));
           return {
             ...dispatched,
             prompt: dispatchPrompt(dispatched.assignment, agent, path, wordsFor(settings.host))

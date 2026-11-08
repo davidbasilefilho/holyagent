@@ -26,7 +26,7 @@ import { io } from "../state/files.ts"
 import { workTreeKey } from "../state/local.ts"
 import { readState, type Snapshot } from "../state/store.ts"
 import { booleanFlag, choiceFlag, requiredFlag, stringFlag } from "./args.ts"
-import { briefPath, writeBrief, writeReport } from "./brief.ts"
+import { briefPath, briefText, writeBrief, writeReport } from "./brief.ts"
 import { agentHostOf, type Launch, launchesOf } from "./config.ts"
 import { nowIso } from "./context.ts"
 import { AgentMismatch, Usage } from "./errors.ts"
@@ -39,7 +39,6 @@ import {
   journalResults,
   piJournalReports,
   piRecordReports,
-  renderPrompt,
 } from "./report.ts"
 import { type Call, type Command, WithTrailer } from "./types.ts"
 import { assignmentRow, assignmentView, byId, present } from "./views.ts"
@@ -346,7 +345,7 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
             const path = yield* writeBrief(
               call,
               dispatched.assignment.id,
-              renderPrompt(dispatched.assignment, agent),
+              briefText(dispatched.assignment, agent, settings.host),
             )
             return {
               ...dispatched,

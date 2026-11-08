@@ -12,6 +12,7 @@ packages/
     src/cli/                    the runtime CLI: intent, assignment, plan, status, reconcile, state, migrate, hook, setup, doctor, rg, fd
     src/setup/                  what setup and doctor read and write: Claude Code settings, ctx7, the shell
     src/vcs/                    the vcs commands (commit, pr, identity)
+    src/prompts/                the first-pass review prompt templates (code-review, security-review): the Pi package ships them and the Pi launcher starts reviewer briefs with them
     src/instructions/
       claude-5.5/               a model family: root/, specialist/, roles/<role>/ (one file per section), shared/ (text the root and the specialists both embed), design-core/, skills/, root-core.ts, guide.md
       kimi-k3.1/                the same layout, written to Moonshot's guides
@@ -25,7 +26,7 @@ packages/
   integrations/pi/              turns the runtime into the Pi package
     build.ts, src/              the generator (generate.ts, agents.ts, files.ts, specialists.ts) and the extension source (extension.ts)
     tests/
-    dist/                       generated: the built Pi package (package.json, agents/, extensions/, scripts/, skills/)
+    dist/                       generated: the built Pi package (package.json, agents/, extensions/, prompts/, scripts/, skills/)
 .claude-plugin/marketplace.json generated; the marketplace entry for the plugin
 .github/                        the CI, publish and release workflows and the tag-release action
 scripts/                        Bun scripts behind the mise tasks: toolchain, hooks, vendoring, versions, the dependency updater, PR checks
@@ -141,11 +142,12 @@ Do not edit generated files; each carries a note naming its source. `.prettierig
 
 - `packages/runtime/src/instructions/<family>/skills/`, the same sources as the Claude plugin's skills, through `skillFiles` in the runtime's `instructions/skills.ts`, which both generators call. The family is a parameter of `generate` and `PI_FAMILY` is its value (`kimi-k3.1`, so the Pi package ships the Kimi skills), written to `dist/skills/`;
 - the Kimi family's role and specialist sections and the route table, through `packages/integrations/pi/src/agents.ts`, written to `dist/agents/` as one agent file for each of the 18 specialists, which `@tintinweb/pi-subagents` loads;
+- `packages/runtime/src/prompts/`, the `code-review` and `security-review` prompt templates, written to `dist/prompts/` with the generated note added to their frontmatter. The runtime owns them because `holyagent assignment` also reads them, to start a Pi `Reviewer.code` or `Reviewer.security` brief with the matching one;
 - `packages/integrations/pi/src/extension.ts`, a default-exported factory that takes Pi's `ExtensionAPI` and registers the `--holyagent-role` flag and its handlers, bundled with `Bun.build` for Node as ESM into `dist/extensions/holyagent.js`. The host modules (the `peerDependencies` of the package's `package.json`, and their subpaths) stay imports;
 - `packages/integrations/claude/src/wrapper.sh` and `empty-bunfig.toml`, which become `dist/scripts/holyagent` and `dist/scripts/empty-bunfig.toml`, and `packages/runtime/src/hooks/pi-entry.ts`, bundled for Bun into `dist/scripts/holyagent.js`. Pi runs the extension under Node and the runtime reads files with Bun, so the extension reaches the runtime only through this wrapper;
 - `packages/integrations/pi/package.json`, whose `version` the build first syncs from the root and whose `peerDependencies` the generated manifest carries.
 
-The generated `package.json` has the `pi-package` keyword, a `pi` key listing `./extensions`, `./skills` and, under `subagents`, `./agents`, `files` naming `agents`, `extensions`, `scripts` and `skills`, and the host modules as `peerDependencies` with the range `*`. It lists no `dependencies`: Pi would install every one whatever the config says and load none, because it loads a package only from a `pi install` entry in its settings, which `holyagent setup` writes per config. Each generated file that can hold a comment carries a note naming its source; JSON has none. The root `package.json` has its own `pi` key that points at the same folders under `packages/integrations/pi/dist/`, because `pi install git:<repo>@<ref>` installs the repository root. `.prettierignore` and `.eslintignore` list the folder.
+The generated `package.json` has the `pi-package` keyword, a `pi` key listing `./extensions`, `./prompts`, `./skills` and, under `subagents`, `./agents`, `files` naming `agents`, `extensions`, `prompts`, `scripts` and `skills`, and the host modules as `peerDependencies` with the range `*`. It lists no `dependencies`: Pi would install every one whatever the config says and load none, because it loads a package only from a `pi install` entry in its settings, which `holyagent setup` writes per config. Each generated file that can hold a comment carries a note naming its source; JSON has none. The root `package.json` has its own `pi` key that points at the same folders under `packages/integrations/pi/dist/`, because `pi install git:<repo>@<ref>` installs the repository root. `.prettierignore` and `.eslintignore` list the folder.
 
 `packages/integrations/pi/tests/pi.test.ts` is its sync test: every committed generated file equals a fresh build byte for byte, the generated path holds nothing the build does not make, the build is deterministic, the commit hook stages exactly `GENERATED_PATHS`, the manifest and the root `pi` key name the same folders, the skills are those of the family, the 18 agent files carry the tools the config decides, the extension registers only its flag and handlers and loads under Node, and the host modules are not bundled. `tests/extension.test.ts` covers the extension's handlers with synthesized Pi events; the tests never run Pi or a model.
 
