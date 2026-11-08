@@ -63,5 +63,41 @@
     "finishedAt": "2026-11-08T03:20:36.750Z"
   },
   "result": "result: kimi-k3.1 is registered; build and verify exit 0 and Claude output is unchanged. No Kimi file needed a fix.\n\nchanged (all in /home/user/holyagent-0.3.0-kimi):\n- packages/runtime/src/instructions/families.ts\n- packages/runtime/src/instructions/coverage.ts\n- packages/runtime/tests/instructions.test.ts\n- packages/integrations/claude/tests/design-skills.test.ts\n- packages/integrations/pi/src/generate.ts\n- packages/integrations/pi/dist/skills/*/SKILL.md (11 files, regenerated)\n- docs/development.md\n- Also present: the untracked kimi-k3.1/ translation files from the four writers, not edited by me.\n\nDetails:\n- families.ts: `FAMILIES = [\"claude-5.5\", \"kimi-k3.1\"]`, and the \"joins later\" note is removed.\n- coverage.ts: the four coverage files are folded in as a `\"kimi-k3.1\"` block and formatted.\n- generate.ts: `PI_FAMILY` is now `\"kimi-k3.1\"`.\n- instructions.test.ts: the structure, role-per-route and skill-frontmatter tests now run for every family with `describe.each(FAMILIES)`. They were claude-only.\n- design-skills.test.ts: the materiality tests were claude-only and failed once kimi-k3.1 was listed. Kimi has its own `shared/materiality.md` and its own marker-line files, so the marker check now runs per family and each family's own materiality file is exempt from the \"restated\" check. Nothing was weakened.\n- docs/development.md: updated the kimi folder description, the family list and the `PI_FAMILY` value. docs/pi/ had no claim to change.\n\nchecks:\n- `bunx --no-install mise run instructions:scaffold` -> exit 0, \"0 files created\".\n- `bunx --no-install mise run build` -> exit 0. Only pi/dist changed; `git status` shows nothing changed in the Claude `dist/`.\n- `bunx --no-install mise run verify` -> exit 0 (type-check, lint, format, tests). 1756 pass, 0 fail.\n- The first run of the verify checks failed, once on formatting of coverage.ts and once on the two design-skills tests. Both are fixed.\n- Install: `bun install --frozen-lockfile` skipped the mise bin because of a blocked postinstall. `bun install --frozen-lockfile --force` fixed it.\n\nblockers: none\nquestions: none\nnotes: The CLI-flag test in instructions.test.ts still runs over all files together rather than per family. It passes, but it does not require each family to contain a CLI invocation.\n\nevidence:\nFAMILIES lists kimi-k3.1 and the mirror and coverage tests pass for it with every id covered: families.ts line 10. `describe.each(FAMILIES)` in packages/runtime/tests/requirements.test.ts passes inside verify (exit 0, 1756 pass). Scaffold reported \"0 files created\".\nThe pi package ships the kimi-k3.1 skills and the Claude output is byte-identical: `PI_FAMILY` is \"kimi-k3.1\" and the 11 pi/dist skill files regenerated. After build, `git status` shows no Claude dist or plugin manifest changes.\nNo test was weakened or exempted for kimi-k3.1; family-specific tests cover every listed family: instructions.test.ts and design-skills.test.ts now iterate FAMILIES. No exemption exists for kimi-k3.1; the only skip is each family's own shared/materiality.md in the \"restated\" check.\nmise run build and mise run verify exit 0: both commands above exited 0.\nchecks-run: scaffold, build, verify, `bun test` on the two edited test files (all exit 0).\nchanged-paths: listed under `changed:` above.\ndiff-file: /home/user/holyagent-notes/kimi-integration.diff\n",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "Kimi set and registration accepted after repair 0e71e52; artifact and code re-reviews found no blocker; verify 1764 pass, build clean",
+    "criteria": [
+      {
+        "criterion": "FAMILIES lists kimi-k3.1 and the mirror and coverage tests pass for it with every id covered",
+        "support": "families.ts line 10. `describe.each(FAMILIES)` in packages/runtime/tests/requirements.test.ts passes inside verify (exit 0, 1756 pass). Scaffold reported \"0 files created\"."
+      },
+      {
+        "criterion": "The pi package ships the kimi-k3.1 skills and the Claude output is byte-identical",
+        "support": "`PI_FAMILY` is \"kimi-k3.1\" and the 11 pi/dist skill files regenerated. After build, `git status` shows no Claude dist or plugin manifest changes."
+      },
+      {
+        "criterion": "No test was weakened or exempted for kimi-k3.1; family-specific tests cover every listed family",
+        "support": "instructions.test.ts and design-skills.test.ts now iterate FAMILIES. No exemption exists for kimi-k3.1; the only skip is each family's own shared/materiality.md in the \"restated\" check."
+      },
+      {
+        "criterion": "mise run build and mise run verify exit 0",
+        "support": "both commands above exited 0."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "scaffold, build, verify, `bun test` on the two edited test files (all exit 0)."
+      },
+      {
+        "label": "changed-paths",
+        "support": "listed under `changed:` above."
+      },
+      {
+        "label": "diff-file",
+        "support": "/home/user/holyagent-notes/kimi-integration.diff"
+      }
+    ]
+  },
   "createdAt": "2026-11-08T03:14:25.196Z"
 }
