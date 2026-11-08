@@ -55,12 +55,13 @@ export class ProviderInvalid extends Data.TaggedError("ProviderInvalid")<{
 }
 
 /**
- * What a failed Pi command printed, for an error report: its standard output, else its standard
- * error, trimmed and cut to {@link DETAIL_CHARS}; `fallback` when it printed neither. Every error
- * detail of the integration comes from here, so they show the same stream and the same length.
+ * What a failed Pi command printed, for an error report: its standard error, then its standard
+ * output, each trimmed, joined and cut to {@link DETAIL_CHARS}; `fallback` when it printed neither.
+ * Standard error leads because it carries the error, so a banner on standard output cannot hide it.
+ * Every error detail of the integration comes from here, so they show the same streams and length.
  */
 export const outputDetail = ({ stdout, stderr }: ShellResult, fallback: string): string =>
-  (stdout.trim() || stderr.trim()).slice(0, DETAIL_CHARS) || fallback
+  [stderr.trim(), stdout.trim()].filter(Boolean).join("\n").slice(0, DETAIL_CHARS) || fallback
 
 /**
  * Asks Pi whether the selected provider has working credentials, with `pi auth check --provider

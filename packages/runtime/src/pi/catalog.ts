@@ -2,7 +2,7 @@ import { Data, Effect, Option, Schema } from "effect"
 
 import type { Config, RouteKey } from "../config/schema.ts"
 import { providerProfile, routedModels } from "./provider.ts"
-import { type CommandRunner, outputDetail } from "./readiness.ts"
+import { type CommandRunner, DETAIL_CHARS, outputDetail } from "./readiness.ts"
 
 /** One model of the user's catalog, as `pi --list-models` lists it. */
 export interface CatalogEntry {
@@ -32,6 +32,20 @@ export class NoModelsListed extends Data.TaggedError("NoModelsListed") {
   }
 }
 
+/**
+ * Pi printed something that is not the model table, so its listing format was not recognised: Pi
+ * may have changed it. This is not a credentials problem, so the output is shown to say what Pi
+ * printed.
+ */
+export class ListingNotRecognised extends Data.TaggedError("ListingNotRecognised")<{
+  readonly detail: string
+}> {
+  /** The description shown to the user. */
+  override get message() {
+    return `pi --list-models printed no model table (a header line starting "provider model" and one row per model), so its listing format was not recognised: ${this.detail}`
+  }
+}
+
 /** Route-table models the user's catalog does not list, with the rows that use each. */
 export class ModelsNotInCatalog extends Data.TaggedError("ModelsNotInCatalog")<{
   readonly provider: string
@@ -49,12 +63,23 @@ export class ModelsNotInCatalog extends Data.TaggedError("ModelsNotInCatalog")<{
   }
 }
 
+/** An id column of the listing: any text without whitespace, which is what separates the columns. */
+const Id = Schema.String.check(Schema.isPattern(/^\S+$/))
+
 /** One row of the listing: the provider id and the model id, the first two columns. */
-const CatalogRow = Schema.Struct({
-  provider: Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9._-]*$/)),
-  model: Schema.String.check(Schema.isPattern(/^\S+$/)),
-})
+const CatalogRow = Schema.Struct({ provider: Id, model: Id })
 const decodeRow = Schema.decodeUnknownOption(CatalogRow, { onExcessProperty: "error" })
+
+/** The non-blank lines of a listing, split into columns. */
+const columnsOf = (text: string): ReadonlyArray<ReadonlyArray<string>> =>
+  text
+    .split(/\r?\n/)
+    .map((line) => line.trim().split(/\s+/))
+    .filter((columns) => columns[0] !== "")
+
+/** Whether a line's columns are the table header, which starts `provider model`. */
+const isHeader = ([provider, model]: ReadonlyArray<string>): boolean =>
+  provider === "provider" && model === "model"
 
 /**
  * Reads the table that `pi --list-models` prints: a header line starting `provider model`, then one
@@ -63,11 +88,8 @@ const decodeRow = Schema.decodeUnknownOption(CatalogRow, { onExcessProperty: "er
  * without the header (Pi's no-models message) is an empty catalog.
  */
 export const parseModelCatalog = (text: string): ReadonlyArray<CatalogEntry> => {
-  const rows = text
-    .split(/\r?\n/)
-    .map((line) => line.trim().split(/\s+/))
-    .filter((columns) => columns[0] !== "")
-  const header = rows.findIndex(([provider, model]) => provider === "provider" && model === "model")
+  const rows = columnsOf(text)
+  const header = rows.findIndex(isHeader)
   const width = rows[header]?.length ?? 0
   return header < 0
     ? []
@@ -81,16 +103,35 @@ export const parseModelCatalog = (text: string): ReadonlyArray<CatalogEntry> => 
 }
 
 /**
+ * Whether a listing that has no model row is one Pi means as empty: no output, the table header
+ * alone, or Pi's own "No models ..." message. Any other output is a format this code does not
+ * know.
+ */
+const isEmptyListing = (text: string): boolean => {
+  const rows = columnsOf(text)
+  return text.trim() === "" || rows.some(isHeader) || /^no models\b/i.test(rows[0]?.join(" ") ?? "")
+}
+
+/**
  * Lists the models the user can use with `pi --list-models`. Pi lists only the models of providers
- * with credentials, so check readiness first; a listing with no model fails with
- * {@link NoModelsListed}.
+ * with credentials, so check readiness first; a listing that is empty fails with
+ * {@link NoModelsListed}, and output that is no model table at all fails with
+ * {@link ListingNotRecognised}.
  */
 export const listModelCatalog = (
   run: CommandRunner,
-): Effect.Effect<ReadonlyArray<CatalogEntry>, CatalogUnavailable | NoModelsListed> =>
+): Effect.Effect<
+  ReadonlyArray<CatalogEntry>,
+  CatalogUnavailable | NoModelsListed | ListingNotRecognised
+> =>
   run("pi", ["--list-models"]).pipe(
     Effect.flatMap(
-      (result): Effect.Effect<ReadonlyArray<CatalogEntry>, CatalogUnavailable | NoModelsListed> => {
+      (
+        result,
+      ): Effect.Effect<
+        ReadonlyArray<CatalogEntry>,
+        CatalogUnavailable | NoModelsListed | ListingNotRecognised
+      > => {
         if (result.exitCode !== 0)
           return Effect.fail(
             new CatalogUnavailable({
@@ -98,7 +139,14 @@ export const listModelCatalog = (
             }),
           )
         const catalog = parseModelCatalog(result.stdout)
-        return catalog.length === 0 ? Effect.fail(new NoModelsListed()) : Effect.succeed(catalog)
+        if (catalog.length > 0) return Effect.succeed(catalog)
+        return Effect.fail(
+          isEmptyListing(result.stdout)
+            ? new NoModelsListed()
+            : new ListingNotRecognised({
+                detail: result.stdout.trim().slice(0, DETAIL_CHARS),
+              }),
+        )
       },
     ),
   )
@@ -132,5 +180,7 @@ export const checkModelCatalog = (
 export const validateModelCatalog = (
   run: CommandRunner,
   config: Config,
-): Effect.Effect<void, CatalogUnavailable | NoModelsListed | ModelsNotInCatalog> =>
-  listModelCatalog(run).pipe(Effect.flatMap((catalog) => checkModelCatalog(config, catalog)))
+): Effect.Effect<
+  void,
+  CatalogUnavailable | NoModelsListed | ListingNotRecognised | ModelsNotInCatalog
+> => listModelCatalog(run).pipe(Effect.flatMap((catalog) => checkModelCatalog(config, catalog)))

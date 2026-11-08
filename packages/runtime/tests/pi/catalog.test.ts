@@ -58,9 +58,21 @@ describe("parseModelCatalog", () => {
     expect(parseModelCatalog(text)).toHaveLength(3)
   })
 
-  test("ignores a row whose provider or model is not an id", () => {
-    const text = `${FULL}Not-A-Provider  some-model  1M  64K  yes  yes\n`
-    expect(parseModelCatalog(text)).toHaveLength(3)
+  test("reads any provider id the columns allow, not only lowercase ones", () => {
+    const text = table([
+      ["Azure-OpenAI", "gpt-5"],
+      ["_internal", "m.1"],
+      ["kimi-coding", "k3.1-pro"],
+    ])
+    expect(parseModelCatalog(text)).toEqual([
+      { provider: "Azure-OpenAI", model: "gpt-5" },
+      { provider: "_internal", model: "m.1" },
+      { provider: "kimi-coding", model: "k3.1-pro" },
+    ])
+  })
+
+  test("ignores a line with fewer columns than the header", () => {
+    expect(parseModelCatalog(`${FULL}Some-Provider  some-model\n`)).toHaveLength(3)
   })
 })
 
@@ -116,13 +128,35 @@ describe("validateModelCatalog", () => {
   })
 
   test("a listing without a model is NoModelsListed, not a list of missing ids", async () => {
-    for (const stdout of ["", 'No models matching "kimi"\n', table([])]) {
+    for (const stdout of ["", " \n", 'No models matching "kimi"\n', table([])]) {
       const error = await Effect.runPromise(
         Effect.flip(validateModelCatalog(runner(0, stdout), DEFAULT_CONFIG)),
       )
       expect(error._tag).toBe("NoModelsListed")
       expect(error.message).toContain("credentials")
     }
+  })
+
+  test("output that is not a model table is reported as an unrecognised format, not as credentials", async () => {
+    for (const stdout of [
+      "KIMI-CODING\tk3.1-pro\nanthropic\tclaude-sonnet-5\n",
+      "Error: something Pi changed\n",
+    ]) {
+      const error = await Effect.runPromise(
+        Effect.flip(validateModelCatalog(runner(0, stdout), DEFAULT_CONFIG)),
+      )
+      expect(error._tag).toBe("ListingNotRecognised")
+      expect(error.message).toContain("format was not recognised")
+      expect(error.message).toContain(stdout.trim().split("\n")[0]!)
+      expect(error.message).not.toContain("credentials")
+    }
+  })
+
+  test("an unrecognised listing shows at most the report length of the output", async () => {
+    const error = await Effect.runPromise(
+      Effect.flip(validateModelCatalog(runner(0, "z".repeat(1000)), DEFAULT_CONFIG)),
+    )
+    expect(error).toMatchObject({ _tag: "ListingNotRecognised", detail: "z".repeat(DETAIL_CHARS) })
   })
 
   test("a footer after the rows does not hide a missing id", async () => {
@@ -137,11 +171,23 @@ describe("validateModelCatalog", () => {
     expect(error._tag).toBe("ModelsNotInCatalog")
   })
 
-  test("a failing pi reports the same detail as the readiness check: stdout first, cut short", async () => {
+  test("a failing pi reports the same detail as the readiness check, cut short", async () => {
     const error = await Effect.runPromise(
-      Effect.flip(validateModelCatalog(runner(1, "x".repeat(1000), "ignored"), DEFAULT_CONFIG)),
+      Effect.flip(validateModelCatalog(runner(1, "x".repeat(1000)), DEFAULT_CONFIG)),
     )
     expect(error).toMatchObject({ _tag: "CatalogUnavailable", detail: "x".repeat(DETAIL_CHARS) })
+  })
+
+  test("a failing pi leads with stderr, so a banner on stdout cannot hide the error", async () => {
+    const error = await Effect.runPromise(
+      Effect.flip(
+        validateModelCatalog(runner(1, "pi 1.x banner\n", "error: no such flag\n"), DEFAULT_CONFIG),
+      ),
+    )
+    expect(error).toMatchObject({
+      _tag: "CatalogUnavailable",
+      detail: "error: no such flag\npi 1.x banner",
+    })
   })
 
   test("a failing pi that prints nothing reports its exit code", async () => {
