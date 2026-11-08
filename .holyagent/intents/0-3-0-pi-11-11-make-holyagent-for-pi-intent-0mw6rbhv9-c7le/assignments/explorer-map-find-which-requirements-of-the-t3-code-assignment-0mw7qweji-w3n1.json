@@ -1,0 +1,42 @@
+{
+  "id": "assignment-0mw7qweji-w3n1",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 11,
+  "roleTask": "Explorer.map",
+  "slug": "find-which-requirements-of-the-t3-code",
+  "objective": "Find which requirements of the T3 Code Intent are already met at the top of the 0.3.0 stack and what remains, and map where the setup TUI, the T3 settings writer and the T3 tool filtering would live, so the remaining work can be planned as PRs.",
+  "state": "Running",
+  "scope": [
+    "Read the Intent with: bun --no-env-file /root/.claude/plugins/synced/03eb801d-6ff6-4373-b5b1-f94edf359a3e_0f3e6ee9-af2e-4c2c-8d3c-9be25ca27713/holyagent/scripts/holyagent.js intent show intent-0mw6rbhv9-c7le is not available to you; use these requirements instead: RPC-only UI under T3 (no custom(), widgets, footer, titles, theme); warn below Full access; keep T3 html_render, html_preview, preview_*, t3_preview_*, device_* tools and deactivate the other mcp__t3-code__ tools at session_start with a tool_call backstop; docs lead with T3 Code, plain pi terminal supported with T3-only features reported unavailable; Cua Driver via @amaster.ai/pi-computer-use pinned, tools only for Worker.visual and Reviewer.visual; setup writes T3 settings in ~/.t3/userdata/settings.json (merge, atomic write, read-back, undo, error on undecodable file), only unset keys that differ from T3 defaults; setup TUI with flags in @opentui/solid 0.8.x in the holycodex style; recorded fixtures of pi --mode rpc traffic in CI.",
+    "Report what exists today for each: e.g. packages/runtime/src/pi, packages/integrations/pi/src/extension.ts, packages/runtime/src/setup (pi-settings.ts is the Pi settings writer to model the T3 writer on), packages/runtime/src/config/pi-packages.json, docs/pi/*.md (docs/pi/README.md:26 and docs/pi/t3-code.md are known to be stale), and whether @opentui/solid or any TUI dependency is present."
+  ],
+  "constraints": [
+    "Work read-only in the worktree /home/user/holyagent-0.3.0-prompts, which holds the top of the open 0.3.0 stack (branch release/0.3.0/feat/pi-review-prompts); read files there, not in /home/user/holyagent, whose checkout is an older detached head.",
+    "Judge each requirement against the code, tests, CI workflows and docs as they are, citing path:line; mark each Met, Partly met (say what is missing) or Not met.",
+    "Report in under 600 words; put any long listing in a file outside the repository under /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Each requirement is marked Met, Partly met or Not met with path:line support",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "For each requirement not fully met, the files a change would touch are named",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "requirement-status"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-08T11:24:49.953Z"
+  },
+  "createdAt": "2026-11-08T11:24:49.953Z"
+}
