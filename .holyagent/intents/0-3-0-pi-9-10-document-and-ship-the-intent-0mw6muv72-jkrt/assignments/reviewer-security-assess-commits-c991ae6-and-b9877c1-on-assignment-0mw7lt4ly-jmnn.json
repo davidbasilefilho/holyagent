@@ -1,0 +1,50 @@
+{
+  "id": "assignment-0mw7lt4ly-jmnn",
+  "intentId": "intent-0mw6muv72-jkrt",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.security",
+  "slug": "assess-commits-c991ae6-and-b9877c1-on",
+  "objective": "Assess commits c991ae6 and b9877c1 on release/0.3.0/feat/pi-install for security vulnerabilities, chiefly the new setup step that runs pi install and pi remove.",
+  "state": "Running",
+  "scope": [
+    "Read the diff file /home/user/holyagent-notes/install-code.diff (range 7846c9b..b9877c1, dist excluded); source files are in /home/user/holyagent-0.3.0-install.",
+    "Trace from the config sources (home-level ~/.holyagent config, project config, Pi settings JSON files, environment such as HOLYAGENT_HOST and PATH) to the process sink in packages/runtime/src/setup/pi-install.ts and the checks in pi-check.ts: argument injection into pi install/remove, package names or pins taken from untrusted project files, removal of packages HolyAgent does not own, and malformed settings files."
+  ],
+  "constraints": [
+    "Read-only; make no edits and no version-control writes.",
+    "Report each finding with source, sink and a concrete trigger; separate validated findings from hardening.",
+    "Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "No untrusted input reaches the pi install or pi remove command line as an option or an unexpected package",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Setup removes only HolyAgent's own feature packages",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Malformed Pi settings or config files fail safely",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "security-findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7le73w-yrta",
+    "assignment-0mw7kvnm5-wvwo"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T09:02:19.031Z"
+  },
+  "createdAt": "2026-11-08T09:02:19.031Z"
+}
