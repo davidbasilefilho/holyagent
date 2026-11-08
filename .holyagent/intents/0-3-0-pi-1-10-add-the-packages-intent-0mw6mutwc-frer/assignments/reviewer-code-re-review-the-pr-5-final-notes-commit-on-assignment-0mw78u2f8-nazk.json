@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mw78u2f8-nazk",
+  "intentId": "intent-0mw6mutwc-frer",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-pr-5-final-notes-commit-on",
+  "objective": "Re-review the PR 5 final-notes commit on release/0.3.0/feat/pi-package (range b6781ee..HEAD, worktree /home/user/holyagent-0.3.0-pi; run commands there) and confirm it closes the earlier optional notes with no regression.",
+  "state": "Running",
+  "scope": [
+    "Diff: /home/user/holyagent-notes/pi1-final.diff. Earlier review: /home/user/holyagent/.git/holyagent/reports/assignment-0mw78djln-wu4j.md (notes 2-5). Writer report (claims only): /home/user/holyagent/.git/holyagent/reports/assignment-0mw78l1k3-89dh.md."
+  ],
+  "constraints": [
+    "Read-only.",
+    "Report in under 250 words."
+  ],
+  "criteria": [
+    {
+      "text": "The notes are closed and the change introduces no regression, with the Claude and pi outputs unchanged",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "bunx --no-install mise run verify exits 0 on HEAD and mise run build leaves the tree clean",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw78l1k3-89dh"
+  ],
+  "followUpOf": "assignment-0mw78djln-wu4j",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T02:59:07.844Z"
+  },
+  "createdAt": "2026-11-08T02:59:07.844Z"
+}
