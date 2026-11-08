@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-the-repair-commit-head-1-head",
   "objective": "Re-review the repair commit HEAD~1..HEAD on release/0.3.0/feat/pi-tools in /home/user/holyagent-0.3.0-tools, which addresses the earlier review's root tool-set finding.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Previous finding to verify closed: the Pi root (`toolArgs(config, \"root\")` in packages/runtime/src/pi/tools.ts, `--tools +codemode`) kept Pi's default selection, so it directly held the computer-use tools and the web choice's tools; the Claude root has neither. The repair adds those to the root's --exclude-tools while each is enabled, keeping write and edit excluded.",
     "Earlier finding settled by the root, not to reopen: Reviewer.code keeps bash, mirroring packages/integrations/claude/src/agents.ts:265.",
@@ -43,5 +43,10 @@
   "independentFrom": [
     "assignment-0mw7g0a2x-hsc6"
   ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T06:23:48.072Z"
+  },
   "createdAt": "2026-11-08T06:23:40.975Z"
 }
