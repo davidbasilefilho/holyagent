@@ -1,0 +1,66 @@
+{
+  "id": "assignment-0mw7lszlt-yqxn",
+  "intentId": "intent-0mw6muv72-jkrt",
+  "intentRevision": 5,
+  "roleTask": "Worker.implementation",
+  "slug": "bring-the-uncommitted-pi-install-docs-in",
+  "objective": "Bring the uncommitted Pi install docs in /home/user/holyagent-0.3.0-install in line with the setup and doctor behavior committed in b9877c1, fixing the stale statements the last writer left.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-install, branch release/0.3.0/feat/pi-install; the docs changes there are uncommitted and are yours to finish.",
+    "Known stale statements: docs/components.md (setup 'runs two steps'; doctor's Pi checks), docs/pi/README.md ('setup for Pi ... Planned'), docs/pi/configuration.md:23 ('installs only the dependencies the default config enables').",
+    "Behavior to describe (read packages/runtime/src/setup/pi-install.ts, pi-check.ts, steps.ts, doctor.ts and cli/setup.ts for the truth): the Pi manifest lists no dependencies; holyagent setup runs pi install npm:<pkg>@<pin> for each package the config enables and pi remove for HolyAgent feature packages the config turns off; with pi.enable off it removes nothing and says so; scopes project and local both use the project .pi/settings.json (pi install -l), user the global one; doctor runs its Pi checks (pi, Node 22.19+, enabled packages at their pins) only when HOLYAGENT_HOST=pi or pi is on PATH, else prints one '~ pi: not in use' line; --undo leaves Pi packages installed.",
+    "Sweep every changed doc (README.md, docs/components.md, docs/development.md, docs/pi/README.md, docs/pi/configuration.md, docs/pi/installation.md, docs/requirements.md, docs/usage.md) for any other statement that contradicts the code, and fix it."
+  ],
+  "constraints": [
+    "Change only the ownership paths; make no version-control writes and no edits under .git/ or .holyagent/.",
+    "README.md keeps exactly its six sections in order (# HolyAgent, ## How do I install it?, ## Why HolyAgent?, ## Development, ## Special thanks, ## License); any Pi mention there is a link into docs/.",
+    "The documented Pi install is Node.js 22.19 or newer plus the official installer or npm install -g --ignore-scripts @earendil-works/pi-coding-agent@<pinned>; the HolyAgent package is installed with pi install npm:...@x.y.z (or a git or local source) so the pin is explicit; Bun is documented as needed by the HolyAgent CLI, not as a Pi install route.",
+    "Write plain, concise English matching the surrounding docs; describe only shipped behavior; no new features.",
+    "Run bunx --no-install mise run verify before reporting.",
+    "Report in under 400 words; put long logs in a file under /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "No doc states that installing the Pi package installs its feature dependencies, that setup for Pi is planned, or that setup runs two steps; each describes the setup and doctor behavior the code has",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "docs/components.md no longer says there is no Pi integration, and docs/usage.md, docs/development.md and docs/pi/README.md describe the package and how to start the root",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "README.md keeps exactly its six sections in order and links into docs/ for Pi",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "mise run verify exits 0",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "README.md",
+    "docs/components.md",
+    "docs/development.md",
+    "docs/pi/README.md",
+    "docs/pi/configuration.md",
+    "docs/pi/installation.md",
+    "docs/requirements.md",
+    "docs/usage.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T09:02:12.545Z"
+  },
+  "createdAt": "2026-11-08T09:02:12.545Z"
+}
