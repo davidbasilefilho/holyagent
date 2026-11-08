@@ -3,16 +3,14 @@ import { Effect, Option } from "effect"
 import { inCloudSession } from "../vcs/identity.ts"
 import type { Env } from "./environment.ts"
 import { SetupFailure } from "./errors.ts"
-import { hint, type Report } from "./report.ts"
+import { piChecks } from "./pi-check.ts"
+import { fail, hint, pass, type Report } from "./report.ts"
 import { type Scope, settingsFile } from "./scope.ts"
 import { mergeUserSettings, missingSettingKeys } from "./settings.ts"
 import { Shell } from "./shell.ts"
 import { asStep, installCtx7 } from "./steps.ts"
 
 const FIX = "run /holyagent:setup, or `holyagent doctor --fix`"
-
-const pass = (name: string, detail: string) => `ok   ${name}: ${detail}`
-const fail = (name: string, detail: string) => `FAIL ${name}: ${detail}`
 
 const checkBun = Effect.gen(function* () {
   const shell = yield* Shell
@@ -62,17 +60,22 @@ const checks = (env: Env, file: string, scope: Scope) =>
 /**
  * Checks the environment HolyAgent needs, one line per check: `bun` and `ctx7` on PATH, the
  * recommended keys of the settings of the chosen scope (`user` unless set; `project` and `local`
- * are found from `cwd`, the process directory when absent). In a claude.ai cloud session `ctx7`
+ * are found from `cwd`, the process directory when absent), then the Pi checks of {@link piChecks}
+ * when Pi is in use and `pi.enable` is on in the HolyAgent config (a machine without Pi gets one
+ * informational line instead; a cloud session runs no Pi). In a claude.ai cloud session `ctx7`
  * passes, since setup leaves it out there. With `fix`, the setup steps behind a failing check run
- * first, their lines come before the checks, and the checks then run again; Bun is never installed.
- * The report is ok when no check fails.
+ * first, their lines come before the checks, and the checks then run again; Bun, Pi, Node and the
+ * Pi packages are never installed, so the Pi lines are read once and name the command that fixes
+ * them. The report is ok when no check fails.
  */
 export const doctor = Effect.fn("doctor")(function* (
   env: Env,
   options: { readonly fix: boolean; readonly scope?: Scope; readonly cwd?: string },
 ) {
   const scope = options.scope ?? "user"
-  const located = yield* settingsFile(env, scope, options.cwd ?? process.cwd()).pipe(
+  const cwd = options.cwd ?? process.cwd()
+  const pi = inCloudSession(env) ? [] : yield* piChecks(env, cwd)
+  const located = yield* settingsFile(env, scope, cwd).pipe(
     Effect.catchTag("SetupFailure", (error) => Effect.succeed(error)),
   )
   if (located instanceof SetupFailure) {
@@ -82,7 +85,7 @@ export const doctor = Effect.fn("doctor")(function* (
       checkCommand(env, "ctx7"),
       Effect.succeed(fail("settings", located.message)),
     ])
-    return { lines, ok: false } satisfies Report
+    return { lines: [...lines, ...pi], ok: false } satisfies Report
   }
   const { file, notice } = located
   // Like setup, name a git top-level that was refused; the settings check names the file used.
@@ -102,6 +105,9 @@ export const doctor = Effect.fn("doctor")(function* (
         )
       : []
   const ran = [...fixes, ...settingsFixes]
-  const lines = noted(ran.length === 0 ? before : [...ran, ...(yield* checks(env, file, scope))])
+  const lines = noted([
+    ...(ran.length === 0 ? before : [...ran, ...(yield* checks(env, file, scope))]),
+    ...pi,
+  ])
   return { lines, ok: lines.every((line) => !line.startsWith("FAIL ")) } satisfies Report
 })

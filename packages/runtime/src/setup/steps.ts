@@ -6,6 +6,8 @@ import { inCloudSession } from "../vcs/identity.ts"
 import { type Env, homeDirectory, userFiles } from "./environment.ts"
 import type { SetupFailure } from "./errors.ts"
 import { fileExists } from "./json-file.ts"
+import { piInUse } from "./pi-check.ts"
+import { installPiPackages } from "./pi-install.ts"
 import { added, failed, hint, present, type Report, skipped } from "./report.ts"
 import { type Scope, settingsFile } from "./scope.ts"
 import { type CacheTtl, mergeUserSettings, undoUserSettings } from "./settings.ts"
@@ -124,13 +126,14 @@ export interface SetupOptions {
 }
 
 /**
- * Sets up HolyAgent for the current user: ctx7 and the recommended keys of the settings of the
- * chosen scope (`user` unless set). Every step checks its own result first, and a step that fails
- * does not stop the next one. On a dry run nothing is installed or written, and the lines say what
- * would be. In a claude.ai cloud session ctx7 is skipped, and the settings are still merged. With
- * `undo` only the settings change: the values setup recorded adding are removed from the chosen
- * scope's file, and ctx7 stays installed. A `project` or `local` target that is a symlink is
- * refused with a `!` line and nothing is written to the settings.
+ * Sets up HolyAgent for the current user: ctx7, the Pi packages the config enables when Pi is in
+ * use ({@link installPiPackages}; not in a cloud session), and the recommended keys of the settings
+ * of the chosen scope (`user` unless set). Every step checks its own result first, and a step that
+ * fails does not stop the next one. On a dry run nothing is installed or written, and the lines say
+ * what would be. In a claude.ai cloud session ctx7 is skipped, and the settings are still merged.
+ * With `undo` only the settings change: the values setup recorded adding are removed from the
+ * chosen scope's file; ctx7 and the Pi packages stay installed. A `project` or `local` target that
+ * is a symlink is refused with a `!` line and nothing is written to the settings.
  */
 export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptions) {
   const scope = options.scope ?? "user"
@@ -161,6 +164,16 @@ export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptio
       : cloud
         ? [skipped(`ctx7: ${CLOUD_SKIP}`)]
         : yield* asStep("ctx7", installCtx7(env, options.dryRun))),
+    ...(!cloud && (yield* piInUse(env))
+      ? yield* asStep(
+          "pi packages",
+          installPiPackages(env, {
+            scope,
+            cwd: options.cwd ?? process.cwd(),
+            dryRun: options.dryRun,
+          }),
+        )
+      : []),
     ...(yield* onSettings((file) =>
       mergeUserSettings({
         env,

@@ -1,0 +1,326 @@
+import { join } from "node:path"
+
+import { Effect, Option, Schema } from "effect"
+
+import { version as holyagentVersion } from "../../../../package.json" with { type: "json" }
+import { loadConfig } from "../config/load.ts"
+import { piPackages } from "../config/packages.ts"
+import type { Config } from "../config/schema.ts"
+import { stateDirectory } from "../state/layout.ts"
+import { type Env, firstNonEmpty, homeDirectory } from "./environment.ts"
+import { SetupFailure } from "./errors.ts"
+import { fileOperation } from "./json-file.ts"
+import { fail, hint, pass } from "./report.ts"
+import { Shell } from "./shell.ts"
+
+/**
+ * The Pi release HolyAgent is built and tested against: the `@earendil-works/pi-coding-agent`
+ * release in `bun.lock`, which the documented install command names. A test keeps the two equal, so
+ * a `mise run deps:update` that moves Pi fails it until this moves too.
+ */
+export const PI_HOST_VERSION = "1.5.0"
+
+/** The oldest Node.js release Pi runs on (the `engines` field of `@earendil-works/pi-coding-agent`). */
+export const PI_MINIMUM_NODE = "22.19.0"
+
+const PI_INSTALL = `npm install -g --ignore-scripts @earendil-works/pi-coding-agent@${PI_HOST_VERSION}`
+const NODE_FIX = `install Node.js ${PI_MINIMUM_NODE} or newer (https://nodejs.org)`
+const PI_FIX = `install Pi with \`${PI_INSTALL}\` (Node.js ${PI_MINIMUM_NODE} or newer), or with the official installer (https://pi.dev)`
+const PACKAGE_FIX = `install it with \`pi install git:github.com/davidbasilefilho/holyagent@holyagent-${holyagentVersion}\` (add -l for this project only)`
+
+const VERSION = /(\d+)\.(\d+)\.(\d+)/
+
+/** The first `major.minor.patch` in a command's output, as numbers; `undefined` when there is none. */
+const releaseIn = (text: string): readonly [number, number, number] | undefined => {
+  const [, major, minor, patch] = VERSION.exec(text) ?? []
+  return major === undefined || minor === undefined || patch === undefined
+    ? undefined
+    : [Number(major), Number(minor), Number(patch)]
+}
+
+/** Orders two releases: negative when `a` is older than `b`, zero when equal, positive when newer. */
+const compareReleases = (
+  a: readonly [number, number, number],
+  b: readonly [number, number, number],
+): number => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]
+
+const PINNED_PI = releaseIn(PI_HOST_VERSION) ?? [0, 0, 0]
+const MINIMUM_NODE = releaseIn(PI_MINIMUM_NODE) ?? [0, 0, 0]
+
+/**
+ * Checks a command that reports its version with `--version`, without installing anything: on PATH
+ * (else it fails with the fix), reporting a release (else `unreadable`), then `judge` says how that
+ * release reads: a detail for an `ok` line, or the reason it fails with the fix appended.
+ */
+const checkVersioned = (
+  env: Env,
+  name: string,
+  command: string,
+  texts: {
+    readonly fix: string
+    readonly judge: (
+      release: readonly [number, number, number],
+      shown: string,
+      path: string,
+    ) => { readonly ok: boolean; readonly detail: string }
+  },
+) =>
+  Effect.gen(function* () {
+    const shell = yield* Shell
+    const found = yield* shell.which(command)
+    if (Option.isNone(found)) return fail(name, `not found on PATH; ${texts.fix}`)
+    const result = yield* shell.run(command, ["--version"], { cwd: homeDirectory(env) })
+    const output = `${result.stdout}\n${result.stderr}`
+    const release = result.exitCode === 0 ? releaseIn(output) : undefined
+    if (release === undefined)
+      return fail(
+        name,
+        `${found.value} did not report a version for --version (exit ${result.exitCode}); ${texts.fix}`,
+      )
+    const shown = release.join(".")
+    const verdict = texts.judge(release, shown, found.value)
+    return verdict.ok ? pass(name, verdict.detail) : fail(name, verdict.detail)
+  })
+
+const checkPi = (env: Env) =>
+  checkVersioned(env, "pi", "pi", {
+    fix: PI_FIX,
+    judge: (release, shown, path) =>
+      compareReleases(release, PINNED_PI) < 0
+        ? {
+            ok: false,
+            detail: `${shown} at ${path} is older than ${PI_HOST_VERSION}, the release HolyAgent is built against; ${PI_FIX}`,
+          }
+        : {
+            ok: true,
+            detail:
+              compareReleases(release, PINNED_PI) === 0
+                ? `${shown} (${path})`
+                : `${shown} (${path}; newer than the ${PI_HOST_VERSION} HolyAgent is built against)`,
+          },
+  })
+
+const checkNode = (env: Env) =>
+  checkVersioned(env, "node", "node", {
+    fix: NODE_FIX,
+    judge: (release, shown, path) =>
+      compareReleases(release, MINIMUM_NODE) < 0
+        ? {
+            ok: false,
+            detail: `${shown} at ${path} is older than ${PI_MINIMUM_NODE}, which Pi needs; ${NODE_FIX}`,
+          }
+        : { ok: true, detail: `${shown} (${path})` },
+  })
+
+// A Pi settings file holds many keys of its own; only `packages` is read, each entry a source string
+// or an object that names its `source` and may narrow the package's resources.
+const Open = Schema.Record(Schema.String, Schema.Unknown)
+const PackageEntry = Schema.Union([
+  Schema.String,
+  Schema.StructWithRest(Schema.Struct({ source: Schema.String }), [Open]),
+])
+const PiSettings = Schema.StructWithRest(
+  Schema.Struct({ packages: Schema.optionalKey(Schema.Array(PackageEntry)) }),
+  [Open],
+)
+
+/**
+ * The name a package source ends in, or `undefined` for a source that is not a package name: the
+ * last path segment without its `@ref` or `@version`, `.git` and an `npm:` scope check (a scoped
+ * npm package is somebody else's, even when it is named `holyagent`).
+ */
+const sourceName = (source: string): string | undefined => {
+  const bare = source.startsWith("npm:") ? source.slice("npm:".length) : source
+  if (source.startsWith("npm:") && bare.startsWith("@")) return undefined
+  const last =
+    bare
+      .split(/[/\\:]/)
+      .filter(Boolean)
+      .at(-1) ?? ""
+  return (last.split("@")[0] ?? "").replace(/\.git$/, "")
+}
+
+/**
+ * Whether a Pi package source names the HolyAgent package: `npm:holyagent@<version>`, a git source
+ * of a repository named `holyagent` (`git:github.com/<owner>/holyagent@<ref>`, an https or ssh
+ * URL), or a local path to a `holyagent` folder or to the built package,
+ * `packages/integrations/pi/dist`.
+ */
+export const isHolyagentSource = (source: string): boolean => {
+  const normal = source.replaceAll("\\", "/").replace(/\/+$/, "")
+  return sourceName(source) === "holyagent" || normal.endsWith("/packages/integrations/pi/dist")
+}
+
+/**
+ * Pi's agent folder: `PI_CODING_AGENT_DIR` (with a leading `~` as the home folder), else
+ * `~/.pi/agent`.
+ */
+export const piAgentDirectory = (env: Env): string => {
+  const home = homeDirectory(env)
+  const set = firstNonEmpty(env["PI_CODING_AGENT_DIR"])
+  if (set === undefined) return join(home, ".pi", "agent")
+  return set === "~" ? home : /^~[/\\]/.test(set) ? join(home, set.slice(2)) : set
+}
+
+/**
+ * The sources in the `packages` of one Pi settings file, an object entry by its `source`; a missing
+ * or empty file lists none, and a file that is not valid Pi settings is a {@link SetupFailure}.
+ */
+export const piSettingsSources = (file: string) =>
+  Effect.gen(function* () {
+    const exists = yield* fileOperation(file, "read", () => Bun.file(file).exists())
+    if (!exists) return []
+    const text = yield* fileOperation(file, "read", () => Bun.file(file).text())
+    if (text.trim() === "") return []
+    const settings = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(PiSettings))(text, {
+      onExcessProperty: "error",
+    }).pipe(
+      Effect.mapError(
+        (error) =>
+          new SetupFailure({ message: `${file} is not valid Pi settings: ${error.message}` }),
+      ),
+    )
+    return (settings.packages ?? []).map((entry) =>
+      typeof entry === "string" ? entry : entry.source,
+    )
+  })
+
+/** Pi's two settings files in the order doctor reads them: the global one, then the project's. */
+export const piSettingsFiles = (env: Env, cwd: string) =>
+  [join(piAgentDirectory(env), "settings.json"), join(cwd, ".pi", "settings.json")] as const
+
+/**
+ * The name and version of an `npm:<name>[@<version>]` package source, or `undefined` for any other
+ * source (a git URL, a path). A scoped name keeps its leading `@`.
+ */
+export const parseNpmSource = (
+  source: string,
+): { readonly name: string; readonly version: string | undefined } | undefined => {
+  if (!source.startsWith("npm:")) return undefined
+  const spec = source.slice("npm:".length)
+  const at = spec.indexOf("@", 1)
+  return at < 0
+    ? { name: spec, version: undefined }
+    : { name: spec.slice(0, at), version: spec.slice(at + 1) }
+}
+
+/** Whether a settings source is exactly the wanted `npm:<name>@<version>` source. */
+export const listsAtPin = (listed: ReadonlyArray<string>, wanted: string): boolean => {
+  const want = parseNpmSource(wanted)
+  return listed.some((source) => {
+    const found = parseNpmSource(source)
+    return found !== undefined && found.name === want?.name && found.version === want.version
+  })
+}
+
+/**
+ * Whether Pi is in use on this machine: `HOLYAGENT_HOST` is `pi` (the Pi extension sets it), or a
+ * `pi` command is on PATH. Setup and doctor do Pi work only then, so a Claude-only user never sees
+ * a Pi failure.
+ */
+export const piInUse = (env: Env) =>
+  Effect.gen(function* () {
+    if (firstNonEmpty(env["HOLYAGENT_HOST"]) === "pi") return true
+    return Option.isSome(yield* (yield* Shell).which("pi"))
+  })
+
+/**
+ * The HolyAgent config for the project in `cwd` (the user's file under the project's
+ * `.holyagent/config.json`), or a {@link SetupFailure} naming the bad file.
+ */
+export const loadPiConfig = (env: Env, cwd: string): Effect.Effect<Config, SetupFailure> =>
+  loadConfig({ projectDirectories: [stateDirectory(cwd)], env }).pipe(
+    Effect.mapError((error) => new SetupFailure({ message: error.message })),
+  )
+
+/**
+ * Whether Pi has the HolyAgent package, at either scope: the global `settings.json` of Pi's agent
+ * folder or the project's `.pi/settings.json` in `cwd`. Reads files only.
+ */
+const checkPackage = (env: Env, cwd: string) =>
+  Effect.gen(function* () {
+    const files = piSettingsFiles(env, cwd)
+    const outcomes = yield* Effect.forEach(files, (file) =>
+      piSettingsSources(file).pipe(
+        Effect.map((sources) => ({
+          file,
+          listed: sources.some(isHolyagentSource),
+          problem: undefined as string | undefined,
+        })),
+        Effect.catchTag("SetupFailure", (error) =>
+          Effect.succeed({ file, listed: false, problem: error.message }),
+        ),
+      ),
+    )
+    const found = outcomes.find((outcome) => outcome.listed)
+    if (found !== undefined) return pass("pi package", `listed in ${found.file}`)
+    const problems = outcomes.flatMap((outcome) =>
+      outcome.problem === undefined ? [] : [outcome.problem],
+    )
+    return fail(
+      "pi package",
+      problems.length > 0
+        ? `${problems.join("; ")}; fix the file, or ${PACKAGE_FIX}`
+        : `not in the packages of ${files.join(" or ")}; ${PACKAGE_FIX}`,
+    )
+  })
+
+/**
+ * One line per Pi package the config enables ({@link piPackages}) that neither Pi settings file
+ * lists at its pinned release, each with the `pi install` command that fixes it; one `ok` line when
+ * none is missing. A settings file that cannot be read lists nothing here; `pi package` names it.
+ */
+const checkFeatures = (env: Env, cwd: string, config: Config) =>
+  Effect.gen(function* () {
+    const files = piSettingsFiles(env, cwd)
+    const listed = (yield* Effect.forEach(files, (file) =>
+      piSettingsSources(file).pipe(Effect.orElseSucceed((): ReadonlyArray<string> => [])),
+    )).flat()
+    const wanted = piPackages(config)
+    const missing = wanted.filter((source) => !listsAtPin(listed, source))
+    if (missing.length === 0)
+      return [pass("pi features", `${wanted.length} enabled packages listed at their pins`)]
+    return missing.map((source) =>
+      fail(
+        `pi feature ${parseNpmSource(source)?.name ?? source}`,
+        `not listed at ${source} in the packages of ${files.join(" or ")}; install it with \`pi install ${source}\` (add -l for this project only), or re-run \`holyagent setup\``,
+      ),
+    )
+  })
+
+/**
+ * The Pi checks of `holyagent doctor`, one line each: `pi` on PATH at the release HolyAgent is
+ * built against ({@link PI_HOST_VERSION}) or newer, `node` on PATH at {@link PI_MINIMUM_NODE} or
+ * newer, `pi package`, the HolyAgent package in the `packages` of Pi's global settings (Pi's agent
+ * folder, `PI_CODING_AGENT_DIR` honored) or the project's `.pi/settings.json`, and each package the
+ * config enables ({@link piPackages}) that those files do not list at its pin. Every failing line
+ * ends with the command that fixes it, and nothing is installed or written. The checks run only
+ * while Pi is in use ({@link piInUse}) and `pi.enable` is on in the HolyAgent config; when Pi is
+ * not in use there is one informational `~` line saying so, with `pi.enable` off there are no
+ * lines, and a config that cannot be loaded gives one failing `pi config` line.
+ */
+export const piChecks = (
+  env: Env,
+  cwd: string,
+): Effect.Effect<ReadonlyArray<string>, never, Shell> =>
+  Effect.gen(function* () {
+    if (!(yield* piInUse(env)))
+      return [
+        hint("pi: not in use (HOLYAGENT_HOST is not pi and pi is not on PATH); Pi checks skipped"),
+      ]
+    return yield* loadPiConfig(env, cwd).pipe(
+      Effect.matchEffect({
+        onFailure: (error) =>
+          Effect.succeed<ReadonlyArray<string>>([fail("pi config", error.message)]),
+        onSuccess: (config) =>
+          config.pi.enable
+            ? Effect.all([
+                checkPi(env),
+                checkNode(env),
+                checkPackage(env, cwd),
+                checkFeatures(env, cwd, config),
+              ]).pipe(Effect.map(([pi, node, pkg, features]) => [pi, node, pkg, ...features]))
+            : Effect.succeed<ReadonlyArray<string>>([]),
+      }),
+    )
+  })
