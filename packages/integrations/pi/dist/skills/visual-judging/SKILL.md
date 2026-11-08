@@ -11,7 +11,7 @@ Judge rendered work from what renders, not from a passing build or a report's cl
 ## Pick the platform skill
 
 1. Pick the platform design skill for the work before the first Worker.visual or Reviewer.visual dispatch: `web-design`, `mobile-design`, `desktop-design` or `tui-design`, one for each platform of a multi-platform project.
-2. Name each skill's file in the criteria of both specialists by its literal absolute path, `skills/<name>/SKILL.md` under the package folder (as the dispatch rules say), with a blocking criterion to read it and to build and inspect (Worker.visual) or judge (Reviewer.visual) against its checklist and capture list. <!-- K2: a specialist starts with no context, so the brief carries the path and the criterion. The specialists read the file with `read`; skills load on demand there (K9, K28). -->
+2. Name each skill's file in the criteria of both specialists by its literal absolute path, `skills/<name>/SKILL.md` under the package folder (as the dispatch rules say), with a blocking criterion to read it and to build and inspect (Worker.visual) or judge (Reviewer.visual) against its checklist and capture list.
 3. Start the render target first, per platform (the `dev-server` skill).
 
 The platform skill is the only design guidance the two specialists get: the shared core (direction before code, the plan, copy, the quality floor), the platform rules, the refuse list and the capture checklist.
@@ -42,4 +42,4 @@ A departure from the platform skill's direction rules that has none of these eff
 
 ## Explanatory pages
 
-When a visual explanation or chart carries what prose cannot, build one self-contained HTML page. Such a page illustrates and does not validate a software interface. T3 Code's `html_preview` and `html_render` are optional aids, available only when T3 Code's tools are enabled: `html_preview` returns a PNG with console output so you can check the page first, and `html_render` shows the finished page inline in the reply. Without them, save the page as a file, check it as far as the environment allows and give the user its path, naming what you could not check. <!-- K2: the fallback is stated because the tools are optional under pi. -->
+When a visual explanation or chart carries what prose cannot, build one self-contained HTML page. Such a page illustrates and does not validate a software interface. T3 Code's `html_preview` and `html_render` are optional aids, available only when T3 Code's tools are enabled: `html_preview` returns a PNG with console output so you can check the page first, and `html_render` shows the finished page inline in the reply. Without them, save the page as a file, check it as far as the environment allows and give the user its path, naming what you could not check.

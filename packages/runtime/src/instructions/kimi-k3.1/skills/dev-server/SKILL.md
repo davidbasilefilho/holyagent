@@ -5,7 +5,7 @@ description: Use when visual work needs a running, capturable render target: a w
 
 # Render targets
 
-Visual specialists that each start their own app collide on ports, sockets and emulators and waste minutes on startup, so one target per platform serves the whole piece of visual work. Detect the platform, never assume it. Every tool named below is an interchangeable example: use what the project and the machine provide. T3 Code's browser, preview and device tools are optional aids, available only when T3 Code's tools are enabled.
+Visual specialists that each start their own app collide on ports, sockets and emulators and waste minutes on startup, so one target per platform serves the whole piece of visual work. Detect the platform, never assume it. Every tool named below is an interchangeable example: use what the project and the machine provide. T3 Code's browser, preview and device tools belong to the visual specialists, and exist only when T3 Code's tools are enabled.
 
 ## Detect
 
@@ -39,7 +39,7 @@ Flags change between versions, so verify each against the installed one before r
 - Linux desktop: run under a virtual X display or a headless Wayland compositor, with screenshots and synthetic input. Rendering is software-only, so an app that needs the GPU fails. Theme and scale variables are toolkit-specific, so read them from the detected toolkit.
 - Android: an SDK emulator, fast only with KVM, so check acceleration first. A debug bridge sets the night mode, font scale and display size variants and takes screenshots.
 - iOS: the Simulator, which runs on macOS with Xcode only. Its control tool sets appearance, content size and increased contrast, and takes screenshots.
-- macOS and Windows desktop: only on a machine with an interactive desktop session and computer use available (`@amaster.ai/pi-computer-use`); macOS also needs the Screen Recording permission.
+- macOS and Windows desktop: only on a machine with an interactive desktop session; macOS also needs the Screen Recording permission.
 
 ## Environment and blocked targets
 

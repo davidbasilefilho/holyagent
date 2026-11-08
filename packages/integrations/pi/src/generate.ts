@@ -15,8 +15,8 @@ import { DIST_DIRECTORY, type GeneratedFile, generatedNote, REPOSITORY, SOURCES 
 export const GENERATED_PATHS: ReadonlyArray<string> = [DIST_DIRECTORY]
 
 /**
- * The model family whose instruction sources the package is built from. The family is a parameter
- * of {@link generate}, so a later change that adds a family switches this one value.
+ * The model family whose instruction sources the package is built from: the Kimi K3.1 set, which is
+ * what {@link generate} uses unless it is given another family.
  */
 export const PI_FAMILY: Family = "kimi-k3.1"
 

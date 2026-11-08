@@ -6,7 +6,7 @@ description: Use when a specialist report carries a verdict the root must accept
 
 # Judging on evidence
 
-You stay the judge and specialists do the heavy work. Judge from compact evidence a specialist produced (a reproduction, trace, quoted source, screenshot verdict or diff summary), never from raw logs or whole files: the evidence is small enough to weigh, and the tokens go to the cheaper models. <!-- K25: the model plans and judges, the specialists retrieve and run. -->
+You stay the judge and specialists do the heavy work. Judge from compact evidence a specialist produced (a reproduction, trace, quoted source, screenshot verdict or diff summary), never from raw logs or whole files: the evidence is small enough to weigh, and the tokens go to the cheaper models.
 
 Find the verdict's kind below and apply its rule.
 
@@ -22,7 +22,7 @@ Send an unproven finding back to the same reviewer for that evidence, since a cl
 
 ## Research
 
-Pick the authoritative source among conflicting ones, keep inference labeled as inference, and have a specialist re-derive any number before it is published or decided on, since a copied number carries its source's mistakes. <!-- K8, K28: answer from credible sources, separate facts from inferences. -->
+Pick the authoritative source among conflicting ones, keep inference labeled as inference, and have a specialist re-derive any number before it is published or decided on, since a copied number carries its source's mistakes.
 
 ## Prose for people
 

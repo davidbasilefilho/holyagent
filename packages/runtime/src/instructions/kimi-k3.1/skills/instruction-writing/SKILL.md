@@ -9,11 +9,12 @@ The tag after each rule names its page: P1 Best Practices for Prompts, P2 Kimi K
 
 ## Principles
 
-- Write model-facing text in US English, terse and direct, and say what you want explicitly: the model cannot read your mind, so name the action, the format and the threshold. (P1)
+- Write model-facing text in US English, terse and direct. (house)
+- Say what you want explicitly: the model cannot read your mind, so name the action, the format and the threshold. (P1 "Write Clear Instructions")
 - Write each model's instruction set from the `requirements/` tree, the model-agnostic behavior requirements, and the family's `guide.md`, and cover every id; change a behavior in the requirements first, then in the sets. (house)
 - Keep each prompt section in its own file, so a change touches one section, the assembled order stays fixed and only the sections a situation needs are loaded. (house; P1 "Categorize to Identify Instructions Relevant to User Queries")
 - Give the full task, intent and constraints, with the reason beside each rule, so the reader can apply it beyond the example. Say what to do rather than what to avoid, and scope each broad rule. (P1 "Including More Details in Your Request"; the positive phrasing is house)
-- Write calmly in imperative verbs, with no capital-letter emphasis or "if in doubt" defaults, which push models to overreach. Give a concrete threshold instead of "important" or "minor". (house; thresholds: P1 "Specify the Desired Length")
+- Write calmly in imperative verbs, with no capital-letter emphasis or "if in doubt" defaults, which push models to overreach. Give a concrete threshold instead of "important" or "minor". (house)
 - Put the full task with its reasons in every brief. A brief for an agent that is not a holyagent specialist also carries three rules: keep working until the task is done, stop and report once it is done and checked, and run a real check before done. A holyagent specialist's own text already holds those three. (house)
 
 ## Prompt shape
@@ -30,7 +31,7 @@ The tag after each rule names its page: P1 Best Practices for Prompts, P2 Kimi K
 
 ## Reasoning and tools
 
-- Leave thinking effort to the route: thinking is always on, and `reasoning_effort` (low, high or max) is set before the conversation starts. Prose such as "think harder" or "think less" does not change it. (P2 "Reasoning effort" and "FAQ"; P4 "Pick the reasoning effort for the task")
+- Leave thinking effort to the route: thinking is always on, and `reasoning_effort` (low, high or max) is set before the conversation starts. The parameter is the documented control, so do not rely on prose such as "think harder" or "think less" to change it. (P2 "Reasoning effort" and "FAQ"; P4 "Pick the reasoning effort for the task")
 - Ask for a short explanation or summary of actions, not the reasoning. The reasoning arrives in its own channel, and the answer carries the conclusion and its evidence. (P2 "Streaming"; the refusal risk of asking for reasoning is from the Claude set, by inference)
 - Require a real check before "done" for runnable changes, not a syntax-only check or one that failed to start, and have the reader name any check it did not run. (house)
 - Leave out text that discourages tool use. The model answers from memory unless told to retrieve, so tell the reader to look up facts that may have changed (versions, flags, limits, prices) even when it feels sure, without searching every question. (P4 "Use tool_choice to force first-turn retrieval"; the instruction is the prose stand-in, since forced tool use is not relied on here)

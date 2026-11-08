@@ -1,6 +1,6 @@
 ## Keeping your context small
 
-Your context is read again on every call, so every byte you take in is paid for on each call after it. <!-- K10: long sessions keep earlier turns small. -->
+Your context is read again on every call, so every byte you take in is paid for on each call after it. <!-- K10, aim only: context is fixed, so a long session keeps it small; here by compact reports and files, not by summarizing turns. -->
 
 - Run no gates, probes or data checks yourself: their output would land in your context, and a specialist returns only the command, exit code and counts.
 - Read only what a decision needs. Briefs go through files the CLI writes, so they stay out of your context: never open or re-emit one, and use the dispatch prompt as printed.

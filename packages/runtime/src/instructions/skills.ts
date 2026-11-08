@@ -32,6 +32,37 @@ export const DESIGN_CORE_PATH = "design-core/core.md"
 /** The line of a design skill's source that a generator replaces with the shared design core. */
 export const DESIGN_CORE_MARKER = "<!-- design-core -->"
 
+/**
+ * The instruction comments a generator keeps: the lines that mark where a generator embeds shared
+ * text. Every other HTML comment is a maintainer's note.
+ */
+const MARKERS: ReadonlySet<string> = new Set([MATERIALITY_MARKER, DESIGN_CORE_MARKER])
+
+const COMMENT = /[ \t]*<!--[\s\S]*?-->/g
+
+// Stands for a comment that held its lines alone, until the lines are removed with their blanks.
+const REMOVED_LINE = "\u0000"
+
+/**
+ * The text with its maintainers' notes removed: every HTML comment except the marker lines of
+ * {@link MATERIALITY_MARKER} and {@link DESIGN_CORE_MARKER}. A source cites the guide point a rule
+ * follows in such a comment, for the people who edit it; the comment says nothing to the model that
+ * reads the generated text, so every family's generator strips it. A comment on a line of its own
+ * is removed with the line, and with one of the blank lines around it when both are blank; a
+ * comment after text takes the spaces before it. Text without a comment is returned as it is.
+ */
+export const stripCitations = (text: string): string =>
+  text
+    .replace(COMMENT, (match, offset: number, whole: string) => {
+      if (MARKERS.has(match.trim())) return match
+      const alone =
+        (offset === 0 || whole[offset - 1] === "\n") &&
+        /^[ \t]*(?:\n|$)/.test(whole.slice(offset + match.length))
+      return alone ? REMOVED_LINE : ""
+    })
+    .replace(new RegExp(`(^|\n\n)${REMOVED_LINE}[ \\t]*\n\n`, "g"), "$1")
+    .replace(new RegExp(`${REMOVED_LINE}[ \\t]*(?:\n|$)`, "g"), "")
+
 /** The platform design skills, which carry the shared design core. */
 export const DESIGN_SKILLS: ReadonlyArray<string> = [
   "web-design",
@@ -115,9 +146,10 @@ export interface SkillFile {
  * The files below a family's `skills/` folder, in path order, ready to write below a harness's own
  * skills folder. Each `SKILL.md` gets the materiality definition and, for a design skill, the
  * shared design core, then `note(source)` as a frontmatter comment, where `source` is the file's
- * path from the repository root. Every other file is carried as it is, except dotfiles and symbolic
- * links, which stay out as they did when the skills were globbed. `root` is the folder of the
- * family folders. Failing to read a source, or a marker used wrongly, is an `InstructionsError`.
+ * path from the repository root, and the maintainers' notes of {@link stripCitations} removed. Every
+ * other file is carried as it is, except dotfiles and symbolic links, which stay out as they did
+ * when the skills were globbed. `root` is the folder of the family folders. Failing to read a
+ * source, or a marker used wrongly, is an `InstructionsError`.
  */
 export const skillFiles = (
   family: Family,
@@ -150,7 +182,7 @@ export const skillFiles = (
           core,
           source,
         )
-        return { path, content: noteInFrontmatter(body, note(source)) }
+        return { path, content: noteInFrontmatter(stripCitations(body), note(source)) }
       }),
     )
   })

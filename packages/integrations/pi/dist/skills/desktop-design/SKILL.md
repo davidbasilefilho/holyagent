@@ -10,7 +10,7 @@ Rules for desktop apps, judged on what renders. Apply the shared part and the se
 
 ## Shared core
 
-Judge every rule on the rendered result, from the captures. The one exception is the rules under Direction before code, which are checked as a plan in the worker's report or `DESIGN.md`, not on a render. <!-- K1: the exception named explicitly -->
+Judge every rule on the rendered result, from the captures. The one exception is the rules under Direction before code, which are checked as a plan in the worker's report or `DESIGN.md`, not on a render.
 
 Two tags mark rules that are not judged from a capture:
 
@@ -30,7 +30,7 @@ Apply the skill's capture checklist on the final captures: the worker before rep
 - When the brief leaves out the subject, the audience or the main job, confirm them with the user when one can answer, and otherwise state them as a proposal in the plan; remembered preferences or project context are a starting hint. The brief's own words outrank every avoid list below.
 - Let the subject supply the look: its trade, materials and idiom decide the visual choices, and the brief's real content stays in the work from start to finish. A ferry timetable and a toddler's game should look nothing alike.
 - Choose palette, type and layout on purpose and for this brief alone, accept visual risk when it earns its place, and treat each project as a chance to try something new instead of repeating what you do best.
-- Sketch a plan before building, in this order: <!-- K5: the plan's steps numbered -->
+- Sketch a plan before building, in this order:
   1. A small named palette: four to six colors, each with a value and a role.
   2. The type roles.
   3. A layout idea in one sentence, compared through rough ASCII wireframes, with how the content aligns (left, centered or justified).
@@ -129,4 +129,4 @@ Capture narrow, default and wide window widths. At each width capture:
 - light, dark and high contrast;
 - 150% or 200% text scale, where the platform has a text scale.
 
-Also capture a keyboard-only focus traversal, the open menus, an inactive window and a dialog or sheet. Show the native window chrome in every capture. <!-- K7 -->
+Also capture a keyboard-only focus traversal, the open menus, an inactive window and a dialog or sheet. Show the native window chrome in every capture.

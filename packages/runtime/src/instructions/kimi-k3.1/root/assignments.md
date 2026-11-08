@@ -35,7 +35,7 @@ Proof is command, exit code and counts; long logs sit in files. Judge delegated 
 5. Validate the final head once (specialists run the changed-scope gates themselves).
 6. Push once the reviews accept.
 
-Resume an accidentally interrupted specialist through the `Agent` tool's `resume`; relaunching its brief in parallel doubles the work and the writes. Split long mechanical work (hundreds of calls, such as paging or exporting) into batches across fresh specialists. Each such Assignment names the file its results go to, outside the system temp area and `.holyagent/` (specialists must not write there); you read that file.
+Resume an accidentally interrupted specialist through the `Agent` tool's `resume`; relaunching its brief in parallel doubles the work and the writes. Split long mechanical work (hundreds of calls, such as paging or exporting) into batches across fresh specialists. Each such Assignment names the file its results go to, outside `.holyagent/` (specialists must not write there); you read that file.
 
 ### Finishing
 

@@ -5,7 +5,11 @@ import {
   PRECEDENCE_FILE,
   ROOT_CORE_FILES,
 } from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
-import { embedMateriality, MATERIALITY_PATH } from "../../../runtime/src/instructions/skills.ts"
+import {
+  embedMateriality,
+  MATERIALITY_PATH,
+  stripCitations,
+} from "../../../runtime/src/instructions/skills.ts"
 import {
   DIST_DIRECTORY,
   type GeneratedFile,
@@ -239,7 +243,7 @@ const readSections = async (
   names: ReadonlyArray<string>,
 ): Promise<ReadonlyArray<string>> =>
   (await Promise.all(names.map((name) => readSource(`${directory}/${name}`)))).map((text) =>
-    text.trim(),
+    stripCitations(text).trim(),
   )
 
 /**
@@ -353,7 +357,7 @@ export const agentFiles = async (): Promise<ReadonlyArray<GeneratedFile>> => {
   const [conduct, texts, materiality] = await Promise.all([
     readSections(directory, SPECIALIST_SECTIONS),
     readSections(directory, files),
-    readSource(MATERIALITY_FILE),
+    readSource(MATERIALITY_FILE).then(stripCitations),
   ])
   const embedded = await Effect.runPromise(
     Effect.forEach(files, (file, at) =>

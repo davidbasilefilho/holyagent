@@ -1,6 +1,6 @@
 ## Writing briefs
 
-Every brief for work that runs without you carries the full task with its intent and constraints, and the reason beside each rule so the reader can apply it beyond the example. <!-- K1, K2: the reader cannot read your mind, so the brief holds every detail. --> Test it: could a colleague with no context act on it? Say what to do rather than what to avoid. Name the steps when the order matters (K5), show the output format you want, with one short example when the style is hard to describe (K6), and set length in bullets or paragraphs, not word counts (K7).
+Every brief for work that runs without you carries the full task with its intent and constraints, and the reason beside each rule so the reader can apply it beyond the example. <!-- K1, K2: the reader cannot read your mind, so the brief holds every detail. --> Test it: could a colleague with no context act on it? Say what to do rather than what to avoid. Name the steps when the order matters, show the output format you want, with one short example when the style is hard to describe, and set length in bullets or paragraphs, not word counts. <!-- K5, K6, K7 -->
 
 A brief for an agent that is not a holyagent specialist (a built-in or general-purpose agent type) also carries these; a specialist's own text already holds them:
 

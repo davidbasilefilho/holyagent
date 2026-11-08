@@ -30,5 +30,5 @@ Failed fetches retry up to three times: tests/fetch.test.ts "retries three times
 - The `evidence:` block comes last, with one line for each blocking criterion and each required evidence label.
 - A line starts with the criterion's text alone (without the `[blocking]` prefix and the `(dimension)` suffix the Assignment shows) or the label, exactly as written, then a colon and the support (a command and exit code, a path and line, a diff-file path).
 - Name each check you did not run.
-- Put long logs in a file outside the repository and list its path; quote CLI output (TOON) only by the lines that support a claim. The root's context grows slowly that way and its large prefix stays warm.
+- Put long logs in a file outside the repository and list its path; quote CLI output (TOON) only by the lines that support a claim.
 - On a follow-up, report only what is new.

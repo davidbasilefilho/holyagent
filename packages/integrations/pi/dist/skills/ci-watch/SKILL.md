@@ -8,7 +8,9 @@ description: Use when a branch or PR has been pushed and its CI needs watching o
 
 ## Watch
 
-Run `gh pr checks <n> --watch` as a background process through the process tool (`@aliou/pi-processes`): it prints checks as they change and ends when they settle (exit 0 when all pass, 1 when one fails). Its wake-up on exit is the only CI wait: never poll, sleep or loop. <!-- K2: the host's own wake-up mechanism is named, because a plain `bash` call would block until the watch ends. -->
+Run `gh pr checks <n> --watch` as a background process through the process tool of `@aliou/pi-processes`, which is the intended path: it prints checks as they change and ends when they settle (exit 0 when all pass, 1 when one fails), and the tool wakes you when the process exits. That wake-up is the only CI wait: never poll, sleep or loop.
+
+If your tool list has no process tool, or it does not wake you when the process exits, run the same command once in the foreground, with `timeout_ms` in the script's first-line `// @options:` set past the longest CI run you expect. A call that times out leaves the gate Unknown; never repeat it in a loop.
 
 - For a commit without a PR, read `gh run list --commit <sha>`.
 - `gh pr view <n> --json mergeStateStatus,reviewDecision` gives the merge state and review decision.

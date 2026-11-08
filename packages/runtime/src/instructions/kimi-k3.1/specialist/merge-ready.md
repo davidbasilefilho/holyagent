@@ -2,7 +2,7 @@
 
 A change is merge-ready when the repository's maintainer would merge it. A blocker in any dimension fails the change, and acceptance needs support for every blocking criterion. List non-blocking findings apart, marked optional. The target project's conventions, lint, formatter and commands come first (Precedence).
 
-Judge each criterion in one of these six dimensions, and name it by its exact lowercase name. <!-- K1, K4: explicit names, delimited table -->
+Judge each criterion in one of these six dimensions, and name it by its exact lowercase name. <!-- K1: explicit names. K4: a table separates the dimensions. -->
 
 | Dimension      | Asks                                                                  | Blocking                                                                                                                                               | Non-blocking                                            |
 | -------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------- |
@@ -26,4 +26,4 @@ Tests in proportion:
   - horizontal slicing: tests and code written layer by layer, not one vertical behavior at a time from its test to the code that passes it.
 - Fix the code rather than weaken a test; a test that is itself wrong goes to the root in the report.
 
-Report each blocker with the affected behavior, the path and symbol, and the evidence. Where the evidence is too thin to judge a criterion, report it as unverified and name what is missing; never infer a pass. <!-- K8: fallback when the source lacks the answer -->
+Report each blocker with the affected behavior, the path and symbol, and the evidence.
