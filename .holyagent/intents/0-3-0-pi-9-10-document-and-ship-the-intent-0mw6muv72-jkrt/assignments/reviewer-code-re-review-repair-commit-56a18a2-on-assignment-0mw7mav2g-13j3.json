@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-repair-commit-56a18a2-on",
   "objective": "Re-review repair commit 56a18a2 on release/0.3.0/feat/pi-install (worktree /home/user/holyagent-0.3.0-install, range 67723bc..56a18a2) against the earlier findings it repairs.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "git -C /home/user/holyagent-0.3.0-install diff 67723bc..56a18a2 with dist excluded, also at /home/user/holyagent-notes/install-repair.diff.",
     "Earlier findings it repairs: (a) a project .holyagent/config.json steered the user-scope install and could remove global packages; now user scope reads the home-level config only, in setup and doctor; (b) the Shell comment wrongly claimed a neutral working directory for project-scope installs; (c) provider profile packages the config no longer selects were left listed; (d) setup read one settings scope while doctor accepted either; (e) a git source whose ref has slashes was not recognized as the HolyAgent package.",
@@ -39,7 +39,29 @@
     "agentId": "workflow:wf_88cd86df-67e/assignment-0mw7mav2g-13j3",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T09:16:06.472Z"
+    "startedAt": "2026-11-08T09:16:06.472Z",
+    "finishedAt": "2026-11-08T09:21:14.678Z"
+  },
+  "result": "result: repair OK. All five earlier findings are repaired and each has a test that fails without it. `mise run verify` passes. No blockers; the writer's note and four smaller items are optional.\n\nThe built-in `/code-review` ran on `67723bc...56a18a2`. Its findings are classed below.\n\n**Earlier findings**\n- (a) Repaired. `loadPiConfig` takes a scope and reads no project directory for `user`. Setup and doctor both pass the scope. New tests cover user-scope setup and doctor with a hostile project config, and project-scope setup removing in the project.\n- (b) Repaired. The `Shell` comment now says the project-scope `pi install -l` runs in the project on purpose.\n- (c) Repaired. `MANAGED_NAMES` now includes the `PROVIDERS` profile packages, through the new `staleManagedNames`. Tests use a synthetic managed set and the real shipped Kimi package.\n- (d) Repaired. Setup now accepts either settings file, as doctor does. Tests cover both scopes and a stale pin.\n- (e) Repaired. `GIT_LEAD` strips the git lead and the whole `@ref` before the name is read. Tests cover slash refs for git, scp, https and ssh sources, plus negatives where only the ref says `holyagent`.\n\n**Writer's note (user-scope presence counting the project `.pi/settings.json`)**\n- Optional. The first review also raised this.\n- User-scope presence should count only the global settings. A repository-controlled file can make a global setup skip the install, which is the same kind of steering the repair removes for config. Doctor shows the same behavior when run in that repo, but the global install is still missing elsewhere.\n- Project scope counting the global file is correct, because Pi loads global packages in a project.\n- Making it global-only means `listedIn` returns `otherFile` only when `projectLevel`. Doctor would also read the global file for the user scope. The test \"either settings file\" and the docs sentence \"so setup and doctor agree\" would then need to change.\n- It is a design choice, not a regression, so it does not block.\n\n**Other optional items**\n- `piSettingsSources(otherFile)` is wrapped in `orElseSucceed`, which swallows all errors, not just invalid JSON. `pi-check.ts` line 294 already does the same on the base.\n- User-scope doctor and setup ignore a project config that the runtime merges over the user's. This is documented and intended, since it is the point of (a).\n- The `local` assertion in the doctor test (`/pi[ :]/` and not `settings`) is loose. The `project` assertion would not catch a project config being ignored.\n- `docs/pi/README.md` lines 130-131 change \"planned\" to present tense for Kimi. This is unrelated to the repair and slightly overstates the current state. Revert it or leave it.\n\n**Repo standards:** The code uses Effect, there is no try/catch, JSDoc is on the changed exports (`staleManagedNames`, `loadPiConfig`, `piChecks`) and there is no dist churn. The docs are updated.\n\nI did not run the tests individually. I read the new tests and the full-suite pass only.\n\nLog: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`. The source diff is at `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/src.diff`.\n\nchecks: `bunx --no-install mise run verify` in `/home/user/holyagent-0.3.0-install` at 56a18a2 -> exit 0; type-check clean over 202 files, lint clean over 203 files, tests 2208 pass and 0 fail.\n\nblockers: none\nquestions: none\n\nevidence:\nEach earlier finding is repaired with a test that fails without it, and nothing else regresses: Findings (a) to (e) each map to a new test in `packages/runtime/tests/setup-pi.test.ts`; `mise run verify` exits 0 with 2208 pass and 0 fail (log above).\nThe repair follows the repository's code rules: Effect-only source, JSDoc on the changed exports, docs updated, no try/catch or generated-file churn; lint and type-check exit 0 via `mise run verify`.\nreview-findings: The built-in `/code-review` returned 6 findings. The user-scope presence item is optional. The `orElseSucceed` swallow, the loose doctor-test assertions and the unrelated `docs/pi/README.md` tense edit are optional. The project-config-merge-at-runtime and cross-scope-removal items are rejected, because the repair documents and intends both. Nothing is a blocker.\n",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "Five earlier findings repaired with tests; verify 2208 pass; optional items taken into the last round",
+    "criteria": [
+      {
+        "criterion": "Each earlier finding is repaired with a test that fails without it, and nothing else regresses",
+        "support": "Findings (a) to (e) each map to a new test in `packages/runtime/tests/setup-pi.test.ts`; `mise run verify` exits 0 with 2208 pass and 0 fail (log above)."
+      },
+      {
+        "criterion": "The repair follows the repository's code rules",
+        "support": "Effect-only source, JSDoc on the changed exports, docs updated, no try/catch or generated-file churn; lint and type-check exit 0 via `mise run verify`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "review-findings",
+        "support": "The built-in `/code-review` returned 6 findings. The user-scope presence item is optional. The `orElseSucceed` swallow, the loose doctor-test assertions and the unrelated `docs/pi/README.md` tense edit are optional. The project-config-merge-at-runtime and cross-scope-removal items are rejected, because the repair documents and intends both. Nothing is a blocker."
+      }
+    ]
   },
   "createdAt": "2026-11-08T09:16:06.472Z"
 }
