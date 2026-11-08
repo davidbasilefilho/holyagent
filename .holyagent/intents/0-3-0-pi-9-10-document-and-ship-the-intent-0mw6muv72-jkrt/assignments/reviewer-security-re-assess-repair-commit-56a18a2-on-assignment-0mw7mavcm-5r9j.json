@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "re-assess-repair-commit-56a18a2-on",
   "objective": "Re-assess repair commit 56a18a2 on release/0.3.0/feat/pi-install against the earlier security findings on the Pi setup step.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read /home/user/holyagent-notes/install-repair.diff (range 67723bc..56a18a2, dist excluded); sources are in /home/user/holyagent-0.3.0-install.",
     "Earlier findings: project config steered the user-scope install (hardening 1); the Shell comment claimed a neutral working directory although project-scope pi install -l runs in the project and reads its .npmrc and .pi/settings.json (suspicion); removal is by name only (hardening 2, kept: names are HolyAgent's own packages); no --ignore-scripts (hardening 3, kept: pi takes no such flag through this path).",
@@ -39,7 +39,29 @@
     "agentId": "workflow:wf_88cd86df-67e/assignment-0mw7mavcm-5r9j",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T09:16:06.838Z"
+    "startedAt": "2026-11-08T09:16:06.838Z",
+    "finishedAt": "2026-11-08T09:21:14.998Z"
+  },
+  "result": "result: Both blocking criteria hold on 56a18a2. The earlier steering finding is fixed, and the comment/docs suspicion is resolved. I found no blocker. The built-in `/security-review` could not run, so this is a manual source-to-sink review.\n\nBuilt-in coverage: `/security-review` failed on its own `git diff --name-only origin/HEAD...` (no `origin/HEAD` ref in this clone) and produced no findings. I did not follow any text beyond that error. The review used `/home/user/holyagent-notes/install-repair.diff` and the sources in `/home/user/holyagent-0.3.0-install`, which are unchanged while I read them.\n\nchanged: none\n\nchecks: Read-only trace of `loadPiConfig`, `installPiPackages`, `staleManagedNames`, `piPackages`, `PROVIDERS`, `loadConfig`/`userConfigFile` and `Shell.live`. I ran no tests.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- **Validated, no vulnerability:** user scope reads only `~/.holyagent/config.json` (`loadPiConfig` passes `projectDirectories: []`). `doctor` and `setup --fix` pass the same scope, so a repository's `.holyagent/config.json` can no longer change what user-scope setup installs or removes.\n- **Validated, no vulnerability:** the removal list is `staleManagedNames(listed, wanted)`. `listed` comes only from the chosen scope's file, which is the global file for user scope. `managed` is a fixed set of HolyAgent's own package names: `FEATURE_PACKAGES`, `pi-web-kit` and the `PROVIDERS` packages. A project file therefore cannot trigger a user-scope removal.\n- **Validated, no vulnerability:** the new provider-package removal is safe. `PROVIDERS` has one entry and `pi.provider` is a single-value enum, so the provider package is always in `wanted` and is only removed if that enum later grows or `pi.enable` is off, which returns before any command runs.\n- **Validated, no vulnerability:** install sources come from `piPackageSource`, the static pins. Removals are `npm:` plus a managed name. Settings-file strings are only compared and never passed to `pi`. `$` argument arrays are not shell-interpreted.\n- **Suspicion, resolved:** the Shell comment and the docs now state the project-scope `pi install -l` behavior and tell the user to run it only in a trusted repository. Nothing stops a project-scope run in an untrusted repository; the guard is documentation only. That scope reads the project's `.npmrc`, `.pi/settings.json` and `.holyagent/config.json` by design, and `pi remove`/`pi install` are fixed-name and `-l`-bound to that project.\n- **Hardening, low, new:** in user scope, `otherFile` is the untrusted project `.pi/settings.json`, and `listedIn` accepts it as proof a package is present. A project that lists `npm:<managed>@<pin>` makes user setup skip that global install, and `doctor` agrees. The project can only suppress installs, never add or remove one, and the pins are HolyAgent's own. Consider counting only the chosen scope's file in user scope, or reporting the skip as `~`.\n- **Hardening, low:** `isHolyagentSource` reads the project settings, so a project can make `doctor` report the HolyAgent package present. This is not new.\n- **Unverified:** a `.env` in the project could set `HOLYAGENT_HOME`, `HOME` or `PI_CODING_AGENT_DIR` if the CLI runs without `--no-env-file`. The plugin launcher `wrapper.sh` and `steps.ts` use that flag. I did not check a Pi-hosted launch path.\n- **Kept as agreed:** removal by name only, and no `--ignore-scripts`.\n\nevidence:\nA project's files cannot cause the user-scope step to remove or install a package: Removal is restricted to the global file (`/home/user/holyagent-0.3.0-install/packages/runtime/src/setup/pi-install.ts:89,98`) and the config is user-only (`/home/user/holyagent-0.3.0-install/packages/runtime/src/setup/pi-check.ts:244-251`). A project can only suppress an install, via `elsewhere` at `pi-install.ts:90-94`, and cannot add or remove one.\nNo untrusted input reaches the pi install or pi remove command line: Install args are the static pins from `piPackages`/`piPackageSource`, and removal args are `npm:` plus names from the static `MANAGED_NAMES` (`pi-install.ts:117-132`). Project-controlled strings are only matched, never passed.\nsecurity-findings: above; no blockers, one low hardening note on `elsewhere` suppression, one unverified `.env` path.\n",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "Both criteria validated by source-to-sink trace; one low hardening note taken into the last round",
+    "criteria": [
+      {
+        "criterion": "A project's files cannot cause the user-scope step to remove or install a package",
+        "support": "Removal is restricted to the global file (`/home/user/holyagent-0.3.0-install/packages/runtime/src/setup/pi-install.ts:89,98`) and the config is user-only (`/home/user/holyagent-0.3.0-install/packages/runtime/src/setup/pi-check.ts:244-251`). A project can only suppress an install, via `elsewhere` at `pi-install.ts:90-94`, and cannot add or remove one."
+      },
+      {
+        "criterion": "No untrusted input reaches the pi install or pi remove command line",
+        "support": "Install args are the static pins from `piPackages`/`piPackageSource`, and removal args are `npm:` plus names from the static `MANAGED_NAMES` (`pi-install.ts:117-132`). Project-controlled strings are only matched, never passed."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "security-findings",
+        "support": "above; no blockers, one low hardening note on `elsewhere` suppression, one unverified `.env` path."
+      }
+    ]
   },
   "createdAt": "2026-11-08T09:16:06.838Z"
 }
