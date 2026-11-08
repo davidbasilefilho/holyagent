@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "rebuild-the-generated-plugin-and-run-the",
   "objective": "Rebuild the generated plugin and run the gates on the heads of three stacked branches, reporting which generated files the build changed and the gate results.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktrees, in this order: /home/user/holyagent-0.3.0-wiring (branch release/0.3.0/feat/pi-root-wiring), /home/user/holyagent-0.3.0-settings (release/0.3.0/feat/pi-tool-settings, just merged the wiring branch), /home/user/holyagent-0.3.0-prompts (release/0.3.0/feat/pi-review-prompts, just merged the settings branch).",
     "In each: run bunx --no-install mise run build, then git status --short (report the changed paths: merged generated bundles may be out of sync), then bunx --no-install mise run verify (report exit code and the pass and fail counts)."
@@ -35,7 +35,25 @@
     "agentId": "workflow:wf_41a04743-a0d/assignment-0mw7qiy7e-i8sr",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-08T11:14:22.250Z"
+    "startedAt": "2026-11-08T11:14:22.250Z",
+    "finishedAt": "2026-11-08T11:17:47.224Z"
+  },
+  "result": "result: All three worktrees built and verified green; the build changed no tracked files in any of them.\nchanged: none (packages/integrations/claude/dist and packages/integrations/pi/dist are tracked; `git status --short` was empty in all three after build)\nchecks:\n- wiring: `bunx --no-install mise run build` -> exit 0, claude 38 files, pi 34 files; `verify` -> exit 0, 2301 pass, 0 fail, 73 files\n- settings: build -> exit 0, claude 38, pi 34; `verify` -> exit 0, 2334 pass, 0 fail, 74 files\n- prompts: build -> exit 0, claude 38, pi 36; `verify` -> exit 0, 2352 pass, 0 fail, 77 files\nblockers: none\nquestions: none\nnotes: Prompts build emitted 36 pi files versus 34 on the other two, yet the tree stayed clean, so the committed dist already matches. The root may want to confirm the 36-file count is expected.\nevidence:\ngate-results: logs at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/{wiring,settings,prompts}-build.log, {wiring,settings,prompts}-verify.log, and {wiring,settings,prompts}-status.txt\n[blocking] Each worktree reports the files the build changed and the verify exit code with counts: wiring, settings and prompts each list no changed paths and verify exit 0 with 2301, 2334 and 2352 passing tests and 0 failing\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Build left all three trees clean; verify exit 0 on each head",
+    "criteria": [
+      {
+        "criterion": "Each worktree reports the files the build changed and the verify exit code with counts",
+        "support": "wiring, settings and prompts each list no changed paths and verify exit 0 with 2301, 2334 and 2352 passing tests and 0 failing"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "gate-results",
+        "support": "logs at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/{wiring,settings,prompts}-build.log, {wiring,settings,prompts}-verify.log, and {wiring,settings,prompts}-status.txt"
+      }
+    ]
   },
   "createdAt": "2026-11-08T11:14:22.250Z"
 }
