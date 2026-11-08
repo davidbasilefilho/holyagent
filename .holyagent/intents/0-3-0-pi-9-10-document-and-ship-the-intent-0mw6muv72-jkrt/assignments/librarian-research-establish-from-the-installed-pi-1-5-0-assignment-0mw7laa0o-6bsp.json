@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mw7laa0o-6bsp",
+  "intentId": "intent-0mw6muv72-jkrt",
+  "intentRevision": 4,
+  "roleTask": "Librarian.research",
+  "slug": "establish-from-the-installed-pi-1-5-0",
+  "objective": "Establish from the installed Pi 1.5.0 source and docs how a Pi package makes other Pi packages it depends on load (their extensions, skills, prompts), and what that means for the HolyAgent package installed from a git tag.",
+  "state": "Running",
+  "scope": [
+    "Sources on disk (read them, do not guess): /home/user/holyagent-notes/pi-probe/node_modules/@earendil-works/pi-coding-agent (docs/packages.md and related docs, dist package manager and resource loader code). HolyAgent ships its Pi package at packages/integrations/pi/dist in /home/user/holyagent-0.3.0-install, and the repository root package.json has a pi manifest pointing there so `pi install git:github.com/davidbasilefilho/holyagent@holyagent-<version>` works; the HolyAgent package needs seven Pi packages (pi-provider-kimi-code, @tintinweb/pi-subagents, billion-context, @juicesharp/rpiv-todo, @juicesharp/rpiv-ask-user-question, @aliou/pi-processes, @amaster.ai/pi-computer-use, plus pi-web-kit when the web choice needs it) at exact pins, chosen per config by piPackages in packages/runtime/src/config/packages.ts.",
+    "Answer with path:line: (1) Does Pi load the resources of a package listed in another package dependencies or bundledDependencies, and how must the parent manifest name them (pi.extensions paths into node_modules, a packages field, anything else)? (2) For a git install, which package.json does Pi read and does it install its dependencies (npm install --omit=dev in the clone?), and for an npm install? (3) Can a package add other packages to the user settings packages list, or must setup write them (e.g. `pi install npm:<pkg>@<pin>` per feature)? (4) Which of these lets the installed set follow the user config (a feature turned off is not installed or loaded)? Recommend the smallest mechanism that meets: installing the HolyAgent package installs only the dependencies the default config enables, and a disabled feature is not loaded."
+  ],
+  "constraints": [
+    "Read-only.",
+    "Do not run pi or any live model.",
+    "Start each evidence line with the criterion text, then a colon.",
+    "Report in under 450 words."
+  ],
+  "criteria": [
+    {
+      "text": "Each of the four questions is answered with source path and line",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A recommended mechanism is tied to the requirement",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-08T08:47:39.576Z"
+  },
+  "createdAt": "2026-11-08T08:47:39.576Z"
+}
