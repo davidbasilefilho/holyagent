@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mw7kc586-wu9f",
+  "intentId": "intent-0mw6muuvl-zq3p",
+  "intentRevision": 7,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-subagentworkflow-renderer",
+  "objective": "Re-review the SubagentWorkflow renderer mitigation for correctness and integration.",
+  "state": "Running",
+  "scope": [
+    "Previous finding to verify closed (security, pre-existing in @tintinweb/pi-subagents 0.23.1): the SubagentWorkflow renderCall (index.ts:2743) calls extractMeta (meta.ts:319, 250) and evaluates the meta fragment in vm createContext({}) during Pi interactive rendering of streamed calls (interactive-mode.js:2904-2916, 3320), before the tool_call gate, so `export const meta = { description: this.constructor.constructor(\\\"return process\\\")() }` reached the host process. The repair registers a tool renderer through pi.registerToolRenderer that replaces renderCall for SubagentWorkflow with a plain line naming the workflow only when literalWorkflowName (workflow-check.ts) vets the fragment, keeping the package renderResult and renderShell; the extension now imports @earendil-works/pi-tui at runtime. Review only d8fcbdf..HEAD in /home/user/holyagent-0.3.0-launcher (source diff at /home/user/holyagent-notes/launcher-repair4.diff; package and Pi sources under /home/user/holyagent-notes/pi-probe/node_modules). Do not run pi or any live model.",
+    "Check that the renderer registration follows the Pi API, that the runtime import of @earendil-works/pi-tui resolves when Pi loads the installed HolyAgent package (dependency or peer declared, or provided by Pi) and that the build bundles or externalises it correctly, and that the tests prove no evaluation."
+  ],
+  "constraints": [
+    "Read-only: no edits and no version-control writes.",
+    "Run bunx --no-install mise run verify and report exit code and counts.",
+    "Start each evidence line with the criterion text, then a colon.",
+    "Report in under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "The mitigation works as intended without new defects",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7jum0q-27k7"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T08:21:07.062Z"
+  },
+  "createdAt": "2026-11-08T08:21:07.062Z"
+}
