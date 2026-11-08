@@ -1,0 +1,61 @@
+{
+  "id": "assignment-0mw7hzsvd-iqr5",
+  "intentId": "intent-0mw6muuvl-zq3p",
+  "intentRevision": 7,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-pi-specialist-launcher-change",
+  "objective": "Review the Pi specialist launcher change, 7bae86c..e55ee8f on release/0.3.0/feat/pi-launcher in /home/user/holyagent-0.3.0-launcher, for correctness and regressions against the merge-ready bar.",
+  "state": "Running",
+  "scope": [
+    "Binding requirements (Intent pi 7/10, revision 7): the launcher is @tintinweb/pi-subagents 0.23.1, which runs children in process; HolyAgent ships the eighteen specialists as package agents (dist/agents, pi.subagents.agents), only those launch (disableDefaultAgents true, fallbackSubagent none), each agent file carries the role prompt (stripCitations, ${HOLYAGENT_PI_ROOT} filled with forward slashes) and a tools allowlist derived from toolArgs, with no model or thinking in the file; model and thinking come per call from the dispatched entry, which under HOLYAGENT_HOST=pi prints the Pi route (config.pi.routes); PI_CODEMODE_MAX_WORKERS and PI_CACHE_RETENTION are set once on the root process; the extension runs a child as a specialist, never as the root; launches are non-blocking with a completion notice that starts a new root turn; failure from stopReason error, aborted or length, an empty report or a settle without a report; a workflow agent and an independent reviewer are never continued; assignment reports reads the package workflow journal by recomputed key and direct agents from subagents:record entries; no workflow script asks for confirmation; no extra report tool. Sources: package source at /home/user/holyagent-notes/pi-probe/node_modules/@tintinweb/pi-subagents and research notes at /home/user/holyagent-notes/launcher-research.md. Do not run pi or any live model.",
+    "Review git -C /home/user/holyagent-0.3.0-launcher diff 7bae86c..e55ee8f (also at /home/user/holyagent-notes/launcher-full.diff): packages/integrations/pi (agents.ts, specialists.ts, extension.ts, generate.ts, files.ts, tests, dist/agents), packages/runtime/src/pi (tools.ts, journal.ts, provider.ts), packages/runtime/src/cli (assignment.ts, report.ts, brief.ts, config.ts, overview.ts), domain/host.ts, instructions/skills.ts (stripCitations), the root package.json, and the docs.",
+    "Check in particular: the journal key recomputation against the package journal code; whether the frontmatter and tools: format of dist/agents matches what the package parses; child detection; the message_end rewrite that fails empty or length-stopped reports (false positives such as a queued steer); duplication between agents.ts and the Claude plugin generator; that Claude output is unchanged.",
+    "Repository rules: Effect with tagged errors, Effect Schema at boundaries with onExcessProperty error, JSDoc on exports, Bun APIs, per .claude/CLAUDE.md."
+  ],
+  "constraints": [
+    "Read-only: no edits and no version-control writes.",
+    "Run bunx --no-install mise run verify in the worktree and report exit code and counts.",
+    "Start each evidence line with the criterion text, then a colon.",
+    "Report in under 600 words; put long output in a file outside the repository."
+  ],
+  "criteria": [
+    {
+      "text": "Behavior meets the binding launcher requirements",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No regression and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Changed behavior is covered by tests that fail without it, error paths included",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Code follows the repository rules and has no material duplication",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "verify-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7gssik-63k5",
+    "assignment-0mw7gtfu7-bypr",
+    "assignment-0mw7gtg3m-7arq",
+    "assignment-0mw7hfosz-q0t4",
+    "assignment-0mw7hpap1-bsp4"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T07:15:31.945Z"
+  },
+  "createdAt": "2026-11-08T07:15:31.945Z"
+}
