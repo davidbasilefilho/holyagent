@@ -1,0 +1,50 @@
+{
+  "id": "assignment-0mw740hzm-tx2y",
+  "intentId": "intent-0mw6uzaad-grmo",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-pr-4-repair-and-the",
+  "objective": "Review the PR 4 repair and the reconciling merges on the head f2323fd of release/0.3.0/feat/requirements-tree (worktree /home/user/holyagent-0.3.0-req; run commands there): the code and test changes in a10b630..8856446 and that the merges a10b630 and f2323fd leave the tree as expected.",
+  "state": "Running",
+  "scope": [
+    "Repair diff: /home/user/holyagent-notes/pr4-repair.diff. Earlier review: .git/holyagent/reports/assignment-0mw7393nm-qw1x.md.",
+    "Merges: a10b630 merged the PR 3 branch (head 1d15120, whose tree equals a38b600) and f2323fd is a -s ours merge of origin/release/0.3.0/integration (279fd50, the squash of PR 3, whose tree equals 1d15120's). Confirm git diff 279fd50 f2323fd touches only PR 4's own paths."
+  ],
+  "constraints": [
+    "Read-only: no edits, no version-control writes.",
+    "Report in under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "The repair's code and test changes are correct and the plugin output changes only in the instruction-writing skill",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The merges introduce no unexpected change against the integration branch",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "bunx --no-install mise run verify exits 0 on f2323fd and mise run build leaves the tree clean",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw73qt7v-lmp8"
+  ],
+  "followUpOf": "assignment-0mw7393nm-qw1x",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T00:44:09.874Z"
+  },
+  "createdAt": "2026-11-08T00:44:09.874Z"
+}
