@@ -67,5 +67,45 @@
     "finishedAt": "2026-11-08T03:42:14.217Z"
   },
   "result": "```\nresult: All findings closed; the Claude output is byte-identical and both gates exit 0.\nchanged: packages/runtime/src/instructions/{skills.ts, kimi-k3.1/**}, packages/runtime/tests/{skills,instructions}.test.ts, packages/integrations/claude/src/agents.ts, packages/integrations/pi/src/generate.ts, packages/integrations/pi/dist/skills/** (rebuilt), docs/development.md, docs/pi/claude-parity.md\nchecks: mise run build -> 0; mise run verify -> 0 (1764 pass, 0 fail, fmt and lint clean; log /home/user/holyagent-notes/verify-kimi-repair.log)\nblockers: none\nquestions: none\nnotes: Claude dist and plugin manifests are unchanged, and no claude-5.5 source holds a provenance comment. docs/pi/claude-parity.md grew 20 changed lines because the formatter re-aligned its tables.\nevidence:\n```\n\nFindings (root, specialist, shared and design-core notes 1-10 first, then the roles-and-skills and code reviews)\n- Note 1, report.md cache reasoning: closed, sentence removed.\n- Note 2 / decision (c), CLI placeholder: closed. `${HOLYAGENT_PI_ROOT}/scripts/holyagent` is defined in `dispatch.md` and used in `delegating.md`, `working.md` and `session-cloud-identity.md`. Other files keep the bare `holyagent <command>` shorthand that `dispatch.md` defines, as the Claude set does. Skills hold no placeholder. The substitution is documented in `docs/pi/claude-parity.md`.\n- Note 3, merge-ready \"unverified\" rule: closed, removed. The Claude set only states it in the audit, artifact and inspection roles.\n- Note 4, identity.md: closed. The Quality boundaries bullet is dropped, \"Respond tersely.\" is restored, and \"information to weigh\" is restored.\n- Note 5, writing-bar.md: closed. Its rules now match the Claude bar, plus a rule to follow the target family's own `guide.md` for that family's text.\n- Note 6, workflows.md: closed. It states that `assignment reports` reads Claude's journal and the Pi tool's has another shape, and the sandbox claim is removed.\n- Note 7, dispatch.md: closed. The launcher records `Agent` launches (orchestration.md); the root records continued and workflow agents.\n- Note 8, search.md: closed, `ls` no longer banned.\n- Note 9, citations: closed. K10 is cited as aim only, K8 and K4 mis-cites are removed, and the visible `(K5)` tags in instruction-guidelines.md are now comments.\n- Note 10, interface-inspection.md: partly closed. `drag` is restored. `reuseExistingTab` and `tabId` are restored with \"when its description lists them\", because docs/pi/t3-code.md does not document them. assignments.md temp wording is fixed.\n- Decision (a), citation stripping: closed. `stripCitations` is in skills.ts. It runs in `skillFiles` for every family and in the Claude `agents.ts` reader, and keeps `<!-- materiality -->` and `<!-- design-core -->`. Tests are in skills.test.ts, and docs/development.md describes it.\n- Decision (b), visual-judging fallback: closed, kept, with its source cited in a comment.\n- reviewer-code builtin-review.md, \"if it cannot run, say so\": closed.\n- Librarian roles: closed. They now list read-only tools plus web tools, and the Exa-only advice is gone.\n- reviewer-visual captures.md: closed, it says to open each capture with `read` and report when only text comes back.\n- ci-watch: closed. `pi-processes` is the intended path, with a foreground `timeout_ms` fallback.\n- dev-server: closed. Worker.operations gets no computer-use tools and no T3 aids.\n- instruction-writing, P1 mis-cites and the \"does not change it\" claim: closed.\n- generate.ts `PI_FAMILY` JSDoc: closed.\n- CLI-flag test per family: closed. `CLI_CHECKS` runs in `describe.each(FAMILIES)`.\n- coverage.ts single-phrase carriedBy entries: left, optional and matches the Claude shape.\n\nProvenance comments removed from Pi output only (about 100); none from Claude output.\n\nevidence:\nEvery review finding is closed or left with a stated reason: the per-finding list above; coverage.ts weak phrases left as optional.\nGuide-citation comments are stripped from generated output for every family, markers are kept, with a test: `stripCitations` in `packages/runtime/src/instructions/skills.ts`; tests in `packages/runtime/tests/skills.test.ts`, including `test.each(FAMILIES)` for no `<!--` in generated skills and a marker-kept test.\nEvery CLI invocation in the Kimi set uses the one documented placeholder: `CLI_CHECKS[\"kimi-k3.1\"]` in `packages/runtime/tests/instructions.test.ts`; documented in `docs/pi/claude-parity.md` section 7.\nEvery requirement id stays covered and no rule changes meaning: the coverage tests pass inside `mise run verify`; `coverage.ts` and `requirements/` are untouched.\nmise run build and mise run verify exit 0: build exit 0; verify exit 0 with 1764 pass and 0 fail, log at `/home/user/holyagent-notes/verify-kimi-repair.log`.\nchecks-run: `bunx --no-install mise run build` -> 0; `bunx --no-install mise run verify` -> 0; `bun test` on `skills.test.ts` and `instructions.test.ts` -> 0 fail.\nchanged-paths: the list in `changed:` above.\ndiff-file: `/home/user/holyagent-notes/kimi-repair.diff`\n",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "Kimi set and registration accepted after repair 0e71e52; artifact and code re-reviews found no blocker; verify 1764 pass, build clean",
+    "criteria": [
+      {
+        "criterion": "Every review finding is closed or left with a stated reason",
+        "support": "the per-finding list above; coverage.ts weak phrases left as optional."
+      },
+      {
+        "criterion": "Guide-citation comments are stripped from generated output for every family, markers are kept, with a test",
+        "support": "`stripCitations` in `packages/runtime/src/instructions/skills.ts`; tests in `packages/runtime/tests/skills.test.ts`, including `test.each(FAMILIES)` for no `<!--` in generated skills and a marker-kept test."
+      },
+      {
+        "criterion": "Every CLI invocation in the Kimi set uses the one documented placeholder",
+        "support": "`CLI_CHECKS[\"kimi-k3.1\"]` in `packages/runtime/tests/instructions.test.ts`; documented in `docs/pi/claude-parity.md` section 7."
+      },
+      {
+        "criterion": "Every requirement id stays covered and no rule changes meaning",
+        "support": "the coverage tests pass inside `mise run verify`; `coverage.ts` and `requirements/` are untouched."
+      },
+      {
+        "criterion": "mise run build and mise run verify exit 0",
+        "support": "build exit 0; verify exit 0 with 1764 pass and 0 fail, log at `/home/user/holyagent-notes/verify-kimi-repair.log`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bunx --no-install mise run build` -> 0; `bunx --no-install mise run verify` -> 0; `bun test` on `skills.test.ts` and `instructions.test.ts` -> 0 fail."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the list in `changed:` above."
+      },
+      {
+        "label": "diff-file",
+        "support": "`/home/user/holyagent-notes/kimi-repair.diff`"
+      }
+    ]
+  },
   "createdAt": "2026-11-08T03:31:39.594Z"
 }
