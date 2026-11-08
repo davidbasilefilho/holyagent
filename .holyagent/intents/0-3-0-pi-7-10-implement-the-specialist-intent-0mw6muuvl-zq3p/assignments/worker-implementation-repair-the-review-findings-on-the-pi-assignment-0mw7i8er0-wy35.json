@@ -1,0 +1,81 @@
+{
+  "id": "assignment-0mw7i8er0-wy35",
+  "intentId": "intent-0mw6muuvl-zq3p",
+  "intentRevision": 7,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-review-findings-on-the-pi",
+  "objective": "Repair the review findings on the Pi agents and extension: remove the duplicated specialist-prompt assembly and make only the eighteen specialists launchable on the workflow path too.",
+  "state": "Running",
+  "scope": [
+    "Work only in /home/user/holyagent-0.3.0-launcher (branch release/0.3.0/feat/pi-launcher, head e55ee8f). The launcher change (7bae86c..e55ee8f) ships the eighteen specialists as @tintinweb/pi-subagents package agents; package source at /home/user/holyagent-notes/pi-probe/node_modules/@tintinweb/pi-subagents. Read the code before changing it.",
+    "(1) Blocking, duplication: packages/integrations/pi/src/agents.ts copies from the Claude generator packages/integrations/claude/src/agents.ts the section reader (sections vs readSections), firstSentence, describe, the agentFiles assembly and the specialist body builder (conduct, materiality embedding, conditional sections, the You are the … specialist. Independence header); the copies already diverged (describe drops model and effort, the header uses a literal holyagent instead of PLUGIN_NAME). Export the shared builder once (from the Claude agents.ts or a shared module both import), parameterized by instruction directory, family and per-host head lines, and make the Pi generator use it. The Claude plugin output in packages/integrations/claude/dist must stay byte-identical (mise run build then git diff on that dist shows no change other than the runtime bundle). Reason: a change to the shared specialist prompt must be made in one place.",
+    "(2) Workflow path gate: refuseNonSpecialist in packages/integrations/pi/src/extension.ts only sees Agent tool calls; a SubagentWorkflow script agent() with no agentType defaults to general-purpose with every tool (workflow/runtime.ts:852 of the package), and nothing yet writes the package subagents.json (setup will, in a later change). Add a tool_call gate on the SubagentWorkflow tool that refuses a script unless every agent() call names one of the eighteen specialists by a string-literal agentType. Reuse the runtime script check if it fits (packages/runtime/src/cli/workflow-check.ts already checks string-literal agentType for the Claude plugin; read it and reuse its agentType check rather than writing a second parser, if it runs in the Node extension bundle); a refusal returns a clear reason and never asks for confirmation (maintainer decision: no workflow script asks for confirmation).",
+    "(3) Gate both Agent and SubagentWorkflow refusals on pi.enable from the collected config, since docs/pi/extensions.md says a disabled extension adds nothing.",
+    "(4) Same-name override (hardening): the package ranks project .pi/agents and global agents above package agents (custom-agents.ts:93-97), so a cloned repository can replace a specialist prompt and tools. Check the package for a setting or load option that ignores project or global agents with the shipped names; if one exists, add it to the subagents settings in toolSettings (packages/runtime/src/pi/tools.ts) with a test; if none exists, state the risk in docs/pi/extensions.md where the shipped agents are described.",
+    "Add tests for (2), (3) and (4) that fail without the change; keep existing tests passing."
+  ],
+  "constraints": [
+    "Edit only the ownership paths; no version-control writes and no edits under .git/ or .holyagent/.",
+    "Effect, Effect Schema at boundaries, JSDoc on exports per .claude/CLAUDE.md; the extension runs on Node inside Pi.",
+    "Do not run pi or any live model.",
+    "Run bunx --no-install mise run build, then bunx --no-install mise run verify, and report each exit code (echo $?) and counts, and confirm the Claude dist agents and skills are unchanged.",
+    "Write the diff to /home/user/holyagent-notes/launcher-f.diff and give it as diff-file evidence.",
+    "Start each evidence line with the criterion text, then a colon.",
+    "Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "The specialist prompt assembly exists once and the Claude dist is byte-identical",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "A SubagentWorkflow script launches only the eighteen specialists by literal agentType, without asking for confirmation",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The gates are inactive with pi.enable off",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The same-name override is mitigated by a setting or documented",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Tests cover each change and fail without it",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "mise run build exits 0 with dist in sync and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi/src",
+    "packages/integrations/pi/tests",
+    "packages/integrations/pi/dist",
+    "packages/integrations/claude/src/agents.ts",
+    "packages/integrations/claude/tests",
+    "packages/integrations/claude/dist",
+    "packages/runtime/src/cli/workflow-check.ts",
+    "packages/runtime/src/pi/tools.ts",
+    "packages/runtime/tests/pi/tools.test.ts",
+    "docs/pi/extensions.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T07:22:13.549Z"
+  },
+  "createdAt": "2026-11-08T07:22:13.549Z"
+}
