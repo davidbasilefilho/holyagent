@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-commit-135c8c1-on-release-0-3-0",
   "objective": "Review commit 135c8c1 on release/0.3.0/feat/kimi-instructions (range 0e71e52..135c8c1, worktree /home/user/holyagent-0.3.0-kimi; run commands there) for correctness and regressions.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "The commit rewrites stripCitations in packages/runtime/src/instructions/skills.ts so comments inside inline code spans and fenced code blocks (backtick and tilde) are left as written, and so removing own-line comments leaves no extra blank lines for LF and CRLF; tests in packages/runtime/tests/skills.test.ts. It also drops one rule from kimi-k3.1/specialist/writing-bar.md and adds a sentence defining the holyagent shorthand to kimi-k3.1/specialist/state-changes.md.",
     "Earlier review notes this answers: a prose `<!--` pairing with a later `-->` deleted text; adjacent own-line comments left extra blank lines; CRLF own-line comments were not recognised.",
@@ -50,7 +50,37 @@
     "agentId": "workflow:wf_44abfd97-ba5/assignment-0mw7avkqg-r6ua",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T03:56:17.464Z"
+    "startedAt": "2026-11-08T03:56:17.464Z",
+    "finishedAt": "2026-11-08T04:01:56.258Z"
+  },
+  "result": "result: All four criteria pass at 135c8c1. The built-in review raised six findings. I confirmed the behavior ones but rate all as optional, because no current source triggers them. Everything below was run in the worktree.\n\nchanged: none (read-only)\n\nchecks:\n- `/code-review 0e71e52...135c8c1` ran through the Skill tool and returned six findings.\n- `bunx --no-install mise run verify` exited 0 with 1766 pass, 0 fail. Log: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`.\n- `bunx --no-install mise run build` exited 0 and `git status --short` was empty afterwards. The commit touches no `dist/` file, so the Claude output is byte-identical.\n- The previous `stripCitations`, copied into the scratchpad, fails the new tests. The code-span, tilde-fence and unclosed-fence tests fail outright. Three of the seven blank-line cases fail in LF (the two-adjacent-comments cases and the leading-comment case). All seven fail in CRLF.\n- Old and new `stripCitations` give identical output on all 272 `.md` files under `packages/runtime/src/instructions`. No current source is affected.\n\nblockers: none\n\nquestions: none\n\nnotes (optional; probes were run against the new code):\n1. The inline-span alternative pairs backticks across list items. `\"- it's a ` tick <!-- K1 -->\\n- another ` tick\\n\"` is returned unchanged, so the note would ship to the model. Source: `skills.ts:48`.\n2. A fenced block indented 4 or more spaces (list-nested) that contains a blank line loses its comment. `\"- a\\n\\n    ```md\\n    one\\n\\n    <!-- keep -->\\n    ```\\n\"` returns without the comment. Source: `skills.ts:44`.\n3. A comment on the last line of the text with no final newline now drops the previous newline. `\"x\\n<!-- a -->\"` returns `\"x\"`, where the old code returned `\"x\\n\"`. The `agents.ts` caller trims. The skills caller at `skills.ts:218` does not trim, but no current source ends this way.\n4. The `docs/development.md` Instruction text paragraph (around line 83) says every generator strips such comments and keeps only the two markers. It does not mention that code spans and fenced blocks are now left as written.\n5. The tests have no CRLF coverage for fences and spans, and none for a comment at the end of the text or an indented fence. The four-alternative regex with numbered backreferences is hard to maintain. A line-based fence scanner would be simpler.\n6. The `writing-bar.md` and `state-changes.md` edits are scoped as described and need nothing more.\n\nNot run: the Kimi generator output. Only the Claude `dist/` was checked, and the 272-file comparison covers the strip function on the sources.\n\nevidence:\nstripCitations strips only provenance comments in prose, leaves code spans, fenced blocks and markers intact, and handles unclosed fences and spans safely: Probes confirmed that code spans, backtick and tilde fences, an unclosed fence and an unclosed span behave as intended, and that both markers are kept. Optional edge gaps are notes 1 to 3. Source: `packages/runtime/src/instructions/skills.ts:44`.\nNo regression: Claude dist byte-identical after mise run build and no other generator output changes unexpectedly: `mise run build` exited 0, `git status` was clean, the commit has no `dist/` changes, and the old and new function agree on all 272 instruction `.md` files.\nThe new tests cover the code-span, fence and blank-line cases and would fail on the previous implementation: The previous function copied into the scratchpad fails 3 of the new tests (code, tilde, open) and fails blank-line cases in LF and CRLF. Probe file: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/oldtest.ts`.\nbunx --no-install mise run verify exits 0 on 135c8c1: exit 0, 1766 pass, 0 fail, lint clean on 175 files.\nchecks-run: `/code-review` via the Skill tool; `mise run verify` (exit 0); `mise run build` (exit 0, tree clean); old-implementation test probe (fails as expected); old-versus-new comparison over 272 `.md` files (0 differences); edge-case probes in `probe.ts` and `cmp.ts` in the scratchpad. Not run: the Kimi generator output.\n",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "All four criteria pass at 135c8c1; old/new identical on 272 sources; optional edge notes carried to the launcher Intent",
+    "criteria": [
+      {
+        "criterion": "stripCitations strips only provenance comments in prose, leaves code spans, fenced blocks and markers intact, and handles unclosed fences and spans safely",
+        "support": "Probes confirmed that code spans, backtick and tilde fences, an unclosed fence and an unclosed span behave as intended, and that both markers are kept. Optional edge gaps are notes 1 to 3. Source: `packages/runtime/src/instructions/skills.ts:44`."
+      },
+      {
+        "criterion": "No regression: Claude dist byte-identical after mise run build and no other generator output changes unexpectedly",
+        "support": "`mise run build` exited 0, `git status` was clean, the commit has no `dist/` changes, and the old and new function agree on all 272 instruction `.md` files."
+      },
+      {
+        "criterion": "The new tests cover the code-span, fence and blank-line cases and would fail on the previous implementation",
+        "support": "The previous function copied into the scratchpad fails 3 of the new tests (code, tilde, open) and fails blank-line cases in LF and CRLF. Probe file: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/oldtest.ts`."
+      },
+      {
+        "criterion": "bunx --no-install mise run verify exits 0 on 135c8c1",
+        "support": "exit 0, 1766 pass, 0 fail, lint clean on 175 files."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`/code-review` via the Skill tool; `mise run verify` (exit 0); `mise run build` (exit 0, tree clean); old-implementation test probe (fails as expected); old-versus-new comparison over 272 `.md` files (0 differences); edge-case probes in `probe.ts` and `cmp.ts` in the scratchpad. Not run: the Kimi generator output."
+      }
+    ]
   },
   "createdAt": "2026-11-08T03:56:17.464Z"
 }
