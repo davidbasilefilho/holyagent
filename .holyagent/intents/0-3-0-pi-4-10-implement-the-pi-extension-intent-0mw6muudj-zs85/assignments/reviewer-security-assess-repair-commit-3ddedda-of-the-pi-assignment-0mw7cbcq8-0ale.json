@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mw7cbcq8-0ale",
+  "intentId": "intent-0mw6muudj-zs85",
+  "intentRevision": 6,
+  "roleTask": "Reviewer.security",
+  "slug": "assess-repair-commit-3ddedda-of-the-pi",
+  "objective": "Assess repair commit 3ddedda of the Pi extension entry (range b7efd82..3ddedda, worktree /home/user/holyagent-0.3.0-ext) for security regressions, focusing on the new --project argument and process.chdir in the pi bundle entry and the neutral exec cwd.",
+  "state": "Running",
+  "scope": [
+    "The earlier security review found no blocker and one low suspicion: pi.exec of bare sh and git with cwd set to the project could resolve a program from the project folder on Windows. The repair runs sh and git in the package folder, passes git -C <project>, and adds a leading --project <dir> to the pi bundle (packages/runtime/src/hooks/pi-entry.ts, pi-project.ts) which chdirs before the CLI runs. It also shares hasStateFolder (hooks/state-folder.ts) and a bundler (packages/runtime/src/bundle.ts).",
+    "Diff without dist: /home/user/holyagent-notes/pi-ext-fix.diff; read worktree files as needed."
+  ],
+  "constraints": [
+    "Read-only: no edits and no version-control writes.",
+    "Report in under 350 words; start each evidence line with the criterion text, a colon, then the support."
+  ],
+  "criteria": [
+    {
+      "text": "The --project argument cannot be confused with an option or used to run the CLI against an unintended folder, and a missing folder fails closed",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "sh and git no longer start in the project folder, and no new command, path or context injection is introduced",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "diff-file"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7bybb7-c3ea"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T04:36:33.200Z"
+  },
+  "createdAt": "2026-11-08T04:36:33.200Z"
+}
