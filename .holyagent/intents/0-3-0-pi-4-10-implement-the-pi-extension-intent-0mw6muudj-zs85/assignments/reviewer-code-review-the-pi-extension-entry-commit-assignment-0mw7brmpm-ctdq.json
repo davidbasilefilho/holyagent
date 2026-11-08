@@ -1,0 +1,59 @@
+{
+  "id": "assignment-0mw7brmpm-ctdq",
+  "intentId": "intent-0mw6muudj-zs85",
+  "intentRevision": 6,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-pi-extension-entry-commit",
+  "objective": "Review the Pi extension entry commit b7efd82 for correctness, regressions and maintainability against the merge-ready bar.",
+  "state": "Running",
+  "scope": [
+    "The commit b7efd82 on release/0.3.0/feat/pi-extension (worktree /home/user/holyagent-0.3.0-ext, range 135c8c1..b7efd82) adds the Pi extension entry: a default-exported factory receiving ExtensionAPI, a --holyagent-role flag (root default, specialist, session; unknown fails closed), holyagent status on every session start reason and on session_compact plus reconcile after resume and compaction, delivered as a message via before_agent_start within the session-start budget, the Kimi root core span for session-role sessions, config loaded through the runtime loader via a config command in the shipped pi bundle, and a scripts/holyagent wrapper plus runtime bundle shipped in packages/integrations/pi/dist/scripts.",
+    "Diff without the two generated bundles: /home/user/holyagent-notes/pi-ext.diff. Design docs: docs/pi/extensions.md, docs/pi/orchestration.md, docs/pi/configuration.md. Repository rules: AGENTS.md and .claude/CLAUDE.md.",
+    "Writer notes to weigh: the bundler and the hasStateFolder check were duplicated from packages/integrations/claude/src/generate.ts and packages/runtime/src/cli/hook.ts because those files were outside the writer ownership; a config command lives in hooks/pi-entry.ts instead of the CLI; sessionContext always appends the Claude reminder so piContext swaps it; docs/pi/orchestration.md still says handlers call domain functions directly; each session start runs about five short processes.",
+    "Run commands in /home/user/holyagent-0.3.0-ext."
+  ],
+  "constraints": [
+    "Tests use unit tests and synthesized fixtures only; do not run the pi binary or any live model.",
+    "Read-only: no edits and no version-control writes.",
+    "Report in under 450 words; start each evidence line with the criterion text, a colon, then the support; put long logs in a file outside the repository."
+  ],
+  "criteria": [
+    {
+      "text": "The extension behaves as the Intent requires: lifecycle, role flag, status and reconcile timing, message delivery, budget, core span, fail-closed handlers, wrapper-only runtime access, config loading",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No regression: Claude dist byte-identical, generated output in sync, existing CLI and hooks unchanged in behavior",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Tests cover each behavior and its error paths and would fail without the change",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "No duplicated logic that should be shared, and code follows the repository rules (Effect, Schema at boundaries, JSDoc, Bun APIs where Bun runs)",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "bunx --no-install mise run verify exits 0 on b7efd82",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T04:21:13.018Z"
+  },
+  "createdAt": "2026-11-08T04:21:13.018Z"
+}
