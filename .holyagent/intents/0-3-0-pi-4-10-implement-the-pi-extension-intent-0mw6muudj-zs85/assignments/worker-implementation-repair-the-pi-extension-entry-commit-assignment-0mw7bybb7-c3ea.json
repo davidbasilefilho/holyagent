@@ -77,5 +77,45 @@
     "finishedAt": "2026-11-08T04:36:11.270Z"
   },
   "result": "result: All six criteria are met, with one deviation. The Claude dist is not byte-identical: `packages/integrations/claude/dist/scripts/holyagent.js` differs by one line (+1/-1). The bundle now emits `hasStateFolder` earlier, because it moved out of `cli/hook.ts` into the shared module. Claude behavior is unchanged. Byte-identity would need `hasStateFolder` to stay defined in `hook.ts`, and the Pi extension cannot import that file. It pulls in `import { $ } from \"bun\"` through `state/tree.ts`, which Node cannot load. Please accept the reorder or tell me to duplicate the function instead.\n\n**Changes**\n- **Blocking fix:** outside git the state folder is `<cwd>/.holyagent` and `state mode` is skipped. The new tests use a real temp project with no `git init`. They check the status, the core span for the session role, and nothing for a project with no `.holyagent` folder.\n- **Neutral cwd:** `sh` and `git` now run in the package folder. The project goes in as `git -C <project>` and a new leading `--project <dir>` handled in `pi-entry.ts`, which does `process.chdir` before the CLI runs. I put this in `pi-entry.ts` because the shared wrapper cannot change without altering the Claude dist, and `pi.exec` takes no environment variables. The Claude hook is unaffected.\n- **Order and deadline:**\n  - Status runs before reconcile, in sequence.\n  - `config` and `state mode` run together.\n  - One 10s deadline (`SESSION_DEADLINE_MS`) covers the whole collection and stops any command still running.\n  - A newer gather aborts the older one, and a stopped gather's result is dropped. This also applies on shutdown, so a stopped gather no longer delivers a notice.\n- **Shared code:** `hasStateFolder` now lives in the new `hooks/state-folder.ts` and both hosts use it. `bundleModule` in the new `packages/runtime/src/bundle.ts` is used by the Claude `bundle()` and by the Pi `runtime()` and `bundleExtension`.\n- **Docs:** `docs/pi/extensions.md` now covers the non-git behavior, the deadline, the cwd rule and the three `piContext` omissions. `docs/pi/orchestration.md` now says handlers reach the runtime through `scripts/holyagent`.\n\n**Tests added:** non-git real and mocked cases, the `--project` failure with a missing folder, status-before-reconcile, concurrent config and `state mode`, the deadline, compaction abort, shutdown drop, exec cwd, and `bundleModule`. I changed two existing config tests in `extension.test.ts` to check that `status` and `reconcile` do not run, because `state mode` now runs alongside `config`.\n\nchanged: packages/integrations/pi/src/{extension,generate}.ts; packages/integrations/pi/tests/{extension,session-context}.test.ts; packages/integrations/pi/dist/{extensions/holyagent.js,scripts/holyagent.js}; packages/integrations/claude/src/generate.ts; packages/integrations/claude/dist/scripts/holyagent.js; packages/runtime/src/{index.ts,cli/hook.ts,hooks/pi-entry.ts}; new: packages/runtime/src/{bundle.ts,hooks/pi-project.ts,hooks/state-folder.ts}, packages/runtime/tests/bundle.test.ts; docs/pi/{extensions,orchestration}.md\n\nchecks:\n- `bunx --no-install mise run verify` -> exit 0. Type-check, lint and format are clean, and 1831 tests pass in 63 files.\n- `bunx --no-install mise run build` -> exit 0. A second run leaves `git status` unchanged. Generated output is in sync.\n\nblockers: none\nquestions: the Claude dist reorder above.\nnotes: none\n\nevidence:\nA non-git project with a .holyagent folder gets status and, for the session role, the core span, with a real-project test: `extension.test.ts`, \"with the built package and a project that is not a git repository\" (4 tests), through the shipped wrapper, plus the mocked non-git block. Passing.\nStatus runs before reconcile, session_start has one 10s overall deadline, and a newer compaction gather aborts the older one, with tests: `extension.test.ts`, \"order and time\" (5 tests). Passing.\ngit and sh run with a cwd that is not the project, with a test: `extension.test.ts`, \"where programs start\". Passing.\nThe state-folder check and the bundler are shared, not duplicated, and the Claude dist stays byte-identical: shared via `state-folder.ts` and `bundle.ts`. Not byte-identical, see the deviation above.\ndocs/pi/extensions.md and docs/pi/orchestration.md match the implementation: both edited; format check passes.\nbunx --no-install mise run verify exits 0 and mise run build leaves generated output in sync: verify exit 0 (log `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`); build is idempotent.\nchanged-paths: listed above.\ndiff-file: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/pi-fix.diff` (source, tests and docs; the dist files are excluded).\n",
+  "acceptance": {
+    "revision": 6,
+    "rationale": "Extension entry and repair confirmed by code and security re-reviews of 3ddedda; verify 1831 pass",
+    "criteria": [
+      {
+        "criterion": "A non-git project with a .holyagent folder gets status and, for the session role, the core span, with a real-project test",
+        "support": "`extension.test.ts`, \"with the built package and a project that is not a git repository\" (4 tests), through the shipped wrapper, plus the mocked non-git block. Passing."
+      },
+      {
+        "criterion": "Status runs before reconcile, session_start has one 10s overall deadline, and a newer compaction gather aborts the older one, with tests",
+        "support": "`extension.test.ts`, \"order and time\" (5 tests). Passing."
+      },
+      {
+        "criterion": "git and sh run with a cwd that is not the project, with a test",
+        "support": "`extension.test.ts`, \"where programs start\". Passing."
+      },
+      {
+        "criterion": "The state-folder check and the bundler are shared, not duplicated, and the Claude dist stays byte-identical",
+        "support": "shared via `state-folder.ts` and `bundle.ts`. Not byte-identical, see the deviation above."
+      },
+      {
+        "criterion": "docs/pi/extensions.md and docs/pi/orchestration.md match the implementation",
+        "support": "both edited; format check passes."
+      },
+      {
+        "criterion": "bunx --no-install mise run verify exits 0 and mise run build leaves generated output in sync",
+        "support": "verify exit 0 (log `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`); build is idempotent."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "listed above."
+      },
+      {
+        "label": "diff-file",
+        "support": "`/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/pi-fix.diff` (source, tests and docs; the dist files are excluded)."
+      }
+    ]
+  },
   "createdAt": "2026-11-08T04:26:24.835Z"
 }
