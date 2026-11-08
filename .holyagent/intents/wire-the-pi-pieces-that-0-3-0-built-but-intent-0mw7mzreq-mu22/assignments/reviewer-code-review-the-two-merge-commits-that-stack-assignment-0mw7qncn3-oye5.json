@@ -1,0 +1,36 @@
+{
+  "id": "assignment-0mw7qncn3-oye5",
+  "intentId": "intent-0mw7mzreq-mu22",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-two-merge-commits-that-stack",
+  "objective": "Review the two merge commits that stack the Pi wiring branches (28d2b56 on release/0.3.0/feat/pi-tool-settings and eb12e30 on release/0.3.0/feat/pi-review-prompts) for merge mistakes.",
+  "state": "Running",
+  "scope": [
+    "28d2b56 merges release/0.3.0/feat/pi-root-wiring (e2b516b) into pi-tool-settings; eb12e30 merges pi-tool-settings into pi-review-prompts. Worktrees /home/user/holyagent-0.3.0-settings and /home/user/holyagent-0.3.0-prompts. Both merged without conflicts.",
+    "Check with git show --cc and git diff of each parent against the merge that no change from either side was lost or duplicated, especially in files both sides touched (docs/pi/extensions.md, docs/pi/README.md, docs/pi/configuration.md, docs/usage.md, the generated dist bundles); that statements in those docs still agree with the merged code; and that the generated dist matches the merged sources (a fresh build left both trees clean and verify passed: 2334 and 2352 pass)."
+  ],
+  "constraints": [
+    "Read-only; no edits and no version-control writes.",
+    "Report in under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "Each merge keeps every change of both parents, and the merged docs agree with the merged code",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "review-findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T11:17:47.583Z"
+  },
+  "createdAt": "2026-11-08T11:17:47.583Z"
+}
