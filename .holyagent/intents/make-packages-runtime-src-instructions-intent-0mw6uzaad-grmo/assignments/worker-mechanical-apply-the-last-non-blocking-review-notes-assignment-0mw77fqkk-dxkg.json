@@ -1,0 +1,59 @@
+{
+  "id": "assignment-0mw77fqkk-dxkg",
+  "intentId": "intent-0mw6uzaad-grmo",
+  "intentRevision": 4,
+  "roleTask": "Worker.mechanical",
+  "slug": "apply-the-last-non-blocking-review-notes",
+  "objective": "Apply the last non-blocking review notes to PR 4 in /home/user/holyagent-0.3.0-req (head f2323fd).",
+  "state": "Running",
+  "scope": [
+    "Run every command in /home/user/holyagent-0.3.0-req.",
+    "1. .claude/skills/requirements/SKILL.md, Gates section: add that requirements/ and each guide.md are not shipped in the plugin, so a rebuild after a change to claude-5.5/ is what updates the plugin.",
+    "2. docs/development.md around line 76: name the mise task (bunx --no-install mise run instructions:scaffold) as the route instead of bun run in packages/runtime, since mise.toml is the single source of commands.",
+    "3. Add one test in packages/runtime/tests/requirements.test.ts that parses CRLF input (e.g. '- R-A: x\\r\\n- See: R-A\\r\\n' with the existing parser export) and asserts the same result as the LF form.",
+    "4. .claude/skills/write-skills/references/model-guides.md: cite G25 rather than G33 for the over-verify point (check both against packages/runtime/src/instructions/claude-5.5/guide.md and keep whichever matches the claim); check the G1 and G21 citations against guide.md and fix any that do not match the claim.",
+    "Details: .git/holyagent/reports/assignment-0mw740hq5-s1r4.md and .git/holyagent/reports/assignment-0mw740hzm-tx2y.md."
+  ],
+  "constraints": [
+    "Change no requirement line (lines starting '- R-') and no shipped instruction text.",
+    "No version-control writes; report changed paths.",
+    "Finish with bunx --no-install mise run verify; write git diff f2323fd to /home/user/holyagent-notes/pr4-final.diff.",
+    "Report in under 150 words."
+  ],
+  "criteria": [
+    {
+      "text": "The four notes are applied as described",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "The CRLF test passes and fails if the parser split on LF only",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "bunx --no-install mise run verify exits 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    ".claude/skills",
+    "docs",
+    "packages/runtime/tests"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw73qt7v-lmp8",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-08T02:19:59.684Z"
+  },
+  "createdAt": "2026-11-08T02:19:59.684Z"
+}
