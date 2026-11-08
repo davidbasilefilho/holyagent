@@ -72,5 +72,37 @@
     "finishedAt": "2026-11-08T08:00:44.266Z"
   },
   "result": "result: Pi gate now vets the exact meta fragment and exact wrapped program; Claude hook restored; build and verify exit 0.\n\nchanged:\n- `packages/runtime/src/cli/workflow-check.ts`\n- `packages/runtime/tests/workflow-check.test.ts`\n- `packages/integrations/pi/src/extension.ts`\n- `packages/integrations/pi/tests/extension.test.ts`\n- `docs/hooks.md`\n- `docs/pi/extensions.md`\n- `packages/integrations/claude/dist/scripts/holyagent.js` (rebuilt)\n- `packages/integrations/pi/dist/extensions/holyagent.js` (rebuilt)\n- `packages/integrations/pi/dist/scripts/holyagent.js` (rebuilt)\n\nchecks:\n- `bunx --no-install mise run build` -> exit 0.\n- `bunx --no-install mise run verify` -> exit 0. Type-check clean, lint clean, 519 files formatted, 2120 pass, 0 fail.\n- The first verify run failed the format check on 3 files. I ran `mise run fmt`, which touched only my files, then rebuilt and re-verified.\n- Claude dist agents and skills are unchanged. `git status` shows only `scripts/holyagent.js` modified under claude/dist.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- `workflowRefusal` takes a third argument, `host: \"claude\" | \"pi\"`. The Pi extension passes `\"pi\"`.\n- Pi mode ports `scanObjectLiteral` and `isRegexPosition` from meta.ts, with a citation comment, and uses the same meta pattern.\n- Pi mode refuses a script with no meta line or more than one.\n- Pi mode accepts the meta fragment only as an object of literals that spans the whole fragment, using the existing `literalOnly` rule. I moved `literalOnly` to module level so both modes share it.\n- Pi mode builds the worker source, which is `(async () => {` + prelude + `\\n` + body + `\\n})()` with the first match's `export` blanked. It parses that as a classic script and confirms the wrapper was not closed early by the body. The check then walks the arrow function's body statements.\n- The prelude is a one-line stand-in (`const Date = void 0;`), not the package's exact prelude text. It cannot change how the body parses.\n- The block-level function refusal now applies to Pi only. Claude is back to its pre-ddd4616 verdicts.\n- A `const text = \\`\\nexport const meta = {…}\\n\\`` line is allowed under Pi, because what the package evaluates is the vetted literal.\n\nevidence:\n- Under Pi the gate vets the exact meta fragment and the exact script the package runs, refusing the comment-before-object and HTML-comment exploits: `packages/runtime/tests/workflow-check.test.ts` (\"the Pi mode checks the meta fragment and the program the package runs\") and `packages/integrations/pi/tests/extension.test.ts` pass in verify. The tests cover block-comment and `//` payloads, the `<!--` and line-leading `-->` hiding of `workflow()`, non-literal meta forms, a missing or repeated meta line, and wrapper escape.\n- The Claude hook verdicts are as before ddd4616, with strings containing --> or <!-- allowed: the \"HTML-like text in a string is plain under both hosts\" tests pass for Claude and Pi. The Claude-mode test also confirms block functions and a comment-wrapped meta line are read as a module.\n- Tests cover the exploits and the allowed cases and fail without the change: the allowed-string cases failed against the old `HTML_COMMENT` rule. The Pi-mode tests need the new third argument, which does not exist on the base.\n- docs/hooks.md and docs/pi/extensions.md match the code: the Script-mode differences bullet in `docs/hooks.md` and the SubagentWorkflow gate bullet in `docs/pi/extensions.md` were rewritten to describe parsing what the package runs.\n- mise run build exits 0 with dist in sync and mise run verify exits 0: build exit 0 and verify exit 0, as above. Logs are `/tmp/claude-0/build.log` and `/tmp/claude-0/verify.log`.\n- diff-file: `/home/user/holyagent-notes/launcher-i.diff` (source, tests and docs; no dist bundles)\n",
+  "acceptance": {
+    "revision": 7,
+    "rationale": "Launcher work reviewed by code and security reviewers through four repair rounds; final head 7846c9b passes verify with 2146 tests and no open blocker.",
+    "criteria": [
+      {
+        "criterion": "Under Pi the gate vets the exact meta fragment and the exact script the package runs, refusing the comment-before-object and HTML-comment exploits",
+        "support": "`packages/runtime/tests/workflow-check.test.ts` (\"the Pi mode checks the meta fragment and the program the package runs\") and `packages/integrations/pi/tests/extension.test.ts` pass in verify. The tests cover block-comment and `//` payloads, the `<!--` and line-leading `-->` hiding of `workflow()`, non-literal meta forms, a missing or repeated meta line, and wrapper escape."
+      },
+      {
+        "criterion": "The Claude hook verdicts are as before ddd4616, with strings containing --> or <!-- allowed",
+        "support": "the \"HTML-like text in a string is plain under both hosts\" tests pass for Claude and Pi. The Claude-mode test also confirms block functions and a comment-wrapped meta line are read as a module."
+      },
+      {
+        "criterion": "Tests cover the exploits and the allowed cases and fail without the change",
+        "support": "the allowed-string cases failed against the old `HTML_COMMENT` rule. The Pi-mode tests need the new third argument, which does not exist on the base."
+      },
+      {
+        "criterion": "docs/hooks.md and docs/pi/extensions.md match the code",
+        "support": "the Script-mode differences bullet in `docs/hooks.md` and the SubagentWorkflow gate bullet in `docs/pi/extensions.md` were rewritten to describe parsing what the package runs."
+      },
+      {
+        "criterion": "mise run build exits 0 with dist in sync and mise run verify exits 0",
+        "support": "build exit 0 and verify exit 0, as above. Logs are `/tmp/claude-0/build.log` and `/tmp/claude-0/verify.log`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff-file",
+        "support": "`/home/user/holyagent-notes/launcher-i.diff` (source, tests and docs; no dist bundles)"
+      }
+    ]
+  },
   "createdAt": "2026-11-08T07:53:58.267Z"
 }
