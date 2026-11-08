@@ -1,0 +1,78 @@
+{
+  "id": "assignment-0mw7q1d60-nvyf",
+  "intentId": "intent-0mw7mzreq-mu22",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-review-findings-on-the-pi",
+  "objective": "Repair the review findings on the Pi review prompts in /home/user/holyagent-0.3.0-prompts (branch release/0.3.0/feat/pi-review-prompts, head 7b935ff).",
+  "state": "Running",
+  "scope": [
+    "Blocking: the prompts and the Kimi reviewer role text disagree on the output. packages/integrations/pi/src/prompts/code-review.md and security-review.md give their own report format and a closing line, while roles/reviewer-code/builtin-review.md and roles/reviewer-security/builtin-review.md (packages/runtime/src/instructions/kimi-k3.1) say to verify each finding, review on your own, then send one final report with the evidence block, classifying findings as blocker, optional or rejected, and reviewer-security/findings.md says a validated vulnerability the change introduced or worsened is a blocker. Make each prompt say its findings are working input to the reviewer's next step, not the final report; in security-review.md map a validated finding the change introduced or worsened to blocker; keep the prompts usable when a person runs them alone (then the prompt's own list is the result).",
+    "Blocking (docs): docs/development.md:28 lists the Pi dist layout without prompts/; docs/pi/installation.md:31 says the root pi key points at extensions/, skills/ and agents/ only.",
+    "Optional (include): the code prompt's step 1 repeats the role's range bullet and shows placeholders when a person passes a...b; make the argument handling plain; with no argument the prompts say 'the refs the Assignment below names': say what to do when run alone with no range (ask for one); add one short example finding entry to each prompt (Kimi guide K1).",
+    "Optional (code review): packages/runtime/src/cli/brief.ts imports from packages/integrations/pi/src, the first runtime-to-integration source import, which also bundles the Pi prompt text into the Claude CLI bundle: move the prompt source into packages/runtime (for example next to the Kimi instructions) and have the Pi generator copy it into dist/prompts, so the dependency stays one-way; parseTemplate throws a bare Error: use a tagged error or make it a build-time check per .claude/CLAUDE.md; replace the name-table lookup with a direct roleTask-to-template record and avoid String.replace dollar patterns.",
+    "Follow .claude/skills/write-skills and the Kimi guide for the prompt text; if Kimi instruction text changes, keep requirements and coverage in sync (.claude/skills/requirements/SKILL.md)."
+  ],
+  "constraints": [
+    "Change only the ownership paths; no version-control writes and no edits under .git/ or .holyagent/.",
+    "Follow .claude/CLAUDE.md code rules; tests must fail without each fix; do not weaken tests.",
+    "Never run pi or a live model.",
+    "Run bunx --no-install mise run build and bunx --no-install mise run verify before reporting.",
+    "Report in under 400 words; put long logs in a file under /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path. Write a diff-file (Claude dist and Pi CLI bundle excluded) at /home/user/holyagent-notes/wire-c-fix.diff."
+  ],
+  "criteria": [
+    {
+      "text": "Each prompt states its findings feed the reviewer's next step and labels findings so the role's blocker, optional and rejected rule applies, with security mapping a validated introduced or worsened finding to blocker",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "docs/development.md and docs/pi/installation.md list the prompts folder and key",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The prompt source lives in the runtime package and no runtime source imports an integration package",
+      "blocking": false,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "The prompts handle a missing or literal range when run alone and show one example entry",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build and mise run verify exit 0",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi/src/prompts",
+    "packages/integrations/pi/src/generate.ts",
+    "packages/integrations/pi/tests/prompts.test.ts",
+    "packages/integrations/pi/tests/pi.test.ts",
+    "packages/integrations/pi/dist/prompts",
+    "packages/integrations/pi/dist/scripts/holyagent.js",
+    "packages/integrations/claude/dist/scripts/holyagent.js",
+    "packages/runtime/src/cli/brief.ts",
+    "packages/runtime/src/prompts",
+    "packages/runtime/src/instructions/kimi-k3.1/roles",
+    "packages/runtime/tests/cli/brief.test.ts",
+    "packages/runtime/tests/prompts.test.ts",
+    "docs/development.md",
+    "docs/pi/installation.md",
+    "docs/pi/extensions.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T11:00:41.832Z"
+  },
+  "createdAt": "2026-11-08T11:00:41.832Z"
+}
