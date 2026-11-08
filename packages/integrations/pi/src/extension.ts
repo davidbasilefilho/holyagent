@@ -159,18 +159,35 @@ export const createExtension =
     // Every program starts in the package's own folder, never the project's: on Windows a bare
     // `sh` or `git` is looked up in the working directory first, where a project could plant one.
     // The project is named in the arguments instead.
+    //
+    // A command that is interrupted (the deadline, or a sibling that failed) is stopped and then
+    // awaited: the effect ends only once Pi's exec has settled, so no process outlives the gather.
+    // On Windows a process still running holds its working directory, here the project's.
     const exec = (signal: AbortSignal, command: string, args: ReadonlyArray<string>) =>
       signal.aborted
         ? Effect.fail(new CommandFailed({ command: args.join(" "), reason: "it was stopped" }))
-        : Effect.tryPromise({
-            // The effect's own signal stops the command when the deadline interrupts the collection.
-            try: (interrupted) =>
-              pi.exec(command, [...args], {
+        : Effect.callback<ExecResult, CommandFailed>((resume, interrupted) => {
+            const stop = new AbortController()
+            const settled = pi
+              .exec(command, [...args], {
                 cwd: packageRoot,
-                signal: AbortSignal.any([signal, interrupted]),
+                signal: AbortSignal.any([signal, interrupted, stop.signal]),
                 timeout: COMMAND_TIMEOUT_MS,
-              }),
-            catch: (cause) => new CommandFailed({ command: args.join(" "), reason: String(cause) }),
+              })
+              .then(
+                (result) => resume(Effect.succeed(result)),
+                (cause) =>
+                  resume(
+                    Effect.fail(
+                      new CommandFailed({ command: args.join(" "), reason: String(cause) }),
+                    ),
+                  ),
+              )
+            // On interruption: abort, then hold the interruption until the command has exited.
+            return Effect.promise(() => {
+              stop.abort()
+              return settled
+            })
           })
 
     // The wrapper runs the package's bundled runtime with Bun, which enters the project first; its

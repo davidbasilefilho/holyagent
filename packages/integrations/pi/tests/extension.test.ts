@@ -90,6 +90,8 @@ const fakeApi = (responder: Responder, value?: string | boolean, cwd = SESSION_C
   const calls: Array<Call> = []
   const sent: Array<unknown> = []
   const touched: Array<string> = []
+  // The commands started and not yet settled: a process that is still running.
+  const running = { count: 0 }
   const api = {
     registerFlag: (name: string, options: { type: string; default?: string }) =>
       void flags.set(name, options),
@@ -106,8 +108,13 @@ const fakeApi = (responder: Responder, value?: string | boolean, cwd = SESSION_C
     ): Promise<ExecResult> => {
       const call: Call = { command, args, cwd: options?.cwd, signal: options?.signal }
       calls.push(call)
-      const outcome = await responder(call, subcommand(call) ?? [])
-      return { stdout: "", stderr: "", code: 0, killed: false, truncated: false, ...outcome }
+      running.count += 1
+      try {
+        const outcome = await responder(call, subcommand(call) ?? [])
+        return { stdout: "", stderr: "", code: 0, killed: false, truncated: false, ...outcome }
+      } finally {
+        running.count -= 1
+      }
     },
   }
   // Only `cwd` of the context is read: any other member, the TUI's `ui` included, fails the test.
@@ -134,6 +141,7 @@ const fakeApi = (responder: Responder, value?: string | boolean, cwd = SESSION_C
     calls,
     sent,
     touched,
+    running,
     emit,
   }
 }
@@ -522,6 +530,8 @@ describe("with the built package and a real project", () => {
         stdout: "pipe",
         stderr: "pipe",
         stdin: "ignore",
+        // Pi's exec kills the process when the signal aborts.
+        ...(call.signal === undefined ? {} : { signal: call.signal }),
       })
       const [stdout, stderr, code] = await Promise.all([
         new Response(child.stdout).text(),
@@ -742,6 +752,74 @@ describe("order and time", () => {
     await started
     expect(await api.emit("before_agent_start", { prompt: "x" })).toEqual([undefined])
     await done()
+  })
+})
+
+describe("no command outlives a gather", () => {
+  // A stopped command takes a while to exit, as a process does: it settles `delay` ms after the
+  // signal aborts, which a gather that does not wait for it would return before.
+  const slowToStop =
+    (hold: ReturnType<typeof gate>, answer: Outcome, delay = 60) =>
+    (call: Call): Promise<Outcome> =>
+      new Promise((settle) => {
+        hold.enter()
+        const stop = () => void setTimeout(() => settle({ killed: true, code: 143 }), delay)
+        if (call.signal?.aborted) return stop()
+        call.signal?.addEventListener("abort", stop, { once: true })
+        void hold.promise.then(() => settle(answer))
+      })
+
+  test("when the config fails, the state folder command is stopped and awaited before the notice is delivered", async () => {
+    const hold = gate()
+    const inner = healthy("/missing")
+    const api = fakeApi((call, runtime) => {
+      if (runtime[0] === "config")
+        return hold.entered.then(() => ({
+          code: 4,
+          stderr: "error: ConfigInvalid: bad\nhint: Fix it.\n",
+        }))
+      return runtime[0] === "state" ? slowToStop(hold, { stdout: "" })(call) : inner(call, runtime)
+    })
+    createExtension({ packageRoot: PACKAGE_ROOT })(api.pi)
+    await api.emit("session_start", { reason: "startup" })
+    expect(api.running.count).toBe(0)
+    const delivered = (await api.emit("before_agent_start", { prompt: "x" })).at(0) as Delivered
+    expect(delivered.message?.customType).toBe(NOTICE_MESSAGE)
+    expect(api.running.count).toBe(0)
+  })
+
+  test("when the gather succeeds, nothing is left running", async () => {
+    const api = fakeApi(healthy("/missing"))
+    createExtension({ packageRoot: PACKAGE_ROOT })(api.pi)
+    await api.emit("session_start", { reason: "resume" })
+    expect(api.running.count).toBe(0)
+  })
+
+  test("at the deadline, the command in flight is stopped and awaited before the notice is delivered", async () => {
+    const hold = gate()
+    const inner = healthy("/missing")
+    const api = fakeApi((call, runtime) =>
+      runtime[0] === "status" ? slowToStop(hold, { stdout: STATUS })(call) : inner(call, runtime),
+    )
+    createExtension({ packageRoot: PACKAGE_ROOT, deadlineMs: 100 })(api.pi)
+    await api.emit("session_start", { reason: "startup" })
+    expect(api.running.count).toBe(0)
+    const delivered = (await api.emit("before_agent_start", { prompt: "x" })).at(0) as Delivered
+    expect(delivered.message?.content).toContain("longer than")
+  })
+
+  test("a shutdown stops the commands and the gather settles only after they exit", async () => {
+    const hold = gate()
+    const inner = healthy("/missing")
+    const api = fakeApi((call, runtime) =>
+      runtime[0] === "status" ? slowToStop(hold, { stdout: STATUS })(call) : inner(call, runtime),
+    )
+    createExtension({ packageRoot: PACKAGE_ROOT })(api.pi)
+    const started = api.emit("session_start", { reason: "startup" })
+    await hold.entered
+    await api.emit("session_shutdown", { reason: "quit" })
+    await started
+    expect(api.running.count).toBe(0)
   })
 })
 

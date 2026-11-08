@@ -2590,6 +2590,9 @@ var try_ = (options) => {
     }
   });
 };
+var promise = (evaluate) => callbackOptions(function(resume, signal) {
+  evaluate(signal).then((a) => resume(succeed3(a)), (e) => resume(die(e)));
+}, evaluate.length !== 0);
 var tryPromise = (options) => {
   const f = typeof options === "function" ? options : options.try;
   const catcher = typeof options === "function" ? (cause) => new UnknownError(cause, "An error occurred in Effect.tryPromise") : options.catch;
@@ -3413,9 +3416,11 @@ var void_2 = exitVoid;
 var isSuccess3 = exitIsSuccess;
 
 var all2 = all;
+var promise2 = promise;
 var tryPromise2 = tryPromise;
 var succeed5 = succeed3;
 var suspend2 = suspend;
+var callback2 = callback;
 var gen2 = gen;
 var fail5 = fail3;
 var failCauseSync2 = failCauseSync;
@@ -8675,13 +8680,17 @@ var createExtension = ({
 } = {}) => (pi) => {
   const wrapper = wrapperPath(packageRoot);
   let held;
-  const exec = (signal, command, args) => signal.aborted ? fail5(new CommandFailed({ command: args.join(" "), reason: "it was stopped" })) : tryPromise2({
-    try: (interrupted) => pi.exec(command, [...args], {
+  const exec = (signal, command, args) => signal.aborted ? fail5(new CommandFailed({ command: args.join(" "), reason: "it was stopped" })) : callback2((resume, interrupted) => {
+    const stop = new AbortController;
+    const settled = pi.exec(command, [...args], {
       cwd: packageRoot,
-      signal: AbortSignal.any([signal, interrupted]),
+      signal: AbortSignal.any([signal, interrupted, stop.signal]),
       timeout: COMMAND_TIMEOUT_MS
-    }),
-    catch: (cause) => new CommandFailed({ command: args.join(" "), reason: String(cause) })
+    }).then((result) => resume(succeed5(result)), (cause) => resume(fail5(new CommandFailed({ command: args.join(" "), reason: String(cause) }))));
+    return promise2(() => {
+      stop.abort();
+      return settled;
+    });
   });
   const holyagent = (signal, project, ...args) => exec(signal, "sh", [wrapper, PI_PROJECT_FLAG, project, ...args]).pipe(flatMap2((result) => result.code === 0 && !result.killed ? succeed5(result.stdout) : fail5(new CommandFailed({ command: args.join(" "), reason: reasonOf(result) }))));
   const topOf = (signal, project) => exec(signal, "git", ["-C", project, "rev-parse", "--show-toplevel"]).pipe(flatMap2((result) => {
