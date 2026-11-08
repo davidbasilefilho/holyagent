@@ -64,24 +64,43 @@ const kimi = (model: string, thinking: Thinking): RouteChoice => ({ model, think
  * at low.
  */
 export const KIMI_ROUTES: Readonly<Record<RouteKey, RouteChoice>> = {
+  // plans, decides and makes the final pass; max is selectable
   root: kimi(KIMI_ROOT, "high"),
+  // reads and reports the layout
   "Explorer.map": kimi(KIMI_SPECIALIST, "high"),
+  // answers a narrow question from files
   "Explorer.lookup": kimi(KIMI_SPECIALIST, "high"),
+  // follows one flow through the code
   "Explorer.trace": kimi(KIMI_SPECIALIST, "high"),
+  // fetches one fact from documentation
   "Librarian.lookup": kimi(KIMI_SPECIALIST, "high"),
+  // gathers and compares sources
   "Librarian.research": kimi(KIMI_SPECIALIST, "high"),
+  // bounded edits with a known recipe
   "Worker.mechanical": kimi(KIMI_SPECIALIST, "high"),
+  // writes the change that gets merged
   "Worker.implementation": kimi(KIMI_SPECIALIST, "max"),
+  // spans several systems and contracts
   "Worker.integration": kimi(KIMI_SPECIALIST, "max"),
+  // runs commands along a documented procedure
   "Worker.operations": kimi(KIMI_SPECIALIST, "high"),
+  // runs the gates and reports their output
   "Worker.validation": kimi(KIMI_SPECIALIST, "high"),
+  // root-cause work needs the deepest reasoning
   "Worker.debugging": kimi(KIMI_SPECIALIST, "max"),
+  // the root makes the final visual pass
   "Worker.visual": kimi(KIMI_ROOT, "low"),
+  // the root makes the final visual pass
   "Reviewer.visual": kimi(KIMI_ROOT, "low"),
+  // a missed defect costs more than the tokens
   "Reviewer.code": kimi(KIMI_SPECIALIST, "max"),
+  // judges whether the tests prove the behavior
   "Reviewer.testing": kimi(KIMI_SPECIALIST, "max"),
+  // checks records against evidence
   "Reviewer.audit": kimi(KIMI_SPECIALIST, "high"),
+  // judges trust boundaries
   "Reviewer.security": kimi(KIMI_SPECIALIST, "max"),
+  // judges instruction text against its requirements
   "Reviewer.artifact": kimi(KIMI_SPECIALIST, "max"),
 }
 

@@ -285,6 +285,35 @@ export const rewriteVendoredTool = (
   return result
 }
 
+/**
+ * The release a Pi package pin moves to: `release`, unless the pin is already above it, which is
+ * kept, because a registry whose `latest` tag points at an older line must not move an exact pin
+ * down. A `release` that is not stable keeps `current`; a `current` that is not stable is
+ * replaced.
+ */
+export const nextPiVersion = (current: string, release: string): string => {
+  const from = parseRelease(current)
+  const to = parseRelease(release)
+  if (to === undefined) return current
+  return from !== undefined && compareReleases(from, to) > 0 ? current : release
+}
+
+/**
+ * The pin table of the Pi packages with their versions set from `versions`, by npm name, keeping
+ * the key order; packages not in the map keep their version.
+ */
+export const withPiPackageVersions = (
+  table: Readonly<Record<string, string>>,
+  versions: ReadonlyMap<string, string>,
+): Record<string, string> =>
+  Object.fromEntries(
+    Object.entries(table).map(([name, version]) => [name, versions.get(name) ?? version]),
+  )
+
+/** The text of `pi-packages.json` for a pin table: two-space JSON and a final newline. */
+export const renderPiPackages = (table: Readonly<Record<string, string>>): string =>
+  `${JSON.stringify(table, null, 2)}\n`
+
 /** The dependency fields of a `package.json` whose values are version ranges by package name. */
 export const DEPENDENCY_FIELDS: ReadonlyArray<string> = [
   "dependencies",

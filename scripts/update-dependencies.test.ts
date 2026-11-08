@@ -11,12 +11,15 @@ import {
   fetchVendored,
   main,
   manifestFiles,
+  PI_PACKAGE_PINS,
   type Pin,
   PinsBehind,
   releaseOf,
+  renderPiPins,
   SourceError,
   type Steps,
   type Survey,
+  surveyPiPackages,
   Usage,
   verifyChecksum,
 } from "./update-dependencies.ts"
@@ -36,6 +39,7 @@ const survey = (...pins: ReadonlyArray<Pin>): Survey => ({
   vendored: new Map(),
   mise: new Map(),
   packages: new Map(),
+  piPackages: new Map(),
 })
 
 /** Steps that read a fixed survey and count the writes asked for. */
@@ -266,5 +270,138 @@ describe("fetchVendored", () => {
     const get = network(api("{}"))
     const error = await Effect.runPromise(Effect.flip(fetchVendored("fd", "10.5.1", "10.6.0", get)))
     expect(error).toBeInstanceOf(SourceError)
+  })
+})
+
+describe("Pi package pins", () => {
+  const write = (file: string, text: string) => Bun.write(join(root, file), text)
+
+  /** The registry's answer for one package: its versions, with `latest` and some deprecated. */
+  const packument = (latest: string, versions: ReadonlyArray<string>, deprecated: string[] = []) =>
+    JSON.stringify({
+      "dist-tags": { latest },
+      versions: Object.fromEntries(
+        versions.map((version) => [
+          version,
+          deprecated.includes(version) ? { deprecated: "do not use" } : {},
+        ]),
+      ),
+    })
+
+  /** A registry serving fixtures by package path; the scoped name's slash is escaped as %2F. */
+  const registry = (answers: Record<string, string>) =>
+    Bun.serve({
+      port: 0,
+      fetch: (request) => {
+        const answer = answers[new URL(request.url).pathname.slice(1)]
+        return answer === undefined ? new Response("", { status: 404 }) : new Response(answer)
+      },
+    })
+
+  const FIXTURE = {
+    "pi-web-kit": packument("0.6.0", ["0.5.0", "0.6.0", "0.7.0-rc.1", "0.7.0"]),
+    "@scope%2Fext": packument("1.3.0", ["1.2.0", "1.3.0", "1.4.0", "1.3.1"], ["1.3.1"]),
+    "old-line": packument("1.0.0", ["1.0.0", "2.0.0"]),
+  }
+
+  const seed = () =>
+    write(
+      PI_PACKAGE_PINS,
+      JSON.stringify({ "pi-web-kit": "0.5.0", "@scope/ext": "1.2.0", "old-line": "3.0.0" }),
+    )
+
+  test("moves each pin to the newest stable, non-deprecated release at or below latest", async () => {
+    await seed()
+    const server = registry(FIXTURE)
+    try {
+      const { pins, latest } = await Effect.runPromise(
+        surveyPiPackages(root, `http://127.0.0.1:${server.port}`),
+      )
+      expect(pins.map(({ kind, name, current, next }) => ({ kind, name, current, next }))).toEqual([
+        { kind: "pi", name: "pi-web-kit", current: "0.5.0", next: "0.6.0" },
+        { kind: "pi", name: "@scope/ext", current: "1.2.0", next: "1.3.0" },
+        // The registry's latest is behind the pin: the pin stays.
+        { kind: "pi", name: "old-line", current: "3.0.0", next: "3.0.0" },
+      ])
+      expect(Object.fromEntries(latest)).toEqual({
+        "pi-web-kit": "0.6.0",
+        "@scope/ext": "1.3.0",
+        "old-line": "3.0.0",
+      })
+      expect(pins.every(({ file }) => file === PI_PACKAGE_PINS)).toBe(true)
+    } finally {
+      await server.stop(true)
+    }
+  })
+
+  test("--check fails when a Pi pin is behind and passes once it is current", async () => {
+    await seed()
+    const server = registry(FIXTURE)
+    try {
+      const found = await Effect.runPromise(
+        surveyPiPackages(root, `http://127.0.0.1:${server.port}`),
+      )
+      const behind = survey(...found.pins)
+      const error = await Effect.runPromise(
+        Effect.flip(execute(["--check", root], steps(behind).stand)),
+      )
+      expect(error).toBeInstanceOf(PinsBehind)
+      expect((error as PinsBehind).count).toBe(2)
+      expect(logged.join("\n")).toContain("pi-web-kit")
+
+      const current = survey(...found.pins.map((pin) => ({ ...pin, current: pin.next })))
+      await Effect.runPromise(execute(["--check", root], steps(current).stand))
+    } finally {
+      await server.stop(true)
+    }
+  })
+
+  test("a package the registry does not know fails the survey", async () => {
+    await seed()
+    const server = registry({})
+    try {
+      const error = await Effect.runPromise(
+        Effect.flip(surveyPiPackages(root, `http://127.0.0.1:${server.port}`)),
+      )
+      expect(error).toBeInstanceOf(SourceError)
+    } finally {
+      await server.stop(true)
+    }
+  })
+
+  test("a pin file that is not a table of strings fails with a FileError", async () => {
+    await write(PI_PACKAGE_PINS, JSON.stringify({ "pi-web-kit": 5 }))
+    const error = await Effect.runPromise(Effect.flip(surveyPiPackages(root, "http://127.0.0.1:1")))
+    expect(error._tag).toBe("FileError")
+  })
+
+  test("renders the moved versions into the file text, in the file's key order", async () => {
+    await seed()
+    const text = await Effect.runPromise(
+      renderPiPins(
+        root,
+        new Map([
+          ["@scope/ext", "1.3.0"],
+          ["pi-web-kit", "0.6.0"],
+        ]),
+      ),
+    )
+    expect(JSON.parse(text)).toEqual({
+      "pi-web-kit": "0.6.0",
+      "@scope/ext": "1.3.0",
+      "old-line": "3.0.0",
+    })
+    expect(Object.keys(JSON.parse(text) as object)).toEqual([
+      "pi-web-kit",
+      "@scope/ext",
+      "old-line",
+    ])
+    expect(text.endsWith("}\n")).toBe(true)
+  })
+
+  test("the repository's own pin file is already in the form the updater writes", async () => {
+    const repository = join(import.meta.dir, "..")
+    const text = await Bun.file(join(repository, PI_PACKAGE_PINS)).text()
+    expect(await Effect.runPromise(renderPiPins(repository, new Map()))).toBe(text)
   })
 })

@@ -15,6 +15,7 @@ import {
   type Hashes,
   newestAllowedRelease,
   newestTag,
+  nextPiVersion,
   nextRange,
   packageDependencies,
   type PackageDependency,
@@ -24,6 +25,7 @@ import {
   parseMiseTools,
   parseTags,
   parseVendoredVersion,
+  renderPiPackages,
   rewriteActionUses,
   rewriteMiseTools,
   rewriteVendoredTool,
@@ -31,6 +33,7 @@ import {
   unreadableActionUses,
   type VendoredTool,
   withPackageRanges,
+  withPiPackageVersions,
 } from "./dependency-pins.ts"
 import { download } from "./vendor.ts"
 
@@ -101,7 +104,7 @@ export class Usage extends Data.TaggedError("Usage")<{ readonly args: ReadonlyAr
 export type Mode = "apply" | "dry-run" | "check"
 
 /** The kinds of pin the updater moves. */
-export type PinKind = "action" | "vendor" | "mise" | "package"
+export type PinKind = "action" | "vendor" | "mise" | "package" | "pi"
 
 /** One pin: where it is, what it is now and what it would become. */
 export interface Pin {
@@ -125,6 +128,8 @@ export interface Survey {
   readonly mise: ReadonlyMap<string, string>
   /** The range every registry dependency should have, by manifest. */
   readonly packages: ReadonlyMap<string, ReadonlyArray<PackageDependency>>
+  /** The exact version every Pi package of `pi-packages.json` should have, by npm name. */
+  readonly piPackages: ReadonlyMap<string, string>
 }
 
 const strict = { onExcessProperty: "error" } as const
@@ -174,6 +179,9 @@ const MISE_SOURCES: Record<string, { repository: string; prefix: string }> = {
 
 /** The file that holds the vendored tools' pins, relative to the repository root. */
 export const VENDOR_PINS = "packages/integrations/claude/src/vendor.ts"
+
+/** The file that holds the exact version of every Pi package HolyAgent enables. */
+export const PI_PACKAGE_PINS = "packages/runtime/src/config/pi-packages.json"
 
 const readText = (root: string, file: string) =>
   Effect.tryPromise({
@@ -413,10 +421,40 @@ const surveyPackages = (root: string) =>
     return { pins, ranges }
   })
 
+const readPiPins = (root: string) =>
+  readText(root, PI_PACKAGE_PINS).pipe(
+    Effect.flatMap((text) =>
+      Schema.decodeUnknownEffect(
+        Schema.fromJsonString(Schema.Record(Schema.String, Schema.String)),
+        strict,
+      )(text).pipe(Effect.mapError((cause) => new FileError({ file: PI_PACKAGE_PINS, cause }))),
+    ),
+  )
+
+/**
+ * The exact Pi package pins of `pi-packages.json`, each looked up in the registry like a package
+ * range: the newest stable, non-deprecated release no higher than `latest`, never moving a pin
+ * down. `registry` is the registry base URL, so a test can serve a fixture.
+ */
+export const surveyPiPackages = (root: string, registry: string = REGISTRY) =>
+  Effect.gen(function* () {
+    const table = yield* readPiPins(root)
+    const releases = yield* resolveAll(Object.keys(table), (name) => releaseOf(name, registry))
+    const pins: Array<Pin> = []
+    const latest = new Map<string, string>()
+    for (const [name, current] of Object.entries(table)) {
+      const next = nextPiVersion(current, releases.get(name) ?? current)
+      latest.set(name, next)
+      pins.push({ kind: "pi", name, file: PI_PACKAGE_PINS, current, next })
+    }
+    return { pins, latest }
+  })
+
 /**
  * Looks at every pin without writing anything: the external actions of the workflows (a tag
- * resolved to its commit), the vendored ripgrep and fd, the mise tools and the ranges of every
- * `package.json`. Each pin moves to the newest stable release; a prerelease is never chosen.
+ * resolved to its commit), the vendored ripgrep and fd, the mise tools, the ranges of every
+ * `package.json` and the exact versions of the Pi packages. Each pin moves to the newest stable
+ * release; a prerelease is never chosen.
  */
 export const survey = (root: string) =>
   Effect.gen(function* () {
@@ -424,13 +462,15 @@ export const survey = (root: string) =>
     const vendored = yield* surveyVendored(root)
     const mise = yield* surveyMise(root)
     const packages = yield* surveyPackages(root)
+    const pi = yield* surveyPiPackages(root)
     return {
-      pins: [...actions.pins, ...vendored.pins, ...mise.pins, ...packages.pins],
+      pins: [...actions.pins, ...vendored.pins, ...mise.pins, ...packages.pins, ...pi.pins],
       skipped: [...actions.skipped, ...mise.skipped],
       actions: actions.latest,
       vendored: vendored.latest,
       mise: mise.latest,
       packages: packages.ranges,
+      piPackages: pi.latest,
     } satisfies Survey
   })
 
@@ -612,6 +652,12 @@ const renderRanges = (root: string, packages: Survey["packages"]) =>
     }),
   )
 
+/** The text of `pi-packages.json` with the versions of a survey set; nothing is written. */
+export const renderPiPins = (root: string, versions: Survey["piPackages"]) =>
+  readPiPins(root).pipe(
+    Effect.map((table) => renderPiPackages(withPiPackageVersions(table, versions))),
+  )
+
 const writeRanges = (root: string, packages: Survey["packages"]) =>
   renderRanges(root, packages).pipe(
     Effect.flatMap((rendered) =>
@@ -621,14 +667,14 @@ const writeRanges = (root: string, packages: Survey["packages"]) =>
 
 /**
  * Writes the moves a survey found. Everything that can fail on the network or on a file is done
- * first: the new texts of the workflows, `mise.toml`, the manifests and the vendored pins are
- * computed, and every moved archive is downloaded and checked against its release's published
- * SHA-256. Only then is anything written, so a failed download leaves the tree unchanged. The moved
- * programs are installed from the archives already downloaded, `scripts/vendor.ts` (the `vendor`
- * task) removes what no pin names, and `bun update` then refreshes the lockfile within the new
- * ranges. The installs run with `--ignore-scripts`, so no install script runs during the update; a
- * later plain `bun install` runs the trusted ones. A failure after the first write leaves the tree
- * half moved.
+ * first: the new texts of the workflows, `mise.toml`, the manifests, the Pi package pins and the
+ * vendored pins are computed, and every moved archive is downloaded and checked against its
+ * release's published SHA-256. Only then is anything written, so a failed download leaves the tree
+ * unchanged. The moved programs are installed from the archives already downloaded,
+ * `scripts/vendor.ts` (the `vendor` task) removes what no pin names, and `bun update` then
+ * refreshes the lockfile within the new ranges. The installs run with `--ignore-scripts`, so no
+ * install script runs during the update; a later plain `bun install` runs the trusted ones. A
+ * failure after the first write leaves the tree half moved.
  */
 export const applySurvey = (root: string, found: Survey) =>
   Effect.gen(function* () {
@@ -641,6 +687,7 @@ export const applySurvey = (root: string, found: Survey) =>
     )
     const mise = rewriteMiseTools(yield* readText(root, "mise.toml"), found.mise)
     const ranges = yield* renderRanges(root, found.packages)
+    const piPins = yield* renderPiPins(root, found.piPackages)
     const moved = found.pins.filter((pin) => pin.kind === "vendor" && isBehind(pin))
     let vendor = yield* readText(root, VENDOR_PINS)
     const archives: Array<Downloaded> = []
@@ -657,6 +704,7 @@ export const applySurvey = (root: string, found: Survey) =>
     for (const [file, text] of workflows) yield* writeText(root, file, text)
     yield* writeText(root, "mise.toml", mise)
     for (const [file, text] of ranges) yield* writeText(root, file, text)
+    yield* writeText(root, PI_PACKAGE_PINS, piPins)
     if (moved.length > 0) {
       yield* writeText(root, VENDOR_PINS, vendor)
       for (const { asset, archive } of archives)

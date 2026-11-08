@@ -5,6 +5,7 @@ import {
   newestAllowedRelease,
   newestRelease,
   newestTag,
+  nextPiVersion,
   nextRange,
   packageDependencies,
   parseActionUses,
@@ -15,11 +16,13 @@ import {
   parseTags,
   parseVendoredVersion,
   releaseOfTag,
+  renderPiPackages,
   rewriteActionUses,
   rewriteMiseTools,
   rewriteVendoredTool,
   unreadableActionUses,
   withPackageRanges,
+  withPiPackageVersions,
 } from "./dependency-pins.ts"
 
 const SHA_A = "a".repeat(40)
@@ -377,5 +380,38 @@ describe("published checksums", () => {
     expect(parseDigest(hash)).toBeUndefined()
     expect(parseDigest("sha256:short")).toBeUndefined()
     expect(parseDigest("")).toBeUndefined()
+  })
+})
+
+describe("Pi package pins", () => {
+  test.each([
+    ["0.6.13", "0.7.0", "0.7.0"],
+    ["0.6.13", "0.6.13", "0.6.13"],
+    ["2.15.0", "2.14.9", "2.15.0"],
+    ["0.1.36", "0.1.212", "0.1.212"],
+  ])("a pin at %s with release %s moves to %s, never down", (current, release, expected) => {
+    expect(nextPiVersion(current, release)).toBe(expected)
+  })
+
+  test("a release that is not stable keeps the pin, a pin that is not stable is replaced", () => {
+    expect(nextPiVersion("1.2.3", "2.0.0-rc.1")).toBe("1.2.3")
+    expect(nextPiVersion("^1.2.3", "1.3.0")).toBe("1.3.0")
+  })
+
+  test("sets the named versions, keeps the order and the other pins", () => {
+    const table = { "pi-web-kit": "0.5.0", "@scope/b": "1.0.0", a: "2.0.0" }
+    const moved = withPiPackageVersions(table, new Map([["@scope/b", "1.1.0"]]))
+    expect(Object.entries(moved)).toEqual([
+      ["pi-web-kit", "0.5.0"],
+      ["@scope/b", "1.1.0"],
+      ["a", "2.0.0"],
+    ])
+    expect(table["@scope/b"]).toBe("1.0.0")
+  })
+
+  test("renders two-space JSON with a final newline", () => {
+    expect(renderPiPackages({ a: "1.0.0", b: "2.0.0" })).toBe(
+      '{\n  "a": "1.0.0",\n  "b": "2.0.0"\n}\n',
+    )
   })
 })

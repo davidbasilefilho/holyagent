@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test"
 
 import { FEATURE_PACKAGES, piPackages, WEB_KIT_PACKAGE } from "../../src/config/packages.ts"
+import {
+  PI_PACKAGE_VERSIONS,
+  type PiPackageName,
+  piPackageSource,
+} from "../../src/config/pi-packages.ts"
 import type { Config } from "../../src/config/schema.ts"
 import { DEFAULT_CONFIG } from "./defaults.ts"
 
@@ -9,16 +14,26 @@ const withFeatures = (features: Partial<Config["pi"]["features"]>): Config => ({
   pi: { ...DEFAULT_CONFIG.pi, features: { ...DEFAULT_CONFIG.pi.features, ...features } },
 })
 
+const ALL_NAMES: ReadonlyArray<PiPackageName> = [
+  "pi-provider-kimi-code",
+  ...Object.values(FEATURE_PACKAGES),
+  WEB_KIT_PACKAGE,
+]
+
+/** The source of a package at its pinned release. */
+const pinned = (name: keyof typeof PI_PACKAGE_VERSIONS) =>
+  `npm:${name}@${PI_PACKAGE_VERSIONS[name]}`
+
 describe("piPackages", () => {
-  test("the default config loads the provider and every feature's package", () => {
+  test("the default config loads the provider and every feature's package, each pinned", () => {
     expect(piPackages(DEFAULT_CONFIG)).toEqual([
-      "pi-provider-kimi-code",
-      "@tintinweb/pi-subagents",
-      "billion-context",
-      "@juicesharp/rpiv-todo",
-      "@juicesharp/rpiv-ask-user-question",
-      "@aliou/pi-processes",
-      "@amaster.ai/pi-computer-use",
+      "npm:pi-provider-kimi-code@0.6.13",
+      "npm:@tintinweb/pi-subagents@0.23.1",
+      "npm:billion-context@0.1.212",
+      "npm:@juicesharp/rpiv-todo@2.15.0",
+      "npm:@juicesharp/rpiv-ask-user-question@2.15.0",
+      "npm:@aliou/pi-processes@0.13.6",
+      "npm:@amaster.ai/pi-computer-use@0.1.36",
     ])
   })
 
@@ -32,7 +47,7 @@ describe("piPackages", () => {
   ] as const)("disabling %s drops %s and nothing else", (feature, name) => {
     const all = piPackages(DEFAULT_CONFIG)
     const without = piPackages(withFeatures({ [feature]: false }))
-    expect(without).toEqual(all.filter((entry) => entry !== name))
+    expect(without).toEqual(all.filter((entry) => entry !== pinned(name)))
     expect(without).toHaveLength(all.length - 1)
   })
 
@@ -46,24 +61,20 @@ describe("piPackages", () => {
       contextCompression: false,
       subagents: false,
     })
-    expect(piPackages(off)).toEqual(["pi-provider-kimi-code"])
+    expect(piPackages(off)).toEqual([pinned("pi-provider-kimi-code")])
   })
 
   test("the web mode picks pi-web-kit only when asked for it", () => {
-    expect(piPackages(withFeatures({ web: "provider" }))).not.toContain("pi-web-kit")
-    expect(piPackages(withFeatures({ web: "off" }))).not.toContain("pi-web-kit")
-    expect(piPackages(withFeatures({ web: "pi-web-kit" }))).toContain("pi-web-kit")
+    expect(piPackages(withFeatures({ web: "provider" }))).not.toContain(pinned("pi-web-kit"))
+    expect(piPackages(withFeatures({ web: "off" }))).not.toContain(pinned("pi-web-kit"))
+    expect(piPackages(withFeatures({ web: "pi-web-kit" }))).toContain("npm:pi-web-kit@0.5.0")
   })
 })
 
 describe("piPackages order and pi.enable", () => {
   test("the features follow the order of FEATURE_PACKAGES and the web kit comes last", () => {
     const config = withFeatures({ web: "pi-web-kit" })
-    expect(piPackages(config)).toEqual([
-      "pi-provider-kimi-code",
-      ...Object.values(FEATURE_PACKAGES),
-      WEB_KIT_PACKAGE,
-    ])
+    expect(piPackages(config)).toEqual(ALL_NAMES.map((name) => piPackageSource(name)))
   })
 
   test("pi.enable off loads nothing, whatever the features say", () => {
@@ -78,6 +89,23 @@ describe("piPackages order and pi.enable", () => {
   })
 
   test("pi.enable on loads the provider extension", () => {
-    expect(piPackages(DEFAULT_CONFIG)[0]).toBe("pi-provider-kimi-code")
+    expect(piPackages(DEFAULT_CONFIG)[0]).toBe(pinned("pi-provider-kimi-code"))
+  })
+})
+
+describe("the pin table", () => {
+  const named = ALL_NAMES.toSorted()
+
+  test("pins exactly the packages the integration can enable, each to an exact stable release", () => {
+    expect(Object.keys(PI_PACKAGE_VERSIONS).toSorted()).toEqual(named)
+    for (const version of Object.values(PI_PACKAGE_VERSIONS))
+      expect(version).toMatch(/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/)
+  })
+
+  test("every source piPackages returns reads its version from the table", () => {
+    const everything = withFeatures({ web: "pi-web-kit" })
+    expect(piPackages(everything).toSorted()).toEqual(
+      named.map((name) => piPackageSource(name)).toSorted(),
+    )
   })
 })
