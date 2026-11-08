@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "harden-the-subagentworkflow-call-line",
   "objective": "Harden the SubagentWorkflow call line the Pi extension draws: strip bidi and zero-width characters, cut without splitting a surrogate pair, and cache the parse per script text.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Work only in /home/user/holyagent-0.3.0-launcher (head 68cca8a). workflowCallLine and workflowRenderers in packages/integrations/pi/src/extension.ts draw the call as a plain line naming the workflow when literalWorkflowName vets the meta fragment. The security re-review noted: the name keeps bidi overrides (U+202A-U+202E, U+2066-U+2069) and zero-width characters (U+200B-U+200F, U+FEFF), which can spoof the line; slice(0, 80) can split a surrogate pair; and the parse runs on every streamed update with no cache. Strip those characters along with the control characters already stripped, cut by code points (or grapheme-safe) to 80, and memoize the name by script text with a small bounded cache (e.g. last value only, since streaming re-renders the same growing call), with tests for each."
   ],
@@ -45,7 +45,9 @@
     "agentId": "workflow:wf_71e9e7d2-c0e/assignment-0mw7kj55d-7ghe",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T08:26:33.554Z"
+    "startedAt": "2026-11-08T08:26:33.554Z",
+    "finishedAt": "2026-11-08T08:30:38.595Z"
   },
+  "result": "result: The Pi call line now drops bidi and zero-width characters, cuts at 80 grapheme clusters, and caches the name per script text. Build and verify both exit 0.\nchanged:\n- packages/integrations/pi/src/extension.ts\n- packages/integrations/pi/tests/extension.test.ts\n- packages/integrations/pi/dist/extensions/holyagent.js (rebuilt)\n\nclaude/dist did not change.\nchecks:\n- `bunx --no-install mise run build` -> exit 0\n- `bunx --no-install mise run verify` -> exit 0; 2146 pass, 0 fail, 14044 expects; no type errors in 199 files, lint clean in 200 files, format clean.\n\nblockers: none\nquestions: none\nnotes:\n- I added exported helpers `sanitizeWorkflowName` and `memoizeLast`, plus a private `shownWorkflowName`.\n- `Intl.Segmenter` cuts at grapheme clusters, which is stricter than code points.\n- The cache holds one entry (last script text only).\n- I added three tests: bidi and zero-width characters dropped, a surrogate pair kept whole at 80, and the memo reusing the last result and recomputing on a new key.\n- I didn't add a test that `workflowCallLine` itself hits the cache. Only `memoizeLast` is tested directly.\n\nevidence:\nThe drawn name has no bidi or zero-width characters, is cut without splitting a surrogate pair, and the parse is cached, with tests: tests added in packages/integrations/pi/tests/extension.test.ts (bidi, surrogate-pair and memo cases); passing in verify.\nmise run build exits 0 with dist in sync and mise run verify exits 0: build=0, verify=0 (2146 pass, 0 fail).\ndiff-file: /home/user/holyagent-notes/launcher-k.diff\n",
   "createdAt": "2026-11-08T08:26:33.554Z"
 }
