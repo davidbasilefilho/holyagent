@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mw7p9z2s-tdcj",
+  "intentId": "intent-0mw7mzreq-mu22",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-last-repair-commit-on",
+  "objective": "Re-review the last repair commit on release/0.3.0/feat/pi-root-wiring (worktree /home/user/holyagent-0.3.0-wiring, range 13f357f..HEAD) against the findings it repairs.",
+  "state": "Running",
+  "scope": [
+    "Diff: /home/user/holyagent-notes/wire-a-last.diff (dist excluded).",
+    "Findings: (1) a project's pi.enable false lifted the root's exclusions, gate and prompt; gates must stand down only for the home-level pi.enable off; (2) a project's feature toggles removed exclusion patterns; now the excluded set is the union of defaults, home-level and merged config; (3) session_start began with no exclusions; (4) notices kept invisible format characters; (5) model ids refused @ and +.",
+    "Writer notes: one extra holyagent config call reads the home config alone; with a project pi.enable false the gate is the only enforcement (no setActiveTools); an existing assertion changed so moonshot_search is blocked under the pi-web-kit web mode; variation selectors are also stripped from workflow names. Judge whether each change is right."
+  ],
+  "constraints": [
+    "Read-only; no edits and no version-control writes.",
+    "Report in under 400 words; put long logs in a file under /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Each finding is repaired with a test that fails without it, and nothing else regresses",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The repair follows the repository's code rules",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "review-findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7p1c61-4dr1"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T10:39:23.860Z"
+  },
+  "createdAt": "2026-11-08T10:39:23.860Z"
+}
