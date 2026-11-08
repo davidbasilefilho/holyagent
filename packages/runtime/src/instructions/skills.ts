@@ -32,6 +32,70 @@ export const DESIGN_CORE_PATH = "design-core/core.md"
 /** The line of a design skill's source that a generator replaces with the shared design core. */
 export const DESIGN_CORE_MARKER = "<!-- design-core -->"
 
+/**
+ * The instruction comments a generator keeps: the lines that mark where a generator embeds shared
+ * text. Every other HTML comment is a maintainer's note.
+ */
+const MARKERS: ReadonlySet<string> = new Set([MATERIALITY_MARKER, DESIGN_CORE_MARKER])
+
+// Code stays as written, so a `<!--` in a code span or a fenced block never pairs with a later
+// `-->`. The alternatives are a backtick fence and a tilde fence (each closed by a fence of its own
+// character at least as long, or by the end of the text), an inline code span (a backtick run closed
+// by a run of the same length within one paragraph) and a comment; the first match wins. The groups
+// are numbered 1 to 3 for the backreferences.
+const CODE_OR_COMMENT = new RegExp(
+  [
+    String.raw`^ {0,3}(\x60{3,})[^\x60\n]*(?:\n[\s\S]*?)?(?:\n {0,3}\1\x60*[ \t]*\r?(?=\n|$)|(?![\s\S]))`,
+    String.raw`^ {0,3}(~{3,})[^\n]*(?:\n[\s\S]*?)?(?:\n {0,3}\2~*[ \t]*\r?(?=\n|$)|(?![\s\S]))`,
+    String.raw`(?<!\x60)(\x60+)(?!\x60)(?:(?!\n[ \t]*\r?\n)[\s\S])*?(?<!\x60)\3(?!\x60)`,
+    String.raw`[ \t]*<!--[\s\S]*?-->`,
+  ].join("|"),
+  "gm",
+)
+
+// Stands for a comment that held its lines alone, until the lines are removed.
+const REMOVED_LINE = "\u0000"
+
+const isBlank = (line: string | undefined) => line !== undefined && /^[ \t]*\r?$/.test(line)
+
+const isRemoved = (line: string | undefined) =>
+  line !== undefined && line.startsWith(REMOVED_LINE) && isBlank(line.slice(REMOVED_LINE.length))
+
+/**
+ * The text with its maintainers' notes removed: every HTML comment in prose except the marker lines
+ * of {@link MATERIALITY_MARKER} and {@link DESIGN_CORE_MARKER}. A source cites the guide point a
+ * rule follows in such a comment, for the people who edit it; the comment says nothing to the model
+ * that reads the generated text, so every family's generator strips it. Code is not prose, so a
+ * comment inside an inline code span or a fenced code block stays. A comment on a line of its own
+ * is removed with the line, and the blank line after the removed lines goes too when the lines
+ * before them are blank or start the text, so the removal never leaves a run of blank lines that
+ * was not there. A comment after text takes the spaces before it. Lines end in LF or CRLF. Text
+ * without a comment is returned as it is.
+ */
+export const stripCitations = (text: string): string => {
+  const marked = text.replace(
+    CODE_OR_COMMENT,
+    (match, _fence, _tilde, _span, offset: number): string => {
+      if (!match.trimStart().startsWith("<!--") || MARKERS.has(match.trim())) return match
+      const alone =
+        (offset === 0 || text[offset - 1] === "\n") &&
+        /^[ \t]*\r?(?:\n|$)/.test(text.slice(offset + match.length))
+      return alone ? REMOVED_LINE : ""
+    },
+  )
+  if (!marked.includes(REMOVED_LINE)) return marked
+  const lines = marked.split("\n")
+  const kept = lines.filter((line, index) => {
+    if (isRemoved(line)) return false
+    if (!isBlank(line) || !isRemoved(lines[index - 1])) return true
+    // A blank line after removed lines: drop it when a blank line or the start is above them.
+    let above = index - 1
+    while (isRemoved(lines[above - 1])) above--
+    return !(above === 0 || isBlank(lines[above - 1]))
+  })
+  return kept.join("\n")
+}
+
 /** The platform design skills, which carry the shared design core. */
 export const DESIGN_SKILLS: ReadonlyArray<string> = [
   "web-design",
@@ -115,9 +179,10 @@ export interface SkillFile {
  * The files below a family's `skills/` folder, in path order, ready to write below a harness's own
  * skills folder. Each `SKILL.md` gets the materiality definition and, for a design skill, the
  * shared design core, then `note(source)` as a frontmatter comment, where `source` is the file's
- * path from the repository root. Every other file is carried as it is, except dotfiles and symbolic
- * links, which stay out as they did when the skills were globbed. `root` is the folder of the
- * family folders. Failing to read a source, or a marker used wrongly, is an `InstructionsError`.
+ * path from the repository root, and the maintainers' notes of {@link stripCitations} removed. Every
+ * other file is carried as it is, except dotfiles and symbolic links, which stay out as they did
+ * when the skills were globbed. `root` is the folder of the family folders. Failing to read a
+ * source, or a marker used wrongly, is an `InstructionsError`.
  */
 export const skillFiles = (
   family: Family,
@@ -150,7 +215,7 @@ export const skillFiles = (
           core,
           source,
         )
-        return { path, content: noteInFrontmatter(body, note(source)) }
+        return { path, content: noteInFrontmatter(stripCitations(body), note(source)) }
       }),
     )
   })

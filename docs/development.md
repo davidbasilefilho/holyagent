@@ -14,10 +14,10 @@ packages/
     src/vcs/                    the vcs commands (commit, pr, identity)
     src/instructions/
       claude-5.5/               a model family: root/, specialist/, roles/<role>/ (one file per section), shared/ (text the root and the specialists both embed), design-core/, skills/, root-core.ts, guide.md
-      kimi-k3.1/                guide.md only until its translations are added
+      kimi-k3.1/                the same layout, written to Moonshot's guides
       requirements/             the requirements, one file for each Markdown file of a family and the same path: what the family file must say
       families.ts, coverage.ts  the supported families, and where each family carries each requirement
-      skills.ts                 builds a family's skills for a harness: the materiality and design core embedded, a note added
+      skills.ts                 builds a family's skills for a harness: the materiality and design core embedded, citation comments stripped, a note added
   integrations/claude/          turns the runtime into the Claude Code plugin
     build.ts, src/              the generator and the wrapper source
     tests/
@@ -78,9 +78,9 @@ Done means `mise run verify` passes; after changing plugin sources, run `mise ru
 
 ## Instruction text
 
-The instruction text is written from requirements. `packages/runtime/src/instructions/requirements/` mirrors every Markdown file of each supported model family (`families.ts` lists them; today `claude-5.5`) with the same path, and each file holds the requirements that become the family file, one `- R-ID: text` line each. Ids are unique; a file that a requirement also governs refers to it with a `- See: R-ID` line. `root-core.ts` and `guide.md` are not mirrored.
+The instruction text is written from requirements. `packages/runtime/src/instructions/requirements/` mirrors every Markdown file of each supported model family (`families.ts` lists them: `claude-5.5` and `kimi-k3.1`) with the same path, and each file holds the requirements that become the family file, one `- R-ID: text` line each. Ids are unique; a file that a requirement also governs refers to it with a `- See: R-ID` line. `root-core.ts` and `guide.md` are not mirrored.
 
-A change starts in `requirements/`. `bunx --no-install mise run instructions:scaffold` then adds every missing folder and file to each family as an empty file, and never overwrites or deletes one with content. The family file is translated from its requirements as the family's `guide.md` directs: `claude-5.5/guide.md` lists the points of Anthropic's prompting guidance for Claude with their source pages, and `kimi-k3.1/guide.md` those of Moonshot's guides for Kimi. `coverage.ts` names, per family, the file and phrase that carry each requirement, or the code or page that carries one no prompt text can. The tests fail on a family file without a requirements file, a requirements file without a family file, and a requirement that a listed family does not cover. `requirements/` and `guide.md` are not shipped in the plugin, so changing them leaves `dist/` as it is.
+A change starts in `requirements/`. `bunx --no-install mise run instructions:scaffold` then adds every missing folder and file to each family as an empty file, and never overwrites or deletes one with content. The family file is translated from its requirements as the family's `guide.md` directs: `claude-5.5/guide.md` lists the points of Anthropic's prompting guidance for Claude with their source pages, and `kimi-k3.1/guide.md` those of Moonshot's guides for Kimi. `coverage.ts` names, per family, the file and phrase that carry each requirement, or the code or page that carries one no prompt text can. The tests fail on a family file without a requirements file, a requirements file without a family file, and a requirement that a listed family does not cover. A source cites the guide point a rule follows in an HTML comment (`<!-- K5 -->`), for the people who edit it; every generator removes such comments with `stripCitations` in `skills.ts`, so they never reach a model, and keeps only the marker lines `<!-- materiality -->` and `<!-- design-core -->`, which it replaces with shared text. `requirements/` and `guide.md` are not shipped in the plugin, so changing them leaves `dist/` as it is.
 
 ## Dependencies
 
@@ -138,7 +138,7 @@ Do not edit generated files; each carries a note naming its source. `.prettierig
 
 `mise run build` also runs `packages/integrations/pi/build.ts`, which removes `packages/integrations/pi/dist/` (`GENERATED_PATHS` in `src/generate.ts`) and writes it again from:
 
-- `packages/runtime/src/instructions/<family>/skills/`, the same sources as the Claude plugin's skills, through `skillFiles` in the runtime's `instructions/skills.ts`, which both generators call. The family is a parameter of `generate` and `PI_FAMILY` is its value (`claude-5.5` until another family is listed in `families.ts`);
+- `packages/runtime/src/instructions/<family>/skills/`, the same sources as the Claude plugin's skills, through `skillFiles` in the runtime's `instructions/skills.ts`, which both generators call. The family is a parameter of `generate` and `PI_FAMILY` is its value (`kimi-k3.1`, so the Pi package ships the Kimi skills);
 - `packages/integrations/pi/src/extension.ts`, a default-exported factory that takes Pi's `ExtensionAPI` and registers nothing yet, bundled with `Bun.build` for Node as ESM into `extensions/holyagent.js`. The host modules (the `peerDependencies` of the package's `package.json`, and their subpaths) stay imports;
 - `packages/integrations/pi/package.json`, whose `version` the build first syncs from the root and whose `peerDependencies` the generated manifest carries.
 

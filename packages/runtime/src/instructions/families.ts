@@ -4,11 +4,10 @@ import { join } from "node:path"
  * The model families whose instruction sets are supported, each a folder of this directory that
  * mirrors `requirements/` file for file. The scaffold and the tests read this one list.
  *
- * `kimi-k3.1` has a `guide.md` and joins the list in the change that adds its translations: a
- * family folder may hold `guide.md` alone before it is listed, and the mirror and coverage tests
+ * A family folder may hold `guide.md` alone before it is listed, and the mirror and coverage tests
  * apply to listed families only.
  */
-export const FAMILIES = ["claude-5.5"] as const
+export const FAMILIES = ["claude-5.5", "kimi-k3.1"] as const
 
 /** A supported model family: an entry of {@link FAMILIES}. */
 export type Family = (typeof FAMILIES)[number]
