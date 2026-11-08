@@ -1,11 +1,15 @@
 import { describe, expect, test } from "bun:test"
-import { readFileSync } from "node:fs"
+import { readFileSync, statSync } from "node:fs"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
+import { pathToFileURL } from "node:url"
+
+import { $ } from "bun"
 
 import { PI_HOST_PACKAGES } from "../../../../scripts/dependency-pins.ts"
 import { toPosix } from "../../../runtime/src/domain/paths.ts"
+import { PI_ROOT_PLACEHOLDER } from "../../../runtime/src/hooks/pi-context.ts"
 import { FAMILIES } from "../../../runtime/src/instructions/families.ts"
 import { instructionsDirectory } from "../../../runtime/src/instructions/skills.ts"
 import { build } from "../build.ts"
@@ -18,6 +22,7 @@ import {
   generate,
   GENERATED_PATHS,
   HOST_MODULES,
+  PACKAGE_FILES,
   PI_FAMILY,
 } from "../src/generate.ts"
 
@@ -138,6 +143,76 @@ describe("the package manifest", () => {
   })
 })
 
+/**
+ * True when the file of the repository can be run: its execute bit where the file system keeps one,
+ * and on Windows, which keeps none, the mode the repository commits for it, which is what a
+ * checkout on POSIX gives it.
+ */
+const isExecutable = async (path: string, platform: string = process.platform) =>
+  platform === "win32"
+    ? (await $`git ls-files -s -- ${path}`.cwd(REPOSITORY).quiet().text()).startsWith("100755 ")
+    : (statSync(path).mode & 0o111) !== 0
+
+describe("the runtime scripts", () => {
+  const scriptsOf = (path: string) =>
+    generated.find((file) => file.path === `${DIST_DIRECTORY}/${path}`)
+
+  test("the package ships the wrapper, its empty Bun config and the runtime bundle", async () => {
+    for (const path of ["scripts/holyagent", "scripts/empty-bunfig.toml", "scripts/holyagent.js"])
+      expect({ path, shipped: scriptsOf(path) !== undefined }).toEqual({ path, shipped: true })
+    expect(scriptsOf("scripts/holyagent")?.executable).toBe(true)
+    const wrapper = join(REPOSITORY, DIST_DIRECTORY, "scripts/holyagent")
+    expect(await isExecutable(wrapper)).toBe(true)
+    // The committed mode, which Windows reads in place of the execute bit it lacks.
+    expect(await isExecutable(wrapper, "win32")).toBe(true)
+  })
+
+  test("the manifest lists the extension, script and skill folders as the package files, and they exist", () => {
+    const manifest = JSON.parse(scriptsOf("package.json")?.content ?? "{}") as {
+      files?: Array<string>
+    }
+    expect(manifest.files).toEqual([...PACKAGE_FILES])
+    for (const entry of PACKAGE_FILES)
+      expect(generated.some((file) => file.path.startsWith(`${DIST_DIRECTORY}/${entry}/`))).toBe(
+        true,
+      )
+  })
+
+  test("the wrapper is the Claude plugin's, with the Pi package's root in its one hint", () => {
+    const claude = read("packages/integrations/claude/src/wrapper.sh").split("\n").slice(1)
+    const pi = (scriptsOf("scripts/holyagent")?.content ?? "").split("\n").slice(2)
+    expect(pi.join("\n")).toBe(
+      claude.join("\n").replaceAll("${CLAUDE_PLUGIN_ROOT}", PI_ROOT_PLACEHOLDER),
+    )
+    expect(pi.join("\n")).not.toContain("CLAUDE")
+  })
+
+  test("the bundle answers config and otherwise is the CLI", async () => {
+    const root = await mkdtemp(join(tmpdir(), "holyagent-pi-bundle-run-"))
+    // `/` only: the shell reads a script path without one as a bare name, as it is on Windows.
+    const script = toPosix(join(REPOSITORY, DIST_DIRECTORY, "scripts/holyagent"))
+    const call = async (...args: Array<string>) => {
+      const child = Bun.spawn(["sh", script, ...args], {
+        cwd: root,
+        env: { ...process.env, HOLYAGENT_HOME: join(root, "home") },
+        stdout: "pipe",
+        stderr: "pipe",
+      })
+      return {
+        stdout: await new Response(child.stdout).text(),
+        stderr: await new Response(child.stderr).text(),
+        code: await child.exited,
+      }
+    }
+    expect((await call("--version")).stdout.trim()).toBe(packageJson.version)
+    const config = await call("config", join(root, ".holyagent"))
+    expect(config.code).toBe(0)
+    expect(JSON.parse(config.stdout)).toMatchObject({ pi: { enable: true } })
+    expect((await call("status")).stdout).toBe("intents: []\n")
+    await rm(root, { recursive: true, force: true })
+  })
+})
+
 describe("the skills", () => {
   const skills = generated.filter((file) => file.path.startsWith(`${DIST_DIRECTORY}/skills/`))
 
@@ -171,17 +246,42 @@ describe("the skills", () => {
 describe("the extension", () => {
   const extension = generated.find((file) => file.path.endsWith(EXTENSION_OUTPUT))
 
-  test("is a default-exported factory that registers nothing", async () => {
+  test("is a default-exported factory that registers the role flag and handlers and starts nothing", async () => {
     const root = await mkdtemp(join(tmpdir(), "holyagent-pi-extension-"))
     const path = join(root, "extension.mjs")
     await Bun.write(path, extension?.content ?? "")
     const loaded = (await import(path)) as { default: (pi: unknown) => unknown }
-    const touched: Array<string | symbol> = []
-    const api = new Proxy({}, { get: (_target, key) => void touched.push(key) })
+    const used: Array<string> = []
+    const api = {
+      registerFlag: (name: string) => void used.push(`registerFlag ${name}`),
+      on: (event: string) => void used.push(`on ${event}`),
+    }
     expect(typeof loaded.default).toBe("function")
     expect(loaded.default(api)).toBeUndefined()
-    expect(touched).toEqual([])
+    expect(used.toSorted()).toEqual([
+      "on before_agent_start",
+      "on session_compact",
+      "on session_shutdown",
+      "on session_start",
+      "registerFlag holyagent-role",
+    ])
     await rm(root, { recursive: true, force: true })
+  })
+
+  test("loads under Node, which has no Bun global", async () => {
+    const node = Bun.which("node")
+    if (node === null) return
+    const run = Bun.spawn(
+      [
+        node,
+        "--input-type=module",
+        "-e",
+        `const m = await import(${JSON.stringify(pathToFileURL(join(REPOSITORY, DIST_DIRECTORY, EXTENSION_OUTPUT)).href)}); process.stdout.write(typeof m.default + " " + typeof globalThis.Bun)`,
+      ],
+      { stdout: "pipe", stderr: "pipe" },
+    )
+    expect(await new Response(run.stdout).text()).toBe("function undefined")
+    expect(await run.exited).toBe(0)
   })
 
   test("leaves the host modules as imports, not bundled", async () => {

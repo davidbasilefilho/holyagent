@@ -12996,6 +12996,7 @@ var ASSIGNMENT_COMMANDS = [
 ];
 
 import { stat as stat2 } from "fs/promises";
+var hasStateFolder = (directory) => io(directory, () => stat2(directory)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
 
 var delegating_default = "## Delegating\n\nEdits, runs, checks, reviews, research and investigation go to specialists. Read only what a decision needs; your Bash is for the holyagent CLI, Git and `gh`. If a `holyagent:*` agent type does not resolve, stop and report it; general-purpose agents are no stand-in. If the user forbids subagents, work to the same criteria and name each waived review.\n";
 
@@ -21471,7 +21472,6 @@ var hook = (name, summary, run, stateless) => ({
 `, 1))))
 });
 var ROOT_AGENTS = new Set(["holyagent", "holyagent:holyagent"]);
-var hasStateFolder = (directory) => io(directory, () => stat2(directory)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
 var RESUMED = new Set(["resume", "compact"]);
 var requirementsOf = (directory) => readOpenState(directory).pipe(flatMap2(resolveIntent), map4(({ id, revision, requirements }) => ({ id, revision, requirements })), catchTag2("NoActiveIntent", () => succeed6(undefined)));
 var SAFE_ID = /^[\w.:-]{1,80}$/;

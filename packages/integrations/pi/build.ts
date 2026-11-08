@@ -1,4 +1,4 @@
-import { rm } from "node:fs/promises"
+import { chmod, rm } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
 import { Effect } from "effect"
@@ -16,8 +16,11 @@ export const build = async (root: string): Promise<ReadonlyArray<string>> => {
   const { generate, GENERATED_PATHS } = await import("./src/generate.ts")
   const files = await generate()
   for (const path of GENERATED_PATHS) await rm(join(root, path), { recursive: true, force: true })
-  for (const file of files)
-    await Bun.write(join(root, file.path), file.content, { createPath: true })
+  for (const file of files) {
+    const target = join(root, file.path)
+    await Bun.write(target, file.content, { createPath: true })
+    if (file.executable) await chmod(target, 0o755)
+  }
   return files.map((file) => file.path)
 }
 
