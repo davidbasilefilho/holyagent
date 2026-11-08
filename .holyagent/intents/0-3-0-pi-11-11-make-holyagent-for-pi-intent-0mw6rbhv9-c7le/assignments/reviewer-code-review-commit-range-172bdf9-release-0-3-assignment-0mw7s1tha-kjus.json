@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-commit-range-172bdf9-release-0-3",
   "objective": "Review commit range 172bdf9..release/0.3.0/feat/t3-settings in the worktree /home/user/holyagent-0.3.0-t3set for correctness and regressions against the merge-ready bar: holyagent setup for Pi merges the agreed T3 Code server settings into ~/.t3/userdata/settings.json (key only when unset and different from T3's default), writes atomically, reads back and restores on mismatch, undoes only what its record says it wrote, and doctor reports missing keys.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-t3set; review `git diff 172bdf9..HEAD` and `git log 172bdf9..HEAD` there, and read surrounding code as needed. Start with /code-review on that range if it is available to you.",
     "Judge behavior, error paths, tests (each new behavior has a test that fails without it, none weakened), duplication, and the repository rules in .claude/CLAUDE.md and AGENTS.md (Effect, Schema at boundaries, JSDoc, Bun APIs). The generated dist files are build output; check only that they match a fresh build."
@@ -41,7 +41,33 @@
     "agentId": "workflow:wf_096fa445-a52/assignment-0mw7s1tha-kjus",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T11:57:02.207Z"
+    "startedAt": "2026-11-08T11:57:02.207Z",
+    "finishedAt": "2026-11-08T12:05:49.925Z"
+  },
+  "result": "result: The range is merge-ready. I found no blocker. The seven built-in findings and my own pass turned up only non-blocking issues.\n\nchanged: none (read-only)\n\nchecks:\n- `bunx --no-install mise run verify` in `/home/user/holyagent-0.3.0-t3set` -> exit 0. Lint and type-check clean, format check clean (534 files), 2384 tests pass, 0 fail.\n- `bunx --no-install mise run test -- packages/runtime/tests/setup-t3-settings.test.ts` -> exit 0, 32 pass.\n- Fresh build of HEAD from `git archive` in the scratchpad: both `dist/scripts/holyagent.js` files are byte-identical to the committed ones.\n- Not run: any real T3 Code, pi or Kimi request, per the constraints.\n\nThe built-in `/code-review` ran at `high` on `172bdf9...release/0.3.0/feat/t3-settings`. Its findings are classified below.\n\nblockers: none\n\nnotes (all non-blocking; the first two are worth fixing, none has a deterministic path to a wrong result in a unit test):\n\n1. `packages/runtime/src/setup/t3-settings.ts:406` (built-in): the install writes `merged` with `writeJsonObject`, not `writeJsonObjectIfUnchanged(file, merged, before.text)`.\n   - Scenario: T3 saves `settings.json` between the snapshot at line 396 and the rename, and its change is lost without notice.\n   - It is a millisecond race. The pi-settings and settings steps write the same way, so this is consistent with the base.\n   - Cheap hardening when `before.text` is defined.\n2. `t3-settings.ts:350-358` (built-in): rollback can lose data.\n   - When `before.text === undefined`, it runs `rm(file, {force:true})` without checking the content.\n   - When T3 re-saved in the window, `current` is read right before the guard, so `writeJsonObjectIfUnchanged` compares against itself and protects nothing.\n   - The doc comment (\"only while the file still holds what the read-back saw\") overclaims. It would only happen under a race on a fresh T3 install.\n   - Fix: compare against the read-back snapshot text, and delete only when the content still equals what setup wrote.\n3. `t3-settings.ts:260-262` (built-in): on a rerun, setup's own `backgroundActivity` and `sourceControlWritingStyle` are reported as \"left out (… is set)\".\n   - The result is correct: nothing is rewritten, as the docs say.\n   - The message is misleading, and doctor never checks the inner keys of a whole unit, so a later-removed override is not reported.\n   - Wording or ownership-via-record polish.\n4. `t3-settings.ts:165-168` (built-in): the refusal reads `config.enabled`, not the top-level `providerInstances.pi.enabled`.\n   - This is not a defect. `docs/pi/t3-code.md` says \"not … its `config.enabled` is false\", and a test covers it (\"disabled in its config\").\n   - Whether T3's schema has both flags could not be verified offline, and the docs already say to re-check the keys against T3's release.\n   - Rejected as a bug.\n5. `t3-settings.ts:346` (built-in): the read-back uses strict `JSON.stringify` equality.\n   - It only fails if T3 re-saves a normalized copy, which is unproven. The failure is fail-safe, since it restores and says to rerun.\n   - Rejected as speculative.\n6. `t3-settings.ts:426` (built-in): the report line prints the full `customInstructions` value, making a long line. Optional.\n7. `t3-settings.ts:153` (built-in): another user instance with `driver: \"pi\"` under a different id still gets a second `providerInstances.pi`. Design choice, optional.\n8. Built-in's Bun-API and double-read point:\n   - `isDirectory` uses `node:fs/promises` `stat`.\n   - `rm` is used only because `writeJsonObject` and the rest of `json-file.ts` already use it.\n   - `checkT3Settings` calls `piInUse` again, which is one extra `which` per doctor run.\n   - Optional. The repository rule says prefer Bun, with `node:` as fallback. `Bun.file(p).stat()` is used in `json-file.ts`, but `.isDirectory()` is not clear-cut there.\n9. Test gap (mine, optional): the undo read-back mismatch has no test of its own. It shares `writeVerified`, which the install tests do exercise.\n\nWiring, undo and doctor matched the brief:\n- Install runs only at scope user and only when Pi is in use.\n- Undo removes only recorded keys whose values still equal what setup wrote.\n- Doctor reports missing keys as a `~` hint and never fails.\n- New exported functions have JSDoc, and the code uses Effect and Bun APIs.\n- Each new behavior has a test, and no existing test was weakened.\n\nevidence:\nfindings: the nine items above, each with a path:line, and none a blocker. The notes in the report block carry the scenarios.\nverdict: merge-ready. `mise run verify` exit 0 (2384 pass, 0 fail), and the dist files match a fresh build.\nEvery blocking finding names path:line and a concrete failure scenario: there are no blocking findings. Items 1 and 2 give a path:line and a scenario but are race-only, so they are non-blocking.\nThe review states whether the range is merge-ready: yes, merge-ready.\n",
+  "acceptance": {
+    "revision": 11,
+    "rationale": "Merge-ready; verify exit 0; race hardening taken as repairs",
+    "criteria": [
+      {
+        "criterion": "Every blocking finding names path:line and a concrete failure scenario",
+        "support": "there are no blocking findings. Items 1 and 2 give a path:line and a scenario but are race-only, so they are non-blocking."
+      },
+      {
+        "criterion": "The review states whether the range is merge-ready",
+        "support": "yes, merge-ready."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "the nine items above, each with a path:line, and none a blocker. The notes in the report block carry the scenarios."
+      },
+      {
+        "label": "verdict",
+        "support": "merge-ready. `mise run verify` exit 0 (2384 pass, 0 fail), and the dist files match a fresh build."
+      }
+    ]
   },
   "createdAt": "2026-11-08T11:57:02.207Z"
 }
