@@ -60,5 +60,37 @@
     "finishedAt": "2026-11-08T03:14:24.640Z"
   },
   "result": "result: all 48 role files written to the Kimi K3.1 set, with a 24-entry coverage file; every phrase occurs in its named file.\nchanged: /home/user/holyagent-0.3.0-kimi/packages/runtime/src/instructions/kimi-k3.1/roles/ (48 files, 18 role folders), /home/user/holyagent-notes/kimi-coverage-roles.ts (new; export `KIMI_COVERAGE_ROLES`)\nchecks:\n- `bun fmt --no-script --check packages/runtime/src/instructions/kimi-k3.1/roles` -> exit 0, \"All 48 files are formatted.\"\n- `bunx --no-install mise run fmt:check` -> not run. `mise` is not installed in this worktree (`bun install --frozen-lockfile` changed nothing).\n- Lint -> not run. The installed Bun 1.4.4 has no `lint` command, and the files are Markdown, which lint does not cover.\n- Coverage script (a scratchpad `chk.ts`, which reads the 24 R-IDs from `requirements/roles`) -> exit 0, 24 ids, 24 entries, 0 missing, 0 extra, 0 phrase misses.\n- A search for Claude Code tool names and plugin paths returned only substring false positives.\nblockers: none\nquestions: none\nnotes:\n- Review templates: Reviewer.code and Reviewer.security start from the `code-review` and `security-review` first-pass prompts the launcher puts in their task. This follows `docs/pi/claude-parity.md`, which says the text of those prompts is not yet known. If the prompt is missing, they say so in the report.\n- Web tools: the librarians name `web_search` and `web_fetch`, or `moonshot_search` and `moonshot_fetch`, called from codemode.\n- Each role's purpose sentence is imperative, so the generated description reads correctly. A second sentence names the role (K3).\n- Rules carried from claude-5.5 files that have no requirement:\n  - All purpose sentences of the roles whose purpose.md has no requirement line (explorers, librarians, reviewer-audit, reviewer-security, worker-debugging, worker-operations, worker-validation, and the rest).\n  - reviewer-code/range.md: `git diff <start>...<head>`, `git show` or `git archive` instead of checkout, read callers, re-review scope.\n  - reviewer-code/builtin-review.md: the first-pass handling beyond R-RC.\n  - reviewer-security/builtin-review.md and trust-boundaries.md.\n  - reviewer-security/findings.md: precondition, impact, list what was sound, no live exploitation, no secrets.\n  - worker-debugging/escalation.md: report what was confirmed versus hypothesis.\n  - worker-implementation/refactor.md, worker-mechanical/refactor.md, worker-validation/baseline.md, worker-visual/method.md.\n  - reviewer-testing/method.md: base-run rule.\n  - reviewer-visual/design.md and worker-visual/design.md: the preference-versus-material rule.\n  - worker-operations/method.md: stay in named paths, observe the result, CI belongs to the root.\n- Added from the guide, not from claude-5.5: \"state no path, line or quote you did not read\" (explorer-lookup, K28) and an explicit gap or fact-versus-inference line (librarian-research, K28).\n\nDiff: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/roles-kimi.diff\n\nevidence:\nEvery Markdown requirements file under the assigned paths has its kimi-k3.1 file at the same path, written to the Kimi guide: `find kimi-k3.1/roles -type f` returns 48, matching `requirements/roles`. K-comments cite K3, K5, K28 and others; `bun fmt --no-script --check` exits 0.\nEvery requirement id and every rule of the matching claude-5.5 file is carried with its meaning: all 24 ids carried, and the rules without a requirement are listed in notes. Sources are `claude-5.5/roles` and the files under `kimi-k3.1/roles`.\nEvery id has a kimi coverage entry whose phrase occurs in the named file: /home/user/holyagent-notes/kimi-coverage-roles.ts; the check script exits 0 with 24 ids, 24 entries and 0 phrase misses.\nHost words are pi's, with no Claude Code tool names or plugin paths left: the tool-name search returned no Claude Code tool name or plugin path. Roles use `tools.grep`, `tools.find`, `tools.read`, the `code-review` and `security-review` first-pass prompts, `web_search` and `web_fetch` or `moonshot_search` and `moonshot_fetch`, and the system temp area.\nchanged-paths: packages/runtime/src/instructions/kimi-k3.1/roles/** (48 files); /home/user/holyagent-notes/kimi-coverage-roles.ts\ncoverage-file: /home/user/holyagent-notes/kimi-coverage-roles.ts\n",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "Kimi set and registration accepted after repair 0e71e52; artifact and code re-reviews found no blocker; verify 1764 pass, build clean",
+    "criteria": [
+      {
+        "criterion": "Every Markdown requirements file under the assigned paths has its kimi-k3.1 file at the same path, written to the Kimi guide",
+        "support": "`find kimi-k3.1/roles -type f` returns 48, matching `requirements/roles`. K-comments cite K3, K5, K28 and others; `bun fmt --no-script --check` exits 0."
+      },
+      {
+        "criterion": "Every requirement id and every rule of the matching claude-5.5 file is carried with its meaning",
+        "support": "all 24 ids carried, and the rules without a requirement are listed in notes. Sources are `claude-5.5/roles` and the files under `kimi-k3.1/roles`."
+      },
+      {
+        "criterion": "Every id has a kimi coverage entry whose phrase occurs in the named file",
+        "support": "/home/user/holyagent-notes/kimi-coverage-roles.ts; the check script exits 0 with 24 ids, 24 entries and 0 phrase misses."
+      },
+      {
+        "criterion": "Host words are pi's, with no Claude Code tool names or plugin paths left",
+        "support": "the tool-name search returned no Claude Code tool name or plugin path. Roles use `tools.grep`, `tools.find`, `tools.read`, the `code-review` and `security-review` first-pass prompts, `web_search` and `web_fetch` or `moonshot_search` and `moonshot_fetch`, and the system temp area."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "packages/runtime/src/instructions/kimi-k3.1/roles/** (48 files); /home/user/holyagent-notes/kimi-coverage-roles.ts"
+      },
+      {
+        "label": "coverage-file",
+        "support": "/home/user/holyagent-notes/kimi-coverage-roles.ts"
+      }
+    ]
+  },
   "createdAt": "2026-11-08T03:03:48.202Z"
 }
