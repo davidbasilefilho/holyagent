@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "re-review-the-pi-docs-commit-20049b6-on",
   "objective": "Re-review the Pi docs commit 20049b6 on release/0.3.0/feat/pi-install against the earlier artifact findings it repairs.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Diff: /home/user/holyagent-notes/install-last-docs.diff (56a18a2..20049b6, docs and README.md); files and code in /home/user/holyagent-0.3.0-install.",
     "Earlier findings: docs/README.md lines 10, 27, 28 called the Pi integration planned and not shipped (blocking); docs/pi/extensions.md lines 3, 9, 14, 21, 64, the status banners of docs/pi/orchestration.md and docs/pi/caching-and-subagents.md, docs/pi/README.md finding 2, README.md's Node wording (Pi needs 22.19 on every OS), and nothing documented doctor's output with pi.enable off.",
@@ -45,7 +45,33 @@
     "agentId": "workflow:wf_2d54c449-9e8/assignment-0mw7mr7g4-ggv0",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T09:28:49.012Z"
+    "startedAt": "2026-11-08T09:28:49.012Z",
+    "finishedAt": "2026-11-08T09:32:38.841Z"
+  },
+  "result": "result: no blockers. All three criteria are met. I have four non-blocking notes, and I could not run any gates.\nchanged: none (read-only)\nchecks: no shell was available, so I read the diff, the docs and the code with Read and Grep. Nothing was run, including the repository's `verify` gates and the docs tests.\nblockers: none\nquestions: none\nnotes (non-blocking):\n1. `docs/usage.md:145,156,160` is outside the diff, but it now sits next to the new \"root's system prompt is planned\" text. Line 156 says plain `pi` starts the root \"the way the Claude plugin does\". The \"Not built yet\" list on line 160 omits the root's system prompt. `extension.ts:719` says the root's system prompt is never touched. Consider adding the root's system prompt to that list.\n2. `docs/pi/README.md:3` says every statement not marked \"planned\" describes what is built. Row 60 (`KIMI_CODE_REGION=global`) and row 64 (codemode mode `only`) are written as plain decisions. No non-test code sets `KIMI_CODE_REGION`, and no non-test code writes `codemode.mode`. Line 42 (\"the state is in the table above\") partly covers this. Narrowing line 3 or marking those rows would settle it.\n3. `docs/pi/README.md` marks \"The tool surface: per-role tool arguments\" as Built, while the root's `--tools` arguments are not applied. The new Planned row 33 does cover this.\n4. `docs/pi/README.md` row 51 (\"plain `pi` starts the HolyAgent root, as the Claude plugin does\") does not mention that the root's system prompt is planned.\n\nevidence:\n- docs/README.md describes the Pi integration as shipped in 0.3.0 and names what remains planned: met. `docs/README.md` line 10 now says the Pi integration ships from 0.3.0 and lists the planned items. The pages-table rows (lines 27-28) and the anchor `pi/README.md#what-ships-now-and-what-is-planned` are correct. The planned items match the code: no root system-prompt override, no `npmCommand` write, and no T3 or cache-measurement code.\n- Every changed statement about Pi matches the code: met. I checked each claim.\n  - `toolSettings`, `providerEnv`, `providerReadiness`, `requireProviderReady` and `validateModelCatalog` are used only in tests and exports. `src/` has no caller.\n  - The `prompts/` folder is absent from `dist` (Glob).\n  - The extension passes only `toolArgs(config,\"root\").env` (`extension.ts:647`, applied at 746). The root's `--tools` arguments are not passed.\n  - Doctor prints no Pi line with `pi.enable` off (`pi-check.ts:357-364`).\n  - Scope `user` counts only the global settings file (`piPresenceFiles`, `pi-check.ts:217-220`), and `project` and `local` count both.\n  - The root role gets the reminder (`pi-context.ts:120`).\n  - `billion-context` is a feature package installed while `contextCompression` is on.\n  - Both `guide.md` and the new providers.md text list four Moonshot guides.\n  - `PI_MINIMUM_NODE` is 22.19.0 on every OS.\n  - The `dist/package.json` `pi` key lists extensions, skills and `subagents.agents`.\n  - The new links resolve (anchors checked by Grep).\n- README.md keeps exactly its six sections in order and any Pi mention there is a link into docs/: met. The headings at `README.md` lines 1, 9, 22, 32, 45 and 54 are `# HolyAgent` plus the five required `##` sections. Pi appears on lines 7, 11 and 20 only as links into `docs/`. Line 11 states the Node 22.19 rule and links `docs/pi/installation.md`.\n- review-findings: the four notes above. There are no blocking findings.\n",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "All three criteria met with each claim checked against the code",
+    "criteria": [
+      {
+        "criterion": "docs/README.md describes the Pi integration as shipped in 0.3.0 and names what remains planned",
+        "support": "met. `docs/README.md` line 10 now says the Pi integration ships from 0.3.0 and lists the planned items. The pages-table rows (lines 27-28) and the anchor `pi/README.md#what-ships-now-and-what-is-planned` are correct. The planned items match the code: no root system-prompt override, no `npmCommand` write, and no T3 or cache-measurement code."
+      },
+      {
+        "criterion": "Every changed statement about Pi matches the code: shipped things are described as shipped and unbuilt things as planned",
+        "support": "met. I checked each claim.; `toolSettings`, `providerEnv`, `providerReadiness`, `requireProviderReady` and `validateModelCatalog` are used only in tests and exports. `src/` has no caller.; The `prompts/` folder is absent from `dist` (Glob).; The extension passes only `toolArgs(config,\"root\").env` (`extension.ts:647`, applied at 746). The root's `--tools` arguments are not passed.; Doctor prints no Pi line with `pi.enable` off (`pi-check.ts:357-364`).; Scope `user` counts only the global settings file (`piPresenceFiles`, `pi-check.ts:217-220`), and `project` and `local` count both.; The root role gets the reminder (`pi-context.ts:120`).; `billion-context` is a feature package installed while `contextCompression` is on.; Both `guide.md` and the new providers.md text list four Moonshot guides.; `PI_MINIMUM_NODE` is 22.19.0 on every OS.; The `dist/package.json` `pi` key lists extensions, skills and `subagents.agents`.; The new links resolve (anchors checked by Grep)."
+      },
+      {
+        "criterion": "README.md keeps exactly its six sections in order and any Pi mention there is a link into docs/",
+        "support": "met. The headings at `README.md` lines 1, 9, 22, 32, 45 and 54 are `# HolyAgent` plus the five required `##` sections. Pi appears on lines 7, 11 and 20 only as links into `docs/`. Line 11 states the Node 22.19 rule and links `docs/pi/installation.md`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "review-findings",
+        "support": "the four notes above. There are no blocking findings."
+      }
+    ]
   },
   "createdAt": "2026-11-08T09:28:49.012Z"
 }
