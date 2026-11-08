@@ -14,9 +14,11 @@
     "Maintainer (verbatim): \"the pi extension and integration will use a config.json that will set options, functionality, the provider, which will enable/disable its deps, etc\".",
     "The config.json from Intent 0.3.0 pi 4/10 selects this: the docs describe every config.json option with its default, and installing the package installs only the dependencies the default config.json enables.",
     "Decided (maintainer): holyagent doctor checks that pi, Node 22.19 or newer and the package are present, without installing them; the Windows installer's Node minimum rises from 22.13 to 22.19.",
-    "Decided: pi runs on Node; Bun is used by pi only as its npmCommand for package installs."
+    "Decided: pi runs on Node; Bun is used by pi only as its npmCommand for package installs.",
+    "Default (research 2026-11-08, Pi 1.5.0 package-manager.js and pi-manifest.js): Pi loads a dependency package only through explicit pi.* paths into node_modules and never adds packages to settings itself, so a static dependencies list would install and load every feature package regardless of config. The HolyAgent manifest lists no Pi package dependencies; holyagent setup runs pi install npm:<pkg>@<pin> for each package piPackages(config) enables and pi remove for HolyAgent's feature packages the config turns off, and holyagent doctor reports each enabled package that is missing with that command as the fix.",
+    "Default: holyagent doctor runs its Pi checks when the host is pi or pi is on PATH; otherwise it prints one informational line that Pi is not in use, so a Claude-only user without Pi gets no failure from the default pi.enable true."
   ],
-  "revision": 4,
+  "revision": 5,
   "state": "Open",
   "createdAt": "2026-11-07T16:43:53.582Z"
 }
