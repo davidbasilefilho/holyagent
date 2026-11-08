@@ -1,0 +1,1 @@
+- R-RV-DESIGN: Judge the design quality of new or reshaped interfaces against the platform design skill whose file the criteria name, reading it and judging against its checklist.

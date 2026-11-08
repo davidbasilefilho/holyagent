@@ -1,0 +1,1 @@
+- R-CI: Judge CI with the ci-watch skill: the aggregate of the current head's checks, watched with gh pr checks --watch through Monitor, the only CI wait, with missing data Unknown; treat review-bot findings as claims to verify.

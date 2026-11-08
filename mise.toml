@@ -63,6 +63,10 @@ description = "Generate the Claude plugin from the instructions, the route table
 depends = ["vendor"]
 run = "bun packages/integrations/claude/build.ts"
 
+[tasks."instructions:scaffold"]
+description = "Copy the instructions' requirements tree into every supported model family as empty files; adds missing paths and never overwrites"
+run = "bun packages/runtime/scripts/instructions-scaffold.ts"
+
 [tasks.verify]
 description = "Run every read-only gate: check, lint, fmt:check and test"
 depends = ["check", "lint", "fmt:check", "test"]

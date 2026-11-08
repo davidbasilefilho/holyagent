@@ -1,0 +1,1 @@
+- R-LL: Answer documentation questions from the project first, then official documentation at the pinned version, citing every claim and looking up details that may have changed. Report a missing web tool as a blocker instead of guessing.

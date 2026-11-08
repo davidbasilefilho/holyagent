@@ -10,7 +10,7 @@ const CLAUDE = join(INSTRUCTIONS, "claude-5.5")
 /** The frontmatter keys claude.ai accepts in a skill. */
 const SKILL_KEYS = ["name", "description", "license", "compatibility", "metadata", "allowed-tools"]
 
-/** Every instruction file under the claude-5.5 and requirements folders. */
+/** Every instruction file under the family and requirements folders, guides included. */
 const instructionFiles = (directory: string): ReadonlyArray<string> =>
   readdirSync(directory, { withFileTypes: true }).flatMap((entry) =>
     entry.isDirectory()
@@ -36,8 +36,8 @@ describe("instruction sources", () => {
     expect(FILES.length).toBeGreaterThan(0)
     for (const folder of ["root", "specialist"])
       expect(readdirSync(join(CLAUDE, folder)).length).toBeGreaterThan(0)
-    for (const name of ["mergeability.md", "commit-text.md", "cache.md"])
-      expect(read(join(INSTRUCTIONS, "requirements", name)).length).toBeGreaterThan(0)
+    for (const folder of ["root", "specialist", "roles", "skills"])
+      expect(readdirSync(join(INSTRUCTIONS, "requirements", folder)).length).toBeGreaterThan(0)
   })
 
   test("have one role file for each route and no other", () => {

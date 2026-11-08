@@ -1,0 +1,1 @@
+- R-WO: Perform the specified operational task by the repository's documented workflow and confirm the observed result.

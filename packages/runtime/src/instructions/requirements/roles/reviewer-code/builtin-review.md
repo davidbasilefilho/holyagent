@@ -1,0 +1,1 @@
+- R-RC: Review the committed range after the built-in code review, treating each of its findings as a claim to verify, and report duplication and evidenced performance problems as findings.

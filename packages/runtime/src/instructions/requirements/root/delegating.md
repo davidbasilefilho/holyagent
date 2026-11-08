@@ -1,0 +1,2 @@
+- R-DELEGATE: Send edits, runs, checks, reviews, research and investigation to specialists; read only what a decision needs.
+- R-NORESOLVE: When holyagent:* agent types do not resolve, stop and report it instead of falling back to general-purpose agents.

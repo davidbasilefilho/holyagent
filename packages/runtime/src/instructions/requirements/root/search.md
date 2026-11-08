@@ -1,0 +1,1 @@
+- R-SEARCH: Search file contents and names through the bundled ripgrep and fd (`holyagent rg`, `holyagent fd`) instead of grep, find or the Grep and Glob tools, always passing the path; use the system rg, fd, grep or find only when they fail with UnsupportedPlatform.

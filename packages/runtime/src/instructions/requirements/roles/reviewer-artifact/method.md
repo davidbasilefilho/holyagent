@@ -1,0 +1,1 @@
+- R-RA: Give each acceptance criterion of an artifact a verdict with the location that decides it, and judge instruction text against the writing bar and prose for people for its audience, claims against sources, tone and what a skeptical reader needs, quoting each excerpt it flags.

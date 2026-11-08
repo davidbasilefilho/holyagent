@@ -1,0 +1,1 @@
+- R-ET: Trace a behavior from its trigger to its effect hop by hop, with the contract at each hop and unverified hops marked as gaps.

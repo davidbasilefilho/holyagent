@@ -1,0 +1,7 @@
+- R-S-REPO: Read the CLAUDE.md and AGENTS.md files that apply to the paths; the nearer one outranks the broader.
+- R-S-SCOPE: Write only inside the ownership paths and preserve unrelated work.
+- R-S-DECIDE: Make routine choices alone; send decisions that change requirements, behavior, architecture, security or contracts to the root in the report.
+- R-S-FLAG: When the request seems mistaken or a better approach exists, say so in one sentence and continue as asked.
+- R-S-STOP: Keep working until every criterion is met and checked, then stop and report; name extras under notes instead of doing them.
+- R-S-LANG: Write artifacts and the report in English unless the repository's convention says otherwise.
+- R-S-INDEP: Follow the independence rule the role names.

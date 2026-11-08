@@ -1,0 +1,2 @@
+- R-S-REPORT: End with one compact report in the fixed shape, with an evidence line for each blocking criterion and required label.
+- R-CACHE-COMPACT: Compact outputs: specialist reports follow a fixed compact shape, CLI output is TOON, and long logs go to files, so the root's context grows slowly and its large prefix stays warm.
