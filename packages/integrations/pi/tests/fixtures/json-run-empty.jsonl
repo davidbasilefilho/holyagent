@@ -1,0 +1,11 @@
+{"holyagentFixture":{"package":"@earendil-works/pi-coding-agent","piVersion":"1.5.0","name":"json-run-empty","source":"json-mode","description":"A final message that stops normally with no text."}}
+{"type":"session","version":3,"id":"0198a2b0-0000-7000-8000-000000000001","timestamp":"2026-01-01T00:00:00.000Z","cwd":"/work/project"}
+{"type":"agent_start"}
+{"type":"turn_start"}
+{"type":"message_start","message":{"role":"user","content":"Review the change.","timestamp":1700000000000}}
+{"type":"message_end","message":{"role":"user","content":"Review the change.","timestamp":1700000000000}}
+{"type":"message_start","message":{"role":"assistant","content":[],"api":"openai-completions","provider":"kimi-coding","model":"k3.1-pro","usage":{"input":120,"output":40,"cacheRead":0,"cacheWrite":0,"totalTokens":160,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}},"stopReason":"pending","timestamp":1700000000001}}
+{"type":"message_end","message":{"role":"assistant","content":[{"type":"thinking","thinking":"hm"}],"api":"openai-completions","provider":"kimi-coding","model":"k3.1-pro","usage":{"input":120,"output":40,"cacheRead":0,"cacheWrite":0,"totalTokens":160,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}},"stopReason":"stop","timestamp":1700000000001}}
+{"type":"turn_end","message":{"role":"assistant","content":[{"type":"thinking","thinking":"hm"}],"api":"openai-completions","provider":"kimi-coding","model":"k3.1-pro","usage":{"input":120,"output":40,"cacheRead":0,"cacheWrite":0,"totalTokens":160,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}},"stopReason":"stop","timestamp":1700000000001},"toolResults":[]}
+{"type":"agent_end","messages":[{"role":"user","content":"Review the change.","timestamp":1700000000000},{"role":"assistant","content":[{"type":"thinking","thinking":"hm"}],"api":"openai-completions","provider":"kimi-coding","model":"k3.1-pro","usage":{"input":120,"output":40,"cacheRead":0,"cacheWrite":0,"totalTokens":160,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}},"stopReason":"stop","timestamp":1700000000001}],"willRetry":false}
+{"type":"agent_settled","aborted":false}
