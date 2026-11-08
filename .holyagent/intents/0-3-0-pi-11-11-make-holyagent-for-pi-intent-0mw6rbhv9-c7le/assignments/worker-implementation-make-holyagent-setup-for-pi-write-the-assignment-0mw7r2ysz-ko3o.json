@@ -1,0 +1,107 @@
+{
+  "id": "assignment-0mw7r2ysz-ko3o",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 11,
+  "roleTask": "Worker.implementation",
+  "slug": "make-holyagent-setup-for-pi-write-the",
+  "objective": "Make holyagent setup for Pi write the agreed T3 Code server settings into T3's settings.json with a merge, an atomic write, a read-back and an undo, and make doctor report them; the per-project git settings and the setup TUI are later work.",
+  "state": "Running",
+  "scope": [
+    "Worktree: /home/user/holyagent-0.3.0-t3set (branch release/0.3.0/feat/t3-settings). Work and run every command there.",
+    "Read /home/user/holyagent-notes/t3-settings.md first: it holds the researched T3 settings facts (file location under T3CODE_HOME, default ~/.t3, at userdata/settings.json; the Effect Schema in pingdotgg/t3code packages/contracts/src/settings.ts; sparse writes with defaults stripped; the client race of issue #18571). Use its key names and defaults; where it does not settle a key's name, shape or default, leave that key out and list it in the report rather than guess, because a wrong key is written into the user's real T3 settings.",
+    "Model the writer on packages/runtime/src/setup/pi-settings.ts (merge, record, undo) and reuse packages/runtime/src/setup/json-file.ts for the atomic write; add the read-back: after writing, read the file again and when it does not decode or differs from what was written, stop with an error naming the file. A settings.json that does not decode stops setup with an error naming the file and leaves it unchanged. Write a key only when the user has not set it and the agreed value differs from T3's default; undo removes only what the setup record says setup wrote.",
+    "Keys, from the maintainer's decisions: the Pi provider (providerInstances.pi) enabled whenever the HolyAgent config's pi.enable is true; agent device access (enableDeviceSupport and enableAgentDeviceAccess) only where Xcode or the Android SDK is present; new threads in worktrees (defaultThreadEnvMode); backgroundActivity overrides pauseWhenHostLocked, pauseWhenHostLowPower, pauseWhenClientLowPower and pauseWhenOnBattery false; sourceControlWritingStyle Conventional Commits with custom instructions forbidding agent attribution, and removeAgentCreditsOnMerge true; autoResumeLimitedThreads on, worktree cleanup on merge, snoozeLimitedThreads on, defaultAutoPull on; storageCleanup logsAfterDays, browserArtifactsAfterDays and worktreeSettledAfterDays with values you choose and document. Never write the context meter, model choices, Pi launch settings (binaryPath, environment, update checks), client per-device settings, or any key whose agreed value equals T3's default (defaultRuntimeMode full-access, enableAgentBrowserAccess, continueThreadsAfterServerUpdate, newWorktreesStartFromOrigin, sidebarAutoSettleOnMerge, followUpBehavior steer, planModeEnabled off).",
+    "Respect the existing pi.t3 config keys (packages/runtime/src/config/schema.ts:178-185, load.ts:53): a key the config turns off is not written. Device access and worktrees are choices the later TUI offers, selected by default: take them as writer options (default on); the setup flags and the TUI for them come in a later change, so leave packages/runtime/src/cli/setup.ts unchanged.",
+    "Wire the step into setup's Pi steps (packages/runtime/src/setup/steps.ts) and doctor (doctor.ts) the way pi-settings.ts is wired, skip it when T3 is not installed (no T3 home), print nothing about per-device client settings, and document the written keys, the storage cleanup values and the undo in docs/pi/t3-code.md (its status line and the settings section) and docs/pi/installation.md."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Report in under 400 words; put long logs in a file in the scratchpad above and give its path.",
+    "The generated packages/integrations/claude/dist and packages/integrations/pi/dist are rewritten by mise run build; include those regenerated files in your change and changed paths, though they are not listed in your ownership paths (parallel branches in other worktrees regenerate them too)."
+  ],
+  "criteria": [
+    {
+      "text": "Setup writes only the agreed keys, each only when unset by the user and different from T3's default, with tests per key group",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "An undecodable settings.json, or a read-back that differs, stops setup with an error naming the file and leaves the file unchanged, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Undo removes only the keys the setup record says setup wrote, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Device access is written only where Xcode or the Android SDK is detected, and only when the option and the pi.t3 config allow it, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The context meter, model choices, Pi launch settings and keys equal to T3's defaults are never written, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Doctor reports the T3 settings state, and the step is skipped when T3 is not installed, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Any key the notes do not settle is left out and listed in the report",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "docs/pi/t3-code.md and docs/pi/installation.md describe the written keys, the cleanup values and the undo",
+      "blocking": false,
+      "dimension": "style"
+    },
+    {
+      "text": "mise run build leaves no unexplained changes and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "No test is weakened or removed to pass; every new behavior has a test that fails without it",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The change stays inside the Assignment's scope and ownership paths",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "keys-written"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/setup/t3-settings.ts",
+    "packages/runtime/src/setup/steps.ts",
+    "packages/runtime/src/setup/doctor.ts",
+    "packages/runtime/tests/setup-t3-settings.test.ts",
+    "docs/pi/t3-code.md",
+    "docs/pi/installation.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T11:29:56.147Z"
+  },
+  "createdAt": "2026-11-08T11:29:56.147Z"
+}
