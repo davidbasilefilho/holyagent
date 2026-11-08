@@ -1,0 +1,53 @@
+{
+  "id": "assignment-0mw7fthz1-dgls",
+  "intentId": "intent-0mw6muupq-5usg",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-pi-tool-surface-change",
+  "objective": "Review the Pi tool surface change, commits 2d4a68a..f02a4f7 on release/0.3.0/feat/pi-tools in /home/user/holyagent-0.3.0-tools, for correctness and regressions against the merge-ready bar.",
+  "state": "Ready",
+  "scope": [
+    "Run `git -C /home/user/holyagent-0.3.0-tools diff 2d4a68a..f02a4f7` and review it: packages/runtime/src/pi/tools.ts (toolArgs per role with argv and env, webChoice, toolSettings), the config schema and packages changes, provider.ts, the tests and the docs under docs/pi/.",
+    "Decisions to check the code against, which are binding: every role (root and the 18 specialists) runs Pi's codemode in mode only, the root with `--tools +codemode` and each specialist with plain `codemode` in its allowlist, with PI_CODEMODE_MAX_WORKERS from pi.codemode.maxWorkers (default 4) in each process's env; Billion Context gets only `{\"pi\":{\"subagents\":false}}` in ~/.config/billion-context/billion-context.json (no forceEnable, no ~/.pi/acp.json); web tools come from pi-web-kit unless the provider offers web tools (Kimi's moonshot_search and moonshot_fetch); each feature is on or off per config.json and a disabled one is not loaded and adds no tool entry or setting; pi.features.mcp off adds --no-mcp to every process; specialists' tool sets follow the route table's capabilities (read-only roles get no write, edit or bash).",
+    "Repository rules: Effect for effects and errors with tagged errors, Effect Schema at data boundaries with onExcessProperty error, JSDoc on every exported function and type, Bun APIs."
+  ],
+  "constraints": [
+    "Read-only: make no edits and no version-control writes.",
+    "Run `bunx --no-install mise run verify` in the worktree and report its exit code and counts.",
+    "Testing is unit tests and fixtures only; do not run pi or any live model.",
+    "Start each evidence line with the criterion text, then a colon.",
+    "Report in under 500 words; put long output in a file outside the repository and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Tool arguments, env and settings match the binding decisions for every role",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No regression in existing behavior and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Changed behavior is covered by tests that fail without it, error paths included",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Code follows the repository rules in .claude/CLAUDE.md",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "verify-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7ex2uh-58hy",
+    "assignment-0mw7fdvg6-5xhs"
+  ],
+  "createdAt": "2026-11-08T06:14:38.653Z"
+}
