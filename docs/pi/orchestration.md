@@ -58,7 +58,7 @@ To be verified when the integration is built:
 
 **Status: decided for 0.3.0.**
 
-- **Recorded fixtures, not a real Pi.** CI replays recorded Pi events for the pinned Pi version. The fixtures are re-recorded when `mise run deps:update` moves Pi ([installation.md](installation.md#the-pin)). A real Pi process would need Node 22.19 and network access, which the plan avoids in CI.
+- **Recorded fixtures, not a real Pi.** CI replays recorded Pi events for the pinned Pi version. `mise run deps:update` moves the Pi package pins but not the Pi host and does not re-record the fixtures, so they are re-recorded separately when Pi or a pin moves ([installation.md](installation.md#the-pin)). A real Pi process would need Node 22.19 and network access, which the plan avoids in CI.
 - **Inside the existing jobs.** The Pi tests run inside the existing `check` and `windows` jobs, so no job is added or renamed and the rulesets' required check names do not change ([development.md](../development.md)). The `check` job's generated-output freshness check covers the Pi package.
 - **A contract test** covers the Pi RPC or JSON events the integration consumes (`agent_settled`, tool events, `extension_ui_request`) against the pinned version. The T3 Code behavior is covered by recorded `pi --mode rpc` fixtures in the same jobs ([t3-code.md](t3-code.md#tests)).
 - **Windows.** Extension and launcher code calls the bundled CLI through Bun on `holyagent.js` directly, not through the POSIX `sh` wrapper. Child launches and paths must work on native Windows, where Pi's built-in tool list includes `powershell` beside `bash`. Whether Pi itself behaves on native Windows is not verified: the research read source only and ran nothing there, so the `windows` job is where it is checked.

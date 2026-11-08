@@ -174,7 +174,7 @@ Each point is settled during implementation and recorded here when it is:
 
 ## Tests
 
-CI covers T3 with recorded fixtures of `pi --mode rpc` traffic inside the existing `check` and `windows` jobs, as the other Pi tests do ([orchestration.md](orchestration.md#ci-and-windows)); no job is added or renamed. The fixtures are re-recorded when `mise run deps:update` moves Pi. They cover:
+CI covers T3 with recorded fixtures of `pi --mode rpc` traffic inside the existing `check` and `windows` jobs, as the other Pi tests do ([orchestration.md](orchestration.md#ci-and-windows)); no job is added or renamed. `mise run deps:update` does not re-record them or move the Pi host; they are re-recorded separately when Pi or a Pi package pin moves. They cover:
 
 - the dialogs, `notify` and `setStatus` HolyAgent sends, and that no `custom()` call is made;
 - the active tool set after `session_start`, `before_agent_start` and `session_tree`, and the `tool_call` block on a deactivated T3 tool;
