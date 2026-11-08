@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mw7s1tt8-5bg8",
+  "intentId": "intent-0mw6muvcv-5we5",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.security",
+  "slug": "assess-commit-range-172bdf9-release-0-3",
+  "objective": "Assess commit range 172bdf9..release/0.3.0/fix/pi-windows-launch for security vulnerabilities: the Pi extension starts the bundled CLI as Bun on scripts/holyagent.js with the sh wrapper's flags on every platform, starts pi through cmd.exe on Windows, and gives powershell the same selection and exclusions as bash in the root and specialist tool lists.",
+  "state": "Running",
+  "scope": [
+    "The committed diff is in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/c-win.diff (diff-file); read the touched files in full in /home/user/holyagent-0.3.0-win for context.",
+    "Focus: process spawning (argument injection through paths, project names or arguments passed to Bun or cmd.exe, Windows command-line quoting and cmd.exe metacharacters), PATH resolution of bun and pi, and whether powershell parity lets a role reach a shell it should not have or slip past a gate that bash is held to."
+  ],
+  "constraints": [
+    "Read-only.",
+    "Substantiate each finding with a source-to-sink trace and path:line; mark it blocking only when the vulnerability is reachable and introduced by this range.",
+    "Report in under 500 words; put long output in a file in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Every blocking finding has a source-to-sink trace with path:line",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The review states whether the range introduces a vulnerability that should hold the push",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "verdict"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7r2y8r-tn1g"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T11:57:02.636Z"
+  },
+  "createdAt": "2026-11-08T11:57:02.636Z"
+}
