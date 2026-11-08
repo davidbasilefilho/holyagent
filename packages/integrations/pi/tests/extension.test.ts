@@ -2248,6 +2248,37 @@ describe("the root's excluded tools", () => {
       expect(await api.emit("tool_call", call(name))).toEqual(blocked)
   })
 
+  test("the user's own exclusions stay when the project's config cannot be read", async () => {
+    // The merged call fails (a malformed or unknown-key project file) while the user's file reads.
+    const { api } = await run(
+      (callOf, runtime) =>
+        runtime[0] === "config" && runtime.length > 1
+          ? { code: 4, stderr: "error: ConfigInvalid: project\n" }
+          : configs(CONFIG, webKit)(callOf, runtime),
+      { activeTools: ["read", ...DEFERRED] },
+    )
+    for (const name of [...EXCLUDED, "web_search", "web_fetch"])
+      expect(await api.emit("tool_call", call(name, { parentToolCallId: "call-1" }))).toEqual(
+        blocked,
+      )
+    expect(api.pi.getActiveTools()).not.toContain("web_search")
+  })
+
+  test("a user config that cannot be read is reported, and the defaults' exclusions stay", async () => {
+    const { api } = await run(
+      (callOf, runtime) =>
+        runtime[0] === "config" && runtime.length === 1
+          ? { code: 4, stderr: "error: ConfigInvalid: home\n" }
+          : healthy("/missing")(callOf, runtime),
+      { startOnly: true },
+    )
+    for (const name of EXCLUDED) expect(await api.emit("tool_call", call(name))).toEqual(blocked)
+    const messages = await nextMessages(api)
+    const home = messages.find((message) => message?.customType === NOTICE_MESSAGE)
+    expect(home?.content).toContain("home-level config could not be read")
+    expect(await nextMessages(api)).toEqual([])
+  })
+
   test("a session starts with the defaults' exclusions, until the config is read", async () => {
     for (const reason of ["startup", "reload"]) {
       const hold = gate()

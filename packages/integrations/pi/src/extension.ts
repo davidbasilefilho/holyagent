@@ -401,6 +401,11 @@ interface Collected {
   readonly gatesOff?: true
   readonly delivery?: Delivery
   /**
+   * Present when the user-level config, read alone, could not be read: the root then keeps only the
+   * defaults' exclusions, and the next run says so beside the other notices.
+   */
+  readonly homeNotice?: Delivery
+  /**
    * The process-wide variables the config decides (`PI_CODEMODE_MAX_WORKERS`), present once the
    * config is read and `pi.enable` is on.
    */
@@ -452,8 +457,11 @@ interface Held {
   probe: AbortController | undefined
   /** The notice the provider checks produced, until the next run delivers it. */
   readiness: Delivery | undefined
-  /** The notice that the root's tools were not applied, until the next run delivers it. */
-  toolsNotice: Delivery | undefined
+  /**
+   * The notice about the session's setup, until the next run delivers it: the root's tools were not
+   * applied, the user-level config could not be read, or both in one line.
+   */
+  setupNotice: Delivery | undefined
 }
 
 /**
@@ -558,6 +566,16 @@ const notice = (text: string): Delivery => ({
   content: `holyagent: ${oneLine(text).slice(0, NOTICE_CHARS)}`,
   display: true,
 })
+
+// Two notices in one, so that a handler that returns one message can deliver both.
+const joinNotices = (first: Delivery | undefined, second: Delivery): Delivery => {
+  const added = second.content.replace(/^holyagent: /, "")
+  return first === undefined
+    ? second
+    : first.content.includes(added)
+      ? first
+      : { ...first, content: `${first.content}; ${added}` }
+}
 
 // What `git rev-parse` says, with exit 128, outside a repository.
 const NOT_A_REPOSITORY = /not a git repository/i
@@ -750,6 +768,7 @@ export const createExtension =
       let configured: Collected | undefined
       let read: Config | undefined
       let user: Config | undefined
+      let homeNotice: Delivery | undefined
       const failed = (text: string): Effect.Effect<Collected> =>
         (configured === undefined ? closedSettings(read, user) : Effect.succeed(configured)).pipe(
           Effect.map((kept): Collected => ({ ...kept, delivery: notice(text) })),
@@ -763,23 +782,39 @@ export const createExtension =
         // The state folder does not depend on the config or on `status`, so it is asked meanwhile;
         // its failure counts only once the config says the extension is on.
         // The user's own file is read alone (no project folder) beside the merged config: only it
-        // may lift the gates, and its exclusions stay whatever a project says. A file that cannot
-        // be read counts for nothing, which leaves the gates on.
-        const [config, folder, own] = yield* Effect.all(
+        // may lift the gates, and its exclusions stay whatever a project says. It is recorded as
+        // soon as it is read, apart from the merged config and the state folder, whose failure
+        // stops the folder command but must not stop this read. A file that cannot be read counts
+        // for nothing, which leaves the gates on and the defaults' exclusions, and is reported.
+        const [attempt] = yield* Effect.all(
           [
-            holyagent(signal, project, "config", join(located.top, STATE_DIRECTORY)).pipe(
-              Effect.flatMap(decodeConfig),
+            Effect.result(
+              Effect.all(
+                [
+                  holyagent(signal, project, "config", join(located.top, STATE_DIRECTORY)).pipe(
+                    Effect.flatMap(decodeConfig),
+                  ),
+                  Effect.result(stateFolderOf(signal, project, located)),
+                ],
+                { concurrency: "unbounded" },
+              ),
             ),
-            Effect.result(stateFolderOf(signal, project, located)),
             holyagent(signal, project, "config").pipe(
               Effect.flatMap(decodeConfig),
-              Effect.orElseSucceed((): Config | undefined => undefined),
+              Effect.map((own) => {
+                user = own
+              }),
+              Effect.catch((error) =>
+                Effect.sync(() => {
+                  homeNotice = notice(`the home-level config could not be read: ${error.message}`)
+                }),
+              ),
             ),
           ],
           { concurrency: "unbounded" },
         )
+        const [config, folder] = yield* Effect.fromResult(attempt)
         read = config
-        user = own
         const bound = boundConfigs(yield* defaultConfig, user)
         if (!config.pi.enable) {
           if (user !== undefined && !user.pi.enable)
@@ -834,6 +869,9 @@ export const createExtension =
         // and are the defaults' when the config could not be read (see closedSettings).
         Effect.catch((error) => failed(error.message)),
         Effect.catchCause((cause) => failed(Cause.pretty(cause))),
+        Effect.map((collected): Collected =>
+          homeNotice === undefined ? collected : { ...collected, homeNotice },
+        ),
       )
     }
 
@@ -959,8 +997,10 @@ export const createExtension =
         if (!taken.started && result?.enabled !== false) {
           taken.started = true
           if (result?.config !== undefined) startProviderCheck(taken, result.config)
-          if (result?.tools !== undefined) taken.toolsNotice = applyRootTools(result.tools)
+          if (result?.tools !== undefined) taken.setupNotice = applyRootTools(result.tools)
         }
+        if (result?.homeNotice !== undefined)
+          taken.setupNotice = joinNotices(taken.setupNotice, result.homeNotice)
         return result
       })
       return taken.pending.then(() => undefined)
@@ -983,7 +1023,7 @@ export const createExtension =
         started: false,
         probe: undefined,
         readiness: undefined,
-        toolsNotice: undefined,
+        setupNotice: undefined,
       }
       return gather(held, ctx, event.reason)
     })
@@ -1041,16 +1081,16 @@ export const createExtension =
     )
 
     // The root's notices are their own messages, one per handler since a handler returns one, so
-    // they never replace the context or each other. The tools notice is ready after the start's
+    // they never replace the context or each other. The setup notice is ready after the start's
     // collection; the provider notice comes from the checks that run beside the session, so it
     // reaches the first run that starts after they end. Each is delivered once.
     const noticeOnce =
-      (slot: "readiness" | "toolsNotice") => (): BeforeAgentStartEventResult | undefined => {
+      (slot: "readiness" | "setupNotice") => (): BeforeAgentStartEventResult | undefined => {
         const message = isChild() ? undefined : held?.[slot]
         if (held !== undefined) held[slot] = undefined
         return message === undefined ? undefined : { message }
       }
-    pi.on("before_agent_start", noticeOnce("toolsNotice"))
+    pi.on("before_agent_start", noticeOnce("setupNotice"))
     pi.on("before_agent_start", noticeOnce("readiness"))
 
     // Only a specialist the package launched is held to a complete report.

@@ -16475,6 +16475,10 @@ var notice = (text) => ({
   content: `holyagent: ${oneLine(text).slice(0, NOTICE_CHARS)}`,
   display: true
 });
+var joinNotices = (first, second) => {
+  const added = second.content.replace(/^holyagent: /, "");
+  return first === undefined ? second : first.content.includes(added) ? first : { ...first, content: `${first.content}; ${added}` };
+};
 var NOT_A_REPOSITORY = /not a git repository/i;
 var SPAWN_FAILURE = /^spawn \S+ E[A-Z0-9]+$/;
 var reasonOf = (result) => {
@@ -16563,19 +16567,24 @@ var createExtension = ({
     let configured;
     let read;
     let user;
+    let homeNotice;
     const failed = (text) => (configured === undefined ? closedSettings(read, user) : succeed5(configured)).pipe(map4((kept) => ({ ...kept, delivery: notice(text) })));
     return gen2(function* () {
       const project = resolve3(cwd);
       const located = yield* topOf(signal, project);
-      const [config, folder, own] = yield* all2([
-        holyagent(signal, project, "config", join(located.top, STATE_DIRECTORY)).pipe(flatMap2(decodeConfig)),
-        result2(stateFolderOf(signal, project, located)),
-        holyagent(signal, project, "config").pipe(flatMap2(decodeConfig), orElseSucceed2(() => {
-          return;
-        }))
+      const [attempt] = yield* all2([
+        result2(all2([
+          holyagent(signal, project, "config", join(located.top, STATE_DIRECTORY)).pipe(flatMap2(decodeConfig)),
+          result2(stateFolderOf(signal, project, located))
+        ], { concurrency: "unbounded" })),
+        holyagent(signal, project, "config").pipe(flatMap2(decodeConfig), map4((own) => {
+          user = own;
+        }), catch_2((error) => sync2(() => {
+          homeNotice = notice(`the home-level config could not be read: ${error.message}`);
+        })))
       ], { concurrency: "unbounded" });
+      const [config, folder] = yield* fromResult2(attempt);
       read = config;
-      user = own;
       const bound = boundConfigs(yield* defaultConfig, user);
       if (!config.pi.enable) {
         if (user !== undefined && !user.pi.enable)
@@ -16602,7 +16611,7 @@ var createExtension = ({
     }).pipe(timeoutOrElse2({
       duration: deadlineMs,
       orElse: () => fail5(new DeadlineExceeded({ ms: deadlineMs }))
-    }), catch_2((error) => failed(error.message)), catchCause2((cause) => failed(pretty(cause))));
+    }), catch_2((error) => failed(error.message)), catchCause2((cause) => failed(pretty(cause))), map4((collected) => homeNotice === undefined ? collected : { ...collected, homeNotice }));
   };
   const release = () => {
     const taken = held;
@@ -16676,8 +16685,10 @@ var createExtension = ({
         if (result?.config !== undefined)
           startProviderCheck(taken, result.config);
         if (result?.tools !== undefined)
-          taken.toolsNotice = applyRootTools(result.tools);
+          taken.setupNotice = applyRootTools(result.tools);
       }
+      if (result?.homeNotice !== undefined)
+        taken.setupNotice = joinNotices(taken.setupNotice, result.homeNotice);
       return result;
     });
     return taken.pending.then(() => {
@@ -16700,7 +16711,7 @@ var createExtension = ({
       started: false,
       probe: undefined,
       readiness: undefined,
-      toolsNotice: undefined
+      setupNotice: undefined
     };
     return gather(held, ctx, event.reason);
   });
@@ -16733,7 +16744,7 @@ ${event.systemPrompt}` : undefined;
       held[slot] = undefined;
     return message === undefined ? undefined : { message };
   };
-  pi.on("before_agent_start", noticeOnce("toolsNotice"));
+  pi.on("before_agent_start", noticeOnce("setupNotice"));
   pi.on("before_agent_start", noticeOnce("readiness"));
   pi.on("message_end", (event) => {
     if (!isChild())
