@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-the-last-repair-commit-on",
   "objective": "Re-review the last repair commit on release/0.3.0/feat/pi-root-wiring (worktree /home/user/holyagent-0.3.0-wiring, range 13f357f..HEAD) against the findings it repairs.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Diff: /home/user/holyagent-notes/wire-a-last.diff (dist excluded).",
     "Findings: (1) a project's pi.enable false lifted the root's exclusions, gate and prompt; gates must stand down only for the home-level pi.enable off; (2) a project's feature toggles removed exclusion patterns; now the excluded set is the union of defaults, home-level and merged config; (3) session_start began with no exclusions; (4) notices kept invisible format characters; (5) model ids refused @ and +.",
@@ -39,7 +39,29 @@
     "agentId": "workflow:wf_06becd1e-6f7/assignment-0mw7p9z2s-tdcj",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T10:39:23.860Z"
+    "startedAt": "2026-11-08T10:39:23.860Z",
+    "finishedAt": "2026-11-08T10:52:29.802Z"
+  },
+  "result": "result: Each of the five findings is repaired and each has a new test that fails on the base. `mise run verify` passes on 7d8c92f. No blockers.\n\nThe built-in `/code-review` returned an empty list for `13f357f...HEAD` because the skill ran from the main checkout, not the worktree. It reported 7 findings on a re-run over `13f357f...7d8c92f`. I classified them below.\n\nchanged: none (read-only)\n\nchecks:\n- `bunx --no-install mise run verify` in the worktree -> exit 0. 2296 pass, 0 fail, type-check, lint and format clean. The worktree stays clean. Log: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`.\n- Base source (`extension.ts`, `schema.ts` at 13f357f) with the new tests -> 8 pi tests and 2 runtime tests fail. Those are the invisible-character, project-off, exclusion-union, startup-exclusions, `pi.enable` real-project and model-id tests. On HEAD all 196 pi and 93 runtime tests pass.\n\nblockers: none\n\nquestions: none\n\nnotes: the built-in's findings, then the writer notes.\n- Rejected: the project-off path leaving `gatesOff` false is the spec, since only the home-level off stands the guard down.\n- Rejected: `Effect.runSync(startingExclusions)` is safe. `roleOf` and `defaultConfig` are synchronous, `runSync` is already used at lines 271 and 919, and the startup test passes.\n- Rejected: the stripping of ZWJ (U+200D), the Arabic letter mark and soft hyphen. U+200D was already stripped on the base, and the others are the intended `Cf` set. The variation selectors are the new part, and a test covers them.\n- Rejected: the union cannot be relaxed. Finding (2) asked for exactly that.\n- Optional: the extra `config` spawn runs on every collect, in parallel with the merged call. A failure of that call is swallowed, so the user config counts as absent. That is fail-closed, but the user's own exclusions then stop applying silently.\n- Optional: with a project `pi.enable: false`, or before the first collect finishes, no `setActiveTools` runs. The excluded tools stay advertised and calls are blocked, which wastes model turns but is safe.\n- Optional: the `@` and `+` in `ModelId` match finding (5). I could not find Pi's `--model` parser in the dependencies, so how it treats those characters is unverified.\n- Writer notes, each judged right:\n  - The extra home-config call is needed to tell the home-level off from a project's.\n  - The gate being the only enforcement with a project off is consistent with how the deferred tools are already handled.\n  - The `moonshot_search` assertion flip follows from the union. The root now never gets any web tool in either web mode, where before `pi-web-kit` mode freed the provider's tools. The docs say so, and I recommend the root accept it as an intended change.\n  - Stripping variation selectors from workflow names comes from the shared `printable` regex and has a test.\n- Repo rules: no try/catch, no `new Promise`, no async functions or Promise statics in the diff. New functions carry comments, and the docs in `docs/pi/extensions.md` and `docs/pi/providers.md` are updated. The `dist` files are in the commit, and the real-project tests pass against them.\n\nevidence:\nEach finding is repaired with a test that fails without it, and nothing else regresses: base-source run gave 10 failing new tests, HEAD gives 289 pass in the pi and runtime suites, and `mise run verify` exited 0 (2296 pass).\nThe repair follows the repository's code rules: `mise run verify` exited 0 (check, lint, fmt:check, test). The diff uses Effect throughout and has no banned constructs. Docs are updated at `/home/user/holyagent-0.3.0-wiring/docs/pi/extensions.md` and `/home/user/holyagent-0.3.0-wiring/docs/pi/providers.md`.\nreview-findings: the built-in's 7 findings are classified above (4 rejected, 3 optional, 0 blockers). The diff is `/home/user/holyagent-notes/wire-a-last.diff`, and the source is `/home/user/holyagent-0.3.0-wiring/packages/integrations/pi/src/extension.ts` and `/home/user/holyagent-0.3.0-wiring/packages/runtime/src/config/schema.ts`.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Five findings repaired with tests failing on the base; verify 2296 pass",
+    "criteria": [
+      {
+        "criterion": "Each finding is repaired with a test that fails without it, and nothing else regresses",
+        "support": "base-source run gave 10 failing new tests, HEAD gives 289 pass in the pi and runtime suites, and `mise run verify` exited 0 (2296 pass)."
+      },
+      {
+        "criterion": "The repair follows the repository's code rules",
+        "support": "`mise run verify` exited 0 (check, lint, fmt:check, test). The diff uses Effect throughout and has no banned constructs. Docs are updated at `/home/user/holyagent-0.3.0-wiring/docs/pi/extensions.md` and `/home/user/holyagent-0.3.0-wiring/docs/pi/providers.md`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "review-findings",
+        "support": "the built-in's 7 findings are classified above (4 rejected, 3 optional, 0 blockers). The diff is `/home/user/holyagent-notes/wire-a-last.diff`, and the source is `/home/user/holyagent-0.3.0-wiring/packages/integrations/pi/src/extension.ts` and `/home/user/holyagent-0.3.0-wiring/packages/runtime/src/config/schema.ts`."
+      }
+    ]
   },
   "createdAt": "2026-11-08T10:39:23.860Z"
 }
