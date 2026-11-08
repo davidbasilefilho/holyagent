@@ -349,7 +349,7 @@ describe("the role flag", () => {
     expect(root).not.toContain(core)
     expect(specialist).not.toContain(core)
     expect(session).toContain(core)
-    expect(session).toContain(`${PACKAGE_ROOT}/scripts/holyagent`)
+    expect(session).toContain(WRAPPER)
     expect(session).not.toContain(PI_ROOT_PLACEHOLDER)
     // The reminder restates root rules: the root and the session role end with the Pi block, the
     // specialist with none, and nobody gets the Claude block.
