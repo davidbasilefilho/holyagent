@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mw7oobai-8ld4",
+  "intentId": "intent-0mw7mzreq-mu22",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-repair-commit-13f357f-on",
+  "objective": "Re-review repair commit 13f357f on release/0.3.0/feat/pi-root-wiring (worktree /home/user/holyagent-0.3.0-wiring, range 5307d43..13f357f) against the findings it repairs.",
+  "state": "Running",
+  "scope": [
+    "Diff: /home/user/holyagent-notes/wire-a-repair.diff (dist excluded).",
+    "Findings repaired: (1) provider probes ran before KIMI_CODE_REGION was applied; (2) notice text could carry C0/C1 control characters from a project model id or probe output, now stripped, and ModelId restricted to ^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$; (3) the root's exclusions and prompt failed open when the config could not be read, now from the defaults; codemode scripts could call deferred excluded tools (computer-use beyond the core set, web_search/web_fetch), now refused by a tool_call gate; optional: a missing pi binary gave a false login notice, a failed setActiveTools was dropped when the status was the delivery, a compaction during the start collection skipped the start work.",
+    "Check the tool_call gate against Pi 1.5.0 (does tool_call fire for codemode script calls; what a refusal returns), that the schema restriction does not reject any model id the shipped routes or docs use, and the third before_agent_start handler."
+  ],
+  "constraints": [
+    "Read-only; no edits and no version-control writes.",
+    "Report in under 400 words; put long logs in a file under /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Each finding is repaired with a test that fails without it, and nothing else regresses",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The repair follows the repository's code rules",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "review-findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7o2nti-ylx1"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T10:22:33.258Z"
+  },
+  "createdAt": "2026-11-08T10:22:33.258Z"
+}
