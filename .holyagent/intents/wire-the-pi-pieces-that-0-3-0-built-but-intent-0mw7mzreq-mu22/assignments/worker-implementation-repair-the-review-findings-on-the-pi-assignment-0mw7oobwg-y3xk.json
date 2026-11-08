@@ -1,0 +1,75 @@
+{
+  "id": "assignment-0mw7oobwg-y3xk",
+  "intentId": "intent-0mw7mzreq-mu22",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-review-findings-on-the-pi",
+  "objective": "Repair the review findings on the Pi tool settings step in /home/user/holyagent-0.3.0-settings (branch release/0.3.0/feat/pi-tool-settings, head after merging pi-root-wiring 13f357f), and finish its docs.",
+  "state": "Running",
+  "scope": [
+    "First run bunx --no-install mise run build: the branch just merged release/0.3.0/feat/pi-root-wiring, and the generated dist bundles must match the merged sources.",
+    "Blocking (security): at project and local scope, locate (pi-settings.ts ~245,249) follows a symlinked .pi folder or settings file, so a repository can redirect the write (for example .pi/settings.json -> ~/.pi/agent/settings.json) and --undo edits through the same link. Refuse a symlinked .pi and each symlinked target at project/local scope with a failed line, as the Claude settings step does (scope.ts:97-103 settingsFile); test it.",
+    "Blocking (security, maintainer rule that the user's off wins for risky settings): at project and local scope, a key is checked as unset only in the project file, so a user's global pi-computer-use confirmations true, or a global moonshot tool false, are overridden by a project write. Skip a key that is already set in the global file at those scopes; test it.",
+    "Optional (include): (1) at project scope, a key equal to the package default is left out even when the global file sets a different value, so the global value wins; write the key at project scope when the global layer differs from it; (2) if recording fails after the file write, --undo skips those keys: record before writing, or make the failure a failed line that names the file; (4) --undo finds files by recomputing locate() from the current environment, so a changed BILI_CONFIG_FILE or XDG_CONFIG_HOME misses a recorded file: iterate the record's own keys.",
+    "Docs: docs/pi/extensions.md lines ~130-142 still say toolSettings is planned; docs/usage.md lists no tool-settings step; docs/pi/configuration.md should state the route model id character set ^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$ (from packages/runtime/src/config/schema.ts); docs/pi/README.md status rows for tool settings."
+  ],
+  "constraints": [
+    "Change only the ownership paths; no version-control writes and no edits under .git/ or .holyagent/.",
+    "Follow .claude/CLAUDE.md code rules; every behavior gets a test that fails without it; do not weaken tests.",
+    "Never run pi.",
+    "Run bunx --no-install mise run build and bunx --no-install mise run verify before reporting.",
+    "Report in under 400 words; put long logs in a file under /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path. Write a diff-file (dist excluded) at /home/user/holyagent-notes/wire-b-repair.diff."
+  ],
+  "criteria": [
+    {
+      "text": "A symlinked .pi folder or target at project or local scope is refused with a failed line and nothing is written or undone through it, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "At project and local scope a key already set in the global file is not written, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The project-scope default layering, the record-before-write order and the undo lookup by record are fixed, with tests",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The docs describe the tool settings step as built and state the model id character set",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build and mise run verify exit 0",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/setup",
+    "packages/runtime/tests/setup-pi-settings.test.ts",
+    "packages/runtime/tests/setup-pi.test.ts",
+    "packages/runtime/tests/setup.test.ts",
+    "packages/integrations/claude/dist",
+    "packages/integrations/pi/dist",
+    "docs/pi/extensions.md",
+    "docs/pi/configuration.md",
+    "docs/pi/installation.md",
+    "docs/pi/README.md",
+    "docs/usage.md",
+    "docs/components.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T10:22:34.049Z"
+  },
+  "createdAt": "2026-11-08T10:22:34.049Z"
+}
