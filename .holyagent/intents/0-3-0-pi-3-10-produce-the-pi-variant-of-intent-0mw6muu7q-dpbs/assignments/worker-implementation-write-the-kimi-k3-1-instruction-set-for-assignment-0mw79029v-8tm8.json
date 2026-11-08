@@ -62,5 +62,37 @@
     "finishedAt": "2026-11-08T03:14:24.104Z"
   },
   "result": "result: The 16 root/ files and both session files are written for pi, and all 49 root requirement ids have a kimi coverage entry. `mise` is not runnable here, so I ran the format check directly and could not run the lint gate.\n\nchanged (all under `/home/user/holyagent-0.3.0-kimi/packages/runtime/src/instructions/kimi-k3.1/`):\n- `root/` holds the 16 files: asking, assignments, context, delegating, dispatch, identity, instruction-guidelines, pr-text, routing, search, skills, stack-plan, task-list, user-messages, version-control, workflows.\n- `session-reminder.md` and `session-cloud-identity.md`.\n- `/home/user/holyagent-notes/kimi-coverage-root.ts`.\n\nchecks:\n- A script that parses the requirements files and checks every phrase against its file -> 49 ids, 49 entries, no missing, extra or absent phrase.\n- `bun fmt --no-script --check` on my paths -> exit 0, 18 files formatted.\n- `bunx --no-install mise run fmt:check` and `bun lint` -> exit 127 and `mise` binary missing. I ran `bun install --frozen-lockfile --ignore-scripts`, which did not fetch the `mise` binary. Lint config was not checked, and these files are Markdown.\n- ripgrep scan of my files for the dates, years, times and `holyagent.js` patterns in `instructions.test.ts`, and for Claude tool names -> no matches.\n\nblockers: none.\n\nRules carried from claude-5.5 with no requirement:\n- **identity:** reply on threads only when authorized; check `git branch --show-current` and use `git switch -c`.\n- **asking:** settle facts first; finish independent work first; plain-word options; record each decision with `intent update --material`; parked decisions are never defaulted.\n- **assignments:** blocking criteria list; proof is command, exit code and counts; evidence goes stale only where touched; reviewer role mapping and `independentFrom`; diff-file evidence; order of work; repair rules; vulnerability holds the push; resume interrupted specialists; split long mechanical work; finish conditions; numbered-deliverable lines.\n- **context:** the report cap, now set in bullets.\n- **delegating:** if the user forbids subagents, work to the same criteria and name waived reviews.\n- **dispatch:** use the printed prompt; literal package paths in briefs; evidence gaps resumed or sent as `followUpOf`; start all ready work together.\n- **instruction-guidelines:** the whole file.\n- **skills:** the skill list.\n- **stack-plan:** all detail beyond R-STACK and R-MERGEREVIEW.\n- **user-messages:** answer first; the leave-unmentioned list.\n- **version-control:** pre-commit checks, git config, non-interactive Git, failed hooks, squash default.\n- **workflows:** the script rules.\n- **session files:** both, from the claude-5.5 text.\n\nnotes:\n- pi-subagents' README names no model-callable stop tool, so R-STOP says \"the host's stop control\".\n- R-REPORT and R-WORKFLOW follow `docs/pi/orchestration.md`: the script returns `{id, report}`. `assignment reports` does not read pi journals, so the report passes verbatim on stdin only as the run returned it.\n- I dropped the built-in `/code-review` and `/security-review` mention, which pi lacks.\n- Cloud identity uses `gh api user` or the session's GitHub tool in place of `get_me`.\n- The script example in `workflows.md` is unchecked against the launcher.\n- R-CACHE-STATIC is carried by the test file, which today covers only claude-5.5 files.\n\nEvidence:\n- Every Markdown requirements file under the assigned paths has its kimi-k3.1 file at the same path, written to the Kimi guide: `root/` holds 16 files plus two session files, with K-citations in HTML comments.\n- Every requirement id and every rule of the matching claude-5.5 file is carried with its meaning: rules with no requirement are listed above, and the diff is at `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/kimi-root.diff`.\n- Every id has a kimi coverage entry whose phrase occurs in the named file: the check script printed `49 49 []`.\n- Host words are pi's, with no Claude Code tool names or plugin paths left: the scan found none. Names used are `todo`, `ask_user_question`, `SubagentWorkflow`, `Agent`, `get_subagent_result`, `steer_subagent`, codemode `tools.bash`, and `pi:<id>` and `pi-workflow:<run>/<id>` ids.\n- changed-paths: listed above.\n- coverage-file: `/home/user/holyagent-notes/kimi-coverage-root.ts`\n",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "Kimi set and registration accepted after repair 0e71e52; artifact and code re-reviews found no blocker; verify 1764 pass, build clean",
+    "criteria": [
+      {
+        "criterion": "Every Markdown requirements file under the assigned paths has its kimi-k3.1 file at the same path, written to the Kimi guide",
+        "support": "`root/` holds 16 files plus two session files, with K-citations in HTML comments."
+      },
+      {
+        "criterion": "Every requirement id and every rule of the matching claude-5.5 file is carried with its meaning",
+        "support": "rules with no requirement are listed above, and the diff is at `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/kimi-root.diff`."
+      },
+      {
+        "criterion": "Every id has a kimi coverage entry whose phrase occurs in the named file",
+        "support": "the check script printed `49 49 []`."
+      },
+      {
+        "criterion": "Host words are pi's, with no Claude Code tool names or plugin paths left",
+        "support": "the scan found none. Names used are `todo`, `ask_user_question`, `SubagentWorkflow`, `Agent`, `get_subagent_result`, `steer_subagent`, codemode `tools.bash`, and `pi:<id>` and `pi-workflow:<run>/<id>` ids."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "listed above."
+      },
+      {
+        "label": "coverage-file",
+        "support": "`/home/user/holyagent-notes/kimi-coverage-root.ts`"
+      }
+    ]
+  },
   "createdAt": "2026-11-08T03:03:47.588Z"
 }
