@@ -54,5 +54,29 @@
     "finishedAt": "2026-11-08T11:11:55.482Z"
   },
   "result": "result: The home-level exclusions now apply when git, the merged read or the deadline fails, and the root's excluded set only grows within a session.\n\nchanged:\n- /home/user/holyagent-0.3.0-wiring/packages/integrations/pi/src/extension.ts\n- /home/user/holyagent-0.3.0-wiring/packages/integrations/pi/tests/extension.test.ts\n- /home/user/holyagent-0.3.0-wiring/packages/integrations/pi/dist/extensions/holyagent.js (rebuilt)\n- /home/user/holyagent-0.3.0-wiring/docs/pi/extensions.md\n\nHow it works:\n- **Fork and await:** `collect` forks the user-only `config` read first, before `topOf`, so it no longer depends on git or the merged read. The main path joins that fiber where it needs `user`, and `failed()` awaits it before building the closed settings.\n- **User-read deadline:** the user read has its own deadline of `deadlineMs`. If it does not finish, the home-level notice is added: \"`holyagent config` failed: it did not finish within Ns\".\n- **Union:** `gather` now unions the new `excludeTools` with `taken.excluded`. Only the user's `pi.enable: false` clears the set.\n- **Docs:** I edited the \"Excluded tools\" bullet in `docs/pi/extensions.md`, which is line 38, not line ~10. It now says git failures and unreadable project configs do not drop the user's patterns, the set only grows, and a user read cut off by the deadline adds the notice. Line 10 and the other \"fails closed\" lines did not overclaim.\n\nTests:\n- **Three new tests** in `extension.test.ts`: git failing with the user config setting `pi-web-kit`, a compaction whose reads fail, and a deadline during the user read. I swapped the base `extension.ts` back in temporarily and all three failed, then restored the fix.\n- **Existing test changed:** the three \"git failure fails closed\" tests in `extension.test.ts` asserted that no command ran. They now assert `[\"config\"]`, because the user-only read runs even when git fails. They still show that no project-config or state command runs.\n\nchecks:\n- `bunx --no-install bun test packages/integrations/pi/tests/extension.test.ts` -> exit 0, 201 pass, 0 fail\n- `bunx --no-install mise run build` -> exit 0\n- `bunx --no-install mise run verify` -> exit 0, no type errors in 204 files, no lint problems in 205 files, 2301 tests pass, 0 fail (log: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log)\n\nblockers: none\nquestions: none\nnotes: if the user edits their exclusions down mid-session, a compaction will not shrink the set. This is deliberate under the \"only grows\" requirement. A reload or resume starts a new `Held`, so it resets.\n\nevidence:\nThe home-level config's exclusions apply when git, the merged read or the deadline fails, with tests: the three new tests in `extension.test.ts` (\"the user's own exclusions stay when git fails…\", \"a compaction whose reads fail…\", \"a deadline during the user's read…\"); all three fail on the base and pass now (201 pass).\nWithin a session the root's excluded set never shrinks, with a test: the union in `gather` (`extension.ts`) and the test \"a compaction whose reads fail keeps the exclusions an earlier collection took from the user\".\nmise run build and mise run verify exit 0: build exit 0; verify exit 0 with 2301 pass and 0 fail.\ndiff-file: /home/user/holyagent-notes/wire-a-fix2.diff\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Independent code, security and artifact reviews accepted the branch head after the repair rounds",
+    "criteria": [
+      {
+        "criterion": "The home-level config's exclusions apply when git, the merged read or the deadline fails, with tests",
+        "support": "the three new tests in `extension.test.ts` (\"the user's own exclusions stay when git fails…\", \"a compaction whose reads fail…\", \"a deadline during the user's read…\"); all three fail on the base and pass now (201 pass)."
+      },
+      {
+        "criterion": "Within a session the root's excluded set never shrinks, with a test",
+        "support": "the union in `gather` (`extension.ts`) and the test \"a compaction whose reads fail keeps the exclusions an earlier collection took from the user\"."
+      },
+      {
+        "criterion": "mise run build and mise run verify exit 0",
+        "support": "build exit 0; verify exit 0 with 2301 pass and 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff-file",
+        "support": "/home/user/holyagent-notes/wire-a-fix2.diff"
+      }
+    ]
+  },
   "createdAt": "2026-11-08T11:06:22.582Z"
 }
