@@ -38,17 +38,22 @@ export const DESIGN_CORE_MARKER = "<!-- design-core -->"
  */
 const MARKERS: ReadonlySet<string> = new Set([MATERIALITY_MARKER, DESIGN_CORE_MARKER])
 
-// Code stays as written, so a `<!--` in a code span or a fenced block never pairs with a later
-// `-->`. The alternatives are a backtick fence and a tilde fence (each closed by a fence of its own
-// character at least as long, or by the end of the text), an inline code span (a backtick run closed
-// by a run of the same length within one paragraph) and a comment; the first match wins. The groups
-// are numbered 1 to 3 for the backreferences.
+// Code stays as written, so a `<!--` in a code span, a fenced block or an indented block never pairs
+// with a later `-->`. The alternatives are an indented code block (lines of four or more spaces or a
+// tab that start the text or follow a blank line, with the blank lines between them; a fence marker
+// in it is just code), a backtick fence and a tilde fence (each at most three spaces deep, closed by a
+// fence of its own character at least as long, or by the end of the text), an inline code span (a
+// backtick run closed by a run of the same length within one paragraph, so not across a blank line or
+// a line that starts a list item) and a comment; the first match wins. The groups are numbered 1 to 3
+// for the backreferences and the comment is group 4; the others do not capture.
+const LIST_ITEM_START = String.raw`\n[ \t]*(?:[-+*]|\d{1,9}[.)])(?:[ \t]|\r?(?:\n|$))`
 const CODE_OR_COMMENT = new RegExp(
   [
+    String.raw`(?:(?<![\s\S])|(?<=\n[ \t]*\r?\n))(?: {4}|\t)[ \t]*[^\s][^\n]*(?:\n(?:[ \t]*\r?\n)*(?: {4}|\t)[ \t]*[^\s][^\n]*)*`,
     String.raw`^ {0,3}(\x60{3,})[^\x60\n]*(?:\n[\s\S]*?)?(?:\n {0,3}\1\x60*[ \t]*\r?(?=\n|$)|(?![\s\S]))`,
     String.raw`^ {0,3}(~{3,})[^\n]*(?:\n[\s\S]*?)?(?:\n {0,3}\2~*[ \t]*\r?(?=\n|$)|(?![\s\S]))`,
-    String.raw`(?<!\x60)(\x60+)(?!\x60)(?:(?!\n[ \t]*\r?\n)[\s\S])*?(?<!\x60)\3(?!\x60)`,
-    String.raw`[ \t]*<!--[\s\S]*?-->`,
+    String.raw`(?<!\x60)(\x60+)(?!\x60)(?:(?!\n[ \t]*\r?\n)(?!${LIST_ITEM_START})[\s\S])*?(?<!\x60)\3(?!\x60)`,
+    String.raw`([ \t]*<!--[\s\S]*?-->)`,
   ].join("|"),
   "gm",
 )
@@ -66,17 +71,17 @@ const isRemoved = (line: string | undefined) =>
  * of {@link MATERIALITY_MARKER} and {@link DESIGN_CORE_MARKER}. A source cites the guide point a
  * rule follows in such a comment, for the people who edit it; the comment says nothing to the model
  * that reads the generated text, so every family's generator strips it. Code is not prose, so a
- * comment inside an inline code span or a fenced code block stays. A comment on a line of its own
- * is removed with the line, and the blank line after the removed lines goes too when the lines
- * before them are blank or start the text, so the removal never leaves a run of blank lines that
- * was not there. A comment after text takes the spaces before it. Lines end in LF or CRLF. Text
- * without a comment is returned as it is.
+ * comment inside an inline code span, a fenced code block or an indented code block stays. A
+ * comment on a line of its own is removed with the line, and the blank line after the removed lines
+ * goes too when the lines before them are blank or start the text, so the removal never leaves a
+ * run of blank lines that was not there. A comment after text takes the spaces before it. Lines end
+ * in LF or CRLF. Text without a comment is returned as it is.
  */
 export const stripCitations = (text: string): string => {
   const marked = text.replace(
     CODE_OR_COMMENT,
-    (match, _fence, _tilde, _span, offset: number): string => {
-      if (!match.trimStart().startsWith("<!--") || MARKERS.has(match.trim())) return match
+    (match, _fence, _tilde, _span, comment: string | undefined, offset: number): string => {
+      if (comment === undefined || MARKERS.has(match.trim())) return match
       const alone =
         (offset === 0 || text[offset - 1] === "\n") &&
         /^[ \t]*\r?(?:\n|$)/.test(text.slice(offset + match.length))
@@ -93,6 +98,8 @@ export const stripCitations = (text: string): string => {
     while (isRemoved(lines[above - 1])) above--
     return !(above === 0 || isBlank(lines[above - 1]))
   })
+  // A removed last line had no line ending of its own, so the one before it stays.
+  if (isRemoved(lines[lines.length - 1])) kept.push("")
   return kept.join("\n")
 }
 

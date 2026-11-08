@@ -76,7 +76,8 @@ export const PI_WORDS: HostWords = {
   journal: "workflow run's journal",
   recordNote:
     "the pi launcher records no agent by hook: the launcher glue or the root records each agent, with the ID the Agent tool returns, including a continued one",
-  reportsNote: "under the pi host this reads Claude workflow journals only for now",
+  reportsNote:
+    "under the pi host the file is a <run id>.workflow.jsonl of @tintinweb/pi-subagents, whose entries are matched to Assignments by the key of their dispatched call, or the root session file, which holds the record of each Assignment recorded as pi:<agent-id>; an entry that failed, has no text or matches no call is listed with the run and its index",
   agentIdNote:
     "under the pi host an agent is recorded as pi:<agent-id>, the ID the Agent tool returns (strip pi: to message it), and a workflow's agent as pi-workflow:<run-id>/<id>, with the run ID and the label the script gave the agent (the Assignment id); any other form is refused",
 }

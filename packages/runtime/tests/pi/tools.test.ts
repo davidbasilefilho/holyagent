@@ -10,6 +10,7 @@ import {
   CODEMODE_MAX_WORKERS_ENV,
   COMPUTER_USE_TOOLS,
   PI_SETTINGS_FILE,
+  SUBAGENTS_SETTINGS_FILE,
   T3_VISUAL_TOOLS,
   toolArgs,
   toolSettings,
@@ -286,7 +287,7 @@ describe("the feature switches and the tool arguments", () => {
 })
 
 describe("toolSettings", () => {
-  test("the default config yields the provider tools, Billion Context and computer-use settings", () => {
+  test("the default config yields the provider tools, subagents, Billion Context and computer-use settings", () => {
     expect(toolSettings(DEFAULT_CONFIG)).toEqual([
       { file: PI_SETTINGS_FILE, content: { codemode: { mode: "only" } } },
       {
@@ -294,6 +295,10 @@ describe("toolSettings", () => {
         content: {
           tools: { moonshot_search: { enabled: true }, moonshot_fetch: { enabled: true } },
         },
+      },
+      {
+        file: "~/.pi/agent/subagents.json",
+        content: { disableDefaultAgents: true, fallbackSubagent: "none" },
       },
       { file: BILLION_CONTEXT_FILE, content: { pi: { subagents: false } } },
       {
@@ -323,6 +328,21 @@ describe("toolSettings", () => {
       file: PI_SETTINGS_FILE,
       content: { codemode: { mode: "on" } },
     })
+  })
+
+  test("only the specialists launch while subagents is on: the defaults are off and no type falls back", () => {
+    const patches = toolSettings(DEFAULT_CONFIG).filter((p) => p.file === SUBAGENTS_SETTINGS_FILE)
+    expect(patches).toEqual([
+      {
+        file: SUBAGENTS_SETTINGS_FILE,
+        content: { disableDefaultAgents: true, fallbackSubagent: "none" },
+      },
+    ])
+  })
+
+  test("subagents off writes no package settings, since the package is not loaded", () => {
+    const files = toolSettings(withFeatures({ subagents: false })).map((p) => p.file)
+    expect(files).not.toContain(SUBAGENTS_SETTINGS_FILE)
   })
 
   test("contextCompression off writes no Billion Context settings", () => {

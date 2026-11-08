@@ -8,19 +8,24 @@ import type { Family } from "../../../runtime/src/instructions/families.ts"
 import { jsonText } from "../../../runtime/src/instructions/generated.ts"
 import { skillFiles } from "../../../runtime/src/instructions/skills.ts"
 import packageJson from "../package.json" with { type: "json" }
-import { DIST_DIRECTORY, type GeneratedFile, generatedNote, REPOSITORY, SOURCES } from "./files.ts"
+import { agentFiles } from "./agents.ts"
+import {
+  DIST_DIRECTORY,
+  type GeneratedFile,
+  generatedNote,
+  PI_FAMILY,
+  readSource,
+  REPOSITORY,
+  SOURCES,
+} from "./files.ts"
+
+export { PI_FAMILY }
 
 /**
  * Every path the build writes, relative to the repository root. The build removes these before it
  * writes and touches nothing else; the commit hook stages exactly these.
  */
 export const GENERATED_PATHS: ReadonlyArray<string> = [DIST_DIRECTORY]
-
-/**
- * The model family whose instruction sources the package is built from: the Kimi K3.1 set, which is
- * what {@link generate} uses unless it is given another family.
- */
-export const PI_FAMILY: Family = "kimi-k3.1"
 
 /** The extension's source file, relative to the repository root. */
 export const EXTENSION_SOURCE = `${SOURCES}/extension.ts`
@@ -30,7 +35,7 @@ export const EXTENSION_OUTPUT = "extensions/holyagent.js"
 
 /** The description of the package in its manifest. */
 export const DESCRIPTION =
-  "HolyAgent for Pi: its skills and an extension, built from the shared holyagent runtime."
+  "HolyAgent for Pi: its skills, its 18 specialists and an extension, built from the shared holyagent runtime."
 
 /**
  * The runtime entry the package bundles as `scripts/holyagent.js`: the CLI, plus the `config`
@@ -39,7 +44,7 @@ export const DESCRIPTION =
 export const RUNTIME_SOURCE = "packages/runtime/src/hooks/pi-entry.ts"
 
 /** The folders and files of the built package, which its manifest lists as the package's files. */
-export const PACKAGE_FILES: ReadonlyArray<string> = ["extensions", "scripts", "skills"]
+export const PACKAGE_FILES: ReadonlyArray<string> = ["agents", "extensions", "scripts", "skills"]
 
 // The wrapper and its empty Bun config are the Claude plugin's, shared so the two cannot differ.
 const WRAPPER_SOURCE = "packages/integrations/claude/src/wrapper.sh"
@@ -60,8 +65,9 @@ const inPackage = (path: string) => `${DIST_DIRECTORY}/${path}`
 /**
  * The manifest of the built package. The `pi-package` keyword makes it a Pi package, and the `pi`
  * key lists its resource folders, relative to the package root, which is where a `pi install` of
- * the built folder looks. Every host module is a peer dependency with the range `*`, as Pi's
- * package documentation requires.
+ * the built folder looks; Pi ignores `pi.subagents`, which `@tintinweb/pi-subagents` reads for the
+ * folder of specialist agent files. Every host module is a peer dependency with the range `*`, as
+ * Pi's package documentation requires.
  */
 export const manifest = (): GeneratedFile => ({
   path: inPackage("package.json"),
@@ -74,7 +80,12 @@ export const manifest = (): GeneratedFile => ({
     type: "module",
     keywords: ["pi-package"],
     files: PACKAGE_FILES,
-    pi: { extensions: ["./extensions"], skills: ["./skills"] },
+    pi: {
+      extensions: ["./extensions"],
+      skills: ["./skills"],
+      // `@tintinweb/pi-subagents` loads the specialists from the folder this key names.
+      subagents: { agents: ["./agents"] },
+    },
     peerDependencies: packageJson.peerDependencies,
   }),
 })
@@ -98,8 +109,6 @@ const extension = async (): Promise<GeneratedFile> => ({
   path: inPackage(EXTENSION_OUTPUT),
   content: await bundleExtension(join(REPOSITORY, EXTENSION_SOURCE), EXTENSION_SOURCE),
 })
-
-const readSource = (path: string): Promise<string> => Bun.file(join(REPOSITORY, path)).text()
 
 /**
  * The runtime as one file for Bun, like the Claude plugin's `holyagent.js`: Bun's module comments
@@ -147,6 +156,10 @@ const skills = async (family: Family): Promise<ReadonlyArray<GeneratedFile>> =>
 
 /** Every generated file of the package for a model family, in path order. */
 export const generate = async (family: Family = PI_FAMILY): Promise<ReadonlyArray<GeneratedFile>> =>
-  [manifest(), await extension(), ...(await scripts()), ...(await skills(family))].toSorted(
-    (a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0),
-  )
+  [
+    manifest(),
+    await extension(),
+    ...(await agentFiles(family)),
+    ...(await scripts()),
+    ...(await skills(family)),
+  ].toSorted((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))

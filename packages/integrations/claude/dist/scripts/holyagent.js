@@ -8252,7 +8252,7 @@ var PI_WORDS = {
   workflowAgentPrefix: PI_WORKFLOW_AGENT_PREFIX,
   journal: "workflow run's journal",
   recordNote: "the pi launcher records no agent by hook: the launcher glue or the root records each agent, with the ID the Agent tool returns, including a continued one",
-  reportsNote: "under the pi host this reads Claude workflow journals only for now",
+  reportsNote: "under the pi host the file is a <run id>.workflow.jsonl of @tintinweb/pi-subagents, whose entries are matched to Assignments by the key of their dispatched call, or the root session file, which holds the record of each Assignment recorded as pi:<agent-id>; an entry that failed, has no text or matches no call is listed with the run and its index",
   agentIdNote: "under the pi host an agent is recorded as pi:<agent-id>, the ID the Agent tool returns (strip pi: to message it), and a workflow's agent as pi-workflow:<run-id>/<id>, with the run ID and the label the script gave the agent (the Assignment id); any other form is refused"
 };
 var wordsFor = (host) => host === "pi" ? PI_WORDS : CLAUDE_WORDS;
@@ -11685,12 +11685,14 @@ var readInput = (host, schema, inline) => readInputBy(host, () => schema, inline
 import { rm as rm4 } from "fs/promises";
 import { isAbsolute, join as join5, resolve as resolve3 } from "path";
 var folderFor = (call, name) => gitMaybe(["rev-parse", "--path-format=absolute", "--git-common-dir"]).pipe(provide3(call.vcs), map4((common) => common !== undefined && isAbsolute(common) ? join5(resolve3(common), "holyagent", name) : localFile(call.directory, name)));
+var pathIn = (call, name, assignmentId) => folderFor(call, name).pipe(map4((folder) => join5(folder, `${assignmentId}.md`)));
 var writeNamed = (call, name, assignmentId, text) => gen2(function* () {
-  const path = join5(yield* folderFor(call, name), `${assignmentId}.md`);
+  const path = yield* pathIn(call, name, assignmentId);
   yield* io(path, () => Bun.write(path, `${text}
 `));
   return path;
 });
+var briefPath = (call, assignmentId) => pathIn(call, "briefs", assignmentId);
 var writeBrief = (call, assignmentId, brief) => writeNamed(call, "briefs", assignmentId, brief);
 var writeReport = (call, assignmentId, report) => writeNamed(call, "reports", assignmentId, report);
 var removeFiles = (call, assignmentIds) => forEach2(["briefs", "reports"], (name) => folderFor(call, name)).pipe(flatMap2((folders) => forEach2(folders.flatMap((folder) => assignmentIds.map((id) => join5(folder, `${id}.md`))), (path) => io(path, () => rm4(path, { force: true })).pipe(as2(undefined), catch_2((error) => succeed6(error.message))))), map4((lines) => lines.filter((line) => line !== undefined)));
@@ -12198,7 +12200,7 @@ var VCS_COMMANDS = [
   }
 ];
 
-import { resolve as resolve4 } from "path";
+import { basename as basename3, resolve as resolve4 } from "path";
 
 var AcceptanceInput = Struct({
   rationale: Text,
@@ -12492,6 +12494,166 @@ var renderJsonReport = (report) => [
 ].join(`
 `);
 
+import { basename as basename2 } from "path";
+
+var KEY_LENGTH = 32;
+var journalKey = (input) => new Bun.CryptoHasher("sha256").update(JSON.stringify([
+  input.prompt,
+  input.label ?? null,
+  input.model ?? null,
+  input.agentType ?? null,
+  input.effort ?? null,
+  input.isolation ?? null,
+  input.gate ?? null,
+  input.resume ?? null,
+  ...input.schema !== undefined ? [input.schema] : []
+])).digest("hex").slice(0, KEY_LENGTH);
+
+class InvalidPiRecord extends TaggedError2("InvalidPiRecord") {
+  get message() {
+    return `${this.source}: ${this.detail}`;
+  }
+}
+var JournalEntry = Struct({
+  index: Int.check(isGreaterThanOrEqualTo2(0)),
+  key: String4,
+  ok: Boolean3,
+  text: optionalKey2(String4),
+  resumed: optionalKey2(Literal2(true))
+});
+var JournalLine = fromJsonString2(JournalEntry);
+var decodePiJournal = (journal, source) => gen2(function* () {
+  const entries = [];
+  for (const [at, line] of journal.split(/\r?\n/).entries()) {
+    if (line.trim() === "")
+      continue;
+    entries.push(yield* decodeUnknownEffect2(JournalLine)(line, { onExcessProperty: "error" }).pipe(mapError2((error) => new InvalidPiRecord({
+      source,
+      detail: `line ${at + 1} is not a workflow journal entry: ${error.message}`
+    }))));
+  }
+  return entries.toSorted((a, b) => a.index - b.index);
+});
+var nonEmpty = (text) => text !== undefined && text.trim() !== "";
+var matchJournal = (entries, expected) => {
+  const idOf = new Map(expected.map(({ id, key }) => [key, id]));
+  const last = new Map;
+  const unmatched = [];
+  for (const entry of entries) {
+    const id = idOf.get(entry.key);
+    if (id !== undefined)
+      last.set(id, entry);
+    else
+      unmatched.push({
+        index: entry.index,
+        id: undefined,
+        reason: !entry.ok ? "failed" : nonEmpty(entry.text) ? "unmatched" : "empty"
+      });
+  }
+  const reports = [];
+  const notReported = [...unmatched];
+  for (const [id, entry] of last)
+    if (entry.ok && nonEmpty(entry.text))
+      reports.push({ id, index: entry.index, report: entry.text });
+    else
+      notReported.push({ index: entry.index, id, reason: entry.ok ? "empty" : "failed" });
+  return {
+    reports: reports.toSorted((a, b) => a.index - b.index),
+    notReported: notReported.toSorted((a, b) => a.index - b.index)
+  };
+};
+var AGENT_RECORD_ENTRY_TYPE = "subagents:record";
+var AgentRecordData = Struct({
+  id: String4,
+  type: String4,
+  description: String4,
+  status: Literals([
+    "queued",
+    "running",
+    "completed",
+    "steered",
+    "aborted",
+    "stopped",
+    "error"
+  ]),
+  result: optionalKey2(String4),
+  error: optionalKey2(String4),
+  startedAt: Number5,
+  completedAt: optionalKey2(Number5),
+  sessionFile: optionalKey2(String4),
+  handle: optionalKey2(String4),
+  alias: optionalKey2(String4),
+  worktreeLost: optionalKey2(Boolean3)
+});
+var RecordEntry = Struct({
+  type: Literal2("custom"),
+  customType: Literal2(AGENT_RECORD_ENTRY_TYPE),
+  data: AgentRecordData,
+  id: String4,
+  parentId: NullOr(String4),
+  timestamp: String4
+});
+var RecordLine = fromJsonString2(RecordEntry);
+var SessionLine = fromJsonString2(Struct({ type: String4, customType: optionalKey2(String4) }));
+
+class PiRecordMissing extends TaggedError2("PiRecordMissing") {
+  get message() {
+    return `${this.source} holds no ${AGENT_RECORD_ENTRY_TYPE} entry for agent ${this.agentId}: it is still running, was evicted before it was persisted, or belongs to another session`;
+  }
+}
+var agentRecordIn = (session, source, agentId) => gen2(function* () {
+  let found;
+  for (const [at, line] of session.split(/\r?\n/).entries()) {
+    if (!line.includes(AGENT_RECORD_ENTRY_TYPE))
+      continue;
+    const probe = yield* decodeUnknownEffect2(SessionLine)(line).pipe(option2);
+    if (probe._tag === "None" || probe.value.type !== "custom" || probe.value.customType !== AGENT_RECORD_ENTRY_TYPE)
+      continue;
+    const { data } = yield* decodeUnknownEffect2(RecordLine)(line, {
+      onExcessProperty: "error"
+    }).pipe(mapError2((error) => new InvalidPiRecord({
+      source,
+      detail: `line ${at + 1} is not a ${AGENT_RECORD_ENTRY_TYPE} entry: ${error.message}`
+    })));
+    if (data.id === agentId)
+      found = data;
+  }
+  return found ?? (yield* new PiRecordMissing({ source, agentId }));
+});
+var STATUS_OF = {
+  ok: { status: "done", close: "success" },
+  error: { status: "failed", close: "errored" },
+  length: { status: "failed", close: "errored" },
+  empty: { status: "failed", close: "errored" },
+  exit: { status: "failed", close: "errored" },
+  aborted: { status: "failed", close: "errored" },
+  stopped: { status: "interrupted", close: "stopped" }
+};
+var assignmentStatusOf = (outcome) => STATUS_OF[outcome];
+var outcomeOfRecord = (record) => {
+  switch (record.status) {
+    case "completed":
+    case "steered":
+      return nonEmpty(record.result) ? "ok" : "empty";
+    case "error":
+    case "aborted":
+    case "stopped":
+      return record.status;
+    case "queued":
+    case "running":
+      return "exit";
+  }
+};
+var piRecordReport = (session, source, agentId) => agentRecordIn(session, source, agentId).pipe(map4((record) => {
+  const outcome = outcomeOfRecord(record);
+  return {
+    ended: outcome,
+    ...assignmentStatusOf(outcome),
+    report: outcome === "ok" ? record.result : undefined,
+    error: record.error
+  };
+}));
+
 var EVIDENCE_HEADING = /^\s*evidence:\s*$/i;
 var indentOf = (line) => line.length - line.trimStart().length;
 var LIST_MARKER = /^(?:[-*+\u2022]\s+|\d+[.)]\s+|\[[ xX]\]\s+)+/;
@@ -12649,7 +12811,7 @@ var Resulted = Struct({
 var Other = Struct({
   type: String4.check(isPattern2(/^(?!(?:started|result)$)/))
 });
-var JournalLine = fromJsonString2(Union2([Started, Resulted, Other]));
+var JournalLine2 = fromJsonString2(Union2([Started, Resulted, Other]));
 var journalResults = (journal, source) => gen2(function* () {
   const labels = new Map;
   const results = [];
@@ -12657,7 +12819,7 @@ var journalResults = (journal, source) => gen2(function* () {
   for (const [index, line] of lines.entries()) {
     if (line.trim() === "")
       continue;
-    const entry = yield* decodeUnknownEffect2(JournalLine)(line, {
+    const entry = yield* decodeUnknownEffect2(JournalLine2)(line, {
       onExcessProperty: "ignore"
     }).pipe(mapError2((error) => new Usage({
       message: `Line ${index + 1} of the journal ${source} is not a started or result entry: ${error.message}`,
@@ -12674,6 +12836,43 @@ var journalResults = (journal, source) => gen2(function* () {
   }
   return results;
 });
+var dispatchedCall = (assignment, agent, briefPath) => {
+  const { agent: agentType, model, effort } = routeFor(assignment.roleTask);
+  return {
+    id: assignment.id,
+    key: journalKey({
+      prompt: dispatchPrompt(assignment, agent, briefPath, PI_WORDS),
+      label: assignment.id,
+      model,
+      agentType,
+      effort
+    })
+  };
+};
+var refused = (hint) => (error) => new Usage({ message: error.message, hint });
+var piJournalReports = (journal, source, calls) => decodePiJournal(journal, source).pipe(mapError2(refused("Pass the <run id>.workflow.jsonl of the workflow run, unedited.")), map4((entries) => {
+  const { reports, notReported } = matchJournal(entries, calls);
+  const run = basename2(source).replace(/\.workflow\.jsonl$/, "");
+  return {
+    reports: reports.map(({ id, report }) => ({ id, report })),
+    notAssignmentIds: notReported.map(({ id, index, reason }) => ({
+      label: id ?? "",
+      agentId: `${run}#${index} ${reason}`
+    }))
+  };
+}));
+var piRecordReports = (session, source, agents) => gen2(function* () {
+  const reports = [];
+  const notAssignmentIds = [];
+  for (const { id, agentId } of agents) {
+    const found = yield* piRecordReport(session, source, agentId.replace(/^pi:/, "")).pipe(catchTag2("PiRecordMissing", () => succeed6(undefined)));
+    if (found?.report !== undefined)
+      reports.push({ id, report: found.report });
+    else
+      notAssignmentIds.push({ label: id, agentId: `${agentId} ${found?.ended ?? "missing"}` });
+  }
+  return { reports, notAssignmentIds };
+}).pipe(mapError2(refused("Pass the root session file of the Pi session, unedited.")));
 
 class WithTrailer {
   fields;
@@ -12727,8 +12926,9 @@ var withPlanned = (snapshot, input, id, now) => completeDraft(snapshot, input).p
   ...snapshot.project,
   assignments: [...snapshot.project.assignments, assignment]
 })));
-var directiveView = (directive) => directive.action === "continue" ? { continue: directive.agentId, reason: directive.reason } : {
-  agent: `${PLUGIN_NAMESPACE}:${directive.agent}`,
+var agentTypeFor = (host, agent) => host === "pi" ? agent : `${PLUGIN_NAMESPACE}:${agent}`;
+var directiveView = (directive, host) => directive.action === "continue" ? { continue: directive.agentId, reason: directive.reason } : {
+  agent: agentTypeFor(host, directive.agent),
   model: directive.model,
   effort: directive.effort,
   reason: directive.reason
@@ -12793,6 +12993,28 @@ var agentIdProblem = (agentId, id, host) => {
     return /^\S+$/.test(agentId.slice(PI_AGENT_PREFIX.length)) ? undefined : `A pi agent is recorded as ${PI_AGENT_PREFIX}<agent-id>`;
   return host === "pi" ? piAgentProblem(id) : undefined;
 };
+var claudeReports = (journal, source) => gen2(function* () {
+  const results = yield* journalResults(journal, source);
+  const byId = new Map;
+  const notAssignmentIds = [];
+  for (const { label, agentId, report } of results) {
+    if (label !== undefined && is2(AssignmentId)(label))
+      byId.set(label, report);
+    else
+      notAssignmentIds.push({ label: label ?? "", agentId });
+  }
+  return { reports: [...byId].map(([id, report]) => ({ id, report })), notAssignmentIds };
+});
+var piReports = (call, source, text) => gen2(function* () {
+  const { project } = yield* readState(call.directory);
+  if (!basename3(source).endsWith(".workflow.jsonl"))
+    return yield* piRecordReports(text, source, project.assignments.flatMap(({ id, specialist }) => {
+      const agentId = specialist?.agentId;
+      return agentId?.startsWith(PI_AGENT_PREFIX) === true ? [{ id, agentId }] : [];
+    }));
+  const calls = yield* forEach2(project.assignments, (assignment) => briefPath(call, assignment.id).pipe(map4((path) => dispatchedCall(assignment, agentTypeFor("pi", routeFor(assignment.roleTask).agent), path))));
+  return yield* piJournalReports(text, source, calls);
+});
 var ASSIGNMENT_COMMANDS = [
   {
     path: ["assignment", "create"],
@@ -12832,7 +13054,7 @@ var ASSIGNMENT_COMMANDS = [
         const id = "id" in request ? request.id : newAssignmentId;
         const project = "id" in request ? snapshot.project : yield* withPlanned(snapshot, request, id, now);
         const dispatched = yield* dispatch(project, snapshot.specialists, id, now, settings, workTreeKey(call.root));
-        const agent = `${PLUGIN_NAMESPACE}:${routeFor(dispatched.assignment.roleTask).agent}`;
+        const agent = agentTypeFor(settings.host, routeFor(dispatched.assignment.roleTask).agent);
         const path = yield* writeBrief(call, dispatched.assignment.id, renderPrompt(dispatched.assignment, agent));
         return {
           ...dispatched,
@@ -12842,7 +13064,7 @@ var ASSIGNMENT_COMMANDS = [
       return new WithTrailer({
         id: started.assignment.id,
         state: started.assignment.state,
-        ...directiveView(started.directive)
+        ...directiveView(started.directive, settings.host)
       }, "prompt", started.prompt);
     })
   },
@@ -12955,18 +13177,10 @@ var ASSIGNMENT_COMMANDS = [
     state: "peek",
     run: (call) => gen2(function* () {
       const source = resolve4(call.cwd, idArgument(call.args.positionals));
-      const journal = yield* io(source, () => Bun.file(source).text());
-      const results = yield* journalResults(journal, source);
-      const byId = new Map;
-      const strays = [];
-      for (const { label, agentId, report } of results) {
-        if (label !== undefined && is2(AssignmentId)(label))
-          byId.set(label, { report });
-        else
-          strays.push({ label: label ?? "", agentId });
-      }
-      const reports = yield* forEach2([...byId], ([id, { report }]) => writeReport(call, id, report).pipe(map4((path) => ({ id, path, words: wordCount(report) }))));
-      return { reports, notAssignmentIds: strays };
+      const text = yield* io(source, () => Bun.file(source).text());
+      const found = (yield* call.config).host === "pi" ? yield* piReports(call, source, text) : yield* claudeReports(text, source);
+      const reports = yield* forEach2(found.reports, ({ id, report }) => writeReport(call, id, report).pipe(map4((path) => ({ id, path, words: wordCount(report) }))));
+      return { reports, notAssignmentIds: found.notAssignmentIds };
     })
   },
   {
@@ -13141,7 +13355,7 @@ var projectSettingsFiles = fn2("projectSettingsFiles")(function* (cwd) {
 });
 
 import { chmod, mkdir as mkdir3, realpath as realpath4, rename as rename4, rm as rm5, writeFile } from "fs/promises";
-import { basename as basename2, dirname as dirname4, join as join11 } from "path";
+import { basename as basename4, dirname as dirname4, join as join11 } from "path";
 var JsonObjectText = fromJsonString2(Record(String4, Unknown2), {
   space: 2
 });
@@ -13173,7 +13387,7 @@ var replaceJsonObject = (path, value, options, unchangedSince) => gen2(function*
   const mode = options?.mode ?? (exists ? (yield* fileOperation(target, "write", () => Bun.file(target).stat())).mode & 511 : undefined);
   const text = (yield* encodeEffect(JsonObjectText)(value, strict2).pipe(mapError2((error) => new SetupFailure({ message: `cannot encode ${path}: ${error.message}` })))) + `
 `;
-  const temporary = join11(dirname4(target), `.${basename2(target)}.${process.pid}.tmp`);
+  const temporary = join11(dirname4(target), `.${basename4(target)}.${process.pid}.tmp`);
   yield* fileOperation(dirname4(target), "write", () => mkdir3(dirname4(target), { recursive: true }));
   yield* tryPromise2({
     try: () => writeFile(temporary, text, { flag: "wx", ...mode === undefined ? {} : { mode } }),

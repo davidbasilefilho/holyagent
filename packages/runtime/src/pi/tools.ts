@@ -184,6 +184,24 @@ export const BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.j
 export const PI_SETTINGS_FILE = "~/.pi/agent/settings.json"
 
 /**
+ * The settings file of `@tintinweb/pi-subagents`: the package reads `subagents.json` from Pi's
+ * agent directory (`getAgentDir()`, which is `PI_CODING_AGENT_DIR` when set) as its global
+ * defaults.
+ */
+export const SUBAGENTS_SETTINGS_FILE = "~/.pi/agent/subagents.json"
+
+/**
+ * The package settings that let only the specialists launch: `disableDefaultAgents` leaves out the
+ * package's own `general-purpose`, `Explore` and `Plan`, and `fallbackSubagent: "none"` makes a
+ * `subagent_type` that names no enabled agent fail instead of falling back to `general-purpose`
+ * (whose tool set is not a specialist's).
+ */
+export const SUBAGENTS_ONLY_SPECIALISTS = {
+  disableDefaultAgents: true,
+  fallbackSubagent: "none",
+} as const
+
+/**
  * What setup writes so the decided tool settings hold, as data; it writes nothing itself. Empty
  * with `pi.enable` off. A switched-off feature adds nothing, since its package is not loaded:
  *
@@ -191,6 +209,8 @@ export const PI_SETTINGS_FILE = "~/.pi/agent/settings.json"
  *   the provider's (they are off by default);
  * - The codemode mode (`pi.codemode.mode`, `only` by default) in Pi's settings, since no command-line
  *   argument sets it;
+ * - The package's `subagents.json` ({@link SUBAGENTS_ONLY_SPECIALISTS}) while `pi.features.subagents`
+ *   is on, so only the 18 specialists the package ships can launch;
  * - Billion Context's own `acp_delegate` subagents off while context compression stays on, because
  *   `@tintinweb/pi-subagents` runs the specialists. This is the one setting the package's README
  *   gives for it, "Pi built-in subagents": merge `{"pi":{"subagents":false}}` into
@@ -216,6 +236,9 @@ export const toolSettings = (
             },
           },
         ]
+      : []),
+    ...(features.subagents
+      ? [{ file: SUBAGENTS_SETTINGS_FILE, content: SUBAGENTS_ONLY_SPECIALISTS }]
       : []),
     ...(features.contextCompression
       ? [{ file: BILLION_CONTEXT_FILE, content: { pi: { subagents: false } } }]

@@ -250,15 +250,15 @@ describe("help under each host", () => {
     )
   })
 
-  test("under pi no help says a hook records agents, and reports reads Claude journals only", async () => {
+  test("under pi no help says a hook records agents, and reports reads pi journals and session records", async () => {
     const record = (await cli(["help", "assignment", "record"], undefined, PI)).stdout
     expect(record).not.toContain("a hook records")
     expect(record).toContain("the pi launcher records no agent by hook")
     const reports = (await cli(["help", "assignment", "reports"], undefined, PI)).stdout
-    expect(reports).toContain("reads Claude workflow journals only for now")
+    expect(reports).toContain("<run id>.workflow.jsonl of @tintinweb/pi-subagents")
     const claude = (await cli(["help", "assignment", "record"])).stdout
     expect(claude).toContain("a hook records an agent spawned from a dispatch prompt")
-    expect((await cli(["help", "assignment", "reports"])).stdout).not.toContain("for now")
+    expect((await cli(["help", "assignment", "reports"])).stdout).not.toContain("workflow.jsonl")
   })
 
   test("the Claude hooks are not listed under pi, the git hook is", async () => {
@@ -306,7 +306,8 @@ describe("dispatch and the hints under the pi host", () => {
     await createIntent()
     const result = await cli(["assignment", "dispatch"], writer, PI)
     const dispatched = data(result)
-    expect(dispatched).toMatchObject({ state: "Running", agent: "holyagent:worker-implementation" })
+    // Pi ships the agents under the bare name, which the root passes as the agent type.
+    expect(dispatched).toMatchObject({ state: "Running", agent: "worker-implementation" })
     expect(String(dispatched.prompt)).toMatch(
       /with the read tool and follow it as your full task\.$/,
     )
@@ -419,7 +420,7 @@ describe("agent ids", () => {
     const next = data(
       await cli(["assignment", "dispatch"], { ...writer, objective: "Fix it", followUpOf: id }, PI),
     )
-    expect(next).toMatchObject({ agent: "holyagent:worker-implementation" })
+    expect(next).toMatchObject({ agent: "worker-implementation" })
     expect(next).not.toHaveProperty("continue")
   })
 

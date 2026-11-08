@@ -1,4 +1,4 @@
-import { resolve } from "node:path"
+import { basename, resolve } from "node:path"
 
 import { Effect, Schema } from "effect"
 
@@ -26,13 +26,21 @@ import { io } from "../state/files.ts"
 import { workTreeKey } from "../state/local.ts"
 import { readState, type Snapshot } from "../state/store.ts"
 import { booleanFlag, choiceFlag, requiredFlag, stringFlag } from "./args.ts"
-import { writeBrief, writeReport } from "./brief.ts"
+import { briefPath, writeBrief, writeReport } from "./brief.ts"
 import { agentHostOf } from "./config.ts"
 import { nowIso } from "./context.ts"
 import { AgentMismatch, Usage } from "./errors.ts"
 import { resolveIntent } from "./intent.ts"
 import { JsonReport, renderJsonReport } from "./jsonreport.ts"
-import { acceptanceFrom, dispatchPrompt, journalResults, renderPrompt } from "./report.ts"
+import {
+  acceptanceFrom,
+  dispatchedCall,
+  dispatchPrompt,
+  journalResults,
+  piJournalReports,
+  piRecordReports,
+  renderPrompt,
+} from "./report.ts"
 import { type Call, type Command, WithTrailer } from "./types.ts"
 import { assignmentRow, assignmentView, byId, present } from "./views.ts"
 
@@ -84,11 +92,19 @@ const withPlanned = (
     })),
   )
 
-const directiveView = (directive: Directive) =>
+/**
+ * The agent type a dispatch prints for a route's agent: Claude names it under the plugin namespace
+ * (`holyagent:worker-implementation`); the Pi package ships the agents under the bare name, which
+ * is what the Pi root passes as `agentType`, and so what the journal key hashes.
+ */
+const agentTypeFor = (host: AgentHost, agent: string): string =>
+  host === "pi" ? agent : `${PLUGIN_NAMESPACE}:${agent}`
+
+const directiveView = (directive: Directive, host: AgentHost) =>
   directive.action === "continue"
     ? { continue: directive.agentId, reason: directive.reason }
     : {
-        agent: `${PLUGIN_NAMESPACE}:${directive.agent}`,
+        agent: agentTypeFor(host, directive.agent),
         model: directive.model,
         effort: directive.effort,
         reason: directive.reason,
@@ -205,6 +221,46 @@ const agentIdProblem = (agentId: string, id: string, host: AgentHost): string | 
   return host === "pi" ? piAgentProblem(id) : undefined
 }
 
+/** The results of a Claude workflow journal: one report per Assignment label, the rest listed. */
+const claudeReports = (journal: string, source: string) =>
+  Effect.gen(function* () {
+    const results = yield* journalResults(journal, source)
+    const byId = new Map<string, string>()
+    const notAssignmentIds: Array<{ label: string; agentId: string }> = []
+    for (const { label, agentId, report } of results) {
+      if (label !== undefined && Schema.is(AssignmentId)(label)) byId.set(label, report)
+      else notAssignmentIds.push({ label: label ?? "", agentId })
+    }
+    return { reports: [...byId].map(([id, report]) => ({ id, report })), notAssignmentIds }
+  })
+
+/**
+ * The reports of a pi source: a `<run id>.workflow.jsonl` is matched to the Assignments by the key
+ * of their dispatched calls, and any other file is the root session, which holds the record of each
+ * Assignment recorded as `pi:<agent-id>`.
+ */
+const piReports = (call: Call, source: string, text: string) =>
+  Effect.gen(function* () {
+    const { project } = yield* readState(call.directory)
+    if (!basename(source).endsWith(".workflow.jsonl"))
+      return yield* piRecordReports(
+        text,
+        source,
+        project.assignments.flatMap(({ id, specialist }) => {
+          const agentId = specialist?.agentId
+          return agentId?.startsWith(PI_AGENT_PREFIX) === true ? [{ id, agentId }] : []
+        }),
+      )
+    const calls = yield* Effect.forEach(project.assignments, (assignment) =>
+      briefPath(call, assignment.id).pipe(
+        Effect.map((path) =>
+          dispatchedCall(assignment, agentTypeFor("pi", routeFor(assignment.roleTask).agent), path),
+        ),
+      ),
+    )
+    return yield* piJournalReports(text, source, calls)
+  })
+
 /** The `assignment` commands. */
 export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
   {
@@ -272,7 +328,10 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
             )
             // Written before the transition commits, so a brief that cannot be stored leaves the
             // Assignment Ready instead of Running with no prompt to send.
-            const agent = `${PLUGIN_NAMESPACE}:${routeFor(dispatched.assignment.roleTask).agent}`
+            const agent = agentTypeFor(
+              settings.host,
+              routeFor(dispatched.assignment.roleTask).agent,
+            )
             const path = yield* writeBrief(
               call,
               dispatched.assignment.id,
@@ -288,7 +347,7 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
           {
             id: started.assignment.id,
             state: started.assignment.state,
-            ...directiveView(started.directive),
+            ...directiveView(started.directive, settings.host),
           },
           "prompt",
           started.prompt,
@@ -463,20 +522,17 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
     run: (call) =>
       Effect.gen(function* () {
         const source = resolve(call.cwd, idArgument(call.args.positionals))
-        const journal = yield* io(source, () => Bun.file(source).text())
-        const results = yield* journalResults(journal, source)
-        const byId = new Map<string, { readonly report: string }>()
-        const strays: Array<{ label: string; agentId: string }> = []
-        for (const { label, agentId, report } of results) {
-          if (label !== undefined && Schema.is(AssignmentId)(label)) byId.set(label, { report })
-          else strays.push({ label: label ?? "", agentId })
-        }
-        const reports = yield* Effect.forEach([...byId], ([id, { report }]) =>
+        const text = yield* io(source, () => Bun.file(source).text())
+        const found =
+          (yield* call.config).host === "pi"
+            ? yield* piReports(call, source, text)
+            : yield* claudeReports(text, source)
+        const reports = yield* Effect.forEach(found.reports, ({ id, report }) =>
           writeReport(call, id, report).pipe(
             Effect.map((path) => ({ id, path, words: wordCount(report) })),
           ),
         )
-        return { reports, notAssignmentIds: strays }
+        return { reports, notAssignmentIds: found.notAssignmentIds }
       }),
   },
   {

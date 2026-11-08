@@ -36,7 +36,12 @@
     ],
     "skills": [
       "./packages/integrations/pi/dist/skills"
-    ]
+    ],
+    "subagents": {
+      "agents": [
+        "./packages/integrations/pi/dist/agents"
+      ]
+    }
   },
   "trustedDependencies": [
     "@anthropic-ai/claude-code",

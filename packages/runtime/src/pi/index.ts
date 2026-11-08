@@ -1,4 +1,5 @@
 export * from "./catalog.ts"
+export * from "./journal.ts"
 export * from "./provider.ts"
 export * from "./readiness.ts"
 export * from "./tools.ts"

@@ -8464,18 +8464,20 @@ class InstructionsError extends TaggedError2("InstructionsError") {
 var MATERIALITY_MARKER = "<!-- materiality -->";
 var DESIGN_CORE_MARKER = "<!-- design-core -->";
 var MARKERS = new Set([MATERIALITY_MARKER, DESIGN_CORE_MARKER]);
+var LIST_ITEM_START = String.raw`\n[ \t]*(?:[-+*]|\d{1,9}[.)])(?:[ \t]|\r?(?:\n|$))`;
 var CODE_OR_COMMENT = new RegExp([
+  String.raw`(?:(?<![\s\S])|(?<=\n[ \t]*\r?\n))(?: {4}|\t)[ \t]*[^\s][^\n]*(?:\n(?:[ \t]*\r?\n)*(?: {4}|\t)[ \t]*[^\s][^\n]*)*`,
   String.raw`^ {0,3}(\x60{3,})[^\x60\n]*(?:\n[\s\S]*?)?(?:\n {0,3}\1\x60*[ \t]*\r?(?=\n|$)|(?![\s\S]))`,
   String.raw`^ {0,3}(~{3,})[^\n]*(?:\n[\s\S]*?)?(?:\n {0,3}\2~*[ \t]*\r?(?=\n|$)|(?![\s\S]))`,
-  String.raw`(?<!\x60)(\x60+)(?!\x60)(?:(?!\n[ \t]*\r?\n)[\s\S])*?(?<!\x60)\3(?!\x60)`,
-  String.raw`[ \t]*<!--[\s\S]*?-->`
+  String.raw`(?<!\x60)(\x60+)(?!\x60)(?:(?!\n[ \t]*\r?\n)(?!${LIST_ITEM_START})[\s\S])*?(?<!\x60)\3(?!\x60)`,
+  String.raw`([ \t]*<!--[\s\S]*?-->)`
 ].join("|"), "gm");
 var REMOVED_LINE = "\x00";
 var isBlank = (line) => line !== undefined && /^[ \t]*\r?$/.test(line);
 var isRemoved = (line) => line !== undefined && line.startsWith(REMOVED_LINE) && isBlank(line.slice(REMOVED_LINE.length));
 var stripCitations = (text) => {
-  const marked = text.replace(CODE_OR_COMMENT, (match, _fence, _tilde, _span, offset) => {
-    if (!match.trimStart().startsWith("<!--") || MARKERS.has(match.trim()))
+  const marked = text.replace(CODE_OR_COMMENT, (match, _fence, _tilde, _span, comment, offset) => {
+    if (comment === undefined || MARKERS.has(match.trim()))
       return match;
     const alone = (offset === 0 || text[offset - 1] === `
 `) && /^[ \t]*\r?(?:\n|$)/.test(text.slice(offset + match.length));
@@ -8495,6 +8497,8 @@ var stripCitations = (text) => {
       above--;
     return !(above === 0 || isBlank(lines[above - 1]));
   });
+  if (isRemoved(lines[lines.length - 1]))
+    kept.push("");
   return kept.join(`
 `);
 };
@@ -8650,6 +8654,75 @@ var routeFor = (roleTask) => ({
   ...SPECS[roleTask]
 });
 var ROUTES = RoleTask.literals.map(routeFor);
+var PROVIDERS = {
+  "kimi-coding-global": {
+    id: "kimi-coding",
+    package: "pi-provider-kimi-code",
+    env: { KIMI_CODE_REGION: "global" },
+    loginFix: "Run /login kimi-coding in Pi, or set KIMI_API_KEY",
+    webTools: ["moonshot_search", "moonshot_fetch"],
+    toolsFile: "~/.pi/providers/kimi-coding/config.json"
+  }
+};
+var providerProfile = (config) => PROVIDERS[config.pi.provider];
+var WEB_KIT_TOOLS = ["web_search", "web_fetch"];
+var webChoice = (profile, mode) => mode === "off" ? { source: "off", tools: [] } : mode === "provider" && profile.webTools.length > 0 ? { source: "provider", tools: profile.webTools } : { source: "pi-web-kit", tools: WEB_KIT_TOOLS };
+
+var READ_TOOLS = ["read", "grep", "find", "ls"];
+var WRITE_TOOLS = ["write", "edit", "bash"];
+var SHELL_TOOLS = ["bash"];
+var CODEMODE_ENTRY = "+codemode";
+var CODEMODE_TOOL = "codemode";
+var CODEMODE_MAX_WORKERS_ENV = "PI_CODEMODE_MAX_WORKERS";
+var T3_PREFIX = "mcp__t3*code__";
+var T3_VISUAL_TOOLS = [
+  `${T3_PREFIX}preview_*`,
+  `${T3_PREFIX}t3_preview_*`,
+  `${T3_PREFIX}html_render`,
+  `${T3_PREFIX}html_preview`,
+  `${T3_PREFIX}device_*`
+];
+var COMPUTER_USE_TOOLS = ["computer_use_*"];
+var build = (tools, excludeTools, noMcp, maxWorkers) => ({
+  tools,
+  excludeTools,
+  noMcp,
+  env: { [CODEMODE_MAX_WORKERS_ENV]: String(maxWorkers) },
+  argv: [
+    "--tools",
+    tools.join(","),
+    ...excludeTools.length > 0 ? ["--exclude-tools", excludeTools.join(",")] : [],
+    ...noMcp ? ["--no-mcp"] : []
+  ]
+});
+var has = (capabilities, capability) => capabilities.includes(capability);
+var toolArgs = (config, key, profile = providerProfile(config)) => {
+  const { features } = config.pi;
+  const noMcp = !features.mcp;
+  const { maxWorkers } = config.pi.codemode;
+  if (key === "root") {
+    const excluded = [
+      "write",
+      "edit",
+      ...features.computerUse ? COMPUTER_USE_TOOLS : [],
+      ...webChoice(profile, features.web).tools
+    ];
+    return build([CODEMODE_ENTRY], excluded, noMcp, maxWorkers);
+  }
+  const { capabilities, roleTask } = routeFor(key);
+  const tools = [
+    ...READ_TOOLS,
+    ...has(capabilities, "Write") ? WRITE_TOOLS : [],
+    ...has(capabilities, "Shell") || roleTask === "Reviewer.code" ? SHELL_TOOLS : [],
+    ...has(capabilities, "Search") ? webChoice(profile, features.web).tools : [],
+    ...has(capabilities, "VisualInspection") ? [
+      ...features.mcp ? T3_VISUAL_TOOLS : [],
+      ...features.computerUse ? COMPUTER_USE_TOOLS : []
+    ] : []
+  ];
+  const unique = [...new Set(tools)];
+  return build([...unique, CODEMODE_TOOL], WRITE_TOOLS.filter((tool) => !unique.includes(tool)), noMcp, maxWorkers);
+};
 
 var Slug = String4.check(isPattern2(/^(?:[a-z0-9]+(?:-[a-z0-9]+)*)?$/));
 
@@ -8660,12 +8733,60 @@ var TRACKED_STATE_PATHSPEC = [
   `:(exclude)${STATE_DIRECTORY}/${CONFIG_FILE}`
 ];
 
+var SPECIALIST_NAMES = ROUTES.map((route) => route.agent);
+
 var ROLE_FLAG = "holyagent-role";
 var CONTEXT_MESSAGE = "holyagent-context";
 var NOTICE_MESSAGE = "holyagent-notice";
 var COMMAND_TIMEOUT_MS = 8000;
 var SESSION_DEADLINE_MS = 1e4;
 var STOP_GRACE_MS = 2000;
+var HOST_ENV = "HOLYAGENT_HOST";
+var WORKFLOWS_ENV = "HOLYAGENT_WORKFLOWS";
+var CACHE_RETENTION_ENV = "PI_CACHE_RETENTION";
+var AGENT_TOOL = "Agent";
+var WORKFLOW_TOOL = "SubagentWorkflow";
+var CODEMODE_TOOL_NAME = "codemode";
+var childAgent = (sessionName) => {
+  const at = sessionName?.indexOf("#") ?? -1;
+  const agent = at < 0 ? undefined : sessionName?.slice(0, at);
+  return agent !== undefined && SPECIALIST_NAMES.includes(agent) ? agent : undefined;
+};
+var hostEnvironment = (activeTools) => ({
+  [HOST_ENV]: "pi",
+  [WORKFLOWS_ENV]: activeTools.includes(WORKFLOW_TOOL) && activeTools.includes(CODEMODE_TOOL_NAME) ? "1" : "0"
+});
+var applyEnvironment = (target, values, keep) => {
+  for (const [name, value] of Object.entries(values))
+    if (!keep || target[name] === undefined)
+      target[name] = value;
+};
+var fillPackageRoot = (prompt, packageRoot, platformPath = nodePath) => prompt.replaceAll(PI_ROOT_PLACEHOLDER, () => toPosix(packageRoot, platformPath.sep));
+var refuseNonSpecialist = (event) => {
+  if (event.toolName !== AGENT_TOOL)
+    return;
+  const { resume, subagent_type: type } = event.input;
+  if (typeof resume === "string" && resume.trim() !== "")
+    return;
+  const requested = typeof type === "string" ? type.trim() : "";
+  if (SPECIALIST_NAMES.includes(requested))
+    return;
+  return {
+    block: true,
+    reason: `${requested === "" ? "No agent type given" : `"${requested}" is not a HolyAgent specialist`}. Use one of: ${SPECIALIST_NAMES.join(", ")}.`
+  };
+};
+var EMPTY_REPORT = "the specialist's final message was empty";
+var CUT_OFF_REPORT = "the specialist's final message was cut off at the output token limit";
+var failedFinalMessage = (message) => {
+  if (message.role !== "assistant")
+    return;
+  if (message.content.some((block) => block.type === "toolCall"))
+    return;
+  const text = message.content.flatMap((block) => block.type === "text" ? [block.text] : []).join("").trim();
+  const errorMessage = message.stopReason === "length" ? CUT_OFF_REPORT : message.stopReason === "stop" && text === "" ? EMPTY_REPORT : undefined;
+  return errorMessage === undefined ? undefined : { ...message, stopReason: "error", errorMessage };
+};
 var NOTICE_CHARS = 400;
 var RECONCILED = new Set(["resume", "compact"]);
 
@@ -8712,9 +8833,13 @@ var exited = (settled, graceMs) => callback2((resume) => {
 var createExtension = ({
   packageRoot = resolve3(fileURLToPath(new URL("..", import.meta.url))),
   deadlineMs = SESSION_DEADLINE_MS,
-  graceMs = STOP_GRACE_MS
+  graceMs = STOP_GRACE_MS,
+  env = process.env,
+  platformPath = nodePath
 } = {}) => (pi) => {
-  const wrapper = wrapperPath(packageRoot);
+  const wrapper = wrapperPath(packageRoot, platformPath);
+  const root = toPosix(packageRoot, platformPath.sep);
+  const isChild = () => childAgent(pi.getSessionName()) !== undefined;
   let held;
   const running = new Set;
   const exec = (signal, command, args) => {
@@ -8766,18 +8891,22 @@ var createExtension = ({
     ], { concurrency: "unbounded" });
     if (!config.pi.enable)
       return;
-    const flag = pi.getFlag(ROLE_FLAG) ?? DEFAULT_PI_ROLE;
+    const flag = isChild() ? "specialist" : pi.getFlag(ROLE_FLAG) ?? DEFAULT_PI_ROLE;
     const role = yield* decodeUnknownEffect2(PiRoleSchema)(flag).pipe(mapError2(() => new UnknownRole({ value: String(flag) })));
     const status = yield* holyagent(signal, project, "status").pipe(flatMap2((text) => parseOutput("status", text)));
     const reconcile = RECONCILED.has(reason) ? yield* holyagent(signal, project, "reconcile").pipe(flatMap2((text) => parseOutput("reconcile", text))) : undefined;
     const directory = yield* fromResult2(folder);
     const state = typeof directory === "string" && (yield* hasStateFolder(directory)) ? { status, ...reconcile === undefined ? {} : { reconcile } } : undefined;
-    const content = piContext(role, packageRoot, state);
-    return content === undefined ? undefined : { customType: CONTEXT_MESSAGE, content, display: false };
+    const content = piContext(role, root, state);
+    const environment = toolArgs(config, "root").env;
+    return content === undefined ? { environment } : {
+      delivery: { customType: CONTEXT_MESSAGE, content, display: false },
+      environment
+    };
   }).pipe(timeoutOrElse2({
     duration: deadlineMs,
     orElse: () => fail5(new DeadlineExceeded({ ms: deadlineMs }))
-  }), catch_2((error) => succeed5(notice(error.message))), catchCause2((cause) => succeed5(notice(pretty(cause)))));
+  }), catch_2((error) => succeed5({ delivery: notice(error.message) })), catchCause2((cause) => succeed5({ delivery: notice(pretty(cause)) })));
   const release = () => {
     const taken = held;
     held = undefined;
@@ -8797,7 +8926,7 @@ var createExtension = ({
     });
     running.add(ended);
     ended.then(() => running.delete(ended));
-    taken.pending = collected.then((delivery) => own.signal.aborted ? undefined : delivery);
+    taken.pending = collected.then((result) => own.signal.aborted ? undefined : result);
     return taken.pending.then(() => {
       return;
     });
@@ -8813,25 +8942,56 @@ var createExtension = ({
     return gather(held, ctx, event.reason);
   });
   pi.on("session_compact", (_event, ctx) => held === undefined ? undefined : gather(held, ctx, "compact"));
-  pi.on("before_agent_start", () => {
+  pi.on("before_agent_start", (event) => {
+    const child = isChild();
+    if (!child)
+      applyEnvironment(env, hostEnvironment(pi.getActiveTools()), false);
+    const filled = child ? fillPackageRoot(event.systemPrompt, packageRoot, platformPath) : undefined;
+    const override = filled === undefined || filled === event.systemPrompt ? {} : { systemPrompt: filled };
     const taken = held;
     const pending = taken?.pending;
-    if (taken === undefined || pending === undefined)
-      return;
-    taken.pending = undefined;
-    return pending.then((delivery) => delivery === undefined ? undefined : { message: delivery });
+    if (taken !== undefined)
+      taken.pending = undefined;
+    const result = (collected) => {
+      if (!child && collected?.environment !== undefined)
+        applyEnvironment(env, { ...collected.environment, [CACHE_RETENTION_ENV]: "long" }, true);
+      const message = collected?.delivery;
+      return message === undefined && Object.keys(override).length === 0 ? undefined : { ...message === undefined ? {} : { message }, ...override };
+    };
+    return pending === undefined ? result(undefined) : pending.then(result);
   });
+  pi.on("message_end", (event) => {
+    if (!isChild())
+      return;
+    const message = failedFinalMessage(event.message);
+    return message === undefined ? undefined : { message };
+  });
+  pi.on("tool_call", (event) => refuseNonSpecialist(event));
   pi.on("session_shutdown", () => release());
 };
 var extension_default = createExtension();
 export {
+  AGENT_TOOL,
+  CACHE_RETENTION_ENV,
+  CODEMODE_TOOL_NAME,
   COMMAND_TIMEOUT_MS,
   CONTEXT_MESSAGE,
+  CUT_OFF_REPORT,
+  EMPTY_REPORT,
+  HOST_ENV,
   NOTICE_MESSAGE,
   ROLE_FLAG,
   SESSION_DEADLINE_MS,
   STOP_GRACE_MS,
+  WORKFLOWS_ENV,
+  WORKFLOW_TOOL,
+  applyEnvironment,
+  childAgent,
   createExtension,
   extension_default as default,
+  failedFinalMessage,
+  fillPackageRoot,
+  hostEnvironment,
+  refuseNonSpecialist,
   wrapperPath
 };

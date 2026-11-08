@@ -6,6 +6,9 @@ import type {
   ExecResult,
   ExtensionAPI,
   ExtensionContext,
+  MessageEndEvent,
+  MessageEndEventResult,
+  ToolCallEventResult,
 } from "@earendil-works/pi-coding-agent"
 import { Cause, Data, Effect, Exit, Schema } from "effect"
 
@@ -15,13 +18,16 @@ import {
   DEFAULT_PI_ROLE,
   parseOutput,
   PI_ROLES,
+  PI_ROOT_PLACEHOLDER,
   piContext,
   PiRoleSchema,
   type ProjectState,
 } from "../../../runtime/src/hooks/pi-context.ts"
 import { PI_PROJECT_FLAG } from "../../../runtime/src/hooks/pi-project.ts"
 import { hasStateFolder } from "../../../runtime/src/hooks/state-folder.ts"
+import { toolArgs } from "../../../runtime/src/pi/tools.ts"
 import { STATE_DIRECTORY } from "../../../runtime/src/state/layout.ts"
+import { SPECIALIST_NAMES } from "./specialists.ts"
 
 /** The launch flag that tells the extension what the session is for: root, specialist or session. */
 export const ROLE_FLAG = "holyagent-role"
@@ -49,6 +55,136 @@ export const SESSION_DEADLINE_MS = 10_000
  * command's pipes would otherwise keep a gather, and the shutdown that waits for it, from ending.
  */
 export const STOP_GRACE_MS = 2_000
+
+/** The environment variable that names the agent host to the `holyagent` CLI. */
+export const HOST_ENV = "HOLYAGENT_HOST"
+
+/** The environment variable that tells the `holyagent` CLI whether the host offers workflows. */
+export const WORKFLOWS_ENV = "HOLYAGENT_WORKFLOWS"
+
+/**
+ * The environment variable that makes Pi's providers keep their prompt cache for the long retention
+ * (one hour on providers that have it).
+ */
+export const CACHE_RETENTION_ENV = "PI_CACHE_RETENTION"
+
+/** The name of the package's tool that launches a specialist. */
+export const AGENT_TOOL = "Agent"
+
+/** The name of the package's tool that runs a workflow script. */
+export const WORKFLOW_TOOL = "SubagentWorkflow"
+
+/** The name of Pi's built-in codemode tool. */
+export const CODEMODE_TOOL_NAME = "codemode"
+
+/**
+ * The name of the specialist a session is, or undefined for any other session. The package names a
+ * child's session `<agent>#<first 8 characters of its id>` before it binds the child's extensions,
+ * so the name is readable when the child's `session_start` fires. A session name a user chose does
+ * not count unless it names a specialist and has the `#`.
+ */
+export const childAgent = (sessionName: string | undefined): string | undefined => {
+  const at = sessionName?.indexOf("#") ?? -1
+  const agent = at < 0 ? undefined : sessionName?.slice(0, at)
+  return agent !== undefined && SPECIALIST_NAMES.includes(agent) ? agent : undefined
+}
+
+/**
+ * The variables the `holyagent` calls of the root need: the host (`pi`) and whether workflows are
+ * on. Workflows are on when both `SubagentWorkflow` and `codemode` are active tools: the workflow
+ * tool is what runs one, and under codemode `only` the root reaches it through a script. The
+ * package can withdraw `SubagentWorkflow` after load, so this is read again before each run.
+ */
+export const hostEnvironment = (
+  activeTools: ReadonlyArray<string>,
+): Readonly<Record<string, string>> => ({
+  [HOST_ENV]: "pi",
+  [WORKFLOWS_ENV]:
+    activeTools.includes(WORKFLOW_TOOL) && activeTools.includes(CODEMODE_TOOL_NAME) ? "1" : "0",
+})
+
+/**
+ * Writes `values` into `target`. Without `keep` it replaces what is there; with it, a variable the
+ * user or an earlier run already set stays, so the value is set once for the process and an
+ * explicit setting wins. Pi's children run in this process and share `target`, so a variable set
+ * here reaches every child and the `holyagent` calls of every session.
+ */
+export const applyEnvironment = (
+  target: Record<string, string | undefined>,
+  values: Readonly<Record<string, string>>,
+  keep: boolean,
+): void => {
+  for (const [name, value] of Object.entries(values))
+    if (!keep || target[name] === undefined) target[name] = value
+}
+
+/**
+ * A specialist's prompt with `${HOLYAGENT_PI_ROOT}` replaced by the package folder, written with
+ * `/` only so the shell takes it for a path (see {@link wrapperPath}). The agent files hold the
+ * placeholder because the install folder is not known when they are built; the extension fills it
+ * when the child starts.
+ */
+export const fillPackageRoot = (
+  prompt: string,
+  packageRoot: string,
+  platformPath: Pick<typeof nodePath, "sep"> = nodePath,
+): string => prompt.replaceAll(PI_ROOT_PLACEHOLDER, () => toPosix(packageRoot, platformPath.sep))
+
+/**
+ * Refuses an `Agent` call whose `subagent_type` is not one of the 18 specialists. The package's
+ * settings already stop its own agents and the fallback, but an agent file in the project's
+ * `.pi/agents` outranks a package's, so the model could still launch a type that has the wrong
+ * prompt and tools. A resume names an existing agent, so its type is not checked. The call's
+ * `model` and `thinking` are left as given: they come per call by design. Returns the `tool_call`
+ * result that blocks the call, or undefined to let it run.
+ */
+export const refuseNonSpecialist = (event: {
+  readonly toolName: string
+  readonly input: Readonly<Record<string, unknown>>
+}): ToolCallEventResult | undefined => {
+  if (event.toolName !== AGENT_TOOL) return undefined
+  const { resume, subagent_type: type } = event.input
+  if (typeof resume === "string" && resume.trim() !== "") return undefined
+  const requested = typeof type === "string" ? type.trim() : ""
+  if (SPECIALIST_NAMES.includes(requested)) return undefined
+  return {
+    block: true,
+    reason: `${requested === "" ? "No agent type given" : `"${requested}" is not a HolyAgent specialist`}. Use one of: ${SPECIALIST_NAMES.join(", ")}.`,
+  }
+}
+
+/** Why a specialist whose last message has no text failed. */
+export const EMPTY_REPORT = "the specialist's final message was empty"
+
+/** Why a specialist whose last message stopped at the token limit failed. */
+export const CUT_OFF_REPORT = "the specialist's final message was cut off at the output token limit"
+
+/**
+ * The failed form of a specialist's final message, or undefined when it is fine. The package counts
+ * a child as completed when its last message stopped for any reason but a provider error or a
+ * length stop without text, which leaves an empty report as "No output." and a truncated report as
+ * a success. The final message is one with no tool calls: it is empty when it has no text, and cut
+ * off when it stopped at the token limit. The failed form keeps the content and has the stop reason
+ * `error`, which the package turns into a failed result with the reason as its error; the wording
+ * avoids the words Pi retries a provider error on.
+ */
+export const failedFinalMessage = (
+  message: MessageEndEvent["message"],
+): MessageEndEventResult["message"] | undefined => {
+  if (message.role !== "assistant") return undefined
+  if (message.content.some((block) => block.type === "toolCall")) return undefined
+  const text = message.content
+    .flatMap((block) => (block.type === "text" ? [block.text] : []))
+    .join("")
+    .trim()
+  const errorMessage =
+    message.stopReason === "length"
+      ? CUT_OFF_REPORT
+      : message.stopReason === "stop" && text === ""
+        ? EMPTY_REPORT
+        : undefined
+  return errorMessage === undefined ? undefined : { ...message, stopReason: "error", errorMessage }
+}
 
 // A notice is one line and never a dump.
 const NOTICE_CHARS = 400
@@ -96,6 +232,16 @@ interface Delivery {
   readonly display: boolean
 }
 
+/** What one collection yields: what the next run is told, and the settings the config decides. */
+interface Collected {
+  readonly delivery?: Delivery
+  /**
+   * The process-wide variables the config decides (`PI_CODEMODE_MAX_WORKERS`), present once the
+   * config is read and `pi.enable` is on.
+   */
+  readonly environment?: Readonly<Record<string, string>>
+}
+
 /**
  * What a session holds from its start until its shutdown: the way to stop the commands of its
  * current collection, and its result. The collections that still run are tracked apart, since a
@@ -103,7 +249,7 @@ interface Delivery {
  */
 interface Held {
   current: AbortController | undefined
-  pending: Promise<Delivery | undefined> | undefined
+  pending: Promise<Collected | undefined> | undefined
 }
 
 /** Where the extension finds what it runs. */
@@ -120,6 +266,16 @@ export interface ExtensionOptions {
    * default.
    */
   readonly graceMs?: number
+  /**
+   * The environment the extension sets the `holyagent` and Pi variables in; the process's own by
+   * default. A test passes its own, so the process keeps its variables.
+   */
+  readonly env?: Record<string, string | undefined>
+  /**
+   * The path module of the platform the package is installed on; the process's own by default. A
+   * test passes `win32` to stand in for Windows.
+   */
+  readonly platformPath?: Pick<typeof nodePath, "join" | "sep">
 }
 
 /**
@@ -175,9 +331,14 @@ export const createExtension =
     packageRoot = resolve(fileURLToPath(new URL("..", import.meta.url))),
     deadlineMs = SESSION_DEADLINE_MS,
     graceMs = STOP_GRACE_MS,
+    env = process.env,
+    platformPath = nodePath,
   }: ExtensionOptions = {}) =>
   (pi: ExtensionAPI): void => {
-    const wrapper = wrapperPath(packageRoot)
+    const wrapper = wrapperPath(packageRoot, platformPath)
+    // The text the model reads names the package folder with `/` only, for the same reason.
+    const root = toPosix(packageRoot, platformPath.sep)
+    const isChild = () => childAgent(pi.getSessionName()) !== undefined
     let held: Held | undefined
     // Every collection started and not yet ended, the stopped ones included: their commands are
     // children of this process until they exit, and the shutdown waits for all of them.
@@ -303,7 +464,9 @@ export const createExtension =
           { concurrency: "unbounded" },
         )
         if (!config.pi.enable) return undefined
-        const flag = pi.getFlag(ROLE_FLAG) ?? DEFAULT_PI_ROLE
+        // A child the package launched is a specialist whatever the flag says: the flag defaults to
+        // the root in every Pi session, and a child has no launch line of its own.
+        const flag = isChild() ? "specialist" : (pi.getFlag(ROLE_FLAG) ?? DEFAULT_PI_ROLE)
         const role = yield* Schema.decodeUnknownEffect(PiRoleSchema)(flag).pipe(
           Effect.mapError(() => new UnknownRole({ value: String(flag) })),
         )
@@ -322,10 +485,14 @@ export const createExtension =
           typeof directory === "string" && (yield* hasStateFolder(directory))
             ? { status, ...(reconcile === undefined ? {} : { reconcile }) }
             : undefined
-        const content = piContext(role, packageRoot, state)
+        const content = piContext(role, root, state)
+        const environment = toolArgs(config, "root").env
         return content === undefined
-          ? undefined
-          : ({ customType: CONTEXT_MESSAGE, content, display: false } satisfies Delivery)
+          ? ({ environment } satisfies Collected)
+          : ({
+              delivery: { customType: CONTEXT_MESSAGE, content, display: false },
+              environment,
+            } satisfies Collected)
       }).pipe(
         // Every command of the collection shares one deadline, as the Claude hook has one timeout.
         Effect.timeoutOrElse({
@@ -333,9 +500,11 @@ export const createExtension =
           orElse: () => Effect.fail(new DeadlineExceeded({ ms: deadlineMs })),
         }),
         // A failure adds one line and nothing else, and never reaches Pi.
-        Effect.catch((error) => Effect.succeed<Delivery | undefined>(notice(error.message))),
+        Effect.catch((error) =>
+          Effect.succeed<Collected | undefined>({ delivery: notice(error.message) }),
+        ),
         Effect.catchCause((cause) =>
-          Effect.succeed<Delivery | undefined>(notice(Cause.pretty(cause))),
+          Effect.succeed<Collected | undefined>({ delivery: notice(Cause.pretty(cause)) }),
         ),
       )
 
@@ -364,7 +533,7 @@ export const createExtension =
       const ended = collected.then(() => undefined)
       running.add(ended)
       void ended.then(() => running.delete(ended))
-      taken.pending = collected.then((delivery) => (own.signal.aborted ? undefined : delivery))
+      taken.pending = collected.then((result) => (own.signal.aborted ? undefined : result))
       return taken.pending.then(() => undefined)
     }
 
@@ -385,19 +554,51 @@ export const createExtension =
     )
 
     // The message is delivered once: the run that reads it takes it, and the next start or
-    // compaction brings a new one. The system prompt is never touched.
+    // compaction brings a new one. The system prompt of the root and of other sessions is never
+    // touched. Before each run of the root the host variables are written, since the `holyagent`
+    // calls of the run read them and the active tools can change; the settings the config decides
+    // are written once, when the config is known. A child fills the package folder into its
+    // prompt instead and leaves the process environment to the root.
     pi.on(
       "before_agent_start",
-      (): Promise<BeforeAgentStartEventResult | undefined> | undefined => {
+      (
+        event,
+      ):
+        | Promise<BeforeAgentStartEventResult | undefined>
+        | BeforeAgentStartEventResult
+        | undefined => {
+        const child = isChild()
+        if (!child) applyEnvironment(env, hostEnvironment(pi.getActiveTools()), false)
+        const filled = child
+          ? fillPackageRoot(event.systemPrompt, packageRoot, platformPath)
+          : undefined
+        const override =
+          filled === undefined || filled === event.systemPrompt ? {} : { systemPrompt: filled }
         const taken = held
         const pending = taken?.pending
-        if (taken === undefined || pending === undefined) return undefined
-        taken.pending = undefined
-        return pending.then((delivery) =>
-          delivery === undefined ? undefined : { message: delivery },
-        )
+        if (taken !== undefined) taken.pending = undefined
+        const result = (
+          collected: Collected | undefined,
+        ): BeforeAgentStartEventResult | undefined => {
+          if (!child && collected?.environment !== undefined)
+            applyEnvironment(env, { ...collected.environment, [CACHE_RETENTION_ENV]: "long" }, true)
+          const message = collected?.delivery
+          return message === undefined && Object.keys(override).length === 0
+            ? undefined
+            : { ...(message === undefined ? {} : { message }), ...override }
+        }
+        return pending === undefined ? result(undefined) : pending.then(result)
       },
     )
+
+    // Only a specialist the package launched is held to a complete report.
+    pi.on("message_end", (event) => {
+      if (!isChild()) return undefined
+      const message = failedFinalMessage(event.message)
+      return message === undefined ? undefined : { message }
+    })
+
+    pi.on("tool_call", (event) => refuseNonSpecialist(event))
 
     // Pi finishes the shutdown when the handler's promise settles, and the folder may be removed
     // then: it settles only after every child has exited or its stop grace (STOP_GRACE_MS, 2 s,
