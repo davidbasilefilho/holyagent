@@ -56,5 +56,29 @@
     "finishedAt": "2026-11-08T05:17:05.022Z"
   },
   "result": "result: Docs now list the Pi package pins among what the updater moves, and no owned doc says the updater re-records fixtures or moves the Pi host.\nchanged: AGENTS.md, docs/development.md, docs/pi/orchestration.md, docs/pi/t3-code.md (all under /home/user/holyagent-0.3.0-provider). `docs/pi/extensions.md` and `docs/pi/caching-and-subagents.md` needed no change. Neither claims the updater re-records fixtures or moves the Pi host, and their `deps:update` mentions are accurate.\nchecks: `bunx --no-install mise run verify` -> exit 0; 1886 pass, 0 fail, lint clean.\nblockers: none\nquestions: none\nnotes:\n- `docs/pi/installation.md` (line 44, \"The pin\") still says the recorded fixtures \"are to be re-recorded with a move\". It is outside my ownership paths, so the root needs to correct it.\n- The updater also moves the caret `devDependency` range for `@earendil-works/pi-coding-agent` in `packages/integrations/pi/package.json`. I did not state that this is the host: the 1.5.0 host is the user's own install and appears in no pin table.\n- Diff for review: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/docs.diff`\nevidence:\nAGENTS.md and docs/development.md list the Pi package pins among what the updater moves: AGENTS.md line 43 and the new bullet in `docs/development.md` \"The pins\" list, both naming `packages/runtime/src/config/pi-packages.json`.\nNo doc claims the updater re-records CI fixtures or moves the Pi host: `docs/pi/orchestration.md` line 61 and `docs/pi/t3-code.md` line 177 now say it does neither. `rg` over the six owned files finds no remaining claim, and the installation.md exception is in the notes.\nbunx --no-install mise run verify exits 0: exit 0, 1886 pass, 0 fail.\nchanged-paths: AGENTS.md, docs/development.md, docs/pi/orchestration.md, docs/pi/t3-code.md\n",
+  "acceptance": {
+    "revision": 9,
+    "rationale": "Provider work confirmed by reviews 3xjk, xm1q, nb2j and 8rme; the last doc mismatch fixed in 6de0371 (diff read); verify 1890 pass",
+    "criteria": [
+      {
+        "criterion": "AGENTS.md and docs/development.md list the Pi package pins among what the updater moves",
+        "support": "AGENTS.md line 43 and the new bullet in `docs/development.md` \"The pins\" list, both naming `packages/runtime/src/config/pi-packages.json`."
+      },
+      {
+        "criterion": "No doc claims the updater re-records CI fixtures or moves the Pi host",
+        "support": "`docs/pi/orchestration.md` line 61 and `docs/pi/t3-code.md` line 177 now say it does neither. `rg` over the six owned files finds no remaining claim, and the installation.md exception is in the notes."
+      },
+      {
+        "criterion": "bunx --no-install mise run verify exits 0",
+        "support": "exit 0, 1886 pass, 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "AGENTS.md, docs/development.md, docs/pi/orchestration.md, docs/pi/t3-code.md"
+      }
+    ]
+  },
   "createdAt": "2026-11-08T05:14:06.809Z"
 }
