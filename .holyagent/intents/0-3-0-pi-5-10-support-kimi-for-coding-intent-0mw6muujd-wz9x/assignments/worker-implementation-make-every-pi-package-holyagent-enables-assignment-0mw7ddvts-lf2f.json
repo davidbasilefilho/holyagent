@@ -1,0 +1,78 @@
+{
+  "id": "assignment-0mw7ddvts-lf2f",
+  "intentId": "intent-0mw6muujd-wz9x",
+  "intentRevision": 9,
+  "roleTask": "Worker.implementation",
+  "slug": "make-every-pi-package-holyagent-enables",
+  "objective": "Make every Pi package HolyAgent enables an exact pin that the repository's dependency updater moves, and close the provider review's optional notes, in /home/user/holyagent-0.3.0-provider (branch release/0.3.0/feat/kimi-provider, head c2f4433).",
+  "state": "Running",
+  "scope": [
+    "Work only in /home/user/holyagent-0.3.0-provider; gates bunx --no-install mise run verify and bunx --no-install mise run build.",
+    "Blocking (code review): pi-provider-kimi-code@0.6.13 is a hardcoded constant in packages/runtime/src/pi/provider.ts; scripts/dependency-pins.ts and scripts/update-dependencies.ts have no pin kind for Pi packages, so mise run deps:update and deps:check never see it, while docs/pi/README.md:19 and docs/pi/installation.md:43-44 and AGENTS.md say every reused extension is pinned and moves only through deps:update. Also piPackages in packages/runtime/src/config/packages.ts returns bare names (pi-provider-kimi-code and the other FEATURE_PACKAGES such as pi-subagents, rpiv-todo, rpiv-ask-user-question, pi-web-kit), so nothing installs a pinned version.",
+    "Fix: (1) keep one source of truth for each Pi package's exact version (a data file or table the updater can rewrite, in the style the updater already uses for the vendored ripgrep and fd or the mise tools); (2) teach scripts/dependency-pins.ts and scripts/update-dependencies.ts a Pi-package pin kind that resolves the newest stable npm release of each package (honouring the prerelease filter) and rewrites that source, with tests using fixtures, no network; deps:check fails when one is behind; (3) make piPackages return pinned sources (for example npm:<name>@<version>) and make providerSource read from the same table so they cannot disagree; set the current versions from /home/user/holyagent-notes/pi-deps.md (the probe recorded each package's latest version) and say which ones you took from there; (4) keep docs/pi/README.md, installation.md and providers.md accurate (exact pin, moves through deps:update; the providers docs say 'exact pin', not '0.6 line').",
+    "Ride-along (optional review notes): decode the parsed pi --list-models rows with Effect Schema and ignore non-row lines such as a footer; when the listing succeeds but is empty, report it as no models listed (likely missing credentials, run readiness first) rather than as missing ids, with a test; make readiness and catalog error details use one helper (same stream order and truncation); reword docs that describe the launcher as using providerEnv, providerSource, validateModelCatalog and requireProviderReady to say these are provided for the launcher."
+  ],
+  "constraints": [
+    "Fixtures only; no network calls, no pi binary, no live model.",
+    "Do not hand-edit bun.lock or package.json dependency ranges; this change concerns Pi package pins, not Bun dependencies.",
+    "Keep the Claude generated output unchanged.",
+    "Make no version-control writes and no edits under .git/ or .holyagent/; report changed paths.",
+    "Follow .claude/CLAUDE.md.",
+    "Report in under 400 words; start each evidence line with the exact criterion text (no backticks), a colon, then the support."
+  ],
+  "criteria": [
+    {
+      "text": "Every Pi package HolyAgent enables has one exact pinned version that piPackages and providerSource both read",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run deps:update moves the Pi package pins and deps:check fails when one is behind, with fixture tests",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "The catalog parser decodes rows with Schema, ignores non-row lines, and reports an empty listing distinctly, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Docs state the exact pins, the updater path and that the launcher functions are provided for the launcher",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "bunx --no-install mise run verify exits 0 and mise run build leaves generated output in sync",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/config",
+    "packages/runtime/src/pi",
+    "packages/runtime/tests/pi",
+    "packages/runtime/tests/config",
+    "scripts/dependency-pins.ts",
+    "scripts/dependency-pins.test.ts",
+    "scripts/update-dependencies.ts",
+    "scripts/update-dependencies.test.ts",
+    "scripts/pi-packages.json",
+    "docs/pi/README.md",
+    "docs/pi/installation.md",
+    "docs/pi/providers.md",
+    "docs/pi/configuration.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw7cxri6-6lgy",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T05:06:30.880Z"
+  },
+  "createdAt": "2026-11-08T05:06:30.880Z"
+}
