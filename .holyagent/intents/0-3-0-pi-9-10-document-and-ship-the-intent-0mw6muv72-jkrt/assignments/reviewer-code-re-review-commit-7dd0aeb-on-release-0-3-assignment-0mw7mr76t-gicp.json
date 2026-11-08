@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-commit-7dd0aeb-on-release-0-3",
   "objective": "Re-review commit 7dd0aeb on release/0.3.0/feat/pi-install (worktree /home/user/holyagent-0.3.0-install), which makes a user-scope Pi package check count only Pi's global settings.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Diff: /home/user/holyagent-notes/install-last-code.diff (56a18a2..7dd0aeb, dist excluded).",
     "Earlier finding it repairs: user-scope setup and doctor counted the project .pi/settings.json as present, so a repository could suppress a global install. Also checks the tightened local and project doctor test assertions."
@@ -38,7 +38,29 @@
     "agentId": "workflow:wf_2d54c449-9e8/assignment-0mw7mr76t-gicp",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T09:28:48.677Z"
+    "startedAt": "2026-11-08T09:28:48.677Z",
+    "finishedAt": "2026-11-08T09:32:38.482Z"
+  },
+  "result": "result: The repair is correct. User-scope setup and doctor now count only Pi's global settings, and project and local scope count both. No blockers.\n\nchanged: none (read-only review)\n\nchecks:\n- `bun test packages/runtime/tests/setup-pi.test.ts` -> exit 0, 64 pass, 0 fail.\n- `bunx --no-install mise run verify` in `/home/user/holyagent-0.3.0-install` at HEAD `20049b6` -> exit 0. Type-check and lint are clean and tests are 2210 pass, 0 fail. I saw only the tail of the output, so I did not see a separate format-check line.\n- Built-in `/code-review medium 56a18a2...7dd0aeb` ran as the real built-in. It returned 3 findings, classified below.\n\nblockers: none\n\nquestions: none\n\nnotes:\n\nFindings from `/code-review`:\n1. Docs claim it flagged (`docs/pi/installation.md:60`, `usage.md:45`, `components.md:62`): partly rejected, partly optional.\n   - `docs/pi/installation.md` lines 59-60 are already correct for the new behavior. `docs/pi/usage.md` and `docs/pi/components.md` do not exist.\n   - The real paths are `docs/usage.md:45` and `docs/components.md:62`. Both still say a package counts when \"neither the global nor the project Pi settings list\" it, with no user-scope exception.\n   - That wording is still true for project and local scope, and `docs/usage.md:45` goes on to say the user scope reads the global file. Optional wording fix: add \"user scope counts the global file only\".\n2. Project file equals global file when `cwd` is home and `PI_CODING_AGENT_DIR` is `~/.pi`: rejected as a blocker. It is a low-severity edge case that existed on the base. User scope is unaffected, since it reads one file. The behavior is only coincidentally correct, as the finding says.\n3. Duplicated `-l` hint, in `packageFix` and an inline ternary in `checkFeatures` (`packages/runtime/src/setup/pi-check.ts` ~line 324): optional. It is a small duplication of a project-only suffix. A shared helper would remove the drift risk, but it does not block.\n\nOwn review:\n- `piPresenceFiles` is the single source of which files count, and `checkPackage`, `checkFeatures` and `installPiPackages` all use it.\n- In `installPiPackages`, `counted` filters out the file already being worked on, so project scope still counts the global file and user scope counts only the global one. An invalid global file is ignored via `orElseSucceed`, as before.\n- The new fix text drops `-l` at user scope, which is right. Messages list only the global file at user scope.\n- JSDoc is present on the new exports and helper. There is no try/catch, Promise or async code, and the code uses Effect, so the repo rules hold.\n- Only the Pi check and Pi install code changed, plus tests; the regenerated `dist` bundle is also in the commit. The project and local paths behave as before.\n\nevidence:\n- User-scope setup and doctor count only the global settings, project and local count both, with tests that fail without the change, and nothing else regresses: `packages/runtime/src/setup/pi-check.ts` `piPresenceFiles` (~line 217) and `packages/runtime/src/setup/pi-install.ts` `counted`. The new tests in `packages/runtime/tests/setup-pi.test.ts` are the user-scope doctor ignoring `.pi/settings.json` and the user-scope setup still installing despite a project listing. Both would see the project file on the base, so they fail there. The setup-pi tests passed (64) and `mise run verify` exited 0.\n- The change follows the repository's code rules: Effect-only composition, JSDoc on the new function and helper, no forbidden constructs, and `mise run verify` exited 0.\n- review-findings: no blockers. Optional items are the stale `docs/usage.md:45` and `docs/components.md:62` wording, and the duplicated `-l` hint. Rejected as a blocker is the home-directory path-equality edge case.\n",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "Repair correct with biting tests; verify 2210 pass at 20049b6",
+    "criteria": [
+      {
+        "criterion": "User-scope setup and doctor count only the global settings, project and local count both, with tests that fail without the change, and nothing else regresses",
+        "support": "`packages/runtime/src/setup/pi-check.ts` `piPresenceFiles` (~line 217) and `packages/runtime/src/setup/pi-install.ts` `counted`. The new tests in `packages/runtime/tests/setup-pi.test.ts` are the user-scope doctor ignoring `.pi/settings.json` and the user-scope setup still installing despite a project listing. Both would see the project file on the base, so they fail there. The setup-pi tests passed (64) and `mise run verify` exited 0."
+      },
+      {
+        "criterion": "The change follows the repository's code rules",
+        "support": "Effect-only composition, JSDoc on the new function and helper, no forbidden constructs, and `mise run verify` exited 0."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "review-findings",
+        "support": "no blockers. Optional items are the stale `docs/usage.md:45` and `docs/components.md:62` wording, and the duplicated `-l` hint. Rejected as a blocker is the home-directory path-equality edge case."
+      }
+    ]
   },
   "createdAt": "2026-11-08T09:28:48.677Z"
 }
