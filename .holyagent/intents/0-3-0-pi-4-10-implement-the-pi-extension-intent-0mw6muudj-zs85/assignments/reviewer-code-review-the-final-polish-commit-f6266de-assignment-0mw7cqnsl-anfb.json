@@ -1,0 +1,54 @@
+{
+  "id": "assignment-0mw7cqnsl-anfb",
+  "intentId": "intent-0mw6muudj-zs85",
+  "intentRevision": 6,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-final-polish-commit-f6266de",
+  "objective": "Review the final polish commit f6266de of the Pi extension entry (range 3ddedda..f6266de on release/0.3.0/feat/pi-extension, worktree /home/user/holyagent-0.3.0-ext; run commands there) for correctness and regressions.",
+  "state": "Running",
+  "scope": [
+    "Notes it answers: topOf treated any git failure as non-git; ctx.cwd was passed unresolved; the --project handoff via Bun.argv.splice was a hidden coupling; Bun.build failures surfaced as String(cause); ordering tests used fixed 30ms sleeps; the wrapper comment and docs said Bun starts in the project under Pi.",
+    "Diff without bundles: /home/user/holyagent-notes/pi-ext-polish.diff. The Claude dist changes only in the wrapper comment, which is accepted."
+  ],
+  "constraints": [
+    "Do not run the pi binary or a live model.",
+    "Read-only: no edits and no version-control writes.",
+    "Report in under 350 words; start each evidence line with the exact criterion text (no backticks), a colon, then the support."
+  ],
+  "criteria": [
+    {
+      "text": "Each note is closed and the change is correct, including the English-only not-a-repository match failing closed",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No regression in the Claude hook, CLI or dist beyond the wrapper comment",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Tests cover the changes without fixed sleeps in ordering tests",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "bunx --no-install mise run verify exits 0 and mise run build leaves the tree clean",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7cia5q-k2se"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T04:48:27.381Z"
+  },
+  "createdAt": "2026-11-08T04:48:27.381Z"
+}
