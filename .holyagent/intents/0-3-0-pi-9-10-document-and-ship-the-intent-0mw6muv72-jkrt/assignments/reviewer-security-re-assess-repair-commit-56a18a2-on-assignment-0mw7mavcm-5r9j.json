@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mw7mavcm-5r9j",
+  "intentId": "intent-0mw6muv72-jkrt",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.security",
+  "slug": "re-assess-repair-commit-56a18a2-on",
+  "objective": "Re-assess repair commit 56a18a2 on release/0.3.0/feat/pi-install against the earlier security findings on the Pi setup step.",
+  "state": "Running",
+  "scope": [
+    "Read /home/user/holyagent-notes/install-repair.diff (range 67723bc..56a18a2, dist excluded); sources are in /home/user/holyagent-0.3.0-install.",
+    "Earlier findings: project config steered the user-scope install (hardening 1); the Shell comment claimed a neutral working directory although project-scope pi install -l runs in the project and reads its .npmrc and .pi/settings.json (suspicion); removal is by name only (hardening 2, kept: names are HolyAgent's own packages); no --ignore-scripts (hardening 3, kept: pi takes no such flag through this path).",
+    "Check the new removal of provider profile packages and the new presence check across both settings scopes for any way a project file can trigger a removal or a different package."
+  ],
+  "constraints": [
+    "Read-only; no edits and no version-control writes.",
+    "Report in under 400 words; put long logs in a file under /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "A project's files cannot cause the user-scope step to remove or install a package",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No untrusted input reaches the pi install or pi remove command line",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "security-findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7m1no2-ud08"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T09:16:06.838Z"
+  },
+  "createdAt": "2026-11-08T09:16:06.838Z"
+}
