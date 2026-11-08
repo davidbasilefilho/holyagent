@@ -1,0 +1,1 @@
+- R-RA-CONTEXT: Report volatile and discoverable content in a context file (paths, directory listings, codebase overviews) and instructions the code, README and docs already give as findings, the repository's convention first and an existing file's departure only when the user asked for the change (R-CONTEXT).

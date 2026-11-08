@@ -1,0 +1,1 @@
+- R-RAU: Classify each stated requirement as verified, discrepant or unverified from the implementing code, and note unrequested behavior.

@@ -1,0 +1,4 @@
+- R-CRITERIA: Give every Assignment the user's constraints verbatim and criteria on the mergeability dimensions, each marked blocking or non-blocking.
+- R-ACCEPT: Judge delegated work from the diff summary and the check output, and accept nothing as done without a check run now on the current head.
+- R-REVIEW: Send work that changes code or artifacts to an independent reviewer, and trust-boundary work also to a security review.
+- R-FINISH: Before finishing, run one more repair round, with re-review, for every open item a specialist can fix other than visual preference. Report beside what needs the user the Unknown results, waived gates and the PR's open threads and merge state. Name unrequested features and refactors; build none.

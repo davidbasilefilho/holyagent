@@ -15,6 +15,8 @@ import {
   ROOT_CORE,
   ROOT_CORE_FILES,
 } from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
+import { REQUIREMENT_COVERAGE } from "../../../runtime/src/instructions/coverage.ts"
+import { parseRequirements } from "../../../runtime/src/instructions/requirements.ts"
 import { build } from "../build.ts"
 import packageJson from "../package.json" with { type: "json" }
 import {
@@ -27,7 +29,6 @@ import {
   MATERIALITY_FILE,
   MERGE_READY_SECTION,
   NATIVE_WEB_TOOLS,
-  REQUIREMENT_SECTIONS,
   ROLE_SECTIONS,
   ROOT_SECTIONS,
   SPECIALIST_SECTIONS,
@@ -40,6 +41,16 @@ import { isExecutable } from "./host.ts"
 
 const read = (...path: Array<string>) => readFileSync(join(ROOT, ...path), "utf8")
 const CLAUDE = "packages/runtime/src/instructions/claude-5.5"
+/** Every requirements file of the instruction sources, joined: the requirements as one text. */
+const REQUIREMENTS = readdirSync(join(ROOT, "packages/runtime/src/instructions/requirements"), {
+  recursive: true,
+  encoding: "utf8",
+})
+  .map((path) => toPosix(path))
+  .filter((path) => path.endsWith(".md"))
+  .toSorted()
+  .map((path) => read("packages/runtime/src/instructions/requirements", path))
+  .join("\n")
 const AGENTS = join("packages", "integrations", "claude", "dist", "agents")
 /** The skills of the plugin, which only the root loads. */
 const SKILLS = [
@@ -487,7 +498,13 @@ describe("agents", () => {
     const sources = {
       mergeReady: read(CLAUDE, "specialist", "merge-ready.md"),
       assignments: read(CLAUDE, "root", "assignments.md"),
-      mergeability: read("packages/runtime/src/instructions", "requirements", "mergeability.md"),
+      mergeability: read(
+        "packages/runtime/src/instructions/requirements/specialist",
+        "merge-ready.md",
+      )
+        .split("\n")
+        .filter((line) => !line.startsWith("- R-MERGE:"))
+        .join("\n"),
     }
     for (const [name, text] of Object.entries(sources)) {
       expect({ name, found: /duplicat\w* (?:logic|code)|performance problem/.test(text) }).toEqual({
@@ -534,9 +551,7 @@ describe("agents", () => {
       "list kept branches as remaining work or cleanup in a report",
     ])
       expect({ part, found: content.includes(part) }).toEqual({ part, found: true })
-    const requirement = read("packages/runtime/src/instructions", "requirements.md")
-      .split("\n")
-      .find((line) => line.startsWith("- R-BRANCH:"))
+    const requirement = REQUIREMENTS.split("\n").find((line) => line.startsWith("- R-BRANCH:"))
     for (const part of [
       "they keep history and references after a merge",
       "only when the user asks",
@@ -565,7 +580,7 @@ describe("agents", () => {
     )?.content
     expect(ciWatch).toContain("report the PR as ready to merge and do not ask whether to merge")
     expect(ciWatch).not.toContain("merging still needs the user's approval")
-    const requirements = read("packages/runtime/src/instructions", "requirements.md")
+    const requirements = REQUIREMENTS
     for (const id of ["R-NOASK", "R-MERGEWAIT"])
       expect({ id, found: requirements.includes(`- ${id}:`) }).toEqual({ id, found: true })
   })
@@ -587,7 +602,7 @@ describe("agents", () => {
     ])
       expect({ part, found: content.includes(part) }).toEqual({ part, found: true })
     expect(content).not.toContain("Ask only when the answer materially changes the result")
-    const requirement = read("packages/runtime/src/instructions", "requirements.md")
+    const requirement = REQUIREMENTS
     expect(requirement).toContain("- R-NOASK:")
   })
 
@@ -634,13 +649,11 @@ describe("agents", () => {
       expect({ rule, found: reminder.includes(rule) }).toEqual({ rule, found: false })
   })
 
-  test("every requirement of requirements.md is implemented by a section that reaches its agents", () => {
-    const lines = read("packages/runtime/src/instructions", "requirements.md").split("\n")
-    const listed = lines.filter((line) => line.startsWith("- "))
-    const ids = listed.map((line) => /^- (R-[A-Z]+(?:-[A-Z]+)*): \S/.exec(line)?.[1] ?? line)
-    expect(ids.every((id) => /^R-[A-Z]+(?:-[A-Z]+)*$/.test(id))).toBe(true)
+  test("every requirement of requirements/ is implemented by a section that reaches its agents", () => {
+    const { ids } = parseRequirements(REQUIREMENTS)
     expect(new Set(ids).size).toBe(ids.length)
-    expect(ids.toSorted()).toEqual(Object.keys(REQUIREMENT_SECTIONS).toSorted())
+    const coverage = REQUIREMENT_COVERAGE["claude-5.5"]
+    expect(ids.toSorted()).toEqual(Object.keys(coverage).toSorted())
 
     const assembled = [
       ...SKILLS.map((name) => `skills/${name}/SKILL.md`),
@@ -652,7 +665,11 @@ describe("agents", () => {
         names.map((name) => `roles/${role}/${name}`),
       ),
     ]
-    for (const [id, { section, phrase }] of Object.entries(REQUIREMENT_SECTIONS)) {
+    for (const [id, entry] of Object.entries(coverage)) {
+      // A requirement that code or documentation carries has no section to reach agents; the
+      // runtime tests check that file.
+      if ("carriedBy" in entry) continue
+      const { section, phrase } = entry
       expect({ id, assembled: assembled.includes(section) }).toEqual({ id, assembled: true })
       expect({ id, holds: read(CLAUDE, section).includes(phrase) }).toEqual({ id, holds: true })
       const conditional = CONDITIONAL_SECTIONS.find(({ file }) => section === `specialist/${file}`)
@@ -1230,7 +1247,7 @@ describe("agents", () => {
     expect(haiku).toContain("Reviewer.audit")
     expect(haiku).not.toContain("Reviewer.artifact")
     expect(sonnet).toContain("the artifact, code, testing and security reviews")
-    const requirements = read("packages/runtime/src/instructions", "requirements.md")
+    const requirements = REQUIREMENTS
     expect(requirements).toContain("(Reviewer.artifact) goes to a sonnet route")
   })
 
@@ -1316,9 +1333,7 @@ describe("agents", () => {
     )
     expect(dispatch).toContain("Close a stopped Assignment with `--outcome stopped`")
     expect(dispatch).not.toMatch(/no polling, steering or stopping/)
-    expect(read("packages/runtime/src/instructions", "requirements.md")).not.toContain(
-      "steering or stopping",
-    )
+    expect(REQUIREMENTS).not.toContain("steering or stopping")
   })
 
   test("the guide gaps are each stated once, in the file that owns them, and in exactly the agents and skills that need them", () => {
@@ -1376,7 +1391,7 @@ describe("agents", () => {
     const once = (text: string, phrase: string) => text.split(phrase).length - 1
     expect(once(root, "in your acknowledgment of that message and continue as asked")).toBe(1)
     expect(once(root, "free of filler sections, redundant summaries and boilerplate")).toBe(1)
-    const requirements = read("packages/runtime/src/instructions", "requirements.md")
+    const requirements = REQUIREMENTS
     expect(requirements).toContain("- R-FLAG:")
     expect(requirements).toContain("- R-NOFILLER:")
   })
@@ -1419,7 +1434,7 @@ describe("agents", () => {
       "The repository's own convention for context files comes first",
     )
     expect(skill?.content).toContain("only when the user asks")
-    const requirements = read("packages/runtime/src/instructions", "requirements.md")
+    const requirements = REQUIREMENTS
     expect(requirements).toContain("arXiv 2602.11988")
     expect(requirements).toContain("Inference: that paths in context files go stale")
   })

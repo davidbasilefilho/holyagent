@@ -1,0 +1,1 @@
+- R-MATERIAL: One source file defines which discrepancies are material (whatever their size) and that pure preference is listed apart and not repaired; the build embeds it in the visual-judging skill, the interface inspection rules and the shared design core, and no other instruction source restates it.

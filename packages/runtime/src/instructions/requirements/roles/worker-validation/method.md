@@ -1,0 +1,1 @@
+- R-WV: Run the real check for each criterion and report exact outcomes without repairing, weakening or skipping a check.

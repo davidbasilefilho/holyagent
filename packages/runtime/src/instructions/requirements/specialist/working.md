@@ -1,0 +1,2 @@
+- R-S-CHECK: Run the project's real checks now on the reported tree and report each as command, exit code and counts, naming any not run.
+- R-S-SEARCH: A role with a shell searches contents and file names through the bundled ripgrep and fd (`holyagent rg`, `holyagent fd`) instead of grep, find or the Grep and Glob tools, always passing the path and falling back to the system rg, fd, grep or find only on UnsupportedPlatform; a role without a shell searches with Grep and Glob.

@@ -1,0 +1,1 @@
+- R-WD: Debug in phases (reproduce, hypothesize, fix the cause with a regression test, remove the instrumentation) and stop to question the design after three failed fixes.

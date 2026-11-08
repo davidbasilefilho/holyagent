@@ -1,0 +1,1 @@
+- R-RT: Map each criterion and changed behavior to the test that protects it, and judge the test by the regression it would catch.

@@ -1,0 +1,1 @@
+- R-LR: Research a bounded question from primary sources, confirm decisive claims with a second source and separate sourced fact from inference. Report a missing web tool as a blocker instead of guessing.

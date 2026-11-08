@@ -13,8 +13,10 @@ packages/
     src/setup/                  what setup and doctor read and write: Claude Code settings, ctx7, the shell
     src/vcs/                    the vcs commands (commit, pr, identity)
     src/instructions/
-      claude-5.5/               root/, specialist/, roles/<role>/ (one file per section), shared/ (text the root and the specialists both embed), design-core/, skills/, root-core.ts
-      requirements/             cache.md, commit-text.md, context.md, mergeability.md: inputs to the instructions, not behavior
+      claude-5.5/               a model family: root/, specialist/, roles/<role>/ (one file per section), shared/ (text the root and the specialists both embed), design-core/, skills/, root-core.ts, guide.md
+      kimi-k3.1/                guide.md only until its translations are added
+      requirements/             the requirements, one file for each Markdown file of a family and the same path: what the family file must say
+      families.ts, coverage.ts  the supported families, and where each family carries each requirement
   integrations/claude/          turns the runtime into the Claude Code plugin
     build.ts, src/              the generator and the wrapper source
     tests/
@@ -46,25 +48,32 @@ bunx --no-install mise run verify
 
 `mise.toml` is the single source of commands. `package.json` scripts and the git hooks only delegate to it, and `--no-script` makes Bun run its own tool rather than a same-named script. Run gates through mise (`bunx --no-install mise run <task>` with the local one) so the `toolchain` task can first confirm a canary Bun.
 
-| Task          | Does                                                            |
-| ------------- | --------------------------------------------------------------- |
-| `toolchain`   | Fails unless Bun is a canary build, and names the fix           |
-| `prepare`     | Installs the git hooks; skips outside a git work tree           |
-| `check`       | `bun check`: type-check                                         |
-| `lint`        | `bun lint`: type-aware lint, no fixing                          |
-| `lint:fix`    | `bun lint --fix`; extra arguments go to Bun (`--staged`)        |
-| `fmt`         | `bun fmt`: format in place; extra arguments go to Bun           |
-| `fmt:check`   | `bun fmt --check`                                               |
-| `test`        | `bun test`                                                      |
-| `vendor`      | Fetches the pinned ripgrep and fd into the plugin               |
-| `build`       | Generates the Claude plugin (runs `vendor` first)               |
-| `bump:patch`  | Raises the root version by a patch, then `build` (Versioning)   |
-| `bump:minor`  | Raises the root version by a minor, then `build` (Versioning)   |
-| `deps:update` | Moves every pin to its newest stable release (see Dependencies) |
-| `deps:check`  | Fails when a pin is behind                                      |
-| `verify`      | `check`, `lint`, `fmt:check` and `test`, all read-only          |
+| Task                    | Does                                                            |
+| ----------------------- | --------------------------------------------------------------- |
+| `toolchain`             | Fails unless Bun is a canary build, and names the fix           |
+| `prepare`               | Installs the git hooks; skips outside a git work tree           |
+| `check`                 | `bun check`: type-check                                         |
+| `lint`                  | `bun lint`: type-aware lint, no fixing                          |
+| `lint:fix`              | `bun lint --fix`; extra arguments go to Bun (`--staged`)        |
+| `fmt`                   | `bun fmt`: format in place; extra arguments go to Bun           |
+| `fmt:check`             | `bun fmt --check`                                               |
+| `test`                  | `bun test`                                                      |
+| `vendor`                | Fetches the pinned ripgrep and fd into the plugin               |
+| `build`                 | Generates the Claude plugin (runs `vendor` first)               |
+| `instructions:scaffold` | Adds the requirements tree to every family as empty files       |
+| `bump:patch`            | Raises the root version by a patch, then `build` (Versioning)   |
+| `bump:minor`            | Raises the root version by a minor, then `build` (Versioning)   |
+| `deps:update`           | Moves every pin to its newest stable release (see Dependencies) |
+| `deps:check`            | Fails when a pin is behind                                      |
+| `verify`                | `check`, `lint`, `fmt:check` and `test`, all read-only          |
 
 Done means `mise run verify` passes; after changing plugin sources, run `mise run build`. `scripts/repo-paths.test.ts` (part of `test`) fails on a tracked path over 120 characters, which overruns Windows MAX_PATH in the marketplace clone, or under `.holyagent/`, which lives on the `holyagent/state` branch.
+
+## Instruction text
+
+The instruction text is written from requirements. `packages/runtime/src/instructions/requirements/` mirrors every Markdown file of each supported model family (`families.ts` lists them; today `claude-5.5`) with the same path, and each file holds the requirements that become the family file, one `- R-ID: text` line each. Ids are unique; a file that a requirement also governs refers to it with a `- See: R-ID` line. `root-core.ts` and `guide.md` are not mirrored.
+
+A change starts in `requirements/`. `mise run instructions:scaffold` (also `bun run instructions:scaffold` in `packages/runtime`) then adds every missing folder and file to each family as an empty file, and never overwrites or deletes one with content. The family file is translated from its requirements as the family's `guide.md` directs: `claude-5.5/guide.md` lists the points of Anthropic's prompting guidance for Claude with their source pages, and `kimi-k3.1/guide.md` those of Moonshot's guides for Kimi. `coverage.ts` names, per family, the file and phrase that carry each requirement, or the code or page that carries one no prompt text can. The tests fail on a family file without a requirements file, a requirements file without a family file, and a requirement that a listed family does not cover. `requirements/` and `guide.md` are not shipped in the plugin, so changing them leaves `dist/` as it is.
 
 ## Dependencies
 

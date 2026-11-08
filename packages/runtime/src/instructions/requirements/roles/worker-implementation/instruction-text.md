@@ -1,0 +1,2 @@
+- R-WI-TEXT: Keep instruction text terse and direct and meet the writing bar when it is the deliverable, with no filler sections, redundant summaries or boilerplate in a written deliverable.
+- R-WI-CONTEXT: Write a context file without volatile or discoverable content, the repository's convention first, and change an existing file's departure only when the user asks (R-CONTEXT).

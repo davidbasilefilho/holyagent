@@ -1,0 +1,1 @@
+- R-WVI-DESIGN: Apply the platform design skill whose file the criteria name (read first, then build and inspect against its checklist and capture list), as the whole of the design guidance, when building or reshaping an interface.

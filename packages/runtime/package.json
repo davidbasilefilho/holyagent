@@ -7,6 +7,9 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "scripts": {
+    "instructions:scaffold": "mise run instructions:scaffold"
+  },
   "dependencies": {
     "@toon-format/toon": "^4.0.0",
     "acorn": "^8.0.0",
