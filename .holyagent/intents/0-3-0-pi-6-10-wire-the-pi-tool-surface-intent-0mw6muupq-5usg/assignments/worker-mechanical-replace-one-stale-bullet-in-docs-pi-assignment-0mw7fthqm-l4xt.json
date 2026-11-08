@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mw7fthqm-l4xt",
+  "intentId": "intent-0mw6muupq-5usg",
+  "intentRevision": 4,
+  "roleTask": "Worker.mechanical",
+  "slug": "replace-one-stale-bullet-in-docs-pi",
+  "objective": "Replace one stale bullet in docs/pi/caching-and-subagents.md of the worktree /home/user/holyagent-0.3.0-tools so it matches the Billion Context setting the code now writes.",
+  "state": "Ready",
+  "scope": [
+    "Work only in /home/user/holyagent-0.3.0-tools (branch release/0.3.0/feat/pi-tools). Line 33 of docs/pi/caching-and-subagents.md currently reads: \"- It compresses the root and the specialists, through `delegate.forceEnable`, because specialists started by a subagent extension get no compression otherwise.\" Replace that whole line with exactly this line: \"- It is meant to compress the root and the specialists. Setup writes only the one setting its README gives, `{\"pi\":{\"subagents\":false}}`, which turns its own subagents off and keeps compression on ([extensions.md](extensions.md#settings-that-setup-writes)); no `delegate.forceEnable` is set. Whether the specialists that `@tintinweb/pi-subagents` starts are compressed too is to be verified with recorded fixtures before the pin is trusted.\" Change nothing else; the reason is that the code dropped forceEnable after the README showed the single setting suffices, and this line still claims the old setting."
+  ],
+  "constraints": [
+    "Edit only docs/pi/caching-and-subagents.md; make no version-control writes and no edits under .git/ or .holyagent/, because the root owns version control.",
+    "Run `bunx --no-install mise run verify` in the worktree after the edit (the formatter check covers Markdown) and report its exit code and test counts.",
+    "Report in under 150 words."
+  ],
+  "criteria": [
+    {
+      "text": "Line 33 replaced with the given text and nothing else changed",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "docs/pi/caching-and-subagents.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-08T06:14:38.350Z"
+}
