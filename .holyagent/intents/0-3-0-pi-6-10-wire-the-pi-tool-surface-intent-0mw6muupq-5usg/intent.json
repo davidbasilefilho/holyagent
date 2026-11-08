@@ -19,7 +19,7 @@
     "Decided (maintainer): web search and fetch come from pi-web-kit, disabled when the provider extension offers web tools (Kimi's moonshot_search and moonshot_fetch).",
     "Decided: @aliou/pi-processes watches long commands such as gh pr checks --watch.",
     "Decided (maintainer: rpiv unless howaboua is better; research found it is not): @juicesharp/rpiv-todo provides the task list and @juicesharp/rpiv-ask-user-question the ask tool.",
-    "Decided (maintainer): Billion Context is installed in the pi integration only: the billion-context package, pinned, compressing the root and specialist sessions (delegate.forceEnable), with its own acp_delegate subagents off (pi.subagents false); it replaces pi's compaction."
+    "Decided (maintainer): Billion Context is installed in the pi integration only: the billion-context package, pinned, compressing the root and specialist sessions with its own acp_delegate subagents off, set as {\"pi\":{\"subagents\":false}} in ~/.config/billion-context/billion-context.json, which its README says keeps compression on (no delegate.forceEnable); it replaces pi's compaction. Maintainer, 2026-11-07: codemode runs in mode only for the root and every specialist, with PI_CODEMODE_MAX_WORKERS=4."
   ],
   "revision": 4,
   "state": "Open",
