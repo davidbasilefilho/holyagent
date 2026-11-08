@@ -33,6 +33,18 @@ describe("the dev toolchain check", () => {
   })
 })
 
+describe("the root package", () => {
+  test("runs the prepare script as its prepare step", async () => {
+    const { scripts } = (await Bun.file(join(import.meta.dir, "../package.json")).json()) as {
+      readonly scripts: Record<string, string>
+    }
+    const [command, file] = (scripts["prepare"] ?? "").split(" ")
+    expect(command).toBe("bun")
+    expect(await Bun.file(join(import.meta.dir, "..", file ?? "")).exists()).toBe(true)
+    expect(file).toBe("scripts/prepare-dev.ts")
+  })
+})
+
 describe("the prepare script", () => {
   test("succeeds with a note and runs nothing when the dev toolchain is absent", async () => {
     expect(await prepareDev(await makeRoot())).toBe(0)

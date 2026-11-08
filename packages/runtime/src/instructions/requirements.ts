@@ -49,17 +49,35 @@ export interface Tree {
   readonly files: ReadonlyArray<string>
 }
 
-/** Lists everything below `directory`; fails with InstructionsError when it cannot be read. */
-export const listTree = (directory: string): Effect.Effect<Tree, InstructionsError> =>
+/**
+ * Lists everything below `directory`; fails with InstructionsError when it cannot be read. With
+ * `plain`, dotfiles and symbolic links are left out, with everything below them, so a tree that
+ * ships as it is carries no hidden or linked file.
+ */
+export const listTree = (
+  directory: string,
+  options: { readonly plain?: boolean } = {},
+): Effect.Effect<Tree, InstructionsError> =>
   Effect.tryPromise({
     try: () => readdir(directory, { recursive: true, withFileTypes: true }),
     catch: (cause) => new InstructionsError({ path: directory, cause }),
   }).pipe(
     Effect.map((entries) => {
+      const listed = entries.map((entry) => ({
+        entry,
+        path: toPosix(relative(directory, join(entry.parentPath, entry.name))),
+      }))
+      const skipped = options.plain
+        ? listed.filter(({ entry }) => entry.name.startsWith(".") || entry.isSymbolicLink())
+        : []
+      const kept = listed.filter(
+        ({ path }) =>
+          !skipped.some((hidden) => path === hidden.path || path.startsWith(`${hidden.path}/`)),
+      )
       const paths = (directories: boolean) =>
-        entries
-          .filter((entry) => entry.isDirectory() === directories)
-          .map((entry) => toPosix(relative(directory, join(entry.parentPath, entry.name))))
+        kept
+          .filter(({ entry }) => entry.isDirectory() === directories)
+          .map(({ path }) => path)
           .toSorted()
       return { directories: paths(true), files: paths(false) }
     }),

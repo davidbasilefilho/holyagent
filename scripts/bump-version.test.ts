@@ -413,6 +413,7 @@ describe("a build whose version sync fails", () => {
         "packages/integrations/claude/src/files.ts",
         "packages/runtime/src/domain/paths.ts",
         "packages/runtime/src/instructions/families.ts",
+        "packages/runtime/src/instructions/generated.ts",
         "packages/runtime/src/instructions/requirements.ts",
         "packages/runtime/src/instructions/skills.ts",
       ])

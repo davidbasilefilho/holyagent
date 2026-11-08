@@ -355,12 +355,12 @@ export const agentFiles = async (): Promise<ReadonlyArray<GeneratedFile>> => {
     readSections(directory, files),
     readSource(MATERIALITY_FILE),
   ])
-  const conditional = Object.fromEntries(
-    files.map((file, at) => [
-      file,
-      Effect.runSync(embedMateriality(texts[at] ?? "", materiality, `${directory}/${file}`)),
-    ]),
+  const embedded = await Effect.runPromise(
+    Effect.forEach(files, (file, at) =>
+      embedMateriality(texts[at] ?? "", materiality, `${directory}/${file}`),
+    ),
   )
+  const conditional = Object.fromEntries(files.map((file, at) => [file, embedded[at] ?? ""]))
   const shared: Shared = {
     conduct,
     conditional,

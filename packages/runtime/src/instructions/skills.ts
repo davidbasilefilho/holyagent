@@ -2,7 +2,7 @@ import { join } from "node:path"
 
 import { Effect } from "effect"
 
-import { type Family, folderOf } from "./families.ts"
+import { type Family, folderOf, INSTRUCTIONS_ROOT } from "./families.ts"
 import { InstructionsError, listTree } from "./requirements.ts"
 
 /** The instruction sources of every family, relative to the repository root. */
@@ -115,15 +115,17 @@ export interface SkillFile {
  * The files below a family's `skills/` folder, in path order, ready to write below a harness's own
  * skills folder. Each `SKILL.md` gets the materiality definition and, for a design skill, the
  * shared design core, then `note(source)` as a frontmatter comment, where `source` is the file's
- * path from the repository root. Every other file is carried as it is. Failing to read a source, or
- * a marker used wrongly, is an `InstructionsError`.
+ * path from the repository root. Every other file is carried as it is, except dotfiles and symbolic
+ * links, which stay out as they did when the skills were globbed. `root` is the folder of the
+ * family folders. Failing to read a source, or a marker used wrongly, is an `InstructionsError`.
  */
 export const skillFiles = (
   family: Family,
   note: (source: string) => string,
+  root: string = INSTRUCTIONS_ROOT,
 ): Effect.Effect<ReadonlyArray<SkillFile>, InstructionsError> =>
   Effect.gen(function* () {
-    const folder = folderOf(family)
+    const folder = folderOf(family, root)
     const directory = instructionsDirectory(family)
     const read = (path: string) =>
       Effect.tryPromise({
@@ -136,7 +138,7 @@ export const skillFiles = (
       materiality,
       `${directory}/${DESIGN_CORE_PATH}`,
     )
-    const { files } = yield* listTree(join(folder, SKILLS_PATH))
+    const { files } = yield* listTree(join(folder, SKILLS_PATH), { plain: true })
     return yield* Effect.forEach(files, (path) =>
       Effect.gen(function* () {
         const source = `${directory}/${SKILLS_PATH}/${path}`

@@ -3,6 +3,7 @@ import { join } from "node:path"
 import { Effect } from "effect"
 
 import type { Family } from "../../../runtime/src/instructions/families.ts"
+import { jsonText, MODULE_COMMENT } from "../../../runtime/src/instructions/generated.ts"
 import { skillFiles } from "../../../runtime/src/instructions/skills.ts"
 import packageJson from "../package.json" with { type: "json" }
 import { DIST_DIRECTORY, type GeneratedFile, generatedNote, REPOSITORY, SOURCES } from "./files.ts"
@@ -38,9 +39,6 @@ export const HOST_MODULES: ReadonlyArray<string> = Object.keys(packageJson.peerD
 
 const inPackage = (path: string) => `${DIST_DIRECTORY}/${path}`
 
-/** Text as JSON with a two-space indent and a final newline. */
-const jsonText = (value: unknown): string => `${JSON.stringify(value, null, 2)}\n`
-
 /**
  * The manifest of the built package. The `pi-package` keyword makes it a Pi package, and the `pi`
  * key lists its resource folders, relative to the package root, which is where a `pi install` of
@@ -62,9 +60,6 @@ export const manifest = (): GeneratedFile => ({
   }),
 })
 
-/** Bun's comment above each module, which names its path from the working directory. */
-const MODULE_MARKER = /^\/\/ \S+\.[cm]?[jt]s$\n/gm
-
 /**
  * Bundles an extension source to one ES module for Pi's Node runtime. The host modules and their
  * subpaths stay imports: Pi supplies them, and a bundled copy would create duplicate classes and
@@ -81,7 +76,7 @@ export const bundleExtension = async (entrypoint: string, source: string): Promi
   const output = result.outputs[0]
   if (!result.success || output === undefined)
     throw new Error(result.logs.map((log) => log.message).join("\n"))
-  return `// ${generatedNote(source)}\n${(await output.text()).replace(MODULE_MARKER, "")}`
+  return `// ${generatedNote(source)}\n${(await output.text()).replace(MODULE_COMMENT, "")}`
 }
 
 const extension = async (): Promise<GeneratedFile> => ({

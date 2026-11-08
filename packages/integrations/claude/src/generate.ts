@@ -3,6 +3,7 @@ import { join } from "node:path"
 import { Effect } from "effect"
 
 import { ROUTES } from "../../../runtime/src/domain/route.ts"
+import { MODULE_COMMENT } from "../../../runtime/src/instructions/generated.ts"
 import { DESIGN_CORE_PATH, skillFiles } from "../../../runtime/src/instructions/skills.ts"
 import packageJson from "../package.json" with { type: "json" }
 import { agentFiles, PLUGIN_NAME } from "./agents.ts"
@@ -205,8 +206,6 @@ const skills = async (): Promise<ReadonlyArray<GeneratedFile>> =>
     content,
   }))
 
-const BUNDLE_MARKER = /^\/\/ \S+\.(?:[cm]?[jt]s|json|md)$\n/gm
-
 /**
  * The CLI as one file for Bun. Bun's comment above each module names its path in node_modules,
  * which depends on how dependencies were installed, so those comments go and the build is the same
@@ -220,7 +219,7 @@ const bundle = async (): Promise<string> => {
   const output = result.outputs[0]
   if (!result.success || output === undefined)
     throw new Error(result.logs.map((log) => log.message).join("\n"))
-  const lines = (await output.text()).replace(BUNDLE_MARKER, "").split("\n")
+  const lines = (await output.text()).replace(MODULE_COMMENT, "").split("\n")
   // Keep the shebang and Bun's `// @bun` pragma first.
   const pragma = lines.indexOf("// @bun")
   if (pragma === -1) throw new Error("The bundle has no // @bun pragma line to put the note after")
