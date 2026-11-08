@@ -5,7 +5,7 @@
   "roleTask": "Worker.integration",
   "slug": "connect-the-pi-report-readers-to-the",
   "objective": "Connect the Pi report readers to the holyagent assignment reports command and the shipped agents to the root package manifest, in /home/user/holyagent-0.3.0-launcher, so the launcher work is complete end to end.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Work only in /home/user/holyagent-0.3.0-launcher (branch release/0.3.0/feat/pi-launcher). Three writers just finished there: Pi agents and extension glue (packages/integrations/pi, packages/runtime/src/pi/tools.ts), Pi report readers (packages/runtime/src/pi/journal.ts, cli/report.ts) and stripCitations fixes. Their notes are in /home/user/holyagent-notes/launcher-research.md and the diffs launcher-a.diff, launcher-b.diff, launcher-c.diff there.",
     "(1) Apply /home/user/holyagent-notes/launcher-b-wiring.patch (git apply; it was checked with git apply --check): it wires assignment reports under HOLYAGENT_HOST=pi to the journal and session readers in packages/runtime/src/cli/assignment.ts, exports briefPath from cli/brief.ts, updates the stale help note in domain/host.ts and tests/host.test.ts, and adds tests/pi-reports-e2e.test.ts. Read it before applying and fix anything that no longer fits the current tree.",
@@ -70,5 +70,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-08T07:00:00.112Z"
+  },
   "createdAt": "2026-11-08T06:59:53.556Z"
 }
