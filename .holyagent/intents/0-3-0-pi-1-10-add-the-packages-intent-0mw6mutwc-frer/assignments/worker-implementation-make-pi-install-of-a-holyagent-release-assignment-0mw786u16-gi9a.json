@@ -75,5 +75,45 @@
     "finishedAt": "2026-11-08T02:45:48.063Z"
   },
   "result": "result: All three install blockers are fixed and the CI stale-build check now covers the Pi output. The consumer-install simulation exits 0 with both npm and bun. `mise run build` and `mise run verify` exit 0 (1743 tests pass).\n\nchanged (all in `/home/user/holyagent-0.3.0-pi`):\n- `package.json`: `prepare` is now `bun scripts/prepare-dev.ts`.\n- `bun.lock`, `packages/integrations/claude/package.json`, `packages/integrations/pi/package.json`: the unused `@holyagent/runtime` `workspace:*` dependency is gone, removed with `bun remove`. It was the `EUNSUPPORTEDPROTOCOL` cause. The integrations import the runtime by relative path.\n- New: `scripts/prepare-dev.ts` and `scripts/prepare-dev.test.ts`. The script runs `bunx --no-install mise run prepare` when `node_modules/.bin/mise` exists. Otherwise it prints one line and exits 0. `mise.toml` is unchanged.\n- `.github/workflows/validation.yml`: `packages/integrations/pi/dist` added to the stale-build paths and the error text. No new action pins or permissions.\n- `docs/pi/README.md`, `docs/pi/claude-parity.md`, `docs/pi/installation.md`: the install command is now `pi install git:github.com/davidbasilefilho/holyagent@holyagent-<version>`, in `installation.md` also with `-l`. A new bullet cites `utils/git.js` `splitRef` L2-L33 and `packages.md` L13 as the reason. The \"not shown to complete\" sentence was rewritten.\n- `docs/development.md`: the `prepare` script and the CI check row are described.\n- The Claude `dist` and `.claude-plugin` output is unchanged.\n\nchecks:\n- `bunx --no-install mise run build` -> 0.\n- `bunx --no-install mise run verify` -> 0 (log: `/home/user/holyagent-notes/pi1-repair-verify.log`).\n- `npm install --omit=dev --legacy-peer-deps` -> 0 (6 packages) on a copy of the working tree.\n- `bun install --production` -> 0, and `bun install --production --frozen-lockfile` -> 0.\n- `bun install --frozen-lockfile` in the worktree -> 0, with \"sync hooks: ✔️(commit-msg, pre-commit)\".\n\nblockers: none.\nquestions: none.\nnotes:\n- The archive was a tar of the working tree without `.git` or `node_modules`, because the changes are uncommitted and `git archive` would omit them.\n- Plain npm still needs `bun` on PATH, because `prepare` is a Bun script. HolyAgent's Pi setup sets `npmCommand` to bun, as the Intent plans.\n- The `splitRef` L2-L33 and `packages.md` L13 citations come from the Pi 1.5.0 copy in `/home/user/holyagent-notes/pi-probe`. I did not run the `pi` binary.\n- The `bun install` calls ran lefthook in the shared `.git/hooks`, which `bun install` always does.\n\nevidence:\nA consumer install of a git archive of the tree exits 0 with npm --omit=dev and with bun production mode: `npm install --omit=dev --legacy-peer-deps` -> 0; `bun install --production` -> 0; `bun install --production --frozen-lockfile` -> 0.\nA development install still installs the hooks and the workspace build is unchanged: `bun install --frozen-lockfile` in the worktree -> 0 and hooks synced; `mise run build` -> 0 with the Claude output unchanged; the tests in `scripts/dependency-ranges.test.ts` and `scripts/bump-version.test.ts` pass in verify.\nThe documented install command uses the @ ref form pi parses, with a source citation: `docs/pi/installation.md` L15, L20 (citation), L31, L32; `docs/pi/README.md` L15; `docs/pi/claude-parity.md` L146.\nCI's stale-build check covers packages/integrations/pi/dist and the workflow tests pass: `.github/workflows/validation.yml` L122-L137; `scripts/workflows.test.ts` passes within verify (1743 pass, 0 fail).\nmise run build and mise run verify exit 0: build -> 0; verify -> 0.\nchecks-run: see checks above.\nchanged-paths: see changed above, 11 paths including the 2 new scripts.\ndiff-file: `/home/user/holyagent-notes/pi1-repair.diff`\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Independent code and security reviews accept the range; verify exit 0 on b6781ee run by the reviewer.",
+    "criteria": [
+      {
+        "criterion": "A consumer install of a git archive of the tree exits 0 with npm --omit=dev and with bun production mode",
+        "support": "`npm install --omit=dev --legacy-peer-deps` -> 0; `bun install --production` -> 0; `bun install --production --frozen-lockfile` -> 0."
+      },
+      {
+        "criterion": "A development install still installs the hooks and the workspace build is unchanged",
+        "support": "`bun install --frozen-lockfile` in the worktree -> 0 and hooks synced; `mise run build` -> 0 with the Claude output unchanged; the tests in `scripts/dependency-ranges.test.ts` and `scripts/bump-version.test.ts` pass in verify."
+      },
+      {
+        "criterion": "The documented install command uses the @ ref form pi parses, with a source citation",
+        "support": "`docs/pi/installation.md` L15, L20 (citation), L31, L32; `docs/pi/README.md` L15; `docs/pi/claude-parity.md` L146."
+      },
+      {
+        "criterion": "CI's stale-build check covers packages/integrations/pi/dist and the workflow tests pass",
+        "support": "`.github/workflows/validation.yml` L122-L137; `scripts/workflows.test.ts` passes within verify (1743 pass, 0 fail)."
+      },
+      {
+        "criterion": "mise run build and mise run verify exit 0",
+        "support": "build -> 0; verify -> 0."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "see checks above."
+      },
+      {
+        "label": "changed-paths",
+        "support": "see changed above, 11 paths including the 2 new scripts."
+      },
+      {
+        "label": "diff-file",
+        "support": "`/home/user/holyagent-notes/pi1-repair.diff`"
+      }
+    ]
+  },
   "createdAt": "2026-11-08T02:41:03.882Z"
 }
