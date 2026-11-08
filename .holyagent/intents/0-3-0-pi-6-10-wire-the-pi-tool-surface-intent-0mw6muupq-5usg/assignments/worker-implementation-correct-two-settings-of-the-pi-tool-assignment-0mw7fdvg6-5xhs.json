@@ -1,0 +1,58 @@
+{
+  "id": "assignment-0mw7fdvg6-5xhs",
+  "intentId": "intent-0mw6muupq-5usg",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "correct-two-settings-of-the-pi-tool",
+  "objective": "Correct two settings of the Pi tool surface (commit 0a89801 on release/0.3.0/feat/pi-tools, worktree /home/user/holyagent-0.3.0-tools) to the maintainer's decisions.",
+  "state": "Running",
+  "scope": [
+    "Work only in /home/user/holyagent-0.3.0-tools; gates bunx --no-install mise run verify and bunx --no-install mise run build.",
+    "1. Codemode: the brief said codemode for the root only, which was wrong. The maintainer decided (Intent 0.3.0 pi 4/10, recorded in docs/pi/orchestration.md): codemode runs in mode \"only\" for the root and every specialist; tools registered model-only (such as rpiv-ask-user-question) stay directly callable; PI_CODEMODE_MAX_WORKERS is 4. Make toolArgs give +codemode (or the codemode setting that yields mode only) to every role and the root, keep each role's allowlist otherwise as it is, export the PI_CODEMODE_MAX_WORKERS value for the launcher, and restore docs/pi/configuration.md to say root and every specialist. Tests per role.",
+    "2. Billion Context: the decided behavior is compression on for root and specialist sessions with Billion Context's own acp_delegate subagents off. The pair written now (pi.subagents:false in billion-context.json and delegate.forceEnable:true in ~/.pi/acp.json) may contradict itself per its docs. Read the 'Pi built-in subagents' section of /home/user/holyagent-notes/pi-probe/readmes/billion-context.md (and any other section it links in that file) and provide exactly the settings it gives for disabling the built-in subagents while keeping context compression; drop any setting the README says is ignored or only matters with acp_delegate on. Cite the README lines in a code comment and in docs/pi/extensions.md, and remove the 'to be verified' flag once settled; if the README does not settle it, say so in the report and keep the flag."
+  ],
+  "constraints": [
+    "Fixtures only; no pi binary, no network.",
+    "Keep the Claude generated output unchanged apart from rebuilt bundles.",
+    "Make no version-control writes; report changed paths.",
+    "Report in under 300 words; start each evidence line with the exact criterion text (no backticks), a colon, then the support."
+  ],
+  "criteria": [
+    {
+      "text": "Every role and the root run codemode in mode only with PI_CODEMODE_MAX_WORKERS 4 exported, and the docs say so, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The Billion Context settings are exactly those the README gives for compression on with its subagents off, cited",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "bunx --no-install mise run verify exits 0 and mise run build leaves generated output in sync",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/pi",
+    "packages/runtime/tests/pi",
+    "packages/integrations/claude/dist",
+    "packages/integrations/pi/dist",
+    "docs/pi/extensions.md",
+    "docs/pi/configuration.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw7ex2uh-58hy",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T06:02:29.622Z"
+  },
+  "createdAt": "2026-11-08T06:02:29.622Z"
+}
