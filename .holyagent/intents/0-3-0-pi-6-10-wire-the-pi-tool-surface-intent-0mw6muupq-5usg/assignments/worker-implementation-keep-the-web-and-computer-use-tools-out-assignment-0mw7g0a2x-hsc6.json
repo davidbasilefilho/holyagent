@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "keep-the-web-and-computer-use-tools-out",
   "objective": "Keep the web and computer-use tools out of the Pi root's direct tool set, so the root delegates research and visual inspection as the Claude root does, in /home/user/holyagent-0.3.0-tools (branch release/0.3.0/feat/pi-tools, head 4ffd0db).",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "In packages/runtime/src/pi/tools.ts, `toolArgs(config, \"root\")` returns `--tools +codemode` with `--exclude-tools write,edit`. Because `+codemode` keeps Pi's default selection, which includes every enabled extension's tools, the root currently also holds the computer-use tools (`computer_use_*`, with `pi.features.computerUse` on) and the web tools of the web choice (`webChoice(profile, features.web).tools`, e.g. pi-web-kit's tools or Kimi's moonshot_search and moonshot_fetch). The Claude root has neither (the holyagent agent excludes WebFetch and WebSearch, and its rules send research to the Librarian roles and visual inspection to the visual specialists), and docs/pi/extensions.md says only the visual specialists get computer use.",
     "Change the root's exclusions to add, while each is enabled, the computer-use tools (COMPUTER_USE_TOOLS) and the web choice's tools (none when the web choice is off). Keep `write,edit` excluded and keep `+codemode`, todo, ask_user_question, the process tools and the subagent tools on the root. Use the profile argument for the web choice as the specialists do.",
@@ -54,5 +54,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T06:20:00.405Z"
+  },
   "createdAt": "2026-11-08T06:19:55.017Z"
 }
