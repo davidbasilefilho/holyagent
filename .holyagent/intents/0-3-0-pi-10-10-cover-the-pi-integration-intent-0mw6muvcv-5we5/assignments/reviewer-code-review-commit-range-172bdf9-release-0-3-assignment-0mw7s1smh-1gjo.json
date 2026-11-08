@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-commit-range-172bdf9-release-0-3",
   "objective": "Review commit range 172bdf9..release/0.3.0/fix/pi-windows-launch in the worktree /home/user/holyagent-0.3.0-win for correctness and regressions against the merge-ready bar: the Pi extension starts the bundled CLI as Bun on scripts/holyagent.js with the sh wrapper's flags on every platform, starts pi through cmd.exe on Windows, and gives powershell the same selection and exclusions as bash in the root and specialist tool lists.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-win; review `git diff 172bdf9..HEAD` and `git log 172bdf9..HEAD` there, and read surrounding code as needed. Start with /code-review on that range if it is available to you.",
     "Judge behavior, error paths, tests (each new behavior has a test that fails without it, none weakened), duplication, and the repository rules in .claude/CLAUDE.md and AGENTS.md (Effect, Schema at boundaries, JSDoc, Bun APIs). The generated dist files are build output; check only that they match a fresh build."
@@ -41,7 +41,33 @@
     "agentId": "workflow:wf_096fa445-a52/assignment-0mw7s1smh-1gjo",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T11:57:01.098Z"
+    "startedAt": "2026-11-08T11:57:01.098Z",
+    "finishedAt": "2026-11-08T12:05:48.764Z"
+  },
+  "result": "result: not merge-ready; one blocking regression (Bun lookup fallback dropped), the rest non-blocking.\n\nchanged: none (read-only). `packages/integrations/claude/build.ts` and `packages/integrations/pi/build.ts` produced no diff, so the dist files match a fresh build.\n\nchecks:\n- `bun test packages/integrations/pi/tests/extension.test.ts packages/integrations/pi/tests/pi.test.ts packages/runtime/tests/pi/tools.test.ts` -> exit 0, 307 pass, 0 fail.\n- Both build scripts, then `git status --short` -> clean.\n- I did not run `mise run verify`, and I ran no pi, Windows or T3 Code. Everything about Windows is read from the code and its win32-stubbed tests.\n- The built-in `/code-review` (high) ran. I checked each of its 7 findings against the code.\n\nblockers:\n1. **Bun lookup regression.** `packages/integrations/pi/src/extension.ts:706-709` now runs `exec(signal, \"bun\", [...bundled, ...])`, so bare `bun` must be on the PATH of Pi's process. The `sh` wrapper it replaced also tried `${BUN_INSTALL:-$HOME/.bun}/bin/bun` (`packages/integrations/pi/dist/scripts/holyagent`, lines 28-33).\n   - Failure: Bun is installed in `~/.bun/bin` and put on PATH only by a shell rc file, and Pi starts from a GUI or an editor such as T3 Code. The old path worked through that fallback. The new one fails to spawn, so every `holyagent` call returns CommandFailed and the config, status and state collection all fail.\n   - Fix: resolve bun with the same fallback before `exec`, or pass the resolved absolute path.\n   - Tests would not notice: they stub `pi.exec`, and `extension.test.ts` asserts only `command === \"bun\"`.\n\nnon-blocking:\n- `packages/runtime/src/pi/tools.ts:12,18`: `powershell` is allowlisted for specialists on every platform. In the installed Pi, `powershell` is registered everywhere and only throws when called off Windows (\"only available on Windows\"), so a Linux or macOS specialist is shown a tool that always errors. The allowlist and exclusion matchers ignore unregistered names, so nothing breaks at launch. This is the same selection and exclusions as `bash`, as the Assignment asks, so it is a trade-off, not a defect. The root avoids it with the Windows-only `+powershell`.\n- Model-facing text (`kimi-k3.1/root/dispatch.md:3`, `delegating.md:9`) still tells the model to run the extensionless `sh` wrapper through bash. On Windows without Git Bash, `powershell` cannot run it, so the model's own `holyagent` calls (`intent`, `assignment`, `status`) still need Git Bash. The extension's own calls work. `docs/pi/orchestration.md` says \"the wrapper stays for the model's own shell calls\", so this is a known gap. Prompts that name the `bun ... holyagent.js` form would close it.\n- `extension.test.ts` (around line 499) checks the wrapper's flags only as three substrings of its last line. A flag added to `wrapper.sh` later would not fail it. One shared constant would remove the duplicate.\n- Rejected: the cmd.exe injection claim. The provider is a literal enum and model ids are limited to `[A-Za-z0-9._:/@+-]`. Rejected: the claim that the 9009 check applies to every command. It sits in `checkProvider`, whose runner is used only by the `pi` probes. Rejected: matching cmd.exe's \"not recognized\" stderr. It exits 9009, which is handled and tested.\n- Tests are not weakened. Each new behavior has a test: runtime args, cmd.exe wrapping, the 9009 handling, the root gaining `powershell` only on Windows, and `powershell` selected and excluded wherever `bash` is.\n\nverdict: not merge-ready until the Bun fallback is restored. No other blocker found.\n\nevidence:\n- Every blocking finding names path:line and a concrete failure scenario: one blocker, `packages/integrations/pi/src/extension.ts:706-709`, with the scenario above.\n- The review states whether the range is merge-ready: not merge-ready, one blocker.\n- findings: the blocker and non-blocking items listed in this report.\n- verdict: not merge-ready (Bun fallback regression); dist matches a fresh build; 307 tests pass.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Bun fallback blocker verified against the wrapper's BUN_INSTALL lookup",
+    "criteria": [
+      {
+        "criterion": "Every blocking finding names path:line and a concrete failure scenario",
+        "support": "one blocker, `packages/integrations/pi/src/extension.ts:706-709`, with the scenario above."
+      },
+      {
+        "criterion": "The review states whether the range is merge-ready",
+        "support": "not merge-ready, one blocker."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "the blocker and non-blocking items listed in this report."
+      },
+      {
+        "label": "verdict",
+        "support": "not merge-ready (Bun fallback regression); dist matches a fresh build; 307 tests pass."
+      }
+    ]
   },
   "createdAt": "2026-11-08T11:57:01.098Z"
 }
