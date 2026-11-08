@@ -7,12 +7,12 @@ import { decode } from "@toon-format/toon"
 import { $ } from "bun"
 import { Effect } from "effect"
 
-import { firstPassPrompt } from "../../../integrations/pi/src/prompts/index.ts"
 import { briefText } from "../../src/cli/brief.ts"
 import { StdinMissing } from "../../src/cli/errors.ts"
 import { run } from "../../src/cli/program.ts"
 import { renderPrompt } from "../../src/cli/report.ts"
 import { ROUTES } from "../../src/domain/route.ts"
+import { firstPassPrompt } from "../../src/prompts/index.ts"
 import { assignment } from "../fixtures.ts"
 
 setDefaultTimeout(30_000)

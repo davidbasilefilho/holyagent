@@ -3,9 +3,9 @@ import { isAbsolute, join, resolve } from "node:path"
 
 import { Effect } from "effect"
 
-import { firstPassPrompt } from "../../../integrations/pi/src/prompts/index.ts"
 import type { Assignment } from "../domain/assignment.ts"
 import type { AgentHost } from "../domain/host.ts"
+import { firstPassPrompt } from "../prompts/index.ts"
 import { io } from "../state/files.ts"
 import { localFile } from "../state/layout.ts"
 import { gitMaybe } from "../vcs/git.ts"

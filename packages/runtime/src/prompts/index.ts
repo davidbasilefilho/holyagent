@@ -1,8 +1,8 @@
-import type { RoleTask } from "../../../../runtime/src/domain/route.ts"
+import type { RoleTask } from "../domain/route.ts"
 import codeReview from "./code-review.md" with { type: "text" }
 import securityReview from "./security-review.md" with { type: "text" }
 
-/** One first-pass prompt template of the Pi package: the file it ships as and what it holds. */
+/** One first-pass prompt template: the file it ships as in the Pi package and what it holds. */
 export interface PromptTemplate {
   /** The template's name, which is its file name without `.md` and its `/` command in Pi. */
   readonly name: string
@@ -14,25 +14,28 @@ export interface PromptTemplate {
 
 const FRONTMATTER = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/
 
+// A source without frontmatter has an empty head and keeps its text as the body; the tests require
+// the head of every template, so the build fails on it.
 const parseTemplate = (name: string, text: string): PromptTemplate => {
   const match = FRONTMATTER.exec(text)
-  if (match === null) throw new Error(`prompts/${name}.md has no frontmatter`)
-  return { name, head: (match[1] ?? "").split("\n"), body: (match[2] ?? "").trim() }
+  return match === null
+    ? { name, head: [], body: text.trim() }
+    : { name, head: (match[1] ?? "").split("\n"), body: (match[2] ?? "").trim() }
 }
 
-/** The templates the package ships in its `prompts/` folder, in name order. */
-export const PROMPT_TEMPLATES: ReadonlyArray<PromptTemplate> = [
-  parseTemplate("code-review", codeReview),
-  parseTemplate("security-review", securityReview),
-]
+const CODE_REVIEW = parseTemplate("code-review", codeReview)
+const SECURITY_REVIEW = parseTemplate("security-review", securityReview)
+
+/** The templates the Pi package ships in its `prompts/` folder, in name order. */
+export const PROMPT_TEMPLATES: ReadonlyArray<PromptTemplate> = [CODE_REVIEW, SECURITY_REVIEW]
 
 /**
  * The role tasks whose task starts with a first-pass prompt on Pi, and the template each one gets.
  * These are the two reviews that run the built-in `/code-review` and `/security-review` on Claude.
  */
-const FIRST_PASS: Readonly<Partial<Record<RoleTask, string>>> = {
-  "Reviewer.code": "code-review",
-  "Reviewer.security": "security-review",
+const FIRST_PASS: Readonly<Partial<Record<RoleTask, PromptTemplate>>> = {
+  "Reviewer.code": CODE_REVIEW,
+  "Reviewer.security": SECURITY_REVIEW,
 }
 
 // Pi fills `${@:-default}` from the arguments of a `/name` call; the launcher has none, so it takes
@@ -44,8 +47,6 @@ const ARGUMENTS_DEFAULT = /\$\{@:-([^}]*)\}/g
  * arguments at their defaults, or undefined for a role that has none (every role but
  * `Reviewer.code` and `Reviewer.security`).
  */
-export const firstPassPrompt = (roleTask: RoleTask): string | undefined => {
-  const name = FIRST_PASS[roleTask]
-  const template = PROMPT_TEMPLATES.find((candidate) => candidate.name === name)
-  return template?.body.replace(ARGUMENTS_DEFAULT, "$1")
-}
+export const firstPassPrompt = (roleTask: RoleTask): string | undefined =>
+  // A replacer function keeps `$` sequences in the default text literal.
+  FIRST_PASS[roleTask]?.body.replace(ARGUMENTS_DEFAULT, (_match, fallback: string) => fallback)

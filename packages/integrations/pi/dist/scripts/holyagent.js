@@ -13900,7 +13900,7 @@ var init_context = __esm(() => {
 });
 
 var code_review_default = `---
-description: First-pass code review of a committed range, each finding traced to a realistic failure and rated
+description: First-pass code review of a committed range, each finding traced to a realistic failure and labeled
 argument-hint: "[<start>...<head>]"
 ---
 
@@ -13908,31 +13908,37 @@ First pass: code-review.
 
 You are the first pass of a code review. Find defects in the committed range and prove each one. The review is read-only: write no comments and no fixes, and change no file, branch or index.
 
-Range: \${@:-the refs the Assignment below names}. A first review reads \`<start>...<head>\`, where \`<start>\` is the target of the pull request; a re-review reads \`<reviewed>...<repaired>\`. If a ref is missing or does not resolve, stop and say which one, because a guessed range reviews the wrong code. Leave the uncommitted changes of the shared tree out.
+Range: \${@:-the refs the Assignment below names}. A range is two refs joined by \`...\`, such as \`main...my-branch\`: the target of the pull request and the head, or for a re-review the reviewed commit and the repaired one. Review that range and no other, and leave the uncommitted changes of the shared tree out. If no Assignment follows and the range names no refs, ask which range to review and stop. If a ref does not resolve, say which one and stop. A guessed range reviews the wrong code.
 
 Steps:
 
-1. Read the whole diff with \`git diff <start>...<head>\`, quoting the ref names for the shell.
+1. Read the whole diff of the range with \`git diff\`, quoting the ref names for the shell.
 2. Read the code around each change: the callers, the callees and the tests that cover it. A change is judged in its context, not alone.
 3. List candidate defects the change introduces or exposes. Look at wrong results, regressions of existing behavior, unhandled error and failure paths, empty, null and boundary input, ordering and concurrency, leaked resources, broken compatibility of an interface or stored data, and tests that cannot fail.
 4. Trace each candidate to a realistic failure: the input or state, the path through the code, and the wrong result a user or caller sees. Drop a candidate you cannot trace to one.
-5. Rate each remaining finding.
+5. Label each remaining finding.
    - blocker: a realistic failure in normal use, data loss, or a break of existing behavior.
    - optional: a real but unlikely or minor failure.
 
-Report, one entry per finding:
+Your findings are working input to the next step, not a final report: a reviewer role that runs this prompt verifies each one, then reviews on its own and reports. When you run it alone, the list is the result.
+
+List one entry per finding:
 
 - the file, the line and the symbol;
 - the failure, in one or two sentences, as input, path and result;
-- the rating;
+- the label;
 - how you know: what you read, or the command you ran and its result.
+
+Example entry:
+
+- \`src/cart.ts:42\`, \`total\`: an empty cart divides by \`items.length\`, so \`checkout\` shows "NaN" as the price. blocker. Read \`total\` and its caller \`checkout\`; \`bun test cart\` with an empty cart fails.
 
 Then list what you checked and found sound, in one line. With no finding, say "No findings" and what the review covered. Leave style, naming and taste out.
 `;
 var init_code_review = () => {};
 
 var security_review_default = `---
-description: First-pass security review of a committed range, tracing sources to sinks and rating validated findings
+description: First-pass security review of a committed range, tracing sources to sinks and labeling validated findings
 argument-hint: "[<start>...<head>]"
 ---
 
@@ -13940,7 +13946,7 @@ First pass: security-review.
 
 You are the first pass of a security review. Find vulnerabilities the committed range introduces or worsens, and separate the ones you validated from the ones you only suspect. The review is read-only: change no file, branch or index, write no comments and no fixes, run no exploit against a live system, and keep every secret you meet out of the report.
 
-Range: \${@:-the refs the Assignment below names}. A first review reads \`<start>...<head>\`, where \`<start>\` is the target of the pull request; a re-review reads \`<reviewed>...<repaired>\`. Take the diff of that range from \`git diff <start>...<head>\` when you have a shell, otherwise from the diff file the Assignment names. If neither gives you the diff, stop and say so, because a guessed range reviews the wrong code.
+Range: \${@:-the refs the Assignment below names}. A range is two refs joined by \`...\`, such as \`main...my-branch\`: the target of the pull request and the head, or for a re-review the reviewed commit and the repaired one. Review that range and no other. Take its diff from \`git diff\` when you have a shell, otherwise from the diff file the Assignment names. If no Assignment follows and the range names no refs, ask which range to review and stop. If a ref does not resolve or neither source gives you the diff, say so and stop. A guessed range reviews the wrong code.
 
 Steps:
 
@@ -13949,14 +13955,21 @@ Steps:
 3. Read each check on the path. A check counts only if it covers this source and this sink.
 4. Validate. A finding is validated when you read the whole path, the attacker controls the source, and their precondition can hold. It is suspected when one link of the path is unread or depends on something you could not see.
 5. Rate each finding by impact, given the precondition: critical, high, medium or low. Name the precondition the attacker needs.
+6. Label each finding. A validated finding the range introduced or worsened is a blocker; a suspected one is optional.
 
-Report, one entry per finding:
+Your findings are working input to the next step, not a final report: a reviewer role that runs this prompt verifies each one and reports. When you run it alone, the list is the result.
+
+List one entry per finding:
 
 - the source, the sink and the path between them, with files and lines;
 - the precondition;
-- the impact;
+- the impact rating;
 - validated or suspected, with what is missing for a suspicion;
-- the rating.
+- the label.
+
+Example entry:
+
+- Source \`GET /files?name=\` in \`src/routes/files.ts:18\`; sink \`readFile\` in \`src/files.ts:31\`; \`name\` is joined to the upload root with no check for \`..\`. Precondition: any signed-in user. Impact: high, reads any file the service can read. Validated: read the whole path, and no check covers \`name\`. blocker.
 
 Then list what you checked and found sound, in one line. With no finding, say "No findings" and what the review covered.
 `;
@@ -13964,26 +13977,18 @@ var init_security_review = () => {};
 
 var FRONTMATTER, parseTemplate = (name, text) => {
   const match = FRONTMATTER.exec(text);
-  if (match === null)
-    throw new Error(`prompts/${name}.md has no frontmatter`);
-  return { name, head: (match[1] ?? "").split(`
+  return match === null ? { name, head: [], body: text.trim() } : { name, head: (match[1] ?? "").split(`
 `), body: (match[2] ?? "").trim() };
-}, PROMPT_TEMPLATES, FIRST_PASS, ARGUMENTS_DEFAULT, firstPassPrompt = (roleTask) => {
-  const name = FIRST_PASS[roleTask];
-  const template = PROMPT_TEMPLATES.find((candidate) => candidate.name === name);
-  return template?.body.replace(ARGUMENTS_DEFAULT, "$1");
-};
+}, CODE_REVIEW, SECURITY_REVIEW, FIRST_PASS, ARGUMENTS_DEFAULT, firstPassPrompt = (roleTask) => FIRST_PASS[roleTask]?.body.replace(ARGUMENTS_DEFAULT, (_match, fallback) => fallback);
 var init_prompts = __esm(() => {
   init_code_review();
   init_security_review();
   FRONTMATTER = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/;
-  PROMPT_TEMPLATES = [
-    parseTemplate("code-review", code_review_default),
-    parseTemplate("security-review", security_review_default)
-  ];
+  CODE_REVIEW = parseTemplate("code-review", code_review_default);
+  SECURITY_REVIEW = parseTemplate("security-review", security_review_default);
   FIRST_PASS = {
-    "Reviewer.code": "code-review",
-    "Reviewer.security": "security-review"
+    "Reviewer.code": CODE_REVIEW,
+    "Reviewer.security": SECURITY_REVIEW
   };
   ARGUMENTS_DEFAULT = /\$\{@:-([^}]*)\}/g;
 });

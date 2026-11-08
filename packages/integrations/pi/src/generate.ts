@@ -7,6 +7,7 @@ import { PI_ROOT_PLACEHOLDER } from "../../../runtime/src/hooks/pi-context.ts"
 import type { Family } from "../../../runtime/src/instructions/families.ts"
 import { jsonText } from "../../../runtime/src/instructions/generated.ts"
 import { skillFiles } from "../../../runtime/src/instructions/skills.ts"
+import { PROMPT_TEMPLATES } from "../../../runtime/src/prompts/index.ts"
 import { frontmatter } from "../../claude/src/agents.ts"
 import packageJson from "../package.json" with { type: "json" }
 import { agentFiles } from "./agents.ts"
@@ -19,7 +20,6 @@ import {
   REPOSITORY,
   SOURCES,
 } from "./files.ts"
-import { PROMPT_TEMPLATES } from "./prompts/index.ts"
 
 export { PI_FAMILY }
 
@@ -161,14 +161,20 @@ const scripts = async (): Promise<ReadonlyArray<GeneratedFile>> => {
 }
 
 /**
+ * The folder of the runtime that holds the first-pass prompt sources, relative to the repository
+ * root.
+ */
+export const PROMPTS_SOURCE = "packages/runtime/src/prompts"
+
+/**
  * One prompt template for each of the package's first-pass reviews, which Pi loads from the
- * `prompts` folder the manifest names. The file is the source with the generated note added to its
- * frontmatter.
+ * `prompts` folder the manifest names. The file is the runtime's source, which the Pi launcher also
+ * reads, with the generated note added to its frontmatter.
  */
 const promptFiles = (): ReadonlyArray<GeneratedFile> =>
   PROMPT_TEMPLATES.map(({ name, head, body }) => ({
     path: inPackage(`prompts/${name}.md`),
-    content: `${frontmatter(generatedNote(`${SOURCES}/prompts/${name}.md`), head)}\n${body}\n`,
+    content: `${frontmatter(generatedNote(`${PROMPTS_SOURCE}/${name}.md`), head)}\n${body}\n`,
   }))
 
 const skills = async (family: Family): Promise<ReadonlyArray<GeneratedFile>> =>
