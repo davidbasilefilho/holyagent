@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "make-the-shutdown-comment-and-docs-of",
   "objective": "Make the shutdown comment and docs of the Pi extension in /home/user/holyagent-0.3.0-ext state the 2 s grace bound.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "In /home/user/holyagent-0.3.0-ext/packages/integrations/pi/src/extension.ts, the comment on release and session_shutdown says shutdown settles after every child has exited; change it to say after every child has exited or its stop grace (STOP_GRACE_MS, 2 s, the graceMs option) has passed.",
     "In /home/user/holyagent-0.3.0-ext/docs/pi/extensions.md, where shutdown is described as stopping commands, add that session_shutdown waits for every command the session started, older aborted gathers included, up to the 2 s stop grace each.",
@@ -41,7 +41,9 @@
     "agentId": "workflow:wf_ddd08606-4fc/assignment-0mw7eo7rv-ymx4",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-08T05:42:32.540Z"
+    "startedAt": "2026-11-08T05:42:32.540Z",
+    "finishedAt": "2026-11-08T05:45:25.110Z"
   },
+  "result": "result: Shutdown comment in extension.ts and the session_shutdown sentence in extensions.md now state the 2 s stop grace bound. Build regenerated dist with no diff; verify passes.\nchanged: packages/integrations/pi/src/extension.ts, docs/pi/extensions.md\nchecks:\n- bunx --no-install mise run build -> exit 0, built 38 claude + 16 pi files, no dist diff\n- bunx --no-install mise run verify -> exit 0, lint 183 files clean, tests 1845 pass / 0 fail\nblockers: none\nquestions: none\nnotes: none\nevidence:\n[blocking] The comment and extensions.md state the 2 s stop grace bound on shutdown: extension.ts lines 342-344 (release) and 402-404 (session_shutdown) name STOP_GRACE_MS, 2 s, the graceMs option; extensions.md line 25 adds the 2 s per-command stop grace. Diff: /tmp/claude-0/shutdown-grace.diff\n[blocking] bunx --no-install mise run verify exits 0 and mise run build leaves generated output in sync: verify exit 0 (1845 pass); build exit 0; git status shows only the two source/doc paths changed, dist unchanged. Logs: /tmp/claude-0/build.log, /tmp/claude-0/verify.log\nchanged-paths: packages/integrations/pi/src/extension.ts, docs/pi/extensions.md\n",
   "createdAt": "2026-11-08T05:42:32.540Z"
 }
