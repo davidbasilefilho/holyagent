@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-the-code-side-of-the-kimi-set",
   "objective": "Review the code side of the Kimi set repair on release/0.3.0/feat/kimi-instructions (range 6b0a934..HEAD, worktree /home/user/holyagent-0.3.0-kimi; run commands there): stripCitations in packages/runtime/src/instructions/skills.ts and its use in the Claude agents reader and the pi skills, the CLI_CHECKS per-family test, and the stale JSDoc fix.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Diff: /home/user/holyagent-notes/kimi-repair.diff. Earlier code review: /home/user/holyagent/.git/holyagent/reports/assignment-0mw79mcbn-o9wi.md. Repair report (claims only): /home/user/holyagent/.git/holyagent/reports/assignment-0mw79zweh-mm10.md.",
     "Check that the strip keeps functional markers, cannot remove non-comment text (for example across code fences or an unterminated comment), and leaves the Claude output byte-identical."
@@ -45,7 +45,37 @@
     "agentId": "workflow:wf_e74f9230-3f5/assignment-0mw7adjyt-15bt",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T03:42:16.661Z"
+    "startedAt": "2026-11-08T03:42:16.661Z",
+    "finishedAt": "2026-11-08T03:50:31.474Z"
+  },
+  "result": "result: no blockers. `stripCitations` strips only provenance comments, the Claude output is byte-identical, and `verify` and `build` pass.\n\nThe built-in `/code-review` did not review the requested range. It reported `6b0a934...HEAD` as empty (it saw HEAD as 953b4d5) and reviewed `6b0a934^2..6b0a934`, so its five findings are about the original Kimi commit, not the repair. I rejected them as outside this range and already covered by the earlier review (`assignment-0mw79mcbn-o9wi`).\n\nThe repair was read on HEAD `0e71e52` in `/home/user/holyagent-0.3.0-kimi`; the tree did not change during the review.\n\n- **Markers:** `MARKERS` keeps `<!-- materiality -->` and `<!-- design-core -->`, including indented ones. A test covers this.\n- **Claude output:** the Claude sources contain only those two markers and no other comment, so the strip changes nothing there. `mise run build` exited 0, `git status` was clean afterwards, and the diff against the base touches no Claude dist.\n- **Pi output:** the build left the committed `pi/dist` unchanged, and it contains no `<!--`. Every Kimi and Claude `SKILL.md` is tested for leftover comments.\n- **Unterminated comment:** `a\\n<!-- unterminated\\nb` comes back unchanged.\n- **Tests:** unit tests cover strip, markers and no-op text, plus a `skillFiles` integration test. `CLI_CHECKS` has one entry per family, with the Claude invocations check moved there unchanged.\n- **JSDoc:** the stale `PI_FAMILY` JSDoc is fixed.\n\nOptional findings, none blocking:\n1. A prose `` `<!--` `` earlier in a file pairs with the next `-->` and deletes the text between them. Probe: ``\"a `<!--` x\\n```\\n<!-- keep? -->\\n```\\nb --> c\"`` returned ``\"a `\\n```\\nb --> c\"``. No current source has this pattern. The strip could skip code spans and fences, or this limit could be documented.\n2. Adjacent own-line comments leave an extra blank line (`x\\n\\n\\ny`). CRLF sources keep a blank line. Both are cosmetic.\n3. Two Kimi role files, `worker-visual/purpose.md` and `method.md`, still carry inline citations. They are not wired to any generator yet, so nothing ships them.\n\nevidence:\nstripCitations removes only provenance comments, keeps markers and is tested: `skills.ts` `stripCitations`; `skills.test.ts` (5 unit tests plus a per-family no-comment test); edge probes run in the scratchpad.\nThe Claude output is unchanged and the pi output matches a fresh build: `mise run build` exit 0, `git status --short` empty, no Claude dist in the diff, no `<!--` in `pi/dist`.\nbunx --no-install mise run verify exits 0 on HEAD and mise run build leaves the tree clean: verify exit 0 (1764 pass, 0 fail; type-check, lint and format check clean); build exit 0, tree clean.\nchecks-run: `bunx --no-install mise run verify` -> 0; `bunx --no-install mise run build` -> 0; `bun run` on `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/e.ts` (edge probes) -> 0. I only read the Kimi family text under Pi, not ran it.\nfindings: no blockers; optional findings 1 to 3 above.\n",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "stripCitations correct and tested, Claude output byte-identical, verify and build pass; three optional notes",
+    "criteria": [
+      {
+        "criterion": "stripCitations removes only provenance comments, keeps markers and is tested",
+        "support": "`skills.ts` `stripCitations`; `skills.test.ts` (5 unit tests plus a per-family no-comment test); edge probes run in the scratchpad."
+      },
+      {
+        "criterion": "The Claude output is unchanged and the pi output matches a fresh build",
+        "support": "`mise run build` exit 0, `git status --short` empty, no Claude dist in the diff, no `<!--` in `pi/dist`."
+      },
+      {
+        "criterion": "bunx --no-install mise run verify exits 0 on HEAD and mise run build leaves the tree clean",
+        "support": "verify exit 0 (1764 pass, 0 fail; type-check, lint and format check clean); build exit 0, tree clean."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bunx --no-install mise run verify` -> 0; `bunx --no-install mise run build` -> 0; `bun run` on `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/e.ts` (edge probes) -> 0. I only read the Kimi family text under Pi, not ran it."
+      },
+      {
+        "label": "findings",
+        "support": "no blockers; optional findings 1 to 3 above."
+      }
+    ]
   },
   "createdAt": "2026-11-08T03:42:16.661Z"
 }
