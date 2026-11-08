@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mw7p9zd7-cmiq",
+  "intentId": "intent-0mw7mzreq-mu22",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.security",
+  "slug": "re-assess-the-last-repair-commit-on",
+  "objective": "Re-assess the last repair commit on release/0.3.0/feat/pi-root-wiring against the hardening findings it repairs.",
+  "state": "Running",
+  "scope": [
+    "Read /home/user/holyagent-notes/wire-a-last.diff; sources in /home/user/holyagent-0.3.0-wiring.",
+    "Findings: a project config (pi.enable false, or feature toggles) could lift the root's exclusions and the tool_call gate; a run across reload or resume started ungated; invisible format characters reached notices. Check every config source that feeds the excluded set, whether the home-level read can be spoofed by the project (HOLYAGENT_HOME, a .env, a symlink), and the new character stripping."
+  ],
+  "constraints": [
+    "Read-only; no edits and no version-control writes.",
+    "Report in under 400 words; put long logs in a file under /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "No project file or project config can lift the root's exclusions, gate or prompt",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Notice text carries no control or invisible format characters",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "security-findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7p1c61-4dr1"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T10:39:24.235Z"
+  },
+  "createdAt": "2026-11-08T10:39:24.235Z"
+}
