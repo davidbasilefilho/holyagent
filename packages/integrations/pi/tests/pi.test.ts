@@ -401,6 +401,7 @@ describe("the extension", () => {
       expect(used.toSorted()).toEqual([
         "on before_agent_start",
         "on before_agent_start",
+        "on before_agent_start",
         "on message_end",
         "on session_compact",
         "on session_shutdown",

@@ -7549,41 +7549,6 @@ function isInt(annotations) {
   });
 }
 var Int = /* @__PURE__ */ Number5.check(/* @__PURE__ */ isInt());
-function makeIsMinLength(minLength, minCodePoints, annotations) {
-  return makeFilter2((input) => input.length >= minLength, {
-    expected: `a value with a length of at least ${minLength}`,
-    representation: {
-      id: "effect/schema/isMinLength",
-      payload: {
-        minLength
-      }
-    },
-    toJsonSchema: ({
-      type
-    }) => type === "string" ? minLength <= 1 ? {
-      minLength: minCodePoints
-    } : [{
-      minLength: minCodePoints
-    }, true] : type === "array" ? {
-      minItems: minLength
-    } : type === undefined ? [{
-      minLength: minCodePoints,
-      minItems: minLength
-    }, true] : [{}, true],
-    toCode: () => ({
-      runtime: `Schema.isMinLength(${minLength})`
-    }),
-    [STRUCTURAL_ANNOTATION_KEY]: true,
-    arbitraryConstraint: {
-      minLength
-    },
-    ...annotations
-  });
-}
-function isNonEmpty(annotations) {
-  return makeIsMinLength(1, 1, annotations);
-}
-var NonEmptyString = /* @__PURE__ */ String4.check(/* @__PURE__ */ isNonEmpty());
 var RegExp2 = /* @__PURE__ */ instanceOf(globalThis.RegExp, {
   representation: {
     id: "effect/schema/RegExp",
@@ -11988,7 +11953,7 @@ var VcsSettings = Struct({
 });
 var PiProvider = Literals(["kimi-coding-global"]);
 var Thinking = Literals(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
-var ModelId = NonEmptyString;
+var ModelId = String4.check(isPattern2(/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/));
 var KIMI_ROOT = "k3.1-pro";
 var KIMI_SPECIALIST = "kimi-for-coding";
 var kimi = (model, thinking) => ({ model, thinking });

@@ -2873,6 +2873,7 @@ var catchIf = /* @__PURE__ */ dual((args) => isEffect(args[0]), (self, predicate
   return f(error.success);
 }));
 var mapError = /* @__PURE__ */ dual(2, (self, f) => catchCause(self, (cause) => failCause(causeMap(cause, f))));
+var orDie = (self) => catch_(self, die);
 var orElseSucceed = /* @__PURE__ */ dual(2, (self, f) => catch_(self, (error) => sync(() => f(error))));
 var result = (self) => matchEager(self, {
   onFailure: fail2,
@@ -3474,6 +3475,7 @@ var catch_2 = catch_;
 var catchCause2 = catchCause;
 var catchIf2 = catchIf;
 var mapError2 = mapError;
+var orDie2 = orDie;
 var orElseSucceed2 = orElseSucceed;
 var timeoutOrElse2 = timeoutOrElse;
 var acquireUseRelease2 = acquireUseRelease;
@@ -6344,41 +6346,6 @@ function isInt(annotations) {
   });
 }
 var Int = /* @__PURE__ */ Number5.check(/* @__PURE__ */ isInt());
-function makeIsMinLength(minLength, minCodePoints, annotations) {
-  return makeFilter2((input) => input.length >= minLength, {
-    expected: `a value with a length of at least ${minLength}`,
-    representation: {
-      id: "effect/schema/isMinLength",
-      payload: {
-        minLength
-      }
-    },
-    toJsonSchema: ({
-      type
-    }) => type === "string" ? minLength <= 1 ? {
-      minLength: minCodePoints
-    } : [{
-      minLength: minCodePoints
-    }, true] : type === "array" ? {
-      minItems: minLength
-    } : type === undefined ? [{
-      minLength: minCodePoints,
-      minItems: minLength
-    }, true] : [{}, true],
-    toCode: () => ({
-      runtime: `Schema.isMinLength(${minLength})`
-    }),
-    [STRUCTURAL_ANNOTATION_KEY]: true,
-    arbitraryConstraint: {
-      minLength
-    },
-    ...annotations
-  });
-}
-function isNonEmpty(annotations) {
-  return makeIsMinLength(1, 1, annotations);
-}
-var NonEmptyString = /* @__PURE__ */ String4.check(/* @__PURE__ */ isNonEmpty());
 var RegExp2 = /* @__PURE__ */ instanceOf(globalThis.RegExp, {
   representation: {
     id: "effect/schema/RegExp",
@@ -13814,7 +13781,7 @@ var VcsSettings = Struct({
 });
 var PiProvider = Literals(["kimi-coding-global"]);
 var Thinking = Literals(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
-var ModelId = NonEmptyString;
+var ModelId = String4.check(isPattern2(/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/));
 var KIMI_ROOT = "k3.1-pro";
 var KIMI_SPECIALIST = "kimi-for-coding";
 var kimi = (model, thinking) => ({ model, thinking });
@@ -16405,8 +16372,11 @@ var refuseNonSpecialistWorkflow = (event) => {
 };
 var WORKFLOW_NAME_LIMIT = 80;
 var GRAPHEME_SEGMENTER = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+var CONTROLS = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g;
+var INVISIBLES = /[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g;
+var printable = (raw) => raw.replace(CONTROLS, " ").replace(INVISIBLES, "").trim();
 var sanitizeWorkflowName = (raw) => {
-  const cleaned = raw.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, " ").replace(/[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, "").trim();
+  const cleaned = printable(raw);
   if (cleaned === "")
     return;
   let shown = "";
@@ -16468,7 +16438,7 @@ class CommandFailed extends TaggedError2("CommandFailed") {
 
 class UnknownRole extends TaggedError2("UnknownRole") {
   get message() {
-    return `unknown --${ROLE_FLAG} value "${this.value.slice(0, 40)}": use ${PI_ROLES.join(", ")}; no HolyAgent context was added`;
+    return `unknown --${ROLE_FLAG} value "${this.value.slice(0, 40)}": use ${PI_ROLES.join(", ")}; no HolyAgent context was added, and the session is held to the root's tools and prompt`;
   }
 }
 
@@ -16477,14 +16447,30 @@ class DeadlineExceeded extends TaggedError2("DeadlineExceeded") {
     return `the status took longer than ${this.ms / 1000}s and was stopped`;
   }
 }
+var settingsFor = (config, role) => {
+  const rootArgs = toolArgs(config, "root");
+  return {
+    environment: rootArgs.env,
+    providerEnvironment: providerEnv(config),
+    ...role === "root" ? {
+      rootPrompt: true,
+      tools: { tools: rootArgs.tools, excludeTools: rootArgs.excludeTools }
+    } : {}
+  };
+};
+var refuseExcludedTool = (event, excluded) => excluded.some((pattern) => toolMatches(pattern, event.toolName)) ? {
+  block: true,
+  reason: `The root may not use ${event.toolName}. Delegate the work to a specialist that has it.`
+} : undefined;
 var wrapperPath = (packageRoot, platformPath = nodePath) => toPosix(platformPath.join(packageRoot, "scripts", "holyagent"), platformPath.sep);
-var oneLine = (text) => text.replace(/\s+/g, " ").trim();
+var oneLine = (text) => printable(text).replace(/\s+/g, " ").trim();
 var notice = (text) => ({
   customType: NOTICE_MESSAGE,
   content: `holyagent: ${oneLine(text).slice(0, NOTICE_CHARS)}`,
   display: true
 });
 var NOT_A_REPOSITORY = /not a git repository/i;
+var SPAWN_FAILURE = /^spawn \S+ E[A-Z0-9]+$/;
 var reasonOf = (result) => {
   if (result.killed)
     return "it timed out or was stopped";
@@ -16553,8 +16539,18 @@ var createExtension = ({
   const decodeConfig = decodeUnknownEffect2(fromJsonString2(Config), {
     onExcessProperty: "error"
   });
+  const roleOf = suspend2(() => {
+    const flag = isChild() ? "specialist" : pi.getFlag(ROLE_FLAG) ?? DEFAULT_PI_ROLE;
+    return decodeUnknownEffect2(PiRoleSchema)(flag).pipe(mapError2(() => new UnknownRole({ value: String(flag) })));
+  });
+  const closedSettings = (config) => gen2(function* () {
+    const role = yield* roleOf.pipe(orElseSucceed2(() => DEFAULT_PI_ROLE));
+    return settingsFor(config ?? (yield* defaultConfig), role);
+  }).pipe(orDie2);
   const collect = (cwd, signal, reason) => {
-    let configured = {};
+    let configured;
+    let read;
+    const failed = (text) => (configured === undefined ? closedSettings(read) : succeed5(configured)).pipe(map4((kept) => ({ ...kept, delivery: notice(text) })));
     return gen2(function* () {
       const project = resolve3(cwd);
       const located = yield* topOf(signal, project);
@@ -16562,21 +16558,13 @@ var createExtension = ({
         holyagent(signal, project, "config", join(located.top, STATE_DIRECTORY)).pipe(flatMap2(decodeConfig)),
         result2(stateFolderOf(signal, project, located))
       ], { concurrency: "unbounded" });
+      read = config;
       if (!config.pi.enable) {
         const userOff = yield* holyagent(signal, project, "config").pipe(flatMap2(decodeConfig), map4((user) => !user.pi.enable), orElseSucceed2(() => false));
         return userOff ? { enabled: false, gatesOff: true } : { enabled: false };
       }
-      const flag = isChild() ? "specialist" : pi.getFlag(ROLE_FLAG) ?? DEFAULT_PI_ROLE;
-      const role = yield* decodeUnknownEffect2(PiRoleSchema)(flag).pipe(mapError2(() => new UnknownRole({ value: String(flag) })));
-      const rootArgs = toolArgs(config, "root");
-      configured = {
-        environment: rootArgs.env,
-        providerEnvironment: providerEnv(config),
-        ...role === "root" ? {
-          rootPrompt: true,
-          tools: { tools: rootArgs.tools, excludeTools: rootArgs.excludeTools }
-        } : {}
-      };
+      const role = yield* roleOf;
+      configured = settingsFor(config, role);
       const status = yield* holyagent(signal, project, "status").pipe(flatMap2((text) => parseOutput("status", text)));
       const reconcile = RECONCILED.has(reason) ? yield* holyagent(signal, project, "reconcile").pipe(flatMap2((text) => parseOutput("reconcile", text))) : undefined;
       const directory = yield* fromResult2(folder);
@@ -16590,10 +16578,7 @@ var createExtension = ({
     }).pipe(timeoutOrElse2({
       duration: deadlineMs,
       orElse: () => fail5(new DeadlineExceeded({ ms: deadlineMs }))
-    }), catch_2((error) => succeed5({ ...configured, delivery: notice(error.message) })), catchCause2((cause) => succeed5({
-      ...configured,
-      delivery: notice(pretty(cause))
-    })));
+    }), catch_2((error) => failed(error.message)), catchCause2((cause) => failed(pretty(cause))));
   };
   const release = () => {
     const taken = held;
@@ -16608,8 +16593,13 @@ var createExtension = ({
   const checkProvider = (signal, config) => {
     let unanswered = false;
     const run = (command, args) => exec(signal, command, args).pipe(map4((result) => {
-      unanswered ||= result.killed;
-      return { exitCode: result.code, stdout: result.stdout, stderr: result.stderr };
+      const unstarted = result.code === 1 && result.stdout === "" && SPAWN_FAILURE.test(result.stderr.trim());
+      unanswered ||= result.killed || unstarted;
+      return {
+        exitCode: unstarted ? 127 : result.code,
+        stdout: result.stdout,
+        stderr: result.stderr
+      };
     }), catch_2(() => {
       unanswered = true;
       return succeed5({ exitCode: 127, stdout: "", stderr: "" });
@@ -16651,12 +16641,20 @@ var createExtension = ({
         taken.rootPrompt = true;
       else if (result?.enabled === false)
         taken.rootPrompt = false;
-      if (reason === "compact")
-        return result;
-      if (result?.config !== undefined)
-        startProviderCheck(taken, result.config);
-      const failure = result?.tools === undefined ? undefined : applyRootTools(result.tools);
-      return failure === undefined || result === undefined ? result : { ...result, delivery: result.delivery ?? failure };
+      if (result?.tools !== undefined)
+        taken.excluded = result.tools.excludeTools;
+      else if (result?.enabled === false)
+        taken.excluded = [];
+      if (result?.providerEnvironment !== undefined)
+        applyEnvironment(env, result.providerEnvironment, true);
+      if (!taken.started && result?.enabled !== false) {
+        taken.started = true;
+        if (result?.config !== undefined)
+          startProviderCheck(taken, result.config);
+        if (result?.tools !== undefined)
+          taken.toolsNotice = applyRootTools(result.tools);
+      }
+      return result;
     });
     return taken.pending.then(() => {
       return;
@@ -16674,8 +16672,11 @@ var createExtension = ({
       pending: undefined,
       gatesOff: false,
       rootPrompt: false,
+      excluded: [],
+      started: false,
       probe: undefined,
-      readiness: undefined
+      readiness: undefined,
+      toolsNotice: undefined
     };
     return gather(held, ctx, event.reason);
   });
@@ -16690,8 +16691,6 @@ var createExtension = ({
     if (taken !== undefined)
       taken.pending = undefined;
     const result = (collected) => {
-      if (collected?.providerEnvironment !== undefined)
-        applyEnvironment(env, collected.providerEnvironment, true);
       if (!child && collected?.environment !== undefined)
         applyEnvironment(env, { ...collected.environment, [CACHE_RETENTION_ENV]: "long" }, true);
       const rooted = !child && taken?.rootPrompt === true ? `${fillPackageRoot(PI_ROOT_PROMPT, packageRoot, platformPath)}
@@ -16704,12 +16703,14 @@ ${event.systemPrompt}` : undefined;
     };
     return pending === undefined ? result(undefined) : pending.then(result);
   });
-  pi.on("before_agent_start", () => {
-    const message = isChild() ? undefined : held?.readiness;
+  const noticeOnce = (slot) => () => {
+    const message = isChild() ? undefined : held?.[slot];
     if (held !== undefined)
-      held.readiness = undefined;
+      held[slot] = undefined;
     return message === undefined ? undefined : { message };
-  });
+  };
+  pi.on("before_agent_start", noticeOnce("toolsNotice"));
+  pi.on("before_agent_start", noticeOnce("readiness"));
   pi.on("message_end", (event) => {
     if (!isChild())
       return;
@@ -16717,7 +16718,7 @@ ${event.systemPrompt}` : undefined;
     return message === undefined ? undefined : { message };
   });
   pi.registerToolRenderer(workflowRenderers);
-  pi.on("tool_call", (event) => held?.gatesOff === true ? undefined : runPromise2(refuseNonSpecialistWorkflow(event).pipe(map4((refusal) => refuseNonSpecialist(event) ?? refusal))));
+  pi.on("tool_call", (event) => held?.gatesOff === true ? undefined : refuseExcludedTool(event, held?.excluded ?? []) ?? runPromise2(refuseNonSpecialistWorkflow(event).pipe(map4((refusal) => refuseNonSpecialist(event) ?? refusal))));
   pi.on("session_shutdown", () => release());
 };
 var extension_default = createExtension();
@@ -16744,6 +16745,7 @@ export {
   fillPackageRoot,
   hostEnvironment,
   memoizeLast,
+  refuseExcludedTool,
   refuseNonSpecialist,
   refuseNonSpecialistWorkflow,
   sanitizeWorkflowName,
