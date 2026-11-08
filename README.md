@@ -8,7 +8,7 @@ HolyAgent ships as a Claude Code plugin and as a [Pi package](docs/usage.md#pi).
 
 ## How do I install it?
 
-You need Claude Code at or above the minimum in [docs/requirements.md](docs/requirements.md#claude-code-version), [Bun](https://bun.sh) on your `PATH` (the plugin's hooks run it), Node.js LTS (22.13 or later, 22.19 or later on Windows), `git` and an authenticated `gh`. On a clean WSL Ubuntu or native Windows machine, `install/wsl-install.sh` and `install/windows-install.ps1` install everything except Claude Code, and install mise only when you pass `--dev` or `-Dev` ([docs/usage.md](docs/usage.md#install)). The full list is in [docs/requirements.md](docs/requirements.md). Then, from a shell:
+You need Claude Code at or above the minimum in [docs/requirements.md](docs/requirements.md#claude-code-version), [Bun](https://bun.sh) on your `PATH` (the plugin's hooks run it), Node.js LTS (22.13 or later, 22.19 or later on Windows; the optional Pi integration needs 22.19 or later on every OS, see [docs/pi/installation.md](docs/pi/installation.md)), `git` and an authenticated `gh`. On a clean WSL Ubuntu or native Windows machine, `install/wsl-install.sh` and `install/windows-install.ps1` install everything except Claude Code, and install mise only when you pass `--dev` or `-Dev` ([docs/usage.md](docs/usage.md#install)). The full list is in [docs/requirements.md](docs/requirements.md). Then, from a shell:
 
 ```sh
 claude plugin marketplace add davidbasilefilho/holyagent

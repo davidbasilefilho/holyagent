@@ -1,6 +1,6 @@
 # Pi prompt caching, context compression, sub-agents and context reuse
 
-**Status: planned for 0.3.0. The first two sections are the plan for the cache target and for compression; the sections after them are research on Pi's caching and sub-agents and are not shipped behaviour.**
+**Status: partly built. `holyagent setup` installs `billion-context` at its pin while `pi.features.contextCompression` is on, as the default config has it ([Context compression](#context-compression-with-billion-context)). Planned and not built: the setting that turns off its own subagents (`holyagent setup` does not write it) and the measurement of the cache target, which no code performs ([Cache target](#cache-target)). The sections after the first two are research on Pi's caching and sub-agents and are not shipped behaviour.**
 
 Pi 1.4.0, commit `4a080252f06caf63a525d7873c5d94d3c23887e0` (the plan pins 1.5.0; see [README.md](README.md#version-risk)). Kimi facts are from the research of 2026-11-07. "Inference:" marks a conclusion drawn here, not a stated fact.
 
