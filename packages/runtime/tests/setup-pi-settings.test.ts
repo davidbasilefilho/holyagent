@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { chmod, mkdir, readdir, stat, writeFile } from "node:fs/promises"
+import { chmod, mkdir, readdir, rm, stat, symlink, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
 import { Effect } from "effect"
@@ -298,6 +298,109 @@ describe("holyagent setup, Pi tool settings", () => {
     expect(await exists(globalSubagents())).toBe(false)
   })
 
+  test("project and local scope leave a key the user's global file sets, whatever its value", async () => {
+    await write(globalSettings(), {
+      ...FULL(),
+      "pi-computer-use": { confirmAppLaunch: true },
+    })
+    await write(globalKimi(), { tools: { moonshot_search: { enabled: false } } })
+    for (const scope of ["project", "local"] as const) {
+      const report = await runSetup(withPi(), { scope })
+      expect(report.ok).toBe(true)
+      expect(await read(projectPi("settings.json"))).toEqual({
+        ...CODEMODE,
+        "pi-computer-use": { confirmDangerousActions: false },
+      })
+      expect(await read(projectPi("providers", "kimi-coding", "config.json"))).toEqual({
+        tools: { moonshot_fetch: { enabled: true } },
+      })
+      const lines = toolLines(report).join("\n")
+      expect(lines).toContain("left out, set in your global file: pi-computer-use.confirmAppLaunch")
+      expect(lines).toContain("left out, set in your global file: tools.moonshot_search.enabled")
+    }
+    // The global files are as the user left them.
+    expect(await read(globalKimi())).toEqual({ tools: { moonshot_search: { enabled: false } } })
+  })
+
+  test("a global file that is not a JSON object stops the project write with a failed line", async () => {
+    await write(globalSubagents(), "{ not json")
+    const report = await runSetup(withPi(), { scope: "project" })
+    expect(report.ok).toBe(false)
+    const failure = toolLines(report).find((line) => line.includes(globalSubagents()))
+    expect(failure).toStartWith("! tool settings: ")
+    expect(await exists(projectPi("subagents.json"))).toBe(false)
+  })
+
+  test("project and local scope refuse a symlinked .pi folder and write nothing through it", async () => {
+    const elsewhere = join(home, "elsewhere")
+    await mkdir(elsewhere, { recursive: true })
+    await symlink(elsewhere, projectPi())
+    for (const scope of ["project", "local"] as const) {
+      const report = await runSetup(withPi(), { scope })
+      expect(report.ok).toBe(false)
+      const failures = toolLines(report).filter((line) => line.startsWith("! "))
+      expect(failures.length).toBeGreaterThan(0)
+      for (const line of failures) expect(line).toContain(`${projectPi()} is a symlink`)
+      expect(await readdir(elsewhere)).toEqual([])
+    }
+  })
+
+  test("project and local scope refuse a symlinked settings file, and the other files are still written", async () => {
+    await installed()
+    const before = await Bun.file(globalSettings()).text()
+    await mkdir(projectPi(), { recursive: true })
+    await symlink(globalSettings(), projectPi("settings.json"))
+    for (const scope of ["project", "local"] as const) {
+      const report = await runSetup(withPi(), { scope })
+      expect(report.ok).toBe(false)
+      expect(toolLines(report)).toContain(
+        `! tool settings: ${projectPi("settings.json")} is a symlink; refusing to write through it in the ${scope} scope. Replace it with a real file and run again`,
+      )
+      expect(await Bun.file(globalSettings()).text()).toBe(before)
+      expect(await read(projectPi("providers", "kimi-coding", "config.json"))).toEqual(KIMI)
+    }
+  })
+
+  test("a symlink below the .pi folder is refused too", async () => {
+    const elsewhere = join(home, "elsewhere")
+    await mkdir(elsewhere, { recursive: true })
+    await mkdir(projectPi(), { recursive: true })
+    await symlink(elsewhere, projectPi("providers"))
+    const report = await runSetup(withPi(), { scope: "project" })
+    expect(report.ok).toBe(false)
+    expect(toolLines(report).join("\n")).toContain(`${projectPi("providers")} is a symlink`)
+    expect(await readdir(elsewhere)).toEqual([])
+  })
+
+  test("user scope still writes through a symlinked file, as before", async () => {
+    await installed()
+    const real = join(home, "dotfiles", "subagents.json")
+    await write(real, {})
+    await symlink(real, globalSubagents())
+    const report = await runSetup(withPi())
+    expect(report.ok).toBe(true)
+    expect(await read(real)).toEqual(SUBAGENTS)
+  })
+
+  test("a record that cannot be written after the file is a failed line naming the file", async () => {
+    await installed()
+    // A leftover temporary file makes the record's own write fail, while reading it still works.
+    await write(
+      join(dirname(recordPath({ HOME: home })), `.setup-records.json.${process.pid}.tmp`),
+      "",
+    )
+    const report = await runSetup(withPi())
+    expect(report.ok).toBe(false)
+    expect(await read(globalSubagents())).toEqual(SUBAGENTS)
+    expect(
+      toolLines(report).some((line) =>
+        line.startsWith(
+          `! tool settings: ${globalSubagents()} was written, but its keys could not be recorded`,
+        ),
+      ),
+    ).toBe(true)
+  })
+
   test("a user-scope setup ignores the repository's config", async () => {
     await installed()
     await setProjectConfig({ pi: { features: { subagents: false } } })
@@ -339,6 +442,24 @@ describe("holyagent doctor, Pi tool settings", () => {
       // Billion Context has no project file, so there is nothing to ask for at this scope.
       expect(toolLines(report).join("\n")).not.toContain("billion-context")
     }
+  })
+
+  test("a key the global file sets is not missing at project scope, and a symlinked folder is reported", async () => {
+    await write(globalSettings(), {
+      ...FULL(),
+      "pi-computer-use": { confirmAppLaunch: true, confirmDangerousActions: true },
+    })
+    const lines = toolLines(await runDoctor(withPi(), { scope: "project" })).join("\n")
+    expect(lines).toContain(projectPi("settings.json"))
+    expect(lines).toContain(`${projectPi("settings.json")} lacks codemode.mode;`)
+    expect(lines).not.toContain("pi-computer-use")
+
+    const elsewhere = join(home, "elsewhere")
+    await mkdir(elsewhere, { recursive: true })
+    await symlink(elsewhere, projectPi())
+    const linked = toolLines(await runDoctor(withPi(), { scope: "project" }))
+    expect(linked.length).toBeGreaterThan(0)
+    for (const line of linked) expect(line).toContain(`${projectPi()} is a symlink`)
   })
 
   test("is quiet once setup has run, and after the user chose other values", async () => {
@@ -469,11 +590,32 @@ describe("holyagent setup --undo, Pi tool settings", () => {
 
   test("project scope backs out the project's files only", async () => {
     await installed()
-    await runSetup(withPi())
+    // Project first: a key the global file sets is left out of the project's files.
     await runSetup(withPi(), { scope: "project" })
+    await runSetup(withPi())
     await runSetup(withPi(), { scope: "project", undo: true })
     expect(await read(projectPi("subagents.json"))).toEqual({})
     expect(await read(globalSubagents())).toEqual(SUBAGENTS)
+  })
+
+  test("project and local scope refuse to undo through a symlink", async () => {
+    await installed()
+    for (const scope of ["project", "local"] as const) {
+      await runSetup(withPi(), { scope })
+      // The repository swaps the settings file for a link to the user's own, holding the same values.
+      await write(globalSettings(), { ...FULL(), ...CODEMODE, ...COMPUTER_USE })
+      const globalBefore = await Bun.file(globalSettings()).text()
+      await rm(projectPi("settings.json"))
+      await symlink(globalSettings(), projectPi("settings.json"))
+      const report = await runSetup(withPi(), { scope, undo: true })
+      expect(report.ok).toBe(false)
+      expect(toolLines(report)).toContain(
+        `! tool settings: ${projectPi("settings.json")} is a symlink; refusing to edit through it in the ${scope} scope. Replace it with a real file and run again`,
+      )
+      expect(await Bun.file(globalSettings()).text()).toBe(globalBefore)
+      await rm(projectPi(), { recursive: true })
+      await write(globalSettings(), FULL())
+    }
   })
 
   test("a file that is not a JSON object is a failed line and stays as it is", async () => {

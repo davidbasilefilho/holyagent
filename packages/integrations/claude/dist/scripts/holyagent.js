@@ -22389,7 +22389,7 @@ var piChecks = (env, cwd, scope) => gen2(function* () {
   }));
 });
 
-import { join as join17, resolve as resolve7 } from "path";
+import { join as join17, relative as relative6, resolve as resolve7, sep as sep7 } from "path";
 
 var T3_PREFIX = "mcp__t3*code__";
 var T3_VISUAL_TOOLS = [
@@ -22493,22 +22493,49 @@ var planFor = (env, cwd, scope, config) => {
       unplaced.push(logical);
       continue;
     }
-    const defaults = PACKAGE_DEFAULTS.get(logical);
-    const isDefault = ({ path, value }) => defaults !== undefined && equals(valueAt3(defaults, path), value);
     targets.push({
       file,
-      keys: all.filter((key) => !isDefault(key)),
-      atDefault: all.filter(isDefault).map(({ path }) => path.join("."))
+      global: scope === "user" ? undefined : locate2(env, cwd, "user", logical),
+      all,
+      defaults: PACKAGE_DEFAULTS.get(logical)
     });
   }
   return { targets, unplaced };
 };
+var resolveTarget = fn2("resolveToolSettingsTarget")(function* (target) {
+  const global = target.global === undefined ? undefined : yield* readJsonObject(target.global);
+  const setGlobally = (key) => global !== undefined && applyDefaults(global, [key]).entries[0]?.status !== "added";
+  const isDefault = ({ path, value }) => target.defaults !== undefined && equals(valueAt3(target.defaults, path), value);
+  const free = target.all.filter((key) => !setGlobally(key));
+  return {
+    file: target.file,
+    keys: free.filter((key) => !isDefault(key)),
+    atDefault: free.filter(isDefault).map(({ path }) => path.join(".")),
+    atGlobal: target.all.filter(setGlobally).map(({ path }) => path.join("."))
+  };
+});
+var refuseLinks = fn2("refuseProjectLinks")(function* (cwd, scope, file, action) {
+  if (scope === "user")
+    return;
+  const parts = relative6(cwd, file).split(sep7);
+  for (let depth = 1;depth <= parts.length; depth++) {
+    const path = join17(cwd, ...parts.slice(0, depth));
+    if (yield* isSymlink(path)) {
+      return yield* new SetupFailure({
+        message: `${path} is a symlink; refusing to ${action} through it in the ${scope} scope. Replace it with a real ${depth === parts.length ? "file" : "folder"} and run again`
+      });
+    }
+  }
+});
 var planAt = (env, cwd, scope) => loadPiConfig(env, cwd, scope).pipe(map4((config) => config.pi.enable ? planFor(env, cwd, scope, config) : undefined), orElseSucceed2(() => {
   return;
 }));
 var label = "tool settings";
-var mergeTarget = fn2("mergeToolSettingsFile")(function* (env, target, dryRun) {
-  const { file } = target;
+var mergeTarget = fn2("mergeToolSettingsFile")(function* (env, options, planned) {
+  const { dryRun } = options;
+  const { file } = planned;
+  yield* refuseLinks(options.cwd, options.scope, file, "write");
+  const target = yield* resolveTarget(planned);
   const existing = yield* readJsonObject(file);
   const { merged, entries } = applyDefaults(existing, target.keys);
   const added = entries.filter((entry) => entry.status === "added");
@@ -22518,7 +22545,9 @@ var mergeTarget = fn2("mergeToolSettingsFile")(function* (env, target, dryRun) {
     const names = new Set(added.map((entry) => entry.path));
     yield* readRecorded(env, file);
     yield* writeJsonObject(file, merged);
-    yield* addRecorded(env, file, target.keys.filter(({ path }) => names.has(path.join("."))));
+    yield* addRecorded(env, file, target.keys.filter(({ path }) => names.has(path.join(".")))).pipe(mapError2((error) => new SetupFailure({
+      message: `${file} was written, but its keys could not be recorded, so --undo will not remove them: ${error.message}`
+    })));
   }
   const parts = [
     ...added.length === 0 ? [] : [
@@ -22526,6 +22555,7 @@ var mergeTarget = fn2("mergeToolSettingsFile")(function* (env, target, dryRun) {
     ],
     ...present.length === 0 ? [] : [`already set: ${present.map((entry) => entry.path).join(", ")}`],
     ...kept.map((entry) => `kept ${entry.path} ${show(entry.value)} (HolyAgent sets ${show(entry.wanted)}; yours wins)`),
+    ...target.atGlobal.length === 0 ? [] : [`left out, set in your global file: ${target.atGlobal.join(", ")}`],
     ...target.atDefault.length === 0 ? [] : [`left out, the package default: ${target.atDefault.join(", ")}`]
   ];
   const mark = added.length > 0 ? "+" : kept.length > 0 ? "~" : "=";
@@ -22537,7 +22567,7 @@ var installPiToolSettings = fn2("installPiToolSettings")(function* (env, options
     return [];
   const lines = [];
   for (const target of plan.targets) {
-    lines.push(yield* mergeTarget(env, target, options.dryRun).pipe(catchTag2("SetupFailure", (error) => succeed6(`! ${label}: ${error.message}`))));
+    lines.push(yield* mergeTarget(env, options, target).pipe(catchTag2("SetupFailure", (error) => succeed6(`! ${label}: ${error.message}`))));
   }
   for (const logical of plan.unplaced) {
     lines.push(skipped(`${label} ${logical}: has no file at ${options.scope} scope; run \`holyagent setup\` at user scope`));
@@ -22552,6 +22582,7 @@ var undoPiToolSettings = fn2("undoPiToolSettings")(function* (env, options) {
       const recorded = yield* readRecorded(env, file);
       if (recorded.length === 0)
         return [];
+      yield* refuseLinks(options.cwd, options.scope, file, "edit");
       let result = yield* readJsonObject(file);
       const removed = [];
       const kept = [];
@@ -22588,11 +22619,14 @@ var checkPiToolSettings = (env, cwd, scope) => gen2(function* () {
   if (plan === undefined)
     return [];
   const lines = [];
-  for (const target of plan.targets) {
-    lines.push(...yield* readJsonObject(target.file).pipe(map4((existing) => {
+  for (const planned of plan.targets) {
+    lines.push(...yield* gen2(function* () {
+      yield* refuseLinks(cwd, scope, planned.file, "write");
+      const target = yield* resolveTarget(planned);
+      const existing = yield* readJsonObject(target.file);
       const missing = applyDefaults(existing, target.keys).entries.filter((entry) => entry.status === "added").map((entry) => entry.path);
       return missing.length === 0 ? [] : [hint(`${label} ${target.file} lacks ${missing.join(", ")}; ${fixFor(scope)}`)];
-    }), catchTag2("SetupFailure", (error) => succeed6([
+    }).pipe(catchTag2("SetupFailure", (error) => succeed6([
       hint(`${label}: ${error.message}; fix the file, then ${fixFor(scope)}`)
     ]))));
   }

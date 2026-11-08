@@ -1,4 +1,4 @@
-import { join, resolve } from "node:path"
+import { join, relative, resolve, sep } from "node:path"
 
 import { Effect, Equal } from "effect"
 
@@ -11,6 +11,7 @@ import {
   toolSettings,
 } from "../pi/tools.ts"
 import { type Env, firstNonEmpty, homeDirectory } from "./environment.ts"
+import { SetupFailure } from "./errors.ts"
 import {
   applyDefaults,
   type Default,
@@ -23,7 +24,7 @@ import { loadPiConfig, piAgentDirectory, piInUse } from "./pi-check.ts"
 import type { PiInstallOptions } from "./pi-install.ts"
 import { addRecorded, clearRecorded, readRecorded } from "./record.ts"
 import { hint, show, skipped } from "./report.ts"
-import type { Scope } from "./scope.ts"
+import { isSymlink, type Scope } from "./scope.ts"
 import { take } from "./settings.ts"
 
 /**
@@ -111,11 +112,16 @@ const locate = (env: Env, cwd: string, scope: Scope, logical: string): string | 
   return project || !logical.startsWith("~/") ? undefined : join(home, logical.slice(2))
 }
 
-/** One settings file setup writes: the keys to set, and the leaves left out for equalling a default. */
+/**
+ * One settings file setup may write: every leaf {@link toolSettings} asks for, where the user's
+ * global file for it is (at project and local scope), and the package defaults of the file.
+ */
 interface Target {
   readonly file: string
-  readonly keys: ReadonlyArray<Default>
-  readonly atDefault: ReadonlyArray<string>
+  /** The user-scope file of the same settings, set at project and local scope only. */
+  readonly global: string | undefined
+  readonly all: ReadonlyArray<Default>
+  readonly defaults: JsonObject | undefined
 }
 
 /** What {@link toolSettings} asks for at a scope: the files to write, and files with no place there. */
@@ -137,17 +143,69 @@ const planFor = (env: Env, cwd: string, scope: Scope, config: Config): Plan => {
       unplaced.push(logical)
       continue
     }
-    const defaults = PACKAGE_DEFAULTS.get(logical)
-    const isDefault = ({ path, value }: Default) =>
-      defaults !== undefined && Equal.equals(valueAt(defaults, path), value)
     targets.push({
       file,
-      keys: all.filter((key) => !isDefault(key)),
-      atDefault: all.filter(isDefault).map(({ path }) => path.join(".")),
+      global: scope === "user" ? undefined : locate(env, cwd, "user", logical),
+      all,
+      defaults: PACKAGE_DEFAULTS.get(logical),
     })
   }
   return { targets, unplaced }
 }
+
+/** A {@link Target} after layering: the keys to set, and the leaves left out and why. */
+interface Resolved {
+  readonly file: string
+  readonly keys: ReadonlyArray<Default>
+  readonly atDefault: ReadonlyArray<string>
+  readonly atGlobal: ReadonlyArray<string>
+}
+
+/**
+ * Layers a target. At project and local scope a key the user's global file already sets, to any
+ * value, is left out: the global value is the user's choice and a repository's file must not
+ * override it (a user's `off` wins for the risky settings). Of the rest, a key equal to the package
+ * default is left out, since writing it would only freeze today's default. Because a global key is
+ * never written at project scope, leaving a default out there cannot hide a global value. Fails
+ * with SetupFailure when the global file is not a JSON object, since what it sets is unknown.
+ */
+const resolveTarget = Effect.fn("resolveToolSettingsTarget")(function* (target: Target) {
+  const global = target.global === undefined ? undefined : yield* readJsonObject(target.global)
+  const setGlobally = (key: Default) =>
+    global !== undefined && applyDefaults(global, [key]).entries[0]?.status !== "added"
+  const isDefault = ({ path, value }: Default) =>
+    target.defaults !== undefined && Equal.equals(valueAt(target.defaults, path), value)
+  const free = target.all.filter((key) => !setGlobally(key))
+  return {
+    file: target.file,
+    keys: free.filter((key) => !isDefault(key)),
+    atDefault: free.filter(isDefault).map(({ path }) => path.join(".")),
+    atGlobal: target.all.filter(setGlobally).map(({ path }) => path.join(".")),
+  } satisfies Resolved
+})
+
+/**
+ * Refuses a symlinked `.pi` folder, folder below it or settings file at project and local scope, so
+ * a repository cannot redirect a write (or an `--undo`) to a file outside the project, as the
+ * Claude settings step does for `.claude`. Scope `user` follows its links, as before.
+ */
+const refuseLinks = Effect.fn("refuseProjectLinks")(function* (
+  cwd: string,
+  scope: Scope,
+  file: string,
+  action: string,
+) {
+  if (scope === "user") return
+  const parts = relative(cwd, file).split(sep)
+  for (let depth = 1; depth <= parts.length; depth++) {
+    const path = join(cwd, ...parts.slice(0, depth))
+    if (yield* isSymlink(path)) {
+      return yield* new SetupFailure({
+        message: `${path} is a symlink; refusing to ${action} through it in the ${scope} scope. Replace it with a real ${depth === parts.length ? "file" : "folder"} and run again`,
+      })
+    }
+  }
+})
 
 /**
  * The plan for a scope from the HolyAgent config that scope reads ({@link loadPiConfig}), or
@@ -165,10 +223,13 @@ const label = "tool settings"
 /** Merges one target into its file and returns its report line. */
 const mergeTarget = Effect.fn("mergeToolSettingsFile")(function* (
   env: Env,
-  target: Target,
-  dryRun: boolean,
+  options: PiInstallOptions,
+  planned: Target,
 ) {
-  const { file } = target
+  const { dryRun } = options
+  const { file } = planned
+  yield* refuseLinks(options.cwd, options.scope, file, "write")
+  const target = yield* resolveTarget(planned)
   const existing = yield* readJsonObject(file)
   const { merged, entries } = applyDefaults(existing, target.keys)
   const added = entries.filter((entry) => entry.status === "added")
@@ -179,10 +240,18 @@ const mergeTarget = Effect.fn("mergeToolSettingsFile")(function* (
     // Read the record first, so one that cannot be decoded stops the run before the file changes.
     yield* readRecorded(env, file)
     yield* writeJsonObject(file, merged)
+    // The keys are in the file now, so a record that fails here is named: `--undo` would skip them.
     yield* addRecorded(
       env,
       file,
       target.keys.filter(({ path }) => names.has(path.join("."))),
+    ).pipe(
+      Effect.mapError(
+        (error) =>
+          new SetupFailure({
+            message: `${file} was written, but its keys could not be recorded, so --undo will not remove them: ${error.message}`,
+          }),
+      ),
     )
   }
   const parts = [
@@ -198,6 +267,9 @@ const mergeTarget = Effect.fn("mergeToolSettingsFile")(function* (
       (entry) =>
         `kept ${entry.path} ${show(entry.value)} (HolyAgent sets ${show(entry.wanted)}; yours wins)`,
     ),
+    ...(target.atGlobal.length === 0
+      ? []
+      : [`left out, set in your global file: ${target.atGlobal.join(", ")}`]),
     ...(target.atDefault.length === 0
       ? []
       : [`left out, the package default: ${target.atDefault.join(", ")}`]),
@@ -211,14 +283,16 @@ const mergeTarget = Effect.fn("mergeToolSettingsFile")(function* (
  * the HolyAgent config of the scope into the files the Pi packages read them from, one report line
  * per file. A key is written only where it is unset in the file and its value differs from the
  * package's own default ({@link PACKAGE_DEFAULTS}); a value the user set stays, whatever it is, so
- * a user's `off` wins for the risky settings too. Keys the file already holds are never touched.
- * The keys it adds are recorded outside the project, which is what {@link undoPiToolSettings}
- * removes. Scope `user` writes Pi's global files, `project` and `local` the project's `.pi` folder
- * (Billion Context's file, which has no project location, is skipped with a `-` line). A file that
- * is not a JSON object is a `!` line and stays as it is, and the other files are still written.
- * Each write goes through a temporary file renamed over the target. With `dryRun` nothing is
- * written or recorded. With `pi.enable` off, or a config that cannot be loaded, there are no
- * lines.
+ * a user's `off` wins for the risky settings too. At project and local scope a key the user's
+ * global file sets is not written either ({@link resolveTarget}), and a symlinked `.pi` folder or
+ * file is a `!` line with nothing written ({@link refuseLinks}). Keys the file already holds are
+ * never touched. The keys it adds are recorded outside the project, which is what
+ * {@link undoPiToolSettings} removes. Scope `user` writes Pi's global files, `project` and `local`
+ * the project's `.pi` folder (Billion Context's file, which has no project location, is skipped
+ * with a `-` line). A file that is not a JSON object is a `!` line and stays as it is, and the
+ * other files are still written. Each write goes through a temporary file renamed over the target.
+ * With `dryRun` nothing is written or recorded. With `pi.enable` off, or a config that cannot be
+ * loaded, there are no lines.
  */
 export const installPiToolSettings = Effect.fn("installPiToolSettings")(function* (
   env: Env,
@@ -229,7 +303,7 @@ export const installPiToolSettings = Effect.fn("installPiToolSettings")(function
   const lines: Array<string> = []
   for (const target of plan.targets) {
     lines.push(
-      yield* mergeTarget(env, target, options.dryRun).pipe(
+      yield* mergeTarget(env, options, target).pipe(
         Effect.catchTag("SetupFailure", (error) => Effect.succeed(`! ${label}: ${error.message}`)),
       ),
     )
@@ -252,7 +326,8 @@ export const installPiToolSettings = Effect.fn("installPiToolSettings")(function
  * record of the file is cleared after a real run. It follows the record, not the config or Pi's
  * presence, so a feature turned off since still gets its keys backed out. Files with no record get
  * no line, and a file that is not a JSON object is a `!` line left as it is. With `dryRun` nothing
- * is written and the record stays.
+ * is written and the record stays. At project and local scope a symlinked `.pi` folder or file is a
+ * `!` line and nothing is edited through it.
  */
 export const undoPiToolSettings = Effect.fn("undoPiToolSettings")(function* (
   env: Env,
@@ -267,6 +342,7 @@ export const undoPiToolSettings = Effect.fn("undoPiToolSettings")(function* (
       ...(yield* Effect.gen(function* () {
         const recorded = yield* readRecorded(env, file)
         if (recorded.length === 0) return []
+        yield* refuseLinks(options.cwd, options.scope, file, "edit")
         let result = yield* readJsonObject(file)
         const removed: Array<string> = []
         const kept: Array<string> = []
@@ -320,17 +396,19 @@ export const checkPiToolSettings = (env: Env, cwd: string, scope: Scope) =>
     const plan = yield* planAt(env, cwd, scope)
     if (plan === undefined) return []
     const lines: Array<string> = []
-    for (const target of plan.targets) {
+    for (const planned of plan.targets) {
       lines.push(
-        ...(yield* readJsonObject(target.file).pipe(
-          Effect.map((existing) => {
-            const missing = applyDefaults(existing, target.keys)
-              .entries.filter((entry) => entry.status === "added")
-              .map((entry) => entry.path)
-            return missing.length === 0
-              ? []
-              : [hint(`${label} ${target.file} lacks ${missing.join(", ")}; ${fixFor(scope)}`)]
-          }),
+        ...(yield* Effect.gen(function* () {
+          yield* refuseLinks(cwd, scope, planned.file, "write")
+          const target = yield* resolveTarget(planned)
+          const existing = yield* readJsonObject(target.file)
+          const missing = applyDefaults(existing, target.keys)
+            .entries.filter((entry) => entry.status === "added")
+            .map((entry) => entry.path)
+          return missing.length === 0
+            ? []
+            : [hint(`${label} ${target.file} lacks ${missing.join(", ")}; ${fixFor(scope)}`)]
+        }).pipe(
           Effect.catchTag("SetupFailure", (error) =>
             Effect.succeed([
               hint(`${label}: ${error.message}; fix the file, then ${fixFor(scope)}`),
