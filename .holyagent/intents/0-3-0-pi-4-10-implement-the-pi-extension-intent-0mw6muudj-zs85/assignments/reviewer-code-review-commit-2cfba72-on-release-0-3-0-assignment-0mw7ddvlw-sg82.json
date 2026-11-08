@@ -1,0 +1,48 @@
+{
+  "id": "assignment-0mw7ddvlw-sg82",
+  "intentId": "intent-0mw6muudj-zs85",
+  "intentRevision": 6,
+  "roleTask": "Reviewer.code",
+  "slug": "review-commit-2cfba72-on-release-0-3-0",
+  "objective": "Review commit 2cfba72 on release/0.3.0/feat/pi-extension (worktree /home/user/holyagent-0.3.0-ext; run commands there), the Windows fix for the PR 78 windows job, for correctness and for not weakening any test.",
+  "state": "Running",
+  "scope": [
+    "Windows job log: /home/user/holyagent-notes/win78.log (failures from about line 2190). Diff without bundles: /home/user/holyagent-notes/pi-windows.diff.",
+    "Stated causes: the extension passed sh a backslash wrapper path, which the wrapper refuses as a bare name (code fix: wrapperPath writes it with forward slashes); mocked-exec assertions hardcoded POSIX paths; the execute-bit check reads mode bits that Windows does not have (falls back to the committed git mode 100755); a Node import of a C:\\ path instead of a file URL. Check that each cause matches the log, that every failing test in the log is addressed, and whether anything else would still fail on Windows (for example bun on PATH, CRLF, the .holyagent path passed through --project)."
+  ],
+  "constraints": [
+    "Read-only: no edits and no version-control writes.",
+    "Report in under 350 words; start each evidence line with the exact criterion text (no backticks), a colon, then the support."
+  ],
+  "criteria": [
+    {
+      "text": "Each failure in the windows log is addressed by a fix that matches its cause",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No test is skipped or weakened, and Linux behavior is unchanged",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "bunx --no-install mise run verify exits 0 and mise run build leaves the tree clean on 2cfba72",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7d6ayz-wjls"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T05:06:30.596Z"
+  },
+  "createdAt": "2026-11-08T05:06:30.596Z"
+}
