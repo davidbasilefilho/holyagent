@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mw7mr76t-gicp",
+  "intentId": "intent-0mw6muv72-jkrt",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-commit-7dd0aeb-on-release-0-3",
+  "objective": "Re-review commit 7dd0aeb on release/0.3.0/feat/pi-install (worktree /home/user/holyagent-0.3.0-install), which makes a user-scope Pi package check count only Pi's global settings.",
+  "state": "Running",
+  "scope": [
+    "Diff: /home/user/holyagent-notes/install-last-code.diff (56a18a2..7dd0aeb, dist excluded).",
+    "Earlier finding it repairs: user-scope setup and doctor counted the project .pi/settings.json as present, so a repository could suppress a global install. Also checks the tightened local and project doctor test assertions."
+  ],
+  "constraints": [
+    "Read-only; no edits and no version-control writes.",
+    "Report in under 400 words; put long logs in a file under /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "User-scope setup and doctor count only the global settings, project and local count both, with tests that fail without the change, and nothing else regresses",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The change follows the repository's code rules",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "review-findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7mhhpb-1bj2"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T09:28:48.677Z"
+  },
+  "createdAt": "2026-11-08T09:28:48.677Z"
+}
