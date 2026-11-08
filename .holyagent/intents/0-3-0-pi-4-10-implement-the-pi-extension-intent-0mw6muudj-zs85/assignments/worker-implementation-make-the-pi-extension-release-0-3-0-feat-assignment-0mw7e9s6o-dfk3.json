@@ -1,0 +1,58 @@
+{
+  "id": "assignment-0mw7e9s6o-dfk3",
+  "intentId": "intent-0mw6muudj-zs85",
+  "intentRevision": 6,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-pi-extension-release-0-3-0-feat",
+  "objective": "Make the Pi extension (release/0.3.0/feat/pi-extension, head 0ca6337, worktree /home/user/holyagent-0.3.0-ext) wait for every child process it started before session_shutdown completes, including those of older aborted gathers, with tests that fail without the fix.",
+  "state": "Running",
+  "scope": [
+    "Work only in /home/user/holyagent-0.3.0-ext; gates bunx --no-install mise run verify and bunx --no-install mise run build.",
+    "Blocking (review of 0ca6337): (1) session_shutdown is () => release(): it aborts current and returns undefined, so Pi can finish shutdown and a folder can be deleted while sh and git are still exiting (the Windows EBUSY path); (2) gather aborts the older signal but only the newest pending is awaited, so an older gather's children are untracked; (3) the shutdown test awaits the session_start promise, which Pi does not do, so it passes without the fix, and 'when the gather succeeds, nothing is left running' is vacuous. Fix: track every gather started (a set of pendings), make release return a promise for all of them, and return it from the session_shutdown handler; rewrite the shutdown test to await only the session_shutdown emit and to fail on the old code, and make the success test assert something that fails without the fix or remove its claim from the title.",
+    "Ride-along (optional review notes): bound the wait on a stopped command with a short grace timeout so a grandchild holding the pipes cannot hang a gather or shutdown; turn a synchronous throw from pi.exec inside Effect.callback into a CommandFailed notice, not a defect; remove the redundant stop controller if interruption already aborts; make the deadline test robust on a slow Windows runner (wider margins or a controllable clock) without weakening it."
+  ],
+  "constraints": [
+    "Unit tests and synthesized fixtures only; do not run the pi binary.",
+    "Never skip or weaken a test.",
+    "Make no version-control writes; report changed paths.",
+    "Report in under 300 words; start each evidence line with the exact criterion text (no backticks), a colon, then the support."
+  ],
+  "criteria": [
+    {
+      "text": "session_shutdown returns a promise that settles only after every child of every gather has exited or hit the grace timeout",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The shutdown and older-gather tests fail on 0ca6337 and pass after, and no test claims what it does not check",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "A synchronous pi.exec throw becomes a notice and stopped commands have a bounded wait, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "bunx --no-install mise run verify exits 0 and mise run build leaves generated output in sync",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw7dvz88-ts1d",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T05:31:19.153Z"
+  },
+  "createdAt": "2026-11-08T05:31:19.153Z"
+}
