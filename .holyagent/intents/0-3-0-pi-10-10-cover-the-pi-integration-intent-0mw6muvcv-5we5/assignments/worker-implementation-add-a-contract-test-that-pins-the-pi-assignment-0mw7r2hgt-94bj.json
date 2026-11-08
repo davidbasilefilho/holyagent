@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "add-a-contract-test-that-pins-the-pi",
   "objective": "Add a contract test that pins the Pi events the HolyAgent integration consumes to the pinned Pi version, using fixtures built from Pi 1.5.0's sources, so a Pi update that changes them fails CI until the fixtures are re-recorded.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree: /home/user/holyagent-0.3.0-contract (branch release/0.3.0/test/pi-event-contract). Work and run every command there.",
     "Find every Pi event and message shape the integration consumes: the agent_settled mapping in packages/runtime/src/pi/journal.ts:259-263, the specialist launcher's reading of child pi output (JSON or RPC mode), the extension's handlers in packages/integrations/pi/src/extension.ts (message_end, tool_call, session events), tool execution events, and the extension_ui_request messages of RPC mode (select, confirm, input, editor, notify, setStatus), which T3 Code renders.",
@@ -71,7 +71,53 @@
     "agentId": "workflow:wf_2a696966-bfd/assignment-0mw7r2hgt-94bj",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T11:29:33.678Z"
+    "startedAt": "2026-11-08T11:29:33.678Z",
+    "finishedAt": "2026-11-08T11:56:01.556Z"
+  },
+  "result": "result: Pi 1.5.0 event contract test added; `mise run build` exits 0 with no changes beyond my files, and `mise run verify` exits 0. Two consumers named in the brief do not exist in source, so two fixture sets are only shape-checked (see notes).\n\nchanged:\n- /home/user/holyagent-0.3.0-contract/packages/integrations/pi/tests/contract.test.ts (new)\n- /home/user/holyagent-0.3.0-contract/packages/integrations/pi/tests/fixtures/record.ts (new)\n- /home/user/holyagent-0.3.0-contract/packages/integrations/pi/tests/fixtures/ (new): 8 files, `extension-events`, `json-run-ok`, `json-run-aborted`, `json-run-error`, `json-run-length`, `json-run-empty`, `json-tool-events`, `rpc-extension-ui` (all `.jsonl`)\n- /home/user/holyagent-0.3.0-contract/docs/development.md: new \"Re-recording the Pi fixtures\" subsection, and the `deps:update` bullet now links to it\n\nchecks:\n- `bunx --no-install mise run build` -> exit 0, `git status` shows only the paths above\n- `bunx --no-install mise run verify` -> exit 0: 212 files with no type errors, lint with 0 warnings, 534 files formatted, 2372 pass and 0 fail\n- `bun test packages/integrations/pi/tests/contract.test.ts` -> 20 pass, 0 fail\n- Stale-version run: with `json-run-ok`'s header set to 1.4.0, the test failed with a message that says to re-record and gives the `record.ts` command. I re-recorded and it passed again.\n- Type-check pin: changing `agent_settled.aborted` to a string made `bun check` fail with 5 errors; I reverted it.\n- Logs and diff: `build.log` and `verify.log` are beside the diff file in the scratchpad.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- **agent_settled:** no source code maps events to an outcome. The brief's `journal.ts:259-263` is only a doc comment on `PiOutcome`. The test uses a small test-local reader that follows the `docs/pi/orchestration.md` table, then calls the real `assignmentStatusOf` and `failedFinalMessage`. A source function from event stream to `PiOutcome` would let the test exercise a real consumer. That is a source change, so I did not make it.\n- **Child pi output:** the HolyAgent integration does not parse it. `@tintinweb/pi-subagents` does, and it is not installed here.\n- **extension_ui_request:** the extension never calls `ctx.ui`, and a test confirms it. The six RPC fixtures are pinned to Pi's `RpcExtensionUIRequest` type at type-check time and checked structurally. There is no runtime consumer to feed them to until dialogs are built.\n- **record.ts:** it is typed source for the fixtures, so tsc checks them against Pi's exported types. The test also fails if a JSONL file differs from what `record.ts` writes.\n- **Fixtures README:** I added none. The repository keeps this kind of note in `docs/`, and each fixture header carries its description.\n- **Duplicated stub:** the test's stub Pi API and exec responder repeat helpers in `extension.test.ts`. Sharing them means exporting from a file I do not own.\n\nevidence:\n- Fixtures cover every Pi event shape the integration consumes, including agent_settled, the tool events and each extension_ui_request method, and each records the Pi version: `tests/fixtures/*.jsonl`, 8 files, each with a `holyagentFixture.piVersion` header. `json-run-*` cover agent_settled and the tool events, `rpc-extension-ui` covers select, confirm, input, editor, notify and setStatus, and `extension-events` covers the extension events. The gap is the missing consumer for `agent_settled` and `extension_ui_request` noted above.\n- Each fixture runs through the integration's real consumer and the test asserts the outcome: `contract.test.ts` feeds the extension handlers (`createExtension` on a stub Pi API), `failedFinalMessage` and `assignmentStatusOf`; 20 tests pass. `agent_settled` and `extension_ui_request` are partial, as noted.\n- The test fails with a re-record message when the installed Pi version differs from the fixtures' version, shown by a test or a demonstrated run: the test \"a fixture of another Pi version is reported with how to re-record it\" and the demonstrated failing run above.\n- docs/development.md says how to re-record the fixtures after deps:update moves Pi: the \"Re-recording the Pi fixtures\" subsection under Dependencies.\n- mise run build leaves no unexplained changes and mise run verify exits 0: both exit 0, and `git status` after build shows only the changed paths.\n- The change stays inside the Assignment's scope and ownership paths: `git status` lists only `docs/development.md`, `tests/contract.test.ts` and `tests/fixtures/`.\n- checks-run: see checks above.\n- changed-paths: see changed above.\n- diff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/pi-event-contract.diff\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Gates exit 0 (2372 tests); fixtures are type-checked against Pi 1.5.0 types and fed to the existing consumers; agent_settled and extension_ui_request have no source consumer in this integration, so they are pinned at type level",
+    "criteria": [
+      {
+        "criterion": "Fixtures cover every Pi event shape the integration consumes, including agent_settled, the tool events and each extension_ui_request method, and each records the Pi version",
+        "support": "`tests/fixtures/*.jsonl`, 8 files, each with a `holyagentFixture.piVersion` header. `json-run-*` cover agent_settled and the tool events, `rpc-extension-ui` covers select, confirm, input, editor, notify and setStatus, and `extension-events` covers the extension events. The gap is the missing consumer for `agent_settled` and `extension_ui_request` noted above."
+      },
+      {
+        "criterion": "Each fixture runs through the integration's real consumer and the test asserts the outcome",
+        "support": "`contract.test.ts` feeds the extension handlers (`createExtension` on a stub Pi API), `failedFinalMessage` and `assignmentStatusOf`; 20 tests pass. `agent_settled` and `extension_ui_request` are partial, as noted."
+      },
+      {
+        "criterion": "The test fails with a re-record message when the installed Pi version differs from the fixtures' version, shown by a test or a demonstrated run",
+        "support": "the test \"a fixture of another Pi version is reported with how to re-record it\" and the demonstrated failing run above."
+      },
+      {
+        "criterion": "docs/development.md says how to re-record the fixtures after deps:update moves Pi",
+        "support": "the \"Re-recording the Pi fixtures\" subsection under Dependencies."
+      },
+      {
+        "criterion": "mise run build leaves no unexplained changes and mise run verify exits 0",
+        "support": "both exit 0, and `git status` after build shows only the changed paths."
+      },
+      {
+        "criterion": "The change stays inside the Assignment's scope and ownership paths",
+        "support": "`git status` lists only `docs/development.md`, `tests/contract.test.ts` and `tests/fixtures/`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "see checks above."
+      },
+      {
+        "label": "changed-paths",
+        "support": "see changed above."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/pi-event-contract.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-08T11:29:33.678Z"
 }
