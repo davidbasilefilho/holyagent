@@ -1,0 +1,49 @@
+{
+  "id": "assignment-0mw7eh9ak-4omc",
+  "intentId": "intent-0mw6muudj-zs85",
+  "intentRevision": 6,
+  "roleTask": "Reviewer.code",
+  "slug": "confirm-commit-425f035-on-release-0-3-0",
+  "objective": "Confirm commit 425f035 on release/0.3.0/feat/pi-extension (range 0ca6337..425f035, worktree /home/user/holyagent-0.3.0-ext; run commands there) closes the previous review's blockers.",
+  "state": "Running",
+  "scope": [
+    "Previous blockers: session_shutdown did not wait for children; an older aborted gather's children were untracked; the shutdown test awaited session_start and the success test was vacuous. Optional: unbounded wait on stopped commands, a synchronous pi.exec throw became a defect, a possibly flaky deadline test.",
+    "The repair tracks all gathers in a set awaited by release and returned from session_shutdown, adds STOP_GRACE_MS (2 s), wraps exec in Effect.try plus acquireUseRelease, removes the vacuous test and widens the deadline test margins. Diff: /home/user/holyagent-notes/pi-shutdown.diff. The original Windows failure: /home/user/holyagent-notes/win78b.log."
+  ],
+  "constraints": [
+    "Do not run the pi binary.",
+    "Read-only: no edits and no version-control writes.",
+    "Report in under 300 words; start each evidence line with the exact criterion text (no backticks), a colon, then the support."
+  ],
+  "criteria": [
+    {
+      "text": "Every previous blocker is closed and no child process outlives session_shutdown beyond the grace",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The new tests fail on 0ca6337 and pass now, and none is vacuous or timing-fragile",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "bunx --no-install mise run verify exits 0 and mise run build leaves the tree clean",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7e9s6o-dfk3"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T05:37:07.916Z"
+  },
+  "createdAt": "2026-11-08T05:37:07.916Z"
+}
