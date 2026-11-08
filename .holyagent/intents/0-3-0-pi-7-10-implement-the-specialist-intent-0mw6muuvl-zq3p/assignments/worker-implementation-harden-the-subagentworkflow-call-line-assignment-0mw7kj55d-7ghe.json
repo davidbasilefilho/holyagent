@@ -49,5 +49,25 @@
     "finishedAt": "2026-11-08T08:30:38.595Z"
   },
   "result": "result: The Pi call line now drops bidi and zero-width characters, cuts at 80 grapheme clusters, and caches the name per script text. Build and verify both exit 0.\nchanged:\n- packages/integrations/pi/src/extension.ts\n- packages/integrations/pi/tests/extension.test.ts\n- packages/integrations/pi/dist/extensions/holyagent.js (rebuilt)\n\nclaude/dist did not change.\nchecks:\n- `bunx --no-install mise run build` -> exit 0\n- `bunx --no-install mise run verify` -> exit 0; 2146 pass, 0 fail, 14044 expects; no type errors in 199 files, lint clean in 200 files, format clean.\n\nblockers: none\nquestions: none\nnotes:\n- I added exported helpers `sanitizeWorkflowName` and `memoizeLast`, plus a private `shownWorkflowName`.\n- `Intl.Segmenter` cuts at grapheme clusters, which is stricter than code points.\n- The cache holds one entry (last script text only).\n- I added three tests: bidi and zero-width characters dropped, a surrogate pair kept whole at 80, and the memo reusing the last result and recomputing on a new key.\n- I didn't add a test that `workflowCallLine` itself hits the cache. Only `memoizeLast` is tested directly.\n\nevidence:\nThe drawn name has no bidi or zero-width characters, is cut without splitting a surrogate pair, and the parse is cached, with tests: tests added in packages/integrations/pi/tests/extension.test.ts (bidi, surrogate-pair and memo cases); passing in verify.\nmise run build exits 0 with dist in sync and mise run verify exits 0: build=0, verify=0 (2146 pass, 0 fail).\ndiff-file: /home/user/holyagent-notes/launcher-k.diff\n",
+  "acceptance": {
+    "revision": 7,
+    "rationale": "Launcher work reviewed by code and security reviewers through four repair rounds; final head 7846c9b passes verify with 2146 tests and no open blocker.",
+    "criteria": [
+      {
+        "criterion": "The drawn name has no bidi or zero-width characters, is cut without splitting a surrogate pair, and the parse is cached, with tests",
+        "support": "tests added in packages/integrations/pi/tests/extension.test.ts (bidi, surrogate-pair and memo cases); passing in verify."
+      },
+      {
+        "criterion": "mise run build exits 0 with dist in sync and mise run verify exits 0",
+        "support": "build=0, verify=0 (2146 pass, 0 fail)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff-file",
+        "support": "/home/user/holyagent-notes/launcher-k.diff"
+      }
+    ]
+  },
   "createdAt": "2026-11-08T08:26:33.554Z"
 }
