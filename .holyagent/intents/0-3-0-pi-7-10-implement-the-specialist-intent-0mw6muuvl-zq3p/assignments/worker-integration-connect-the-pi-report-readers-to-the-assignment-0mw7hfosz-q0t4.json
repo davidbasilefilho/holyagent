@@ -1,0 +1,74 @@
+{
+  "id": "assignment-0mw7hfosz-q0t4",
+  "intentId": "intent-0mw6muuvl-zq3p",
+  "intentRevision": 7,
+  "roleTask": "Worker.integration",
+  "slug": "connect-the-pi-report-readers-to-the",
+  "objective": "Connect the Pi report readers to the holyagent assignment reports command and the shipped agents to the root package manifest, in /home/user/holyagent-0.3.0-launcher, so the launcher work is complete end to end.",
+  "state": "Ready",
+  "scope": [
+    "Work only in /home/user/holyagent-0.3.0-launcher (branch release/0.3.0/feat/pi-launcher). Three writers just finished there: Pi agents and extension glue (packages/integrations/pi, packages/runtime/src/pi/tools.ts), Pi report readers (packages/runtime/src/pi/journal.ts, cli/report.ts) and stripCitations fixes. Their notes are in /home/user/holyagent-notes/launcher-research.md and the diffs launcher-a.diff, launcher-b.diff, launcher-c.diff there.",
+    "(1) Apply /home/user/holyagent-notes/launcher-b-wiring.patch (git apply; it was checked with git apply --check): it wires assignment reports under HOLYAGENT_HOST=pi to the journal and session readers in packages/runtime/src/cli/assignment.ts, exports briefPath from cli/brief.ts, updates the stale help note in domain/host.ts and tests/host.test.ts, and adds tests/pi-reports-e2e.test.ts. Read it before applying and fix anything that no longer fits the current tree.",
+    "(2) Status mapping: the Intent requires failure from stopReason error, aborted or length. assignmentStatusOf in packages/runtime/src/pi/journal.ts and the table in docs/pi/orchestration.md map the package aborted outcome to interrupted; change it to failed (a user stop stays stopped), with the test updated. Reason: the package aborted is a hard abort after the turn limit, which is a failed run, not an interruption the root should resume.",
+    "(3) Add pi.subagents.agents: [\"./packages/integrations/pi/dist/agents\"] to the root package.json pi section, so a git install of the repository root finds the shipped agents, and restore the root-vs-dist pi key comparison in packages/integrations/pi/tests/pi.test.ts that excluded subagents. Do not touch the version field: the version changes only through mise run bump.",
+    "(4) Check that the key the journal reader recomputes uses the same agentType, model and effort the Pi root will pass to agent(): the agent names the Pi package ships (the Claude slug without holyagent:, e.g. worker-implementation) and the model and effort values assignment dispatch prints under HOLYAGENT_HOST=pi. If the pi-host dispatch output prints holyagent:<slug> or Claude model names that the Pi root would not pass, make the pi-host dispatch print the Pi agent name, and report what it prints now; add a test."
+  ],
+  "constraints": [
+    "Edit only the ownership paths; no version-control writes and no edits under .git/ or .holyagent/, because the root owns version control.",
+    "Effect, Effect Schema at boundaries, JSDoc on exports, Bun APIs per .claude/CLAUDE.md.",
+    "Do not run pi or any live model.",
+    "Run bunx --no-install mise run build, then bunx --no-install mise run verify, and report each exit code (capture it with echo $?) and the test counts.",
+    "Write the diff of your changes to /home/user/holyagent-notes/launcher-d.diff and give it as diff-file evidence.",
+    "Start each evidence line with the criterion text, then a colon.",
+    "Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "assignment reports under HOLYAGENT_HOST=pi reads a workflow journal and a session file end to end, with the Claude path unchanged",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The package aborted outcome maps to failed and a user stop to stopped",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The root package.json lists the shipped agents and the root-vs-dist test compares the subagents key",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The journal key matches what the Pi root passes to agent()",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build exits 0 with dist in sync and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli/assignment.ts",
+    "packages/runtime/src/cli/brief.ts",
+    "packages/runtime/src/cli/dispatch.ts",
+    "packages/runtime/src/domain/host.ts",
+    "packages/runtime/tests/host.test.ts",
+    "packages/runtime/tests/pi-reports-e2e.test.ts",
+    "packages/runtime/src/pi/journal.ts",
+    "packages/runtime/tests/pi/journal.test.ts",
+    "docs/pi/orchestration.md",
+    "package.json",
+    "packages/integrations/pi/tests/pi.test.ts",
+    "packages/integrations/pi/dist",
+    "packages/integrations/claude/dist",
+    "packages/runtime/tests/dispatch.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-08T06:59:53.556Z"
+}
