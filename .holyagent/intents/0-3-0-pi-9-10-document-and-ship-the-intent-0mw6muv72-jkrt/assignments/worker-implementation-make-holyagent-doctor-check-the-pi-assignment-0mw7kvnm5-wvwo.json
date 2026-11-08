@@ -1,0 +1,69 @@
+{
+  "id": "assignment-0mw7kvnm5-wvwo",
+  "intentId": "intent-0mw6muv72-jkrt",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "make-holyagent-doctor-check-the-pi",
+  "objective": "Make holyagent doctor check the Pi prerequisites and package, raise the Windows installer Node minimum to 22.19, and make installing the Pi package pull in only what the default config enables.",
+  "state": "Running",
+  "scope": [
+    "Binding requirements (Intent pi 9/10): the documented Pi install is Node.js 22.19 or newer plus the official installer or npm install -g --ignore-scripts @earendil-works/pi-coding-agent@<pinned>; the HolyAgent package is installed with pi install npm:...@x.y.z (or a git or local source) so the pin is explicit; Bun is documented as needed by the HolyAgent CLI, not as a Pi install route; pi runs on Node and uses Bun only as its npmCommand for package installs. holyagent doctor checks that pi, Node 22.19 or newer and the package are present, without installing them; the Windows installer Node minimum rises from 22.13 to 22.19. The docs describe every config.json option with its default, and installing the package installs only the dependencies the default config.json enables. docs/components.md no longer says there is no Pi integration; docs/usage.md, docs/development.md (layout and generated paths) and docs/pi/README.md describe the new package and how to start the root. README.md keeps exactly its six sections in order and any Pi mention there is a link into docs/. Tests and fixtures only: never run pi or a live model. Work only in /home/user/holyagent-0.3.0-install (branch release/0.3.0/feat/pi-install, cut from release/0.3.0/feat/pi-launcher at 7846c9b, which ships the Pi package in packages/integrations/pi with its dist, the pinned Pi packages in packages/runtime/src/config/pi-packages.json, and docs under docs/pi/).",
+    "Doctor: extend packages/runtime/src/setup/doctor.ts (read how its checks, output and tests are structured first) with Pi checks that run when the config pi section is enabled: pi on PATH and its version (compare to the pinned Pi host version the repository records; find where it is pinned), Node on PATH at 22.19 or newer, and the HolyAgent Pi package present in pi settings (global ~/.pi/agent/settings.json or project .pi/settings.json packages lists, PI_CODING_AGENT_DIR honored), each reported with a fix hint (the install command) and never installing anything. Use the Bun Shell $ for processes and Effect Schema to decode the settings files, with tests using fixtures and a stubbed process runner.",
+    "Installer: raise the Node minimum in install/windows-install.ps1 from 22.13 to 22.19 (and in any test that pins it); leave install/wsl-install.sh unless it checks the same Node minimum for Pi, and say what you found.",
+    "Dependencies: find how a pi install of the HolyAgent package installs the packages the config enables (the Pi package manifest in packages/integrations/pi, its dependencies or pi.packages lists, and piPackages in packages/runtime/src/config/packages.ts). Make the shipped manifest install only the packages the default config enables, with a test; if Pi installs every listed dependency regardless, report the mechanism and what setup must install instead."
+  ],
+  "constraints": [
+    "Edit only the ownership paths; no version-control writes and no edits under .git/ or .holyagent/.",
+    "Effect with tagged errors, Effect Schema with onExcessProperty error, JSDoc on exports, Bun Shell per .claude/CLAUDE.md.",
+    "Run bunx --no-install mise run build, then bunx --no-install mise run verify; report each exit code (echo $?) and counts.",
+    "Write the source diff (no dist bundles) to /home/user/holyagent-notes/install-a.diff and give it as diff-file evidence.",
+    "Start each evidence line with the criterion text, then a colon.",
+    "Report in under 400 words, including the exact doctor checks and messages so the docs can match them."
+  ],
+  "criteria": [
+    {
+      "text": "holyagent doctor reports pi, Node 22.19 or newer and the HolyAgent Pi package without installing them, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The Windows installer requires Node 22.19 or newer",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Installing the Pi package installs only what the default config enables, or the mechanism is reported",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build exits 0 with dist in sync and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/setup",
+    "packages/runtime/tests",
+    "install/windows-install.ps1",
+    "install/wsl-install.sh",
+    "scripts",
+    "packages/integrations/pi/src",
+    "packages/integrations/pi/tests",
+    "packages/integrations/pi/package.json",
+    "packages/integrations/pi/dist",
+    "packages/integrations/claude/dist",
+    "packages/runtime/src/config/packages.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T08:36:17.357Z"
+  },
+  "createdAt": "2026-11-08T08:36:17.357Z"
+}
