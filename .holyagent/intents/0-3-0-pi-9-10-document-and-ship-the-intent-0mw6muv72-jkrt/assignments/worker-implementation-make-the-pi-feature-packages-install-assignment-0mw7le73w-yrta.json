@@ -67,5 +67,33 @@
     "finishedAt": "2026-11-08T09:01:20.314Z"
   },
   "result": "result: Pi manifest has no dependencies; `holyagent setup` installs and removes Pi feature packages per config; doctor gates its Pi checks and reports missing feature packages. `mise run build` exits 0 and `mise run verify` exits 0.\n\nchanged: `packages/runtime/src/setup/pi-check.ts`, `pi-install.ts` (new), `steps.ts`, `doctor.ts`, `packages/runtime/src/cli/setup.ts`, `packages/integrations/pi/src/generate.ts` (comment only), `packages/runtime/tests/setup-pi.test.ts`, `setup.test.ts`, `setup-cli.test.ts`, `setup-scope.test.ts`, `setup-fixture.ts`, `docs/pi/installation.md`, `docs/usage.md`, and the rebuilt dist bundles.\n\nchecks:\n- `bunx --no-install mise run build` -> 0\n- `bunx --no-install mise run verify` -> 0; 2195 pass, 0 fail across 72 files; type-check, lint and format check pass\n- The generated Pi `dist/package.json` is back to the base (no `dependencies`).\n\nblockers: none\n\nquestions:\n- With `pi.enable` off, setup removes nothing and says so. Should it remove the feature packages instead?\n- Scope `local` has no Pi equivalent, so `project` and `local` both use the project's `.pi/settings.json` with `-l`. Is that the intended mapping?\n\nnotes:\n- The previous writer's `piDependencies`, its tests and the `generate.ts` dependency wiring are removed.\n- Pi counts as in use when `HOLYAGENT_HOST=pi` or `pi` is on PATH. Setup prints nothing about Pi when it is not in use; doctor prints one `~ pi: not in use` line.\n- Doctor counts a package listed at a different pin as missing, matching what setup would reinstall. The provider package is checked and installed as well as the feature packages, but only feature packages and `pi-web-kit` are ever removed.\n- Out of my ownership and still stale: `docs/components.md` (\"runs two steps\", doctor's Pi checks), `docs/pi/README.md` (\"setup for Pi ... Planned\") and `docs/pi/configuration.md:23` (\"installs only the dependencies the default config enables\").\n- `--undo` leaves Pi packages installed, as it does ctx7.\n\nevidence:\n- The Pi manifest lists no feature package dependencies and holyagent setup installs and removes feature packages per config, with tests: `generate.ts` has no `dependencies` field, and the existing `pi.test.ts` assertion `not.toHaveProperty(\"dependencies\")` is back. `packages/runtime/src/setup/pi-install.ts` is wired in at `steps.ts`. `setup-pi.test.ts` \"holyagent setup, Pi packages\" has 10 tests with a stubbed runner, covering install missing, skip present or stale, remove disabled, `pi.enable` off, dry run, project scope with `-l`, a failing command, `pi` missing from PATH, and a bad settings file. Last test run: `mise run verify`, exit 0.\n- holyagent doctor reports each missing enabled feature package and runs its Pi checks only when Pi is in use, with tests: `pi-check.ts` `checkFeatures` and `piInUse`. `setup-pi.test.ts` covers the not-in-use line, `HOLYAGENT_HOST=pi`, `pi` on PATH, per-package FAIL lines with the install command, a wrong pin, either settings scope, and config-driven requirements including `pi-web-kit`. The `pi.enable false` test workaround (`disablePi`) is deleted.\n- Docs match the setup and doctor behavior: `docs/pi/installation.md` (How HolyAgent installs, What setup and doctor do, wsl-install.sh Node 22.13 vs 22.19 note) and `docs/usage.md` (setup steps, doctor, Pi section). The doctor summary text in `cli/setup.ts` is updated.\n- mise run build exits 0 with dist in sync and mise run verify exits 0: build exit 0 and verify exit 0, logs in `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/build.log` and `verify.log`.\n- diff-file: `/home/user/holyagent-notes/install-c.diff`\n",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "Independent code, security and artifact reviews accepted the final head 20049b6; verify 2210 pass",
+    "criteria": [
+      {
+        "criterion": "The Pi manifest lists no feature package dependencies and holyagent setup installs and removes feature packages per config, with tests",
+        "support": "`generate.ts` has no `dependencies` field, and the existing `pi.test.ts` assertion `not.toHaveProperty(\"dependencies\")` is back. `packages/runtime/src/setup/pi-install.ts` is wired in at `steps.ts`. `setup-pi.test.ts` \"holyagent setup, Pi packages\" has 10 tests with a stubbed runner, covering install missing, skip present or stale, remove disabled, `pi.enable` off, dry run, project scope with `-l`, a failing command, `pi` missing from PATH, and a bad settings file. Last test run: `mise run verify`, exit 0."
+      },
+      {
+        "criterion": "holyagent doctor reports each missing enabled feature package and runs its Pi checks only when Pi is in use, with tests",
+        "support": "`pi-check.ts` `checkFeatures` and `piInUse`. `setup-pi.test.ts` covers the not-in-use line, `HOLYAGENT_HOST=pi`, `pi` on PATH, per-package FAIL lines with the install command, a wrong pin, either settings scope, and config-driven requirements including `pi-web-kit`. The `pi.enable false` test workaround (`disablePi`) is deleted."
+      },
+      {
+        "criterion": "Docs match the setup and doctor behavior",
+        "support": "`docs/pi/installation.md` (How HolyAgent installs, What setup and doctor do, wsl-install.sh Node 22.13 vs 22.19 note) and `docs/usage.md` (setup steps, doctor, Pi section). The doctor summary text in `cli/setup.ts` is updated."
+      },
+      {
+        "criterion": "mise run build exits 0 with dist in sync and mise run verify exits 0",
+        "support": "build exit 0 and verify exit 0, logs in `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/build.log` and `verify.log`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff-file",
+        "support": "`/home/user/holyagent-notes/install-c.diff`"
+      }
+    ]
+  },
   "createdAt": "2026-11-08T08:50:42.428Z"
 }
