@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mw7mav2g-13j3",
+  "intentId": "intent-0mw6muv72-jkrt",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-repair-commit-56a18a2-on",
+  "objective": "Re-review repair commit 56a18a2 on release/0.3.0/feat/pi-install (worktree /home/user/holyagent-0.3.0-install, range 67723bc..56a18a2) against the earlier findings it repairs.",
+  "state": "Running",
+  "scope": [
+    "git -C /home/user/holyagent-0.3.0-install diff 67723bc..56a18a2 with dist excluded, also at /home/user/holyagent-notes/install-repair.diff.",
+    "Earlier findings it repairs: (a) a project .holyagent/config.json steered the user-scope install and could remove global packages; now user scope reads the home-level config only, in setup and doctor; (b) the Shell comment wrongly claimed a neutral working directory for project-scope installs; (c) provider profile packages the config no longer selects were left listed; (d) setup read one settings scope while doctor accepted either; (e) a git source whose ref has slashes was not recognized as the HolyAgent package.",
+    "Writer's note to check: user-scope setup now counts the project .pi/settings.json as present, so a repository listing a package there makes a global setup skip installing it globally. Judge whether user-scope presence should count only the global settings."
+  ],
+  "constraints": [
+    "Read-only; no edits and no version-control writes.",
+    "Report in under 400 words; put long logs in a file under /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Each earlier finding is repaired with a test that fails without it, and nothing else regresses",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The repair follows the repository's code rules",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "review-findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7m1no2-ud08"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T09:16:06.472Z"
+  },
+  "createdAt": "2026-11-08T09:16:06.472Z"
+}
