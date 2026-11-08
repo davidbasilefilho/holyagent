@@ -1,0 +1,58 @@
+{
+  "id": "assignment-0mw7g0a2x-hsc6",
+  "intentId": "intent-0mw6muupq-5usg",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "keep-the-web-and-computer-use-tools-out",
+  "objective": "Keep the web and computer-use tools out of the Pi root's direct tool set, so the root delegates research and visual inspection as the Claude root does, in /home/user/holyagent-0.3.0-tools (branch release/0.3.0/feat/pi-tools, head 4ffd0db).",
+  "state": "Ready",
+  "scope": [
+    "In packages/runtime/src/pi/tools.ts, `toolArgs(config, \"root\")` returns `--tools +codemode` with `--exclude-tools write,edit`. Because `+codemode` keeps Pi's default selection, which includes every enabled extension's tools, the root currently also holds the computer-use tools (`computer_use_*`, with `pi.features.computerUse` on) and the web tools of the web choice (`webChoice(profile, features.web).tools`, e.g. pi-web-kit's tools or Kimi's moonshot_search and moonshot_fetch). The Claude root has neither (the holyagent agent excludes WebFetch and WebSearch, and its rules send research to the Librarian roles and visual inspection to the visual specialists), and docs/pi/extensions.md says only the visual specialists get computer use.",
+    "Change the root's exclusions to add, while each is enabled, the computer-use tools (COMPUTER_USE_TOOLS) and the web choice's tools (none when the web choice is off). Keep `write,edit` excluded and keep `+codemode`, todo, ask_user_question, the process tools and the subagent tools on the root. Use the profile argument for the web choice as the specialists do.",
+    "Add tests in packages/runtime/tests/pi/tools.test.ts that fail without the change: root exclusions with computerUse on and off, with web pi-web-kit, provider (Kimi profile) and off.",
+    "Update the root row and the notes in docs/pi/extensions.md (Tool arguments) and the JSDoc of toolArgs to state the root's exclusions and why.",
+    "Leave Reviewer.code's bash as it is: it mirrors packages/integrations/claude/src/agents.ts:265, where the Claude Reviewer.code gets Bash for git diff and test runs."
+  ],
+  "constraints": [
+    "Edit only the paths listed in ownership; make no version-control writes and no edits under .git/ or .holyagent/, because the root owns version control.",
+    "Use Effect and the existing helpers; give every export JSDoc, per .claude/CLAUDE.md.",
+    "Do not run pi or any live model; unit tests only.",
+    "Run `bunx --no-install mise run verify` and `bunx --no-install mise run build` in the worktree and report exit codes and counts, and whether build changed any tracked file.",
+    "Write `git -C /home/user/holyagent-0.3.0-tools diff` to a file outside the repository and list it as diff-file evidence.",
+    "Start each evidence line with the criterion text, then a colon.",
+    "Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "The root excludes the computer-use tools and the web choice's tools while each is enabled, and keeps write and edit excluded",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Tests cover the root's exclusions for each toggle and fail without the change",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Docs and JSDoc state the root's exclusions",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "mise run verify exits 0 and mise run build leaves the tree in sync",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/pi/tools.ts",
+    "packages/runtime/tests/pi/tools.test.ts",
+    "docs/pi/extensions.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-08T06:19:55.017Z"
+}
