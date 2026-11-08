@@ -1,0 +1,82 @@
+{
+  "id": "assignment-0mw7ex2uh-58hy",
+  "intentId": "intent-0mw6muupq-5usg",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "wire-the-pi-tool-surface-of-the",
+  "objective": "Wire the Pi tool surface of the HolyAgent Pi integration from existing Pi tools and extensions, as data and functions the launcher and setup will use, in /home/user/holyagent-0.3.0-tools (branch release/0.3.0/feat/pi-tools).",
+  "state": "Running",
+  "scope": [
+    "Work only in /home/user/holyagent-0.3.0-tools; node_modules is installed. Gates: bunx --no-install mise run verify and bunx --no-install mise run build.",
+    "Binding requirements: /home/user/holyagent-notes/intent-tool-surface.txt (the Intent; read every requirement and Decided entry). Also read AGENTS.md, .claude/CLAUDE.md, docs/pi/extensions.md, docs/pi/configuration.md, docs/pi/claude-parity.md, docs/pi/orchestration.md, docs/pi/caching-and-subagents.md, packages/runtime/src/config/{schema,packages,pi-packages}.ts and pi-packages.json, packages/runtime/src/pi/{provider,index}.ts, and the pi probes /home/user/holyagent-notes/pi-deps.md and /home/user/holyagent-notes/pi-probe/ (READMEs of pi-coding-agent, pi-web-kit, pi-processes, billion-context, rpiv-todo, rpiv-ask-user-question). Do not run the pi binary.",
+    "Build: (1) one module (for example packages/runtime/src/pi/tools.ts) that gives, per route-table role and for the root, the Pi --tools / --exclude-tools arguments from the route table's allowlists as the requirements state them (read-only roles: read, grep, find, ls; Worker.operations and Worker.validation: bash without write or edit; Reviewer.code keeps bash; Librarian roles get the web tools; codemode for the root via +codemode), so no other place decides a role's tools; (2) the web-tool choice: when the provider's extension offers web tools (Kimi: moonshot_search, moonshot_fetch) pi-web-kit is not loaded, otherwise pi-web-kit is, as config.json selects; (3) the config.json switches for each tool or feature and the package that carries it (todo, ask, processes, web, billion-context, MCP, computer use where present), so a disabled one is neither loaded nor required, reusing packages.ts and the pi-packages table; (4) the Billion Context settings the requirements decide (delegate.forceEnable for root and specialists, its own subagents off) as data for setup to write, plus anything else the Decided entries specify; (5) docs/pi/extensions.md and docs/pi/configuration.md updated to the code, including what MCP and T3 tools need from the user and that their absence makes the visual roles report the inspection as blocked.",
+    "Out of scope: launching processes, writing Pi settings files (setup), the T3 integration, the system prompt. Name what they need in the report."
+  ],
+  "constraints": [
+    "Unit tests with synthesized fixtures only; no pi binary, no live model, no network.",
+    "Reuse existing carriers; add custom code only where the requirements say no existing carrier exists, and say which.",
+    "Dependencies and pins change only through the updater's table; do not hand-edit bun.lock or ranges.",
+    "Keep the Claude generated output unchanged.",
+    "Make no version-control writes and no edits under .git/ or .holyagent/; report changed paths.",
+    "Follow .claude/CLAUDE.md (Effect, Schema with onExcessProperty error, JSDoc on exports, Bun APIs).",
+    "Report in under 450 words; start each evidence line with the exact criterion text (no backticks), a colon, then the support; put long logs in a file outside the repository."
+  ],
+  "criteria": [
+    {
+      "text": "One module gives every role's and the root's Pi tool arguments as the requirements state, with tests per role",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "pi-web-kit is loaded only when the provider extension offers no web tools, as config.json selects, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Each tool or feature switch in config.json enables or disables its carrier package, and a disabled one is neither loaded nor required, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The Billion Context and other decided settings are provided as data with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "docs/pi/extensions.md and docs/pi/configuration.md match the code",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "Only the tool-surface scope is built; launcher, setup and T3 needs are named, not built",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "bunx --no-install mise run verify exits 0 and mise run build leaves generated output in sync",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/pi",
+    "packages/runtime/src/config",
+    "packages/runtime/src/index.ts",
+    "packages/runtime/tests/pi",
+    "packages/runtime/tests/config",
+    "docs/pi/extensions.md",
+    "docs/pi/configuration.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T05:49:26.057Z"
+  },
+  "createdAt": "2026-11-08T05:49:26.057Z"
+}
