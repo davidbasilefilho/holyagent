@@ -65,5 +65,25 @@
     "finishedAt": "2026-11-08T07:45:47.517Z"
   },
   "result": "result: Parser-mismatch bypass closed in the shared check, plus the two ride-alongs. build and verify both exit 0.\n\nchanged: packages/runtime/src/cli/workflow-check.ts, packages/runtime/tests/workflow-check.test.ts, packages/integrations/pi/src/extension.ts, packages/integrations/pi/tests/extension.test.ts, docs/pi/extensions.md, plus the rebuilt bundles packages/integrations/claude/dist/scripts/holyagent.js, packages/integrations/pi/dist/extensions/holyagent.js and packages/integrations/pi/dist/scripts/holyagent.js.\n\nchecks:\n- `bunx --no-install mise run build` -> 0\n- `bunx --no-install mise run verify` -> 0 (2106 pass, 0 fail, no type errors in 199 files, fmt and lint clean)\n- Claude dist: only the `scripts/holyagent.js` bundle changed (+11 lines); agents and skills are unchanged.\n- The 14 new runtime tests fail on the base `workflow-check.ts` (207 pass, 14 fail) and pass with the fix. The `-->`-at-line-start test passes on both, because that script is already a parse error in the module.\n- The new gate and SubagentWorkflow-input tests in `extension.test.ts` pass; I did not run them against the base.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- **Extra hole found and closed:** the package's `extractMeta` evaluates the first line starting `export const meta =` on the host thread before the script runs, wherever that line sits (comment or string). The checker never saw it there, and `this.constructor.constructor(\"return process\")()` in an empty `vm` context reaches `process` (verified on Node 22). The check now refuses unless the matches of that pattern are exactly the one vetted `export const meta`.\n- **Annex B:** block-level function declarations hoist out of the block in a classic script. They are now refused anywhere but a function body or the top level.\n- **Other differences:** I found none that the checker relies on. `with`, octal literals, `this`, `arguments` and labelled functions are already refused or are parse errors.\n- **Config gates:** the gates stand down only when the user-level config alone has `pi.enable` off. When the merged config is off, the extension makes one extra `config` call with no project folder, to read the user file. An unreadable config keeps the gates on. A project `pi.enable: false` still adds no context.\n- **Outside my ownership:** `docs/hooks.md` line 68 describes the Claude hook's parse and could mention the new refusals. A user on the Claude `Workflow` hook now gets a prompt for such scripts instead of an allow.\n\nevidence:\ndiff-file: /home/user/holyagent-notes/launcher-h.diff\nScripts containing HTML-like comment sequences or other script-vs-module differences are refused, with exploit tests: `workflow-check.test.ts`, describe \"reads the script the way the Pi runtime does\" (HTML comment exploit, `-->`, block functions, fake meta exports); the 14 fail on base and pass now.\nmise run build exits 0 with dist in sync and mise run verify exits 0: build=0, verify=0, 2106 pass and 0 fail; the pi dist-in-sync test passes.\n",
+  "acceptance": {
+    "revision": 7,
+    "rationale": "Launcher work reviewed by code and security reviewers through four repair rounds; final head 7846c9b passes verify with 2146 tests and no open blocker.",
+    "criteria": [
+      {
+        "criterion": "Scripts containing HTML-like comment sequences or other script-vs-module differences are refused, with exploit tests",
+        "support": "`workflow-check.test.ts`, describe \"reads the script the way the Pi runtime does\" (HTML comment exploit, `-->`, block functions, fake meta exports); the 14 fail on base and pass now."
+      },
+      {
+        "criterion": "mise run build exits 0 with dist in sync and mise run verify exits 0",
+        "support": "build=0, verify=0, 2106 pass and 0 fail; the pi dist-in-sync test passes."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff-file",
+        "support": "/home/user/holyagent-notes/launcher-h.diff"
+      }
+    ]
+  },
   "createdAt": "2026-11-08T07:37:11.444Z"
 }
