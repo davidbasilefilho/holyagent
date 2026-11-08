@@ -1,0 +1,66 @@
+{
+  "id": "assignment-0mw7irnkk-pt46",
+  "intentId": "intent-0mw6muuvl-zq3p",
+  "intentRevision": 7,
+  "roleTask": "Worker.implementation",
+  "slug": "close-the-parser-mismatch-bypass-of-the",
+  "objective": "Close the parser-mismatch bypass of the Pi workflow gate and two smaller gate gaps, in /home/user/holyagent-0.3.0-launcher (head 58671ec).",
+  "state": "Running",
+  "scope": [
+    "Security finding (blocking): workflowRefusal in packages/runtime/src/cli/workflow-check.ts parses the script with acorn sourceType module (about line 820), where <!-- is an operator sequence, but @tintinweb/pi-subagents runs the body with vm.Script as a classic script (src/workflow/worker-source.ts:757 of the package at /home/user/holyagent-notes/pi-probe/node_modules/@tintinweb/pi-subagents), where <!-- and a line-leading --> start HTML-like comments. A script like `let n = 0\\nn <!--n; function workflow() { return 1 }\\nawait workflow({ scriptPath: \"x.js\" })` makes the checker see a local workflow function while the runtime calls the package global workflow(), which runs an unchecked script. Fix it in the shared check so the checker and the runtime agree: refuse any script whose source contains <!-- or a --> (the simplest sound rule; scripts have no reason to contain them), and add tests with this exploit and the --> variant. Read the package worker-source.ts and extractMeta to check for any other script-vs-module difference the checker relies on (e.g. top-level await, export handling, strict mode, function declarations at top level) and close each one you find the same way, with a test. The Claude hook uses the same check; refusing these sequences there only makes such a script prompt, which is acceptable.",
+    "Code review (non-blocking, ride along): refuseNonSpecialistWorkflow in packages/integrations/pi/src/extension.ts lets a call with both script and name pass; refuse any SubagentWorkflow input key other than script and args, as the Claude hook does, with a test.",
+    "Security hardening (non-blocking, ride along): a project .holyagent/config.json with pi.enable false switches both gates off. Make the gates stand down only when pi.enable is off in the user-level config, or when the project value is off and the user value is also off, so a cloned repository cannot turn the gates off; read how the extension collects the config (packages/runtime/src/config) to do it, with a test. Keep the gates on when the config cannot be read."
+  ],
+  "constraints": [
+    "Edit only the ownership paths; no version-control writes and no edits under .git/ or .holyagent/.",
+    "Effect and JSDoc per .claude/CLAUDE.md; the extension runs on Node inside Pi.",
+    "Do not run pi or any live model.",
+    "Run bunx --no-install mise run build, then bunx --no-install mise run verify; report each exit code (echo $?) and counts, and confirm the Claude dist agents and skills are unchanged.",
+    "Write the source diff (excluding the dist bundles) to /home/user/holyagent-notes/launcher-h.diff and give it as diff-file evidence.",
+    "Start each evidence line with the criterion text, then a colon.",
+    "Report in under 350 words."
+  ],
+  "criteria": [
+    {
+      "text": "Scripts containing HTML-like comment sequences or other script-vs-module differences are refused, with exploit tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "SubagentWorkflow inputs other than script and args are refused",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A project config cannot turn the gates off",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build exits 0 with dist in sync and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli/workflow-check.ts",
+    "packages/runtime/tests",
+    "packages/integrations/pi/src/extension.ts",
+    "packages/integrations/pi/tests",
+    "packages/integrations/pi/dist",
+    "packages/integrations/claude/dist",
+    "packages/runtime/src/config",
+    "docs/pi/extensions.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T07:37:11.444Z"
+  },
+  "createdAt": "2026-11-08T07:37:11.444Z"
+}
