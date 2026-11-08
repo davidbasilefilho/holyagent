@@ -46,6 +46,12 @@ describe("requirements parser", () => {
     ).toEqual({ ids: ["R-ONE", "R-TWO-PART"], references: ["R-ONE", "R-OTHER"] })
   })
 
+  test("reads CRLF line endings the same as LF", () => {
+    const lf = parseRequirements("- R-A: x\n- See: R-A\n")
+    expect(parseRequirements("- R-A: x\r\n- See: R-A\r\n")).toEqual(lf)
+    expect(lf).toEqual({ ids: ["R-A"], references: ["R-A"] })
+  })
+
   test("mirrors Markdown files only, and not the guide", () => {
     expect(isMirrored("root/identity.md")).toBe(true)
     expect(isMirrored("skills/x/SKILL.md")).toBe(true)

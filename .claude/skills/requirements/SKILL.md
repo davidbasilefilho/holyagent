@@ -66,5 +66,5 @@ A family joins by being listed in `FAMILIES` in `families.ts`, in the same chang
 
 ## Gates
 
-1. `bunx --no-install mise run build` regenerates the plugin from the instructions; commit its output with the change.
+1. `bunx --no-install mise run build` regenerates the plugin from the instructions; commit its output with the change. `requirements/` and each `guide.md` are not shipped in the plugin, so a rebuild after a change to `claude-5.5/` is what updates the plugin.
 2. `bunx --no-install mise run verify` (type-check, lint, format check, tests) must pass. A failing mirror or id-coverage test names the missing file or id.
