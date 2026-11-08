@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-repair-commit-74d9379-on",
   "objective": "Re-review repair commit 74d9379 on release/0.3.0/feat/pi-tool-settings (worktree /home/user/holyagent-0.3.0-settings, range ff016a6..74d9379) against the findings it repairs, and check its docs.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Diff: /home/user/holyagent-notes/wire-b-repair.diff (dist excluded).",
     "Findings repaired: (1) project/local scope followed a symlinked .pi folder or file, now refused from .pi down to the file; (2) project/local scope checked only the project file, so a project write could override a global choice, now every key the global file sets is left; optional: the default layering, now subsumed; a record failure after a write is now a failed line. Kept by default: --undo locates files from the current environment, documented.",
@@ -44,7 +44,33 @@
     "agentId": "workflow:wf_1db59d9e-82e/assignment-0mw7p1cg5-v77s",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T10:32:41.285Z"
+    "startedAt": "2026-11-08T10:32:41.285Z",
+    "finishedAt": "2026-11-08T10:39:20.528Z"
+  },
+  "result": "result: Repair 74d9379 fixes both findings and the record-failure item; each has a test that fails on the base source, and the docs match the code. No blockers. All of this ran on the committed head.\n\nI ran `/code-review ff016a6...74d9379` through the Skill tool; it returned the built-in review's seven findings, and I read the cited code for each. The `dist` bundles are generated and I did not read them.\n\nchanged: none (read-only)\n\nchecks:\n- `bun test packages/runtime/tests/setup-pi-settings.test.ts` on head -> 33 pass, 0 fail.\n- Same test file against the base `pi-settings.ts` and `scope.ts`, extracted to scratchpad -> 8 fail, 25 pass. The 8 failures are the new tests: global-key leave-out, non-object global file, symlinked `.pi`, symlinked file, symlink below `.pi`, record-failure line, doctor, undo through a symlink.\n- `bunx --no-install mise run verify` -> exit 0. Type-check clean, lint clean, format clean, 2316 tests pass. Log: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`.\n\nblockers: none\n\nnotes (all optional, none blocking):\n- **Record failure (`pi-settings.ts:253`):** the `!` line drops the per-key detail. The keys stay in the file and a later run sees them as present, so `--undo` never removes them. The installation.md text says this, and recording before writing would be tidier.\n- **Undo through a symlink (`pi-settings.ts:345`):** `refuseLinks` runs before `clearRecorded`, so the record entry stays until the link is replaced. That fits the documented refusal.\n- **Duplicated walk (`pi-settings.ts:199`):** `refuseLinks` repeats the per-component symlink walk that `settingsFile` in `scope.ts` does. It could be shared through the newly exported `isSymlink`. It also does not check `cwd` itself.\n- **Repeated work (`pi-settings.ts:193`):** `resolveTarget` calls `applyDefaults` twice per key. This is negligible at this size.\n- **Left-out keys (`pi-settings.ts:199`):** the \"left out, set in your global file\" note does not show the global value. It is documented, and the finding stands as optional.\n- **Test coupling:** the record-failure test relies on the temporary-file name `.<name>.<pid>.tmp` from the shared `writeJsonObject` helper in `json-file.ts:115`. That is a minor coupling to an implementation detail.\n- **Reordered undo test:** the reorder is justified, and the new test \"project and local scope leave a key the user's global file sets\" covers the global-then-project interaction directly.\n- **Kept by default (`--undo`):** `--undo` finds files from the current environment, and installation.md now documents this.\n\nevidence:\n- Each finding is repaired with a test that fails without it, and nothing else regresses: 8 new tests fail on the base `pi-settings.ts` and `scope.ts` and pass on head. `mise run verify` passes with 2316 tests and no failures.\n- The changed docs match the code: installation.md, extensions.md, configuration.md, usage.md, components.md and docs/pi/README.md match the diff of `pi-settings.ts`. They cover the \"left out, set in your global file\" wording, the symlink refusal for `.pi`, a folder below it and the file, a non-object global file giving a `!` line, the record-failure `!` line, and the doctor and undo behavior.\n- The repair follows the repository's code rules: it uses Effect throughout, with no try/catch or Promise statics in the new source. The exported `isSymlink` has JSDoc. Lint, format and type-check pass under `mise run verify`.\n- review-findings: the seven built-in findings are all optional, per the notes above; none is a blocker.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Both findings repaired with tests failing on the base; docs match; verify 2316 pass",
+    "criteria": [
+      {
+        "criterion": "Each finding is repaired with a test that fails without it, and nothing else regresses",
+        "support": "8 new tests fail on the base `pi-settings.ts` and `scope.ts` and pass on head. `mise run verify` passes with 2316 tests and no failures."
+      },
+      {
+        "criterion": "The changed docs match the code",
+        "support": "installation.md, extensions.md, configuration.md, usage.md, components.md and docs/pi/README.md match the diff of `pi-settings.ts`. They cover the \"left out, set in your global file\" wording, the symlink refusal for `.pi`, a folder below it and the file, a non-object global file giving a `!` line, the record-failure `!` line, and the doctor and undo behavior."
+      },
+      {
+        "criterion": "The repair follows the repository's code rules",
+        "support": "it uses Effect throughout, with no try/catch or Promise statics in the new source. The exported `isSymlink` has JSDoc. Lint, format and type-check pass under `mise run verify`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "review-findings",
+        "support": "the seven built-in findings are all optional, per the notes above; none is a blocker."
+      }
+    ]
   },
   "createdAt": "2026-11-08T10:32:41.285Z"
 }
