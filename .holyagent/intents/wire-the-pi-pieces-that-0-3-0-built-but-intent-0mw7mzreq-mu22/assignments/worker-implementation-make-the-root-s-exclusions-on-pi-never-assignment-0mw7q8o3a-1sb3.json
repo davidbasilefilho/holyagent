@@ -1,0 +1,55 @@
+{
+  "id": "assignment-0mw7q8o3a-1sb3",
+  "intentId": "intent-0mw7mzreq-mu22",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-root-s-exclusions-on-pi-never",
+  "objective": "Make the root's exclusions on Pi never lose the home-level config's patterns within a session, whatever fails, in /home/user/holyagent-0.3.0-wiring (branch release/0.3.0/feat/pi-root-wiring, head edc25d8).",
+  "state": "Running",
+  "scope": [
+    "Validated (security re-review): topOf (git rev-parse --show-toplevel) is awaited at extension.ts ~780 before the Effect.all that reads the user-only config; a project-delivered malformed .git (garbage gitfile, malformed .git/config) fails it, failed() calls closedSettings(undefined, undefined), and the user's exclusions (for example web_search and web_fetch under pi-web-kit) are lifted for the root, with no notice about them. Start the user-only read first and independently of topOf and of the merged read (it needs no project path), so its result is used on every path.",
+    "Same root cause: gather sets taken.excluded = result.tools.excludeTools, so a later collection (compaction) whose reads fail replaces a user-inclusive list with the defaults'; make the session's excluded set only grow (union with the previous one). A deadline hit while the user read is still running leaves user undefined silently: when the user read did not finish, add the home-level notice.",
+    "Tests: a failing topOf with a user config setting pi-web-kit keeps web_search and web_fetch gated; a compaction collection whose reads fail keeps the earlier user-inclusive exclusions; a deadline during the user read shows the home-level notice and keeps the defaults. Fix docs/pi/extensions.md line ~10 if it claims more than the code does."
+  ],
+  "constraints": [
+    "Change only the ownership paths; no version-control writes and no edits under .git/ or .holyagent/.",
+    "Follow .claude/CLAUDE.md code rules; each test must fail without its fix; do not weaken tests.",
+    "Never run pi.",
+    "Run bunx --no-install mise run build and bunx --no-install mise run verify before reporting.",
+    "Report in under 400 words; put long logs in a file under /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path. Write a diff-file (dist excluded) at /home/user/holyagent-notes/wire-a-fix2.diff."
+  ],
+  "criteria": [
+    {
+      "text": "The home-level config's exclusions apply when git, the merged read or the deadline fails, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Within a session the root's excluded set never shrinks, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build and mise run verify exit 0",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi/src/extension.ts",
+    "packages/integrations/pi/tests/extension.test.ts",
+    "packages/integrations/pi/dist/extensions",
+    "docs/pi/extensions.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T11:06:22.582Z"
+  },
+  "createdAt": "2026-11-08T11:06:22.582Z"
+}
