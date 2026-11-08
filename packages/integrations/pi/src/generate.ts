@@ -18,7 +18,7 @@ export const GENERATED_PATHS: ReadonlyArray<string> = [DIST_DIRECTORY]
  * The model family whose instruction sources the package is built from. The family is a parameter
  * of {@link generate}, so a later change that adds a family switches this one value.
  */
-export const PI_FAMILY: Family = "claude-5.5"
+export const PI_FAMILY: Family = "kimi-k3.1"
 
 /** The extension's source file, relative to the repository root. */
 export const EXTENSION_SOURCE = `${SOURCES}/extension.ts`

@@ -3,9 +3,9 @@ import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { ROUTES } from "../src/domain/route.ts"
+import { FAMILIES } from "../src/instructions/families.ts"
 
 const INSTRUCTIONS = join(import.meta.dir, "../src/instructions")
-const CLAUDE = join(INSTRUCTIONS, "claude-5.5")
 
 /** The frontmatter keys claude.ai accepts in a skill. */
 const SKILL_KEYS = ["name", "description", "license", "compatibility", "metadata", "allowed-tools"]
@@ -31,25 +31,27 @@ const frontmatterKeys = (text: string): ReadonlyArray<string> | undefined => {
   return lines.slice(1, end).flatMap((line) => /^([A-Za-z][\w-]*):/.exec(line)?.[1] ?? [])
 }
 
-describe("instruction sources", () => {
+describe.each(FAMILIES)("instruction sources of family %s", (family) => {
+  const FAMILY = join(INSTRUCTIONS, family)
+
   test("hold the root, the specialist conduct, a role per route, skills and requirements", () => {
     expect(FILES.length).toBeGreaterThan(0)
     for (const folder of ["root", "specialist"])
-      expect(readdirSync(join(CLAUDE, folder)).length).toBeGreaterThan(0)
+      expect(readdirSync(join(FAMILY, folder)).length).toBeGreaterThan(0)
     for (const folder of ["root", "specialist", "roles", "skills"])
       expect(readdirSync(join(INSTRUCTIONS, "requirements", folder)).length).toBeGreaterThan(0)
   })
 
   test("have one role file for each route and no other", () => {
-    const roles = readdirSync(join(CLAUDE, "roles")).toSorted()
+    const roles = readdirSync(join(FAMILY, "roles")).toSorted()
     expect(roles).toEqual(ROUTES.map((route) => route.agent).toSorted())
     for (const role of roles)
-      for (const section of readdirSync(join(CLAUDE, "roles", role)))
-        expect(read(join(CLAUDE, "roles", role, section)).trim()).not.toBe("")
+      for (const section of readdirSync(join(FAMILY, "roles", role)))
+        expect(read(join(FAMILY, "roles", role, section)).trim()).not.toBe("")
   })
 
   test("give each skill a folder named after it and only the frontmatter keys claude.ai accepts", () => {
-    const skills = readdirSync(join(CLAUDE, "skills"))
+    const skills = readdirSync(join(FAMILY, "skills"))
     expect(skills.toSorted()).toEqual([
       "ci-watch",
       "desktop-design",
@@ -64,7 +66,7 @@ describe("instruction sources", () => {
       "web-design",
     ])
     for (const skill of skills) {
-      const text = read(join(CLAUDE, "skills", skill, "SKILL.md"))
+      const text = read(join(FAMILY, "skills", skill, "SKILL.md"))
       const keys = frontmatterKeys(text)
       expect(keys).toBeDefined()
       for (const key of keys ?? []) expect(SKILL_KEYS).toContain(key)
@@ -73,7 +75,9 @@ describe("instruction sources", () => {
       expect(text).toContain(`name: ${skill}\n`)
     }
   })
+})
 
+describe("instruction sources", () => {
   test("refer to no skill that has been folded into the root rules or the CLI help", () => {
     for (const path of FILES)
       expect({

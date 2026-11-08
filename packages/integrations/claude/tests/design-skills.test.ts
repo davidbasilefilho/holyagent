@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { Effect } from "effect"
 
 import { toPosix } from "../../../runtime/src/domain/paths.ts"
+import { FAMILIES } from "../../../runtime/src/instructions/families.ts"
 import {
   DESIGN_CORE_MARKER,
   DESIGN_SKILLS,
@@ -27,6 +28,13 @@ const INSTRUCTION_FILES = (
 )
   .map((path) => toPosix(`packages/runtime/src/instructions/${path}`))
   .toSorted()
+/** The instruction folder of a family, relative to the repository root. */
+const familyDirectory = (family: string) => `packages/runtime/src/instructions/${family}`
+/** The sources of a family folder, as paths relative to it. */
+const familySources = (family: string) =>
+  INSTRUCTION_FILES.filter((path) => path.startsWith(`${familyDirectory(family)}/`)).map((path) =>
+    path.slice(familyDirectory(family).length + 1),
+  )
 const materiality = read(MATERIALITY_FILE).trim()
 const core = Effect.runSync(
   embedMateriality(read(DESIGN_CORE_FILE), materiality, DESIGN_CORE_FILE),
@@ -210,17 +218,30 @@ describe("the materiality definition", () => {
         path: file.path,
         marker: file.content.split("\n").includes(MATERIALITY_MARKER),
       }).toEqual({ path: file.path, marker: false })
-    const sources = INSTRUCTION_FILES.filter((path) =>
-      read(path).split("\n").includes(MATERIALITY_MARKER),
-    )
+    for (const family of FAMILIES) {
+      const sources = familySources(family).filter((path) =>
+        read(`${familyDirectory(family)}/${path}`)
+          .split("\n")
+          .includes(MATERIALITY_MARKER),
+      )
+      expect({ family, sources: sources.toSorted() }).toEqual({
+        family,
+        sources: MATERIALITY_SOURCES,
+      })
+    }
     expect(
-      sources.map((path) => path.slice(`${INSTRUCTIONS_DIRECTORY}/`.length)).toSorted(),
-    ).toEqual(MATERIALITY_SOURCES)
+      INSTRUCTION_FILES.filter(
+        (path) =>
+          !FAMILIES.some((family) => path.startsWith(`${familyDirectory(family)}/`)) &&
+          read(path).split("\n").includes(MATERIALITY_MARKER),
+      ),
+    ).toEqual([])
   })
 
   test("is restated by no other instruction source or generated file", () => {
     for (const path of INSTRUCTION_FILES) {
-      if (path === MATERIALITY_FILE) continue
+      if (FAMILIES.some((family) => path === `${familyDirectory(family)}/shared/materiality.md`))
+        continue
       const text = read(path)
       for (const marker of DEFINITION_MARKERS)
         expect({ path, marker, found: text.includes(marker) }).toEqual({
