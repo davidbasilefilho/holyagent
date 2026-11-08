@@ -1,0 +1,46 @@
+{
+  "id": "assignment-0mw7s1sw6-f68l",
+  "intentId": "intent-0mw6ry92f-k0w1",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.code",
+  "slug": "review-commit-range-172bdf9-release-0-3",
+  "objective": "Review commit range 172bdf9..release/0.3.0/feat/installed-scope-default in the worktree /home/user/holyagent-0.3.0-scope for correctness and regressions against the merge-ready bar: holyagent setup and doctor default to the scope whose Claude Code settings enable holyagent@holyagent (local over project over user, user when none), print the scope and the file it came from, and let --scope win; note that a symlinked project or local .claude makes a run without --scope fail even for a user install, and judge whether that is right.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-scope; review `git diff 172bdf9..HEAD` and `git log 172bdf9..HEAD` there, and read surrounding code as needed. Start with /code-review on that range if it is available to you.",
+    "Judge behavior, error paths, tests (each new behavior has a test that fails without it, none weakened), duplication, and the repository rules in .claude/CLAUDE.md and AGENTS.md (Effect, Schema at boundaries, JSDoc, Bun APIs). The generated dist files are build output; check only that they match a fresh build."
+  ],
+  "constraints": [
+    "Read-only: make no edits and no git writes.",
+    "Testing in this project is unit tests and fixtures only: never start pi, T3 Code or a Kimi request.",
+    "Mark each finding blocking or non-blocking with path:line and a concrete failure scenario; a finding without a reproducible path to a wrong result is non-blocking.",
+    "Report in under 500 words; put long output in a file in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Every blocking finding names path:line and a concrete failure scenario",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The review states whether the range is merge-ready",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "verdict"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7r2yig-qb6p"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T11:57:01.446Z"
+  },
+  "createdAt": "2026-11-08T11:57:01.446Z"
+}
