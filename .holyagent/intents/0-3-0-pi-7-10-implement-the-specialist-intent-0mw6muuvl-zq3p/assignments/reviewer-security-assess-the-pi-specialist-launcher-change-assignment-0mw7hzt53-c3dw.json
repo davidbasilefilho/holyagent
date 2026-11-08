@@ -1,0 +1,50 @@
+{
+  "id": "assignment-0mw7hzt53-c3dw",
+  "intentId": "intent-0mw6muuvl-zq3p",
+  "intentRevision": 7,
+  "roleTask": "Reviewer.security",
+  "slug": "assess-the-pi-specialist-launcher-change",
+  "objective": "Assess the Pi specialist launcher change, 7bae86c..e55ee8f on release/0.3.0/feat/pi-launcher, for security vulnerabilities, tracing sources to sinks.",
+  "state": "Running",
+  "scope": [
+    "Binding requirements (Intent pi 7/10, revision 7): the launcher is @tintinweb/pi-subagents 0.23.1, which runs children in process; HolyAgent ships the eighteen specialists as package agents (dist/agents, pi.subagents.agents), only those launch (disableDefaultAgents true, fallbackSubagent none), each agent file carries the role prompt (stripCitations, ${HOLYAGENT_PI_ROOT} filled with forward slashes) and a tools allowlist derived from toolArgs, with no model or thinking in the file; model and thinking come per call from the dispatched entry, which under HOLYAGENT_HOST=pi prints the Pi route (config.pi.routes); PI_CODEMODE_MAX_WORKERS and PI_CACHE_RETENTION are set once on the root process; the extension runs a child as a specialist, never as the root; launches are non-blocking with a completion notice that starts a new root turn; failure from stopReason error, aborted or length, an empty report or a settle without a report; a workflow agent and an independent reviewer are never continued; assignment reports reads the package workflow journal by recomputed key and direct agents from subagents:record entries; no workflow script asks for confirmation; no extra report tool. Sources: package source at /home/user/holyagent-notes/pi-probe/node_modules/@tintinweb/pi-subagents and research notes at /home/user/holyagent-notes/launcher-research.md. Do not run pi or any live model.",
+    "Read the diff file /home/user/holyagent-notes/launcher-full.diff, and the files in /home/user/holyagent-0.3.0-launcher as needed.",
+    "Surfaces: the Pi extension (packages/integrations/pi/src/extension.ts) as a privileged hook: its tool_call gate on the Agent tool (can a model bypass the eighteen-name restriction, e.g. via workflow agent() calls, case or alias), process.env mutation, the message_end rewrite, child detection that decides root vs specialist context; the wrapper and exec calls (path and argument injection, Windows paths); assignment reports reading journal and session files from paths given on the command line and writing report files (path traversal, writing outside the reports folder, ids from untrusted journal content); the settings files toolSettings writes under the home directory (overwrite or merge safety); the shipped agent tools allowlists (privilege of read-only roles)."
+  ],
+  "constraints": [
+    "Read-only: no edits and no version-control writes.",
+    "Substantiate each finding with a source-to-sink path and a realistic scenario; separate validated findings from hardening notes.",
+    "Start each evidence line with the criterion text, then a colon.",
+    "Report in under 500 words."
+  ],
+  "criteria": [
+    {
+      "text": "No validated vulnerability introduced by the change",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Read-only roles cannot write or run commands through the shipped agent tools",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "diff-file-read"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7gssik-63k5",
+    "assignment-0mw7gtfu7-bypr",
+    "assignment-0mw7gtg3m-7arq",
+    "assignment-0mw7hfosz-q0t4",
+    "assignment-0mw7hpap1-bsp4"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T07:15:32.296Z"
+  },
+  "createdAt": "2026-11-08T07:15:32.296Z"
+}
