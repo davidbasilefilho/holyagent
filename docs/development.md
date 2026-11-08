@@ -72,6 +72,8 @@ bunx --no-install mise run verify
 | `deps:check`            | Fails when a pin is behind                                      |
 | `verify`                | `check`, `lint`, `fmt:check` and `test`, all read-only          |
 
+The root `prepare` script is `bun scripts/prepare-dev.ts`, which runs the `prepare` task only when `mise` is installed under `node_modules`, so a consumer install that omits dev dependencies (what Pi runs on a release tag) succeeds without hooks and a development install still installs them.
+
 Done means `mise run verify` passes; after changing plugin sources, run `mise run build`. `scripts/repo-paths.test.ts` (part of `test`) fails on a tracked path over 120 characters, which overruns Windows MAX_PATH in the marketplace clone, or under `.holyagent/`, which lives on the `holyagent/state` branch.
 
 ## Instruction text
@@ -156,7 +158,7 @@ Each release `0.X.Y` has an integration branch, `release/0.X.Y/integration`, cut
 
 | Check          | Runs on              | Does                                                                                                                                                       |
 | -------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `check`        | PRs and calls        | The gates, the generated-plugin freshness check, plugin validation and shellcheck                                                                          |
+| `check`        | PRs and calls        | The gates, the freshness check of the generated plugin and Pi package, plugin validation and shellcheck                                                    |
 | `windows`      | PRs and calls        | The test suite on `windows-latest`                                                                                                                         |
 | `installers`   | PRs and calls        | Parses both installers                                                                                                                                     |
 | `branch-model` | PRs only             | `scripts/pr-checks.ts branch-model <base> <head>`: the three branch rules in AGENTS.md, after the inline guard, which runs first, fails a head from a fork |

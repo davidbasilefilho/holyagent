@@ -12,7 +12,7 @@
   "scripts": {
     "bump:minor": "mise run bump:minor",
     "bump:patch": "mise run bump:patch",
-    "prepare": "mise run prepare",
+    "prepare": "bun scripts/prepare-dev.ts",
     "build": "mise run build",
     "check": "mise run check",
     "fmt": "mise run fmt",

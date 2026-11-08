@@ -16,16 +16,10 @@
     "packages/integrations/claude": {
       "name": "@holyagent/claude",
       "version": "0.3.0",
-      "dependencies": {
-        "@holyagent/runtime": "workspace:*",
-      },
     },
     "packages/integrations/pi": {
       "name": "@holyagent/pi",
       "version": "0.3.0",
-      "dependencies": {
-        "@holyagent/runtime": "workspace:*",
-      },
       "devDependencies": {
         "@earendil-works/pi-coding-agent": "^1.0.0",
       },
