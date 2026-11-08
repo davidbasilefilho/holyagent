@@ -1,0 +1,52 @@
+{
+  "id": "assignment-0mw7d6pcg-3xjk",
+  "intentId": "intent-0mw6muujd-wz9x",
+  "intentRevision": 9,
+  "roleTask": "Reviewer.code",
+  "slug": "review-commit-c2f4433-on-release-0-3-0",
+  "objective": "Review commit c2f4433 on release/0.3.0/feat/kimi-provider (range 0266927..c2f4433, worktree /home/user/holyagent-0.3.0-provider; run commands there) for correctness, regressions and fit with its requirements.",
+  "state": "Running",
+  "scope": [
+    "Requirements: /home/user/holyagent-notes/intent-kimi-provider.txt (binding, including the Decided routing entry). Diff: /home/user/holyagent-notes/kimi-provider.diff.",
+    "The commit adds packages/runtime/src/pi/{provider,readiness,catalog,index}.ts with tests, edits config/packages.ts and schema.ts, and updates docs/pi/providers.md and configuration.md. Writer notes to weigh: the config selector is pi.provider kimi-coding-global; pi-provider-kimi-code@0.6.13 is recorded in the provider table and exposed as providerSource, not in package.json, and scripts/dependency-pins.ts does not know it, so deps:update will not move it; the pi --list-models format was taken from pi-coding-agent 1.5.0 dist/cli/list-models.js; readiness goes by exit code only; K3.1 Pro rejecting thinking off is documented but not enforced."
+  ],
+  "constraints": [
+    "Do not run the pi binary or a live model and make no network calls.",
+    "Read-only: no edits and no version-control writes.",
+    "Report in under 400 words; start each evidence line with the exact criterion text (no backticks), a colon, then the support."
+  ],
+  "criteria": [
+    {
+      "text": "The route table, mapping, readiness and catalog checks behave as the requirements say, including the decided routing for all eighteen roles and the root",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The provider pin is kept current by the repository's dependency tooling or the gap is a stated, tested decision",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "No regression in config loading or the package list, and tests cover each behavior and its error paths",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "bunx --no-install mise run verify exits 0 and mise run build leaves the tree clean on c2f4433",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T05:00:55.888Z"
+  },
+  "createdAt": "2026-11-08T05:00:55.888Z"
+}
