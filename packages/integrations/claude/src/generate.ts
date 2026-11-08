@@ -2,8 +2,8 @@ import { join } from "node:path"
 
 import { Effect } from "effect"
 
+import { bundleModule } from "../../../runtime/src/bundle.ts"
 import { ROUTES } from "../../../runtime/src/domain/route.ts"
-import { MODULE_COMMENT } from "../../../runtime/src/instructions/generated.ts"
 import { DESIGN_CORE_PATH, skillFiles } from "../../../runtime/src/instructions/skills.ts"
 import packageJson from "../package.json" with { type: "json" }
 import { agentFiles, PLUGIN_NAME } from "./agents.ts"
@@ -30,6 +30,9 @@ export const MARKETPLACE_PATH = ".claude-plugin/marketplace.json"
 export const GENERATED_PATHS: ReadonlyArray<string> = [MARKETPLACE_PATH, DIST_DIRECTORY]
 
 const SOURCES = `${PLUGIN_DIRECTORY}/src`
+
+// The CLI the plugin bundles as `scripts/holyagent.js`.
+const CLI_SOURCE = "packages/runtime/src/cli/main.ts"
 
 /** The English words for the counts a specialist roster can have, indexed by the count. */
 const COUNT_WORDS: ReadonlyArray<string> = [
@@ -206,27 +209,14 @@ const skills = async (): Promise<ReadonlyArray<GeneratedFile>> =>
     content,
   }))
 
-/**
- * The CLI as one file for Bun. Bun's comment above each module names its path in node_modules,
- * which depends on how dependencies were installed, so those comments go and the build is the same
- * on every machine.
- */
-const bundle = async (): Promise<string> => {
-  const result = await Bun.build({
-    entrypoints: [join(REPOSITORY, "packages/runtime/src/cli/main.ts")],
-    target: "bun",
-  })
-  const output = result.outputs[0]
-  if (!result.success || output === undefined)
-    throw new Error(result.logs.map((log) => log.message).join("\n"))
-  const lines = (await output.text()).replace(MODULE_COMMENT, "").split("\n")
-  // Keep the shebang and Bun's `// @bun` pragma first.
-  const pragma = lines.indexOf("// @bun")
-  if (pragma === -1) throw new Error("The bundle has no // @bun pragma line to put the note after")
-  const at = pragma + 1
-  lines.splice(at, 0, `// ${generatedNote("packages/runtime/src/cli/main.ts")}`)
-  return lines.join("\n")
-}
+/** The CLI as one file for Bun, bundled the way every generated runtime is. */
+const bundle = (): Promise<string> =>
+  Effect.runPromise(
+    bundleModule(join(REPOSITORY, CLI_SOURCE), {
+      target: "bun",
+      note: generatedNote(CLI_SOURCE),
+    }),
+  )
 
 const scripts = async (): Promise<ReadonlyArray<GeneratedFile>> => {
   const [shebang = "", ...wrapper] = (await readSource(`${SOURCES}/wrapper.sh`)).split("\n")

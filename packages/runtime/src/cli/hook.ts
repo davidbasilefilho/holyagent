@@ -1,13 +1,12 @@
-import { stat } from "node:fs/promises"
-
 import { Effect, Schema } from "effect"
 
+import { hasStateFolder } from "../hooks/state-folder.ts"
 import { ROOT_CORE } from "../instructions/claude-5.5/root-core.ts"
 import historyRules from "../instructions/claude-5.5/shared/history-rules.md" with { type: "text" }
 import stateChanges from "../instructions/claude-5.5/specialist/state-changes.md" with { type: "text" }
 import { setupNotice } from "../setup/check.ts"
 import { claimRulesDelivery, isSessionId, markRulesDelivered } from "../state/delivery.ts"
-import { hasCode, io } from "../state/files.ts"
+import { io } from "../state/files.ts"
 import { stateDirectory } from "../state/layout.ts"
 import { legacyFoldersWithState } from "../state/legacy.ts"
 import { deadlineIn, HOOK_WAIT_MS } from "../state/lock.ts"
@@ -94,19 +93,6 @@ const hook = (
 
 /** The agent types of the root: the plugin's `agent` setting applied, with or without namespace. */
 const ROOT_AGENTS: ReadonlySet<string | undefined> = new Set(["holyagent", "holyagent:holyagent"])
-
-/**
- * Whether the project has a `.holyagent` state folder at `directory`; a missing folder is false,
- * not a failure.
- */
-export const hasStateFolder = (directory: string) =>
-  io(directory, () => stat(directory)).pipe(
-    Effect.as(true),
-    Effect.catchIf(
-      (error) => hasCode(error.cause, "ENOENT"),
-      () => Effect.succeed(false),
-    ),
-  )
 
 /** The SessionStart sources after which pending notices are lost and the Running rows need a check. */
 export const RESUMED: ReadonlySet<string | undefined> = new Set(["resume", "compact"])

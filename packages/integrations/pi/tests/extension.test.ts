@@ -13,12 +13,14 @@ import {
   PI_ROOT_PLACEHOLDER,
   PI_SESSION_REMINDER,
 } from "../../../runtime/src/hooks/pi-context.ts"
+import { PI_PROJECT_FLAG } from "../../../runtime/src/hooks/pi-project.ts"
 import {
   COMMAND_TIMEOUT_MS,
   CONTEXT_MESSAGE,
   createExtension,
   NOTICE_MESSAGE,
   ROLE_FLAG,
+  SESSION_DEADLINE_MS,
 } from "../src/extension.ts"
 import { DIST_DIRECTORY, REPOSITORY } from "../src/files.ts"
 
@@ -42,7 +44,9 @@ type Responder = (call: Call, runtime: ReadonlyArray<string>) => Outcome | Promi
 
 /** The holyagent subcommand a call runs through the wrapper, or undefined for another program. */
 const subcommand = (call: Call): ReadonlyArray<string> | undefined =>
-  call.command === "sh" && call.args[0] === WRAPPER ? call.args.slice(1) : undefined
+  call.command === "sh" && call.args[0] === WRAPPER && call.args[1] === PI_PROJECT_FLAG
+    ? call.args.slice(3)
+    : undefined
 
 const STATUS =
   "intents[1]{id,revision,objective,running,unaccepted}:\n  intent-a,1,Ship the thing,0,0\n"
@@ -344,11 +348,15 @@ describe("what runs and when", () => {
     const { api } = await run(healthy(directory), { start: { reason: "resume" } })
     for (const call of api.calls) {
       if (call.command === "git") continue
-      expect({ command: call.command, script: call.args[0] }).toEqual({
+      expect({
+        command: call.command,
+        script: call.args[0],
+        project: call.args.slice(1, 3),
+      }).toEqual({
         command: "sh",
         script: WRAPPER,
+        project: [PI_PROJECT_FLAG, "/work/project/src"],
       })
-      expect(call.cwd).toBe("/work/project/src")
     }
     const commands = startedWith(api.calls)
     for (const expected of ["config /work/project/.holyagent", "status", "reconcile", "state mode"])
@@ -456,7 +464,8 @@ describe("the config", () => {
         },
       )
       expect(delivered).toBeUndefined()
-      expect(startedWith(api.calls).every((entry) => entry.startsWith("config "))).toBe(true)
+      expect(startedWith(api.calls)).not.toContain("status")
+      expect(startedWith(api.calls)).not.toContain("reconcile")
       expect(api.sent).toEqual([])
     }
   })
@@ -472,7 +481,7 @@ describe("the config", () => {
     expect(delivered?.message?.customType).toBe(NOTICE_MESSAGE)
     expect(delivered?.message?.content).toContain(message)
     expect(delivered?.message?.content).not.toContain("hint:")
-    expect(startedWith(api.calls).every((entry) => entry.startsWith("config "))).toBe(true)
+    expect(startedWith(api.calls)).not.toContain("status")
   })
 
   test("a config with an unknown key is refused when decoded", async () => {
@@ -568,5 +577,290 @@ describe("with the built package and a real project", () => {
     )
     expect(await real(root, home)).toBeUndefined()
     await done()
+  })
+})
+
+/** A promise and the way to settle it, to hold a command until the test lets it go. */
+const gate = () => {
+  let open = () => {}
+  const promise = new Promise<void>((resolve) => void (open = resolve))
+  return { promise, open }
+}
+
+/** Answers once the gate opens, or as a stopped command when the signal aborts first. */
+const gated = (hold: Promise<void>, answer: Outcome, signal?: AbortSignal): Promise<Outcome> =>
+  new Promise((resolve) => {
+    const stop = () => resolve({ killed: true, code: 143 })
+    if (signal?.aborted) return stop()
+    signal?.addEventListener("abort", stop, { once: true })
+    void hold.then(() => resolve(answer))
+  })
+
+const settle = () => Bun.sleep(30)
+
+describe("order and time", () => {
+  const state = async () => {
+    const directory = await mkdtemp(join(tmpdir(), "holyagent-pi-order-"))
+    return { directory, done: () => rm(directory, { recursive: true, force: true }) }
+  }
+
+  test("status finishes before reconcile starts", async () => {
+    const { directory, done } = await state()
+    const hold = gate()
+    const inner = healthy(directory)
+    const api = fakeApi((call, runtime) =>
+      runtime[0] === "status"
+        ? gated(hold.promise, { stdout: STATUS }, call.signal)
+        : inner(call, runtime),
+    )
+    createExtension({ packageRoot: PACKAGE_ROOT })(api.pi)
+    const started = api.emit("session_start", { reason: "resume" })
+    await settle()
+    expect(startedWith(api.calls)).toContain("status")
+    expect(startedWith(api.calls)).not.toContain("reconcile")
+    hold.open()
+    await started
+    const commands = startedWith(api.calls)
+    expect(commands.indexOf("reconcile")).toBeGreaterThan(commands.indexOf("status"))
+    await done()
+  })
+
+  test("the config and the state folder are asked together, before status", async () => {
+    const { directory, done } = await state()
+    const hold = gate()
+    const inner = healthy(directory)
+    const api = fakeApi((call, runtime) =>
+      runtime[0] === "config"
+        ? gated(hold.promise, { stdout: `${CONFIG}\n` }, call.signal)
+        : inner(call, runtime),
+    )
+    createExtension({ packageRoot: PACKAGE_ROOT })(api.pi)
+    const started = api.emit("session_start", { reason: "startup" })
+    await settle()
+    expect(startedWith(api.calls)).toContain("state mode")
+    expect(startedWith(api.calls)).not.toContain("status")
+    hold.open()
+    await started
+    expect(startedWith(api.calls)).toContain("status")
+    await done()
+  })
+
+  test("the whole collection has one deadline of the Claude hook's ten seconds", async () => {
+    expect(SESSION_DEADLINE_MS).toBe(10_000)
+    expect(COMMAND_TIMEOUT_MS).toBeLessThan(SESSION_DEADLINE_MS)
+    const { directory, done } = await state()
+    // Every command answers in time on its own; together they run past the deadline.
+    const inner = healthy(directory)
+    const api = fakeApi(async (call, runtime) => {
+      await Bun.sleep(60)
+      return inner(call, runtime)
+    })
+    createExtension({ packageRoot: PACKAGE_ROOT, deadlineMs: 150 })(api.pi)
+    const began = performance.now()
+    await api.emit("session_start", { reason: "resume" })
+    expect(performance.now() - began).toBeLessThan(1_500)
+    const delivered = (await api.emit("before_agent_start", { prompt: "x" })).at(0) as Delivered
+    expect(delivered.message?.customType).toBe(NOTICE_MESSAGE)
+    expect(delivered.message?.content).toContain("longer than")
+    // The command in flight at the deadline is stopped, and none starts after it.
+    expect(api.calls.at(-1)?.signal?.aborted).toBe(true)
+    const count = api.calls.length
+    await Bun.sleep(150)
+    expect(api.calls.length).toBe(count)
+    await done()
+  })
+
+  test("a compaction aborts the gather still pending and delivers its own result", async () => {
+    const { directory, done } = await state()
+    const hold = gate()
+    const inner = healthy(directory)
+    let first = true
+    const api = fakeApi((call, runtime) => {
+      if (runtime[0] !== "status" || !first) return inner(call, runtime)
+      first = false
+      return gated(hold.promise, { stdout: STATUS }, call.signal)
+    })
+    createExtension({ packageRoot: PACKAGE_ROOT })(api.pi)
+    const started = api.emit("session_start", { reason: "startup" })
+    await settle()
+    const older = api.calls.filter((call) => subcommand(call)?.[0] === "status")[0]?.signal
+    expect(older?.aborted).toBe(false)
+    await api.emit("session_compact", { reason: "threshold" })
+    expect(older?.aborted).toBe(true)
+    await started
+    const delivered = (await api.emit("before_agent_start", { prompt: "x" })).at(0) as Delivered
+    expect(delivered.message?.customType).toBe(CONTEXT_MESSAGE)
+    expect(delivered.message?.content).toContain("holyagent reconcile:")
+    // The aborted gather asked for nothing more.
+    expect(startedWith(api.calls).filter((entry) => entry === "reconcile")).toHaveLength(1)
+    await done()
+  })
+
+  test("a shutdown drops the result of the gather it stopped", async () => {
+    const { directory, done } = await state()
+    const hold = gate()
+    const inner = healthy(directory)
+    const api = fakeApi((call, runtime) =>
+      runtime[0] === "status"
+        ? gated(hold.promise, { stdout: STATUS }, call.signal)
+        : inner(call, runtime),
+    )
+    createExtension({ packageRoot: PACKAGE_ROOT })(api.pi)
+    const started = api.emit("session_start", { reason: "startup" })
+    await settle()
+    await api.emit("session_shutdown", { reason: "quit" })
+    await started
+    expect(await api.emit("before_agent_start", { prompt: "x" })).toEqual([undefined])
+    await done()
+  })
+})
+
+describe("where programs start", () => {
+  test("git and sh run in the package's folder, never the project's, and the project is an argument", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "holyagent-pi-cwd-"))
+    const project = "/work/project/src"
+    const { api } = await run(healthy(directory), { start: { reason: "resume" }, cwd: project })
+    expect(api.calls.length).toBeGreaterThan(4)
+    for (const call of api.calls) {
+      expect(call.cwd).toBe(PACKAGE_ROOT)
+      expect(call.cwd).not.toBe(project)
+    }
+    const git = api.calls.filter((call) => call.command === "git")
+    expect(git.map((call) => call.args)).toEqual([["-C", project, "rev-parse", "--show-toplevel"]])
+    for (const call of api.calls.filter((entry) => entry.command === "sh"))
+      expect(call.args.slice(0, 3)).toEqual([WRAPPER, PI_PROJECT_FLAG, project])
+    await rm(directory, { recursive: true, force: true })
+  })
+})
+
+describe("a project that is not a git repository", () => {
+  const notGit: Responder = (call, runtime) =>
+    call.command === "git"
+      ? {
+          code: 128,
+          stderr: "fatal: not a git repository (or any of the parent directories): .git\n",
+        }
+      : healthy("/unused")(call, runtime)
+
+  test("its state folder is .holyagent of the project and state mode is not asked", async () => {
+    const project = await mkdtemp(join(tmpdir(), "holyagent-pi-plain-mock-"))
+    await mkdir(join(project, ".holyagent"))
+    const { api, delivered } = await run(notGit, { cwd: project })
+    const commands = startedWith(api.calls)
+    expect(commands).toContain(`config ${join(project, ".holyagent")}`)
+    expect(commands).toContain("status")
+    expect(commands).not.toContain("state mode")
+    expect(delivered?.message?.customType).toBe(CONTEXT_MESSAGE)
+    expect(delivered?.message?.content).toContain("Ship the thing")
+    await rm(project, { recursive: true, force: true })
+  })
+
+  test("without a .holyagent folder it gets nothing, except the core of a session role", async () => {
+    const project = await mkdtemp(join(tmpdir(), "holyagent-pi-plain-mock-"))
+    expect((await run(notGit, { cwd: project })).delivered).toBeUndefined()
+    const { delivered } = await run(notGit, { cwd: project, flag: "session" })
+    expect(delivered?.message?.content).toContain("You are the root")
+    expect(delivered?.message?.content).not.toContain("holyagent status:")
+    await rm(project, { recursive: true, force: true })
+  })
+})
+
+describe("with the built package and a project that is not a git repository", () => {
+  const realExec =
+    (home: string): Responder =>
+    async (call) => {
+      const child = Bun.spawn([call.command, ...call.args], {
+        ...(call.cwd === undefined ? {} : { cwd: call.cwd }),
+        env: { ...process.env, HOLYAGENT_HOME: home },
+        stdout: "pipe",
+        stderr: "pipe",
+        stdin: "ignore",
+      })
+      const [stdout, stderr, code] = await Promise.all([
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+        child.exited,
+      ])
+      return { stdout, stderr, code }
+    }
+
+  const plain = async () => {
+    const root = await mkdtemp(join(tmpdir(), "holyagent-pi-plain-"))
+    const outside = Bun.spawn(["git", "-C", root, "rev-parse", "--show-toplevel"], {
+      stdout: "ignore",
+      stderr: "ignore",
+    })
+    // The folder must not sit inside a repository, or the test would not be about one.
+    expect(await outside.exited).not.toBe(0)
+    return {
+      root,
+      home: join(root, "home"),
+      done: () => rm(root, { recursive: true, force: true }),
+    }
+  }
+
+  const createIntent = async (root: string, home: string) => {
+    const created = Bun.spawn(
+      [
+        "sh",
+        WRAPPER,
+        PI_PROJECT_FLAG,
+        root,
+        "intent",
+        "create",
+        "--input",
+        JSON.stringify({ objective: "Plain objective" }),
+      ],
+      {
+        cwd: PACKAGE_ROOT,
+        env: { ...process.env, HOLYAGENT_HOME: home },
+        stdout: "ignore",
+        stderr: "pipe",
+      },
+    )
+    expect(await created.exited).toBe(0)
+  }
+
+  const real = async (cwd: string, home: string, flag?: string) =>
+    (await run(realExec(home), { cwd, ...(flag === undefined ? {} : { flag }) })).delivered
+
+  test("a project with a .holyagent folder gets its status", async () => {
+    const { root, home, done } = await plain()
+    expect(await real(root, home)).toBeUndefined()
+    await createIntent(root, home)
+    const delivered = await real(root, home)
+    expect(delivered?.message?.customType).toBe(CONTEXT_MESSAGE)
+    expect(delivered?.message?.content).toContain("Plain objective")
+    expect(delivered?.message?.content.length).toBeLessThanOrEqual(CONTEXT_BUDGET)
+    await done()
+  })
+
+  test("a session role gets the core and the status", async () => {
+    const { root, home, done } = await plain()
+    await createIntent(root, home)
+    const delivered = await real(root, home, "session")
+    expect(delivered?.message?.customType).toBe(CONTEXT_MESSAGE)
+    expect(delivered?.message?.content).toContain("You are the root")
+    expect(delivered?.message?.content).toContain("Plain objective")
+    await done()
+  })
+
+  test("a session role without a .holyagent folder still gets the core", async () => {
+    const { root, home, done } = await plain()
+    const delivered = await real(root, home, "session")
+    expect(delivered?.message?.customType).toBe(CONTEXT_MESSAGE)
+    expect(delivered?.message?.content).toContain("You are the root")
+    expect(delivered?.message?.content).not.toContain("holyagent status:")
+    await done()
+  })
+
+  test("the wrapper fails as a state error for a project folder that does not exist", async () => {
+    const child = Bun.spawn(
+      ["sh", WRAPPER, PI_PROJECT_FLAG, join(tmpdir(), "holyagent-pi-no-such-project"), "status"],
+      { cwd: PACKAGE_ROOT, stdout: "pipe", stderr: "pipe", stdin: "ignore" },
+    )
+    const [stderr, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
+    expect(code).toBe(4)
+    expect(stderr).toContain("error: StateIo")
   })
 })

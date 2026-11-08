@@ -15160,6 +15160,13 @@ var init_assignment2 = __esm(() => {
   ];
 });
 
+import { stat as stat2 } from "fs/promises";
+var hasStateFolder = (directory) => io(directory, () => stat2(directory)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
+var init_state_folder = __esm(() => {
+  init_dist();
+  init_files();
+});
+
 var delegating_default = "## Delegating\n\nEdits, runs, checks, reviews, research and investigation go to specialists. Read only what a decision needs; your Bash is for the holyagent CLI, Git and `gh`. If a `holyagent:*` agent type does not resolve, stop and report it; general-purpose agents are no stand-in. If the user forbids subagents, work to the same criteria and name each waived review.\n";
 var init_delegating = () => {};
 
@@ -23536,7 +23543,6 @@ var init_workflow_check = __esm(() => {
   UNARY = new Set(["!", "-", "+", "~", "typeof", "void"]);
 });
 
-import { stat as stat2 } from "fs/promises";
 var Payload, NOTHING, output = (hookSpecificOutput) => new Verbatim(`${JSON.stringify({ hookSpecificOutput })}
 `, "", 0), decision = (permissionDecision, permissionDecisionReason) => output({ hookEventName: "PreToolUse", permissionDecision, permissionDecisionReason }), hook = (name, summary, run, stateless) => ({
   path: ["hook", name],
@@ -23550,7 +23556,7 @@ var Payload, NOTHING, output = (hookSpecificOutput) => new Verbatim(`${JSON.stri
   ...stateless === undefined ? {} : { stateless },
   run: (call) => call.text.pipe(flatMap2(decodeUnknownEffect2(fromJsonString2(Payload))), flatMap2((payload) => run(payload, call)), catch_2((error) => succeed6(new Verbatim("", `holyagent hook ${name}: ${describeFailure(error).message}
 `, 1))))
-}), ROOT_AGENTS, hasStateFolder = (directory) => io(directory, () => stat2(directory)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false))), RESUMED, requirementsOf = (directory) => readOpenState(directory).pipe(flatMap2(resolveIntent), map5(({ id, revision, requirements }) => ({ id, revision, requirements })), catchTag2("NoActiveIntent", () => succeed6(undefined))), SAFE_ID, launchedAgent = (response) => {
+}), ROOT_AGENTS, RESUMED, requirementsOf = (directory) => readOpenState(directory).pipe(flatMap2(resolveIntent), map5(({ id, revision, requirements }) => ({ id, revision, requirements })), catchTag2("NoActiveIntent", () => succeed6(undefined))), SAFE_ID, launchedAgent = (response) => {
   const agentId = typeof response === "object" && response !== null && "agentId" in response ? response.agentId : undefined;
   return typeof agentId === "string" && SAFE_ID.test(agentId) ? agentId : undefined;
 }, HAND_BACK, postToolUse = (additionalContext) => output({ hookEventName: "PostToolUse", additionalContext }), SPECIALIST_RULES, HISTORY_RULES, VCS_REMINDER, PLATFORM_BRANCH_REMINDER = "This commit, push or PR concerns a `claude/*` branch, which the platform assigns unless the user named it as the work branch: its name carries no meaning, so commit and push only on your own conventional branch, and push the assigned one only after your own push is refused and the user says so.", isPlatformBranch = (name) => name?.startsWith("claude/") === true, isSpecialist = (type) => type !== undefined && type.startsWith("holyagent:") && !ROOT_AGENTS.has(type), MENTIONS_VCS_WRITE, fileSetting = (key) => gitMaybe(["config", "--show-origin", "--get", key]).pipe(map5((line) => {
@@ -23563,6 +23569,7 @@ var Payload, NOTHING, output = (hookSpecificOutput) => new Verbatim(`${JSON.stri
 `).replaceAll("${CLAUDE_PLUGIN_ROOT}", () => call.env.CLAUDE_PLUGIN_ROOT ?? "${CLAUDE_PLUGIN_ROOT}"), isMainThread = (payload) => payload.agent_id === undefined && !isSpecialist(payload.agent_type), HOOK_COMMANDS;
 var init_hook = __esm(() => {
   init_dist();
+  init_state_folder();
   init_root_core();
   init_history_rules();
   init_state_changes();
@@ -24395,33 +24402,47 @@ var init_main = __esm(async () => {
 init_dist();
 init_errors3();
 init_load();
+init_errors4();
+
+var PI_PROJECT_FLAG = "--project";
+var projectOf = (args) => args[0] === PI_PROJECT_FLAG && args[1] !== undefined ? { directory: args[1], rest: args.slice(2) } : { directory: undefined, rest: args };
+
 var PI_CONFIG_COMMAND = "config";
+var failureResult = (error) => {
+  const { tag, message, hint, code } = describeFailure(error);
+  return { stdout: "", stderr: `error: ${tag}: ${message}
+hint: ${hint}
+`, code };
+};
+var enterProject = (directory) => try_2({
+  try: () => process.chdir(directory),
+  catch: (cause) => new StateIo({ path: directory, cause })
+});
 var configResult = (folders, env) => loadConfig({ projectDirectories: folders, env }).pipe(map5((config) => ({
   stdout: `${JSON.stringify(config)}
 `,
   stderr: "",
   code: 0
-})), catch_2((error) => {
-  const { tag, message, hint, code } = describeFailure(error);
-  return succeed6({
-    stdout: "",
-    stderr: `error: ${tag}: ${message}
-hint: ${hint}
-`,
-    code
-  });
-}));
+})), catch_2((error) => succeed6(failureResult(error))));
 if (import.meta.main) {
-  const [command, ...folders] = Bun.argv.slice(2);
-  if (command === PI_CONFIG_COMMAND) {
-    const result = await runPromise2(configResult(folders, process.env));
+  const { directory, rest } = projectOf(Bun.argv.slice(2));
+  const entered = directory === undefined ? undefined : await runPromise2(enterProject(directory).pipe(as2(undefined), catch_2((error) => succeed6(failureResult(error)))));
+  if (entered !== undefined) {
+    process.stderr.write(entered.stderr);
+    process.exitCode = entered.code;
+  } else if (rest[0] === PI_CONFIG_COMMAND) {
+    const result = await runPromise2(configResult(rest.slice(1), process.env));
     process.stdout.write(result.stdout);
     process.stderr.write(result.stderr);
     process.exitCode = result.code;
-  } else
+  } else {
+    if (directory !== undefined)
+      Bun.argv.splice(2, 2);
     await init_main().then(() => ({}));
+  }
 }
 export {
   PI_CONFIG_COMMAND,
-  configResult
+  configResult,
+  enterProject
 };

@@ -16,7 +16,8 @@ import {
   piContext,
   piRootCore,
 } from "../../../runtime/src/hooks/pi-context.ts"
-import { configResult } from "../../../runtime/src/hooks/pi-entry.ts"
+import { configResult, enterProject } from "../../../runtime/src/hooks/pi-entry.ts"
+import { PI_PROJECT_FLAG, projectOf } from "../../../runtime/src/hooks/pi-project.ts"
 import { ROOT_CORE_FILES } from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
 import { instructionsDirectory, stripCitations } from "../../../runtime/src/instructions/skills.ts"
 import { REPOSITORY } from "../src/files.ts"
@@ -151,5 +152,26 @@ describe("the config command of the runtime bundle", () => {
     expect(result.stderr).toContain(join(root, ".holyagent", "config.json"))
     expect(result.stderr).toContain("enabel")
     await done()
+  })
+})
+
+describe("the project flag of the runtime bundle", () => {
+  test("splits a leading flag and its folder off the command line", () => {
+    expect(projectOf([PI_PROJECT_FLAG, "/work/p", "status"])).toEqual({
+      directory: "/work/p",
+      rest: ["status"],
+    })
+    expect(projectOf(["status", PI_PROJECT_FLAG, "/work/p"])).toEqual({
+      directory: undefined,
+      rest: ["status", PI_PROJECT_FLAG, "/work/p"],
+    })
+    expect(projectOf([PI_PROJECT_FLAG])).toEqual({ directory: undefined, rest: [PI_PROJECT_FLAG] })
+  })
+
+  test("a folder that does not exist fails as a state error that names it", async () => {
+    const missing = join(tmpdir(), "holyagent-pi-no-such-folder")
+    const error = await Effect.runPromise(Effect.flip(enterProject(missing)))
+    expect(error._tag).toBe("StateIo")
+    expect(error.message).toContain(missing)
   })
 })

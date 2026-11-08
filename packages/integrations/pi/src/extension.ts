@@ -1,4 +1,3 @@
-import { stat } from "node:fs/promises"
 import { join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -19,7 +18,8 @@ import {
   PiRoleSchema,
   type ProjectState,
 } from "../../../runtime/src/hooks/pi-context.ts"
-import { hasCode, io } from "../../../runtime/src/state/files.ts"
+import { PI_PROJECT_FLAG } from "../../../runtime/src/hooks/pi-project.ts"
+import { hasStateFolder } from "../../../runtime/src/hooks/state-folder.ts"
 import { STATE_DIRECTORY } from "../../../runtime/src/state/layout.ts"
 
 /** The launch flag that tells the extension what the session is for: root, specialist or session. */
@@ -36,6 +36,12 @@ export const NOTICE_MESSAGE = "holyagent-notice"
 
 /** The longest a command may run, in milliseconds, as the Claude hook's ten seconds allow. */
 export const COMMAND_TIMEOUT_MS = 8_000
+
+/**
+ * The longest the whole collection may take, in milliseconds: the Claude hook's ten seconds, which
+ * every command, however many run, shares.
+ */
+export const SESSION_DEADLINE_MS = 10_000
 
 // A notice is one line and never a dump.
 const NOTICE_CHARS = 400
@@ -68,6 +74,14 @@ class UnknownRole extends Data.TaggedError("UnknownRole")<{ readonly value: stri
   }
 }
 
+/** The collection did not finish within its overall deadline. */
+class DeadlineExceeded extends Data.TaggedError("DeadlineExceeded")<{ readonly ms: number }> {
+  /** The description shown to the user. */
+  override get message() {
+    return `the status took longer than ${this.ms / 1000}s and was stopped`
+  }
+}
+
 /** What the next run is told: a message and whether the user sees it. */
 interface Delivery {
   readonly customType: typeof CONTEXT_MESSAGE | typeof NOTICE_MESSAGE
@@ -76,11 +90,11 @@ interface Delivery {
 }
 
 /**
- * What a session holds from its start until its shutdown: the way to stop its commands, and its
- * result.
+ * What a session holds from its start until its shutdown: the way to stop the commands of its
+ * current collection, and its result.
  */
 interface Held {
-  readonly stop: AbortController
+  current: AbortController | undefined
   pending: Promise<Delivery | undefined> | undefined
 }
 
@@ -91,6 +105,8 @@ export interface ExtensionOptions {
    * default.
    */
   readonly packageRoot?: string
+  /** The overall deadline of one collection in milliseconds; {@link SESSION_DEADLINE_MS} by default. */
+  readonly deadlineMs?: number
 }
 
 const oneLine = (text: string): string => text.replace(/\s+/g, " ").trim()
@@ -119,30 +135,33 @@ const reasonOf = (result: ExecResult): string => {
 export const createExtension =
   ({
     packageRoot = resolve(fileURLToPath(new URL("..", import.meta.url))),
+    deadlineMs = SESSION_DEADLINE_MS,
   }: ExtensionOptions = {}) =>
   (pi: ExtensionAPI): void => {
     const wrapper = join(packageRoot, "scripts", "holyagent")
     let held: Held | undefined
 
-    const exec = (
-      ctx: ExtensionContext,
-      signal: AbortSignal,
-      command: string,
-      args: ReadonlyArray<string>,
-    ) =>
-      Effect.tryPromise({
-        try: () =>
-          pi.exec(command, [...args], { cwd: ctx.cwd, signal, timeout: COMMAND_TIMEOUT_MS }),
-        catch: (cause) => new CommandFailed({ command: args.join(" "), reason: String(cause) }),
-      })
+    // Every program starts in the package's own folder, never the project's: on Windows a bare
+    // `sh` or `git` is looked up in the working directory first, where a project could plant one.
+    // The project is named in the arguments instead.
+    const exec = (signal: AbortSignal, command: string, args: ReadonlyArray<string>) =>
+      signal.aborted
+        ? Effect.fail(new CommandFailed({ command: args.join(" "), reason: "it was stopped" }))
+        : Effect.tryPromise({
+            // The effect's own signal stops the command when the deadline interrupts the collection.
+            try: (interrupted) =>
+              pi.exec(command, [...args], {
+                cwd: packageRoot,
+                signal: AbortSignal.any([signal, interrupted]),
+                timeout: COMMAND_TIMEOUT_MS,
+              }),
+            catch: (cause) => new CommandFailed({ command: args.join(" "), reason: String(cause) }),
+          })
 
-    // The wrapper runs the package's bundled runtime with Bun; its stdout is the command's output.
-    const holyagent = (
-      ctx: ExtensionContext,
-      signal: AbortSignal,
-      ...args: ReadonlyArray<string>
-    ) =>
-      exec(ctx, signal, "sh", [wrapper, ...args]).pipe(
+    // The wrapper runs the package's bundled runtime with Bun, which enters the project first; its
+    // stdout is the command's output.
+    const holyagent = (signal: AbortSignal, project: string, ...args: ReadonlyArray<string>) =>
+      exec(signal, "sh", [wrapper, PI_PROJECT_FLAG, project, ...args]).pipe(
         Effect.flatMap((result) =>
           result.code === 0 && !result.killed
             ? Effect.succeed(result.stdout)
@@ -150,64 +169,66 @@ export const createExtension =
         ),
       )
 
-    // The top of the work tree holds the project's config; outside git the working directory does.
-    const topOf = (ctx: ExtensionContext, signal: AbortSignal) =>
-      exec(ctx, signal, "git", ["rev-parse", "--show-toplevel"]).pipe(
+    // The top of the work tree holds the project's config; outside git the project folder does, and
+    // so does its state.
+    const topOf = (signal: AbortSignal, project: string) =>
+      exec(signal, "git", ["-C", project, "rev-parse", "--show-toplevel"]).pipe(
         Effect.map((result) => (result.code === 0 ? result.stdout.trim() : "")),
         Effect.orElseSucceed(() => ""),
-        Effect.map((top) => (top === "" ? ctx.cwd : top)),
+        Effect.map((top) => (top === "" ? { top: project, git: false } : { top, git: true })),
       )
 
-    // A missing folder is false, not a failure.
-    const folderExists = (directory: string) =>
-      io(directory, () => stat(directory)).pipe(
-        Effect.as(true),
-        Effect.catchIf(
-          (error) => hasCode(error.cause, "ENOENT"),
-          () => Effect.succeed(false),
-        ),
-      )
+    // The folder that holds the project's state: the one `holyagent state mode` reports in a git
+    // work tree, and `.holyagent` of the project outside git, where that command fails.
+    const stateFolderOf = (
+      signal: AbortSignal,
+      project: string,
+      located: { readonly top: string; readonly git: boolean },
+    ) =>
+      located.git
+        ? holyagent(signal, project, "state", "mode").pipe(
+            Effect.flatMap((text) => parseOutput("state mode", text)),
+            Effect.map((where) => where["directory"]),
+          )
+        : Effect.succeed<unknown>(join(located.top, STATE_DIRECTORY))
 
-    const collect = (ctx: ExtensionContext, signal: AbortSignal, reason: Reason) =>
+    const collect = (project: string, signal: AbortSignal, reason: Reason) =>
       Effect.gen(function* () {
+        const located = yield* topOf(signal, project)
         // The loader reads files with Bun, which Pi's Node does not have, so the wrapper loads it.
-        const config = yield* holyagent(
-          ctx,
-          signal,
-          "config",
-          join(yield* topOf(ctx, signal), STATE_DIRECTORY),
-        ).pipe(
-          Effect.flatMap(
-            Schema.decodeUnknownEffect(Schema.fromJsonString(Config), {
-              onExcessProperty: "error",
-            }),
-          ),
+        // The state folder does not depend on the config or on `status`, so it is asked meanwhile;
+        // its failure counts only once the config says the extension is on.
+        const [config, folder] = yield* Effect.all(
+          [
+            holyagent(signal, project, "config", join(located.top, STATE_DIRECTORY)).pipe(
+              Effect.flatMap(
+                Schema.decodeUnknownEffect(Schema.fromJsonString(Config), {
+                  onExcessProperty: "error",
+                }),
+              ),
+            ),
+            Effect.result(stateFolderOf(signal, project, located)),
+          ],
+          { concurrency: "unbounded" },
         )
         if (!config.pi.enable) return undefined
         const flag = pi.getFlag(ROLE_FLAG) ?? DEFAULT_PI_ROLE
         const role = yield* Schema.decodeUnknownEffect(PiRoleSchema)(flag).pipe(
           Effect.mapError(() => new UnknownRole({ value: String(flag) })),
         )
-        // Status first: for a project that keeps state it makes the state worktree the next calls read.
-        const [status, reconcile] = yield* Effect.all(
-          [
-            holyagent(ctx, signal, "status").pipe(
-              Effect.flatMap((text) => parseOutput("status", text)),
-            ),
-            RECONCILED.has(reason)
-              ? holyagent(ctx, signal, "reconcile").pipe(
-                  Effect.flatMap((text) => parseOutput("reconcile", text)),
-                )
-              : Effect.succeed(undefined),
-          ],
-          { concurrency: "unbounded" },
+        // Status first, then reconcile: for a project that keeps state, status makes the state
+        // worktree that the next calls read.
+        const status = yield* holyagent(signal, project, "status").pipe(
+          Effect.flatMap((text) => parseOutput("status", text)),
         )
-        const where = yield* holyagent(ctx, signal, "state", "mode").pipe(
-          Effect.flatMap((text) => parseOutput("state mode", text)),
-        )
-        const directory = where["directory"]
+        const reconcile = RECONCILED.has(reason)
+          ? yield* holyagent(signal, project, "reconcile").pipe(
+              Effect.flatMap((text) => parseOutput("reconcile", text)),
+            )
+          : undefined
+        const directory = yield* Effect.fromResult(folder)
         const state: ProjectState | undefined =
-          typeof directory === "string" && (yield* folderExists(directory))
+          typeof directory === "string" && (yield* hasStateFolder(directory))
             ? { status, ...(reconcile === undefined ? {} : { reconcile }) }
             : undefined
         const content = piContext(role, packageRoot, state)
@@ -215,6 +236,11 @@ export const createExtension =
           ? undefined
           : ({ customType: CONTEXT_MESSAGE, content, display: false } satisfies Delivery)
       }).pipe(
+        // Every command of the collection shares one deadline, as the Claude hook has one timeout.
+        Effect.timeoutOrElse({
+          duration: deadlineMs,
+          orElse: () => Effect.fail(new DeadlineExceeded({ ms: deadlineMs })),
+        }),
         // A failure adds one line and nothing else, and never reaches Pi.
         Effect.catch((error) => Effect.succeed<Delivery | undefined>(notice(error.message))),
         Effect.catchCause((cause) =>
@@ -226,11 +252,18 @@ export const createExtension =
     const release = (): void => {
       const taken = held
       held = undefined
-      taken?.stop.abort()
+      taken?.current?.abort()
     }
 
+    // A newer collection stops the older one, and the result of a stopped one is dropped: nobody
+    // reads it, and a session that ended has nothing to be told.
     const gather = (taken: Held, ctx: ExtensionContext, reason: Reason): Promise<void> => {
-      taken.pending = Effect.runPromise(collect(ctx, taken.stop.signal, reason))
+      taken.current?.abort()
+      const own = new AbortController()
+      taken.current = own
+      taken.pending = Effect.runPromise(collect(ctx.cwd, own.signal, reason)).then((delivery) =>
+        own.signal.aborted ? undefined : delivery,
+      )
       return taken.pending.then(() => undefined)
     }
 
@@ -242,7 +275,7 @@ export const createExtension =
 
     pi.on("session_start", (event, ctx) => {
       release()
-      held = { stop: new AbortController(), pending: undefined }
+      held = { current: undefined, pending: undefined }
       return gather(held, ctx, event.reason)
     })
 

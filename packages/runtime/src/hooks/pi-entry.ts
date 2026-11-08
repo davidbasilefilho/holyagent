@@ -5,6 +5,8 @@ import { describeFailure } from "../cli/errors.ts"
 import type { Result } from "../cli/program.ts"
 import { loadConfig } from "../config/load.ts"
 import type { Env } from "../setup/environment.ts"
+import { StateIo } from "../state/errors.ts"
+import { projectOf } from "./pi-project.ts"
 
 /**
  * The first argument that makes {@link piEntry} print the loaded config instead of running a CLI
@@ -12,6 +14,19 @@ import type { Env } from "../setup/environment.ts"
  * the order to try.
  */
 export const PI_CONFIG_COMMAND = "config"
+
+/** A failure as the CLI prints it: `error: <tag>: <message>` and `hint:` on stderr, its exit code. */
+const failureResult = (error: unknown): Result => {
+  const { tag, message, hint, code } = describeFailure(error)
+  return { stdout: "", stderr: `error: ${tag}: ${message}\nhint: ${hint}\n`, code }
+}
+
+/** Makes `directory` the working directory, or fails as a state error that names it. */
+export const enterProject = (directory: string): Effect.Effect<void, StateIo> =>
+  Effect.try({
+    try: () => process.chdir(directory),
+    catch: (cause) => new StateIo({ path: directory, cause }),
+  })
 
 /**
  * Loads the HolyAgent config through the runtime loader and prints it as one line of JSON, every
@@ -27,25 +42,34 @@ export const configResult = (folders: ReadonlyArray<string>, env: Env): Effect.E
       stderr: "",
       code: 0,
     })),
-    Effect.catch((error) => {
-      const { tag, message, hint, code } = describeFailure(error)
-      return Effect.succeed<Result>({
-        stdout: "",
-        stderr: `error: ${tag}: ${message}\nhint: ${hint}\n`,
-        code,
-      })
-    }),
+    Effect.catch((error) => Effect.succeed(failureResult(error))),
   )
 
-// The Pi package's `scripts/holyagent.js` is this file bundled: `config` is answered here and every
-// other command line is the CLI, unchanged, so the wrapper serves both. Importing the module (the
-// tests do) runs nothing.
+// The Pi package's `scripts/holyagent.js` is this file bundled: `--project` and `config` are answered
+// here and every other command line is the CLI, unchanged, so the wrapper serves both. Importing the
+// module (the tests do) runs nothing.
 if (import.meta.main) {
-  const [command, ...folders] = Bun.argv.slice(2)
-  if (command === PI_CONFIG_COMMAND) {
-    const result = await Effect.runPromise(configResult(folders, process.env))
+  const { directory, rest } = projectOf(Bun.argv.slice(2))
+  const entered =
+    directory === undefined
+      ? undefined
+      : await Effect.runPromise(
+          enterProject(directory).pipe(
+            Effect.as(undefined),
+            Effect.catch((error) => Effect.succeed(failureResult(error))),
+          ),
+        )
+  if (entered !== undefined) {
+    process.stderr.write(entered.stderr)
+    process.exitCode = entered.code
+  } else if (rest[0] === PI_CONFIG_COMMAND) {
+    const result = await Effect.runPromise(configResult(rest.slice(1), process.env))
     process.stdout.write(result.stdout)
     process.stderr.write(result.stderr)
     process.exitCode = result.code
-  } else await import("../cli/main.ts")
+  } else {
+    // The CLI reads its own arguments from `Bun.argv`: take the flag and its directory off.
+    if (directory !== undefined) Bun.argv.splice(2, 2)
+    await import("../cli/main.ts")
+  }
 }

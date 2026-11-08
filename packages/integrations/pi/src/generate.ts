@@ -2,9 +2,10 @@ import { join } from "node:path"
 
 import { Effect } from "effect"
 
+import { bundleModule } from "../../../runtime/src/bundle.ts"
 import { PI_ROOT_PLACEHOLDER } from "../../../runtime/src/hooks/pi-context.ts"
 import type { Family } from "../../../runtime/src/instructions/families.ts"
-import { jsonText, MODULE_COMMENT } from "../../../runtime/src/instructions/generated.ts"
+import { jsonText } from "../../../runtime/src/instructions/generated.ts"
 import { skillFiles } from "../../../runtime/src/instructions/skills.ts"
 import packageJson from "../package.json" with { type: "json" }
 import { DIST_DIRECTORY, type GeneratedFile, generatedNote, REPOSITORY, SOURCES } from "./files.ts"
@@ -84,18 +85,14 @@ export const manifest = (): GeneratedFile => ({
  * registries. Bun's module comments go, so the text is the same from every working directory.
  * Returns the module text, led by the note that names its source.
  */
-export const bundleExtension = async (entrypoint: string, source: string): Promise<string> => {
-  const result = await Bun.build({
-    entrypoints: [entrypoint],
-    target: "node",
-    format: "esm",
-    external: HOST_MODULES.flatMap((name) => [name, `${name}/*`]),
-  })
-  const output = result.outputs[0]
-  if (!result.success || output === undefined)
-    throw new Error(result.logs.map((log) => log.message).join("\n"))
-  return `// ${generatedNote(source)}\n${(await output.text()).replace(MODULE_COMMENT, "")}`
-}
+export const bundleExtension = (entrypoint: string, source: string): Promise<string> =>
+  Effect.runPromise(
+    bundleModule(entrypoint, {
+      target: "node",
+      note: generatedNote(source),
+      external: HOST_MODULES.flatMap((name) => [name, `${name}/*`]),
+    }),
+  )
 
 const extension = async (): Promise<GeneratedFile> => ({
   path: inPackage(EXTENSION_OUTPUT),
@@ -109,20 +106,13 @@ const readSource = (path: string): Promise<string> => Bun.file(join(REPOSITORY, 
  * go, so the text is the same on every machine, and the note that names the source follows Bun's
  * `// @bun` pragma, which stays first after the shebang.
  */
-const runtime = async (): Promise<string> => {
-  const result = await Bun.build({
-    entrypoints: [join(REPOSITORY, RUNTIME_SOURCE)],
-    target: "bun",
-  })
-  const output = result.outputs[0]
-  if (!result.success || output === undefined)
-    throw new Error(result.logs.map((log) => log.message).join("\n"))
-  const lines = (await output.text()).replace(MODULE_COMMENT, "").split("\n")
-  const pragma = lines.indexOf("// @bun")
-  if (pragma === -1) throw new Error("The bundle has no // @bun pragma line to put the note after")
-  lines.splice(pragma + 1, 0, `// ${generatedNote(RUNTIME_SOURCE)}`)
-  return lines.join("\n")
-}
+const runtime = (): Promise<string> =>
+  Effect.runPromise(
+    bundleModule(join(REPOSITORY, RUNTIME_SOURCE), {
+      target: "bun",
+      note: generatedNote(RUNTIME_SOURCE),
+    }),
+  )
 
 const scripts = async (): Promise<ReadonlyArray<GeneratedFile>> => {
   const [shebang = "", ...wrapper] = (await readSource(WRAPPER_SOURCE)).split("\n")
