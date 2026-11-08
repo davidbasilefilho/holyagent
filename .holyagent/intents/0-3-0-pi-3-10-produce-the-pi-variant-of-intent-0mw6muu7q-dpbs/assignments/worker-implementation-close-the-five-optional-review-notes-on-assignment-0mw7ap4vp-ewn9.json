@@ -1,0 +1,75 @@
+{
+  "id": "assignment-0mw7ap4vp-ewn9",
+  "intentId": "intent-0mw6muu7q-dpbs",
+  "intentRevision": 5,
+  "roleTask": "Worker.implementation",
+  "slug": "close-the-five-optional-review-notes-on",
+  "objective": "Close the five optional review notes on the Kimi instruction set PR in /home/user/holyagent-0.3.0-kimi (branch release/0.3.0/feat/kimi-instructions, head 0e71e52), so the PR ships without open items a writer can fix.",
+  "state": "Running",
+  "scope": [
+    "Work only in /home/user/holyagent-0.3.0-kimi; run every command there (bun install --frozen-lockfile first if node_modules is missing).",
+    "1. stripCitations (packages/runtime/src/instructions/skills.ts): a `<!--` inside an inline code span or a fenced code block currently pairs with the next `-->` and deletes the text between. Make the strip leave code spans and fenced blocks untouched (only strip comments in prose), and add unit tests for both cases. Probe that fails today: \"a `<!--` x\\n```\\n<!-- keep? -->\\n```\\nb --> c\" must come back unchanged.",
+    "2. stripCitations: removing adjacent own-line comments leaves extra blank lines (\"x\\n<!-- K1 -->\\n<!-- K2 -->\\n\\ny\" gives \"x\\n\\n\\ny\"). Collapse the blank lines a removed own-line comment leaves so no run of more than one blank line is created where none existed; handle CRLF the same as LF. Add tests.",
+    "3. kimi-k3.1/roles/worker-visual/purpose.md and method.md still carry inline citations in prose form; convert them to the `<!-- K.. -->` / `<!-- P.. -->` comment form the rest of the Kimi set uses, without changing any rule's meaning.",
+    "4. kimi-k3.1/specialist/writing-bar.md gained a last rule (follow the target family's guide.md) that the Claude writing bar does not have; guide.md is not shipped in the plugin. Remove that rule so the Kimi bar matches the Claude bar's rules.",
+    "5. kimi-k3.1/specialist/state-changes.md names bare `holyagent status` and `assignment show`; the shorthand is defined only in root/dispatch.md, which a specialist does not load. Add one short sentence saying `holyagent <command>` means `${HOLYAGENT_PI_ROOT}/scripts/holyagent <command>`, matching the placeholder used elsewhere in the Kimi set."
+  ],
+  "constraints": [
+    "The Claude generated output (packages/integrations/claude/dist) must stay byte-identical; check with mise run build and git status.",
+    "Keep `<!-- materiality -->` and `<!-- design-core -->` markers, which the generators rely on.",
+    "Do not edit requirements/, coverage.ts or claude-5.5/ files.",
+    "Make no version-control writes (no git add, commit, checkout, stash); report changed paths for the root to commit.",
+    "Code follows .claude/CLAUDE.md: Effect where effects exist, JSDoc on exported functions, Bun APIs.",
+    "Report in under 400 words; start each evidence line with the criterion text, a colon, then the support; put long logs in a file outside the repository and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "stripCitations leaves comments inside inline code spans and fenced code blocks unchanged, with unit tests that fail on the old code",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Removing own-line comments leaves no extra blank lines, for LF and CRLF, with unit tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "worker-visual purpose.md and method.md carry citations only as comments, with no rule's meaning changed",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "The Kimi writing bar has no guide.md rule and state-changes.md defines the holyagent shorthand",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Claude dist byte-identical and pi dist regenerated: mise run build exit 0 with only expected pi dist changes",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "bunx --no-install mise run verify exits 0",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions/skills.ts",
+    "packages/runtime/tests",
+    "packages/runtime/src/instructions/kimi-k3.1",
+    "packages/integrations/pi/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T03:51:16.981Z"
+  },
+  "createdAt": "2026-11-08T03:51:16.981Z"
+}
