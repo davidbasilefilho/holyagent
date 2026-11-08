@@ -12458,7 +12458,7 @@ var VcsSettings = Struct({
 });
 var PiProvider = Literals(["kimi-coding-global"]);
 var Thinking = Literals(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
-var ModelId = String4.check(isPattern2(/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/));
+var ModelId = String4.check(isPattern2(/^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$/));
 var KIMI_ROOT = "k3.1-pro";
 var KIMI_SPECIALIST = "kimi-for-coding";
 var kimi = (model, thinking) => ({ model, thinking });

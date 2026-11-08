@@ -599,6 +599,20 @@ describe("failing closed", () => {
     expect(content).toContain("holyagent: ")
   })
 
+  test("a notice carries no format character or variation selector, and keeps ordinary text", async () => {
+    // Word joiners and invisible operators, the Arabic letter mark, the Mongolian vowel separator,
+    // a soft hyphen, the tag block and variation selectors.
+    const hidden =
+      "\u2060\u2061\u2062\u2063\u2064\u061c\u180e\u00ad\u{e0001}\u{e0041}\u{e007f}\ufe00\ufe0f"
+    const { delivered } = await run(
+      healthy("/missing", {
+        status: { code: 4, stderr: `error: ca${hidden}fe \u65e5\u672c\u8a9e \u00fc\n` },
+      }),
+    )
+    const content = delivered?.message?.content ?? ""
+    expect(content).toBe("holyagent: `holyagent status` failed: cafe \u65e5\u672c\u8a9e \u00fc")
+  })
+
   test("a notice is short even when the failure is long", async () => {
     const { delivered } = await run(
       healthy("/missing", { status: { code: 4, stderr: `error: StateIo: ${"x".repeat(5000)}\n` } }),
@@ -735,7 +749,10 @@ describe("with the built package and a real project", () => {
       join(root, ".holyagent", "config.json"),
       JSON.stringify({ pi: { enable: false } }),
     )
-    expect(await real(root, home)).toBeUndefined()
+    // Nothing is added, but the root keeps its prompt: only the user's own config lifts it.
+    const delivered = await real(root, home)
+    expect(delivered?.message).toBeUndefined()
+    expect(delivered?.systemPrompt).toContain("the system prompt")
     await done()
   })
 })
@@ -1103,8 +1120,9 @@ describe("a git failure that does not say the project is not a repository", () =
       expect(delivered?.message?.display).toBe(true)
       expect(delivered?.message?.content).toContain("git rev-parse --show-toplevel")
       expect(delivered?.message?.content).toContain(reason)
-      // Nothing else ran: no command guessed at a config or state folder.
-      expect(startedWith(api.calls)).toEqual([])
+      // Only the user's own config was read, which needs no project folder: no command guessed at
+      // the project's config or state folder.
+      expect(startedWith(api.calls)).toEqual(["config"])
     })
 })
 
@@ -1599,7 +1617,7 @@ describe("the gates and pi.enable", () => {
         ? { stdout: runtime.length > 1 ? DISABLED : CONFIG }
         : healthy("/missing")(call, runtime),
     )
-    expect(delivered).toBeUndefined()
+    expect(delivered?.message).toBeUndefined()
     for (const event of refusing)
       expect(await api.emit("tool_call", event)).toEqual([expect.objectContaining({ block: true })])
   })
@@ -1805,6 +1823,13 @@ describe("drawing a SubagentWorkflow call", () => {
     expect(line).toMatch(/release$/)
     expect(line).not.toMatch(/[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/)
     expect(sanitizeWorkflowName("\u200b\u202e\ufeff")).toBeUndefined()
+  })
+
+  test("format characters and variation selectors of a name are dropped, ordinary text stays", () => {
+    expect(sanitizeWorkflowName("re\u2060le\u061cas\u180ee\u{e0041}\ufe0f \u00fc\u65e5")).toBe(
+      "release \u00fc\u65e5",
+    )
+    expect(sanitizeWorkflowName("\u2060\u2064\u{e0000}\u{e007f}\ufe00")).toBeUndefined()
   })
 
   test("a name is cut at 80 characters without splitting a surrogate pair", () => {
@@ -2172,8 +2197,173 @@ describe("the root's excluded tools", () => {
       expect(await api.emit("tool_call", call(name, { parentToolCallId: "call-1" }))).toEqual(
         blocked,
       )
-    // With the web mode on pi-web-kit the provider's own tools are the root's to leave.
-    expect(await api.emit("tool_call", call("moonshot_search"))).toEqual([undefined])
+    // The defaults' exclusions stay whatever the config chooses, so the provider's tools too.
+    expect(await api.emit("tool_call", call("moonshot_search"))).toEqual(blocked)
+  })
+
+  /** Answers the project's merged `config` call with `merged` and the user's alone with `user`. */
+  const configs =
+    (merged: string, user: string = CONFIG): Responder =>
+    (callOf, runtime) =>
+      runtime[0] === "config"
+        ? { stdout: runtime.length > 1 ? merged : user }
+        : healthy("/missing")(callOf, runtime)
+  const project = (pi: object) => JSON.stringify({ ...DEFAULTS, pi: { ...DEFAULTS.pi, ...pi } })
+  const featuresOf = (features: object) =>
+    project({ features: { ...DEFAULTS.pi.features, ...features } })
+
+  test("a project's pi.enable false keeps the exclusions, the gate and the root prompt", async () => {
+    const { api, delivered } = await run(configs(project({ enable: false })))
+    expect(delivered?.message).toBeUndefined()
+    expect(delivered?.systemPrompt).toContain(`${toPosix(PACKAGE_ROOT)}/scripts/holyagent`)
+    for (const name of EXCLUDED)
+      expect(await api.emit("tool_call", call(name, { parentToolCallId: "call-1" }))).toEqual(
+        blocked,
+      )
+    expect(await api.emit("tool_call", call("read"))).toEqual([undefined])
+  })
+
+  test("a project's pi.enable false still lifts them for another role", async () => {
+    const { api, delivered } = await run(configs(project({ enable: false })), { flag: "session" })
+    expect(delivered).toBeUndefined()
+    for (const name of EXCLUDED)
+      expect(await api.emit("tool_call", call(name))).toEqual([undefined])
+  })
+
+  test("a project can add an exclusion but not take one away", async () => {
+    // computerUse off and the pi-web-kit mode each drop patterns from the merged config's own list.
+    const { api } = await run(
+      configs(featuresOf({ computerUse: false, web: "pi-web-kit" }), CONFIG),
+      { activeTools: ["read", "computer_use_click", "moonshot_search", "web_search"] },
+    )
+    for (const name of [...EXCLUDED, "web_search", "web_fetch"])
+      expect(await api.emit("tool_call", call(name))).toEqual(blocked)
+    // And the active tools lose them too.
+    expect(api.pi.getActiveTools()).not.toContain("computer_use_click")
+    expect(api.pi.getActiveTools()).not.toContain("moonshot_search")
+  })
+
+  test("the user's own exclusions stay whatever the project says", async () => {
+    const { api } = await run(configs(CONFIG, webKit))
+    for (const name of [...EXCLUDED, "web_search", "web_fetch"])
+      expect(await api.emit("tool_call", call(name))).toEqual(blocked)
+  })
+
+  test("the user's own exclusions stay when the project's config cannot be read", async () => {
+    // The merged call fails (a malformed or unknown-key project file) while the user's file reads.
+    const { api } = await run(
+      (callOf, runtime) =>
+        runtime[0] === "config" && runtime.length > 1
+          ? { code: 4, stderr: "error: ConfigInvalid: project\n" }
+          : configs(CONFIG, webKit)(callOf, runtime),
+      { activeTools: ["read", ...DEFERRED] },
+    )
+    for (const name of [...EXCLUDED, "web_search", "web_fetch"])
+      expect(await api.emit("tool_call", call(name, { parentToolCallId: "call-1" }))).toEqual(
+        blocked,
+      )
+    expect(api.pi.getActiveTools()).not.toContain("web_search")
+  })
+
+  test("the user's own exclusions stay when git fails, as a project's malformed .git makes it", async () => {
+    const { api } = await run(
+      (callOf, runtime) =>
+        callOf.command === "git"
+          ? { code: 128, stderr: "fatal: invalid gitfile format\n" }
+          : configs(CONFIG, webKit)(callOf, runtime),
+      { activeTools: ["read", ...DEFERRED] },
+    )
+    for (const name of [...EXCLUDED, "web_search", "web_fetch"])
+      expect(await api.emit("tool_call", call(name))).toEqual(blocked)
+    expect(api.pi.getActiveTools()).not.toContain("web_search")
+  })
+
+  test("a compaction whose reads fail keeps the exclusions an earlier collection took from the user", async () => {
+    let failing = false
+    const { api } = await run(
+      (callOf, runtime) =>
+        failing && (callOf.command === "git" || runtime[0] === "config")
+          ? { code: 4, stderr: "error: unreadable\n" }
+          : configs(CONFIG, webKit)(callOf, runtime),
+      { startOnly: true },
+    )
+    failing = true
+    await api.emit("session_compact", {})
+    for (const name of [...EXCLUDED, "web_search", "web_fetch"])
+      expect(await api.emit("tool_call", call(name))).toEqual(blocked)
+  })
+
+  test("a deadline during the user's read reports the home-level config and keeps the defaults", async () => {
+    const hold = gate()
+    const { api } = await run(
+      (callOf, runtime) =>
+        runtime[0] === "config" && runtime.length === 1
+          ? gated(hold, { stdout: webKit }, callOf.signal)
+          : healthy("/missing")(callOf, runtime),
+      { startOnly: true, deadlineMs: 100 },
+    )
+    for (const name of EXCLUDED) expect(await api.emit("tool_call", call(name))).toEqual(blocked)
+    const messages = await nextMessages(api)
+    expect(
+      messages.some(
+        (message) =>
+          message?.customType === NOTICE_MESSAGE &&
+          String(message.content).includes("home-level config could not be read"),
+      ),
+    ).toBe(true)
+  })
+
+  test("a user config that cannot be read is reported, and the defaults' exclusions stay", async () => {
+    const { api } = await run(
+      (callOf, runtime) =>
+        runtime[0] === "config" && runtime.length === 1
+          ? { code: 4, stderr: "error: ConfigInvalid: home\n" }
+          : healthy("/missing")(callOf, runtime),
+      { startOnly: true },
+    )
+    for (const name of EXCLUDED) expect(await api.emit("tool_call", call(name))).toEqual(blocked)
+    const messages = await nextMessages(api)
+    const home = messages.find((message) => message?.customType === NOTICE_MESSAGE)
+    expect(home?.content).toContain("home-level config could not be read")
+    expect(await nextMessages(api)).toEqual([])
+  })
+
+  test("a session starts with the defaults' exclusions, until the config is read", async () => {
+    for (const reason of ["startup", "reload"]) {
+      const hold = gate()
+      const api = fakeApi((callOf, runtime) =>
+        runtime[0] === "config"
+          ? gated(hold, { stdout: `${CONFIG}\n` }, callOf.signal)
+          : healthy("/missing")(callOf, runtime),
+      )
+      createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
+      const started = api.emit("session_start", { reason })
+      await hold.entered
+      for (const name of EXCLUDED) expect(await api.emit("tool_call", call(name))).toEqual(blocked)
+      hold.open()
+      await started
+      for (const name of EXCLUDED) expect(await api.emit("tool_call", call(name))).toEqual(blocked)
+    }
+  })
+
+  test("a session that is not the root starts with none", async () => {
+    const hold = gate()
+    const api = fakeApi(
+      (callOf, runtime) =>
+        runtime[0] === "config"
+          ? gated(hold, { stdout: `${CONFIG}\n` }, callOf.signal)
+          : healthy("/missing")(callOf, runtime),
+      undefined,
+      SESSION_CWD,
+      { name: "worker-implementation#a1b2c3d4" },
+    )
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
+    const started = api.emit("session_start", { reason: "startup" })
+    await hold.entered
+    for (const name of EXCLUDED)
+      expect(await api.emit("tool_call", call(name))).toEqual([undefined])
+    hold.open()
+    await started
   })
 
   test("a config that cannot be read leaves the defaults' exclusions", async () => {
