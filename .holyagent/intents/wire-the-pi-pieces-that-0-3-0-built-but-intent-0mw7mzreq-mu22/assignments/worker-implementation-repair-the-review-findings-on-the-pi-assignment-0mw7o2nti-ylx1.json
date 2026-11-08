@@ -1,0 +1,81 @@
+{
+  "id": "assignment-0mw7o2nti-ylx1",
+  "intentId": "intent-0mw7mzreq-mu22",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-review-findings-on-the-pi",
+  "objective": "Repair the review findings on the Pi root wiring in /home/user/holyagent-0.3.0-wiring (branch release/0.3.0/feat/pi-root-wiring, head 5307d43), with tests and accurate docs.",
+  "state": "Running",
+  "scope": [
+    "Blocking 1 (code review): the provider probes run before KIMI_CODE_REGION is set: gather calls startProviderCheck (extension.ts ~808-818) but applyEnvironment(providerEnvironment) runs only in before_agent_start (~876), and Pi's exec inherits process env. Apply the provider environment before the probes start, and add a test asserting the env at probe time.",
+    "Blocking 2 (security): notice() only collapses whitespace and cuts to 400 characters, so ESC and C0/C1 control bytes from a project config's pi.routes.*.model (via ModelsNotInCatalog.brief) or from pi auth check output (outputDetail, ProviderInvalid.message) reach Pi's Markdown-rendered notice and the model. Strip C0/C1 controls (keep nothing that can start an escape sequence) in notice/oneLine, and restrict the model id in the config schema to a safe character set that still accepts real ids such as kimi-coding/kimi-for-coding; test both.",
+    "Blocking 3 (security): the root's exclusion is weaker than --exclude-tools and fails open. (a) If topOf (git), the config decode or the role decode fails, the root gets no exclusions and no root prompt: apply the root's default exclusions and the root prompt from the defaults when the config cannot be read (still show the notice). (b) setActiveTools only deactivates; Pi 1.5.0 agent-session.js _getCallableTools (~line 1176) lets codemode scripts call registered tools whose exposure is codemode or deferred whether active or not. Read how codemode, the computer-use, Moonshot and web packages register their tools (pinned sources via npm pack into /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad if not in node_modules) and, where an excluded tool stays callable, block it for the root through Pi's tool_call event (or the equivalent Pi API) so a call to an excluded tool is refused; test it. Say which tools needed the block.",
+    "Optional (include): a missing pi binary (ENOENT, mapped by Pi exec to code 1) must not produce a false not-logged-in notice: treat a probe that did not start as no notice, matching the existing cannot-start rule; the setActiveTools-failure notice is dropped when the status context is the delivery (extension.ts:818): deliver both; a compaction that lands before the start collection ends drops applyRootTools and the probes: make the start work run once regardless.",
+    "Docs (artifact review): docs/pi/providers.md:107 still says the root prompt is planned; README.md status table and Provider decision row and providers.md say KIMI_CODE_REGION is set at session start (make them match the repaired code); extensions.md and providers.md say the probes share the collection's deadline (they have their own deadline of the same length); extensions.md says a throwing setActiveTools is reported (make it true); extensions.md: the agent generator, not the extension, leaves mcp__ entries out of agent files; the 'root only' intro should say the provider environment covers children too. Also docs/pi/extensions.md:130-142 says toolSettings is planned and docs/usage.md lists no tool-settings step: the next branch (release/0.3.0/feat/pi-tool-settings) writes them, so leave those two for it."
+  ],
+  "constraints": [
+    "Change only the ownership paths; no version-control writes and no edits under .git/ or .holyagent/.",
+    "Follow .claude/CLAUDE.md code rules; every behavior gets a test that fails without it; do not weaken tests.",
+    "Never run pi or a live provider.",
+    "Run bunx --no-install mise run build and bunx --no-install mise run verify before reporting.",
+    "Report in under 400 words; put long logs in a file under /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path. Write a diff-file (dist excluded) at /home/user/holyagent-notes/wire-a-repair.diff."
+  ],
+  "criteria": [
+    {
+      "text": "The probes run with the provider environment applied, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Notice text carries no C0 or C1 control characters and model ids are restricted to a safe set, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The root's exclusions and prompt hold when the config cannot be read, and an excluded tool cannot be called by the root through codemode, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A missing pi binary gives no false login notice, a failed setActiveTools is always reported, and a compaction during the start collection does not skip the start work",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The changed docs match the repaired code",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build and mise run verify exit 0",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi/src",
+    "packages/integrations/pi/tests",
+    "packages/integrations/pi/dist/extensions",
+    "packages/runtime/src/pi/catalog.ts",
+    "packages/runtime/src/pi/readiness.ts",
+    "packages/runtime/src/pi/root-prompt.ts",
+    "packages/runtime/src/pi/index.ts",
+    "packages/runtime/src/config/schema.ts",
+    "packages/runtime/tests/pi",
+    "packages/runtime/tests/config",
+    "docs/pi/README.md",
+    "docs/pi/extensions.md",
+    "docs/pi/providers.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T10:05:43.063Z"
+  },
+  "createdAt": "2026-11-08T10:05:43.063Z"
+}
