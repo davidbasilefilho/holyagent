@@ -74,5 +74,29 @@
     "finishedAt": "2026-11-08T09:28:26.431Z"
   },
   "result": "result: all six items done in /home/user/holyagent-0.3.0-install. `mise run build` and `mise run verify` both exit 0.\n\nchanged:\n- packages/runtime/src/setup/pi-check.ts\n- packages/runtime/src/setup/pi-install.ts\n- packages/runtime/tests/setup-pi.test.ts\n- packages/integrations/claude/dist/scripts/holyagent.js (regenerated)\n- packages/integrations/pi/dist/scripts/holyagent.js (regenerated)\n- README.md\n- docs/README.md\n- docs/components.md\n- docs/pi/README.md\n- docs/pi/caching-and-subagents.md\n- docs/pi/extensions.md\n- docs/pi/installation.md\n- docs/pi/orchestration.md\n- docs/pi/providers.md\n\nchecks:\n- `bunx --no-install mise run build` -> 0\n- `bunx --no-install mise run verify` -> 0. Type-check and lint are clean, and 2210 tests pass with 0 failing. Log: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log\n- To confirm the new tests bite, I temporarily made user scope count both settings files again, then restored it. Four tests in `setup-pi.test.ts` failed.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- **Code:** a new exported `piPresenceFiles(env, cwd, scope)` returns the global file for user scope and global plus project for project and local. Setup and doctor both use it.\n- **Doctor messages:** user-scope doctor messages now name only the global file and drop the \"add -l\" hint, so I changed the expected text in the existing tests.\n- **Docs (code gaps found):** Nothing in the code calls the provider readiness check, the catalog check or `providerEnv`. Nothing applies the root's `--tools` arguments, and nothing writes `toolSettings` (codemode mode, the `subagents.json` file, Billion Context's setting). The package has no `prompts/` folder, although the docs said it ships code-review and security-review templates. The root also gets no system-prompt change. I marked each of these planned or not built where the docs had called them shipped, and added a Planned row in `docs/pi/README.md` for the launch step.\n- **Docs (Kimi wording):** the instruction guide cites four Moonshot guides, not three. I fixed that in `docs/pi/README.md` and `providers.md`.\n- **Left unchanged, worth a follow-up:** `docs/pi/claude-parity.md` and the Kimi instruction text under `packages/runtime/src/instructions/kimi-k3.1` still assume a launcher that applies the `code-review` and `security-review` first-pass prompts. That launcher does not exist.\n- The two edited `dist/scripts/holyagent.js` files are build output of the setup change.\n\nevidence:\n- A user-scope setup and doctor count only Pi's global settings for presence, with a test where a project .pi/settings.json listing a package does not stop the global install: `piPresenceFiles` in `pi-check.ts`, used by `checkPackage`, `checkFeatures` and `installPiPackages`. Tests in `setup-pi.test.ts`: \"a user-scope setup counts Pi's global settings only, so a repository's .pi/settings.json does not stop the global install\" and \"a user-scope doctor ignores the repository's .pi/settings.json, which project and local scope read\". Both fail without the change.\n- docs/README.md describes the Pi integration as shipped in 0.3.0 and names what remains planned: docs/README.md line 10 (what ships, then the root's system prompt, `npmCommand`, T3 Code and the cache-hit measurement as planned) and the table rows for pi/README.md and pi/t3-code.md.\n- mise run build and mise run verify exit 0: both exit 0, as shown under checks.\n- diff-file: /home/user/holyagent-0.3.0-install/../holyagent-notes/install-last.diff, i.e. /home/user/holyagent-notes/install-last.diff. dist is excluded.\n",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "Independent code, security and artifact reviews accepted the final head 20049b6; verify 2210 pass",
+    "criteria": [
+      {
+        "criterion": "A user-scope setup and doctor count only Pi's global settings for presence, with a test where a project .pi/settings.json listing a package does not stop the global install",
+        "support": "`piPresenceFiles` in `pi-check.ts`, used by `checkPackage`, `checkFeatures` and `installPiPackages`. Tests in `setup-pi.test.ts`: \"a user-scope setup counts Pi's global settings only, so a repository's .pi/settings.json does not stop the global install\" and \"a user-scope doctor ignores the repository's .pi/settings.json, which project and local scope read\". Both fail without the change."
+      },
+      {
+        "criterion": "docs/README.md describes the Pi integration as shipped in 0.3.0 and names what remains planned",
+        "support": "docs/README.md line 10 (what ships, then the root's system prompt, `npmCommand`, T3 Code and the cache-hit measurement as planned) and the table rows for pi/README.md and pi/t3-code.md."
+      },
+      {
+        "criterion": "mise run build and mise run verify exit 0",
+        "support": "both exit 0, as shown under checks."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff-file",
+        "support": "/home/user/holyagent-0.3.0-install/../holyagent-notes/install-last.diff, i.e. /home/user/holyagent-notes/install-last.diff. dist is excluded."
+      }
+    ]
+  },
   "createdAt": "2026-11-08T09:21:15.744Z"
 }
