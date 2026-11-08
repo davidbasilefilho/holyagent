@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "ship-the-eighteen-holyagent-specialists",
   "objective": "Ship the eighteen HolyAgent specialists as @tintinweb/pi-subagents package agents and add the extension glue the package lacks, so the Pi root dispatches Assignments to in-process child sessions and is woken on completion.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Work only in the worktree /home/user/holyagent-0.3.0-launcher (branch release/0.3.0/feat/pi-launcher, cut from release/0.3.0/integration at 7bae86c). Read /home/user/holyagent-notes/launcher-research.md first: it holds the research on @tintinweb/pi-subagents 0.23.1 with source paths and lines, and the installed package source is at /home/user/holyagent-notes/pi-probe/node_modules/@tintinweb/pi-subagents (Pi 1.5.0 at /home/user/holyagent-notes/pi-probe/node_modules/@earendil-works/pi-coding-agent). Open the source before relying on any claim; do not guess about code you have not read. The Intent requirements given in your brief are binding: the maintainer decided the launcher is @tintinweb/pi-subagents and that HolyAgent adds glue only where the package does not meet a requirement.",
     "Agents: add packages/integrations/pi/src/agents.ts that generates dist/agents/<name>.md for each of the 18 specialists (name = the Claude agent slug without the holyagent: prefix, e.g. worker-implementation, reviewer-code), registered through pi.subagents.agents in the generated Pi package manifest and listed in the package files. Each file: frontmatter per the package format (read src/custom-agents.ts and the README) with prompt_mode replace, a tools: allowlist derived from toolArgs(config, key) in packages/runtime/src/pi/tools.ts for the default config (built-ins, ext:builtin:codemode or the package equivalent, mcp__ patterns as the package accepts), no model and no thinking (they come per call); body = the Kimi specialist prompt (the role file of packages/runtime/src/instructions/kimi-k3.1, with the session-core part the Pi specialist needs) passed through stripCitations from packages/runtime/src/instructions/skills.ts, with ${HOLYAGENT_PI_ROOT} filled with forward slashes (toPosix). Reason: children run in process, so the agent file is the only place a role prompt and tool set can live.",
@@ -70,5 +70,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T06:42:43.686Z"
+  },
   "createdAt": "2026-11-08T06:42:05.276Z"
 }
