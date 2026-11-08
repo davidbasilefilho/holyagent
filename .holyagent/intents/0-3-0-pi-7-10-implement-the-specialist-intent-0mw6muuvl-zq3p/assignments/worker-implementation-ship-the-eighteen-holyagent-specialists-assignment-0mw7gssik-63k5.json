@@ -1,0 +1,74 @@
+{
+  "id": "assignment-0mw7gssik-63k5",
+  "intentId": "intent-0mw6muuvl-zq3p",
+  "intentRevision": 7,
+  "roleTask": "Worker.implementation",
+  "slug": "ship-the-eighteen-holyagent-specialists",
+  "objective": "Ship the eighteen HolyAgent specialists as @tintinweb/pi-subagents package agents and add the extension glue the package lacks, so the Pi root dispatches Assignments to in-process child sessions and is woken on completion.",
+  "state": "Ready",
+  "scope": [
+    "Work only in the worktree /home/user/holyagent-0.3.0-launcher (branch release/0.3.0/feat/pi-launcher, cut from release/0.3.0/integration at 7bae86c). Read /home/user/holyagent-notes/launcher-research.md first: it holds the research on @tintinweb/pi-subagents 0.23.1 with source paths and lines, and the installed package source is at /home/user/holyagent-notes/pi-probe/node_modules/@tintinweb/pi-subagents (Pi 1.5.0 at /home/user/holyagent-notes/pi-probe/node_modules/@earendil-works/pi-coding-agent). Open the source before relying on any claim; do not guess about code you have not read. The Intent requirements given in your brief are binding: the maintainer decided the launcher is @tintinweb/pi-subagents and that HolyAgent adds glue only where the package does not meet a requirement.",
+    "Agents: add packages/integrations/pi/src/agents.ts that generates dist/agents/<name>.md for each of the 18 specialists (name = the Claude agent slug without the holyagent: prefix, e.g. worker-implementation, reviewer-code), registered through pi.subagents.agents in the generated Pi package manifest and listed in the package files. Each file: frontmatter per the package format (read src/custom-agents.ts and the README) with prompt_mode replace, a tools: allowlist derived from toolArgs(config, key) in packages/runtime/src/pi/tools.ts for the default config (built-ins, ext:builtin:codemode or the package equivalent, mcp__ patterns as the package accepts), no model and no thinking (they come per call); body = the Kimi specialist prompt (the role file of packages/runtime/src/instructions/kimi-k3.1, with the session-core part the Pi specialist needs) passed through stripCitations from packages/runtime/src/instructions/skills.ts, with ${HOLYAGENT_PI_ROOT} filled with forward slashes (toPosix). Reason: children run in process, so the agent file is the only place a role prompt and tool set can live.",
+    "Settings: extend toolSettings in packages/runtime/src/pi/tools.ts with the package settings file (subagents.json at the location the package reads, see agent-types.ts:62-69,174-219) setting disableDefaultAgents true and fallbackSubagent none while pi.features.subagents is on, so only the eighteen names launch; tests.",
+    "Extension glue in packages/integrations/pi/src/extension.ts: (1) detect a child session (session name of the form <agent>#, per the research, verify in source) and run it as a specialist instead of the root (no root context injection); (2) at before_agent_start in the root, set HOLYAGENT_HOST=pi and HOLYAGENT_WORKFLOWS=1 or 0 from pi.getActiveTools() (SubagentWorkflow and codemode active => 1) in process.env so the holyagent wrapper calls see them, and set PI_CODEMODE_MAX_WORKERS from ToolArgs.env and PI_CACHE_RETENTION=long once for the process; (3) a tool_call handler on the package Agent tool that refuses a subagent_type outside the eighteen and leaves model/thinking as given; (4) map a child that settles with an empty final message or a length stop to a failed result the root sees (tool_result or the package hook the research names). Keep each piece a small exported function with JSDoc and tests using synthesized event fixtures.",
+    "Carried requirement: a test drives createExtension with a Windows package root (C:\\\\...) and asserts the wrapper path passed to exec uses forward slashes.",
+    "Docs: update docs/pi/extensions.md, docs/pi/caching-and-subagents.md and docs/pi/claude-parity.md to describe the in-process children, the shipped agents, the settings and the glue, replacing text that describes per-child CLI flags (--session-id, -e, --append-system-prompt, per-child env).",
+    "Out of scope (another writer owns them): assignment reports and journal reading (packages/runtime/src/cli/report.ts, packages/runtime/src/pi/journal.ts, packages/runtime/src/pi/index.ts, docs/pi/orchestration.md) and stripCitations itself (packages/runtime/src/instructions/skills.ts). If the runtime pi-host dispatch output must change to name the pi agent, report it instead of editing it."
+  ],
+  "constraints": [
+    "Edit only the ownership paths; make no version-control writes and no edits under .git/ or .holyagent/, because the root owns version control.",
+    "Use Effect, Effect Schema at boundaries, Bun APIs and JSDoc on exports per .claude/CLAUDE.md; the extension runs on Node inside Pi, so follow the existing extension.ts patterns there.",
+    "Do not run pi or any live model; unit tests with fixtures only.",
+    "Run bunx --no-install mise run build and bunx --no-install mise run verify and report exit codes and counts; commit-ready means the generated dist is in sync.",
+    "Write git -C /home/user/holyagent-0.3.0-launcher diff (including untracked files via git add -N is not allowed; instead list untracked files and append their contents with diff --no-index) to /home/user/holyagent-notes/launcher-a.diff and give it as diff-file evidence.",
+    "Name any requirement you could not meet and why; do not add features beyond the brief.",
+    "Start each evidence line with the criterion text, then a colon.",
+    "Report in under 500 words."
+  ],
+  "criteria": [
+    {
+      "text": "The eighteen specialists ship as package agents with role prompt, stripCitations, forward-slash package root and a tools allowlist derived from toolArgs, and no model or thinking",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "subagents.json settings make only the eighteen launchable while subagents is on",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The extension runs a child as a specialist, sets HOLYAGENT_HOST, HOLYAGENT_WORKFLOWS, PI_CODEMODE_MAX_WORKERS and PI_CACHE_RETENTION, refuses non-specialist agent types, and fails empty or length-stopped reports",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Each piece has fixture tests that fail without it, including the Windows package root test",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Docs describe in-process children and drop the per-child CLI flag text",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "mise run build leaves dist in sync and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi",
+    "packages/runtime/src/pi/tools.ts",
+    "packages/runtime/tests/pi/tools.test.ts",
+    "docs/pi/extensions.md",
+    "docs/pi/caching-and-subagents.md",
+    "docs/pi/claude-parity.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-08T06:42:05.276Z"
+}
