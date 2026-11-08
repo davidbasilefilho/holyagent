@@ -68,6 +68,48 @@ describe("assignment dispatch under each host", () => {
     expect(pi).toContain("worker-implementation")
     expect(pi).not.toContain("holyagent:")
   })
+
+  test("prints the Pi route model and thinking under pi, and the Claude route under claude", async () => {
+    await cli(["intent", "create"], { objective: "Parse" })
+    const under = async (host: string, roleTask: string, id: string) => {
+      const out = await cli(["assignment", "dispatch"], draft(id, roleTask), {
+        HOLYAGENT_HOST: host,
+      })
+      return decode(`${out.stdout.split("\nprompt:\n")[0]}\n`) as Record<string, string>
+    }
+    const pi = await under("pi", "Worker.implementation", "a")
+    expect(pi.model).toBe("kimi-coding/kimi-for-coding")
+    expect(pi.effort).toBe("max")
+    const visual = await under("pi", "Reviewer.visual", "b")
+    expect(visual.model).toBe("kimi-coding/k3.1-pro")
+    expect(visual.effort).toBe("low")
+    const claude = await under("claude", "Worker.implementation", "c")
+    expect(claude.model).toBe("sonnet")
+    expect(claude.effort).toBe("high")
+  })
+
+  test("takes the model and thinking from the user and project config, and omits them with pi off", async () => {
+    await cli(["intent", "create"], { objective: "Parse" })
+    await Bun.write(
+      join(home, ".holyagent", "config.json"),
+      JSON.stringify({ pi: { routes: { "Worker.implementation": { thinking: "high" } } } }),
+    )
+    await Bun.write(
+      join(project, ".holyagent", "config.json"),
+      JSON.stringify({ pi: { routes: { "Worker.implementation": { model: "k3.1-pro" } } } }),
+    )
+    const tuned = await dispatch(draft("tuned"))
+    expect(tuned.model).toBe("kimi-coding/k3.1-pro")
+    expect(tuned.effort).toBe("high")
+    await Bun.write(
+      join(project, ".holyagent", "config.json"),
+      JSON.stringify({ pi: { enable: false } }),
+    )
+    const off = await dispatch(draft("off"))
+    expect(off.agent).toBe("worker-implementation")
+    expect(off).not.toHaveProperty("model")
+    expect(off).not.toHaveProperty("effort")
+  })
 })
 
 describe("assignment reports under pi", () => {
@@ -89,6 +131,9 @@ describe("assignment reports under pi", () => {
     // The Pi root passes the printed agent as `agentType`, and the package ships the bare name.
     expect(a.agent).toBe("worker-implementation")
     expect(b.agent).toBe("reviewer-code")
+    // The model and thinking are the Pi route table's, in the form the package takes.
+    expect([a.model, a.effort]).toEqual(["kimi-coding/kimi-for-coding", "max"])
+    expect([b.model, b.effort]).toEqual(["kimi-coding/kimi-for-coding", "max"])
     expect(a.prompt).toContain("(worker-implementation)")
     const journal = [
       { index: 0, key: key(a), ok: true, text: "first report" },
@@ -114,6 +159,56 @@ describe("assignment reports under pi", () => {
     expect(await readdir(join(project, ".git", "holyagent", "reports"))).toEqual([
       `${String(a.id)}.md`,
     ])
+  })
+
+  test("a workflow journal still matches when the config sets other routes or pi is off", async () => {
+    await cli(["intent", "create"], { objective: "Parse" })
+    await Bun.write(
+      join(project, ".holyagent", "config.json"),
+      JSON.stringify({ pi: { routes: { "Worker.implementation": { thinking: "high" } } } }),
+    )
+    const tuned = await dispatch(draft("tuned"))
+    const off = await (async () => {
+      await Bun.write(
+        join(project, ".holyagent", "config.json"),
+        JSON.stringify({ pi: { enable: false } }),
+      )
+      return dispatch(draft("off"))
+    })()
+    const keyOfCall = (d: Record<string, string>) =>
+      keyOf([
+        d.prompt ?? "",
+        d.id ?? "",
+        d.model ?? null,
+        d.agent ?? "",
+        d.effort ?? null,
+        null,
+        null,
+        null,
+      ])
+    const journal = [
+      { index: 0, key: keyOfCall(tuned), ok: true, text: "tuned report" },
+      { index: 1, key: keyOfCall(off), ok: true, text: "off report" },
+    ]
+      .map((l) => JSON.stringify(l))
+      .join("\n")
+    await Bun.write(join(project, "wf_cfg.workflow.jsonl"), `${journal}\n`)
+    // Pi is off now, so only the entry dispatched with it off still matches its call.
+    const done = await cli(["assignment", "reports", "wf_cfg.workflow.jsonl"])
+    const rows = decode(done.stdout) as {
+      reports: Array<{ id: string }>
+      notAssignmentIds: unknown
+    }
+    expect(rows.reports.map(({ id }) => id)).toEqual([String(off.id)])
+    expect(rows.notAssignmentIds).toEqual([{ label: "", agentId: "wf_cfg#0 unmatched" }])
+    await Bun.write(
+      join(project, ".holyagent", "config.json"),
+      JSON.stringify({ pi: { routes: { "Worker.implementation": { thinking: "high" } } } }),
+    )
+    const again = await cli(["assignment", "reports", "wf_cfg.workflow.jsonl"])
+    expect(
+      (decode(again.stdout) as { reports: Array<{ id: string }> }).reports.map(({ id }) => id),
+    ).toEqual([String(tuned.id)])
   })
 
   test("a session file", async () => {

@@ -97,6 +97,7 @@ export const resumeOf = (directory: string, words: HostWords = CLAUDE_WORDS) =>
  */
 const planNotes = (words: HostWords): ReadonlyArray<string> => [
   "`workflow` first: `assignments` are the ids in run order, a writer followed by the review of its work; `assignment dispatch` each for its agent, model, effort and prompt, then write the inline script as the root workflow text says. A single Assignment is a one-entry workflow",
+  ...(words.launchNote === undefined ? [] : [words.launchNote]),
   `\`continues\` lists Ready work that continues a warm specialist, by ${words.message} beside the workflow. \`fallback\` is the same work as direct subagents, for a session where the ${words.workflowTool} tool is disabled or unavailable: its writers launch together, and the \`afterwards\` reviews launch once the writers they depend on are terminal`,
 ]
 

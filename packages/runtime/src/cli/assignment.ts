@@ -27,7 +27,7 @@ import { workTreeKey } from "../state/local.ts"
 import { readState, type Snapshot } from "../state/store.ts"
 import { booleanFlag, choiceFlag, requiredFlag, stringFlag } from "./args.ts"
 import { briefPath, writeBrief, writeReport } from "./brief.ts"
-import { agentHostOf } from "./config.ts"
+import { agentHostOf, type Launch, launchesOf } from "./config.ts"
 import { nowIso } from "./context.ts"
 import { AgentMismatch, Usage } from "./errors.ts"
 import { resolveIntent } from "./intent.ts"
@@ -100,15 +100,16 @@ const withPlanned = (
 const agentTypeFor = (host: AgentHost, agent: string): string =>
   host === "pi" ? agent : `${PLUGIN_NAMESPACE}:${agent}`
 
-const directiveView = (directive: Directive, host: AgentHost) =>
+/** What a dispatch prints for its directive; `launch` is the model and effort of a spawn. */
+const directiveView = (directive: Directive, host: AgentHost, launch: Launch) =>
   directive.action === "continue"
     ? { continue: directive.agentId, reason: directive.reason }
-    : {
+    : present({
         agent: agentTypeFor(host, directive.agent),
-        model: directive.model,
-        effort: directive.effort,
+        model: launch.model,
+        effort: launch.effort,
         reason: directive.reason,
-      }
+      })
 
 const ExistingRef = Schema.Struct({ id: AssignmentId })
 
@@ -123,7 +124,7 @@ const OUTCOMES: Readonly<Record<typeof OutcomeFlag.Type, Outcome>> = {
 }
 
 const dispatchOutput = (words: HostWords) => ({
-  output: `TOON fields (id, state, agent/model/effort or continue, reason), then a line \`prompt:\` alone, then a two-line specialist prompt that names the brief file the full Assignment was written to; pass that text as it is: as the prompt of its agent() in your inline workflow script first, to the ${words.agentTool} tool only when the ${words.workflowTool} tool is disabled or unavailable, and by ${words.message} only for a warm continuation. The brief itself is never printed: the specialist reads it with the ${words.readTool} tool`,
+  output: `TOON fields (id, state, agent/model/effort or continue, reason), then a line \`prompt:\` alone, then a two-line specialist prompt that names the brief file the full Assignment was written to; pass that text as it is: as the prompt of its agent() in your inline workflow script first, to the ${words.agentTool} tool only when the ${words.workflowTool} tool is disabled or unavailable, and by ${words.message} only for a warm continuation. The brief itself is never printed: the specialist reads it with the ${words.readTool} tool${words.launchNote === undefined ? "" : `. ${words.launchNote}`}`,
 })
 
 const recordHelp = (words: HostWords) => ({
@@ -251,10 +252,16 @@ const piReports = (call: Call, source: string, text: string) =>
           return agentId?.startsWith(PI_AGENT_PREFIX) === true ? [{ id, agentId }] : []
         }),
       )
+    const launchOf = yield* launchesOf(call.env, call.root, "pi")
     const calls = yield* Effect.forEach(project.assignments, (assignment) =>
       briefPath(call, assignment.id).pipe(
         Effect.map((path) =>
-          dispatchedCall(assignment, agentTypeFor("pi", routeFor(assignment.roleTask).agent), path),
+          dispatchedCall(
+            assignment,
+            agentTypeFor("pi", routeFor(assignment.roleTask).agent),
+            path,
+            launchOf(assignment.roleTask),
+          ),
         ),
       ),
     )
@@ -311,6 +318,7 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
           ),
         )
         const settings = yield* config
+        const launchOf = yield* launchesOf(call.env, call.root, settings.host)
         const newAssignmentId = yield* newId("assignment")
         const now = yield* nowIso
         const started = yield* update((snapshot) =>
@@ -347,7 +355,11 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
           {
             id: started.assignment.id,
             state: started.assignment.state,
-            ...directiveView(started.directive, settings.host),
+            ...directiveView(
+              started.directive,
+              settings.host,
+              launchOf(started.assignment.roleTask),
+            ),
           },
           "prompt",
           started.prompt,

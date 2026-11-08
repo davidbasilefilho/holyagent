@@ -15,6 +15,7 @@ import {
   matchJournal,
   piRecordReport,
 } from "../pi/journal.ts"
+import type { Launch } from "./config.ts"
 import { Usage } from "./errors.ts"
 import { JsonReport, renderJsonReport } from "./jsonreport.ts"
 
@@ -340,27 +341,26 @@ export const journalResults = (journal: string, source: string) =>
 /**
  * The key an Assignment's dispatched call has in a `@tintinweb/pi-subagents` workflow journal: the
  * prompt that {@link dispatchPrompt} prints for the pi host (`agent` is the namespaced agent it
- * names, `briefPath` the brief file it points at), the Assignment id as the label, and the route's
- * agent (the Claude slug without its namespace, which the Pi package ships under that name), model
- * and effort as the dispatch printed them. The script passes no isolation, gate, resume or schema.
+ * names, `briefPath` the brief file it points at), the Assignment id as the label, the route's
+ * agent (the Claude slug without its namespace, which the Pi package ships under that name), and
+ * the model and effort as the dispatch printed them (`launch`, see `launchesOf`). The script passes
+ * no isolation, gate, resume or schema.
  */
 export const dispatchedCall = (
   assignment: Assignment,
   agent: string,
   briefPath: string,
-): ExpectedCall => {
-  const { agent: agentType, model, effort } = routeFor(assignment.roleTask)
-  return {
-    id: assignment.id,
-    key: journalKey({
-      prompt: dispatchPrompt(assignment, agent, briefPath, PI_WORDS),
-      label: assignment.id,
-      model,
-      agentType,
-      effort,
-    }),
-  }
-}
+  launch: Launch,
+): ExpectedCall => ({
+  id: assignment.id,
+  key: journalKey({
+    prompt: dispatchPrompt(assignment, agent, briefPath, PI_WORDS),
+    label: assignment.id,
+    model: launch.model,
+    agentType: routeFor(assignment.roleTask).agent,
+    effort: launch.effort,
+  }),
+})
 
 /**
  * The reports a pi source yields and the entries or agents that yield none, as `reports` lists

@@ -2,10 +2,14 @@ import { join } from "node:path"
 
 import { Effect, Schema } from "effect"
 
+import { loadConfig as loadHolyagentConfig } from "../config/load.ts"
 import { DEFAULT_CONFIG, type ExecutionConfig } from "../domain/directive.ts"
 import { AGENT_HOSTS, type AgentHost } from "../domain/host.ts"
+import { type RoleTask, routeFor } from "../domain/route.ts"
+import { routeModel, subagentModel } from "../pi/provider.ts"
 import { claudeConfigDirectory } from "../setup/environment.ts"
 import { readText } from "../state/files.ts"
+import { stateDirectory } from "../state/layout.ts"
 import { Usage } from "./errors.ts"
 import type { Host } from "./types.ts"
 
@@ -134,3 +138,36 @@ export const loadConfig = (env: Host["env"], root: string) =>
     workflowsAvailable: workflowsAvailable(env, root),
     host: agentHostOf(env),
   }).pipe(Effect.map((config): ExecutionConfig => config))
+
+/**
+ * The model and effort a dispatch prints for a specialist, which the root passes to its launcher as
+ * printed. Either is absent when the host should pick it.
+ */
+export interface Launch {
+  /** The model the host launches the specialist on. */
+  readonly model?: string
+  /** The reasoning effort (pi: thinking level) the host launches the specialist at. */
+  readonly effort?: string
+}
+
+/**
+ * Resolves the {@link Launch} of each role task under a host. Claude launches a specialist on its
+ * route's model alias and effort. Pi launches it on the model and thinking level of its row in the
+ * `pi.routes` table of the HolyAgent config (the user's file under the project's, as the `config`
+ * command loads it), written as `@tintinweb/pi-subagents` takes them; with `pi.enable` off no row
+ * applies and the specialist inherits the session's model and thinking. A pi config that cannot be
+ * loaded fails as ConfigInvalid, and Claude never reads it.
+ */
+export const launchesOf = (env: Host["env"], root: string, host: AgentHost) =>
+  host === "claude"
+    ? Effect.succeed((roleTask: RoleTask): Launch => {
+        const { model, effort } = routeFor(roleTask)
+        return { model, effort }
+      })
+    : loadHolyagentConfig({ projectDirectories: [stateDirectory(root)], env }).pipe(
+        Effect.map((config) => (roleTask: RoleTask): Launch => {
+          if (!config.pi.enable) return {}
+          const route = routeModel(config, roleTask)
+          return { model: subagentModel(route), effort: route.thinking }
+        }),
+      )

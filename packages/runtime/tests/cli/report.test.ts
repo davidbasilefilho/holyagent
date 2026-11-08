@@ -22,6 +22,8 @@ const packageKey = (fields: ReadonlyArray<string | null>): string =>
 const AGENT = "holyagent:worker-implementation"
 const BRIEF = "/clone/.git/holyagent/briefs/assignment-a.md"
 const first = assignment({ id: "assignment-a" })
+/** What a Claude dispatch prints for the route of `first`. */
+const LAUNCH = { model: "sonnet", effort: "high" }
 const second = assignment({ id: "assignment-b", roleTask: "Reviewer.code" })
 
 describe("dispatchedCall", () => {
@@ -29,7 +31,7 @@ describe("dispatchedCall", () => {
     const prompt =
       "Role: Worker.implementation (holyagent:worker-implementation). Assignment: assignment-a.\nRead the brief at /clone/.git/holyagent/briefs/assignment-a.md with the read tool and follow it as your full task."
     expect(dispatchPrompt(first, AGENT, BRIEF, PI_WORDS)).toBe(prompt)
-    expect(dispatchedCall(first, AGENT, BRIEF)).toEqual({
+    expect(dispatchedCall(first, AGENT, BRIEF, LAUNCH)).toEqual({
       id: "assignment-a",
       key: packageKey([
         prompt,
@@ -44,10 +46,21 @@ describe("dispatchedCall", () => {
     })
   })
 
+  test("hashes the model and effort the dispatch printed, null when it printed none", () => {
+    const prompt = dispatchPrompt(first, AGENT, BRIEF, PI_WORDS)
+    const keyFor = (model: string | null, effort: string | null) =>
+      packageKey([prompt, "assignment-a", model, "worker-implementation", effort, null, null, null])
+    expect(
+      dispatchedCall(first, AGENT, BRIEF, { model: "kimi-coding/kimi-for-coding", effort: "max" })
+        .key,
+    ).toBe(keyFor("kimi-coding/kimi-for-coding", "max"))
+    expect(dispatchedCall(first, AGENT, BRIEF, {}).key).toBe(keyFor(null, null))
+  })
+
   test("differs per Assignment and per route", () => {
     const keys = [
-      dispatchedCall(first, AGENT, BRIEF).key,
-      dispatchedCall(second, "holyagent:reviewer-code", BRIEF).key,
+      dispatchedCall(first, AGENT, BRIEF, LAUNCH).key,
+      dispatchedCall(second, "holyagent:reviewer-code", BRIEF, LAUNCH).key,
     ]
     expect(new Set(keys).size).toBe(2)
   })
@@ -55,11 +68,12 @@ describe("dispatchedCall", () => {
 
 describe("piJournalReports", () => {
   const calls = [
-    dispatchedCall(first, AGENT, BRIEF),
+    dispatchedCall(first, AGENT, BRIEF, LAUNCH),
     dispatchedCall(
       second,
       "holyagent:reviewer-code",
       "/clone/.git/holyagent/briefs/assignment-b.md",
+      LAUNCH,
     ),
   ]
   const source = "/tmp/wf_0123456789ab.workflow.jsonl"

@@ -8253,7 +8253,8 @@ var PI_WORDS = {
   journal: "workflow run's journal",
   recordNote: "the pi launcher records no agent by hook: the launcher glue or the root records each agent, with the ID the Agent tool returns, including a continued one",
   reportsNote: "under the pi host the file is a <run id>.workflow.jsonl of @tintinweb/pi-subagents, whose entries are matched to Assignments by the key of their dispatched call, or the root session file, which holds the record of each Assignment recorded as pi:<agent-id>; an entry that failed, has no text or matches no call is listed with the run and its index",
-  agentIdNote: "under the pi host an agent is recorded as pi:<agent-id>, the ID the Agent tool returns (strip pi: to message it), and a workflow's agent as pi-workflow:<run-id>/<id>, with the run ID and the label the script gave the agent (the Assignment id); any other form is refused"
+  agentIdNote: "under the pi host an agent is recorded as pi:<agent-id>, the ID the Agent tool returns (strip pi: to message it), and a workflow's agent as pi-workflow:<run-id>/<id>, with the run ID and the label the script gave the agent (the Assignment id); any other form is refused",
+  launchNote: "under the pi host model is the Pi route table's `<provider>/<id>` and effort its thinking level for the specialist (pi.routes in config.json), as @tintinweb/pi-subagents takes them: pass model as it is, and effort as agent()'s effort or the Agent tool's thinking. With pi.enable off both are left out and the specialist inherits the session's"
 };
 var wordsFor = (host) => host === "pi" ? PI_WORDS : CLAUDE_WORDS;
 
@@ -12419,6 +12420,24 @@ var closeAssignment = (project, registry, assignmentId, input, now) => gen2(func
 });
 
 import { join as join8 } from "path";
+var PROVIDERS = {
+  "kimi-coding-global": {
+    id: "kimi-coding",
+    package: "pi-provider-kimi-code",
+    env: { KIMI_CODE_REGION: "global" },
+    loginFix: "Run /login kimi-coding in Pi, or set KIMI_API_KEY",
+    webTools: ["moonshot_search", "moonshot_fetch"],
+    toolsFile: "~/.pi/providers/kimi-coding/config.json"
+  }
+};
+var providerProfile = (config) => PROVIDERS[config.pi.provider];
+var routeModel = (config, key) => {
+  const { id } = providerProfile(config);
+  const { model, thinking } = config.pi.routes[key];
+  return { key, provider: id, model, thinking, spec: `${id}/${model}:${thinking}` };
+};
+var subagentModel = ({ provider, model }) => `${provider}/${model}`;
+
 var TTL_VARIABLE = "HOLYAGENT_REUSE_TTL_MINUTES";
 var HOST_VARIABLE = "HOLYAGENT_HOST";
 var WORKFLOWS_VARIABLE = "HOLYAGENT_WORKFLOWS";
@@ -12468,6 +12487,15 @@ var loadConfig2 = (env, root) => all2({
   workflowsAvailable: workflowsAvailable(env, root),
   host: agentHostOf(env)
 }).pipe(map4((config) => config));
+var launchesOf = (env, root, host) => host === "claude" ? succeed6((roleTask) => {
+  const { model, effort } = routeFor(roleTask);
+  return { model, effort };
+}) : loadConfig({ projectDirectories: [stateDirectory(root)], env }).pipe(map4((config) => (roleTask) => {
+  if (!config.pi.enable)
+    return {};
+  const route = routeModel(config, roleTask);
+  return { model: subagentModel(route), effort: route.thinking };
+}));
 
 var REPORT_FIELDS = Struct({
   status: Literals(["done", "partial", "blocked"]),
@@ -12836,19 +12864,16 @@ var journalResults = (journal, source) => gen2(function* () {
   }
   return results;
 });
-var dispatchedCall = (assignment, agent, briefPath) => {
-  const { agent: agentType, model, effort } = routeFor(assignment.roleTask);
-  return {
-    id: assignment.id,
-    key: journalKey({
-      prompt: dispatchPrompt(assignment, agent, briefPath, PI_WORDS),
-      label: assignment.id,
-      model,
-      agentType,
-      effort
-    })
-  };
-};
+var dispatchedCall = (assignment, agent, briefPath, launch) => ({
+  id: assignment.id,
+  key: journalKey({
+    prompt: dispatchPrompt(assignment, agent, briefPath, PI_WORDS),
+    label: assignment.id,
+    model: launch.model,
+    agentType: routeFor(assignment.roleTask).agent,
+    effort: launch.effort
+  })
+});
 var refused = (hint) => (error) => new Usage({ message: error.message, hint });
 var piJournalReports = (journal, source, calls) => decodePiJournal(journal, source).pipe(mapError2(refused("Pass the <run id>.workflow.jsonl of the workflow run, unedited.")), map4((entries) => {
   const { reports, notReported } = matchJournal(entries, calls);
@@ -12927,12 +12952,12 @@ var withPlanned = (snapshot, input, id, now) => completeDraft(snapshot, input).p
   assignments: [...snapshot.project.assignments, assignment]
 })));
 var agentTypeFor = (host, agent) => host === "pi" ? agent : `${PLUGIN_NAMESPACE}:${agent}`;
-var directiveView = (directive, host) => directive.action === "continue" ? { continue: directive.agentId, reason: directive.reason } : {
+var directiveView = (directive, host, launch) => directive.action === "continue" ? { continue: directive.agentId, reason: directive.reason } : present({
   agent: agentTypeFor(host, directive.agent),
-  model: directive.model,
-  effort: directive.effort,
+  model: launch.model,
+  effort: launch.effort,
   reason: directive.reason
-};
+});
 var ExistingRef = Struct({ id: AssignmentId });
 var OutcomeFlag = Literals(["success", "failure", "errored", "interrupted", "stopped"]);
 var OUTCOMES = {
@@ -12943,7 +12968,7 @@ var OUTCOMES = {
   stopped: "Cancelled"
 };
 var dispatchOutput = (words) => ({
-  output: `TOON fields (id, state, agent/model/effort or continue, reason), then a line \`prompt:\` alone, then a two-line specialist prompt that names the brief file the full Assignment was written to; pass that text as it is: as the prompt of its agent() in your inline workflow script first, to the ${words.agentTool} tool only when the ${words.workflowTool} tool is disabled or unavailable, and by ${words.message} only for a warm continuation. The brief itself is never printed: the specialist reads it with the ${words.readTool} tool`
+  output: `TOON fields (id, state, agent/model/effort or continue, reason), then a line \`prompt:\` alone, then a two-line specialist prompt that names the brief file the full Assignment was written to; pass that text as it is: as the prompt of its agent() in your inline workflow script first, to the ${words.agentTool} tool only when the ${words.workflowTool} tool is disabled or unavailable, and by ${words.message} only for a warm continuation. The brief itself is never printed: the specialist reads it with the ${words.readTool} tool${words.launchNote === undefined ? "" : `. ${words.launchNote}`}`
 });
 var recordHelp = (words) => ({
   summary: `Record the launch of a dispatched Assignment (a workflow's agent as ${words.workflowAgentPrefix}<run-id>/<id>), or roll it back when the launch failed`,
@@ -13012,7 +13037,8 @@ var piReports = (call, source, text) => gen2(function* () {
       const agentId = specialist?.agentId;
       return agentId?.startsWith(PI_AGENT_PREFIX) === true ? [{ id, agentId }] : [];
     }));
-  const calls = yield* forEach2(project.assignments, (assignment) => briefPath(call, assignment.id).pipe(map4((path) => dispatchedCall(assignment, agentTypeFor("pi", routeFor(assignment.roleTask).agent), path))));
+  const launchOf = yield* launchesOf(call.env, call.root, "pi");
+  const calls = yield* forEach2(project.assignments, (assignment) => briefPath(call, assignment.id).pipe(map4((path) => dispatchedCall(assignment, agentTypeFor("pi", routeFor(assignment.roleTask).agent), path, launchOf(assignment.roleTask)))));
   return yield* piJournalReports(text, source, calls);
 });
 var ASSIGNMENT_COMMANDS = [
@@ -13048,6 +13074,7 @@ var ASSIGNMENT_COMMANDS = [
         message: `${error.message}. To dispatch an existing Assignment send {"id": "<id>"}`
       }) : error));
       const settings = yield* config;
+      const launchOf = yield* launchesOf(call.env, call.root, settings.host);
       const newAssignmentId = yield* newId("assignment");
       const now = yield* nowIso;
       const started = yield* update((snapshot) => gen2(function* () {
@@ -13064,7 +13091,7 @@ var ASSIGNMENT_COMMANDS = [
       return new WithTrailer({
         id: started.assignment.id,
         state: started.assignment.state,
-        ...directiveView(started.directive, settings.host)
+        ...directiveView(started.directive, settings.host, launchOf(started.assignment.roleTask))
       }, "prompt", started.prompt);
     })
   },
@@ -14473,6 +14500,7 @@ var resumeOf = (directory, words = CLAUDE_WORDS) => readOpenState(directory).pip
 })));
 var planNotes = (words) => [
   "`workflow` first: `assignments` are the ids in run order, a writer followed by the review of its work; `assignment dispatch` each for its agent, model, effort and prompt, then write the inline script as the root workflow text says. A single Assignment is a one-entry workflow",
+  ...words.launchNote === undefined ? [] : [words.launchNote],
   `\`continues\` lists Ready work that continues a warm specialist, by ${words.message} beside the workflow. \`fallback\` is the same work as direct subagents, for a session where the ${words.workflowTool} tool is disabled or unavailable: its writers launch together, and the \`afterwards\` reviews launch once the writers they depend on are terminal`
 ];
 var OVERVIEW_COMMANDS = [

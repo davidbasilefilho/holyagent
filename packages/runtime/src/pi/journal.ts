@@ -7,9 +7,9 @@ import { Data, Effect, Schema } from "effect"
 export interface JournalKeyInput {
   readonly prompt: string
   readonly label?: string
-  readonly model?: string
+  readonly model?: string | undefined
   readonly agentType?: string
-  readonly effort?: string
+  readonly effort?: string | undefined
   readonly isolation?: string
   readonly gate?: string
   readonly resume?: string
