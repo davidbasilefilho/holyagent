@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "re-assess-repair-commit-13f357f-on",
   "objective": "Re-assess repair commit 13f357f on release/0.3.0/feat/pi-root-wiring against the two security blockers it repairs.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read /home/user/holyagent-notes/wire-a-repair.diff; sources in /home/user/holyagent-0.3.0-wiring; Pi 1.5.0 sources under its node_modules/@earendil-works/pi-coding-agent.",
     "Blocker 1: unsanitized text reached notice() from a project config pi.routes.*.model and from pi auth check output. Repair: printable() in oneLine/notice and a ModelId pattern.",
@@ -40,7 +40,29 @@
     "agentId": "workflow:wf_153bab69-df7/assignment-0mw7oobm3-k632",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T10:22:33.675Z"
+    "startedAt": "2026-11-08T10:22:33.675Z",
+    "finishedAt": "2026-11-08T10:32:11.355Z"
+  },
+  "result": "result: No blockers. Both repairs hold on a read of the code. The built-in `/security-review` could not run, and I had no shell to run the tests.\n\n**Built-in:** The Skill tool loaded `security-review`, but its `git log origin/HEAD...` preprocessing failed with \"ambiguous argument 'origin/HEAD...'\". I reviewed the range from `/home/user/holyagent-notes/wire-a-repair.diff` and the sources in `/home/user/holyagent-0.3.0-wiring`.\n\n**Validated as sound**\n- **Control characters (blocker 1):** Every `Delivery` with `display: true` goes through `notice()` and then `oneLine()` and `printable()` (extension.ts:526-531). That covers `failed()`, `UnknownRole`, `Cause.pretty`, the provider-check errors, `ModelsNotInCatalog.brief` and the `setActiveTools` failure. The only other delivery is the status context (`display: false`), which is not a notice.\n- **`ModelId` pattern (schema.ts:50):** It forbids a leading `-` and any control or whitespace character. JS `$` does not match before a trailing newline, and the extension decodes the config with the schema.\n- **Tool gate (blocker 2):** In Pi 1.5.0, `ctx.executeTool` runs through `_beforeToolCall`, which calls `emitToolCall` with the real registry name (agent-session.js:339-428, nested-tool-calls.js). The gate matches by name pattern when the call is made, so it also covers tools registered after the session starts and calls made through `tool_search`. Codemode aliases are namespace names only (execute.js:468 passes `tool.name`).\n- **Unreadable config:** `closedSettings` falls back to the defaults. It also covers an invalid role (falls back to the root) and a deadline overrun. `before_agent_start` awaits `pending`, and `excluded` is set inside that promise, so it is set before the first run.\n- **Session rename:** `excluded` is never cleared by a session rename.\n\n**Non-blocking findings (reading only)**\n1. **Invisible characters not stripped (hardening).** The notice reaches the user and the model, and the regex misses U+2060-2064, U+061C, U+180E, U+FE00-FE0F and the tag block U+E0000-E007F. The tag block is the usual route for hidden text aimed at a model. Config decode errors that quote project values pass through the notice, so a project can reach it. The criterion, which says control characters, is met.\n2. **A project config can lift the exclusion.**\n   - **Project `pi.enable: false`:** this sets `excluded = []` (extension.ts:899), so the gate stops refusing. This contradicts the comment at line 1011 that a project cannot lift the gates. `docs/pi/extensions.md` says the gate \"stands down with `pi.enable` off\", so confirm it should hold for a project's `false` too.\n   - **Feature toggles:** a project's `pi.features.computerUse: false`, or a different `pi.features.web` mode, drops those patterns while the packages stay installed under Pi. A malicious cloned repo could do this.\n   - **Impact is limited:** the root keeps `bash` either way, so the write and edit exclusion is role discipline, not a hard boundary.\n3. **Empty `excluded` after a restart (low).** Every `session_start` builds a new `held` with `excluded: []` (line 925) instead of the defaults. A run already in flight across a reload, resume or fork would be ungated until the collection ends. A normal first run is covered by the `before_agent_start` await.\n4. **Not verified.** The computer-use and pi-web-kit tool names (`computer_use_*`, `web_search`, `web_fetch`) are not in the tree, so I could not confirm the patterns match them. I did not run Pi or the tests.\n\nresult: pass, no blockers.\nchanged: none\nblockers: none\nevidence:\nNo untrusted input reaches the notice text with control characters: all notice paths go through `printable()` in `oneLine()` at extension.ts:526-531, `ModelsNotInCatalog.brief` included. The `ModelId` pattern is at schema.ts:50. Invisible-character gap is finding 1.\nThe root cannot call an excluded tool, including when the config cannot be read: the `tool_call` gate is at extension.ts:1013-1016 and the Pi dispatch at agent-session.js:339-428. `closedSettings` is at extension.ts:698. Project-config limits are finding 2.\nsecurity-findings: findings 1-4 above; no log file was written.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Both blockers validated as repaired by source-to-sink reading; hardening items taken into the last round",
+    "criteria": [
+      {
+        "criterion": "No untrusted input reaches the notice text with control characters",
+        "support": "all notice paths go through `printable()` in `oneLine()` at extension.ts:526-531, `ModelsNotInCatalog.brief` included. The `ModelId` pattern is at schema.ts:50. Invisible-character gap is finding 1."
+      },
+      {
+        "criterion": "The root cannot call an excluded tool, including when the config cannot be read",
+        "support": "the `tool_call` gate is at extension.ts:1013-1016 and the Pi dispatch at agent-session.js:339-428. `closedSettings` is at extension.ts:698. Project-config limits are finding 2."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "security-findings",
+        "support": "findings 1-4 above; no log file was written."
+      }
+    ]
   },
   "createdAt": "2026-11-08T10:22:33.675Z"
 }
