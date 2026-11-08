@@ -1,0 +1,50 @@
+{
+  "id": "assignment-0mw7adjyt-15bt",
+  "intentId": "intent-0mw6muu7q-dpbs",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-code-side-of-the-kimi-set",
+  "objective": "Review the code side of the Kimi set repair on release/0.3.0/feat/kimi-instructions (range 6b0a934..HEAD, worktree /home/user/holyagent-0.3.0-kimi; run commands there): stripCitations in packages/runtime/src/instructions/skills.ts and its use in the Claude agents reader and the pi skills, the CLI_CHECKS per-family test, and the stale JSDoc fix.",
+  "state": "Running",
+  "scope": [
+    "Diff: /home/user/holyagent-notes/kimi-repair.diff. Earlier code review: /home/user/holyagent/.git/holyagent/reports/assignment-0mw79mcbn-o9wi.md. Repair report (claims only): /home/user/holyagent/.git/holyagent/reports/assignment-0mw79zweh-mm10.md.",
+    "Check that the strip keeps functional markers, cannot remove non-comment text (for example across code fences or an unterminated comment), and leaves the Claude output byte-identical."
+  ],
+  "constraints": [
+    "Read-only.",
+    "Report in under 300 words; end with an evidence: block whose lines start with the criterion text."
+  ],
+  "criteria": [
+    {
+      "text": "stripCitations removes only provenance comments, keeps markers and is tested",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The Claude output is unchanged and the pi output matches a fresh build",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "bunx --no-install mise run verify exits 0 on HEAD and mise run build leaves the tree clean",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw79zweh-mm10"
+  ],
+  "followUpOf": "assignment-0mw79mcbn-o9wi",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T03:42:16.661Z"
+  },
+  "createdAt": "2026-11-08T03:42:16.661Z"
+}
