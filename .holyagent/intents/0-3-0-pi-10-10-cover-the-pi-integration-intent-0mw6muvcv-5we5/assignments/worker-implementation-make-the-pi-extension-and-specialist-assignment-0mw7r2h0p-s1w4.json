@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "make-the-pi-extension-and-specialist",
   "objective": "Make the Pi extension and specialist launcher work on native Windows: call the bundled CLI through Bun on scripts/holyagent.js instead of `sh scripts/holyagent`, and treat Pi's powershell tool like bash wherever the tool selection or gates name bash.",
-  "state": "Running",
+  "state": "Cancelled",
   "scope": [
     "Worktree: /home/user/holyagent-0.3.0-win (branch release/0.3.0/fix/pi-windows-launch, from the top of the open 0.3.0 stack). Work and run every command there.",
     "Today packages/integrations/pi/src/extension.ts:681-682 runs exec(signal, \"sh\", [wrapper, PI_PROJECT_FLAG, project, ...args]) on every platform, and wrapperPath (extension.ts:551-559) returns scripts/holyagent. generate.ts:132-159 already ships scripts/holyagent.js, and packages/integrations/pi/tests/session-context.test.ts:184 shows the Bun-direct pattern. Read the generated sh wrapper first and keep every flag it passes Bun (for example --no-env-file and the empty bunfig --config), so the direct call behaves the same. Choose whether to call Bun directly on every platform or only on win32 from what is simpler and keeps one tested path; say which and why.",
@@ -82,7 +82,9 @@
   "specialist": {
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T11:29:33.097Z"
+    "startedAt": "2026-11-08T11:29:33.097Z",
+    "finishedAt": "2026-11-08T11:29:55.087Z"
   },
+  "result": "stopped: Not launched: redrafted with ownership paths that do not overlap the parallel branches.\n",
   "createdAt": "2026-11-08T11:29:33.097Z"
 }
