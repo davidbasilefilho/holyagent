@@ -1,0 +1,63 @@
+{
+  "id": "assignment-0mw7393ui-i0k7",
+  "intentId": "intent-0mw6uzaad-grmo",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-pr-4-s-text-artifacts-in-home",
+  "objective": "Review PR 4's text artifacts in /home/user/holyagent-0.3.0-req (range a38b600..79866c4): the requirements split for fidelity, the two guide.md files for completeness, packages/runtime/AGENTS.md, and the repository skills .claude/skills/requirements/ and .claude/skills/write-skills/.",
+  "state": "Running",
+  "scope": [
+    "Diff: /home/user/holyagent-notes/pr4.diff (the 28 empty requirements files are in the tree but carry no lines). The old files are in the diff's deleted hunks; the id mapping is /home/user/holyagent-notes/pr4-mapping.md.",
+    "Guide sources: /home/user/holyagent-notes/claude-guide-points.md (74 points) and /home/user/holyagent-notes/kimi-guide-points.md (45 points); Agent Skills standard notes: /home/user/holyagent-notes/agent-skills-standard.md.",
+    "The maintainer's words and requirements are in the Intent in use; key ones: each requirements .md becomes the same-path file in every model set; guide.md in claude-5.5 and kimi-k3.1 includes each point of its guide; the requirements skill covers create, adjust, remove and translation per guide.md and must use the scaffold script; write-skills follows the Agent Skills standard with references and draws on the shared and complementary model-guide points so distributed skills work on every supported family; both skills are repo-only; a skill description starts with the situation, then what the skill does.",
+    "Check that the requirements skill matches the final tree (how ids appear, the exact scaffold command, the test names) and that write-skills references cite the guide.md files now present.",
+    "Known open items already queued for the repair (confirm or refine, do not re-litigate): the shipped claude-5.5/skills/instruction-writing/SKILL.md still says it draws on requirements.md and plugin.test.ts asserts that string; packages/runtime/AGENTS.md has no CLAUDE.md importing it, so Claude may not load it; FAMILIES holds only claude-5.5 by root default, with kimi-k3.1 joining in the Kimi PR together with its translations (kimi-k3.1/guide.md already exists)."
+  ],
+  "constraints": [
+    "Read-only: no edits, no version-control writes.",
+    "Report in under 450 words."
+  ],
+  "criteria": [
+    {
+      "text": "Every old requirement is in the tree once with its meaning unchanged and sits in the file it governs",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Both guide.md files list every point of their source guide with its source",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The requirements skill is accurate against the final tree and runs the scaffold before translating",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "write-skills follows the Agent Skills standard with sourced references and the shared and complementary model-guide points",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "packages/runtime/AGENTS.md states the requirements-first rule and points to the skill",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "diff-file"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw6zq6yu-yip7",
+    "assignment-0mw6zqlai-6xjn"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T00:22:51.834Z"
+  },
+  "createdAt": "2026-11-08T00:22:51.834Z"
+}
