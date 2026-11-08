@@ -1,0 +1,69 @@
+{
+  "id": "assignment-0mw7gtfu7-bypr",
+  "intentId": "intent-0mw6muuvl-zq3p",
+  "intentRevision": 7,
+  "roleTask": "Worker.implementation",
+  "slug": "make-holyagent-assignment-reports-read",
+  "objective": "Make holyagent assignment reports read the @tintinweb/pi-subagents workflow journal and direct-agent records under HOLYAGENT_HOST=pi, so the Pi root closes each Assignment from a report file instead of taking reports into its context.",
+  "state": "Ready",
+  "scope": [
+    "Work only in the worktree /home/user/holyagent-0.3.0-launcher (branch release/0.3.0/feat/pi-launcher, cut from release/0.3.0/integration at 7bae86c). Read /home/user/holyagent-notes/launcher-research.md first: it holds the research on @tintinweb/pi-subagents 0.23.1 with source paths and lines, and the installed package source is at /home/user/holyagent-notes/pi-probe/node_modules/@tintinweb/pi-subagents (Pi 1.5.0 at /home/user/holyagent-notes/pi-probe/node_modules/@earendil-works/pi-coding-agent). Open the source before relying on any claim; do not guess about code you have not read. The Intent requirements given in your brief are binding: the maintainer decided the launcher is @tintinweb/pi-subagents and that HolyAgent adds glue only where the package does not meet a requirement.",
+    "Today packages/runtime/src/cli/report.ts (about lines 259-327) reads only the Claude workflow journal (started and result entries) and docs/pi/orchestration.md (The runtime under Pi, Not covered) says a Pi script returns its reports to the root. The pi-subagents journal (<run id>.workflow.jsonl, src/journal.ts:50-70 of the package) has one entry type {index, key, ok, text?, resumed?}, where key is the first 32 hex characters of sha256 over the JSON of [prompt, label, model, agentType, effort, isolation, gate, resume, schema?]; it carries no label. Read journal.ts and the code that builds the key to get the exact serialization (absent vs null fields, order).",
+    "Add packages/runtime/src/pi/journal.ts: decode the journal with Effect Schema (onExcessProperty error), and match each entry to an Assignment by recomputing the key from the Assignment dispatched call: the printed prompt, label = Assignment id, and the model, effort and agentType as the dispatch printed them; the pi agent name is the Claude agent slug without the holyagent: prefix (e.g. worker-implementation), which the Pi package ships. Read where the runtime records a dispatch to find which of these it stores, and store what is missing if needed within your ownership.",
+    "Wire it into assignment reports: under HOLYAGENT_HOST=pi, given a .workflow.jsonl path, write each matched ok entry text to the report file by Assignment id as the Claude path does, print the same id, path, words listing, and list unmatched or ok:false entries the way Claude results without a report are listed. An entry with ok true and empty text counts as no report. Under Claude behaviour is unchanged.",
+    "Also read direct agents: the package persists each direct launch as a subagents:record custom entry in the root session file with the full result (see the research and the package source); add a reader that, given the session file, writes the report of a pi:<agent-id> Assignment, if a CLI entry point fits the existing reports command, else export the function for the extension and say so.",
+    "Status mapping: export a function that maps the package outcomes (ok, error, aborted, length stop, empty report, process exit) to the Assignment status table in docs/pi/orchestration.md (Event to Assignment status).",
+    "Update docs/pi/orchestration.md (The runtime under Pi, the Not covered line and the status table) to match.",
+    "Out of scope (another writer owns them): packages/integrations/pi, packages/runtime/src/pi/tools.ts, packages/runtime/src/instructions/skills.ts and the other docs/pi files."
+  ],
+  "constraints": [
+    "Edit only the ownership paths; make no version-control writes and no edits under .git/ or .holyagent/ (tests use temporary directories), because the root owns version control.",
+    "Use Effect with tagged errors, Effect Schema at the journal boundary, Bun APIs and JSDoc on exports per .claude/CLAUDE.md.",
+    "Do not run pi or any live model; tests use synthesized journal and session fixtures, including a key computed exactly as the package computes it.",
+    "Run bunx --no-install mise run build and bunx --no-install mise run verify and report exit codes and counts.",
+    "Write the tracked diff and the contents of new files to /home/user/holyagent-notes/launcher-b.diff and give it as diff-file evidence.",
+    "Start each evidence line with the criterion text, then a colon.",
+    "Report in under 500 words."
+  ],
+  "criteria": [
+    {
+      "text": "assignment reports under HOLYAGENT_HOST=pi writes each matched journal entry report by Assignment id and lists unmatched, failed and empty entries",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The journal key is recomputed exactly as the package computes it, proven by a fixture",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Direct agent records and the status mapping are readable and tested",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Claude behaviour of assignment reports is unchanged",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "mise run build leaves dist in sync and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli/report.ts",
+    "packages/runtime/src/pi/journal.ts",
+    "packages/runtime/src/pi/index.ts",
+    "packages/runtime/tests/pi/journal.test.ts",
+    "packages/runtime/tests/cli/report.test.ts",
+    "docs/pi/orchestration.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-08T06:42:35.503Z"
+}
