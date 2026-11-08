@@ -1,0 +1,55 @@
+{
+  "id": "assignment-0mw7pre7o-12ae",
+  "intentId": "intent-0mw7mzreq-mu22",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "keep-the-user-s-own-root-exclusions-when",
+  "objective": "Keep the user's own root exclusions when the project config cannot be read, in /home/user/holyagent-0.3.0-wiring (branch release/0.3.0/feat/pi-root-wiring, head 7d8c92f).",
+  "state": "Running",
+  "scope": [
+    "Security finding (validated): extension.ts ~768-782 runs the merged config read and the user-only read in one Effect.all and sets user only after all succeed; when the merged read fails (malformed or unknown-key project .holyagent/config.json, or a failing git call), failed() leads to closedSettings(undefined, undefined) (~730) and boundConfigs holds only the defaults, so a user's extra exclusions (for example pi.features.web pi-web-kit excluding web_search and web_fetch) are dropped for the root. Read the user-only config independently (Effect.result or equivalent) so its exclusions apply whether or not the merged read fails, and include it in the union.",
+    "When the user-only read itself fails, keep the defaults' exclusions and add a notice that the home-level config could not be read, so a silent loss of the user's exclusions is visible.",
+    "Tests: a malformed project config with a user config that sets pi-web-kit keeps web_search and web_fetch excluded and gated; a failing user-only read shows the notice."
+  ],
+  "constraints": [
+    "Change only the ownership paths; no version-control writes and no edits under .git/ or .holyagent/.",
+    "Follow .claude/CLAUDE.md code rules; tests must fail without the fix; do not weaken tests.",
+    "Never run pi.",
+    "Run bunx --no-install mise run build and bunx --no-install mise run verify before reporting.",
+    "Report in under 400 words; put long logs in a file under /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path. Write a diff-file (dist excluded) at /home/user/holyagent-notes/wire-a-fix.diff."
+  ],
+  "criteria": [
+    {
+      "text": "The user's own exclusions apply to the root when the project config cannot be read, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A failed read of the home-level config shows a notice and keeps the defaults' exclusions, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build and mise run verify exit 0",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi/src/extension.ts",
+    "packages/integrations/pi/tests/extension.test.ts",
+    "packages/integrations/pi/dist/extensions",
+    "docs/pi/extensions.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T10:52:56.628Z"
+  },
+  "createdAt": "2026-11-08T10:52:56.628Z"
+}
