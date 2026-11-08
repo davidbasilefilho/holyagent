@@ -58,6 +58,7 @@ describe("default config", () => {
       processes: true,
       todo: true,
       ask: true,
+      mcp: true,
       computerUse: true,
       contextCompression: true,
       subagents: true,

@@ -51,6 +51,10 @@ describe("piPackages", () => {
     expect(without).toHaveLength(all.length - 1)
   })
 
+  test("mcp is carried by Pi's built-in extension, so its switch changes no package", () => {
+    expect(piPackages(withFeatures({ mcp: false }))).toEqual(piPackages(DEFAULT_CONFIG))
+  })
+
   test("with every feature off only the provider extension remains", () => {
     const off = withFeatures({
       web: "off",
@@ -64,7 +68,7 @@ describe("piPackages", () => {
     expect(piPackages(off)).toEqual([pinned("pi-provider-kimi-code")])
   })
 
-  test("the web mode picks pi-web-kit only when asked for it", () => {
+  test("the web mode picks pi-web-kit only when asked for it, the provider offering web tools", () => {
     expect(piPackages(withFeatures({ web: "provider" }))).not.toContain(pinned("pi-web-kit"))
     expect(piPackages(withFeatures({ web: "off" }))).not.toContain(pinned("pi-web-kit"))
     expect(piPackages(withFeatures({ web: "pi-web-kit" }))).toContain("npm:pi-web-kit@0.5.0")
