@@ -1,0 +1,48 @@
+{
+  "id": "assignment-0mw7brmxj-obu8",
+  "intentId": "intent-0mw6muudj-zs85",
+  "intentRevision": 6,
+  "roleTask": "Reviewer.security",
+  "slug": "assess-the-pi-extension-entry-commit",
+  "objective": "Assess the Pi extension entry commit b7efd82 for security vulnerabilities: process execution, wrapper and shell invocation, config and state-file parsing, and context injection into the model.",
+  "state": "Running",
+  "scope": [
+    "The commit b7efd82 on release/0.3.0/feat/pi-extension (worktree /home/user/holyagent-0.3.0-ext, range 135c8c1..b7efd82) adds the Pi extension entry: a default-exported factory receiving ExtensionAPI, a --holyagent-role flag (root default, specialist, session; unknown fails closed), holyagent status on every session start reason and on session_compact plus reconcile after resume and compaction, delivered as a message via before_agent_start within the session-start budget, the Kimi root core span for session-role sessions, config loaded through the runtime loader via a config command in the shipped pi bundle, and a scripts/holyagent wrapper plus runtime bundle shipped in packages/integrations/pi/dist/scripts.",
+    "Diff without the two generated bundles: /home/user/holyagent-notes/pi-ext.diff. Design docs: docs/pi/extensions.md, docs/pi/orchestration.md, docs/pi/configuration.md. Repository rules: AGENTS.md and .claude/CLAUDE.md.",
+    "Writer notes to weigh: the bundler and the hasStateFolder check were duplicated from packages/integrations/claude/src/generate.ts and packages/runtime/src/cli/hook.ts because those files were outside the writer ownership; a config command lives in hooks/pi-entry.ts instead of the CLI; sessionContext always appends the Claude reminder so piContext swaps it; docs/pi/orchestration.md still says handlers call domain functions directly; each session start runs about five short processes.",
+    "Trace sources to sinks: the role flag value, the project working directory and git toplevel, .holyagent/config.json and state files, the status and reconcile output injected as a message, the scripts/holyagent wrapper and how pi.exec builds its arguments, and the empty-bunfig.toml config used to run the bundle."
+  ],
+  "constraints": [
+    "Read-only: no edits and no version-control writes; read the diff file and the worktree files.",
+    "Report in under 400 words; start each evidence line with the criterion text, a colon, then the support."
+  ],
+  "criteria": [
+    {
+      "text": "No command or argument injection through flag values, paths, config or state content",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The wrapper runs the shipped bundle without loading project-controlled Bun config, env files or preload scripts",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Injected context cannot exceed the budget or carry content beyond status, reconcile and the core span, and handler failures do not leak secrets",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "diff-file"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T04:21:13.303Z"
+  },
+  "createdAt": "2026-11-08T04:21:13.303Z"
+}
