@@ -1,0 +1,42 @@
+{
+  "id": "assignment-0mw7qwdzg-eig5",
+  "intentId": "intent-0mw6muvcv-5we5",
+  "intentRevision": 3,
+  "roleTask": "Explorer.map",
+  "slug": "find-which-requirements-of-the-intent",
+  "objective": "Find which requirements of the Intent 'Cover the Pi integration in CI and on Windows' are already met at the top of the 0.3.0 stack and what remains, so the remaining work can be planned as PRs.",
+  "state": "Running",
+  "scope": [
+    "The Intent's requirements, each judged: check-job generated-output freshness covers packages/integrations/pi; the windows job runs the Pi tests; extension and launcher code on Windows calls the bundled CLI through Bun on holyagent.js, not the POSIX sh wrapper; child launches and paths on native Windows, including Pi's powershell tool; a contract test of the Pi RPC or JSON events the integration consumes (agent_settled, tool events, extension_ui_request) against the pinned Pi version using recorded fixtures re-recorded when deps:update moves pi; the pi tests run inside the existing check and windows jobs.",
+    "Files to start from: .github/workflows/validation.yml, mise.toml, packages/integrations/pi/src and tests, packages/runtime/src/pi, scripts/workflows.test.ts, packages/runtime/src/config/pi-packages.json."
+  ],
+  "constraints": [
+    "Work read-only in the worktree /home/user/holyagent-0.3.0-prompts, which holds the top of the open 0.3.0 stack (branch release/0.3.0/feat/pi-review-prompts); read files there, not in /home/user/holyagent, whose checkout is an older detached head.",
+    "Judge each requirement against the code, tests, CI workflows and docs as they are, citing path:line; mark each Met, Partly met (say what is missing) or Not met.",
+    "Report in under 600 words; put any long listing in a file outside the repository under /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Each requirement is marked Met, Partly met or Not met with path:line support",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "For each requirement not fully met, the files a change would touch are named",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "requirement-status"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-08T11:24:49.228Z"
+  },
+  "createdAt": "2026-11-08T11:24:49.228Z"
+}
