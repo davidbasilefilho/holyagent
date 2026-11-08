@@ -91,10 +91,13 @@ const has = (capabilities: ReadonlyArray<Capability>, capability: Capability) =>
  * The Pi tool arguments of the root or of one specialist; the one place a role's tools are decided.
  * Every role runs `codemode` (mode `only`, from `pi.codemode.mode`, written by `toolSettings`) with
  * `PI_CODEMODE_MAX_WORKERS` from `pi.codemode.maxWorkers` in `env`. The root keeps the default
- * selection (`read` and `bash`, the extension tools of the enabled packages) and adds `+codemode`;
- * it writes no files, so `write` and `edit` are excluded. A specialist gets an allowlist: the read
- * tools, then what its route grants, then `codemode`, and `--exclude-tools` repeats as a floor the
- * write tools it must not have:
+ * selection (`read` and `bash`, the extension tools of the enabled packages, `todo`,
+ * `ask_user_question`, the process and subagent tools) and adds `+codemode`. It excludes `write`
+ * and `edit`, since it writes no files, and, while each is enabled, the computer-use tools and the
+ * web choice's tools: `+codemode` keeps every enabled extension's tools, but the root delegates
+ * research to the Librarian roles and visual inspection to the visual specialists, as the Claude
+ * root does. A specialist gets an allowlist: the read tools, then what its route grants, then
+ * `codemode`, and `--exclude-tools` repeats as a floor the write tools it must not have:
  *
  * - Write: `write`, `edit` and `bash`;
  * - Shell: `bash` (Worker.operations, Worker.validation, Reviewer.testing), and Reviewer.code, which
@@ -116,7 +119,15 @@ export const toolArgs = (
   const { features } = config.pi
   const noMcp = !features.mcp
   const { maxWorkers } = config.pi.codemode
-  if (key === "root") return build([CODEMODE_ENTRY], ["write", "edit"], noMcp, maxWorkers)
+  if (key === "root") {
+    const excluded = [
+      "write",
+      "edit",
+      ...(features.computerUse ? COMPUTER_USE_TOOLS : []),
+      ...webChoice(profile, features.web).tools,
+    ]
+    return build([CODEMODE_ENTRY], excluded, noMcp, maxWorkers)
+  }
   const { capabilities, roleTask } = routeFor(key)
   const tools = [
     ...READ_TOOLS,

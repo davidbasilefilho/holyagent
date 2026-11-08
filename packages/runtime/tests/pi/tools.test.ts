@@ -105,14 +105,39 @@ describe("toolArgs for the specialists", () => {
 })
 
 describe("toolArgs for the root", () => {
-  test("adds codemode to the default selection and takes write and edit away", () => {
+  test("adds codemode to the default selection and takes write, edit, computer use and web away", () => {
     expect(toolArgs(DEFAULT_CONFIG, "root")).toEqual({
       tools: ["+codemode"],
-      excludeTools: ["write", "edit"],
+      excludeTools: ["write", "edit", ...COMPUTER_USE_TOOLS, ...MOONSHOT],
       noMcp: false,
       env: { PI_CODEMODE_MAX_WORKERS: "4" },
-      argv: ["--tools", "+codemode", "--exclude-tools", "write,edit"],
+      argv: [
+        "--tools",
+        "+codemode",
+        "--exclude-tools",
+        "write,edit,computer_use_*,moonshot_search,moonshot_fetch",
+      ],
     })
+  })
+
+  test("excludes the computer-use tools only while pi.features.computerUse is on", () => {
+    const on = toolArgs(withFeatures({ computerUse: true, web: "off" }), "root")
+    const off = toolArgs(withFeatures({ computerUse: false, web: "off" }), "root")
+    expect(on.excludeTools).toEqual(["write", "edit", ...COMPUTER_USE_TOOLS])
+    expect(off.excludeTools).toEqual(["write", "edit"])
+  })
+
+  test("excludes the tools of the web choice: pi-web-kit, the provider's, or none", () => {
+    const exclusions = (web: Config["pi"]["features"]["web"], profile?: ProviderProfile) =>
+      toolArgs(withFeatures({ computerUse: false, web }), "root", profile).excludeTools
+    expect(exclusions("pi-web-kit")).toEqual(["write", "edit", ...WEB_KIT])
+    expect(exclusions("provider", PROVIDERS["kimi-coding-global"])).toEqual([
+      "write",
+      "edit",
+      ...MOONSHOT,
+    ])
+    expect(exclusions("provider", NO_WEB_PROVIDER)).toEqual(["write", "edit", ...WEB_KIT])
+    expect(exclusions("off")).toEqual(["write", "edit"])
   })
 
   test("the worker cap follows pi.codemode.maxWorkers for the root and every specialist", () => {
