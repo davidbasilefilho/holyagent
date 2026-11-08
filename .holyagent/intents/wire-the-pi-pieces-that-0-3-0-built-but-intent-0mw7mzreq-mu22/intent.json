@@ -1,0 +1,21 @@
+{
+  "id": "intent-0mw7mzreq-mu22",
+  "slug": "wire-the-pi-pieces-that-0-3-0-built-but",
+  "objective": "Wire the Pi pieces that 0.3.0 built but never connected, so plain pi starts a HolyAgent root with its instructions, tools, provider environment and readiness check, setup writes the Pi tool settings, and the Pi reviewers get their first-pass prompts.",
+  "requirements": [
+    "Maintainer, 2026-11-07: implement 0.3.0 now, every part except the dropped auto-mode gate; test with unit tests and recorded or synthesized fixtures only, no live Kimi runs and never run pi; merge each PR once it is reviewed and green.",
+    "Release model: work lands on release/0.3.0/integration as one release/0.3.0/<type>/<change> branch and one PR per change; mergeability first.",
+    "Done means mise run verify passes with the generated output in sync (mise run build) and CI green on every required check, including windows.",
+    "Found by trace 2026-11-08: the root on Pi gets no system prompt (extension.ts touches systemPrompt only for children), so the Kimi root instructions under instructions/kimi-k3.1/root never reach it; before_agent_start must set the root's system prompt from them, with ${HOLYAGENT_PI_ROOT} filled.",
+    "Found by trace: toolArgs(config, 'root').tools and excludeTools are never applied; the extension must apply them with pi.setActiveTools at session start.",
+    "Found by trace: providerEnv (KIMI_CODE_REGION) is never applied and providerReadiness / validateModelCatalog are never called; the extension must apply the provider environment and report a not-ready provider or missing model as a blocker notice at session start.",
+    "Found by trace: toolSettings (codemode mode, subagents.json, the Billion Context setting, Moonshot tools and computer-use settings) is never written; holyagent setup must write it into Pi's settings.",
+    "Found by trace: the Pi package ships no prompts/ folder although the Kimi Reviewer.code and Reviewer.security text expects the launcher to put a first-pass code-review or security-review prompt at the start of the task; ship those prompts and put them in the Pi reviewer task.",
+    "Decided (maintainer, T3 settings): a setting is written only where unset and different from the tool's own default, and a user's off wins for risky settings.",
+    "Default: three stacked PRs in order: extension wiring (system prompt, active tools, provider environment and readiness), then setup tool settings, then the reviewer first-pass prompts; each from the one before so their generated files do not conflict.",
+    "Default: docs nits left from PR 82 (docs/usage.md:45,156,160, docs/components.md:62, docs/pi/README.md rows 51, 60, 64, the duplicated -l hint in pi-check.ts) ride along in the PR whose change makes each row true."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-08T09:35:28.130Z"
+}
