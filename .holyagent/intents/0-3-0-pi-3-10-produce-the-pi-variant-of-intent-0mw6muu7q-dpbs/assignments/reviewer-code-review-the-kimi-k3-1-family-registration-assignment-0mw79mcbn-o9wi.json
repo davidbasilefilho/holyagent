@@ -1,0 +1,49 @@
+{
+  "id": "assignment-0mw79mcbn-o9wi",
+  "intentId": "intent-0mw6muu7q-dpbs",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-kimi-k3-1-family-registration",
+  "objective": "Review the kimi-k3.1 family registration commit 6e6aa68 and the head 6b0a934 of release/0.3.0/feat/kimi-instructions (worktree /home/user/holyagent-0.3.0-kimi; run commands there) for correctness and regressions.",
+  "state": "Running",
+  "scope": [
+    "Diff (without generated pi dist): /home/user/holyagent-notes/kimi-reg.diff. Writer report (claims only): .git/holyagent/reports/assignment-0mw79dq98-x2tx.md.",
+    "Check that the tests now run per family without weakening (instructions.test.ts describe.each, design-skills.test.ts per-family marker and materiality checks), the coverage map shape, the pi generator family switch, and that 6b0a934 (a -s ours merge of origin/release/0.3.0/integration, whose tree equals e6d8130) changes nothing against integration beyond this PR's paths."
+  ],
+  "constraints": [
+    "Read-only.",
+    "Report in under 350 words."
+  ],
+  "criteria": [
+    {
+      "text": "The registration and test changes are correct and no test is weakened",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The Claude output is unchanged and the pi output matches a fresh build",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "bunx --no-install mise run verify exits 0 on 6b0a934 and mise run build leaves the tree clean",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw79dq98-x2tx"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T03:21:07.044Z"
+  },
+  "createdAt": "2026-11-08T03:21:07.044Z"
+}
