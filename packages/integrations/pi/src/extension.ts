@@ -168,10 +168,11 @@ const present = (value: unknown): value is string =>
  * specialists by a string-literal `agentType`. Without an `agentType` the package starts its own
  * `general-purpose` agent with every tool, and settings cannot switch that off on this path, so the
  * script is read before it runs, with the runtime's check of the Claude `Workflow` tool (the script
- * must be plain, see `workflow-check.ts`). Only an inline `script` can be read here: a `scriptPath`
- * or a saved `name` is refused, since the file may change before the package reads it. A refusal
- * never asks for confirmation. Returns the `tool_call` result that blocks the call, or undefined to
- * let it run.
+ * must be plain, see `workflow-check.ts`) in its Pi mode, which parses the meta fragment and the
+ * program the package runs. Only an inline `script` can be read here: a `scriptPath` or a saved
+ * `name` is refused, since the file may change before the package reads it. A refusal never asks
+ * for confirmation. Returns the `tool_call` result that blocks the call, or undefined to let it
+ * run.
  */
 export const refuseNonSpecialistWorkflow = (event: {
   readonly toolName: string
@@ -194,7 +195,7 @@ export const refuseNonSpecialistWorkflow = (event: {
       ),
     )
   if (!present(script)) return Effect.succeed(refuse("No inline `script` given."))
-  return workflowRefusal(script, WORKFLOW_SPECIALISTS).pipe(
+  return workflowRefusal(script, WORKFLOW_SPECIALISTS, "pi").pipe(
     Effect.map((why) =>
       why === undefined ? undefined : refuse(`The workflow script is refused: it ${why}.`),
     ),

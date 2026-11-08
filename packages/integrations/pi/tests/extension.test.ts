@@ -1426,6 +1426,27 @@ describe("the SubagentWorkflow tool", () => {
     expect((await refusedWorkflow({ script: "agent(" }))?.block).toBe(true)
   })
 
+  // The package cuts the meta fragment from the source by pattern and evaluates it on the host
+  // thread, then compiles the script as a classic script: the gate vets exactly those.
+  test("the meta fragment the package would evaluate, and the program it would run, are vetted", async () => {
+    const payload = '{ description: this.constructor.constructor("return process")() }'
+    const body = "await agent('t', { agentType: 'explorer-map' })"
+    for (const script of [
+      `export const meta = /* ${payload} */ { name: "a", description: "d" }\n${body}`,
+      `export const meta = // ${payload}\n{ name: "a", description: "d" }\n${body}`,
+      `${META}let n = 0\nn <!--n; function workflow() { return 1 }\nawait workflow({ scriptPath: "x.js" })\n${body}`,
+    ]) {
+      const result = await refusedWorkflow({ script })
+      expect(result?.block).toBe(true)
+      expect(result?.reason).toContain("The workflow script is refused")
+    }
+  })
+
+  test("text with `<!--` or `-->` in a string is not refused", async () => {
+    const script = `${META}log(\`a --> b\`)\nawait agent('see <!-- and --> here', { agentType: 'explorer-map' })`
+    expect(await refusedWorkflow({ script })).toBeUndefined()
+  })
+
   test("a scriptPath, a saved name or no script is refused, as one cannot be vetted", async () => {
     for (const input of [
       { scriptPath: "w.js" },

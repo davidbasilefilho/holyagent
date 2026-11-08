@@ -17,19 +17,6 @@ import { ROUTES } from "../domain/route.ts"
 // (`[...a, ...a]`, `a.concat(a)`), an array is not given a length or a far index, and what loops,
 // data iteration and calls multiply stays under a total. Nothing here runs the script.
 
-/**
- * `<!--` and `-->` start a comment in a classic script, which is how the Pi runtime compiles the
- * script, and are operators in the module this check parses; any script that holds either is read
- * two ways, so it is refused.
- */
-const HTML_COMMENT = /<!--|-->/
-
-/**
- * The line the Pi runtime takes for `export const meta =` (its own pattern): it evaluates the
- * object after it before the script runs, so the check must have vetted that very export.
- */
-const META_DECLARATION = /(^|[\r\n])[ \t]*export[ \t\r\n]+const[ \t\r\n]+meta[ \t\r\n]*=/g
-
 /** A node of the syntax tree, read loosely: the walk checks every type before it reads a field. */
 interface JsNode {
   readonly type: string
@@ -823,21 +810,277 @@ const occurrencesIn = (
 }
 
 /**
+ * The deepest check of what `@tintinweb/pi-subagents` runs. The package does not parse a workflow
+ * script: it finds `export const meta =` by pattern and evaluates the fragment after it on the host
+ * thread (`workflow/meta.ts`), then compiles the script, `export` blanked, as a classic script
+ * inside an async arrow function in a worker (`workflow/worker-source.ts`). An approximation of
+ * either leaves a script that reads one way to the check and another way to the package, so the
+ * helpers below repeat the package's own steps and the check parses their results.
+ */
+
+/** `meta.ts:61`, the package's pattern for the meta line, made global here to count its matches. */
+const META_DECLARATION = /(^|[\r\n])[ \t]*export[ \t\r\n]+const[ \t\r\n]+meta[ \t\r\n]*=/g
+
+/**
+ * Port of `scanObjectLiteral` (`meta.ts:93-174`): the index just past the object literal that
+ * starts at `open`, or -1 when the braces never balance, and whether a `${` opened in a template.
+ * The package tracks strings, templates, comments and regexes, by the same rules, to keep braces
+ * inside them from moving the depth. Kept line for line so the two cut the same fragment.
+ */
+const scanObjectLiteral = (
+  source: string,
+  open: number,
+): { readonly end: number; readonly sawInterpolation: boolean } => {
+  let depth = 0
+  let i = open
+  let sawInterpolation = false
+  let mode: "code" | "line-comment" | "block-comment" | "single" | "double" | "template" | "regex" =
+    "code"
+  const templateStack: Array<number> = []
+
+  while (i < source.length) {
+    const c = source[i]
+    const next = source[i + 1]
+
+    if (mode === "line-comment") {
+      if (c === "\n") mode = "code"
+      i++
+      continue
+    }
+    if (mode === "block-comment") {
+      if (c === "*" && next === "/") {
+        mode = "code"
+        i += 2
+        continue
+      }
+      i++
+      continue
+    }
+    if (mode === "single" || mode === "double" || mode === "regex") {
+      if (c === "\\") {
+        i += 2
+        continue
+      }
+      if (mode === "single" && c === "'") mode = "code"
+      else if (mode === "double" && c === '"') mode = "code"
+      else if (mode === "regex" && c === "/") mode = "code"
+      else if (c === "\n" && mode !== "double") mode = "code"
+      i++
+      continue
+    }
+    if (mode === "template") {
+      if (c === "\\") {
+        i += 2
+        continue
+      }
+      if (c === "`") {
+        mode = "code"
+        i++
+        continue
+      }
+      if (c === "$" && next === "{") {
+        sawInterpolation = true
+        templateStack.push(depth)
+        depth++
+        mode = "code"
+        i += 2
+        continue
+      }
+      i++
+      continue
+    }
+
+    if (c === "/" && next === "/") {
+      mode = "line-comment"
+      i += 2
+      continue
+    }
+    if (c === "/" && next === "*") {
+      mode = "block-comment"
+      i += 2
+      continue
+    }
+    if (c === "'") {
+      mode = "single"
+      i++
+      continue
+    }
+    if (c === '"') {
+      mode = "double"
+      i++
+      continue
+    }
+    if (c === "`") {
+      mode = "template"
+      i++
+      continue
+    }
+    if (c === "/" && isRegexPosition(source, i)) {
+      mode = "regex"
+      i++
+      continue
+    }
+    if (c === "{") {
+      depth++
+      i++
+      continue
+    }
+    if (c === "}") {
+      depth--
+      i++
+      if (templateStack.length > 0 && depth === templateStack[templateStack.length - 1]) {
+        templateStack.pop()
+        mode = "template"
+        continue
+      }
+      if (depth === 0) return { end: i, sawInterpolation }
+      continue
+    }
+    i++
+  }
+  return { end: -1, sawInterpolation }
+}
+
+/** Port of `isRegexPosition` (`meta.ts:176-183`): whether the `/` at `i` opens a regex literal. */
+const isRegexPosition = (source: string, i: number): boolean => {
+  let j = i - 1
+  while (j >= 0 && /\s/.test(source[j] ?? "")) j--
+  if (j < 0) return true
+  return !/[\w$)\]]/.test(source[j] ?? "")
+}
+
+/**
+ * A literal and nothing else: strings, numbers, booleans, `null`, and arrays and objects of them,
+ * with plain keys. No identifier, call, `this`, template, spread, getter, method or computed key.
+ */
+const literalOnly = (node: JsNode | undefined, depth: number): boolean => {
+  if (node === undefined || depth > MAX_DEPTH) return false
+  if (node.type === "Literal") return !("regex" in node) && !("bigint" in node)
+  if (node.type === "ArrayExpression")
+    return nodesAt(node, "elements").every((item) => literalOnly(item, depth + 1))
+  if (node.type !== "ObjectExpression") return false
+  return nodesAt(node, "properties").every((property) => {
+    const key = nodeAt(property ?? { type: "" }, "key")
+    const name =
+      key?.type === "Literal" && typeof key["value"] === "string" ? key["value"] : nameOf(key)
+    return (
+      property?.type === "Property" &&
+      property["computed"] === false &&
+      property["kind"] === "init" &&
+      property["method"] !== true &&
+      name !== undefined &&
+      !DENIED_NAMES.has(name) &&
+      literalOnly(nodeAt(property, "value"), depth + 1)
+    )
+  })
+}
+
+/** The line the wrapper puts before the script, as `worker-source.ts:757` builds it. */
+const WRAPPER_OPEN = "(async () => {"
+
+/**
+ * What the worker's prelude adds before the script on one line (`worker-source.ts:55-72`, a `const
+ * Date = …;` statement): the parse of the script cannot tell its text from this stand-in.
+ */
+const WRAPPER_PRELUDE = "const Date = void 0;"
+
+/**
+ * The program the Pi package runs for `script`, as a tree for the check to walk, or the reason the
+ * package would run something the check cannot vet.
+ *
+ * First the meta fragment, computed as `extractMeta` does (`meta.ts:216-247`): the package takes
+ * the first match of the meta pattern, the first `{` after it and the brace-scanned fragment from
+ * there, and evaluates `(fragment)` on the host thread, where `this.constructor.constructor`
+ * reaches `process`. The fragment is accepted only as an object expression of literals that is the
+ * whole fragment, and a script with no match, or more than one, is refused. Then the body the
+ * worker compiles (`meta.ts:289-290`, `worker-source.ts:757`): the script with the first match's
+ * `export` blanked, wrapped as `(async () => {` prelude `\n` body `\n})()`, parsed as a classic
+ * script, so HTML-like comments and Annex B function hoisting read as they do at run time. The tree
+ * is returned as a program of the statements of the wrapper's body, after the prelude, and only
+ * when the wrapper stands as built (the body did not close it and open another).
+ */
+const workerProgram = (
+  script: string,
+): { readonly program: JsNode } | { readonly refusal: string } => {
+  const matches = [...script.matchAll(META_DECLARATION)]
+  const found = matches[0]
+  if (found === undefined)
+    return {
+      refusal: "has no line that reads as `export const meta =`, which the package requires",
+    }
+  if (matches.length > 1)
+    return { refusal: "has more than one line that reads as `export const meta =`" }
+
+  const open = script.indexOf("{", (found.index ?? 0) + found[0].length)
+  if (open === -1) return { refusal: "gives `export const meta` no object literal" }
+  const { end, sawInterpolation } = scanObjectLiteral(script, open)
+  if (end === -1) return { refusal: "has a `meta` object literal that is never closed" }
+  if (sawInterpolation) return { refusal: "uses template interpolation in `meta`" }
+  const fragment = script.slice(open, end)
+  const wrapped = parse(`(${fragment})`, { ecmaVersion: "latest", sourceType: "script" })
+  const statement = wrapped.body[0] as unknown as JsNode | undefined
+  const value = statement === undefined ? undefined : nodeAt(statement, "expression")
+  if (
+    wrapped.body.length !== 1 ||
+    statement?.type !== "ExpressionStatement" ||
+    value?.type !== "ObjectExpression" ||
+    startOf(value) !== 1 ||
+    endOf(value) !== fragment.length + 1 ||
+    !literalOnly(value, 1)
+  )
+    return { refusal: "has a `meta` that is not an object literal of plain literals" }
+
+  const exportAt = script.indexOf("export", found.index)
+  const body = `${script.slice(0, exportAt)}${" ".repeat(6)}${script.slice(exportAt + 6)}`
+  const prefix = `${WRAPPER_OPEN}${WRAPPER_PRELUDE}\n`
+  const source = `${prefix}${body}\n})()`
+  const program = parse(source, { ecmaVersion: "latest", sourceType: "script" })
+  const call = nodeAt(program.body[0] as unknown as JsNode, "expression")
+  const arrow = call === undefined ? undefined : nodeAt(call, "callee")
+  const block = arrow === undefined ? undefined : nodeAt(arrow, "body")
+  const statements = block === undefined ? [] : nodesAt(block, "body")
+  const prelude = statements[0]
+  if (
+    program.body.length !== 1 ||
+    call?.type !== "CallExpression" ||
+    nodesAt(call, "arguments").length !== 0 ||
+    arrow?.type !== "ArrowFunctionExpression" ||
+    arrow["async"] !== true ||
+    block?.type !== "BlockStatement" ||
+    endOf(block) !== source.length - 3 ||
+    prelude?.type !== "VariableDeclaration" ||
+    startOf(prelude) !== WRAPPER_OPEN.length ||
+    endOf(prelude) !== prefix.length - 1
+  )
+    return { refusal: "closes the wrapper the package puts around a script" }
+  return { program: { type: "Program", body: statements.slice(1) } }
+}
+
+/**
  * Why a script is not plain (the first reason found), or undefined when it is: the script parsed as
- * a module with top-level await, every node of a type in the closed set, every name resolved, every
+ * a module with top-level await (or, when `classic`, as the program the Pi package runs, see
+ * {@link workerProgram}), every node of a type in the closed set, every name resolved, every
  * `agent()` call vetted and at least one of them. A parse error or an overflow throws; the caller
  * turns that into a refusal.
  */
-const inspect = (script: string, specialists: ReadonlySet<string>): string | undefined => {
+const inspect = (
+  script: string,
+  specialists: ReadonlySet<string>,
+  classic: boolean,
+): string | undefined => {
   if (script.length > MAX_WORKFLOW_SCRIPT) return "the script is too large"
-  if (HTML_COMMENT.test(script))
-    return "contains `<!--` or `-->`, which only a classic script reads as a comment"
-  const program = parse(script, {
-    ecmaVersion: "latest",
-    sourceType: "module",
-    allowAwaitOutsideFunction: true,
-    allowReturnOutsideFunction: true,
-  }) as unknown as JsNode
+  const parsed = classic
+    ? workerProgram(script)
+    : {
+        program: parse(script, {
+          ecmaVersion: "latest",
+          sourceType: "module",
+          allowAwaitOutsideFunction: true,
+          allowReturnOutsideFunction: true,
+        }) as unknown as JsNode,
+      }
+  if ("refusal" in parsed) return parsed.refusal
+  const { program } = parsed
   let refusal: string | undefined
   const refuse = (why: string) => {
     refusal ??= why
@@ -1505,9 +1748,9 @@ const inspect = (script: string, specialists: ReadonlySet<string>): string | und
         return variableDeclaration(node, scope, depth)
       case "FunctionDeclaration": {
         // A classic script hoists a function declared in a block to the function around it, a
-        // module keeps it in the block; no name may mean two things, so only a function body
-        // (or the script) declares functions.
-        if (!scope.isFunction) refuse("declares a function inside a block")
+        // module keeps it in the block; under Pi no name may mean two things, so only a function
+        // body (or the script) declares functions.
+        if (classic && !scope.isFunction) refuse("declares a function inside a block")
         const name = nameOf(nodeAt(node, "id")) ?? ""
         declare(scope, name, "unsafe")
         scope.names.get(name)?.functions.add(node)
@@ -1631,29 +1874,6 @@ const inspect = (script: string, specialists: ReadonlySet<string>): string | und
       default:
         return refuse(`uses ${node.type}`)
     }
-  }
-
-  // `export const meta = { … }` of literals only, the one export a workflow script may make.
-  const literalOnly = (node: JsNode | undefined, depth: number): boolean => {
-    if (node === undefined || depth > MAX_DEPTH) return false
-    if (node.type === "Literal") return !("regex" in node) && !("bigint" in node)
-    if (node.type === "ArrayExpression")
-      return nodesAt(node, "elements").every((item) => literalOnly(item, depth + 1))
-    if (node.type !== "ObjectExpression") return false
-    return nodesAt(node, "properties").every((property) => {
-      const key = nodeAt(property ?? { type: "" }, "key")
-      const name =
-        key?.type === "Literal" && typeof key["value"] === "string" ? key["value"] : nameOf(key)
-      return (
-        property?.type === "Property" &&
-        property["computed"] === false &&
-        property["kind"] === "init" &&
-        property["method"] !== true &&
-        name !== undefined &&
-        !DENIED_NAMES.has(name) &&
-        literalOnly(nodeAt(property, "value"), depth + 1)
-      )
-    })
   }
 
   /**
@@ -2231,14 +2451,12 @@ const inspect = (script: string, specialists: ReadonlySet<string>): string | und
 
   const moduleScope: Scope = { parent: undefined, names: new Map(), isFunction: true }
   let exported = 0
-  const exportStarts: Array<unknown> = []
   for (const node of nodesAt(program, "body")) {
     if (node?.type !== "ExportNamedDeclaration") {
       statement(node, moduleScope, 1)
       continue
     }
     exported += 1
-    exportStarts.push(node["start"])
     const declaration = nodeAt(node, "declaration")
     const declarators = nodesAt(declaration ?? node, "declarations")
     const meta = declarators[0]
@@ -2254,14 +2472,6 @@ const inspect = (script: string, specialists: ReadonlySet<string>): string | und
       refuse("exports anything but `export const meta = { … }` of literals")
     moduleScope.names.set("meta", { ...newBinding(), unsafe: true })
   }
-  // The runtime reads `meta` from the first line that starts `export const meta =`, wherever it
-  // stands (a comment, a string), and evaluates it before the script runs. Only the checked
-  // export may be that line.
-  const claimed = [...script.matchAll(META_DECLARATION)].map((found) =>
-    script.indexOf("export", found.index),
-  )
-  if (claimed.length !== exportStarts.length || claimed.some((at, i) => at !== exportStarts[i]))
-    refuse("has a line that reads as `export const meta =` other than the one export")
 
   for (const reference of references) {
     const held = binding(reference.scope, reference.name)
@@ -2302,13 +2512,16 @@ const inspect = (script: string, specialists: ReadonlySet<string>): string | und
  * this plugin's specialists by a string-literal `agentType`. It never fails: whatever goes wrong
  * while reading the script (a syntax error, a tree too deep for the stack) is a refusal.
  * `specialists` is the set of `agentType` values that count as specialists: the Claude plugin's by
- * default, or the bare names the Pi package ships them under.
+ * default, or the bare names the Pi package ships them under. `host` "pi" checks the program
+ * `@tintinweb/pi-subagents` runs, meta fragment included (see {@link workerProgram}), where "claude"
+ * checks the script as a module.
  */
 export const workflowRefusal = (
   script: string,
   specialists: ReadonlySet<string> = CLAUDE_SPECIALISTS,
+  host: "claude" | "pi" = "claude",
 ): Effect.Effect<string | undefined> =>
   Effect.try({
-    try: () => inspect(script, specialists),
+    try: () => inspect(script, specialists, host === "pi"),
     catch: (cause) => `cannot read the script: ${String(cause)}`,
   }).pipe(Effect.catch((reason) => Effect.succeed<string | undefined>(reason)))

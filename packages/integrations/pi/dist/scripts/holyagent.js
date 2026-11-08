@@ -22184,7 +22184,7 @@ var init_acorn = __esm(() => {
   };
 });
 
-var HTML_COMMENT, META_DECLARATION, isNode = (value) => typeof value === "object" && value !== null && ("type" in value) && typeof value.type === "string", nodeAt = (node, field) => {
+var isNode = (value) => typeof value === "object" && value !== null && ("type" in value) && typeof value.type === "string", nodeAt = (node, field) => {
   const value = node[field];
   return isNode(value) ? value : undefined;
 }, nodesAt = (node, field) => {
@@ -22368,17 +22368,192 @@ var HTML_COMMENT, META_DECLARATION, isNode = (value) => typeof value === "object
     if (field !== skipped && typeof value === "object")
       occurrencesIn(value, scope, into, depth + 1);
   return into;
-}, inspect = (script, specialists) => {
+}, META_DECLARATION, scanObjectLiteral = (source, open) => {
+  let depth = 0;
+  let i = open;
+  let sawInterpolation = false;
+  let mode = "code";
+  const templateStack = [];
+  while (i < source.length) {
+    const c = source[i];
+    const next = source[i + 1];
+    if (mode === "line-comment") {
+      if (c === `
+`)
+        mode = "code";
+      i++;
+      continue;
+    }
+    if (mode === "block-comment") {
+      if (c === "*" && next === "/") {
+        mode = "code";
+        i += 2;
+        continue;
+      }
+      i++;
+      continue;
+    }
+    if (mode === "single" || mode === "double" || mode === "regex") {
+      if (c === "\\") {
+        i += 2;
+        continue;
+      }
+      if (mode === "single" && c === "'")
+        mode = "code";
+      else if (mode === "double" && c === '"')
+        mode = "code";
+      else if (mode === "regex" && c === "/")
+        mode = "code";
+      else if (c === `
+` && mode !== "double")
+        mode = "code";
+      i++;
+      continue;
+    }
+    if (mode === "template") {
+      if (c === "\\") {
+        i += 2;
+        continue;
+      }
+      if (c === "`") {
+        mode = "code";
+        i++;
+        continue;
+      }
+      if (c === "$" && next === "{") {
+        sawInterpolation = true;
+        templateStack.push(depth);
+        depth++;
+        mode = "code";
+        i += 2;
+        continue;
+      }
+      i++;
+      continue;
+    }
+    if (c === "/" && next === "/") {
+      mode = "line-comment";
+      i += 2;
+      continue;
+    }
+    if (c === "/" && next === "*") {
+      mode = "block-comment";
+      i += 2;
+      continue;
+    }
+    if (c === "'") {
+      mode = "single";
+      i++;
+      continue;
+    }
+    if (c === '"') {
+      mode = "double";
+      i++;
+      continue;
+    }
+    if (c === "`") {
+      mode = "template";
+      i++;
+      continue;
+    }
+    if (c === "/" && isRegexPosition(source, i)) {
+      mode = "regex";
+      i++;
+      continue;
+    }
+    if (c === "{") {
+      depth++;
+      i++;
+      continue;
+    }
+    if (c === "}") {
+      depth--;
+      i++;
+      if (templateStack.length > 0 && depth === templateStack[templateStack.length - 1]) {
+        templateStack.pop();
+        mode = "template";
+        continue;
+      }
+      if (depth === 0)
+        return { end: i, sawInterpolation };
+      continue;
+    }
+    i++;
+  }
+  return { end: -1, sawInterpolation };
+}, isRegexPosition = (source, i) => {
+  let j = i - 1;
+  while (j >= 0 && /\s/.test(source[j] ?? ""))
+    j--;
+  if (j < 0)
+    return true;
+  return !/[\w$)\]]/.test(source[j] ?? "");
+}, literalOnly = (node, depth) => {
+  if (node === undefined || depth > MAX_DEPTH)
+    return false;
+  if (node.type === "Literal")
+    return !("regex" in node) && !("bigint" in node);
+  if (node.type === "ArrayExpression")
+    return nodesAt(node, "elements").every((item) => literalOnly(item, depth + 1));
+  if (node.type !== "ObjectExpression")
+    return false;
+  return nodesAt(node, "properties").every((property) => {
+    const key = nodeAt(property ?? { type: "" }, "key");
+    const name = key?.type === "Literal" && typeof key["value"] === "string" ? key["value"] : nameOf(key);
+    return property?.type === "Property" && property["computed"] === false && property["kind"] === "init" && property["method"] !== true && name !== undefined && !DENIED_NAMES.has(name) && literalOnly(nodeAt(property, "value"), depth + 1);
+  });
+}, WRAPPER_OPEN = "(async () => {", WRAPPER_PRELUDE = "const Date = void 0;", workerProgram = (script) => {
+  const matches = [...script.matchAll(META_DECLARATION)];
+  const found = matches[0];
+  if (found === undefined)
+    return {
+      refusal: "has no line that reads as `export const meta =`, which the package requires"
+    };
+  if (matches.length > 1)
+    return { refusal: "has more than one line that reads as `export const meta =`" };
+  const open = script.indexOf("{", (found.index ?? 0) + found[0].length);
+  if (open === -1)
+    return { refusal: "gives `export const meta` no object literal" };
+  const { end, sawInterpolation } = scanObjectLiteral(script, open);
+  if (end === -1)
+    return { refusal: "has a `meta` object literal that is never closed" };
+  if (sawInterpolation)
+    return { refusal: "uses template interpolation in `meta`" };
+  const fragment = script.slice(open, end);
+  const wrapped = parse2(`(${fragment})`, { ecmaVersion: "latest", sourceType: "script" });
+  const statement = wrapped.body[0];
+  const value = statement === undefined ? undefined : nodeAt(statement, "expression");
+  if (wrapped.body.length !== 1 || statement?.type !== "ExpressionStatement" || value?.type !== "ObjectExpression" || startOf(value) !== 1 || endOf(value) !== fragment.length + 1 || !literalOnly(value, 1))
+    return { refusal: "has a `meta` that is not an object literal of plain literals" };
+  const exportAt = script.indexOf("export", found.index);
+  const body = `${script.slice(0, exportAt)}${" ".repeat(6)}${script.slice(exportAt + 6)}`;
+  const prefix = `${WRAPPER_OPEN}${WRAPPER_PRELUDE}
+`;
+  const source = `${prefix}${body}
+})()`;
+  const program = parse2(source, { ecmaVersion: "latest", sourceType: "script" });
+  const call = nodeAt(program.body[0], "expression");
+  const arrow = call === undefined ? undefined : nodeAt(call, "callee");
+  const block = arrow === undefined ? undefined : nodeAt(arrow, "body");
+  const statements = block === undefined ? [] : nodesAt(block, "body");
+  const prelude = statements[0];
+  if (program.body.length !== 1 || call?.type !== "CallExpression" || nodesAt(call, "arguments").length !== 0 || arrow?.type !== "ArrowFunctionExpression" || arrow["async"] !== true || block?.type !== "BlockStatement" || endOf(block) !== source.length - 3 || prelude?.type !== "VariableDeclaration" || startOf(prelude) !== WRAPPER_OPEN.length || endOf(prelude) !== prefix.length - 1)
+    return { refusal: "closes the wrapper the package puts around a script" };
+  return { program: { type: "Program", body: statements.slice(1) } };
+}, inspect = (script, specialists, classic) => {
   if (script.length > MAX_WORKFLOW_SCRIPT)
     return "the script is too large";
-  if (HTML_COMMENT.test(script))
-    return "contains `<!--` or `-->`, which only a classic script reads as a comment";
-  const program = parse2(script, {
-    ecmaVersion: "latest",
-    sourceType: "module",
-    allowAwaitOutsideFunction: true,
-    allowReturnOutsideFunction: true
-  });
+  const parsed = classic ? workerProgram(script) : {
+    program: parse2(script, {
+      ecmaVersion: "latest",
+      sourceType: "module",
+      allowAwaitOutsideFunction: true,
+      allowReturnOutsideFunction: true
+    })
+  };
+  if ("refusal" in parsed)
+    return parsed.refusal;
+  const { program } = parsed;
   let refusal;
   const refuse = (why) => {
     refusal ??= why;
@@ -22904,7 +23079,7 @@ var HTML_COMMENT, META_DECLARATION, isNode = (value) => typeof value === "object
       case "VariableDeclaration":
         return variableDeclaration(node, scope, depth);
       case "FunctionDeclaration": {
-        if (!scope.isFunction)
+        if (classic && !scope.isFunction)
           refuse("declares a function inside a block");
         const name = nameOf(nodeAt(node, "id")) ?? "";
         declare(scope, name, "unsafe");
@@ -23016,21 +23191,6 @@ var HTML_COMMENT, META_DECLARATION, isNode = (value) => typeof value === "object
         return refuse(`uses ${node.type}`);
     }
   }
-  const literalOnly = (node, depth) => {
-    if (node === undefined || depth > MAX_DEPTH)
-      return false;
-    if (node.type === "Literal")
-      return !("regex" in node) && !("bigint" in node);
-    if (node.type === "ArrayExpression")
-      return nodesAt(node, "elements").every((item) => literalOnly(item, depth + 1));
-    if (node.type !== "ObjectExpression")
-      return false;
-    return nodesAt(node, "properties").every((property) => {
-      const key = nodeAt(property ?? { type: "" }, "key");
-      const name = key?.type === "Literal" && typeof key["value"] === "string" ? key["value"] : nameOf(key);
-      return property?.type === "Property" && property["computed"] === false && property["kind"] === "init" && property["method"] !== true && name !== undefined && !DENIED_NAMES.has(name) && literalOnly(nodeAt(property, "value"), depth + 1);
-    });
-  };
   function analyse() {
     const keyOf = (name, scope) => binding(scope, name) ?? (name === "args" ? "args" : undefined);
     const dynamic = new Set;
@@ -23479,14 +23639,12 @@ var HTML_COMMENT, META_DECLARATION, isNode = (value) => typeof value === "object
   }
   const moduleScope = { parent: undefined, names: new Map, isFunction: true };
   let exported = 0;
-  const exportStarts = [];
   for (const node of nodesAt(program, "body")) {
     if (node?.type !== "ExportNamedDeclaration") {
       statement(node, moduleScope, 1);
       continue;
     }
     exported += 1;
-    exportStarts.push(node["start"]);
     const declaration = nodeAt(node, "declaration");
     const declarators = nodesAt(declaration ?? node, "declarations");
     const meta = declarators[0];
@@ -23494,9 +23652,6 @@ var HTML_COMMENT, META_DECLARATION, isNode = (value) => typeof value === "object
       refuse("exports anything but `export const meta = { \u2026 }` of literals");
     moduleScope.names.set("meta", { ...newBinding(), unsafe: true });
   }
-  const claimed = [...script.matchAll(META_DECLARATION)].map((found) => script.indexOf("export", found.index));
-  if (claimed.length !== exportStarts.length || claimed.some((at, i) => at !== exportStarts[i]))
-    refuse("has a line that reads as `export const meta =` other than the one export");
   for (const reference of references) {
     const held = binding(reference.scope, reference.name);
     const { name, use } = reference;
@@ -23534,16 +23689,14 @@ var HTML_COMMENT, META_DECLARATION, isNode = (value) => typeof value === "object
   if (refusal === undefined && agentCalls === 0)
     refuse("starts no agent");
   return refusal;
-}, workflowRefusal = (script, specialists = CLAUDE_SPECIALISTS) => try_2({
-  try: () => inspect(script, specialists),
+}, workflowRefusal = (script, specialists = CLAUDE_SPECIALISTS, host = "claude") => try_2({
+  try: () => inspect(script, specialists, host === "pi"),
   catch: (cause) => `cannot read the script: ${String(cause)}`
 }).pipe(catch_2((reason) => succeed6(reason)));
 var init_workflow_check = __esm(() => {
   init_acorn();
   init_dist();
   init_route();
-  HTML_COMMENT = /<!--|-->/;
-  META_DECLARATION = /(^|[\r\n])[ \t]*export[ \t\r\n]+const[ \t\r\n]+meta[ \t\r\n]*=/g;
   TEXT_COUNTS = new Set(["repeat", "padStart", "padEnd"]);
   GROWING_METHODS = new Set(["push", "unshift", "splice"]);
   CALLBACK_ARGUMENTS = new Map([
@@ -23793,6 +23946,7 @@ var init_workflow_check = __esm(() => {
   ]);
   CLAUDE_SPECIALISTS = new Set(ROUTES.map((route) => `${PLUGIN_NAMESPACE2}:${route.agent}`));
   UNARY = new Set(["!", "-", "+", "~", "typeof", "void"]);
+  META_DECLARATION = /(^|[\r\n])[ \t]*export[ \t\r\n]+const[ \t\r\n]+meta[ \t\r\n]*=/g;
 });
 
 var Payload, NOTHING, output = (hookSpecificOutput) => new Verbatim(`${JSON.stringify({ hookSpecificOutput })}
