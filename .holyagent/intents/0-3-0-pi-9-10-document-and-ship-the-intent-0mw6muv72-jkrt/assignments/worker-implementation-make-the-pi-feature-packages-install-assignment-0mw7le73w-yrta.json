@@ -1,0 +1,68 @@
+{
+  "id": "assignment-0mw7le73w-yrta",
+  "intentId": "intent-0mw6muv72-jkrt",
+  "intentRevision": 5,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-pi-feature-packages-install",
+  "objective": "Make the Pi feature packages install through holyagent setup per config, and keep holyagent doctor from failing users who do not use Pi, in /home/user/holyagent-0.3.0-install.",
+  "state": "Running",
+  "scope": [
+    "Work only in /home/user/holyagent-0.3.0-install (branch release/0.3.0/feat/pi-install). Its uncommitted tree holds the previous writers work: doctor Pi checks (packages/runtime/src/setup/pi-check.ts, doctor.ts, report.ts, tests/setup-pi.test.ts), a piDependencies list written into packages/integrations/pi/dist/package.json dependencies (generate.ts, config/packages.ts, pi.test.ts), the Windows installer at Node 22.19, and docs (docs/pi/installation.md, usage.md, requirements.md, components.md, development.md, pi/README.md, pi/configuration.md, README.md). Their reports: install-a.diff and install-b.diff in /home/user/holyagent-notes.",
+    "Research (Pi 1.5.0 package-manager.js, pi-manifest.js, docs/packages.md:102-143) found: Pi loads a dependency package only through explicit pi.* paths into node_modules and never adds packages to settings by itself; only pi install and pi remove write the settings packages list. So: (1) remove the dependencies list from the generated Pi manifest (piDependencies and its test), since it would install every feature package regardless of config and load none; (2) add a Pi step to holyagent setup (read packages/runtime/src/setup and packages/runtime/src/cli/setup.ts first): when Pi is in use, run `pi install npm:<pkg>@<pin>` for each source piPackages(config) returns that the Pi settings do not list at that pin, and `pi remove npm:<pkg>` for HolyAgent feature packages (the FEATURE_PACKAGES and pi-web-kit) listed in the settings that the config turns off; global by default, -l when setup runs at project scope if setup already has a scope notion (else global only, and say so); use the Bun Shell $, show what it runs, support the existing dry-run or check mode if setup has one; (3) doctor: report each enabled feature package missing from the settings with that pi install command as the fix, never installing; (4) doctor gating: run the Pi checks only when HOLYAGENT_HOST is pi or pi is on PATH, otherwise print one informational (not failing) line that Pi is not in use, and drop the test workaround that wrote pi.enable false; (5) update the doctor summary text in packages/runtime/src/cli/setup.ts that still lists only bun, ctx7 and settings; (6) update docs/pi/installation.md and docs/usage.md to the setup and doctor behavior (setup installs the enabled feature packages; a user who turns on pi-web-kit reruns setup), and note in docs/pi/installation.md that install/wsl-install.sh still accepts Node 22.13 while Pi needs 22.19.",
+    "Tests with a stubbed process runner and fixture settings for each case (install missing, skip present, remove disabled, gating on and off)."
+  ],
+  "constraints": [
+    "Edit only the ownership paths; no version-control writes and no edits under .git/ or .holyagent/.",
+    "Effect with tagged errors, Effect Schema with onExcessProperty error, JSDoc, Bun Shell per .claude/CLAUDE.md.",
+    "Never run pi, npm or any installer for real; tests stub the runner.",
+    "Run bunx --no-install mise run build, then bunx --no-install mise run verify; report each exit code (echo $?) and counts.",
+    "Write the full uncommitted source diff of the worktree (no dist bundles) to /home/user/holyagent-notes/install-c.diff and give it as diff-file evidence.",
+    "Start each evidence line with the criterion text, then a colon.",
+    "Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "The Pi manifest lists no feature package dependencies and holyagent setup installs and removes feature packages per config, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "holyagent doctor reports each missing enabled feature package and runs its Pi checks only when Pi is in use, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Docs match the setup and doctor behavior",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "mise run build exits 0 with dist in sync and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/setup",
+    "packages/runtime/src/cli/setup.ts",
+    "packages/runtime/src/config/packages.ts",
+    "packages/runtime/tests",
+    "packages/integrations/pi/src/generate.ts",
+    "packages/integrations/pi/tests",
+    "packages/integrations/pi/dist",
+    "packages/integrations/claude/dist",
+    "docs/pi/installation.md",
+    "docs/usage.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T08:50:42.428Z"
+  },
+  "createdAt": "2026-11-08T08:50:42.428Z"
+}
