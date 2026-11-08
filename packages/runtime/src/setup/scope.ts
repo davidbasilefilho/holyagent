@@ -5,6 +5,8 @@ import { Effect } from "effect"
 
 import { type Env, userFiles } from "./environment.ts"
 import { SetupFailure } from "./errors.ts"
+import { isJsonObject, readJsonObject } from "./json-file.ts"
+import { PLUGIN_ID } from "./settings.ts"
 import { Shell } from "./shell.ts"
 
 /**
@@ -126,3 +128,43 @@ export const projectSettingsFiles = Effect.fn("projectSettingsFiles")(function* 
     join(root, ".claude", "settings.local.json"),
   ])
 })
+
+/**
+ * The scope `setup` and `doctor` work on and why: `flag` when `--scope` named it, `inferred` when
+ * the HolyAgent plugin is enabled in `file`, `default` (`user`) when it is enabled nowhere.
+ */
+export type ResolvedScope =
+  | { readonly scope: Scope; readonly source: "flag" }
+  | { readonly scope: Scope; readonly source: "inferred"; readonly file: string }
+  | { readonly scope: "user"; readonly source: "default" }
+
+/**
+ * The scope the HolyAgent plugin is installed at, from where `enabledPlugins` has the plugin id set
+ * to `true`: Claude Code reads `local` over `project` over `user`, so the files are read in that
+ * order and the first that enables the plugin wins. The files are those of {@link settingsFile}, so
+ * a symlinked `project` or `local` target fails with SetupFailure as it does for a write, and a
+ * file read that is not a JSON object fails naming the file. The plugin enabled nowhere gives
+ * `user` as the `default`.
+ */
+export const installedScope = Effect.fn("installedScope")(function* (env: Env, cwd: string) {
+  for (const scope of ["local", "project", "user"] as const) {
+    const { file } = yield* settingsFile(env, scope, cwd)
+    const plugins = (yield* readJsonObject(file))["enabledPlugins"]
+    if (isJsonObject(plugins) && plugins[PLUGIN_ID] === true) {
+      return { scope, source: "inferred", file } satisfies ResolvedScope
+    }
+  }
+  return { scope: "user", source: "default" } satisfies ResolvedScope
+})
+
+/** The text that says which scope was used and where it came from, for a `scope:` report line. */
+export const describeScope = (resolved: ResolvedScope): string => {
+  switch (resolved.source) {
+    case "flag":
+      return `${resolved.scope} (from --scope)`
+    case "inferred":
+      return `${resolved.scope} (inferred: ${PLUGIN_ID} is enabled in ${resolved.file})`
+    case "default":
+      return `user (default: ${PLUGIN_ID} is not enabled in any settings file)`
+  }
+}

@@ -128,15 +128,15 @@ Claude Code installs a plugin at one of three scopes, and each records `enabledP
 
 **Sharing a project-scope install with a team.** A committed project entry enables the plugin but does not download it. One person installs at project scope and runs `holyagent setup --scope project`, which writes `extraKnownMarketplaces`, `enabledPlugins` and the other recommended keys of [User settings](#user-settings) into `.claude/settings.json`; commit that file only when the team wants those keys. Each collaborator then runs `claude plugin install holyagent@holyagent --scope project` once ([plugin discovery docs](https://code.claude.com/docs/en/discover-plugins)).
 
-**Setup and doctor follow the scope.** Planned for 0.3.0 and not shipped: install, `holyagent setup`, `holyagent doctor` and the session-start setup check work the same at user, project and local scope, and setup and doctor default to the scope the plugin is installed at. Shipped today: the default is `user`, `--scope` picks another, and the session-start hint already checks the user, project and local settings ([First launch](#install)). For a project-scope install:
+**Setup and doctor follow the scope.** Install, `holyagent setup`, `holyagent doctor` and the session-start setup check work the same at user, project and local scope. Without `--scope`, setup and doctor use the scope the plugin is installed at: they read `enabledPlugins` of `.claude/settings.local.json`, then `.claude/settings.json`, then the user `settings.json` (the files of [User settings](#user-settings) and the table above), and take the first that sets `holyagent@holyagent` to `true`, which is Claude Code's own precedence. When none does, the default is `user`. An explicit `--scope` always wins. The first line of the output names the scope used and where it came from, for example `~ scope: project (inferred: holyagent@holyagent is enabled in /repo/.claude/settings.json)` for setup and `ok   scope: project (from --scope)` for doctor. A settings file read for the search that is not a JSON object, or a symlinked project or local file, is an error naming the file, and nothing else runs; `--scope` skips the search. For a project-scope install:
 
 ```sh
 claude plugin install holyagent@holyagent --scope project
-holyagent setup --scope project     # planned to be the default when the plugin is installed at project scope
-holyagent doctor --scope project
+holyagent setup                     # writes .claude/settings.json: the plugin is enabled there
+holyagent doctor                    # checks the same file
 ```
 
-Which scope setup and doctor choose when the plugin is installed at more than one is not decided and is to be settled when the default is built. Tests will cover the scope resolution for setup and doctor inside the existing CI jobs. The Pi integration has its own two scopes, global and project-local ([Pi](#pi)), and claude.ai chat and Cowork install per account ([claude.ai](#claudeai)).
+The session-start hint already checks the user, project and local settings ([First launch](#install)). The Pi integration has its own two scopes, global and project-local ([Pi](#pi)), and claude.ai chat and Cowork install per account ([claude.ai](#claudeai)).
 
 **A user-level HolyAgent config.** A `~/.holyagent/config.json` with the same schema as the project's `.holyagent/config.json` holds your per-user defaults, and the project file overrides it key by key. Both files are decoded with `onExcessProperty: "error"` before they are merged. The schema, with its common settings and its `pi` and `claude` sections, is described in [pi/configuration.md](pi/configuration.md#holyagent-configjson).
 

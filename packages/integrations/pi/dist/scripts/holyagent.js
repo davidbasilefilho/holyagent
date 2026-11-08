@@ -15593,105 +15593,8 @@ var init_errors6 = __esm(() => {
   };
 });
 
-import { delimiter, join as join9 } from "path";
-var {$: $3 } = globalThis.Bun;
-var pathKey = (env, insensitive = process.platform === "win32") => {
-  if (!insensitive || env.PATH !== undefined)
-    return "PATH";
-  return Object.keys(env).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
-}, pathWithBunBin = (env, options) => {
-  const key = pathKey(env, options.insensitive);
-  const root = options.bunInstall ? options.bunInstall : join9(options.home, ".bun");
-  const bunBin = join9(root, "bin");
-  return { key, value: `${env[key] ?? ""}${options.delimiter ?? delimiter}${bunBin}`, bunBin };
-}, findCommand = (env, command, options) => {
-  const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory(env), bunInstall: env.BUN_INSTALL });
-  return fromNullishOr(Bun.which(command, {
-    PATH: options?.includeBunBin ? bunBin.value : env[bunBin.key] ?? ""
-  }));
-}, EMPTY_BUNFIG, Shell;
-var init_shell = __esm(() => {
-  init_dist();
-  init_environment();
-  EMPTY_BUNFIG = join9(import.meta.dir, "empty-bunfig.toml");
-  Shell = class Shell extends Service()("holyagent/Shell") {
-    static live = (env) => {
-      const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory(env), bunInstall: env.BUN_INSTALL });
-      return succeed5(Shell, Shell.of({
-        which: (command, options) => sync2(() => findCommand(env, command, options)),
-        run: (command, args, options) => tryPromise2({
-          try: () => $3`${command} ${args}`.cwd(options.cwd).env(definedEnv({ ...env, [bunBin.key]: bunBin.value })).quiet().nothrow().then((result) => ({
-            exitCode: result.exitCode,
-            stdout: result.stdout.toString(),
-            stderr: result.stderr.toString()
-          })),
-          catch: (error) => String(error)
-        }).pipe(catch_2((message) => succeed6({ exitCode: 127, stdout: "", stderr: message })))
-      }));
-    };
-  };
-});
-
-import { lstat as lstat3, realpath as realpath3 } from "fs/promises";
-import { dirname as dirname3, isAbsolute as isAbsolute2, join as join10, relative as relative4, resolve as resolve5, sep as sep6 } from "path";
-var SCOPES, within = (parent, child) => {
-  const path = relative4(parent, child);
-  return path === "" || path !== ".." && !path.startsWith(`..${sep6}`) && !isAbsolute2(path);
-}, real = (path) => tryPromise2(() => realpath3(path)).pipe(orElseSucceed2(() => {
-  return;
-})), present2 = (path) => tryPromise2(() => lstat3(path)).pipe(as2(true), orElseSucceed2(() => false)), isSymlink = (path) => tryPromise2({
-  try: () => lstat3(path),
-  catch: (cause) => cause
-}).pipe(map5((stats) => stats.isSymbolicLink()), catch_2((error) => error.code === "ENOENT" || error.code === "ENOTDIR" ? succeed6(false) : fail5(new SetupFailure({ message: `cannot inspect ${path}: ${error.message}` })))), settingsFile, projectSettingsFiles;
-var init_scope = __esm(() => {
-  init_dist();
-  init_environment();
-  init_errors6();
-  init_shell();
-  SCOPES = ["user", "project", "local"];
-  settingsFile = fn2("settingsFile")(function* (env, scope, cwd) {
-    if (scope === "user")
-      return { file: userFiles(env).settings };
-    const shell = yield* Shell;
-    const top = yield* shell.run("git", ["rev-parse", "--show-toplevel"], { cwd });
-    const line = top.stdout.trim();
-    const named = top.exitCode === 0 && line !== "" ? resolve5(line) : undefined;
-    const realTop = named === undefined ? undefined : yield* real(named);
-    const realCwd = yield* real(cwd);
-    const trusted = named !== undefined && realTop !== undefined && realCwd !== undefined && within(realTop, realCwd) && (yield* present2(join10(named, ".git")));
-    const root = trusted ? named : cwd;
-    const notice = trusted ? undefined : named === undefined ? `not inside a git repository; using ${cwd}` : `git names ${named} as the top-level, which is not the current directory or an ancestor holding a .git entry; using ${cwd}`;
-    const folder = join10(root, ".claude");
-    const file = join10(folder, scope === "project" ? "settings.json" : "settings.local.json");
-    for (const path of [folder, file]) {
-      if (yield* isSymlink(path)) {
-        return yield* new SetupFailure({
-          message: `${path} is a symlink; refusing to write through it in the ${scope} scope. Replace it with a real ${path === folder ? "folder" : "file"} and run again`
-        });
-      }
-    }
-    return { file, ...notice === undefined ? {} : { notice } };
-  });
-  projectSettingsFiles = fn2("projectSettingsFiles")(function* (cwd) {
-    const roots = [resolve5(cwd)];
-    for (let folder = resolve5(cwd);; folder = dirname3(folder)) {
-      if (yield* present2(join10(folder, ".git"))) {
-        if (folder !== roots[0])
-          roots.push(folder);
-        break;
-      }
-      if (dirname3(folder) === folder)
-        break;
-    }
-    return roots.flatMap((root) => [
-      join10(root, ".claude", "settings.json"),
-      join10(root, ".claude", "settings.local.json")
-    ]);
-  });
-});
-
-import { chmod, mkdir as mkdir3, realpath as realpath4, rename as rename4, rm as rm5, writeFile } from "fs/promises";
-import { basename as basename4, dirname as dirname4, join as join11 } from "path";
+import { chmod, mkdir as mkdir3, realpath as realpath3, rename as rename4, rm as rm5, writeFile } from "fs/promises";
+import { basename as basename4, dirname as dirname3, join as join9 } from "path";
 var JsonObjectText, strict2, empty4, fileOperation = (path, what, run) => tryPromise2({
   try: run,
   catch: (cause) => new SetupFailure({
@@ -15708,12 +15611,12 @@ var JsonObjectText, strict2, empty4, fileOperation = (path, what, run) => tryPro
   return { value, text };
 }), writeJsonObject = (path, value, options) => replaceJsonObject(path, value, options).pipe(asVoid2), replaceJsonObject = (path, value, options, unchangedSince) => gen2(function* () {
   const exists = yield* fileOperation(path, "write", () => Bun.file(path).exists());
-  const target = exists ? yield* fileOperation(path, "write", () => realpath4(path)) : path;
+  const target = exists ? yield* fileOperation(path, "write", () => realpath3(path)) : path;
   const mode = options?.mode ?? (exists ? (yield* fileOperation(target, "write", () => Bun.file(target).stat())).mode & 511 : undefined);
   const text = (yield* encodeEffect(JsonObjectText)(value, strict2).pipe(mapError2((error) => new SetupFailure({ message: `cannot encode ${path}: ${error.message}` })))) + `
 `;
-  const temporary = join11(dirname4(target), `.${basename4(target)}.${process.pid}.tmp`);
-  yield* fileOperation(dirname4(target), "write", () => mkdir3(dirname4(target), { recursive: true }));
+  const temporary = join9(dirname3(target), `.${basename4(target)}.${process.pid}.tmp`);
+  yield* fileOperation(dirname3(target), "write", () => mkdir3(dirname3(target), { recursive: true }));
   yield* tryPromise2({
     try: () => writeFile(temporary, text, { flag: "wx", ...mode === undefined ? {} : { mode } }),
     catch: (cause) => cause
@@ -15770,8 +15673,8 @@ var init_json_file = __esm(() => {
   empty4 = {};
 });
 
-import { join as join12, resolve as resolve6 } from "path";
-var RecordedKey, RecordFile, recordPath = (env) => join12(userFiles(env).claudeDir, "holyagent", "setup-records.json"), keyOf = (file) => resolve6(file), load = (env) => gen2(function* () {
+import { join as join10, resolve as resolve5 } from "path";
+var RecordedKey, RecordFile, recordPath = (env) => join10(userFiles(env).claudeDir, "holyagent", "setup-records.json"), keyOf = (file) => resolve5(file), load = (env) => gen2(function* () {
   const path = recordPath(env);
   const raw = yield* readJsonObject(path);
   if (Object.keys(raw).length === 0)
@@ -15824,7 +15727,7 @@ var init_record2 = __esm(() => {
   });
 });
 
-var added = (text) => `+ ${text}`, present3 = (text) => `= ${text}`, skipped = (text) => `- ${text}`, hint = (text) => `~ ${text}`, failed2 = (what, result) => {
+var added = (text) => `+ ${text}`, present2 = (text) => `= ${text}`, skipped = (text) => `- ${text}`, hint = (text) => `~ ${text}`, failed2 = (what, result) => {
   const detail = (result.stderr || result.stdout).trim().split(`
 `)[0] ?? "";
   return `! ${what}: failed (exit ${result.exitCode})${detail === "" ? "" : `: ${detail}`}`;
@@ -15965,6 +15868,124 @@ var init_settings2 = __esm(() => {
   missingSettingKeys = fn2("missingSettingKeys")(function* (file) {
     const existing = yield* readJsonObject(file);
     return applyDefaults(existing, defaultsFor(existing, "1h")).entries.filter((entry) => entry.status === "added").map((entry) => entry.path);
+  });
+});
+
+import { delimiter, join as join11 } from "path";
+var {$: $3 } = globalThis.Bun;
+var pathKey = (env, insensitive = process.platform === "win32") => {
+  if (!insensitive || env.PATH !== undefined)
+    return "PATH";
+  return Object.keys(env).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
+}, pathWithBunBin = (env, options) => {
+  const key = pathKey(env, options.insensitive);
+  const root = options.bunInstall ? options.bunInstall : join11(options.home, ".bun");
+  const bunBin = join11(root, "bin");
+  return { key, value: `${env[key] ?? ""}${options.delimiter ?? delimiter}${bunBin}`, bunBin };
+}, findCommand = (env, command, options) => {
+  const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory(env), bunInstall: env.BUN_INSTALL });
+  return fromNullishOr(Bun.which(command, {
+    PATH: options?.includeBunBin ? bunBin.value : env[bunBin.key] ?? ""
+  }));
+}, EMPTY_BUNFIG, Shell;
+var init_shell = __esm(() => {
+  init_dist();
+  init_environment();
+  EMPTY_BUNFIG = join11(import.meta.dir, "empty-bunfig.toml");
+  Shell = class Shell extends Service()("holyagent/Shell") {
+    static live = (env) => {
+      const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory(env), bunInstall: env.BUN_INSTALL });
+      return succeed5(Shell, Shell.of({
+        which: (command, options) => sync2(() => findCommand(env, command, options)),
+        run: (command, args, options) => tryPromise2({
+          try: () => $3`${command} ${args}`.cwd(options.cwd).env(definedEnv({ ...env, [bunBin.key]: bunBin.value })).quiet().nothrow().then((result) => ({
+            exitCode: result.exitCode,
+            stdout: result.stdout.toString(),
+            stderr: result.stderr.toString()
+          })),
+          catch: (error) => String(error)
+        }).pipe(catch_2((message) => succeed6({ exitCode: 127, stdout: "", stderr: message })))
+      }));
+    };
+  };
+});
+
+import { lstat as lstat3, realpath as realpath4 } from "fs/promises";
+import { dirname as dirname4, isAbsolute as isAbsolute2, join as join12, relative as relative4, resolve as resolve6, sep as sep6 } from "path";
+var SCOPES, within = (parent, child) => {
+  const path = relative4(parent, child);
+  return path === "" || path !== ".." && !path.startsWith(`..${sep6}`) && !isAbsolute2(path);
+}, real = (path) => tryPromise2(() => realpath4(path)).pipe(orElseSucceed2(() => {
+  return;
+})), present3 = (path) => tryPromise2(() => lstat3(path)).pipe(as2(true), orElseSucceed2(() => false)), isSymlink = (path) => tryPromise2({
+  try: () => lstat3(path),
+  catch: (cause) => cause
+}).pipe(map5((stats) => stats.isSymbolicLink()), catch_2((error) => error.code === "ENOENT" || error.code === "ENOTDIR" ? succeed6(false) : fail5(new SetupFailure({ message: `cannot inspect ${path}: ${error.message}` })))), settingsFile, projectSettingsFiles, installedScope, describeScope = (resolved) => {
+  switch (resolved.source) {
+    case "flag":
+      return `${resolved.scope} (from --scope)`;
+    case "inferred":
+      return `${resolved.scope} (inferred: ${PLUGIN_ID} is enabled in ${resolved.file})`;
+    case "default":
+      return `user (default: ${PLUGIN_ID} is not enabled in any settings file)`;
+  }
+};
+var init_scope = __esm(() => {
+  init_dist();
+  init_environment();
+  init_errors6();
+  init_json_file();
+  init_settings2();
+  init_shell();
+  SCOPES = ["user", "project", "local"];
+  settingsFile = fn2("settingsFile")(function* (env, scope, cwd) {
+    if (scope === "user")
+      return { file: userFiles(env).settings };
+    const shell = yield* Shell;
+    const top = yield* shell.run("git", ["rev-parse", "--show-toplevel"], { cwd });
+    const line = top.stdout.trim();
+    const named = top.exitCode === 0 && line !== "" ? resolve6(line) : undefined;
+    const realTop = named === undefined ? undefined : yield* real(named);
+    const realCwd = yield* real(cwd);
+    const trusted = named !== undefined && realTop !== undefined && realCwd !== undefined && within(realTop, realCwd) && (yield* present3(join12(named, ".git")));
+    const root = trusted ? named : cwd;
+    const notice = trusted ? undefined : named === undefined ? `not inside a git repository; using ${cwd}` : `git names ${named} as the top-level, which is not the current directory or an ancestor holding a .git entry; using ${cwd}`;
+    const folder = join12(root, ".claude");
+    const file = join12(folder, scope === "project" ? "settings.json" : "settings.local.json");
+    for (const path of [folder, file]) {
+      if (yield* isSymlink(path)) {
+        return yield* new SetupFailure({
+          message: `${path} is a symlink; refusing to write through it in the ${scope} scope. Replace it with a real ${path === folder ? "folder" : "file"} and run again`
+        });
+      }
+    }
+    return { file, ...notice === undefined ? {} : { notice } };
+  });
+  projectSettingsFiles = fn2("projectSettingsFiles")(function* (cwd) {
+    const roots = [resolve6(cwd)];
+    for (let folder = resolve6(cwd);; folder = dirname4(folder)) {
+      if (yield* present3(join12(folder, ".git"))) {
+        if (folder !== roots[0])
+          roots.push(folder);
+        break;
+      }
+      if (dirname4(folder) === folder)
+        break;
+    }
+    return roots.flatMap((root) => [
+      join12(root, ".claude", "settings.json"),
+      join12(root, ".claude", "settings.local.json")
+    ]);
+  });
+  installedScope = fn2("installedScope")(function* (env, cwd) {
+    for (const scope of ["local", "project", "user"]) {
+      const { file } = yield* settingsFile(env, scope, cwd);
+      const plugins = (yield* readJsonObject(file))["enabledPlugins"];
+      if (isJsonObject2(plugins) && plugins[PLUGIN_ID] === true) {
+        return { scope, source: "inferred", file };
+      }
+    }
+    return { scope: "user", source: "default" };
   });
 });
 
@@ -24909,7 +24930,7 @@ var init_pi_install = __esm(() => {
     const removals = staleManagedNames(listed, wanted);
     const lines = wanted.flatMap((source) => {
       const where = listedIn(source);
-      return where === undefined ? [] : [present3(`pi ${source}: already listed in ${where}`)];
+      return where === undefined ? [] : [present2(`pi ${source}: already listed in ${where}`)];
     });
     if (installs.length === 0 && removals.length === 0)
       return lines;
@@ -24961,7 +24982,7 @@ var init_steps = __esm(() => {
   ensureGlobal = fn2("ensureGlobal")(function* (env, command, packageName, dryRun) {
     const shell = yield* Shell;
     if (isSome2(yield* shell.which(command, { includeBunBin: true }))) {
-      return { usable: true, lines: [present3(`${command}: already installed`)] };
+      return { usable: true, lines: [present2(`${command}: already installed`)] };
     }
     if (dryRun) {
       return {
@@ -24988,7 +25009,7 @@ var init_steps = __esm(() => {
       return global.lines;
     const skillReady = (yield* fileExists2(join18(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join18(files.claudeDir, "rules", "context7.md")));
     if (skillReady)
-      return [...global.lines, present3("ctx7 skill: already installed")];
+      return [...global.lines, present2("ctx7 skill: already installed")];
     const apiKey = env.CONTEXT7_API_KEY === "" ? undefined : env.CONTEXT7_API_KEY;
     const setupArgs = ["setup", "--cli", "--claude", "--yes"];
     const args = apiKey !== undefined ? [...setupArgs, "--api-key", apiKey] : (yield* fileExists2(files.ctx7Credentials)) ? setupArgs : undefined;
@@ -25096,10 +25117,11 @@ var init_doctor = __esm(() => {
 
 var CacheTtlFlag, ScopeFlag, printed = (report) => new Verbatim(`${report.lines.join(`
 `)}
-`, "", report.ok ? 0 : 1), SETUP_USAGE = "setup [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7]", DOCTOR_USAGE = "doctor [--scope user|project|local] [--fix]", SETUP_COMMANDS;
+`, "", report.ok ? 0 : 1), resolveScope, SETUP_USAGE = "setup [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7]", DOCTOR_USAGE = "doctor [--scope user|project|local] [--fix]", SETUP_COMMANDS;
 var init_setup = __esm(() => {
   init_dist();
   init_doctor();
+  init_errors6();
   init_scope();
   init_settings2();
   init_shell();
@@ -25107,6 +25129,12 @@ var init_setup = __esm(() => {
   init_args();
   CacheTtlFlag = Literals(CACHE_TTLS);
   ScopeFlag = Literals(SCOPES);
+  resolveScope = fn2("resolveScope")(function* (flag, usage, env, cwd) {
+    if (flag === undefined)
+      return yield* installedScope(env, cwd);
+    const scope = yield* choiceFlag(ScopeFlag, "scope", flag, usage);
+    return { scope, source: "flag" };
+  });
   SETUP_COMMANDS = [
     {
       path: ["setup"],
@@ -25117,7 +25145,8 @@ var init_setup = __esm(() => {
         "installs ctx7 with the Context7 skill (needs CONTEXT7_API_KEY or a saved login)",
         "when Pi is in use (HOLYAGENT_HOST=pi, or pi on PATH; not in a cloud session), makes Pi's packages match the HolyAgent config: `pi install npm:<name>@<pin>` for each package the config enables that Pi's settings do not list at that pin, and `pi remove npm:<name>` for each feature package the settings list but the config turns off; scope user works on Pi's global settings, project and local on the project's .pi/settings.json with -l; nothing runs while pi.enable is off; re-run setup after changing pi.features or pi.web in the config",
         "merges these keys into the settings file of --scope without changing any value already set: attribution, includeGitInstructions, subagentPromptCacheTtl, modelSettings.claude-opus-5-5 (effortLevel high and autoCompactWindow 450000 for the root), extraKnownMarketplaces, enabledPlugins and permissions.deny for WebSearch and WebFetch",
-        "--scope picks the file like Claude Code's scopes: user (default) is CLAUDE_CONFIG_DIR/settings.json, else ~/.claude/settings.json; project is .claude/settings.json and local is .claude/settings.local.json, both in the git top-level of the current directory when that is the current directory or above it and holds a .git entry, else in the current directory (a `~` line says so, outside a repository too); project and local refuse a symlinked settings file or .claude folder with a `!` line; ctx7 is installed for the user whatever the scope",
+        "--scope picks the file like Claude Code's scopes: user is CLAUDE_CONFIG_DIR/settings.json, else ~/.claude/settings.json; project is .claude/settings.json and local is .claude/settings.local.json, both in the git top-level of the current directory when that is the current directory or above it and holds a .git entry, else in the current directory (a `~` line says so, outside a repository too); project and local refuse a symlinked settings file or .claude folder with a `!` line; ctx7 is installed for the user whatever the scope",
+        "without --scope the scope is where the plugin is enabled: the first of local, project and user whose enabledPlugins sets holyagent@holyagent to true (as Claude Code's precedence), user when none does; the output starts with a `~ scope:` line naming the scope and, when inferred, the file; a settings file in that search that is not a JSON object, or a symlinked project or local file, fails with a `!` line naming it and nothing runs",
         "setup records the keys it adds, per settings file, in holyagent/setup-records.json under CLAUDE_CONFIG_DIR (else ~/.claude), outside the project",
         "--undo removes from the --scope file only what that record says setup added, and only while the value still equals what setup wrote: a changed value, and a key with no record (set before setup or by an earlier version), is kept and reported with `~`, so remove it by hand; permissions.deny loses only the entries setup added, and parent objects left empty are dropped; removed keys print `-` lines (`= nothing to remove` when absent); the file's record is cleared; ctx7 and the Pi packages stay installed; honors --dry-run",
         "a failed step is reported and the rest still run; in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) ctx7 is skipped and the settings are still merged"
@@ -25132,17 +25161,23 @@ var init_setup = __esm(() => {
       stateless: true,
       positionals: 0,
       run: ({ args, env, cwd }) => gen2(function* () {
-        const scope = yield* choiceFlag(ScopeFlag, "scope", stringFlag(args, "scope") ?? "user", SETUP_USAGE);
+        const resolved = yield* resolveScope(stringFlag(args, "scope"), SETUP_USAGE, env, cwd).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
+        if (resolved instanceof SetupFailure) {
+          return printed({ lines: [`! scope: ${resolved.message}`], ok: false });
+        }
         const subagentCacheTtl = yield* choiceFlag(CacheTtlFlag, "subagent-cache-ttl", stringFlag(args, "subagent-cache-ttl") ?? "1h", SETUP_USAGE);
         const report = yield* setup(env, {
-          scope,
+          scope: resolved.scope,
           undo: booleanFlag(args, "undo"),
           cwd,
           subagentCacheTtl,
           dryRun: booleanFlag(args, "dry-run"),
           skipCtx7: booleanFlag(args, "skip-ctx7")
         });
-        return printed(report);
+        return printed({
+          ...report,
+          lines: [hint(`scope: ${describeScope(resolved)}`), ...report.lines]
+        });
       }).pipe(provide4(Shell.live(env)))
     },
     {
@@ -25151,7 +25186,7 @@ var init_setup = __esm(() => {
       summary: "Check bun, ctx7 and the settings of a scope, and, when Pi is in use, pi, node and the Pi packages the config enables; exit 1 when a check fails",
       output: "one line per check, `ok   <name>: \u2026` or `FAIL <name>: \u2026`; exit 1 when any check failed",
       notes: [
-        "--scope picks the settings file to check, as for setup (user by default); --fix then merges into that file",
+        "--scope picks the settings file to check, as for setup; without it the scope is where the plugin is enabled, user when nowhere, and the output starts with an `ok   scope:` line naming the scope and, when inferred, the file; --fix then merges into that file",
         "the Pi checks run when HOLYAGENT_HOST=pi or pi is on PATH and pi.enable is on; otherwise one `~ pi: not in use` line is printed and nothing fails; a missing Pi package line names its `pi install` command, and `holyagent setup` installs them",
         "--fix runs the setup steps behind a failing check, prints their lines, then checks again; it never installs Bun, Pi, Node or Pi packages"
       ],
@@ -25159,8 +25194,19 @@ var init_setup = __esm(() => {
       stateless: true,
       positionals: 0,
       run: ({ args, env, cwd }) => gen2(function* () {
-        const scope = yield* choiceFlag(ScopeFlag, "scope", stringFlag(args, "scope") ?? "user", DOCTOR_USAGE);
-        return printed(yield* doctor(env, { fix: booleanFlag(args, "fix"), scope, cwd }));
+        const resolved = yield* resolveScope(stringFlag(args, "scope"), DOCTOR_USAGE, env, cwd).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
+        if (resolved instanceof SetupFailure) {
+          return printed({ lines: [fail6("scope", resolved.message)], ok: false });
+        }
+        const report = yield* doctor(env, {
+          fix: booleanFlag(args, "fix"),
+          scope: resolved.scope,
+          cwd
+        });
+        return printed({
+          ...report,
+          lines: [pass("scope", describeScope(resolved)), ...report.lines]
+        });
       }).pipe(provide4(Shell.live(env)))
     }
   ];
