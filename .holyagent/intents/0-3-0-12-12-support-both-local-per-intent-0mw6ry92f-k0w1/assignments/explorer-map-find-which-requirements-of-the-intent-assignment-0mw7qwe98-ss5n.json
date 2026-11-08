@@ -1,0 +1,42 @@
+{
+  "id": "assignment-0mw7qwe98-ss5n",
+  "intentId": "intent-0mw6ry92f-k0w1",
+  "intentRevision": 3,
+  "roleTask": "Explorer.map",
+  "slug": "find-which-requirements-of-the-intent",
+  "objective": "Find which requirements of the Intent 'local and global installs in Claude Code and pi, a user-level HolyAgent config, and claude.ai chat and Cowork docs' are already met at the top of the 0.3.0 stack and what remains, so the remaining work can be planned as PRs.",
+  "state": "Running",
+  "scope": [
+    "The Intent's requirements, each judged: Claude Code install, setup, doctor and the session-start setup check work at user, project and local scope, setup and doctor default to the installed scope, docs give per-scope commands including team sharing of a project-scope install; pi global and project-local installs both documented (global first), the project trust step, specialists of a project-local install inheriting the parent's trust (--approve only when the parent trusted the project), behavior when declared at both scopes; ~/.holyagent/config.json with the same schema, project overriding key by key, both decoded with onExcessProperty error; a user-level false for computer use, T3 device access and the web tools is final; docs state HolyAgent works in claude.ai chat and Cowork (replacing the docs/usage.md and docs/requirements.md statement that it does not), plain chat loads skills only; tests for scope resolution and config merge.",
+    "Files to start from: packages/runtime/src/setup, packages/runtime/src/config, packages/integrations/pi/src (launcher, extension), packages/integrations/claude, docs/installation*.md, docs/usage.md, docs/requirements.md, docs/pi/installation.md, docs/configuration*.md."
+  ],
+  "constraints": [
+    "Work read-only in the worktree /home/user/holyagent-0.3.0-prompts, which holds the top of the open 0.3.0 stack (branch release/0.3.0/feat/pi-review-prompts); read files there, not in /home/user/holyagent, whose checkout is an older detached head.",
+    "Judge each requirement against the code, tests, CI workflows and docs as they are, citing path:line; mark each Met, Partly met (say what is missing) or Not met.",
+    "Report in under 600 words; put any long listing in a file outside the repository under /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Each requirement is marked Met, Partly met or Not met with path:line support",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "For each requirement not fully met, the files a change would touch are named",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "requirement-status"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-08T11:24:49.580Z"
+  },
+  "createdAt": "2026-11-08T11:24:49.580Z"
+}
