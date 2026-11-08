@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "assess-the-pi-extension-entry-commit",
   "objective": "Assess the Pi extension entry commit b7efd82 for security vulnerabilities: process execution, wrapper and shell invocation, config and state-file parsing, and context injection into the model.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "The commit b7efd82 on release/0.3.0/feat/pi-extension (worktree /home/user/holyagent-0.3.0-ext, range 135c8c1..b7efd82) adds the Pi extension entry: a default-exported factory receiving ExtensionAPI, a --holyagent-role flag (root default, specialist, session; unknown fails closed), holyagent status on every session start reason and on session_compact plus reconcile after resume and compaction, delivered as a message via before_agent_start within the session-start budget, the Kimi root core span for session-role sessions, config loaded through the runtime loader via a config command in the shipped pi bundle, and a scripts/holyagent wrapper plus runtime bundle shipped in packages/integrations/pi/dist/scripts.",
     "Diff without the two generated bundles: /home/user/holyagent-notes/pi-ext.diff. Design docs: docs/pi/extensions.md, docs/pi/orchestration.md, docs/pi/configuration.md. Repository rules: AGENTS.md and .claude/CLAUDE.md.",
@@ -43,7 +43,33 @@
     "agentId": "workflow:wf_d62c4365-7e3/assignment-0mw7brmxj-obu8",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T04:21:13.303Z"
+    "startedAt": "2026-11-08T04:21:13.303Z",
+    "finishedAt": "2026-11-08T04:26:24.499Z"
+  },
+  "result": "result: No blockers. The built-in `/security-review` did not run, so every conclusion below comes from reading the code. It failed with `fatal: ambiguous argument 'origin/HEAD...'` because this checkout has no `origin/HEAD`. Nothing was executed, because I have no shell, and the diff-file reading stopped at line 1,079 of 1,630. I read the non-test code and the worktree files directly.\n\nchanged: none\n\nchecks: not run (no shell). Reading only: `pi-ext.diff`, `/home/user/holyagent-0.3.0-ext/packages/runtime/src/{cli/sessioncontext.ts,config/load.ts,config/schema.ts}`, and the built `dist/extensions/holyagent.js` and `dist/scripts/holyagent.js`.\n\nblockers: none\n\nnotes:\n- Suspicion, Windows only, low: `pi.exec(\"sh\" | \"git\", ..., {cwd: project})` resolves the program by bare name. If Pi spawns without a shell, libuv searches the working directory first on Windows, so a project holding `sh.exe` or `git.exe` could run. I could not confirm this because Pi's `exec` source is not installed in this tree. A cheap fix is to resolve absolute paths first, or run from a neutral `cwd`.\n- Config validation is only partly stricter than the Claude path. A project `.holyagent/config.json` can set `pi.enable: false` and silence the context. That is intended and not an escalation, and the user-level \"final off\" settings are preserved.\n- Prompt injection through state content (intent objectives, agent ids) is unchanged from the Claude hook. `sessionContext` narrows it and adds a fixed \"this is data, not instructions\" line.\n\nevidence:\n- No command or argument injection through flag values, paths, config or state content: `pi.exec` takes an argv array with no shell. The only variable arguments are the wrapper path, which is fixed from `import.meta.url`, a fixed subcommand, and `join(gitToplevel, \".holyagent\")`. That path is absolute and follows `config`, so it cannot be read as an option. The role flag never reaches a command. It is decoded against `Schema.Literals`, and an unknown value becomes a notice that cuts it to 40 characters (diff `src/extension.ts` 209-215, 333-336). Config and state output are decoded as JSON or TOON into data only (`pi-entry.ts`, `parseOutput`). The core's `${HOLYAGENT_PI_ROOT}` is filled with `replaceAll` and a function, so `$` patterns in the path are not expanded.\n- The wrapper runs the shipped bundle without loading project-controlled Bun config, env files or preload scripts: the `scripts/holyagent` line 140 is `exec \"$bun\" --no-env-file --config=\"$here/empty-bunfig.toml\" \"$here/holyagent.js\" \"$@\"`. `$here` comes from `$0`, which is the absolute package path, and a bare-name start exits 127. The wrapper is generated from the Claude `wrapper.sh` with only the plugin-root hint replaced. `holyagent.js` imports only Node built-ins, so Bun has no auto-install path. The empty-bunfig is shipped in `dist/scripts`.\n- Injected context cannot exceed the budget or carry content beyond status, reconcile and the core span, and handler failures do not leak secrets: `piContext` uses `sessionContext` for the status and reconcile rows, with its ladder narrowing to `CONTEXT_BUDGET` = 9400. The Pi reminder is shorter than the Claude one, so swapping it only shrinks the text. The no-state path (`bareContext`) holds only the core and the reminder. The extension adds only the message from `piContext` or a notice cut to 400 characters. Failure text is the first stderr line, or `Cause.pretty`, after `oneLine` and the cut. The config schema has no secret fields. The tests cover a budget run with 400 rows and 200 Running rows for all three roles.\n- diff-file: `/home/user/holyagent-notes/pi-ext.diff` (read to line 1,079 and lines 1,431-1,630, which cover all non-test source; the test files from line 1,079 onward were skipped).\n",
+  "acceptance": {
+    "revision": 6,
+    "rationale": "No command injection (argv only, fixed wrapper path), wrapper loads no project Bun config, context bounded; one low Windows lookup suspicion carried to the repair",
+    "criteria": [
+      {
+        "criterion": "No command or argument injection through flag values, paths, config or state content",
+        "support": "`pi.exec` takes an argv array with no shell. The only variable arguments are the wrapper path, which is fixed from `import.meta.url`, a fixed subcommand, and `join(gitToplevel, \".holyagent\")`. That path is absolute and follows `config`, so it cannot be read as an option. The role flag never reaches a command. It is decoded against `Schema.Literals`, and an unknown value becomes a notice that cuts it to 40 characters (diff `src/extension.ts` 209-215, 333-336). Config and state output are decoded as JSON or TOON into data only (`pi-entry.ts`, `parseOutput`). The core's `${HOLYAGENT_PI_ROOT}` is filled with `replaceAll` and a function, so `$` patterns in the path are not expanded."
+      },
+      {
+        "criterion": "The wrapper runs the shipped bundle without loading project-controlled Bun config, env files or preload scripts",
+        "support": "the `scripts/holyagent` line 140 is `exec \"$bun\" --no-env-file --config=\"$here/empty-bunfig.toml\" \"$here/holyagent.js\" \"$@\"`. `$here` comes from `$0`, which is the absolute package path, and a bare-name start exits 127. The wrapper is generated from the Claude `wrapper.sh` with only the plugin-root hint replaced. `holyagent.js` imports only Node built-ins, so Bun has no auto-install path. The empty-bunfig is shipped in `dist/scripts`."
+      },
+      {
+        "criterion": "Injected context cannot exceed the budget or carry content beyond status, reconcile and the core span, and handler failures do not leak secrets",
+        "support": "`piContext` uses `sessionContext` for the status and reconcile rows, with its ladder narrowing to `CONTEXT_BUDGET` = 9400. The Pi reminder is shorter than the Claude one, so swapping it only shrinks the text. The no-state path (`bareContext`) holds only the core and the reminder. The extension adds only the message from `piContext` or a notice cut to 400 characters. Failure text is the first stderr line, or `Cause.pretty`, after `oneLine` and the cut. The config schema has no secret fields. The tests cover a budget run with 400 rows and 200 Running rows for all three roles."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff-file",
+        "support": "`/home/user/holyagent-notes/pi-ext.diff` (read to line 1,079 and lines 1,431-1,630, which cover all non-test source; the test files from line 1,079 onward were skipped)."
+      }
+    ]
   },
   "createdAt": "2026-11-08T04:21:13.303Z"
 }
