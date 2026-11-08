@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "let-session-file-mode-of-assignment",
   "objective": "Let session-file mode of assignment reports under the pi host list the pi-workflow Assignments it cannot read, by passing them to piRecordReports.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Work only in /home/user/holyagent-0.3.0-launcher. In packages/runtime/src/cli/assignment.ts near line 249, the session-file branch keeps only agents with the PI_AGENT_PREFIX (pi:) before calling piRecordReports, so pi-workflow: agents never reach it and are not listed. Change the filter to keep agents starting with PI_AGENT_PREFIX or PI_WORKFLOW_AGENT_PREFIX (import the constant from where PI_AGENT_PREFIX comes). piRecordReports in packages/runtime/src/cli/report.ts already lists a pi-workflow agent as <agent id> not in a session file.",
     "Add one case to packages/runtime/tests/pi-reports-e2e.test.ts (session-file test) asserting that a dispatched Assignment recorded as pi-workflow:<run>/<id> appears in that listing."
@@ -42,7 +42,24 @@
     "agentId": "workflow:wf_afef8690-336/assignment-0mw7igr5n-s2ua",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-08T07:28:42.875Z"
+    "startedAt": "2026-11-08T07:28:42.875Z",
+    "finishedAt": "2026-11-08T07:31:58.612Z"
+  },
+  "result": "result: Session-file mode now passes pi-workflow Assignments to piRecordReports, which lists them as not in a session file. Build and verify both exit 0.\nchanged: packages/runtime/src/cli/assignment.ts; packages/runtime/tests/pi-reports-e2e.test.ts; build regenerated packages/integrations/claude/dist/scripts/holyagent.js, packages/integrations/pi/dist/scripts/holyagent.js, packages/integrations/pi/dist/extensions/holyagent.js. The dist diffs also carry other workers' uncommitted src edits (claude/src/agents.ts, pi/src/*, runtime report.ts), not mine.\nchecks:\n- bun test packages/runtime/tests/pi-reports-e2e.test.ts -> exit 0, 7 pass, 0 fail\n- bunx --no-install mise run build -> exit 0 (built 38 + 34 files)\n- bunx --no-install mise run verify -> exit 0; check no type errors, lint no problems, fmt all 519 formatted, test 2085 pass, 0 fail (71 files)\nblockers: none\nquestions: none\nnotes: The new test fails on the base because the pi-workflow agent was filtered out before piRecordReports. Logs are in /tmp/claude-0/build.log and /tmp/claude-0/verify.log. Diff of owned src/test paths: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/s2ua-diff.patch\nevidence:\nSession-file mode lists pi-workflow Assignments, with a test (behavior): packages/runtime/tests/pi-reports-e2e.test.ts \"a session file lists an Assignment recorded as a pi-workflow agent\" passes; filter at packages/runtime/src/cli/assignment.ts ~line 252\nmise run build exits 0 and mise run verify exits 0 (regressions): build exit 0; verify exit 0, 2085 pass / 0 fail\n",
+  "acceptance": {
+    "revision": 7,
+    "rationale": "One-line filter plus a test; verify exit 0 with 2085 pass.",
+    "criteria": [
+      {
+        "criterion": "Session-file mode lists pi-workflow Assignments, with a test",
+        "support": "packages/runtime/tests/pi-reports-e2e.test.ts \"a session file lists an Assignment recorded as a pi-workflow agent\" passes; filter at packages/runtime/src/cli/assignment.ts ~line 252"
+      },
+      {
+        "criterion": "mise run build exits 0 and mise run verify exits 0",
+        "support": "build exit 0; verify exit 0, 2085 pass / 0 fail"
+      }
+    ],
+    "evidence": []
   },
   "createdAt": "2026-11-08T07:28:42.875Z"
 }
