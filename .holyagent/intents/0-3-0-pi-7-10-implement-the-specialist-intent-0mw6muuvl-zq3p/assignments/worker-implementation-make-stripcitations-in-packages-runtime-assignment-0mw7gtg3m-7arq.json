@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "make-stripcitations-in-packages-runtime",
   "objective": "Make stripCitations in packages/runtime/src/instructions/skills.ts handle the three edge cases the Kimi set review found, so the Pi root and role prompts can pass through it safely.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Work only in /home/user/holyagent-0.3.0-launcher (branch release/0.3.0/feat/pi-launcher). stripCitations removes citation tags from instruction text but skips code spans and fenced blocks and collapses blank lines (LF and CRLF).",
     "Fix and test: (1) a stray backtick must not pair code spans across list items (a code span does not cross a blank line or a new list item, per CommonMark); (2) a fence indented four or more spaces is an indented code block line, not a fence, and an indented code block containing a blank line is left as written; (3) a citation comment on the final line keeps the preceding newline. Add a test for each that fails without the fix.",
@@ -52,7 +52,9 @@
     "agentId": "workflow:wf_54066b36-b2d/assignment-0mw7gtg3m-7arq",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T06:42:44.399Z"
+    "startedAt": "2026-11-08T06:42:44.399Z",
+    "finishedAt": "2026-11-08T06:59:52.614Z"
   },
+  "result": "result: `stripCitations` now handles all three cases, with tests that fail on the base; build and verify pass.\n\nchanged:\n- `/home/user/holyagent-0.3.0-launcher/packages/runtime/src/instructions/skills.ts`\n- `/home/user/holyagent-0.3.0-launcher/packages/runtime/tests/instructions/strip-citations.test.ts` (new)\n- `/home/user/holyagent-0.3.0-launcher/docs/development.md`\n- `/home/user/holyagent-0.3.0-launcher/packages/integrations/claude/dist/scripts/holyagent.js` (rebuilt bundle, which also carries other writers' edits; no skills files changed)\n\nchecks:\n- `bunx --no-install mise run build` -> exit 0. Only `claude/dist/scripts/holyagent.js` changed under the Claude `dist`.\n- `bunx --no-install mise run verify` -> exit 0: no type errors, no lint problems, 518 files formatted, 2065 pass, 0 fail across 70 files. The first run failed `fmt:check` on two files; `mise run fmt` fixed them, then build and verify were re-run.\n- Against the base `skills.ts`, 4 of the 6 new tests fail (list-item spans, indented fence, indented block with a blank line, final-line comment); the 2 that pass guard against over-fixing.\n\nblockers: none\nquestions: none\n\nnotes:\n- The brief's ownership path `packages/runtime/tests/instructions` did not exist, so I put the tests in a new file there; the existing `tests/skills.test.ts` is untouched and still passes.\n- Indented code blocks are recognised as 4+ spaces (or a tab) at the start of the text or after a blank line. A 4-space line inside a list item after a blank line is treated as code, though CommonMark may read it as a paragraph. No current source has an indented comment.\n- Spans also stop at list-item starts, bullet or numbered. The `docs/development.md` sentence is a clause added to the existing `stripCitations` sentence, not a separate sentence.\n\nevidence:\nThe three edge cases are handled with tests that fail without the fix: `strip-citations.test.ts` fails 4 of 6 on the base `skills.ts` and passes 6 of 6 with the fix.\ndocs/development.md states that code spans and fenced blocks are left as written: the `stripCitations` sentence in the instructions section now says it \"leaves code spans, fenced blocks and indented code blocks as written\".\nmise run build leaves dist in sync and mise run verify exits 0: build exit 0; verify exit 0 with 2065 pass and 0 fail.\ndiff-file: /home/user/holyagent-notes/launcher-c.diff\n",
   "createdAt": "2026-11-08T06:42:35.842Z"
 }
