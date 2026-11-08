@@ -1,12 +1,44 @@
-# Pi coding agent: the plan for the HolyAgent Pi integration
+# Pi coding agent: the HolyAgent Pi integration
 
-**Status: planned for 0.3.0. Nothing on these pages is shipped.** HolyAgent 0.2.x supports Claude Code only. These pages state the plan the maintainer has decided for the Pi integration in 0.3.0, with the research it rests on. Where a page says "will" or "is planned", the code does not exist yet; the maintainer implements it in eleven open 0.3.0 Intents: the T3 Code Intent and the install-scope Intent joined the nine of the first plan (another, which would have added an auto-mode gate, was closed; see [auto-mode.md](auto-mode.md)).
+**Status: the Pi package, its extension, the Kimi provider, the tool surface and the config ship in 0.3.0. Some parts are not built yet; [What ships now and what is planned](#what-ships-now-and-what-is-planned) lists both.** HolyAgent 0.2.x supported Claude Code only. These pages state the decisions the maintainer made for the Pi integration in 0.3.0, with the research they rest on. A page says "planned" or "is to" where the code does not exist yet; every other statement about HolyAgent's own behavior describes what is built.
 
-The research is based on Pi's official docs and source code and on the third-party packages named on each page. Nothing was installed and no Pi code was written. Pi facts were read at Pi 1.4.0 unless a page says otherwise; the version the plan pins is 1.5.0 (see [Version risk](#version-risk)).
+The research is based on Pi's official docs and source code and on the third-party packages named on each page. Pi facts were read at Pi 1.4.0 unless a page says otherwise; the version HolyAgent pins is 1.5.0 (see [Version risk](#version-risk)).
+
+## Getting started
+
+Install Node.js 22.19 or newer and Bun (the HolyAgent CLI needs it), then Pi 1.5.0 and the package, let `holyagent setup` install the Pi packages your config enables, and start `pi`:
+
+```sh
+npm install -g --ignore-scripts @earendil-works/pi-coding-agent@1.5.0
+pi install git:github.com/davidbasilefilho/holyagent@holyagent-<version>
+holyagent setup
+pi
+```
+
+The steps, the project-local install, the official installer and what `holyagent doctor` checks are in [installation.md](installation.md); the options of `config.json` with their defaults are in [configuration.md](configuration.md#keys-and-defaults); [usage.md](../usage.md#pi) is the short version.
+
+## What ships now and what is planned
+
+| Part                                                                                                                | State   | Detail                                                                                                             |
+| ------------------------------------------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------ |
+| The Pi package (`packages/integrations/pi`): manifest, 18 specialist agent files, skills, wrapper and bundled CLI   | Built   | [extensions.md](extensions.md#the-holyagent-package), [development.md](../development.md#the-generated-pi-package) |
+| The extension: the `--holyagent-role` flag, session context, the `Agent` and `SubagentWorkflow` gates, report check | Built   | [extensions.md](extensions.md#the-extension-entry)                                                                 |
+| The launcher: specialists and workflows through `@tintinweb/pi-subagents`                                           | Built   | [orchestration.md](orchestration.md#decision-for-030)                                                              |
+| The tool surface: per-role tool arguments, the pinned packages and the settings data                                | Built   | [extensions.md](extensions.md#tool-surface-for-030)                                                                |
+| The Kimi for Coding provider: routing table, readiness and catalog checks, the Kimi K3.1 instructions               | Built   | [providers.md](providers.md)                                                                                       |
+| `config.json`: the `pi` and `claude` sections and the user-level file                                               | Built   | [configuration.md](configuration.md#holyagent-configjson)                                                          |
+| Install, global and project-local, at an explicit pin; the package lists no dependencies                            | Built   | [installation.md](installation.md)                                                                                 |
+| `holyagent setup` installs and removes the config's Pi packages; `holyagent doctor` checks Pi, Node.js and packages | Built   | [installation.md](installation.md#what-setup-and-doctor-do)                                                        |
+| `holyagent setup` sets Pi's `npmCommand` and writes the settings data from the config                               | Planned | [installation.md](installation.md#what-setup-and-doctor-do)                                                        |
+| The root's system prompt on Pi                                                                                      | Planned | [extensions.md](extensions.md#the-extension-entry)                                                                 |
+| T3 Code as the primary interface, its settings and its tools                                                        | Planned | [t3-code.md](t3-code.md)                                                                                           |
+| Cache-hit measurement against the 95% target for the Kimi provider and Billion Context                              | Planned | [caching-and-subagents.md](caching-and-subagents.md#cache-target)                                                  |
+
+Pages that are not listed as built (the approval, auto-mode and Claude parity pages) are plans and research.
 
 ## The decisions for 0.3.0
 
-Every row is decided. The page in the last column holds the detail and the sources. A point the sources leave open is marked "to be measured" or "to be settled" on its page and is not decided here.
+Every row is decided; the state of each part is in the table above. The page in the last column holds the detail and the sources. A point the sources leave open is marked "to be measured" or "to be settled" on its page and is not decided here.
 
 | Area               | Decision                                                                                                                                                                                                                                                                                     | Detail                                                                                                                                                                   |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -17,7 +49,7 @@ Every row is decided. The page in the last column holds the detail and the sourc
 | Ship format        | Built JavaScript from `bun build`, inside the generated package and covered by the sync check.                                                                                                                                                                                               | [extensions.md](extensions.md#the-holyagent-package)                                                                                                                     |
 | Start              | `pi install` once, then plain `pi` starts the HolyAgent root, as the Claude plugin does.                                                                                                                                                                                                     | [installation.md](installation.md#how-holyagent-installs)                                                                                                                |
 | Pi version         | Every reused extension is an exact pin in `pi-packages.json` and moves only through `mise run deps:update`; `mise run deps:check` fails when one is behind. The Pi host used for development and tests moves with the lockfile through the same command, and a user's own Pi is theirs.      | [installation.md](installation.md#the-pin)                                                                                                                               |
-| Installers         | `holyagent doctor` only checks (Pi, Node 22.19 or newer, the package). The Windows installer's Node minimum rises from 22.13 to 22.19. `holyagent setup` sets bun as Pi's `npmCommand`.                                                                                                      | [installation.md](installation.md#what-setup-and-doctor-do)                                                                                                              |
+| Installers         | `holyagent doctor` only checks (Pi, Node 22.19 or newer, the package and the enabled packages); `holyagent setup` installs the enabled packages. The Windows installer's Node minimum is 22.19, up from 22.13. `holyagent setup` is planned to set bun as Pi's `npmCommand`.                 | [installation.md](installation.md#what-setup-and-doctor-do)                                                                                                              |
 | CI                 | Recorded Pi events (fixtures) for the pinned version, replayed inside the existing `check` and `windows` jobs. No ruleset change.                                                                                                                                                            | [orchestration.md](orchestration.md#ci-and-windows)                                                                                                                      |
 | Approval           | No auto-mode. Full access is the default, and children inherit the parent's project trust (`--approve` when the parent trusted the project). Under T3 Code, HolyAgent threads must run in T3's Full access mode, with a setup check and a warning in other modes.                            | [auto-mode.md](auto-mode.md), [approval.md](approval.md#decision-for-030), [t3-code.md](t3-code.md#full-access-is-required)                                              |
 | T3 dialogs         | Under T3 only the RPC dialogs, `notify` and `setStatus`; never `custom()` or widgets. A HolyAgent adapter covers rpiv tools that need `custom()`.                                                                                                                                            | [t3-code.md](t3-code.md#dialogs-and-status-only)                                                                                                                         |
@@ -77,18 +109,18 @@ The `pi-durable` package is marked experimental ([durable README](https://github
 
 ## Index
 
-| File                                                 | Topic                                                                                                                    |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| [t3-code.md](t3-code.md)                             | T3 Code as the primary interface: how it runs Pi, its tools, browser, computer use and settings                          |
-| [configuration.md](configuration.md)                 | The planned `.holyagent/config.json` sections and user-level config; Pi's config files, precedence, settings keys, trust |
-| [installation.md](installation.md)                   | How HolyAgent installs on Pi (global and project-local), the pin, `setup` and `doctor`; installing Pi itself; Bun status |
-| [providers.md](providers.md)                         | Kimi for Coding (global), the routing table, the Kimi K3.1 instructions; Pi's provider layer                             |
-| [extensions.md](extensions.md)                       | The HolyAgent package and the reused extensions; the Extension API, events, custom tools                                 |
-| [orchestration.md](orchestration.md)                 | Workflows through `@tintinweb/pi-subagents`, codemode, event to status map, CI and Windows                               |
-| [caching-and-subagents.md](caching-and-subagents.md) | The cache target, Kimi's prefix cache, Billion Context; Pi's caching per provider; context reuse                         |
-| [approval.md](approval.md)                           | Full access by default; what Pi gives an extension for approval (not used in 0.3.0)                                      |
-| [auto-mode.md](auto-mode.md)                         | Why auto-mode is dropped for 0.3.0                                                                                       |
-| [claude-parity.md](claude-parity.md)                 | Which HolyAgent Claude rules and mechanisms become Pi rules, and what carries each                                       |
+| File                                                 | Topic                                                                                                                                           |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| [t3-code.md](t3-code.md)                             | T3 Code as the primary interface: how it runs Pi, its tools, browser, computer use and settings                                                 |
+| [configuration.md](configuration.md)                 | The `.holyagent/config.json` sections with every option and default, the user-level config; Pi's config files, precedence, settings keys, trust |
+| [installation.md](installation.md)                   | How HolyAgent installs on Pi (global and project-local), the pin, `setup` and `doctor`; installing Pi itself; Bun status                        |
+| [providers.md](providers.md)                         | Kimi for Coding (global), the routing table, the Kimi K3.1 instructions; Pi's provider layer                                                    |
+| [extensions.md](extensions.md)                       | The HolyAgent package and the reused extensions; the Extension API, events, custom tools                                                        |
+| [orchestration.md](orchestration.md)                 | Workflows through `@tintinweb/pi-subagents`, codemode, event to status map, CI and Windows                                                      |
+| [caching-and-subagents.md](caching-and-subagents.md) | The cache target, Kimi's prefix cache, Billion Context; Pi's caching per provider; context reuse                                                |
+| [approval.md](approval.md)                           | Full access by default; what Pi gives an extension for approval (not used in 0.3.0)                                                             |
+| [auto-mode.md](auto-mode.md)                         | Why auto-mode is dropped for 0.3.0                                                                                                              |
+| [claude-parity.md](claude-parity.md)                 | Which HolyAgent Claude rules and mechanisms become Pi rules, and what carries each                                                              |
 
 ## Top findings and gaps
 

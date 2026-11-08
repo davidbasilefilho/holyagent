@@ -1,8 +1,8 @@
 # Pi configuration: files, locations, precedence, keys
 
-**Status: the first section describes HolyAgent's own configuration, which the runtime reads in 0.3.0; the sections after it are research on Pi's configuration and are not shipped behaviour.**
+**Status: the first section describes HolyAgent's own configuration, which the runtime reads in 0.3.0; [How HolyAgent launches Pi](#how-holyagent-launches-pi) says what is built; the sections between are research on Pi's configuration, not HolyAgent behavior.**
 
-Pi 1.4.0, commit `4a080252f06caf63a525d7873c5d94d3c23887e0` (the plan pins 1.5.0; see [README.md](README.md#version-risk)). "Inference:" marks a conclusion drawn here, not a stated fact.
+Pi 1.4.0, commit `4a080252f06caf63a525d7873c5d94d3c23887e0` (HolyAgent pins 1.5.0; see [README.md](README.md#version-risk)). "Inference:" marks a conclusion drawn here, not a stated fact.
 
 ## HolyAgent config.json
 
@@ -20,7 +20,7 @@ Rules for the file:
 - An unknown key or an invalid value, at any depth, stops the run with a `ConfigInvalid` error whose message names the field (as a path such as `["pi"]["routes"]["root"]["thinking"]`) and the file, and whose hint points to this page. It never falls back silently, and it never ignores a key it does not know. The one leniency is `"vcs": null`, which older files wrote and which reads as no `vcs` section; `pi` and `claude` stay strict.
 - Every command that reads the config decodes the whole file, not only its own section: the `vcs` commands (`vcs commit`, `vcs pr` and the `commit-msg` hook) stop on an invalid key in the `pi` or `claude` section too, with the file and the field named, and so does the Pi integration on an invalid `vcs` section. One file means one schema, so a mistake cannot hide in the section that the current command does not use.
 - Every key may be left out; the file `{}` is valid and means all defaults.
-- Installing the package installs only the dependencies that the default `config.json` enables.
+- The package lists no dependencies. `holyagent setup` runs `pi install` for each Pi package the config enables, at its pin, and `pi remove` for a feature package the config turns off; re-run it after changing `pi.features` ([installation.md](installation.md#what-setup-and-doctor-do)).
 
 ### Keys and defaults
 
@@ -56,7 +56,7 @@ The `pi` section ([providers.md](providers.md), [extensions.md](extensions.md), 
 | `pi.t3.worktrees`                | boolean                                                   | `true`                 | Setup turns on T3 Code's worktrees; the setup TUI preselects it                                                                                                                                                                                                                                                                                                                                    |
 | `pi.t3.deviceAccess`             | boolean                                                   | `true`                 | Setup turns on T3 Code's device access; the setup TUI preselects it. A `false` in the user file is final ([t3-code.md](t3-code.md#t3-settings-written-by-setup), [the user-level config](#the-user-level-config))                                                                                                                                                                                  |
 
-A `false` feature is not loaded and not required: `piPackages` leaves its package out, and with every feature off only `pi-provider-kimi-code` remains (every source carries its pinned version); with `pi.enable` off nothing is loaded. The packages come in the order of `FEATURE_PACKAGES` (`@tintinweb/pi-subagents`, `billion-context`, `@juicesharp/rpiv-todo`, `@juicesharp/rpiv-ask-user-question`, `@aliou/pi-processes`, `@amaster.ai/pi-computer-use`) after the provider extension, then `pi-web-kit` when the web choice is `pi-web-kit` (chosen, or a provider without web tools). `pi.features.mcp` is carried by Pi's built-in MCP extension, so it loads no package: `false` adds `--no-mcp` to every process. The same switches shape each role's tool arguments (`toolArgs`: no web tool with `web` `off`, no `computer_use_*` entry with `computerUse` off, no `mcp__` entry with `mcp` off) and the settings data `toolSettings` returns for setup to write ([extensions.md](extensions.md#tool-arguments)). The `pi.codemode` and `pi.t3` settings load no package. T3 Code's context meter is not a setting: setup does not set it.
+A `false` feature is not loaded and not required: `piPackages` leaves its package out, and with every feature off only `pi-provider-kimi-code` remains (every source carries its pinned version); with `pi.enable` off nothing is loaded, and `holyagent setup` neither installs nor removes a Pi package. The packages come in the order of `FEATURE_PACKAGES` (`@tintinweb/pi-subagents`, `billion-context`, `@juicesharp/rpiv-todo`, `@juicesharp/rpiv-ask-user-question`, `@aliou/pi-processes`, `@amaster.ai/pi-computer-use`) after the provider extension, then `pi-web-kit` when the web choice is `pi-web-kit` (chosen, or a provider without web tools). `pi.features.mcp` is carried by Pi's built-in MCP extension, so it loads no package: `false` adds `--no-mcp` to every process. The same switches shape each role's tool arguments (`toolArgs`: no web tool with `web` `off`, no `computer_use_*` entry with `computerUse` off, no `mcp__` entry with `mcp` off) and the settings data `toolSettings` returns for setup to write ([extensions.md](extensions.md#tool-arguments)). The `pi.codemode` and `pi.t3` settings load no package. T3 Code's context meter is not a setting: setup does not set it.
 
 Three settings grant access, to the computer (`pi.features.computerUse`), to devices (`pi.t3.deviceAccess`) and to the web (`pi.features.web`); a `false` (`"off"` for the web) in the user file is final for them ([the user-level config](#the-user-level-config)).
 
@@ -165,16 +165,18 @@ There is **no** settings key for prompt-cache retention or for tool approval: th
 
 ## How HolyAgent launches Pi
 
-**Status: planned for 0.3.0.** Decided:
+**Status: the first list is built; the second is planned.**
 
-- Pi starts as plain `pi` after the one-time `pi install` ([installation.md](installation.md#how-holyagent-installs)); that session is the root. The root launches specialists as child Pi processes through `@tintinweb/pi-subagents` ([orchestration.md](orchestration.md#decision-for-030)).
-- Specialists run in full access (see [auto-mode.md](auto-mode.md)) with `PI_SKIP_VERSION_CHECK=1` and `PI_TELEMETRY=0`, and inherit the parent session's project trust: they get `--approve` only when the parent trusted the project ([installation.md](installation.md#global-and-project-local-installs)). They are not run fully offline: the 1.5.0 docs word `PI_OFFLINE` as disabling automatic network activity, including model catalog refreshes.
-- The root and every specialist run codemode in mode `only` (their tool arguments add `codemode`), and `PI_CODEMODE_MAX_WORKERS` is 4 in each process (`ToolArgs.env`) ([orchestration.md](orchestration.md#codemode-in-030)). Each process gets the `--tools`, `--exclude-tools` and `--no-mcp` that `toolArgs` returns for its row of the route table ([extensions.md](extensions.md#tool-arguments)).
-- `holyagent setup` sets Pi's `npmCommand` setting to `bun`, so Pi installs its packages with Bun ([installation.md](installation.md#what-setup-and-doctor-do)).
-- Model and thinking level reach Pi as `--model <provider/id>:<thinking>` from the route table in `config.json` ([providers.md](providers.md#routing)).
+Built:
 
-Still to be settled at implementation: the name and values of the launch flag that tells the extension whether a session is the root, a specialist or another session, and whether the extension also loads in children by `-e` or by the user-level install.
+- Pi starts as plain `pi` after the one-time `pi install` ([installation.md](installation.md#how-holyagent-installs)); that session is the root, because the package's `--holyagent-role` flag defaults to `root` ([extensions.md](extensions.md#the-extension-entry)).
+- The root starts specialists through `@tintinweb/pi-subagents`, which runs each as an in-process session of the root's Pi process, so a specialist has no launch line, environment or `--approve` of its own and shares the root's project trust ([extensions.md](extensions.md#specialists-as-package-agents), [orchestration.md](orchestration.md#decision-for-030)). Each specialist's tools are the `tools:` line of its agent file, which `toolArgs` decides from the config ([extensions.md](extensions.md#tool-arguments)).
+- Before each run of the root the extension writes `HOLYAGENT_HOST=pi`, `HOLYAGENT_WORKFLOWS`, `PI_CODEMODE_MAX_WORKERS` (from `pi.codemode.maxWorkers`) and `PI_CACHE_RETENTION=long` into its process environment.
+- The model and thinking level of each specialist come from the route table in `config.json`; the root passes them with its `Agent` calls ([providers.md](providers.md#routing)).
 
-Inference: to keep HolyAgent-driven Pi sessions reproducible, a launch should pass an explicit session directory, `--model`, `--tools` or `--exclude-tools` and, when the parent session trusted the project, `--approve` rather than rely on the user's `~/.pi/agent/settings.json`. All of those are documented flags and variables (links above, [cli.md L55-L110](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/docs/cli.md#L55-L110)).
+Planned:
+
+- `holyagent setup` sets Pi's `npmCommand` setting to `bun`, so Pi installs its packages with Bun, and writes the settings `toolSettings` returns ([installation.md](installation.md#what-setup-and-doctor-do)).
+- `PI_SKIP_VERSION_CHECK=1` and `PI_TELEMETRY=0` for the specialists, and an explicit session directory, `--model`, `--tools` or `--exclude-tools` and `--approve` for a reproducible launch rather than the user's `~/.pi/agent/settings.json`. All of those are documented flags and variables ([cli.md L55-L110](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/docs/cli.md#L55-L110)). The 1.5.0 docs word `PI_OFFLINE` as disabling automatic network activity, including model catalog refreshes, so the specialists are not run fully offline.
 
 HolyAgent's own state (Intent revisions, Assignment status) has no place in Pi's settings; Pi offers `pi.appendEntry()` for session-attached data ([extensions.md L337-L355](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/docs/extensions.md#L337-L355)), but the Intent store stays in HolyAgent.
