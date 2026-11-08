@@ -34,8 +34,11 @@ const present = (path: string) =>
     Effect.orElseSucceed(() => false),
   )
 
-/** Whether the entry at `path` is itself a symlink; a missing entry is not. */
-const isSymlink = (path: string) =>
+/**
+ * Whether the entry at `path` is itself a symlink; a missing entry is not. Fails with SetupFailure
+ * when the entry cannot be inspected.
+ */
+export const isSymlink = (path: string) =>
   Effect.tryPromise({
     try: () => lstat(path),
     catch: (cause) => cause as NodeJS.ErrnoException,

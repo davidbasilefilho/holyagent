@@ -4,6 +4,7 @@ import { inCloudSession } from "../vcs/identity.ts"
 import type { Env } from "./environment.ts"
 import { SetupFailure } from "./errors.ts"
 import { piChecks } from "./pi-check.ts"
+import { checkPiToolSettings } from "./pi-settings.ts"
 import { fail, hint, pass, type Report } from "./report.ts"
 import { type Scope, settingsFile } from "./scope.ts"
 import { mergeUserSettings, missingSettingKeys } from "./settings.ts"
@@ -64,11 +65,12 @@ const checks = (env: Env, file: string, scope: Scope) =>
  * when Pi is in use and `pi.enable` is on in the HolyAgent config of that scope (the user's file
  * for `user`, so a repository's own config cannot change what doctor expects of the global install;
  * the project's over it for `project` and `local`). A machine without Pi gets one informational
- * line instead, and a cloud session runs no Pi. In a claude.ai cloud session `ctx7` passes, since
- * setup leaves it out there. With `fix`, the setup steps behind a failing check run first, their
- * lines come before the checks, and the checks then run again; Bun, Pi, Node and the Pi packages
- * are never installed, so the Pi lines are read once and name the command that fixes them. The
- * report is ok when no check fails.
+ * line instead, and a cloud session runs no Pi. When Pi is in use, a `~` line follows for each Pi
+ * tool settings file that lacks keys setup writes ({@link checkPiToolSettings}). In a claude.ai
+ * cloud session `ctx7` passes, since setup leaves it out there. With `fix`, the setup steps behind
+ * a failing check run first, their lines come before the checks, and the checks then run again;
+ * Bun, Pi, Node and the Pi packages are never installed, so the Pi lines are read once and name the
+ * command that fixes them. The report is ok when no check fails.
  */
 export const doctor = Effect.fn("doctor")(function* (
   env: Env,
@@ -76,7 +78,9 @@ export const doctor = Effect.fn("doctor")(function* (
 ) {
   const scope = options.scope ?? "user"
   const cwd = options.cwd ?? process.cwd()
-  const pi = inCloudSession(env) ? [] : yield* piChecks(env, cwd, scope)
+  const pi = inCloudSession(env)
+    ? []
+    : [...(yield* piChecks(env, cwd, scope)), ...(yield* checkPiToolSettings(env, cwd, scope))]
   const located = yield* settingsFile(env, scope, cwd).pipe(
     Effect.catchTag("SetupFailure", (error) => Effect.succeed(error)),
   )

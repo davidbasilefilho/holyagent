@@ -8,6 +8,7 @@ import type { SetupFailure } from "./errors.ts"
 import { fileExists } from "./json-file.ts"
 import { piInUse } from "./pi-check.ts"
 import { installPiPackages } from "./pi-install.ts"
+import { installPiToolSettings, undoPiToolSettings } from "./pi-settings.ts"
 import { added, failed, hint, present, type Report, skipped } from "./report.ts"
 import { type Scope, settingsFile } from "./scope.ts"
 import { type CacheTtl, mergeUserSettings, undoUserSettings } from "./settings.ts"
@@ -126,14 +127,16 @@ export interface SetupOptions {
 }
 
 /**
- * Sets up HolyAgent for the current user: ctx7, the Pi packages the config enables when Pi is in
- * use ({@link installPiPackages}; not in a cloud session), and the recommended keys of the settings
- * of the chosen scope (`user` unless set). Every step checks its own result first, and a step that
- * fails does not stop the next one. On a dry run nothing is installed or written, and the lines say
- * what would be. In a claude.ai cloud session ctx7 is skipped, and the settings are still merged.
- * With `undo` only the settings change: the values setup recorded adding are removed from the
- * chosen scope's file; ctx7 and the Pi packages stay installed. A `project` or `local` target that
- * is a symlink is refused with a `!` line and nothing is written to the settings.
+ * Sets up HolyAgent for the current user: ctx7, the Pi packages the config enables and the Pi tool
+ * settings ({@link installPiPackages} and {@link installPiToolSettings}; both only when Pi is in
+ * use, never in a cloud session), and the recommended keys of the settings of the chosen scope
+ * (`user` unless set). Every step checks its own result first, and a step that fails does not stop
+ * the next one. On a dry run nothing is installed or written, and the lines say what would be. In a
+ * claude.ai cloud session ctx7 is skipped, and the settings are still merged. With `undo` only
+ * settings change: the values setup recorded adding are removed from the chosen scope's file and
+ * from the Pi tool settings files ({@link undoPiToolSettings}); ctx7 and the Pi packages stay
+ * installed. A `project` or `local` target that is a symlink is refused with a `!` line and nothing
+ * is written to the settings.
  */
 export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptions) {
   const scope = options.scope ?? "user"
@@ -150,30 +153,26 @@ export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptio
         return target.notice === undefined ? lines : [hint(`${label}: ${target.notice}`), ...lines]
       }),
     )
+  const piOptions = { scope, cwd: options.cwd ?? process.cwd(), dryRun: options.dryRun }
   if (options.undo === true) {
     const lines = [
       hint("ctx7: left installed; --undo only removes the settings setup recorded adding"),
       ...(yield* onSettings((file) => undoUserSettings({ env, file, dryRun: options.dryRun }))),
+      // Only files with a setup record get a line, so a machine that never ran the step prints none.
+      ...(yield* asStep("tool settings", undoPiToolSettings(env, piOptions))),
     ]
     return { lines, ok: !lines.some((line) => line.startsWith("! ")) } satisfies Report
   }
   const cloud = inCloudSession(env)
+  const piUsed = !cloud && (yield* piInUse(env))
   const lines = [
     ...(options.skipCtx7
       ? [skipped("ctx7: skipped by flag")]
       : cloud
         ? [skipped(`ctx7: ${CLOUD_SKIP}`)]
         : yield* asStep("ctx7", installCtx7(env, options.dryRun))),
-    ...(!cloud && (yield* piInUse(env))
-      ? yield* asStep(
-          "pi packages",
-          installPiPackages(env, {
-            scope,
-            cwd: options.cwd ?? process.cwd(),
-            dryRun: options.dryRun,
-          }),
-        )
-      : []),
+    ...(piUsed ? yield* asStep("pi packages", installPiPackages(env, piOptions)) : []),
+    ...(piUsed ? yield* asStep("tool settings", installPiToolSettings(env, piOptions)) : []),
     ...(yield* onSettings((file) =>
       mergeUserSettings({
         env,

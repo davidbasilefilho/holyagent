@@ -120,7 +120,7 @@ export const mergeUserSettings = Effect.fn("mergeUserSettings")(function* (optio
 })
 
 /** One planned removal: `removed` when setup's value is there, `absent` when nothing of it is. */
-interface Removal {
+export interface Removal {
   readonly path: string
   readonly status: "removed" | "absent" | "kept" | "unrecorded"
   /** What was taken out, or the existing value for `kept` and `unrecorded`. */
@@ -146,7 +146,7 @@ const valueAt = (node: JsonObject, path: readonly string[]): unknown => {
  * `wanted`. A list is cut by the entries `wanted` names, so the user's own entries stay. A parent
  * object that the removal leaves empty is dropped too.
  */
-const take = (
+export const take = (
   node: JsonObject,
   path: readonly [string, ...Array<string>],
   depth: number,

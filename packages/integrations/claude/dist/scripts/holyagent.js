@@ -22389,7 +22389,251 @@ var piChecks = (env, cwd, scope) => gen2(function* () {
   }));
 });
 
-import { join as join17 } from "path";
+import { join as join17, relative as relative6, resolve as resolve7, sep as sep7 } from "path";
+
+var T3_PREFIX = "mcp__t3*code__";
+var T3_VISUAL_TOOLS = [
+  `${T3_PREFIX}preview_*`,
+  `${T3_PREFIX}t3_preview_*`,
+  `${T3_PREFIX}html_render`,
+  `${T3_PREFIX}html_preview`,
+  `${T3_PREFIX}device_*`
+];
+var BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json";
+var PI_SETTINGS_FILE = "~/.pi/agent/settings.json";
+var SUBAGENTS_SETTINGS_FILE = "~/.pi/agent/subagents.json";
+var SUBAGENTS_ONLY_SPECIALISTS = {
+  disableDefaultAgents: true,
+  fallbackSubagent: "none"
+};
+var toolSettings = (config, profile = providerProfile(config)) => {
+  const { enable, features } = config.pi;
+  if (!enable)
+    return [];
+  const web = webChoice(profile, features.web);
+  return [
+    { file: PI_SETTINGS_FILE, content: { codemode: { mode: config.pi.codemode.mode } } },
+    ...web.source === "provider" ? [
+      {
+        file: profile.toolsFile,
+        content: {
+          tools: Object.fromEntries(web.tools.map((tool) => [tool, { enabled: true }]))
+        }
+      }
+    ] : [],
+    ...features.subagents ? [{ file: SUBAGENTS_SETTINGS_FILE, content: SUBAGENTS_ONLY_SPECIALISTS }] : [],
+    ...features.contextCompression ? [{ file: BILLION_CONTEXT_FILE, content: { pi: { subagents: false } } }] : [],
+    ...features.computerUse ? [
+      {
+        file: PI_SETTINGS_FILE,
+        content: {
+          "pi-computer-use": { confirmAppLaunch: false, confirmDangerousActions: false }
+        }
+      }
+    ] : []
+  ];
+};
+
+var PACKAGE_DEFAULTS = new Map([
+  [
+    PI_SETTINGS_FILE,
+    {
+      codemode: { mode: "on" },
+      "pi-computer-use": { confirmAppLaunch: true, confirmDangerousActions: true }
+    }
+  ],
+  [SUBAGENTS_SETTINGS_FILE, { disableDefaultAgents: false }],
+  ...Object.values(PROVIDERS).map((profile) => [
+    profile.toolsFile,
+    { tools: Object.fromEntries(profile.webTools.map((tool) => [tool, { enabled: false }])) }
+  ])
+]);
+var valueAt3 = (node, path) => path.reduce((current, key) => isJsonObject2(current) ? current[key] : undefined, node);
+var leaves = (content, prefix = []) => Object.entries(content).flatMap(([key, child]) => isJsonObject2(child) ? leaves(child, [...prefix, key]) : [{ path: [...prefix, key], value: child }]);
+var KNOWN_FILES = [
+  PI_SETTINGS_FILE,
+  SUBAGENTS_SETTINGS_FILE,
+  BILLION_CONTEXT_FILE,
+  ...Object.values(PROVIDERS).map((profile) => profile.toolsFile)
+];
+var AGENT_PREFIX = "~/.pi/agent/";
+var PI_PREFIX = "~/.pi/";
+var locate2 = (env, cwd, scope, logical) => {
+  const project = scope !== "user";
+  const home = homeDirectory(env);
+  if (logical === BILLION_CONTEXT_FILE) {
+    if (project)
+      return;
+    const explicit = firstNonEmpty(env["BILI_CONFIG_FILE"]);
+    if (explicit !== undefined)
+      return resolve7(cwd, explicit);
+    const base = firstNonEmpty(env["XDG_CONFIG_HOME"]) ?? join17(home, ".config");
+    return join17(base, "billion-context", "billion-context.json");
+  }
+  if (logical.startsWith(AGENT_PREFIX)) {
+    const name = logical.slice(AGENT_PREFIX.length);
+    return project ? join17(cwd, ".pi", name) : join17(piAgentDirectory(env), name);
+  }
+  if (logical.startsWith(PI_PREFIX)) {
+    const name = logical.slice(PI_PREFIX.length);
+    return project ? join17(cwd, ".pi", name) : join17(home, ".pi", name);
+  }
+  return project || !logical.startsWith("~/") ? undefined : join17(home, logical.slice(2));
+};
+var planFor = (env, cwd, scope, config) => {
+  const byFile = new Map;
+  for (const patch of toolSettings(config)) {
+    byFile.set(patch.file, [...byFile.get(patch.file) ?? [], ...leaves(patch.content)]);
+  }
+  const targets = [];
+  const unplaced = [];
+  for (const [logical, all] of byFile) {
+    const file = locate2(env, cwd, scope, logical);
+    if (file === undefined) {
+      unplaced.push(logical);
+      continue;
+    }
+    targets.push({
+      file,
+      global: scope === "user" ? undefined : locate2(env, cwd, "user", logical),
+      all,
+      defaults: PACKAGE_DEFAULTS.get(logical)
+    });
+  }
+  return { targets, unplaced };
+};
+var resolveTarget = fn2("resolveToolSettingsTarget")(function* (target) {
+  const global = target.global === undefined ? undefined : yield* readJsonObject(target.global);
+  const setGlobally = (key) => global !== undefined && applyDefaults(global, [key]).entries[0]?.status !== "added";
+  const isDefault = ({ path, value }) => target.defaults !== undefined && equals(valueAt3(target.defaults, path), value);
+  const free = target.all.filter((key) => !setGlobally(key));
+  return {
+    file: target.file,
+    keys: free.filter((key) => !isDefault(key)),
+    atDefault: free.filter(isDefault).map(({ path }) => path.join(".")),
+    atGlobal: target.all.filter(setGlobally).map(({ path }) => path.join("."))
+  };
+});
+var refuseLinks = fn2("refuseProjectLinks")(function* (cwd, scope, file, action) {
+  if (scope === "user")
+    return;
+  const parts = relative6(cwd, file).split(sep7);
+  for (let depth = 1;depth <= parts.length; depth++) {
+    const path = join17(cwd, ...parts.slice(0, depth));
+    if (yield* isSymlink(path)) {
+      return yield* new SetupFailure({
+        message: `${path} is a symlink; refusing to ${action} through it in the ${scope} scope. Replace it with a real ${depth === parts.length ? "file" : "folder"} and run again`
+      });
+    }
+  }
+});
+var planAt = (env, cwd, scope) => loadPiConfig(env, cwd, scope).pipe(map4((config) => config.pi.enable ? planFor(env, cwd, scope, config) : undefined), orElseSucceed2(() => {
+  return;
+}));
+var label = "tool settings";
+var mergeTarget = fn2("mergeToolSettingsFile")(function* (env, options, planned) {
+  const { dryRun } = options;
+  const { file } = planned;
+  yield* refuseLinks(options.cwd, options.scope, file, "write");
+  const target = yield* resolveTarget(planned);
+  const existing = yield* readJsonObject(file);
+  const { merged, entries } = applyDefaults(existing, target.keys);
+  const added = entries.filter((entry) => entry.status === "added");
+  const kept = entries.filter((entry) => entry.status === "kept");
+  const present = entries.filter((entry) => entry.status === "present");
+  if (added.length > 0 && !dryRun) {
+    const names = new Set(added.map((entry) => entry.path));
+    yield* readRecorded(env, file);
+    yield* writeJsonObject(file, merged);
+    yield* addRecorded(env, file, target.keys.filter(({ path }) => names.has(path.join(".")))).pipe(mapError2((error) => new SetupFailure({
+      message: `${file} was written, but its keys could not be recorded, so --undo will not remove them: ${error.message}`
+    })));
+  }
+  const parts = [
+    ...added.length === 0 ? [] : [
+      `${dryRun ? "would add" : "added"} ${added.map((entry) => `${entry.path} ${show(entry.value)}`).join(", ")}`
+    ],
+    ...present.length === 0 ? [] : [`already set: ${present.map((entry) => entry.path).join(", ")}`],
+    ...kept.map((entry) => `kept ${entry.path} ${show(entry.value)} (HolyAgent sets ${show(entry.wanted)}; yours wins)`),
+    ...target.atGlobal.length === 0 ? [] : [`left out, set in your global file: ${target.atGlobal.join(", ")}`],
+    ...target.atDefault.length === 0 ? [] : [`left out, the package default: ${target.atDefault.join(", ")}`]
+  ];
+  const mark = added.length > 0 ? "+" : kept.length > 0 ? "~" : "=";
+  return `${mark} ${label} ${file}: ${parts.join("; ")}${added.length > 0 && dryRun ? " (dry run, nothing written)" : ""}`;
+});
+var installPiToolSettings = fn2("installPiToolSettings")(function* (env, options) {
+  const plan = yield* planAt(env, options.cwd, options.scope);
+  if (plan === undefined)
+    return [];
+  const lines = [];
+  for (const target of plan.targets) {
+    lines.push(yield* mergeTarget(env, options, target).pipe(catchTag2("SetupFailure", (error) => succeed6(`! ${label}: ${error.message}`))));
+  }
+  for (const logical of plan.unplaced) {
+    lines.push(skipped(`${label} ${logical}: has no file at ${options.scope} scope; run \`holyagent setup\` at user scope`));
+  }
+  return lines;
+});
+var undoPiToolSettings = fn2("undoPiToolSettings")(function* (env, options) {
+  const lines = [];
+  const files = new Set(KNOWN_FILES.flatMap((logical) => locate2(env, options.cwd, options.scope, logical) ?? []));
+  for (const file of files) {
+    lines.push(...yield* gen2(function* () {
+      const recorded = yield* readRecorded(env, file);
+      if (recorded.length === 0)
+        return [];
+      yield* refuseLinks(options.cwd, options.scope, file, "edit");
+      let result = yield* readJsonObject(file);
+      const removed = [];
+      const kept = [];
+      for (const { path, value } of recorded) {
+        const [next, removal] = take(result, path, 0, value);
+        result = next;
+        if (removal.status === "removed")
+          removed.push(`${removal.path} ${show(removal.value)}`);
+        if (removal.status === "kept")
+          kept.push(`${removal.path} ${show(removal.value)} (setup wrote ${show(removal.wanted)})`);
+      }
+      if (!options.dryRun) {
+        if (removed.length > 0)
+          yield* writeJsonObject(file, result);
+        yield* clearRecorded(env, file);
+      }
+      const parts = [
+        ...removed.length === 0 ? [] : [`${options.dryRun ? "would remove" : "removed"} ${removed.join(", ")}`],
+        ...kept.length === 0 ? [] : [`kept ${kept.join(", ")}`]
+      ];
+      const mark = removed.length > 0 ? "-" : kept.length > 0 ? "~" : "=";
+      return [
+        `${mark} ${label} ${file}: ${parts.length === 0 ? "nothing of setup's left to remove" : parts.join("; ")}${removed.length > 0 && options.dryRun ? " (dry run, nothing written)" : ""}`
+      ];
+    }).pipe(catchTag2("SetupFailure", (error) => succeed6([`! ${label}: ${error.message}`]))));
+  }
+  return lines;
+});
+var fixFor = (scope) => scope === "user" ? "run `holyagent setup`" : `run \`holyagent setup --scope ${scope}\``;
+var checkPiToolSettings = (env, cwd, scope) => gen2(function* () {
+  if (!(yield* piInUse(env)))
+    return [];
+  const plan = yield* planAt(env, cwd, scope);
+  if (plan === undefined)
+    return [];
+  const lines = [];
+  for (const planned of plan.targets) {
+    lines.push(...yield* gen2(function* () {
+      yield* refuseLinks(cwd, scope, planned.file, "write");
+      const target = yield* resolveTarget(planned);
+      const existing = yield* readJsonObject(target.file);
+      const missing = applyDefaults(existing, target.keys).entries.filter((entry) => entry.status === "added").map((entry) => entry.path);
+      return missing.length === 0 ? [] : [hint(`${label} ${target.file} lacks ${missing.join(", ")}; ${fixFor(scope)}`)];
+    }).pipe(catchTag2("SetupFailure", (error) => succeed6([
+      hint(`${label}: ${error.message}; fix the file, then ${fixFor(scope)}`)
+    ]))));
+  }
+  return lines;
+});
+
+import { join as join18 } from "path";
 
 var MANAGED_NAMES = new Set([
   ...Object.values(FEATURE_PACKAGES),
@@ -22487,7 +22731,7 @@ var installCtx7 = fn2("installCtx7")(function* (env, dryRun) {
   const global = yield* ensureGlobal(env, "ctx7", "ctx7", dryRun);
   if (!global.usable)
     return global.lines;
-  const skillReady = (yield* fileExists2(join17(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join17(files.claudeDir, "rules", "context7.md")));
+  const skillReady = (yield* fileExists2(join18(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join18(files.claudeDir, "rules", "context7.md")));
   if (skillReady)
     return [...global.lines, present3("ctx7 skill: already installed")];
   const apiKey = env.CONTEXT7_API_KEY === "" ? undefined : env.CONTEXT7_API_KEY;
@@ -22517,21 +22761,21 @@ var setup = fn2("setup")(function* (env, options) {
     const lines = yield* run(target.file);
     return target.notice === undefined ? lines : [hint(`${label}: ${target.notice}`), ...lines];
   }));
+  const piOptions = { scope, cwd: options.cwd ?? process.cwd(), dryRun: options.dryRun };
   if (options.undo === true) {
     const lines = [
       hint("ctx7: left installed; --undo only removes the settings setup recorded adding"),
-      ...yield* onSettings((file) => undoUserSettings({ env, file, dryRun: options.dryRun }))
+      ...yield* onSettings((file) => undoUserSettings({ env, file, dryRun: options.dryRun })),
+      ...yield* asStep("tool settings", undoPiToolSettings(env, piOptions))
     ];
     return { lines, ok: !lines.some((line) => line.startsWith("! ")) };
   }
   const cloud = inCloudSession(env);
+  const piUsed = !cloud && (yield* piInUse(env));
   const lines = [
     ...options.skipCtx7 ? [skipped("ctx7: skipped by flag")] : cloud ? [skipped(`ctx7: ${CLOUD_SKIP}`)] : yield* asStep("ctx7", installCtx7(env, options.dryRun)),
-    ...!cloud && (yield* piInUse(env)) ? yield* asStep("pi packages", installPiPackages(env, {
-      scope,
-      cwd: options.cwd ?? process.cwd(),
-      dryRun: options.dryRun
-    })) : [],
+    ...piUsed ? yield* asStep("pi packages", installPiPackages(env, piOptions)) : [],
+    ...piUsed ? yield* asStep("tool settings", installPiToolSettings(env, piOptions)) : [],
     ...yield* onSettings((file) => mergeUserSettings({
       env,
       file,
@@ -22558,13 +22802,13 @@ var checkCommand = (env, command) => gen2(function* () {
   const anywhere = yield* shell.which(command, { includeBunBin: true });
   return isSome2(anywhere) ? pass(command, `${anywhere.value} (not on PATH; add its directory to PATH)`) : fail6(command, `not found on PATH or in Bun's bin directory; ${FIX}`);
 });
-var fixFor = (scope) => scope === "user" ? FIX : `run /holyagent:setup --scope ${scope}, or \`holyagent doctor --fix --scope ${scope}\``;
-var checkSettings = (file, scope) => missingSettingKeys(file).pipe(map4((missing) => missing.length === 0 ? pass("settings", file) : fail6("settings", `${file} lacks ${missing.join(", ")}; ${fixFor(scope)}`)), catchTag2("SetupFailure", (error) => succeed6(fail6("settings", error.message))));
+var fixFor2 = (scope) => scope === "user" ? FIX : `run /holyagent:setup --scope ${scope}, or \`holyagent doctor --fix --scope ${scope}\``;
+var checkSettings = (file, scope) => missingSettingKeys(file).pipe(map4((missing) => missing.length === 0 ? pass("settings", file) : fail6("settings", `${file} lacks ${missing.join(", ")}; ${fixFor2(scope)}`)), catchTag2("SetupFailure", (error) => succeed6(fail6("settings", error.message))));
 var checks = (env, file, scope) => all2([checkBun, checkCommand(env, "ctx7"), checkSettings(file, scope)]);
 var doctor = fn2("doctor")(function* (env, options) {
   const scope = options.scope ?? "user";
   const cwd = options.cwd ?? process.cwd();
-  const pi = inCloudSession(env) ? [] : yield* piChecks(env, cwd, scope);
+  const pi = inCloudSession(env) ? [] : [...yield* piChecks(env, cwd, scope), ...yield* checkPiToolSettings(env, cwd, scope)];
   const located = yield* settingsFile(env, scope, cwd).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
   if (located instanceof SetupFailure) {
     const lines = yield* all2([
@@ -22681,14 +22925,14 @@ var STATE_COMMANDS = [
   }
 ];
 
-import { join as join18 } from "path";
+import { join as join19 } from "path";
 var {$: $5 } = globalThis.Bun;
 var TARGETS = [
   { id: "darwin-arm64", platform: "darwin", arch: "arm64", suffix: "" },
   { id: "linux-x64", platform: "linux", arch: "x64", suffix: "" },
   { id: "windows-x64", platform: "win32", arch: "x64", suffix: ".exe" }
 ];
-var BUNDLED_TOOLS = join18(import.meta.dir, "vendor");
+var BUNDLED_TOOLS = join19(import.meta.dir, "vendor");
 
 class UnsupportedPlatform extends TaggedError2("UnsupportedPlatform") {
   get message() {
@@ -22705,7 +22949,7 @@ var selectTarget = (platform, arch) => {
   const target = TARGETS.find((candidate) => candidate.platform === platform && candidate.arch === arch);
   return target === undefined ? fail5(new UnsupportedPlatform({ platform, arch })) : succeed6(target);
 };
-var toolPath = (directory, tool, target) => join18(directory, target.id, `${tool}${target.suffix}`);
+var toolPath = (directory, tool, target) => join19(directory, target.id, `${tool}${target.suffix}`);
 var runTool = (options) => gen2(function* () {
   const path = toolPath(options.directory, options.tool, options.target);
   if (!(yield* promise2(() => Bun.file(path).exists())))
