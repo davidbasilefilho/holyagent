@@ -1,9 +1,22 @@
+import { basename } from "node:path"
+
 import { Effect, Schema } from "effect"
 
 import type { AcceptanceInput } from "../domain/acceptance.ts"
 import type { Assignment } from "../domain/assignment.ts"
+import { PI_WORKFLOW_AGENT_PREFIX } from "../domain/directive.ts"
 import { InsufficientAcceptance } from "../domain/errors.ts"
-import { CLAUDE_WORDS, type HostWords } from "../domain/host.ts"
+import { CLAUDE_WORDS, type HostWords, PI_WORDS } from "../domain/host.ts"
+import { routeFor } from "../domain/route.ts"
+import {
+  decodePiJournal,
+  type ExpectedCall,
+  type InvalidPiRecord,
+  journalKey,
+  matchJournal,
+  piRecordReport,
+} from "../pi/journal.ts"
+import type { Launch } from "./config.ts"
 import { Usage } from "./errors.ts"
 import { JsonReport, renderJsonReport } from "./jsonreport.ts"
 
@@ -325,3 +338,100 @@ export const journalResults = (journal: string, source: string) =>
     }
     return results
   })
+
+/**
+ * The key an Assignment's dispatched call has in a `@tintinweb/pi-subagents` workflow journal: the
+ * prompt that {@link dispatchPrompt} prints for the pi host (`agent` is the namespaced agent it
+ * names, `briefPath` the brief file it points at), the Assignment id as the label, the route's
+ * agent (the Claude slug without its namespace, which the Pi package ships under that name), and
+ * the model and effort as the dispatch printed them (`launch`, see `launchesOf`). The script passes
+ * no isolation, gate, resume or schema.
+ */
+export const dispatchedCall = (
+  assignment: Assignment,
+  agent: string,
+  briefPath: string,
+  launch: Launch,
+): ExpectedCall => ({
+  id: assignment.id,
+  key: journalKey({
+    prompt: dispatchPrompt(assignment, agent, briefPath, PI_WORDS),
+    label: assignment.id,
+    model: launch.model,
+    agentType: routeFor(assignment.roleTask).agent,
+    effort: launch.effort,
+  }),
+})
+
+/**
+ * The reports a pi source yields and the entries or agents that yield none, as `reports` lists
+ * them.
+ */
+export interface PiReports {
+  /** The report of each Assignment, to write to its report file. */
+  readonly reports: ReadonlyArray<{ readonly id: string; readonly report: string }>
+  /**
+   * What yields no report, in the rows of the Claude listing: the label is the Assignment id, or
+   * empty when the entry matches none, and the agent says which entry or agent and why.
+   */
+  readonly notAssignmentIds: ReadonlyArray<{ readonly label: string; readonly agentId: string }>
+}
+
+const refused = (hint: string) => (error: InvalidPiRecord) =>
+  new Usage({ message: error.message, hint })
+
+/**
+ * The reports of a `<run id>.workflow.jsonl` of `@tintinweb/pi-subagents`: each entry whose key is
+ * that of a dispatched call in `calls` (see {@link dispatchedCall}) gives the report of its
+ * Assignment. An entry that failed, has no text or matches no call is listed as `<run id>#<index>
+ * failed|empty|unmatched`, since the journal carries no label to say more.
+ */
+export const piJournalReports = (
+  journal: string,
+  source: string,
+  calls: ReadonlyArray<ExpectedCall>,
+) =>
+  decodePiJournal(journal, source).pipe(
+    Effect.mapError(refused("Pass the <run id>.workflow.jsonl of the workflow run, unedited.")),
+    Effect.map((entries): PiReports => {
+      const { reports, notReported } = matchJournal(entries, calls)
+      const run = basename(source).replace(/\.workflow\.jsonl$/, "")
+      return {
+        reports: reports.map(({ id, report }) => ({ id, report })),
+        notAssignmentIds: notReported.map(({ id, index, reason }) => ({
+          label: id ?? "",
+          agentId: `${run}#${index} ${reason}`,
+        })),
+      }
+    }),
+  )
+
+/**
+ * The reports of direct agents, read from the root session file: each `pi:<agent-id>` of `agents`
+ * (an Assignment id and the agent id recorded for it) whose `subagents:record` entry ended `ok`
+ * gives the report of its Assignment. An agent with no record, or one that did not end `ok`, is
+ * listed as `<agent id> missing|<outcome>`. A `pi-workflow:<run-id>/<id>` agent has no record in
+ * the session file (its report is in the `<run id>.workflow.jsonl`), so it is listed as `<agent id>
+ * not in a session file` rather than dropped.
+ */
+export const piRecordReports = (
+  session: string,
+  source: string,
+  agents: ReadonlyArray<{ readonly id: string; readonly agentId: string }>,
+) =>
+  Effect.gen(function* () {
+    const reports: Array<{ readonly id: string; readonly report: string }> = []
+    const notAssignmentIds: Array<{ readonly label: string; readonly agentId: string }> = []
+    for (const { id, agentId } of agents) {
+      if (agentId.startsWith(PI_WORKFLOW_AGENT_PREFIX)) {
+        notAssignmentIds.push({ label: id, agentId: `${agentId} not in a session file` })
+        continue
+      }
+      const found = yield* piRecordReport(session, source, agentId.replace(/^pi:/, "")).pipe(
+        Effect.catchTag("PiRecordMissing", () => Effect.succeed(undefined)),
+      )
+      if (found?.report !== undefined) reports.push({ id, report: found.report })
+      else notAssignmentIds.push({ label: id, agentId: `${agentId} ${found?.ended ?? "missing"}` })
+    }
+    return { reports, notAssignmentIds } satisfies PiReports
+  }).pipe(Effect.mapError(refused("Pass the root session file of the Pi session, unedited.")))

@@ -6,15 +6,21 @@ import { join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
 
 import { $ } from "bun"
+import { Effect } from "effect"
 
 import { PI_HOST_PACKAGES } from "../../../../scripts/dependency-pins.ts"
+import { defaultConfig } from "../../../runtime/src/config/schema.ts"
 import { toPosix } from "../../../runtime/src/domain/paths.ts"
+import { type Route, ROUTES } from "../../../runtime/src/domain/route.ts"
 import { PI_ROOT_PLACEHOLDER } from "../../../runtime/src/hooks/pi-context.ts"
 import { FAMILIES } from "../../../runtime/src/instructions/families.ts"
-import { instructionsDirectory } from "../../../runtime/src/instructions/skills.ts"
+import { instructionsDirectory, stripCitations } from "../../../runtime/src/instructions/skills.ts"
+import { toolArgs } from "../../../runtime/src/pi/tools.ts"
+import { CONDITIONAL_SECTIONS } from "../../claude/src/agents.ts"
 import { build } from "../build.ts"
 import packageJson from "../package.json" with { type: "json" }
-import { DIST_DIRECTORY, REPOSITORY } from "../src/files.ts"
+import { agentTools } from "../src/agents.ts"
+import { DIST_DIRECTORY, PACKAGE_DIRECTORY, REPOSITORY } from "../src/files.ts"
 import {
   bundleExtension,
   DESCRIPTION,
@@ -25,6 +31,7 @@ import {
   PACKAGE_FILES,
   PI_FAMILY,
 } from "../src/generate.ts"
+import { SPECIALIST_NAMES } from "../src/specialists.ts"
 
 const read = (...path: Array<string>) => readFileSync(join(REPOSITORY, ...path), "utf8")
 const readJson = (...path: Array<string>) => JSON.parse(read(...path)) as Record<string, unknown>
@@ -36,6 +43,7 @@ const filesBelow = async (path: string): Promise<ReadonlyArray<string>> =>
     .toSorted()
 
 const generated = await generate()
+const config = await Effect.runPromise(defaultConfig)
 const sourceSkills = (await filesBelow(`${instructionsDirectory(PI_FAMILY)}/skills`)).map((path) =>
   path.slice(`${instructionsDirectory(PI_FAMILY)}/skills/`.length),
 )
@@ -113,7 +121,11 @@ describe("the package manifest", () => {
   })
 
   test("lists the extension and skill folders under the pi key, and they exist", () => {
-    expect(manifest["pi"]).toEqual({ extensions: ["./extensions"], skills: ["./skills"] })
+    expect(manifest["pi"]).toEqual({
+      extensions: ["./extensions"],
+      skills: ["./skills"],
+      subagents: { agents: ["./agents"] },
+    })
     const built = generated.map((file) => file.path.slice(`${DIST_DIRECTORY}/`.length))
     expect(built).toContain(EXTENSION_OUTPUT)
     expect(built.some((path) => path.startsWith("skills/"))).toBe(true)
@@ -128,12 +140,22 @@ describe("the package manifest", () => {
   })
 
   test("is what a git install of the repository root finds: the root pi key points at the build", () => {
-    const rootPi = readJson("package.json")["pi"] as Record<string, ReadonlyArray<string>>
+    // A folder list is an array under its kind; `subagents` nests its own under `agents`.
+    type PiKey = Record<string, ReadonlyArray<string> | { agents: ReadonlyArray<string> }>
+    const folders = (pi: PiKey) =>
+      Object.fromEntries(
+        Object.entries(pi).map(([kind, entries]) => [
+          kind === "subagents" ? "subagents.agents" : kind,
+          Array.isArray(entries) ? entries : (entries as { agents: ReadonlyArray<string> }).agents,
+        ]),
+      ) as Record<string, ReadonlyArray<string>>
+    const rootPi = folders(readJson("package.json")["pi"] as PiKey)
     const fromRoot = (entries: ReadonlyArray<string> = []) =>
       entries.map((entry) => resolve(REPOSITORY, entry))
     const fromPackage = (entries: ReadonlyArray<string>) =>
       entries.map((entry) => resolve(REPOSITORY, DIST_DIRECTORY, entry))
-    const own = manifest["pi"] as Record<string, ReadonlyArray<string>>
+    const own = folders(manifest["pi"] as PiKey)
+    expect(Object.keys(own)).toContain("subagents.agents")
     expect(Object.keys(rootPi).toSorted()).toEqual(Object.keys(own).toSorted())
     for (const [kind, entries] of Object.entries(own))
       expect({ kind, paths: fromRoot(rootPi[kind]) }).toEqual({
@@ -167,7 +189,7 @@ describe("the runtime scripts", () => {
     expect(await isExecutable(wrapper, "win32")).toBe(true)
   })
 
-  test("the manifest lists the extension, script and skill folders as the package files, and they exist", () => {
+  test("the manifest lists the agent, extension, script and skill folders as the package files, and they exist", () => {
     const manifest = JSON.parse(scriptsOf("package.json")?.content ?? "{}") as {
       files?: Array<string>
     }
@@ -243,29 +265,152 @@ describe("the skills", () => {
   })
 })
 
+describe("the specialists", () => {
+  const files = generated.filter((file) => file.path.startsWith(`${DIST_DIRECTORY}/agents/`))
+  const parsed = (file: { readonly content: string }) => {
+    const [, head = "", body = ""] = /^---\n([\s\S]*?)\n---\n\n([\s\S]*)$/.exec(file.content) ?? []
+    return { frontmatter: Bun.YAML.parse(head) as Record<string, unknown>, body }
+  }
+
+  test("are one agent file for each of the 18 specialists, and the manifest names their folder", () => {
+    expect(files.map((file) => file.path.slice(`${DIST_DIRECTORY}/agents/`.length))).toEqual(
+      SPECIALIST_NAMES.map((name) => `${name}.md`).toSorted(),
+    )
+    expect(SPECIALIST_NAMES).toHaveLength(18)
+    const manifest = readJson(DIST_DIRECTORY, "package.json") as { pi: Record<string, unknown> }
+    expect(manifest.pi["subagents"]).toEqual({ agents: ["./agents"] })
+  })
+
+  test("carry the package's frontmatter: name, a replace prompt, a tools allowlist, and no model or thinking", () => {
+    for (const file of files) {
+      const { frontmatter } = parsed(file)
+      const name = file.path.split("/").at(-1)?.replace(/\.md$/, "")
+      expect(Object.keys(frontmatter).toSorted()).toEqual([
+        "description",
+        "name",
+        "prompt_mode",
+        "tools",
+      ])
+      expect(frontmatter["name"]).toBe(name)
+      expect(frontmatter["prompt_mode"]).toBe("replace")
+      expect(String(frontmatter["description"])).toStartWith(`Use for ${name}: `)
+    }
+  })
+
+  test("grant the tools toolArgs decides, in the package's entry forms", () => {
+    for (const route of ROUTES) {
+      const file = files.find((entry) => entry.path.endsWith(`/${route.agent}.md`))
+      const tools = String(parsed(file ?? { content: "" }).frontmatter["tools"]).split(", ")
+      expect(tools).toEqual([...agentTools(config, route)])
+      // Each tool of toolArgs is covered: built-ins and mcp__ patterns by name, codemode, the
+      // computer-use and web tools through the extension that serves them.
+      const decided = toolArgs(config, route.roleTask).tools
+      const covered = decided.map((tool) =>
+        tool === "codemode"
+          ? "ext:builtin:codemode"
+          : tool.startsWith("computer_use_")
+            ? "ext:pi-computer-use"
+            : tool.startsWith("moonshot_")
+              ? `ext:pi-provider-kimi-code/${tool}`
+              : tool,
+      )
+      expect(tools).toEqual([...new Set(covered)])
+    }
+  })
+
+  test("the roles differ in tools as the config decides", () => {
+    const tools = (agent: string) =>
+      agentTools(config, ROUTES.find((route) => route.agent === agent) as Route)
+    expect(tools("explorer-map")).toEqual(["read", "grep", "find", "ls", "ext:builtin:codemode"])
+    expect(tools("worker-implementation")).toContain("write")
+    expect(tools("reviewer-code")).toContain("bash")
+    expect(tools("reviewer-code")).not.toContain("write")
+    expect(tools("librarian-research")).toContain("ext:pi-provider-kimi-code/moonshot_search")
+    expect(tools("reviewer-visual").some((tool) => tool.startsWith("mcp__t3"))).toBe(true)
+    expect(tools("reviewer-visual")).toContain("ext:pi-computer-use")
+    for (const route of ROUTES)
+      for (const root of ["todo", "ask_user_question"])
+        expect(tools(route.agent)).not.toContain(root)
+  })
+
+  test("follow the config: no web tools with web off, no T3 tools with mcp off, the web kit as a fallback", () => {
+    const librarian = ROUTES.find((route) => route.agent === "librarian-research") as Route
+    const visual = ROUTES.find((route) => route.agent === "reviewer-visual") as Route
+    const withFeatures = (features: Partial<typeof config.pi.features>) => ({
+      ...config,
+      pi: { ...config.pi, features: { ...config.pi.features, ...features } },
+    })
+    expect(agentTools(withFeatures({ web: "off" }), librarian).join()).not.toContain("web")
+    expect(agentTools(withFeatures({ web: "pi-web-kit" }), librarian)).toContain(
+      "ext:pi-web-kit/web_search",
+    )
+    expect(agentTools(withFeatures({ mcp: false }), visual).join()).not.toContain("mcp__")
+    expect(agentTools(withFeatures({ computerUse: false }), visual).join()).not.toContain(
+      "computer",
+    )
+  })
+
+  test("have the Kimi specialist prompt as the body, without the maintainers' notes", () => {
+    const instructions = instructionsDirectory(PI_FAMILY)
+    for (const route of ROUTES) {
+      const file = files.find((entry) => entry.path.endsWith(`/${route.agent}.md`))
+      const { body } = parsed(file ?? { content: "" })
+      const purpose = stripCitations(read(instructions, "roles", route.agent, "purpose.md")).trim()
+      const conduct = stripCitations(read(instructions, "specialist", "conduct.md")).trim()
+      expect(body).toContain(`You are the holyagent ${route.agent} specialist.`)
+      expect(body).toContain(purpose)
+      expect(body).toContain(conduct)
+      expect(body).not.toContain("<!--")
+      // Only the roles of the Claude set get the merge-ready bar, here as there.
+      expect(body.includes("## Merge-ready")).toBe(
+        CONDITIONAL_SECTIONS.some(
+          ({ file: section, applies }) => section === "merge-ready.md" && applies(route),
+        ),
+      )
+    }
+  })
+
+  test("leave ${HOLYAGENT_PI_ROOT} for the extension to fill when the child starts, never a path", () => {
+    for (const file of files) {
+      expect(file.content).toContain(PI_ROOT_PLACEHOLDER)
+      expect(file.content).not.toContain(REPOSITORY)
+    }
+  })
+})
+
 describe("the extension", () => {
   const extension = generated.find((file) => file.path.endsWith(EXTENSION_OUTPUT))
 
   test("is a default-exported factory that registers the role flag and handlers and starts nothing", async () => {
-    const root = await mkdtemp(join(tmpdir(), "holyagent-pi-extension-"))
+    // Inside the package, so the host peers resolve by the plain walk up to its node_modules, as
+    // they do for the built extension. A temp folder linked to that node_modules with a junction
+    // made Bun on Windows fail with "Cannot find module" for the peer.
+    const root = await mkdtemp(join(REPOSITORY, PACKAGE_DIRECTORY, "extension-test-"))
     const path = join(root, "extension.mjs")
-    await Bun.write(path, extension?.content ?? "")
-    const loaded = (await import(path)) as { default: (pi: unknown) => unknown }
-    const used: Array<string> = []
-    const api = {
-      registerFlag: (name: string) => void used.push(`registerFlag ${name}`),
-      on: (event: string) => void used.push(`on ${event}`),
+    try {
+      await Bun.write(path, extension?.content ?? "")
+      const loaded = (await import(path)) as { default: (pi: unknown) => unknown }
+      const used: Array<string> = []
+      const api = {
+        registerFlag: (name: string) => void used.push(`registerFlag ${name}`),
+        on: (event: string) => void used.push(`on ${event}`),
+        registerToolRenderer: () => void used.push("registerToolRenderer"),
+      }
+      expect(typeof loaded.default).toBe("function")
+      expect(loaded.default(api)).toBeUndefined()
+      expect(used.toSorted()).toEqual([
+        "on before_agent_start",
+        "on message_end",
+        "on session_compact",
+        "on session_shutdown",
+        "on session_start",
+        "on tool_call",
+        "registerFlag holyagent-role",
+        "registerToolRenderer",
+      ])
+    } finally {
+      await rm(root, { recursive: true, force: true })
     }
-    expect(typeof loaded.default).toBe("function")
-    expect(loaded.default(api)).toBeUndefined()
-    expect(used.toSorted()).toEqual([
-      "on before_agent_start",
-      "on session_compact",
-      "on session_shutdown",
-      "on session_start",
-      "registerFlag holyagent-role",
-    ])
-    await rm(root, { recursive: true, force: true })
   })
 
   test("loads under Node, which has no Bun global", async () => {

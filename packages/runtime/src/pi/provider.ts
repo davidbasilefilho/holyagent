@@ -67,6 +67,13 @@ export const routeModel = (config: Config, key: RouteKey): ModelRoute => {
   return { key, provider: id, model, thinking, spec: `${id}/${model}:${thinking}` }
 }
 
+/**
+ * The model of a route as `@tintinweb/pi-subagents` takes it per call (the `model` of its `Agent`
+ * tool and of `agent()`): `<provider>/<id>`, which it matches exactly, without the `:<thinking>`
+ * suffix of `--model`. The thinking level goes in the call's `thinking` (`effort` in `agent()`).
+ */
+export const subagentModel = ({ provider, model }: ModelRoute): string => `${provider}/${model}`
+
 /** Every row of the route table, the root first, resolved with {@link routeModel}. */
 export const routedModels = (config: Config): ReadonlyArray<ModelRoute> =>
   (Object.keys(config.pi.routes) as Array<RouteKey>).map((key) => routeModel(config, key))

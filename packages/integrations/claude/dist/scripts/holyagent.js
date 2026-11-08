@@ -8252,8 +8252,9 @@ var PI_WORDS = {
   workflowAgentPrefix: PI_WORKFLOW_AGENT_PREFIX,
   journal: "workflow run's journal",
   recordNote: "the pi launcher records no agent by hook: the launcher glue or the root records each agent, with the ID the Agent tool returns, including a continued one",
-  reportsNote: "under the pi host this reads Claude workflow journals only for now",
-  agentIdNote: "under the pi host an agent is recorded as pi:<agent-id>, the ID the Agent tool returns (strip pi: to message it), and a workflow's agent as pi-workflow:<run-id>/<id>, with the run ID and the label the script gave the agent (the Assignment id); any other form is refused"
+  reportsNote: "under the pi host the file is a <run id>.workflow.jsonl of @tintinweb/pi-subagents, whose entries are matched to Assignments by the key of their dispatched call, or the root session file, which holds the record of each Assignment recorded as pi:<agent-id>; an entry that failed, has no text or matches no call is listed with the run and its index",
+  agentIdNote: "under the pi host an agent is recorded as pi:<agent-id>, the ID the Agent tool returns (strip pi: to message it), and a workflow's agent as pi-workflow:<run-id>/<id>, with the run ID and the label the script gave the agent (the Assignment id); any other form is refused",
+  launchNote: "under the pi host model is the Pi route table's `<provider>/<id>` and effort its thinking level for the specialist (pi.routes in config.json), as @tintinweb/pi-subagents takes them: pass model as it is, and effort as agent()'s effort or the Agent tool's thinking. With pi.enable off both are left out and the specialist inherits the session's"
 };
 var wordsFor = (host) => host === "pi" ? PI_WORDS : CLAUDE_WORDS;
 
@@ -11685,12 +11686,14 @@ var readInput = (host, schema, inline) => readInputBy(host, () => schema, inline
 import { rm as rm4 } from "fs/promises";
 import { isAbsolute, join as join5, resolve as resolve3 } from "path";
 var folderFor = (call, name) => gitMaybe(["rev-parse", "--path-format=absolute", "--git-common-dir"]).pipe(provide3(call.vcs), map4((common) => common !== undefined && isAbsolute(common) ? join5(resolve3(common), "holyagent", name) : localFile(call.directory, name)));
+var pathIn = (call, name, assignmentId) => folderFor(call, name).pipe(map4((folder) => join5(folder, `${assignmentId}.md`)));
 var writeNamed = (call, name, assignmentId, text) => gen2(function* () {
-  const path = join5(yield* folderFor(call, name), `${assignmentId}.md`);
+  const path = yield* pathIn(call, name, assignmentId);
   yield* io(path, () => Bun.write(path, `${text}
 `));
   return path;
 });
+var briefPath = (call, assignmentId) => pathIn(call, "briefs", assignmentId);
 var writeBrief = (call, assignmentId, brief) => writeNamed(call, "briefs", assignmentId, brief);
 var writeReport = (call, assignmentId, report) => writeNamed(call, "reports", assignmentId, report);
 var removeFiles = (call, assignmentIds) => forEach2(["briefs", "reports"], (name) => folderFor(call, name)).pipe(flatMap2((folders) => forEach2(folders.flatMap((folder) => assignmentIds.map((id) => join5(folder, `${id}.md`))), (path) => io(path, () => rm4(path, { force: true })).pipe(as2(undefined), catch_2((error) => succeed6(error.message))))), map4((lines) => lines.filter((line) => line !== undefined)));
@@ -12198,7 +12201,7 @@ var VCS_COMMANDS = [
   }
 ];
 
-import { resolve as resolve4 } from "path";
+import { basename as basename3, resolve as resolve4 } from "path";
 
 var AcceptanceInput = Struct({
   rationale: Text,
@@ -12417,6 +12420,24 @@ var closeAssignment = (project, registry, assignmentId, input, now) => gen2(func
 });
 
 import { join as join8 } from "path";
+var PROVIDERS = {
+  "kimi-coding-global": {
+    id: "kimi-coding",
+    package: "pi-provider-kimi-code",
+    env: { KIMI_CODE_REGION: "global" },
+    loginFix: "Run /login kimi-coding in Pi, or set KIMI_API_KEY",
+    webTools: ["moonshot_search", "moonshot_fetch"],
+    toolsFile: "~/.pi/providers/kimi-coding/config.json"
+  }
+};
+var providerProfile = (config) => PROVIDERS[config.pi.provider];
+var routeModel = (config, key) => {
+  const { id } = providerProfile(config);
+  const { model, thinking } = config.pi.routes[key];
+  return { key, provider: id, model, thinking, spec: `${id}/${model}:${thinking}` };
+};
+var subagentModel = ({ provider, model }) => `${provider}/${model}`;
+
 var TTL_VARIABLE = "HOLYAGENT_REUSE_TTL_MINUTES";
 var HOST_VARIABLE = "HOLYAGENT_HOST";
 var WORKFLOWS_VARIABLE = "HOLYAGENT_WORKFLOWS";
@@ -12466,6 +12487,15 @@ var loadConfig2 = (env, root) => all2({
   workflowsAvailable: workflowsAvailable(env, root),
   host: agentHostOf(env)
 }).pipe(map4((config) => config));
+var launchesOf = (env, root, host) => host === "claude" ? succeed6((roleTask) => {
+  const { model, effort } = routeFor(roleTask);
+  return { model, effort };
+}) : loadConfig({ projectDirectories: [stateDirectory(root)], env }).pipe(map4((config) => (roleTask) => {
+  if (!config.pi.enable)
+    return {};
+  const route = routeModel(config, roleTask);
+  return { model: subagentModel(route), effort: route.thinking };
+}));
 
 var REPORT_FIELDS = Struct({
   status: Literals(["done", "partial", "blocked"]),
@@ -12491,6 +12521,166 @@ var renderJsonReport = (report) => [
   ...section("evidence", report.evidence.map(({ key, support }) => `${oneLine(key)}: ${support}`))
 ].join(`
 `);
+
+import { basename as basename2 } from "path";
+
+var KEY_LENGTH = 32;
+var journalKey = (input) => new Bun.CryptoHasher("sha256").update(JSON.stringify([
+  input.prompt,
+  input.label ?? null,
+  input.model ?? null,
+  input.agentType ?? null,
+  input.effort ?? null,
+  input.isolation ?? null,
+  input.gate ?? null,
+  input.resume ?? null,
+  ...input.schema !== undefined ? [input.schema] : []
+])).digest("hex").slice(0, KEY_LENGTH);
+
+class InvalidPiRecord extends TaggedError2("InvalidPiRecord") {
+  get message() {
+    return `${this.source}: ${this.detail}`;
+  }
+}
+var JournalEntry = Struct({
+  index: Int.check(isGreaterThanOrEqualTo2(0)),
+  key: String4,
+  ok: Boolean3,
+  text: optionalKey2(String4),
+  resumed: optionalKey2(Literal2(true))
+});
+var JournalLine = fromJsonString2(JournalEntry);
+var decodePiJournal = (journal, source) => gen2(function* () {
+  const entries = [];
+  for (const [at, line] of journal.split(/\r?\n/).entries()) {
+    if (line.trim() === "")
+      continue;
+    entries.push(yield* decodeUnknownEffect2(JournalLine)(line, { onExcessProperty: "error" }).pipe(mapError2((error) => new InvalidPiRecord({
+      source,
+      detail: `line ${at + 1} is not a workflow journal entry: ${error.message}`
+    }))));
+  }
+  return entries.toSorted((a, b) => a.index - b.index);
+});
+var nonEmpty = (text) => text !== undefined && text.trim() !== "";
+var matchJournal = (entries, expected) => {
+  const idOf = new Map(expected.map(({ id, key }) => [key, id]));
+  const last = new Map;
+  const unmatched = [];
+  for (const entry of entries) {
+    const id = idOf.get(entry.key);
+    if (id !== undefined)
+      last.set(id, entry);
+    else
+      unmatched.push({
+        index: entry.index,
+        id: undefined,
+        reason: !entry.ok ? "failed" : nonEmpty(entry.text) ? "unmatched" : "empty"
+      });
+  }
+  const reports = [];
+  const notReported = [...unmatched];
+  for (const [id, entry] of last)
+    if (entry.ok && nonEmpty(entry.text))
+      reports.push({ id, index: entry.index, report: entry.text });
+    else
+      notReported.push({ index: entry.index, id, reason: entry.ok ? "empty" : "failed" });
+  return {
+    reports: reports.toSorted((a, b) => a.index - b.index),
+    notReported: notReported.toSorted((a, b) => a.index - b.index)
+  };
+};
+var AGENT_RECORD_ENTRY_TYPE = "subagents:record";
+var AgentRecordData = Struct({
+  id: String4,
+  type: String4,
+  description: String4,
+  status: Literals([
+    "queued",
+    "running",
+    "completed",
+    "steered",
+    "aborted",
+    "stopped",
+    "error"
+  ]),
+  result: optionalKey2(String4),
+  error: optionalKey2(String4),
+  startedAt: Number5,
+  completedAt: optionalKey2(Number5),
+  sessionFile: optionalKey2(String4),
+  handle: optionalKey2(String4),
+  alias: optionalKey2(String4),
+  worktreeLost: optionalKey2(Boolean3)
+});
+var RecordEntry = Struct({
+  type: Literal2("custom"),
+  customType: Literal2(AGENT_RECORD_ENTRY_TYPE),
+  data: AgentRecordData,
+  id: String4,
+  parentId: NullOr(String4),
+  timestamp: String4
+});
+var RecordLine = fromJsonString2(RecordEntry);
+var SessionLine = fromJsonString2(Struct({ type: String4, customType: optionalKey2(String4) }));
+
+class PiRecordMissing extends TaggedError2("PiRecordMissing") {
+  get message() {
+    return `${this.source} holds no ${AGENT_RECORD_ENTRY_TYPE} entry for agent ${this.agentId}: it is still running, was evicted before it was persisted, or belongs to another session`;
+  }
+}
+var agentRecordIn = (session, source, agentId) => gen2(function* () {
+  let found;
+  for (const [at, line] of session.split(/\r?\n/).entries()) {
+    if (!line.includes(AGENT_RECORD_ENTRY_TYPE))
+      continue;
+    const probe = yield* decodeUnknownEffect2(SessionLine)(line).pipe(option2);
+    if (probe._tag === "None" || probe.value.type !== "custom" || probe.value.customType !== AGENT_RECORD_ENTRY_TYPE)
+      continue;
+    const { data } = yield* decodeUnknownEffect2(RecordLine)(line, {
+      onExcessProperty: "error"
+    }).pipe(mapError2((error) => new InvalidPiRecord({
+      source,
+      detail: `line ${at + 1} is not a ${AGENT_RECORD_ENTRY_TYPE} entry: ${error.message}`
+    })));
+    if (data.id === agentId)
+      found = data;
+  }
+  return found ?? (yield* new PiRecordMissing({ source, agentId }));
+});
+var STATUS_OF = {
+  ok: { status: "done", close: "success" },
+  error: { status: "failed", close: "errored" },
+  length: { status: "failed", close: "errored" },
+  empty: { status: "failed", close: "errored" },
+  exit: { status: "failed", close: "errored" },
+  aborted: { status: "failed", close: "errored" },
+  stopped: { status: "interrupted", close: "stopped" }
+};
+var assignmentStatusOf = (outcome) => STATUS_OF[outcome];
+var outcomeOfRecord = (record) => {
+  switch (record.status) {
+    case "completed":
+    case "steered":
+      return nonEmpty(record.result) ? "ok" : "empty";
+    case "error":
+    case "aborted":
+    case "stopped":
+      return record.status;
+    case "queued":
+    case "running":
+      return "exit";
+  }
+};
+var piRecordReport = (session, source, agentId) => agentRecordIn(session, source, agentId).pipe(map4((record) => {
+  const outcome = outcomeOfRecord(record);
+  return {
+    ended: outcome,
+    ...assignmentStatusOf(outcome),
+    report: outcome === "ok" ? record.result : undefined,
+    error: record.error
+  };
+}));
 
 var EVIDENCE_HEADING = /^\s*evidence:\s*$/i;
 var indentOf = (line) => line.length - line.trimStart().length;
@@ -12649,7 +12839,7 @@ var Resulted = Struct({
 var Other = Struct({
   type: String4.check(isPattern2(/^(?!(?:started|result)$)/))
 });
-var JournalLine = fromJsonString2(Union2([Started, Resulted, Other]));
+var JournalLine2 = fromJsonString2(Union2([Started, Resulted, Other]));
 var journalResults = (journal, source) => gen2(function* () {
   const labels = new Map;
   const results = [];
@@ -12657,7 +12847,7 @@ var journalResults = (journal, source) => gen2(function* () {
   for (const [index, line] of lines.entries()) {
     if (line.trim() === "")
       continue;
-    const entry = yield* decodeUnknownEffect2(JournalLine)(line, {
+    const entry = yield* decodeUnknownEffect2(JournalLine2)(line, {
       onExcessProperty: "ignore"
     }).pipe(mapError2((error) => new Usage({
       message: `Line ${index + 1} of the journal ${source} is not a started or result entry: ${error.message}`,
@@ -12674,6 +12864,44 @@ var journalResults = (journal, source) => gen2(function* () {
   }
   return results;
 });
+var dispatchedCall = (assignment, agent, briefPath, launch) => ({
+  id: assignment.id,
+  key: journalKey({
+    prompt: dispatchPrompt(assignment, agent, briefPath, PI_WORDS),
+    label: assignment.id,
+    model: launch.model,
+    agentType: routeFor(assignment.roleTask).agent,
+    effort: launch.effort
+  })
+});
+var refused = (hint) => (error) => new Usage({ message: error.message, hint });
+var piJournalReports = (journal, source, calls) => decodePiJournal(journal, source).pipe(mapError2(refused("Pass the <run id>.workflow.jsonl of the workflow run, unedited.")), map4((entries) => {
+  const { reports, notReported } = matchJournal(entries, calls);
+  const run = basename2(source).replace(/\.workflow\.jsonl$/, "");
+  return {
+    reports: reports.map(({ id, report }) => ({ id, report })),
+    notAssignmentIds: notReported.map(({ id, index, reason }) => ({
+      label: id ?? "",
+      agentId: `${run}#${index} ${reason}`
+    }))
+  };
+}));
+var piRecordReports = (session, source, agents) => gen2(function* () {
+  const reports = [];
+  const notAssignmentIds = [];
+  for (const { id, agentId } of agents) {
+    if (agentId.startsWith(PI_WORKFLOW_AGENT_PREFIX)) {
+      notAssignmentIds.push({ label: id, agentId: `${agentId} not in a session file` });
+      continue;
+    }
+    const found = yield* piRecordReport(session, source, agentId.replace(/^pi:/, "")).pipe(catchTag2("PiRecordMissing", () => succeed6(undefined)));
+    if (found?.report !== undefined)
+      reports.push({ id, report: found.report });
+    else
+      notAssignmentIds.push({ label: id, agentId: `${agentId} ${found?.ended ?? "missing"}` });
+  }
+  return { reports, notAssignmentIds };
+}).pipe(mapError2(refused("Pass the root session file of the Pi session, unedited.")));
 
 class WithTrailer {
   fields;
@@ -12727,12 +12955,13 @@ var withPlanned = (snapshot, input, id, now) => completeDraft(snapshot, input).p
   ...snapshot.project,
   assignments: [...snapshot.project.assignments, assignment]
 })));
-var directiveView = (directive) => directive.action === "continue" ? { continue: directive.agentId, reason: directive.reason } : {
-  agent: `${PLUGIN_NAMESPACE}:${directive.agent}`,
-  model: directive.model,
-  effort: directive.effort,
+var agentTypeFor = (host, agent) => host === "pi" ? agent : `${PLUGIN_NAMESPACE}:${agent}`;
+var directiveView = (directive, host, launch) => directive.action === "continue" ? { continue: directive.agentId, reason: directive.reason } : present({
+  agent: agentTypeFor(host, directive.agent),
+  model: launch.model,
+  effort: launch.effort,
   reason: directive.reason
-};
+});
 var ExistingRef = Struct({ id: AssignmentId });
 var OutcomeFlag = Literals(["success", "failure", "errored", "interrupted", "stopped"]);
 var OUTCOMES = {
@@ -12743,7 +12972,7 @@ var OUTCOMES = {
   stopped: "Cancelled"
 };
 var dispatchOutput = (words) => ({
-  output: `TOON fields (id, state, agent/model/effort or continue, reason), then a line \`prompt:\` alone, then a two-line specialist prompt that names the brief file the full Assignment was written to; pass that text as it is: as the prompt of its agent() in your inline workflow script first, to the ${words.agentTool} tool only when the ${words.workflowTool} tool is disabled or unavailable, and by ${words.message} only for a warm continuation. The brief itself is never printed: the specialist reads it with the ${words.readTool} tool`
+  output: `TOON fields (id, state, agent/model/effort or continue, reason), then a line \`prompt:\` alone, then a two-line specialist prompt that names the brief file the full Assignment was written to; pass that text as it is: as the prompt of its agent() in your inline workflow script first, to the ${words.agentTool} tool only when the ${words.workflowTool} tool is disabled or unavailable, and by ${words.message} only for a warm continuation. The brief itself is never printed: the specialist reads it with the ${words.readTool} tool${words.launchNote === undefined ? "" : `. ${words.launchNote}`}`
 });
 var recordHelp = (words) => ({
   summary: `Record the launch of a dispatched Assignment (a workflow's agent as ${words.workflowAgentPrefix}<run-id>/<id>), or roll it back when the launch failed`,
@@ -12793,6 +13022,29 @@ var agentIdProblem = (agentId, id, host) => {
     return /^\S+$/.test(agentId.slice(PI_AGENT_PREFIX.length)) ? undefined : `A pi agent is recorded as ${PI_AGENT_PREFIX}<agent-id>`;
   return host === "pi" ? piAgentProblem(id) : undefined;
 };
+var claudeReports = (journal, source) => gen2(function* () {
+  const results = yield* journalResults(journal, source);
+  const byId = new Map;
+  const notAssignmentIds = [];
+  for (const { label, agentId, report } of results) {
+    if (label !== undefined && is2(AssignmentId)(label))
+      byId.set(label, report);
+    else
+      notAssignmentIds.push({ label: label ?? "", agentId });
+  }
+  return { reports: [...byId].map(([id, report]) => ({ id, report })), notAssignmentIds };
+});
+var piReports = (call, source, text) => gen2(function* () {
+  const { project } = yield* readState(call.directory);
+  if (!basename3(source).endsWith(".workflow.jsonl"))
+    return yield* piRecordReports(text, source, project.assignments.flatMap(({ id, specialist }) => {
+      const agentId = specialist?.agentId;
+      return agentId !== undefined && (agentId.startsWith(PI_AGENT_PREFIX) || agentId.startsWith(PI_WORKFLOW_AGENT_PREFIX)) ? [{ id, agentId }] : [];
+    }));
+  const launchOf = yield* launchesOf(call.env, call.root, "pi");
+  const calls = yield* forEach2(project.assignments, (assignment) => briefPath(call, assignment.id).pipe(map4((path) => dispatchedCall(assignment, agentTypeFor("pi", routeFor(assignment.roleTask).agent), path, launchOf(assignment.roleTask)))));
+  return yield* piJournalReports(text, source, calls);
+});
 var ASSIGNMENT_COMMANDS = [
   {
     path: ["assignment", "create"],
@@ -12826,13 +13078,14 @@ var ASSIGNMENT_COMMANDS = [
         message: `${error.message}. To dispatch an existing Assignment send {"id": "<id>"}`
       }) : error));
       const settings = yield* config;
+      const launchOf = yield* launchesOf(call.env, call.root, settings.host);
       const newAssignmentId = yield* newId("assignment");
       const now = yield* nowIso;
       const started = yield* update((snapshot) => gen2(function* () {
         const id = "id" in request ? request.id : newAssignmentId;
         const project = "id" in request ? snapshot.project : yield* withPlanned(snapshot, request, id, now);
         const dispatched = yield* dispatch(project, snapshot.specialists, id, now, settings, workTreeKey(call.root));
-        const agent = `${PLUGIN_NAMESPACE}:${routeFor(dispatched.assignment.roleTask).agent}`;
+        const agent = agentTypeFor(settings.host, routeFor(dispatched.assignment.roleTask).agent);
         const path = yield* writeBrief(call, dispatched.assignment.id, renderPrompt(dispatched.assignment, agent));
         return {
           ...dispatched,
@@ -12842,7 +13095,7 @@ var ASSIGNMENT_COMMANDS = [
       return new WithTrailer({
         id: started.assignment.id,
         state: started.assignment.state,
-        ...directiveView(started.directive)
+        ...directiveView(started.directive, settings.host, launchOf(started.assignment.roleTask))
       }, "prompt", started.prompt);
     })
   },
@@ -12955,18 +13208,10 @@ var ASSIGNMENT_COMMANDS = [
     state: "peek",
     run: (call) => gen2(function* () {
       const source = resolve4(call.cwd, idArgument(call.args.positionals));
-      const journal = yield* io(source, () => Bun.file(source).text());
-      const results = yield* journalResults(journal, source);
-      const byId = new Map;
-      const strays = [];
-      for (const { label, agentId, report } of results) {
-        if (label !== undefined && is2(AssignmentId)(label))
-          byId.set(label, { report });
-        else
-          strays.push({ label: label ?? "", agentId });
-      }
-      const reports = yield* forEach2([...byId], ([id, { report }]) => writeReport(call, id, report).pipe(map4((path) => ({ id, path, words: wordCount(report) }))));
-      return { reports, notAssignmentIds: strays };
+      const text = yield* io(source, () => Bun.file(source).text());
+      const found = (yield* call.config).host === "pi" ? yield* piReports(call, source, text) : yield* claudeReports(text, source);
+      const reports = yield* forEach2(found.reports, ({ id, report }) => writeReport(call, id, report).pipe(map4((path) => ({ id, path, words: wordCount(report) }))));
+      return { reports, notAssignmentIds: found.notAssignmentIds };
     })
   },
   {
@@ -13141,7 +13386,7 @@ var projectSettingsFiles = fn2("projectSettingsFiles")(function* (cwd) {
 });
 
 import { chmod, mkdir as mkdir3, realpath as realpath4, rename as rename4, rm as rm5, writeFile } from "fs/promises";
-import { basename as basename2, dirname as dirname4, join as join11 } from "path";
+import { basename as basename4, dirname as dirname4, join as join11 } from "path";
 var JsonObjectText = fromJsonString2(Record(String4, Unknown2), {
   space: 2
 });
@@ -13173,7 +13418,7 @@ var replaceJsonObject = (path, value, options, unchangedSince) => gen2(function*
   const mode = options?.mode ?? (exists ? (yield* fileOperation(target, "write", () => Bun.file(target).stat())).mode & 511 : undefined);
   const text = (yield* encodeEffect(JsonObjectText)(value, strict2).pipe(mapError2((error) => new SetupFailure({ message: `cannot encode ${path}: ${error.message}` })))) + `
 `;
-  const temporary = join11(dirname4(target), `.${basename2(target)}.${process.pid}.tmp`);
+  const temporary = join11(dirname4(target), `.${basename4(target)}.${process.pid}.tmp`);
   yield* fileOperation(dirname4(target), "write", () => mkdir3(dirname4(target), { recursive: true }));
   yield* tryPromise2({
     try: () => writeFile(temporary, text, { flag: "wx", ...mode === undefined ? {} : { mode } }),
@@ -14259,6 +14504,7 @@ var resumeOf = (directory, words = CLAUDE_WORDS) => readOpenState(directory).pip
 })));
 var planNotes = (words) => [
   "`workflow` first: `assignments` are the ids in run order, a writer followed by the review of its work; `assignment dispatch` each for its agent, model, effort and prompt, then write the inline script as the root workflow text says. A single Assignment is a one-entry workflow",
+  ...words.launchNote === undefined ? [] : [words.launchNote],
   `\`continues\` lists Ready work that continues a warm specialist, by ${words.message} beside the workflow. \`fallback\` is the same work as direct subagents, for a session where the ${words.workflowTool} tool is disabled or unavailable: its writers launch together, and the \`afterwards\` reviews launch once the writers they depend on are terminal`
 ];
 var OVERVIEW_COMMANDS = [
@@ -20078,7 +20324,8 @@ var AGENT_OPTIONS = new Set([
   "label",
   "phase"
 ]);
-var SPECIALISTS = new Set(ROUTES.map((route) => `${PLUGIN_NAMESPACE}:${route.agent}`));
+var PLUGIN_NAMESPACE2 = "holyagent";
+var CLAUDE_SPECIALISTS = new Set(ROUTES.map((route) => `${PLUGIN_NAMESPACE2}:${route.agent}`));
 var UNARY = new Set(["!", "-", "+", "~", "typeof", "void"]);
 var newBinding = () => ({
   unsafe: false,
@@ -20281,15 +20528,205 @@ var occurrencesIn = (node, scope, into, depth = 0) => {
       occurrencesIn(value, scope, into, depth + 1);
   return into;
 };
-var inspect = (script) => {
+var META_DECLARATION = /(^|[\r\n])[ \t]*export[ \t\r\n]+const[ \t\r\n]+meta[ \t\r\n]*=/g;
+var scanObjectLiteral = (source, open) => {
+  let depth = 0;
+  let i = open;
+  let sawInterpolation = false;
+  let mode = "code";
+  const templateStack = [];
+  while (i < source.length) {
+    const c = source[i];
+    const next = source[i + 1];
+    if (mode === "line-comment") {
+      if (c === `
+`)
+        mode = "code";
+      i++;
+      continue;
+    }
+    if (mode === "block-comment") {
+      if (c === "*" && next === "/") {
+        mode = "code";
+        i += 2;
+        continue;
+      }
+      i++;
+      continue;
+    }
+    if (mode === "single" || mode === "double" || mode === "regex") {
+      if (c === "\\") {
+        i += 2;
+        continue;
+      }
+      if (mode === "single" && c === "'")
+        mode = "code";
+      else if (mode === "double" && c === '"')
+        mode = "code";
+      else if (mode === "regex" && c === "/")
+        mode = "code";
+      else if (c === `
+` && mode !== "double")
+        mode = "code";
+      i++;
+      continue;
+    }
+    if (mode === "template") {
+      if (c === "\\") {
+        i += 2;
+        continue;
+      }
+      if (c === "`") {
+        mode = "code";
+        i++;
+        continue;
+      }
+      if (c === "$" && next === "{") {
+        sawInterpolation = true;
+        templateStack.push(depth);
+        depth++;
+        mode = "code";
+        i += 2;
+        continue;
+      }
+      i++;
+      continue;
+    }
+    if (c === "/" && next === "/") {
+      mode = "line-comment";
+      i += 2;
+      continue;
+    }
+    if (c === "/" && next === "*") {
+      mode = "block-comment";
+      i += 2;
+      continue;
+    }
+    if (c === "'") {
+      mode = "single";
+      i++;
+      continue;
+    }
+    if (c === '"') {
+      mode = "double";
+      i++;
+      continue;
+    }
+    if (c === "`") {
+      mode = "template";
+      i++;
+      continue;
+    }
+    if (c === "/" && isRegexPosition(source, i)) {
+      mode = "regex";
+      i++;
+      continue;
+    }
+    if (c === "{") {
+      depth++;
+      i++;
+      continue;
+    }
+    if (c === "}") {
+      depth--;
+      i++;
+      if (templateStack.length > 0 && depth === templateStack[templateStack.length - 1]) {
+        templateStack.pop();
+        mode = "template";
+        continue;
+      }
+      if (depth === 0)
+        return { end: i, sawInterpolation };
+      continue;
+    }
+    i++;
+  }
+  return { end: -1, sawInterpolation };
+};
+var isRegexPosition = (source, i) => {
+  let j = i - 1;
+  while (j >= 0 && /\s/.test(source[j] ?? ""))
+    j--;
+  if (j < 0)
+    return true;
+  return !/[\w$)\]]/.test(source[j] ?? "");
+};
+var literalOnly = (node, depth) => {
+  if (node === undefined || depth > MAX_DEPTH)
+    return false;
+  if (node.type === "Literal")
+    return !("regex" in node) && !("bigint" in node);
+  if (node.type === "ArrayExpression")
+    return nodesAt(node, "elements").every((item) => literalOnly(item, depth + 1));
+  if (node.type !== "ObjectExpression")
+    return false;
+  return nodesAt(node, "properties").every((property) => {
+    const key = nodeAt(property ?? { type: "" }, "key");
+    const name = key?.type === "Literal" && typeof key["value"] === "string" ? key["value"] : nameOf(key);
+    return property?.type === "Property" && property["computed"] === false && property["kind"] === "init" && property["method"] !== true && name !== undefined && !DENIED_NAMES.has(name) && literalOnly(nodeAt(property, "value"), depth + 1);
+  });
+};
+var WRAPPER_OPEN = "(async () => {";
+var WRAPPER_PRELUDE = "const Date = void 0;";
+var metaFragment = (script) => {
+  const matches = [...script.matchAll(META_DECLARATION)];
+  const found = matches[0];
+  if (found === undefined)
+    return {
+      refusal: "has no line that reads as `export const meta =`, which the package requires"
+    };
+  if (matches.length > 1)
+    return { refusal: "has more than one line that reads as `export const meta =`" };
+  const open = script.indexOf("{", (found.index ?? 0) + found[0].length);
+  if (open === -1)
+    return { refusal: "gives `export const meta` no object literal" };
+  const { end, sawInterpolation } = scanObjectLiteral(script, open);
+  if (end === -1)
+    return { refusal: "has a `meta` object literal that is never closed" };
+  if (sawInterpolation)
+    return { refusal: "uses template interpolation in `meta`" };
+  const fragment = script.slice(open, end);
+  const wrapped = parse2(`(${fragment})`, { ecmaVersion: "latest", sourceType: "script" });
+  const statement = wrapped.body[0];
+  const value = statement === undefined ? undefined : nodeAt(statement, "expression");
+  if (value === undefined || wrapped.body.length !== 1 || statement?.type !== "ExpressionStatement" || value.type !== "ObjectExpression" || startOf(value) !== 1 || endOf(value) !== fragment.length + 1 || !literalOnly(value, 1))
+    return { refusal: "has a `meta` that is not an object literal of plain literals" };
+  return { at: found.index ?? 0, value };
+};
+var workerProgram = (script) => {
+  const meta = metaFragment(script);
+  if ("refusal" in meta)
+    return meta;
+  const exportAt = script.indexOf("export", meta.at);
+  const body = `${script.slice(0, exportAt)}${" ".repeat(6)}${script.slice(exportAt + 6)}`;
+  const prefix = `${WRAPPER_OPEN}${WRAPPER_PRELUDE}
+`;
+  const source = `${prefix}${body}
+})()`;
+  const program = parse2(source, { ecmaVersion: "latest", sourceType: "script" });
+  const call = nodeAt(program.body[0], "expression");
+  const arrow = call === undefined ? undefined : nodeAt(call, "callee");
+  const block = arrow === undefined ? undefined : nodeAt(arrow, "body");
+  const statements = block === undefined ? [] : nodesAt(block, "body");
+  const prelude = statements[0];
+  if (program.body.length !== 1 || call?.type !== "CallExpression" || nodesAt(call, "arguments").length !== 0 || arrow?.type !== "ArrowFunctionExpression" || arrow["async"] !== true || block?.type !== "BlockStatement" || endOf(block) !== source.length - 3 || prelude?.type !== "VariableDeclaration" || startOf(prelude) !== WRAPPER_OPEN.length || endOf(prelude) !== prefix.length - 1)
+    return { refusal: "closes the wrapper the package puts around a script" };
+  return { program: { type: "Program", body: statements.slice(1) } };
+};
+var inspect = (script, specialists, classic) => {
   if (script.length > MAX_WORKFLOW_SCRIPT)
     return "the script is too large";
-  const program = parse2(script, {
-    ecmaVersion: "latest",
-    sourceType: "module",
-    allowAwaitOutsideFunction: true,
-    allowReturnOutsideFunction: true
-  });
+  const parsed = classic ? workerProgram(script) : {
+    program: parse2(script, {
+      ecmaVersion: "latest",
+      sourceType: "module",
+      allowAwaitOutsideFunction: true,
+      allowReturnOutsideFunction: true
+    })
+  };
+  if ("refusal" in parsed)
+    return parsed.refusal;
+  const { program } = parsed;
   let refusal;
   const refuse = (why) => {
     refusal ??= why;
@@ -20558,7 +20995,7 @@ var inspect = (script) => {
       const value = nodeAt(property, "value");
       if (name !== "agentType")
         expression(value, scope, depth + 1);
-      else if (value?.type === "Literal" && typeof value["value"] === "string" && SPECIALISTS.has(value["value"]))
+      else if (value?.type === "Literal" && typeof value["value"] === "string" && specialists.has(value["value"]))
         named += 1;
       else
         return refuse("starts an agent that is not a holyagent specialist by a literal agentType");
@@ -20815,6 +21252,8 @@ var inspect = (script) => {
       case "VariableDeclaration":
         return variableDeclaration(node, scope, depth);
       case "FunctionDeclaration": {
+        if (classic && !scope.isFunction)
+          refuse("declares a function inside a block");
         const name = nameOf(nodeAt(node, "id")) ?? "";
         declare(scope, name, "unsafe");
         scope.names.get(name)?.functions.add(node);
@@ -20925,21 +21364,6 @@ var inspect = (script) => {
         return refuse(`uses ${node.type}`);
     }
   }
-  const literalOnly = (node, depth) => {
-    if (node === undefined || depth > MAX_DEPTH)
-      return false;
-    if (node.type === "Literal")
-      return !("regex" in node) && !("bigint" in node);
-    if (node.type === "ArrayExpression")
-      return nodesAt(node, "elements").every((item) => literalOnly(item, depth + 1));
-    if (node.type !== "ObjectExpression")
-      return false;
-    return nodesAt(node, "properties").every((property) => {
-      const key = nodeAt(property ?? { type: "" }, "key");
-      const name = key?.type === "Literal" && typeof key["value"] === "string" ? key["value"] : nameOf(key);
-      return property?.type === "Property" && property["computed"] === false && property["kind"] === "init" && property["method"] !== true && name !== undefined && !DENIED_NAMES.has(name) && literalOnly(nodeAt(property, "value"), depth + 1);
-    });
-  };
   function analyse() {
     const keyOf = (name, scope) => binding(scope, name) ?? (name === "args" ? "args" : undefined);
     const dynamic = new Set;
@@ -21439,8 +21863,8 @@ var inspect = (script) => {
     refuse("starts no agent");
   return refusal;
 };
-var workflowRefusal = (script) => try_2({
-  try: () => inspect(script),
+var workflowRefusal = (script, specialists = CLAUDE_SPECIALISTS, host = "claude") => try_2({
+  try: () => inspect(script, specialists, host === "pi"),
   catch: (cause) => `cannot read the script: ${String(cause)}`
 }).pipe(catch_2((reason) => succeed6(reason)));
 

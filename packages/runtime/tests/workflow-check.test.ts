@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import { Effect } from "effect"
 
-import { workflowRefusal } from "../src/cli/workflow-check.ts"
+import { literalWorkflowName, workflowRefusal } from "../src/cli/workflow-check.ts"
 
 const META = 'export const meta = { name: "w", description: "d" }'
 const AGENT = "await agent('p', { agentType: 'holyagent:worker-implementation' })"
@@ -877,5 +877,178 @@ describe("the workflow check lets the scripts the root writes run", () => {
         ].join("\n"),
       ),
     ).toBeUndefined()
+  })
+})
+
+describe("the Pi mode checks the meta fragment and the program the package runs", () => {
+  // The package evaluates a fragment cut from the source by pattern, on the host thread, where
+  // `this.constructor.constructor` reaches `process`, and compiles the script as a classic script.
+  const SPECIALISTS = new Set(["worker-implementation"])
+  const PI_AGENT = "await agent('p', { agentType: 'worker-implementation' })"
+  const PAYLOAD = '{ description: this.constructor.constructor("return process")() }'
+  const OBJECT = '{ name: "a", description: "d" }'
+
+  const piRefusal = (script: string) =>
+    Effect.runPromise(workflowRefusal(script, SPECIALISTS, "pi"))
+  /** The refusal of a script made of the lines under the Pi mode, with meta and a vetted agent(). */
+  const piLines = (...lines: ReadonlyArray<string>) =>
+    piRefusal([META, ...lines, PI_AGENT].join("\n"))
+
+  test.each<readonly [string, string]>([
+    ["a block comment", `export const meta = /* ${PAYLOAD} */ ${OBJECT}`],
+    ["a line comment", `export const meta = // ${PAYLOAD}\n${OBJECT}`],
+    ["a block comment with a nested brace", `export const meta = /* { { */ ${PAYLOAD}`],
+  ])("refuses the meta fragment the package cuts from %s", async (_label, line) => {
+    expect(await piRefusal(`${line}\n${PI_AGENT}`)).toContain("`meta`")
+  })
+
+  test.each<readonly [string, string]>([
+    ["a call", '{ name: "a", description: String(1) }'],
+    ["a getter", '{ name: "a", get description() { return "d" } }'],
+    ["a computed key", '{ name: "a", ["description"]: "d" }'],
+    ["a shorthand name", '{ name, description: "d" }'],
+    ["a spread", '{ ...other, name: "a" }'],
+    ["a template with an expression", "{ name: `a${1}`, description: 'd' }"],
+    ["an identifier", '{ name: "a", description: Object }'],
+    ["a regex", '{ name: "a", description: /x/ }'],
+    ["an arrow function", '{ name: "a", description: () => 1 }'],
+  ])("refuses a meta that holds %s", async (_label, object) => {
+    expect(await piRefusal(`export const meta = ${object}\n${PI_AGENT}`)).toContain("`meta`")
+  })
+
+  test("refuses a script whose meta line is missing or repeated", async () => {
+    expect(await piRefusal(PI_AGENT)).toContain("export const meta")
+    expect(await piRefusal(`/*\n${META}\n*/\n${META}\n${PI_AGENT}`)).toContain("more than one")
+  })
+
+  test("allows a meta of literals, wherever the comments around it stand", async () => {
+    expect(await piRefusal(`${META}\n${PI_AGENT}`)).toBeUndefined()
+    expect(
+      await piRefusal(
+        `export const meta = /* the meta */ { name: "a", "description": 'd', n: 1, ok: true, none: null, phases: [{ title: "t", detail: "a}b" }] }\n${PI_AGENT}`,
+      ),
+    ).toBeUndefined()
+    expect(
+      await piRefusal(`export const meta = // the meta\n${OBJECT}\n${PI_AGENT}`),
+    ).toBeUndefined()
+    // The line is the package's meta wherever it stands; what it evaluates is the vetted literal.
+    expect(await piRefusal(`const text = \`\n${META}\n\`\n${PI_AGENT}`)).toBeUndefined()
+  })
+
+  test("reads the script as a classic script, so an HTML-like comment hides what it hides", async () => {
+    // In a classic script `<!--` and a line-leading `-->` start a comment; the function declared on
+    // the commented line does not exist, so `workflow` is a global of the worker, not of the script.
+    expect(
+      await piLines(
+        "let n = 0",
+        "n <!--n; function workflow() { return 1 }",
+        'await workflow({ scriptPath: "x.js" })',
+      ),
+    ).toContain("workflow")
+    expect(
+      await piLines(
+        "--> function workflow() { return 1 }",
+        'await workflow({ scriptPath: "x.js" })',
+      ),
+    ).toContain("workflow")
+  })
+
+  test.each<readonly [string, string]>([
+    ["a block", "{ function f() { return 2 } }\nlog(f())"],
+    ["an if", "const ok = true\nif (ok) { function g() { return 2 } }\nlog(1)"],
+    ["a loop body", "for (let i = 0; i < 2; i++) { function h() { return i } }"],
+    ["a case", "switch (1) { case 1: function k() { return 1 } }"],
+    ["a try block", "try { function t() { return 1 } } catch (e) { log(e) }"],
+  ])(
+    "refuses a function declared in %s, which a classic script hoists out of it",
+    async (_l, text) => {
+      expect(await piLines(text)).toContain("declares a function inside a block")
+    },
+  )
+
+  test("allows functions declared at the top of the script and of a function", async () => {
+    expect(
+      await piLines(
+        "function one(n) { return n + 1 }",
+        "function two(n) { function inner(m) { return one(m) }\nreturn inner(n) }",
+        "log(two(1))",
+      ),
+    ).toBeUndefined()
+  })
+
+  test("refuses a script that closes the wrapper the package puts around it", async () => {
+    expect(await piLines("})", "log(1)", ";(async () => {")).toContain("wrapper")
+  })
+
+  test("applies the rules of the Claude check to the program, with bare names", async () => {
+    expect(
+      await piRefusal(
+        `${META}\nawait agent('p', { agentType: 'holyagent:worker-implementation' })`,
+      ),
+    ).toBeString()
+    expect(await piRefusal(`${META}\nawait agent('p', { agentType: 'other' })`)).toBeString()
+    expect(await piRefusal(`${META}\nlog(1)`)).toContain("starts no agent")
+    expect(await piRefusal(`${META}\nawait Date.now()\n${PI_AGENT}`)).toBeString()
+  })
+})
+
+describe("HTML-like text in a string is plain under both hosts", () => {
+  // `<!--` and `-->` inside a string or template are data in a module and in a classic script alike.
+  const claude = (...lines: ReadonlyArray<string>) => refusal(...lines)
+  const pi = (...lines: ReadonlyArray<string>) =>
+    Effect.runPromise(
+      workflowRefusal(
+        [META, ...lines, "await agent('p', { agentType: 'worker-implementation' })"].join("\n"),
+        new Set(["worker-implementation"]),
+        "pi",
+      ),
+    )
+
+  test.each<readonly [string, string]>([
+    ["`-->` in a template", "log(`a --> b`)"],
+    ["`<!--` in a string", "log('a <!-- b')"],
+    ["both in a double-quoted string", 'log("<!-- a --> b")'],
+    ["`-->` at the start of a template line", "log(`a\n--> b`)"],
+    ["both in an agent prompt", "await agent('see <!-- and --> here', { agentType: 'AGENT' })"],
+  ])("allows %s", async (_label, text) => {
+    expect(await claude(text.replace("AGENT", "holyagent:worker-implementation"))).toBeUndefined()
+    expect(await pi(text.replace("AGENT", "worker-implementation"))).toBeUndefined()
+  })
+
+  test("the Claude hook still reads the script as a module", async () => {
+    expect(await claude("{ function f() { return 2 } }", "log(1)")).toBeUndefined()
+    expect(
+      await refusalOf(`export const meta = /* x */ { name: "a", description: "d" }\n${AGENT}`),
+    ).toBeUndefined()
+    expect(await refusalOf(`/*\n${META}\n*/\n${META}\n${AGENT}`)).toBeUndefined()
+    expect(await refusalOf(AGENT)).toBeUndefined()
+  })
+})
+
+describe("the literal workflow name", () => {
+  test.each<readonly [string, string, string | undefined]>([
+    ["a literal name", "export const meta = { name: 'w', description: 'd' }\nreturn 1", "w"],
+    ["a quoted key", "export const meta = { 'name': \"q\" }", "q"],
+    ["the last of two names", "export const meta = { name: 'a', name: 'b' }", "b"],
+    ["a name that is no string", "export const meta = { name: 2 }", undefined],
+    ["no name", "export const meta = { description: 'd' }", undefined],
+    ["no meta", "return 1", undefined],
+    [
+      "two metas",
+      "export const meta = { name: 'a' }\nexport const meta = { name: 'b' }",
+      undefined,
+    ],
+    ["a call in the fragment", "export const meta = { name: String('a') }", undefined],
+    ["a call elsewhere in the fragment", "export const meta = { name: 'a', x: f() }", undefined],
+    ["a getter", "export const meta = { get name() { return 'a' } }", undefined],
+    [
+      "a constructor chain",
+      'export const meta = { name: this.constructor.constructor("return 1")() }',
+      undefined,
+    ],
+    ["an interpolated template", "export const meta = { name: `${x}` }", undefined],
+    ["a syntax error", "export const meta = { name: ", undefined],
+  ])("%s", (_label, script, expected) => {
+    expect(Effect.runSync(literalWorkflowName(script))).toBe(expected)
   })
 })

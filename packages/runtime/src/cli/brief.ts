@@ -23,16 +23,22 @@ const folderFor = (call: Call, name: string) =>
     ),
   )
 
+const pathIn = (call: Call, name: string, assignmentId: string) =>
+  folderFor(call, name).pipe(Effect.map((folder) => join(folder, `${assignmentId}.md`)))
+
 /**
  * Writes `text` to `<id>.md` in the named folder and returns the absolute path; a repeat replaces
  * it.
  */
 const writeNamed = (call: Call, name: string, assignmentId: string, text: string) =>
   Effect.gen(function* () {
-    const path = join(yield* folderFor(call, name), `${assignmentId}.md`)
+    const path = yield* pathIn(call, name, assignmentId)
     yield* io(path, () => Bun.write(path, `${text}\n`))
     return path
   })
+
+/** The absolute path of the brief file of an Assignment, where {@link writeBrief} writes it. */
+export const briefPath = (call: Call, assignmentId: string) => pathIn(call, "briefs", assignmentId)
 
 /**
  * Writes the brief of an Assignment to its file and returns the absolute path, for the dispatch

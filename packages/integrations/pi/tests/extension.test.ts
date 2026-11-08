@@ -3,10 +3,19 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { isAbsolute, join, resolve, win32 } from "node:path"
 
-import type { ExecResult, ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent"
+import type {
+  ExecResult,
+  ExtensionAPI,
+  ExtensionContext,
+  ToolRendererResolver,
+  ToolRenderers,
+} from "@earendil-works/pi-coding-agent"
 import { Effect } from "effect"
 
+import { PLUGIN_NAMESPACE } from "../../../runtime/src/cli/assignment.ts"
+import { HOST_VARIABLE, WORKFLOWS_VARIABLE } from "../../../runtime/src/cli/config.ts"
 import { CONTEXT_BUDGET, SESSION_REMINDER } from "../../../runtime/src/cli/sessioncontext.ts"
+import { CLAUDE_SPECIALISTS } from "../../../runtime/src/cli/workflow-check.ts"
 import { defaultConfig } from "../../../runtime/src/config/schema.ts"
 import { toPosix } from "../../../runtime/src/domain/paths.ts"
 import {
@@ -15,22 +24,44 @@ import {
   PI_SESSION_REMINDER,
 } from "../../../runtime/src/hooks/pi-context.ts"
 import { PI_PROJECT_FLAG } from "../../../runtime/src/hooks/pi-project.ts"
+import { toolArgs } from "../../../runtime/src/pi/tools.ts"
 import {
+  AGENT_TOOL,
+  applyEnvironment,
+  CACHE_RETENTION_ENV,
+  childAgent,
   COMMAND_TIMEOUT_MS,
   CONTEXT_MESSAGE,
   createExtension,
+  CUT_OFF_REPORT,
+  EMPTY_REPORT,
+  type ExtensionOptions,
+  failedFinalMessage,
+  fillPackageRoot,
+  HOST_ENV,
+  hostEnvironment,
+  memoizeLast,
   NOTICE_MESSAGE,
+  refuseNonSpecialist,
+  refuseNonSpecialistWorkflow,
   ROLE_FLAG,
+  sanitizeWorkflowName,
   SESSION_DEADLINE_MS,
+  WORKFLOW_TOOL,
+  workflowCallLine,
+  workflowRenderers,
+  WORKFLOWS_ENV,
   wrapperPath,
 } from "../src/extension.ts"
 import { DIST_DIRECTORY, REPOSITORY } from "../src/files.ts"
+import { SPECIALIST_NAMES } from "../src/specialists.ts"
 
 const PACKAGE_ROOT = join(REPOSITORY, DIST_DIRECTORY)
 // The shell reads a script path without a `/` as a bare name, so the extension names it with `/`
 // only, drive letter included on Windows.
 const WRAPPER = toPosix(join(PACKAGE_ROOT, "scripts", "holyagent"))
-const CONFIG = JSON.stringify(await Effect.runPromise(defaultConfig))
+const DEFAULTS = await Effect.runPromise(defaultConfig)
+const CONFIG = JSON.stringify(DEFAULTS)
 const DISABLED = JSON.stringify({
   ...(await Effect.runPromise(defaultConfig)),
   pi: { ...(await Effect.runPromise(defaultConfig)).pi, enable: false },
@@ -84,18 +115,27 @@ const SESSION_CWD = "/work/project/src"
 const SESSION_PROJECT = resolve(SESSION_CWD)
 
 /** A fake ExtensionAPI that records what the extension registers and runs. */
-const fakeApi = (responder: Responder, value?: string | boolean, cwd = SESSION_CWD) => {
+const fakeApi = (
+  responder: Responder,
+  value?: string | boolean,
+  cwd = SESSION_CWD,
+  session: { readonly name?: string; readonly activeTools?: ReadonlyArray<string> } = {},
+) => {
   const flags = new Map<string, { type: string; default?: string }>()
   const handlers = new Map<string, Array<(...args: Array<never>) => unknown>>()
   const calls: Array<Call> = []
   const sent: Array<unknown> = []
   const touched: Array<string> = []
+  const renderers: Array<ToolRendererResolver> = []
   // The commands started and not yet settled: a process that is still running.
   const running = { count: 0 }
   const api = {
     registerFlag: (name: string, options: { type: string; default?: string }) =>
       void flags.set(name, options),
     getFlag: (name: string) => value ?? flags.get(name)?.default,
+    registerToolRenderer: (resolver: ToolRendererResolver) => void renderers.push(resolver),
+    getSessionName: () => session.name,
+    getActiveTools: () => [...(session.activeTools ?? [])],
     on: (event: string, handler: (...args: Array<never>) => unknown) => {
       handlers.set(event, [...(handlers.get(event) ?? []), handler])
       return () => undefined
@@ -138,6 +178,7 @@ const fakeApi = (responder: Responder, value?: string | boolean, cwd = SESSION_C
     pi: api as unknown as ExtensionAPI,
     flags,
     handlers,
+    renderers,
     calls,
     sent,
     touched,
@@ -159,23 +200,41 @@ const run = async (
     start?: object
     cwd?: string
     afterwards?: (api: ReturnType<typeof fakeApi>) => Promise<void>
+    /** The session's name: a child of the package has `<agent>#<id>`. */
+    sessionName?: string
+    activeTools?: ReadonlyArray<string>
+    /** The environment the extension writes to; a fresh empty one by default. */
+    env?: Record<string, string | undefined>
+    systemPrompt?: string
+    packageRoot?: string
+    platformPath?: ExtensionOptions["platformPath"]
   } = {},
 ) => {
-  const api = fakeApi(responder, options.flag, options.cwd)
-  createExtension({ packageRoot: PACKAGE_ROOT })(api.pi)
+  const api = fakeApi(responder, options.flag, options.cwd, {
+    ...(options.sessionName === undefined ? {} : { name: options.sessionName }),
+    ...(options.activeTools === undefined ? {} : { activeTools: options.activeTools }),
+  })
+  const env = options.env ?? {}
+  createExtension({
+    packageRoot: options.packageRoot ?? PACKAGE_ROOT,
+    env,
+    ...(options.platformPath === undefined ? {} : { platformPath: options.platformPath }),
+  })(api.pi)
   await api.emit("session_start", options.start ?? { reason: "startup" })
   await options.afterwards?.(api)
-  const delivered = (await api.emit("before_agent_start", { prompt: "hello" })).find(
-    (result) => result !== undefined,
-  ) as Delivered | undefined
-  return { api, delivered }
+  const results = await api.emit("before_agent_start", {
+    prompt: "hello",
+    systemPrompt: options.systemPrompt ?? "the system prompt",
+  })
+  const delivered = results.find((result) => result !== undefined) as Delivered | undefined
+  return { api, delivered, env }
 }
 
 const startedWith = (calls: ReadonlyArray<Call>) =>
   calls.map((call) => subcommand(call)?.join(" ")).filter((entry) => entry !== undefined)
 
 describe("the factory", () => {
-  test("registers the role flag and the four handlers and starts nothing", () => {
+  test("registers the role flag and the handlers and starts nothing", () => {
     const timers: Array<string> = []
     const originals = {
       setTimeout: globalThis.setTimeout,
@@ -191,16 +250,18 @@ describe("the factory", () => {
       })
     const api = fakeApi(healthy("/none"))
     try {
-      expect(createExtension({ packageRoot: PACKAGE_ROOT })(api.pi)).toBeUndefined()
+      expect(createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)).toBeUndefined()
     } finally {
       Object.assign(globalThis, originals)
     }
     expect(api.flags.get(ROLE_FLAG)).toMatchObject({ type: "string", default: "root" })
     expect([...api.handlers.keys()].toSorted()).toEqual([
       "before_agent_start",
+      "message_end",
       "session_compact",
       "session_shutdown",
       "session_start",
+      "tool_call",
     ])
     expect(api.calls).toEqual([])
     expect(api.sent).toEqual([])
@@ -221,7 +282,7 @@ describe("the factory", () => {
 describe("session_start and session_shutdown", () => {
   test("session_start takes a stop signal for its commands and session_shutdown stops them, twice safely", async () => {
     const api = fakeApi(healthy("/missing"))
-    createExtension({ packageRoot: PACKAGE_ROOT })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
     await api.emit("session_start", { reason: "startup" })
     const signals = api.calls.map((call) => call.signal)
     expect(signals.length).toBeGreaterThan(0)
@@ -236,14 +297,14 @@ describe("session_start and session_shutdown", () => {
 
   test("a shutdown with no start is a no-op", async () => {
     const api = fakeApi(healthy("/missing"))
-    createExtension({ packageRoot: PACKAGE_ROOT })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
     expect(await api.emit("session_shutdown", { reason: "quit" })).toEqual([undefined])
     expect(api.calls).toEqual([])
   })
 
   test("a new start releases the previous one", async () => {
     const api = fakeApi(healthy("/missing"))
-    createExtension({ packageRoot: PACKAGE_ROOT })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
     await api.emit("session_start", { reason: "startup" })
     const first = api.calls.map((call) => call.signal)
     await api.emit("session_start", { reason: "new" })
@@ -288,7 +349,7 @@ describe("the role flag", () => {
     expect(root).not.toContain(core)
     expect(specialist).not.toContain(core)
     expect(session).toContain(core)
-    expect(session).toContain(`${PACKAGE_ROOT}/scripts/holyagent`)
+    expect(session).toContain(WRAPPER)
     expect(session).not.toContain(PI_ROOT_PLACEHOLDER)
     // The reminder restates root rules: the root and the session role end with the Pi block, the
     // specialist with none, and nobody gets the Claude block.
@@ -652,7 +713,7 @@ describe("order and time", () => {
     const api = fakeApi((call, runtime) =>
       runtime[0] === "status" ? gated(hold, { stdout: STATUS }, call.signal) : inner(call, runtime),
     )
-    createExtension({ packageRoot: PACKAGE_ROOT })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
     const started = api.emit("session_start", { reason: "resume" })
     await hold.entered
     expect(startedWith(api.calls)).toContain("status")
@@ -675,7 +736,7 @@ describe("order and time", () => {
         ? gated(hold, { stdout: `${CONFIG}\n` }, call.signal)
         : inner(call, runtime)
     })
-    createExtension({ packageRoot: PACKAGE_ROOT })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
     const started = api.emit("session_start", { reason: "startup" })
     // The config is held, and the state folder is asked while it is.
     await Promise.all([hold.entered, folderAsked.entered])
@@ -699,7 +760,7 @@ describe("order and time", () => {
     })
     // Four steps of 100ms in sequence (git, config with the state folder, status, reconcile) cross
     // a 250ms deadline in status. A slow runner only brings the deadline earlier.
-    createExtension({ packageRoot: PACKAGE_ROOT, deadlineMs: 250 })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {}, deadlineMs: 250 })(api.pi)
     const began = performance.now()
     await api.emit("session_start", { reason: "resume" })
     expect(performance.now() - began).toBeLessThan(5_000)
@@ -724,7 +785,7 @@ describe("order and time", () => {
       first = false
       return gated(hold, { stdout: STATUS }, call.signal)
     })
-    createExtension({ packageRoot: PACKAGE_ROOT })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
     const started = api.emit("session_start", { reason: "startup" })
     await hold.entered
     const older = api.calls.filter((call) => subcommand(call)?.[0] === "status")[0]?.signal
@@ -747,7 +808,7 @@ describe("order and time", () => {
     const api = fakeApi((call, runtime) =>
       runtime[0] === "status" ? gated(hold, { stdout: STATUS }, call.signal) : inner(call, runtime),
     )
-    createExtension({ packageRoot: PACKAGE_ROOT })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
     const started = api.emit("session_start", { reason: "startup" })
     await hold.entered
     await api.emit("session_shutdown", { reason: "quit" })
@@ -782,7 +843,7 @@ describe("no command outlives a gather", () => {
         }))
       return runtime[0] === "state" ? slowToStop(hold, { stdout: "" })(call) : inner(call, runtime)
     })
-    createExtension({ packageRoot: PACKAGE_ROOT })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
     await api.emit("session_start", { reason: "startup" })
     expect(api.running.count).toBe(0)
     const delivered = (await api.emit("before_agent_start", { prompt: "x" })).at(0) as Delivered
@@ -796,7 +857,7 @@ describe("no command outlives a gather", () => {
     const api = fakeApi((call, runtime) =>
       runtime[0] === "status" ? slowToStop(hold, { stdout: STATUS })(call) : inner(call, runtime),
     )
-    createExtension({ packageRoot: PACKAGE_ROOT, deadlineMs: 100 })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {}, deadlineMs: 100 })(api.pi)
     await api.emit("session_start", { reason: "startup" })
     expect(api.running.count).toBe(0)
     const delivered = (await api.emit("before_agent_start", { prompt: "x" })).at(0) as Delivered
@@ -833,7 +894,7 @@ describe("no command outlives a gather", () => {
         ? lingering(hold, exit, { stdout: STATUS })(call)
         : inner(call, runtime),
     )
-    createExtension({ packageRoot: PACKAGE_ROOT })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
     // Pi does not wait for the session_start handler, and neither does this test.
     const started = api.emit("session_start", { reason: "startup" })
     await hold.entered
@@ -857,7 +918,7 @@ describe("no command outlives a gather", () => {
       first = false
       return lingering(hold, exit, { stdout: STATUS })(call)
     })
-    createExtension({ packageRoot: PACKAGE_ROOT })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
     const started = api.emit("session_start", { reason: "startup" })
     await hold.entered
     // The compaction's own gather runs to its end while the older one's command is still leaving.
@@ -878,7 +939,7 @@ describe("no command outlives a gather", () => {
     const api = fakeApi((call, runtime) =>
       runtime[0] === "status" ? new Promise<Outcome>(() => hold.enter()) : inner(call, runtime),
     )
-    createExtension({ packageRoot: PACKAGE_ROOT, graceMs: 50 })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {}, graceMs: 50 })(api.pi)
     const started = api.emit("session_start", { reason: "startup" })
     await hold.entered
     await api.emit("session_shutdown", { reason: "quit" })
@@ -891,7 +952,7 @@ describe("no command outlives a gather", () => {
     const api = fakeApi((call, runtime) =>
       runtime[0] === "status" ? new Promise<Outcome>(() => {}) : inner(call, runtime),
     )
-    createExtension({ packageRoot: PACKAGE_ROOT, deadlineMs: 50, graceMs: 50 })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {}, deadlineMs: 50, graceMs: 50 })(api.pi)
     await api.emit("session_start", { reason: "startup" })
     const delivered = (await api.emit("before_agent_start", { prompt: "x" })).at(0) as Delivered
     expect(delivered.message?.customType).toBe(NOTICE_MESSAGE)
@@ -903,7 +964,7 @@ describe("no command outlives a gather", () => {
     ;(api.pi as unknown as { exec: () => never }).exec = () => {
       throw new Error("sync boom")
     }
-    createExtension({ packageRoot: PACKAGE_ROOT })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
     await api.emit("session_start", { reason: "startup" })
     const delivered = (await api.emit("before_agent_start", { prompt: "x" })).at(0) as Delivered
     expect(delivered.message?.customType).toBe(NOTICE_MESSAGE)
@@ -1104,5 +1165,614 @@ describe("with the built package and a project that is not a git repository", ()
     const [stderr, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
     expect(code).toBe(4)
     expect(stderr).toContain("error: StateIo")
+  })
+})
+
+describe("a Windows package root", () => {
+  const WINDOWS_ROOT = "C:\\Users\\me\\pkg"
+
+  test("the wrapper passed to exec is written with / only, and the programs still start in the package folder", async () => {
+    const { api } = await run(
+      (call) => (call.command === "git" ? { stdout: "/work/project\n" } : { stdout: CONFIG }),
+      { packageRoot: WINDOWS_ROOT, platformPath: win32 },
+    )
+    const wrappers = api.calls.filter((call) => call.command === "sh").map((call) => call.args[0])
+    expect(wrappers.length).toBeGreaterThan(0)
+    for (const wrapper of wrappers) expect(wrapper).toBe("C:/Users/me/pkg/scripts/holyagent")
+    for (const call of api.calls) expect(call.cwd).toBe(WINDOWS_ROOT)
+  })
+
+  test("the session role's core names the package folder with / only too", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "holyagent-pi-win-"))
+    const wrapper = "C:/Users/me/pkg/scripts/holyagent"
+    const { delivered } = await run(
+      (call) =>
+        call.command === "git"
+          ? { stdout: "/work/project\n" }
+          : call.args[3] === "config"
+            ? { stdout: CONFIG }
+            : call.args[3] === "status"
+              ? { stdout: STATUS }
+              : call.args[3] === "state"
+                ? { stdout: `mode: work\nconfigured: true\ndirectory: ${directory}\n` }
+                : { code: 2 },
+      { packageRoot: WINDOWS_ROOT, platformPath: win32, flag: "session" },
+    )
+    expect(delivered?.message?.content).toContain(wrapper)
+    expect(delivered?.message?.content).not.toContain("C:\\Users")
+    await rm(directory, { recursive: true, force: true })
+  })
+})
+
+describe("telling a child from the root", () => {
+  test.each(SPECIALIST_NAMES)("%s#<id> is that specialist", (name) => {
+    expect(childAgent(`${name}#a1b2c3d4`)).toBe(name)
+  })
+
+  test("any other session is not a child: no name, no #, or a name that is not a specialist", () => {
+    for (const name of [
+      undefined,
+      "",
+      "holyagent",
+      "worker-implementation",
+      "my chat#1",
+      "#a1b2c3d4",
+    ])
+      expect(childAgent(name)).toBeUndefined()
+  })
+
+  test("a child gets the specialist's context, not the root's reminder, though the flag says root", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "holyagent-pi-child-"))
+    const text = async (sessionName?: string) =>
+      (await run(healthy(directory), sessionName === undefined ? {} : { sessionName })).delivered
+        ?.message?.content ?? ""
+    const root = await text()
+    const child = await text("reviewer-code#a1b2c3d4")
+    expect(root.endsWith(PI_SESSION_REMINDER)).toBe(true)
+    expect(child).toContain("Ship the thing")
+    expect(child).not.toContain(PI_SESSION_REMINDER)
+    await rm(directory, { recursive: true, force: true })
+  })
+
+  test("a child fills the package folder into its prompt and leaves the process environment alone", async () => {
+    const prompt = `run ${PI_ROOT_PLACEHOLDER}/scripts/holyagent status, then ${PI_ROOT_PLACEHOLDER}/scripts/holyagent rg x .`
+    const { delivered, env } = await run(healthy("/missing"), {
+      sessionName: "worker-implementation#a1b2c3d4",
+      activeTools: ["SubagentWorkflow", "codemode"],
+      systemPrompt: prompt,
+      packageRoot: "C:\\Users\\me\\pkg",
+      platformPath: win32,
+    })
+    expect(delivered?.systemPrompt).toBe(
+      "run C:/Users/me/pkg/scripts/holyagent status, then C:/Users/me/pkg/scripts/holyagent rg x .",
+    )
+    expect(env).toEqual({})
+  })
+
+  test("a prompt without the placeholder is left as it is: no override is returned", async () => {
+    const { api } = await run(healthy("/missing"), { sessionName: "reviewer-code#a1b2c3d4" })
+    const results = await api.emit("before_agent_start", { systemPrompt: "plain" })
+    expect(results).toEqual([undefined])
+  })
+
+  test("fillPackageRoot writes the folder with the platform separator turned to /", () => {
+    expect(fillPackageRoot(`${PI_ROOT_PLACEHOLDER}/x`, "/opt/pkg")).toBe("/opt/pkg/x")
+    expect(fillPackageRoot(`${PI_ROOT_PLACEHOLDER}/x`, "D:\\p q\\pkg", win32)).toBe("D:/p q/pkg/x")
+  })
+})
+
+describe("the host and process variables", () => {
+  const TOOLS = ["read", "bash", "SubagentWorkflow", "codemode"]
+  const maxWorkers = toolArgs(DEFAULTS, "root").env
+
+  test("the names are the ones the holyagent CLI reads", () => {
+    expect(HOST_ENV).toBe(HOST_VARIABLE)
+    expect(WORKFLOWS_ENV).toBe(WORKFLOWS_VARIABLE)
+  })
+
+  test("hostEnvironment says workflows are on only with SubagentWorkflow and codemode both active", () => {
+    expect(hostEnvironment(TOOLS)).toEqual({ HOLYAGENT_HOST: "pi", HOLYAGENT_WORKFLOWS: "1" })
+    for (const tools of [["read", "codemode"], ["read", "SubagentWorkflow"], ["read"], []])
+      expect(hostEnvironment(tools)).toEqual({ HOLYAGENT_HOST: "pi", HOLYAGENT_WORKFLOWS: "0" })
+  })
+
+  test("applyEnvironment replaces, or with keep leaves what is set", () => {
+    const target: Record<string, string | undefined> = { A: "1", B: undefined }
+    applyEnvironment(target, { A: "2", B: "2", C: "2" }, true)
+    expect(target).toEqual({ A: "1", B: "2", C: "2" })
+    applyEnvironment(target, { A: "3" }, false)
+    expect(target.A).toBe("3")
+  })
+
+  test("before the root's run: host pi, workflows from the active tools, the worker cap and the long cache", async () => {
+    const { env } = await run(healthy("/missing"), { activeTools: TOOLS })
+    expect(env).toEqual({
+      HOLYAGENT_HOST: "pi",
+      HOLYAGENT_WORKFLOWS: "1",
+      ...maxWorkers,
+      PI_CACHE_RETENTION: "long",
+    })
+    expect(Object.keys(maxWorkers)).toEqual(["PI_CODEMODE_MAX_WORKERS"])
+    expect(CACHE_RETENTION_ENV).toBe("PI_CACHE_RETENTION")
+  })
+
+  test("workflows are read again at each run, and the other variables are set once", async () => {
+    const env: Record<string, string | undefined> = {}
+    const active: Array<string> = ["read", "codemode"]
+    const api = fakeApi(healthy("/missing"), undefined, SESSION_CWD, { activeTools: active })
+    createExtension({ packageRoot: PACKAGE_ROOT, env })(api.pi)
+    await api.emit("session_start", { reason: "startup" })
+    await api.emit("before_agent_start", { prompt: "a" })
+    expect(env["HOLYAGENT_WORKFLOWS"]).toBe("0")
+    active.push("SubagentWorkflow")
+    env["PI_CACHE_RETENTION"] = "short"
+    await api.emit("before_agent_start", { prompt: "b" })
+    expect(env["HOLYAGENT_WORKFLOWS"]).toBe("1")
+    expect(env["PI_CACHE_RETENTION"]).toBe("short")
+  })
+
+  test("a value the user already set wins over the config's", async () => {
+    const { env } = await run(healthy("/missing"), {
+      env: { PI_CODEMODE_MAX_WORKERS: "9", PI_CACHE_RETENTION: "none" },
+    })
+    expect(env["PI_CODEMODE_MAX_WORKERS"]).toBe("9")
+    expect(env["PI_CACHE_RETENTION"]).toBe("none")
+  })
+
+  test("with pi.enable off the config sets nothing, though the host is still pi", async () => {
+    const { env } = await run(
+      (call, runtime) =>
+        runtime[0] === "config" ? { stdout: DISABLED } : healthy("/missing")(call, runtime),
+      { activeTools: TOOLS },
+    )
+    expect(env).toEqual({ HOLYAGENT_HOST: "pi", HOLYAGENT_WORKFLOWS: "1" })
+  })
+})
+
+describe("the Agent tool", () => {
+  test.each(SPECIALIST_NAMES)("%s may launch", (name) => {
+    expect(
+      refuseNonSpecialist({ toolName: AGENT_TOOL, input: { subagent_type: name } }),
+    ).toBeUndefined()
+  })
+
+  test("a type outside the 18 is refused with the names that are allowed", () => {
+    for (const type of ["general-purpose", "Explore", "my-reviewer", "Worker-Implementation", ""]) {
+      const result = refuseNonSpecialist({ toolName: AGENT_TOOL, input: { subagent_type: type } })
+      expect(result?.block).toBe(true)
+      expect(result?.reason).toContain(SPECIALIST_NAMES.join(", "))
+    }
+    expect(refuseNonSpecialist({ toolName: AGENT_TOOL, input: {} })?.reason).toStartWith(
+      "No agent type given",
+    )
+  })
+
+  test("a resume names an existing agent, so its type is not checked", () => {
+    expect(
+      refuseNonSpecialist({
+        toolName: AGENT_TOOL,
+        input: { subagent_type: "general-purpose", resume: "agent-1" },
+      }),
+    ).toBeUndefined()
+  })
+
+  test("another tool is not looked at", () => {
+    expect(
+      refuseNonSpecialist({ toolName: "bash", input: { subagent_type: "general-purpose" } }),
+    ).toBeUndefined()
+  })
+
+  test("the tool_call handler blocks, and leaves model and thinking as given", async () => {
+    const api = fakeApi(healthy("/missing"))
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
+    const input = {
+      subagent_type: "reviewer-code",
+      model: "kimi-coding/kimi-k3.1",
+      thinking: "high",
+      prompt: "x",
+    }
+    const before = structuredClone(input)
+    expect(await api.emit("tool_call", { toolName: AGENT_TOOL, input })).toEqual([undefined])
+    expect(input).toEqual(before)
+    const blocked = await api.emit("tool_call", {
+      toolName: AGENT_TOOL,
+      input: { ...input, subagent_type: "general-purpose" },
+    })
+    expect(blocked).toEqual([expect.objectContaining({ block: true })])
+  })
+})
+
+const META = "export const meta = { name: 'w', description: 'd' }\n"
+const workflowScript = (...agentTypes: ReadonlyArray<string | undefined>): string =>
+  `${META}const out = await parallel([${agentTypes
+    .map(
+      (type, at) =>
+        `() => agent('task ${at}', ${type === undefined ? "{ label: 'x' }" : `{ agentType: '${type}' }`})`,
+    )
+    .join(", ")}])\nreturn out`
+
+const refusedWorkflow = (input: Record<string, unknown>) =>
+  Effect.runPromise(refuseNonSpecialistWorkflow({ toolName: WORKFLOW_TOOL, input }))
+
+describe("the SubagentWorkflow tool", () => {
+  test("the workflow check knows the Claude specialists under the namespace it keeps for itself", () => {
+    expect([...CLAUDE_SPECIALISTS]).toEqual(
+      SPECIALIST_NAMES.map((name) => `${PLUGIN_NAMESPACE}:${name}`),
+    )
+  })
+
+  test("a script whose every agent() names a specialist by literal agentType may run", async () => {
+    expect(await refusedWorkflow({ script: workflowScript(...SPECIALIST_NAMES) })).toBeUndefined()
+  })
+
+  test("a script that starts a default, a foreign or a computed agent is refused", async () => {
+    const scripts = [
+      workflowScript(undefined),
+      workflowScript("worker-implementation", undefined),
+      workflowScript("general-purpose"),
+      workflowScript("holyagent:worker-implementation"),
+      `${META}const type = 'worker-implementation'\nreturn await agent('x', { agentType: type })`,
+    ]
+    for (const script of scripts) {
+      const result = await refusedWorkflow({ script })
+      expect(result?.block).toBe(true)
+      expect(result?.reason).toContain(SPECIALIST_NAMES.join(", "))
+    }
+  })
+
+  test("any input but script and args is refused, though the script alone would pass", async () => {
+    const script = workflowScript("explorer-map")
+    expect(await refusedWorkflow({ script, args: { entries: [] } })).toBeUndefined()
+    for (const extra of [
+      { name: "saved" },
+      { scriptPath: "w.js" },
+      { resume: "run-1" },
+      { x: 1 },
+    ]) {
+      const result = await refusedWorkflow({ script, ...extra })
+      expect(result?.block).toBe(true)
+      expect(result?.reason).toContain("inline `script`")
+    }
+  })
+
+  test("a script that cannot be read is refused", async () => {
+    expect((await refusedWorkflow({ script: "agent(" }))?.block).toBe(true)
+  })
+
+  // The package cuts the meta fragment from the source by pattern and evaluates it on the host
+  // thread, then compiles the script as a classic script: the gate vets exactly those.
+  test("the meta fragment the package would evaluate, and the program it would run, are vetted", async () => {
+    const payload = '{ description: this.constructor.constructor("return process")() }'
+    const body = "await agent('t', { agentType: 'explorer-map' })"
+    for (const script of [
+      `export const meta = /* ${payload} */ { name: "a", description: "d" }\n${body}`,
+      `export const meta = // ${payload}\n{ name: "a", description: "d" }\n${body}`,
+      `${META}let n = 0\nn <!--n; function workflow() { return 1 }\nawait workflow({ scriptPath: "x.js" })\n${body}`,
+    ]) {
+      const result = await refusedWorkflow({ script })
+      expect(result?.block).toBe(true)
+      expect(result?.reason).toContain("The workflow script is refused")
+    }
+  })
+
+  test("text with `<!--` or `-->` in a string is not refused", async () => {
+    const script = `${META}log(\`a --> b\`)\nawait agent('see <!-- and --> here', { agentType: 'explorer-map' })`
+    expect(await refusedWorkflow({ script })).toBeUndefined()
+  })
+
+  test("a scriptPath, a saved name or no script is refused, as one cannot be vetted", async () => {
+    for (const input of [
+      { scriptPath: "w.js" },
+      { script: workflowScript("explorer-map"), scriptPath: "w.js" },
+      { name: "saved" },
+      {},
+      { script: "  " },
+    ]) {
+      expect((await refusedWorkflow(input))?.block).toBe(true)
+    }
+  })
+
+  test("another tool is not looked at", async () => {
+    expect(
+      await Effect.runPromise(
+        refuseNonSpecialistWorkflow({ toolName: "bash", input: { script: "agent(" } }),
+      ),
+    ).toBeUndefined()
+  })
+
+  test("the tool_call handler blocks without asking, and lets a specialist script through", async () => {
+    const api = fakeApi(healthy("/missing"))
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
+    expect(
+      await api.emit("tool_call", {
+        toolName: WORKFLOW_TOOL,
+        input: { script: workflowScript("reviewer-code") },
+      }),
+    ).toEqual([undefined])
+    const [blocked] = await api.emit("tool_call", {
+      toolName: WORKFLOW_TOOL,
+      input: { script: workflowScript(undefined) },
+    })
+    expect(blocked).toMatchObject({ block: true })
+    expect(typeof (blocked as { reason: unknown }).reason).toBe("string")
+    expect(api.touched).toEqual([])
+  })
+})
+
+describe("the gates and pi.enable", () => {
+  const refusing = [
+    { toolName: AGENT_TOOL, input: { subagent_type: "general-purpose" } },
+    { toolName: WORKFLOW_TOOL, input: { script: workflowScript(undefined) } },
+  ]
+
+  test("with pi.enable off neither tool is refused", async () => {
+    const { api } = await run(healthy("/missing", { config: { stdout: `${DISABLED}\n` } }))
+    for (const event of refusing) expect(await api.emit("tool_call", event)).toEqual([undefined])
+  })
+
+  test("with pi.enable on both tools are refused", async () => {
+    const { api } = await run(healthy("/missing"))
+    for (const event of refusing)
+      expect(await api.emit("tool_call", event)).toEqual([expect.objectContaining({ block: true })])
+  })
+
+  test("pi.enable off in the project's config alone leaves both gates on, and the context off", async () => {
+    // The merged call names the project's state folder; the user's file is read alone, with none.
+    const { api, delivered } = await run((call, runtime) =>
+      runtime[0] === "config"
+        ? { stdout: runtime.length > 1 ? DISABLED : CONFIG }
+        : healthy("/missing")(call, runtime),
+    )
+    expect(delivered).toBeUndefined()
+    for (const event of refusing)
+      expect(await api.emit("tool_call", event)).toEqual([expect.objectContaining({ block: true })])
+  })
+
+  test("pi.enable off in the user's config lifts the gates", async () => {
+    const { api } = await run((call, runtime) =>
+      runtime[0] === "config" ? { stdout: DISABLED } : healthy("/missing")(call, runtime),
+    )
+    for (const event of refusing) expect(await api.emit("tool_call", event)).toEqual([undefined])
+  })
+
+  test("a user config that cannot be read leaves the gates on under a project that says off", async () => {
+    const { api } = await run((call, runtime) =>
+      runtime[0] === "config"
+        ? runtime.length > 1
+          ? { stdout: DISABLED }
+          : { code: 4, stderr: "error: ConfigInvalid: broken\n" }
+        : healthy("/missing")(call, runtime),
+    )
+    for (const event of refusing)
+      expect(await api.emit("tool_call", event)).toEqual([expect.objectContaining({ block: true })])
+  })
+
+  test("a config that cannot be read leaves both gates on", async () => {
+    const { api } = await run(
+      healthy("/missing", { config: { code: 4, stderr: "error: ConfigInvalid: broken\n" } }),
+    )
+    for (const event of refusing)
+      expect(await api.emit("tool_call", event)).toEqual([expect.objectContaining({ block: true })])
+  })
+
+  test("a later collection that finds the extension on turns the gates back on", async () => {
+    let enabled = false
+    const { api } = await run((call, runtime) =>
+      runtime[0] === "config"
+        ? { stdout: enabled ? CONFIG : DISABLED }
+        : healthy("/missing")(call, runtime),
+    )
+    expect(await api.emit("tool_call", refusing[0])).toEqual([undefined])
+    enabled = true
+    await api.emit("session_compact", {})
+    expect(await api.emit("tool_call", refusing[0])).toEqual([
+      expect.objectContaining({ block: true }),
+    ])
+  })
+})
+
+describe("a child that settles without a usable report", () => {
+  const assistant = (
+    stopReason: string,
+    content: ReadonlyArray<object>,
+  ): Parameters<typeof failedFinalMessage>[0] =>
+    ({ role: "assistant", content, stopReason, model: "m", usage: {} }) as never
+
+  const text = (value: string) => ({ type: "text", text: value })
+
+  test("an empty final message fails, with the reason", () => {
+    for (const content of [
+      [],
+      [text("")],
+      [text("  \n")],
+      [{ type: "thinking", thinking: "hm" }],
+    ]) {
+      expect(failedFinalMessage(assistant("stop", content))).toMatchObject({
+        stopReason: "error",
+        errorMessage: EMPTY_REPORT,
+      })
+    }
+  })
+
+  test("a length stop fails even with text, and keeps the text for the partial output", () => {
+    const failed = failedFinalMessage(assistant("length", [text("result: half")]))
+    expect(failed).toMatchObject({ stopReason: "error", errorMessage: CUT_OFF_REPORT })
+    expect((failed as { content: unknown }).content).toEqual([text("result: half")])
+  })
+
+  test("a complete report, a tool call, an error and a user message are left alone", () => {
+    expect(failedFinalMessage(assistant("stop", [text("result: done")]))).toBeUndefined()
+    expect(
+      failedFinalMessage(assistant("toolUse", [{ type: "toolCall", id: "1", name: "bash" }])),
+    ).toBeUndefined()
+    expect(
+      failedFinalMessage(assistant("length", [{ type: "toolCall", id: "1", name: "bash" }])),
+    ).toBeUndefined()
+    expect(failedFinalMessage(assistant("error", []))).toBeUndefined()
+    expect(failedFinalMessage(assistant("aborted", []))).toBeUndefined()
+    expect(
+      failedFinalMessage({ role: "user", content: "hi", timestamp: 1 } as never),
+    ).toBeUndefined()
+  })
+
+  test("the reasons carry no word Pi retries a provider error on", () => {
+    for (const reason of [EMPTY_REPORT, CUT_OFF_REPORT])
+      expect(reason).not.toMatch(
+        /overloaded|rate.?limit|timed? ?out|timeout|terminated|ended without|try .* again|retry|unavailable|5\d\d/i,
+      )
+  })
+
+  test("message_end replaces the message of a child, and leaves the root's alone", async () => {
+    const message = assistant("stop", [])
+    const child = fakeApi(healthy("/missing"), undefined, SESSION_CWD, {
+      name: "worker-debugging#a1b2c3d4",
+    })
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(child.pi)
+    const [replaced] = await child.emit("message_end", { message })
+    expect((replaced as { message: object }).message).toMatchObject({
+      stopReason: "error",
+      errorMessage: EMPTY_REPORT,
+    })
+    const root = fakeApi(healthy("/missing"))
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(root.pi)
+    expect(await root.emit("message_end", { message })).toEqual([undefined])
+  })
+})
+
+/** A theme that marks nothing, so a drawn line reads as plain text. */
+const PLAIN_THEME = { fg: (_color: string, text: string) => text, bold: (text: string) => text }
+
+/** The tool's own renderers, as the package registers them: drawing a call evaluates its script. */
+const evaluatingRenderers = (evaluated: Array<string>): ToolRenderers => ({
+  renderCall: (args) => {
+    evaluated.push(String((args as { script?: unknown }).script))
+    throw new Error("the package drew the call")
+  },
+  renderResult: () => ({ render: () => ["card"], invalidate: () => undefined }),
+})
+
+/** The lines the resolved renderers draw for a workflow call with `script`. */
+const drawnCall = (script: unknown, evaluated: Array<string> = []): ReadonlyArray<string> => {
+  const resolved = workflowRenderers(WORKFLOW_TOOL, () => evaluatingRenderers(evaluated))
+  const component = resolved?.renderCall?.({ script }, PLAIN_THEME as never, {} as never)
+  return component?.render(120) ?? []
+}
+
+describe("drawing a SubagentWorkflow call", () => {
+  // The package draws a call by evaluating the meta fragment on the host, and Pi draws a call on
+  // every streamed update, before the tool_call gate: nothing in the script may run.
+  const EXPLOITS: ReadonlyArray<readonly [string, string]> = [
+    [
+      "a constructor chain to process",
+      'export const meta = { description: this.constructor.constructor("return process")() }',
+    ],
+    [
+      "a call that records itself",
+      'export const meta = { name: (globalThis.__holyagentEvaluated = "call", "x") }',
+    ],
+    [
+      "a getter that records itself",
+      'export const meta = { get name() { globalThis.__holyagentEvaluated = "getter"; return "x" } }',
+    ],
+    [
+      "an immediately invoked function that records itself",
+      'export const meta = { name: (() => { globalThis.__holyagentEvaluated = "iife"; return "x" })() }',
+    ],
+  ]
+
+  test.each(EXPLOITS)("%s is not evaluated and draws the default line", (_label, meta) => {
+    const globals = globalThis as { __holyagentEvaluated?: string }
+    delete globals.__holyagentEvaluated
+    const evaluated: Array<string> = []
+    const lines = drawnCall(
+      `${meta}\nawait agent('p', { agentType: 'worker-implementation' })`,
+      evaluated,
+    )
+    expect(globals.__holyagentEvaluated).toBeUndefined()
+    expect(evaluated).toEqual([])
+    expect(lines.join("\n")).toContain(`${WORKFLOW_TOOL}`)
+    expect(lines.join("\n")).toContain("workflow")
+  })
+
+  test("a literal meta shows its name, and the package's own call drawing is never used", () => {
+    const evaluated: Array<string> = []
+    const lines = drawnCall(
+      "export const meta = { name: 'release-check', description: 'd' }\nreturn 1",
+      evaluated,
+    )
+    expect(lines.join("\n")).toContain("release-check")
+    expect(evaluated).toEqual([])
+  })
+
+  test("a later name wins, and a name that is no string is not shown", () => {
+    const line = (script: string) => workflowCallLine({ script }, PLAIN_THEME)
+    expect(line("export const meta = { name: 'first', name: 'second' }")).toMatch(/second$/)
+    expect(line("export const meta = { name: 'first', name: 2 }")).toMatch(/workflow$/)
+  })
+
+  test("control characters of a name are removed and a long name is cut", () => {
+    const line = workflowCallLine(
+      { script: `export const meta = { name: '\\x1b[2Jevil\\n${"x".repeat(200)}' }` },
+      PLAIN_THEME,
+    )
+    expect(line).not.toContain("\u001b")
+    expect(line).not.toContain("\n")
+    expect(line.length).toBeLessThan(WORKFLOW_TOOL.length + 100)
+  })
+
+  test("bidi overrides and zero-width characters of a name are dropped", () => {
+    const hidden = "\\u202e\\u2066\\u2069\\u200b\\u200f\\ufeff"
+    const line = workflowCallLine(
+      { script: `export const meta = { name: 'rel${hidden}ease${hidden}' }` },
+      PLAIN_THEME,
+    )
+    expect(line).toMatch(/release$/)
+    expect(line).not.toMatch(/[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/)
+    expect(sanitizeWorkflowName("\u200b\u202e\ufeff")).toBeUndefined()
+  })
+
+  test("a name is cut at 80 characters without splitting a surrogate pair", () => {
+    const emoji = "\u{1f600}"
+    const cut = sanitizeWorkflowName(`${"x".repeat(79)}${emoji}${emoji}`)
+    expect(cut).toBe(`${"x".repeat(79)}${emoji}`)
+    expect(cut).not.toMatch(
+      /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/,
+    )
+    expect(sanitizeWorkflowName("y".repeat(200))).toBe("y".repeat(80))
+  })
+
+  test("the last argument's result is reused, and a new argument computes again", () => {
+    const seen: Array<string> = []
+    const cached = memoizeLast((key) => {
+      seen.push(key)
+      return key.length
+    })
+    expect([cached("aa"), cached("aa"), cached("aa")]).toEqual([2, 2, 2])
+    expect(cached("b")).toBe(1)
+    expect(cached("aa")).toBe(2)
+    expect(seen).toEqual(["aa", "b", "aa"])
+  })
+
+  test("a call without a string script draws the default line", () => {
+    for (const script of [undefined, 3, "", "no meta here"])
+      expect(drawnCall(script).join("\n")).toMatch(/workflow\s*$/)
+    expect(workflowCallLine(undefined, PLAIN_THEME)).toMatch(/workflow$/)
+  })
+
+  test("the result card and every other tool keep what Pi would use", () => {
+    const base = evaluatingRenderers([])
+    const resolved = workflowRenderers(WORKFLOW_TOOL, () => base)
+    expect(resolved?.renderResult).toBe(base.renderResult)
+    expect(workflowRenderers("bash", () => base)).toBe(base)
+    expect(workflowRenderers("bash", () => undefined)).toBeUndefined()
+    expect(workflowRenderers(WORKFLOW_TOOL, () => undefined)).toBeUndefined()
+  })
+
+  test("the extension registers the resolver in every session, a child's and a disabled one's too", () => {
+    for (const session of [{}, { name: "worker-debugging#a1b2c3d4" }]) {
+      const api = fakeApi(healthy("/missing"), undefined, SESSION_CWD, session)
+      createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
+      expect(api.renderers).toEqual([workflowRenderers])
+    }
   })
 })

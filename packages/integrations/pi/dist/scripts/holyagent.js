@@ -10351,8 +10351,9 @@ var init_host = __esm(() => {
     workflowAgentPrefix: PI_WORKFLOW_AGENT_PREFIX,
     journal: "workflow run's journal",
     recordNote: "the pi launcher records no agent by hook: the launcher glue or the root records each agent, with the ID the Agent tool returns, including a continued one",
-    reportsNote: "under the pi host this reads Claude workflow journals only for now",
-    agentIdNote: "under the pi host an agent is recorded as pi:<agent-id>, the ID the Agent tool returns (strip pi: to message it), and a workflow's agent as pi-workflow:<run-id>/<id>, with the run ID and the label the script gave the agent (the Assignment id); any other form is refused"
+    reportsNote: "under the pi host the file is a <run id>.workflow.jsonl of @tintinweb/pi-subagents, whose entries are matched to Assignments by the key of their dispatched call, or the root session file, which holds the record of each Assignment recorded as pi:<agent-id>; an entry that failed, has no text or matches no call is listed with the run and its index",
+    agentIdNote: "under the pi host an agent is recorded as pi:<agent-id>, the ID the Agent tool returns (strip pi: to message it), and a workflow's agent as pi-workflow:<run-id>/<id>, with the run ID and the label the script gave the agent (the Assignment id); any other form is refused",
+    launchNote: "under the pi host model is the Pi route table's `<provider>/<id>` and effort its thinking level for the specialist (pi.routes in config.json), as @tintinweb/pi-subagents takes them: pass model as it is, and effort as agent()'s effort or the Agent tool's thinking. With pi.enable off both are left out and the specialist inherits the session's"
   };
 });
 
@@ -13900,12 +13901,12 @@ var init_context = __esm(() => {
 
 import { rm as rm4 } from "fs/promises";
 import { isAbsolute, join as join6, resolve as resolve3 } from "path";
-var folderFor = (call, name) => gitMaybe(["rev-parse", "--path-format=absolute", "--git-common-dir"]).pipe(provide4(call.vcs), map5((common) => common !== undefined && isAbsolute(common) ? join6(resolve3(common), "holyagent", name) : localFile(call.directory, name))), writeNamed = (call, name, assignmentId, text) => gen2(function* () {
-  const path = join6(yield* folderFor(call, name), `${assignmentId}.md`);
+var folderFor = (call, name) => gitMaybe(["rev-parse", "--path-format=absolute", "--git-common-dir"]).pipe(provide4(call.vcs), map5((common) => common !== undefined && isAbsolute(common) ? join6(resolve3(common), "holyagent", name) : localFile(call.directory, name))), pathIn = (call, name, assignmentId) => folderFor(call, name).pipe(map5((folder) => join6(folder, `${assignmentId}.md`))), writeNamed = (call, name, assignmentId, text) => gen2(function* () {
+  const path = yield* pathIn(call, name, assignmentId);
   yield* io(path, () => Bun.write(path, `${text}
 `));
   return path;
-}), writeBrief = (call, assignmentId, brief) => writeNamed(call, "briefs", assignmentId, brief), writeReport = (call, assignmentId, report) => writeNamed(call, "reports", assignmentId, report), removeFiles = (call, assignmentIds) => forEach2(["briefs", "reports"], (name) => folderFor(call, name)).pipe(flatMap2((folders) => forEach2(folders.flatMap((folder) => assignmentIds.map((id) => join6(folder, `${id}.md`))), (path) => io(path, () => rm4(path, { force: true })).pipe(as2(undefined), catch_2((error) => succeed6(error.message))))), map5((lines) => lines.filter((line) => line !== undefined)));
+}), briefPath = (call, assignmentId) => pathIn(call, "briefs", assignmentId), writeBrief = (call, assignmentId, brief) => writeNamed(call, "briefs", assignmentId, brief), writeReport = (call, assignmentId, report) => writeNamed(call, "reports", assignmentId, report), removeFiles = (call, assignmentIds) => forEach2(["briefs", "reports"], (name) => folderFor(call, name)).pipe(flatMap2((folders) => forEach2(folders.flatMap((folder) => assignmentIds.map((id) => join6(folder, `${id}.md`))), (path) => io(path, () => rm4(path, { force: true })).pipe(as2(undefined), catch_2((error) => succeed6(error.message))))), map5((lines) => lines.filter((line) => line !== undefined)));
 var init_brief = __esm(() => {
   init_dist();
   init_files();
@@ -14575,6 +14576,31 @@ var init_lifecycle = __esm(() => {
   });
 });
 
+var init_pi_packages = () => {};
+
+var init_pi_packages2 = __esm(() => {
+  init_pi_packages();
+});
+
+var PROVIDERS, providerProfile = (config) => PROVIDERS[config.pi.provider], routeModel = (config, key) => {
+  const { id } = providerProfile(config);
+  const { model, thinking } = config.pi.routes[key];
+  return { key, provider: id, model, thinking, spec: `${id}/${model}:${thinking}` };
+}, subagentModel = ({ provider, model }) => `${provider}/${model}`;
+var init_provider = __esm(() => {
+  init_pi_packages2();
+  PROVIDERS = {
+    "kimi-coding-global": {
+      id: "kimi-coding",
+      package: "pi-provider-kimi-code",
+      env: { KIMI_CODE_REGION: "global" },
+      loginFix: "Run /login kimi-coding in Pi, or set KIMI_API_KEY",
+      webTools: ["moonshot_search", "moonshot_fetch"],
+      toolsFile: "~/.pi/providers/kimi-coding/config.json"
+    }
+  };
+});
+
 import { join as join8 } from "path";
 var TTL_VARIABLE = "HOLYAGENT_REUSE_TTL_MINUTES", HOST_VARIABLE = "HOLYAGENT_HOST", WORKFLOWS_VARIABLE = "HOLYAGENT_WORKFLOWS", Minutes, reuseTtl = (env) => {
   const raw = env[TTL_VARIABLE];
@@ -14609,13 +14635,25 @@ var TTL_VARIABLE = "HOLYAGENT_REUSE_TTL_MINUTES", HOST_VARIABLE = "HOLYAGENT_HOS
   ttlMinutes: reuseTtl(env),
   workflowsAvailable: workflowsAvailable(env, root),
   host: agentHostOf(env)
-}).pipe(map5((config) => config));
+}).pipe(map5((config) => config)), launchesOf = (env, root, host) => host === "claude" ? succeed6((roleTask) => {
+  const { model, effort } = routeFor(roleTask);
+  return { model, effort };
+}) : loadConfig({ projectDirectories: [stateDirectory(root)], env }).pipe(map5((config) => (roleTask) => {
+  if (!config.pi.enable)
+    return {};
+  const route = routeModel(config, roleTask);
+  return { model: subagentModel(route), effort: route.thinking };
+}));
 var init_config = __esm(() => {
   init_dist();
+  init_load();
   init_directive();
   init_host();
+  init_route();
+  init_provider();
   init_environment();
   init_files();
+  init_layout();
   init_errors3();
   Minutes = NumberFromString.check(isFinite2(), isGreaterThanOrEqualTo2(0));
   WorkflowsSwitch = Literals(["0", "1"]);
@@ -14652,6 +14690,157 @@ var init_jsonreport = __esm(() => {
   KNOWN = new Set(Object.keys(REPORT_FIELDS.fields));
 });
 
+var KEY_LENGTH = 32, journalKey = (input) => new Bun.CryptoHasher("sha256").update(JSON.stringify([
+  input.prompt,
+  input.label ?? null,
+  input.model ?? null,
+  input.agentType ?? null,
+  input.effort ?? null,
+  input.isolation ?? null,
+  input.gate ?? null,
+  input.resume ?? null,
+  ...input.schema !== undefined ? [input.schema] : []
+])).digest("hex").slice(0, KEY_LENGTH), InvalidPiRecord, JournalEntry, JournalLine, decodePiJournal = (journal, source) => gen2(function* () {
+  const entries = [];
+  for (const [at, line] of journal.split(/\r?\n/).entries()) {
+    if (line.trim() === "")
+      continue;
+    entries.push(yield* decodeUnknownEffect2(JournalLine)(line, { onExcessProperty: "error" }).pipe(mapError2((error) => new InvalidPiRecord({
+      source,
+      detail: `line ${at + 1} is not a workflow journal entry: ${error.message}`
+    }))));
+  }
+  return entries.toSorted((a, b) => a.index - b.index);
+}), nonEmpty = (text) => text !== undefined && text.trim() !== "", matchJournal = (entries, expected) => {
+  const idOf = new Map(expected.map(({ id, key }) => [key, id]));
+  const last = new Map;
+  const unmatched = [];
+  for (const entry of entries) {
+    const id = idOf.get(entry.key);
+    if (id !== undefined)
+      last.set(id, entry);
+    else
+      unmatched.push({
+        index: entry.index,
+        id: undefined,
+        reason: !entry.ok ? "failed" : nonEmpty(entry.text) ? "unmatched" : "empty"
+      });
+  }
+  const reports = [];
+  const notReported = [...unmatched];
+  for (const [id, entry] of last)
+    if (entry.ok && nonEmpty(entry.text))
+      reports.push({ id, index: entry.index, report: entry.text });
+    else
+      notReported.push({ index: entry.index, id, reason: entry.ok ? "empty" : "failed" });
+  return {
+    reports: reports.toSorted((a, b) => a.index - b.index),
+    notReported: notReported.toSorted((a, b) => a.index - b.index)
+  };
+}, AGENT_RECORD_ENTRY_TYPE = "subagents:record", AgentRecordData, RecordEntry, RecordLine, SessionLine, PiRecordMissing, agentRecordIn = (session, source, agentId) => gen2(function* () {
+  let found;
+  for (const [at, line] of session.split(/\r?\n/).entries()) {
+    if (!line.includes(AGENT_RECORD_ENTRY_TYPE))
+      continue;
+    const probe = yield* decodeUnknownEffect2(SessionLine)(line).pipe(option2);
+    if (probe._tag === "None" || probe.value.type !== "custom" || probe.value.customType !== AGENT_RECORD_ENTRY_TYPE)
+      continue;
+    const { data } = yield* decodeUnknownEffect2(RecordLine)(line, {
+      onExcessProperty: "error"
+    }).pipe(mapError2((error) => new InvalidPiRecord({
+      source,
+      detail: `line ${at + 1} is not a ${AGENT_RECORD_ENTRY_TYPE} entry: ${error.message}`
+    })));
+    if (data.id === agentId)
+      found = data;
+  }
+  return found ?? (yield* new PiRecordMissing({ source, agentId }));
+}), STATUS_OF, assignmentStatusOf = (outcome) => STATUS_OF[outcome], outcomeOfRecord = (record) => {
+  switch (record.status) {
+    case "completed":
+    case "steered":
+      return nonEmpty(record.result) ? "ok" : "empty";
+    case "error":
+    case "aborted":
+    case "stopped":
+      return record.status;
+    case "queued":
+    case "running":
+      return "exit";
+  }
+}, piRecordReport = (session, source, agentId) => agentRecordIn(session, source, agentId).pipe(map5((record) => {
+  const outcome = outcomeOfRecord(record);
+  return {
+    ended: outcome,
+    ...assignmentStatusOf(outcome),
+    report: outcome === "ok" ? record.result : undefined,
+    error: record.error
+  };
+}));
+var init_journal = __esm(() => {
+  init_dist();
+  InvalidPiRecord = class InvalidPiRecord extends TaggedError2("InvalidPiRecord") {
+    get message() {
+      return `${this.source}: ${this.detail}`;
+    }
+  };
+  JournalEntry = Struct({
+    index: Int.check(isGreaterThanOrEqualTo2(0)),
+    key: String6,
+    ok: Boolean3,
+    text: optionalKey2(String6),
+    resumed: optionalKey2(Literal2(true))
+  });
+  JournalLine = fromJsonString2(JournalEntry);
+  AgentRecordData = Struct({
+    id: String6,
+    type: String6,
+    description: String6,
+    status: Literals([
+      "queued",
+      "running",
+      "completed",
+      "steered",
+      "aborted",
+      "stopped",
+      "error"
+    ]),
+    result: optionalKey2(String6),
+    error: optionalKey2(String6),
+    startedAt: Number6,
+    completedAt: optionalKey2(Number6),
+    sessionFile: optionalKey2(String6),
+    handle: optionalKey2(String6),
+    alias: optionalKey2(String6),
+    worktreeLost: optionalKey2(Boolean3)
+  });
+  RecordEntry = Struct({
+    type: Literal2("custom"),
+    customType: Literal2(AGENT_RECORD_ENTRY_TYPE),
+    data: AgentRecordData,
+    id: String6,
+    parentId: NullOr(String6),
+    timestamp: String6
+  });
+  RecordLine = fromJsonString2(RecordEntry);
+  SessionLine = fromJsonString2(Struct({ type: String6, customType: optionalKey2(String6) }));
+  PiRecordMissing = class PiRecordMissing extends TaggedError2("PiRecordMissing") {
+    get message() {
+      return `${this.source} holds no ${AGENT_RECORD_ENTRY_TYPE} entry for agent ${this.agentId}: it is still running, was evicted before it was persisted, or belongs to another session`;
+    }
+  };
+  STATUS_OF = {
+    ok: { status: "done", close: "success" },
+    error: { status: "failed", close: "errored" },
+    length: { status: "failed", close: "errored" },
+    empty: { status: "failed", close: "errored" },
+    exit: { status: "failed", close: "errored" },
+    aborted: { status: "failed", close: "errored" },
+    stopped: { status: "interrupted", close: "stopped" }
+  };
+});
+
+import { basename as basename2 } from "path";
 var EVIDENCE_HEADING, indentOf = (line) => line.length - line.trimStart().length, LIST_MARKER, evidenceEntries = (report) => {
   const lines = report.split(/\r?\n/);
   const heading = lines.findLastIndex((line) => EVIDENCE_HEADING.test(line));
@@ -14776,14 +14965,14 @@ var EVIDENCE_HEADING, indentOf = (line) => line.length - line.trimStart().length
   `Role: ${assignment.roleTask} (${agent}). Assignment: ${assignment.id}.`,
   `Read the brief at ${briefPath} with the ${words.readTool} tool and follow it as your full task.`
 ].join(`
-`), Started, Resulted, Other, JournalLine, journalResults = (journal, source) => gen2(function* () {
+`), Started, Resulted, Other, JournalLine2, journalResults = (journal, source) => gen2(function* () {
   const labels = new Map;
   const results = [];
   const lines = journal.split(/\r?\n/);
   for (const [index, line] of lines.entries()) {
     if (line.trim() === "")
       continue;
-    const entry = yield* decodeUnknownEffect2(JournalLine)(line, {
+    const entry = yield* decodeUnknownEffect2(JournalLine2)(line, {
       onExcessProperty: "ignore"
     }).pipe(mapError2((error) => new Usage({
       message: `Line ${index + 1} of the journal ${source} is not a started or result entry: ${error.message}`,
@@ -14799,11 +14988,48 @@ var EVIDENCE_HEADING, indentOf = (line) => line.length - line.trimStart().length
     }
   }
   return results;
-});
+}), dispatchedCall = (assignment, agent, briefPath, launch) => ({
+  id: assignment.id,
+  key: journalKey({
+    prompt: dispatchPrompt(assignment, agent, briefPath, PI_WORDS),
+    label: assignment.id,
+    model: launch.model,
+    agentType: routeFor(assignment.roleTask).agent,
+    effort: launch.effort
+  })
+}), refused = (hint) => (error) => new Usage({ message: error.message, hint }), piJournalReports = (journal, source, calls) => decodePiJournal(journal, source).pipe(mapError2(refused("Pass the <run id>.workflow.jsonl of the workflow run, unedited.")), map5((entries) => {
+  const { reports, notReported } = matchJournal(entries, calls);
+  const run = basename2(source).replace(/\.workflow\.jsonl$/, "");
+  return {
+    reports: reports.map(({ id, report }) => ({ id, report })),
+    notAssignmentIds: notReported.map(({ id, index, reason }) => ({
+      label: id ?? "",
+      agentId: `${run}#${index} ${reason}`
+    }))
+  };
+})), piRecordReports = (session, source, agents) => gen2(function* () {
+  const reports = [];
+  const notAssignmentIds = [];
+  for (const { id, agentId } of agents) {
+    if (agentId.startsWith(PI_WORKFLOW_AGENT_PREFIX)) {
+      notAssignmentIds.push({ label: id, agentId: `${agentId} not in a session file` });
+      continue;
+    }
+    const found = yield* piRecordReport(session, source, agentId.replace(/^pi:/, "")).pipe(catchTag2("PiRecordMissing", () => succeed6(undefined)));
+    if (found?.report !== undefined)
+      reports.push({ id, report: found.report });
+    else
+      notAssignmentIds.push({ label: id, agentId: `${agentId} ${found?.ended ?? "missing"}` });
+  }
+  return { reports, notAssignmentIds };
+}).pipe(mapError2(refused("Pass the root session file of the Pi session, unedited.")));
 var init_report = __esm(() => {
   init_dist();
+  init_directive();
   init_errors();
   init_host();
+  init_route();
+  init_journal();
   init_errors3();
   init_jsonreport();
   EVIDENCE_HEADING = /^\s*evidence:\s*$/i;
@@ -14829,7 +15055,7 @@ var init_report = __esm(() => {
   Other = Struct({
     type: String6.check(isPattern2(/^(?!(?:started|result)$)/))
   });
-  JournalLine = fromJsonString2(Union2([Started, Resulted, Other]));
+  JournalLine2 = fromJsonString2(Union2([Started, Resulted, Other]));
 });
 
 class WithTrailer {
@@ -14861,7 +15087,7 @@ class Streamed {
   }
 }
 
-import { resolve as resolve4 } from "path";
+import { basename as basename3, resolve as resolve4 } from "path";
 var PLUGIN_NAMESPACE = "holyagent", AssignmentInput, DRAFT_SHAPE, DRAFT_NOTES, completeDraft = (snapshot, input) => gen2(function* () {
   const { intentId, intentRevision, ...rest } = input;
   if (intentId !== undefined && intentRevision !== undefined)
@@ -14871,13 +15097,13 @@ var PLUGIN_NAMESPACE = "holyagent", AssignmentInput, DRAFT_SHAPE, DRAFT_NOTES, c
 }), withPlanned = (snapshot, input, id, now) => completeDraft(snapshot, input).pipe(flatMap2((draft) => createAssignment(snapshot.project, draft, { id, now })), map5(({ assignment }) => ({
   ...snapshot.project,
   assignments: [...snapshot.project.assignments, assignment]
-}))), directiveView = (directive) => directive.action === "continue" ? { continue: directive.agentId, reason: directive.reason } : {
-  agent: `${PLUGIN_NAMESPACE}:${directive.agent}`,
-  model: directive.model,
-  effort: directive.effort,
+}))), agentTypeFor = (host, agent) => host === "pi" ? agent : `${PLUGIN_NAMESPACE}:${agent}`, directiveView = (directive, host, launch) => directive.action === "continue" ? { continue: directive.agentId, reason: directive.reason } : present({
+  agent: agentTypeFor(host, directive.agent),
+  model: launch.model,
+  effort: launch.effort,
   reason: directive.reason
-}, ExistingRef, OutcomeFlag, OUTCOMES, dispatchOutput = (words) => ({
-  output: `TOON fields (id, state, agent/model/effort or continue, reason), then a line \`prompt:\` alone, then a two-line specialist prompt that names the brief file the full Assignment was written to; pass that text as it is: as the prompt of its agent() in your inline workflow script first, to the ${words.agentTool} tool only when the ${words.workflowTool} tool is disabled or unavailable, and by ${words.message} only for a warm continuation. The brief itself is never printed: the specialist reads it with the ${words.readTool} tool`
+}), ExistingRef, OutcomeFlag, OUTCOMES, dispatchOutput = (words) => ({
+  output: `TOON fields (id, state, agent/model/effort or continue, reason), then a line \`prompt:\` alone, then a two-line specialist prompt that names the brief file the full Assignment was written to; pass that text as it is: as the prompt of its agent() in your inline workflow script first, to the ${words.agentTool} tool only when the ${words.workflowTool} tool is disabled or unavailable, and by ${words.message} only for a warm continuation. The brief itself is never printed: the specialist reads it with the ${words.readTool} tool${words.launchNote === undefined ? "" : `. ${words.launchNote}`}`
 }), recordHelp = (words) => ({
   summary: `Record the launch of a dispatched Assignment (a workflow's agent as ${words.workflowAgentPrefix}<run-id>/<id>), or roll it back when the launch failed`,
   notes: [
@@ -14912,7 +15138,28 @@ var PLUGIN_NAMESPACE = "holyagent", AssignmentInput, DRAFT_SHAPE, DRAFT_NOTES, c
   if (agentId.startsWith(PI_AGENT_PREFIX))
     return /^\S+$/.test(agentId.slice(PI_AGENT_PREFIX.length)) ? undefined : `A pi agent is recorded as ${PI_AGENT_PREFIX}<agent-id>`;
   return host === "pi" ? piAgentProblem(id) : undefined;
-}, ASSIGNMENT_COMMANDS;
+}, claudeReports = (journal, source) => gen2(function* () {
+  const results = yield* journalResults(journal, source);
+  const byId = new Map;
+  const notAssignmentIds = [];
+  for (const { label, agentId, report } of results) {
+    if (label !== undefined && is2(AssignmentId)(label))
+      byId.set(label, report);
+    else
+      notAssignmentIds.push({ label: label ?? "", agentId });
+  }
+  return { reports: [...byId].map(([id, report]) => ({ id, report })), notAssignmentIds };
+}), piReports = (call, source, text) => gen2(function* () {
+  const { project } = yield* readState(call.directory);
+  if (!basename3(source).endsWith(".workflow.jsonl"))
+    return yield* piRecordReports(text, source, project.assignments.flatMap(({ id, specialist }) => {
+      const agentId = specialist?.agentId;
+      return agentId !== undefined && (agentId.startsWith(PI_AGENT_PREFIX) || agentId.startsWith(PI_WORKFLOW_AGENT_PREFIX)) ? [{ id, agentId }] : [];
+    }));
+  const launchOf = yield* launchesOf(call.env, call.root, "pi");
+  const calls = yield* forEach2(project.assignments, (assignment) => briefPath(call, assignment.id).pipe(map5((path) => dispatchedCall(assignment, agentTypeFor("pi", routeFor(assignment.roleTask).agent), path, launchOf(assignment.roleTask)))));
+  return yield* piJournalReports(text, source, calls);
+}), ASSIGNMENT_COMMANDS;
 var init_assignment2 = __esm(() => {
   init_dist();
   init_acceptance();
@@ -14990,13 +15237,14 @@ var init_assignment2 = __esm(() => {
           message: `${error.message}. To dispatch an existing Assignment send {"id": "<id>"}`
         }) : error));
         const settings = yield* config;
+        const launchOf = yield* launchesOf(call.env, call.root, settings.host);
         const newAssignmentId = yield* newId("assignment");
         const now = yield* nowIso;
         const started = yield* update((snapshot) => gen2(function* () {
           const id = "id" in request ? request.id : newAssignmentId;
           const project = "id" in request ? snapshot.project : yield* withPlanned(snapshot, request, id, now);
           const dispatched = yield* dispatch(project, snapshot.specialists, id, now, settings, workTreeKey(call.root));
-          const agent = `${PLUGIN_NAMESPACE}:${routeFor(dispatched.assignment.roleTask).agent}`;
+          const agent = agentTypeFor(settings.host, routeFor(dispatched.assignment.roleTask).agent);
           const path = yield* writeBrief(call, dispatched.assignment.id, renderPrompt(dispatched.assignment, agent));
           return {
             ...dispatched,
@@ -15006,7 +15254,7 @@ var init_assignment2 = __esm(() => {
         return new WithTrailer({
           id: started.assignment.id,
           state: started.assignment.state,
-          ...directiveView(started.directive)
+          ...directiveView(started.directive, settings.host, launchOf(started.assignment.roleTask))
         }, "prompt", started.prompt);
       })
     },
@@ -15119,18 +15367,10 @@ var init_assignment2 = __esm(() => {
       state: "peek",
       run: (call) => gen2(function* () {
         const source = resolve4(call.cwd, idArgument(call.args.positionals));
-        const journal = yield* io(source, () => Bun.file(source).text());
-        const results = yield* journalResults(journal, source);
-        const byId = new Map;
-        const strays = [];
-        for (const { label, agentId, report } of results) {
-          if (label !== undefined && is2(AssignmentId)(label))
-            byId.set(label, { report });
-          else
-            strays.push({ label: label ?? "", agentId });
-        }
-        const reports = yield* forEach2([...byId], ([id, { report }]) => writeReport(call, id, report).pipe(map5((path) => ({ id, path, words: wordCount(report) }))));
-        return { reports, notAssignmentIds: strays };
+        const text = yield* io(source, () => Bun.file(source).text());
+        const found = (yield* call.config).host === "pi" ? yield* piReports(call, source, text) : yield* claudeReports(text, source);
+        const reports = yield* forEach2(found.reports, ({ id, report }) => writeReport(call, id, report).pipe(map5((path) => ({ id, path, words: wordCount(report) }))));
+        return { reports, notAssignmentIds: found.notAssignmentIds };
       })
     },
     {
@@ -15332,7 +15572,7 @@ var init_scope = __esm(() => {
 });
 
 import { chmod, mkdir as mkdir3, realpath as realpath4, rename as rename4, rm as rm5, writeFile } from "fs/promises";
-import { basename as basename2, dirname as dirname4, join as join11 } from "path";
+import { basename as basename4, dirname as dirname4, join as join11 } from "path";
 var JsonObjectText, strict2, empty4, fileOperation = (path, what, run) => tryPromise2({
   try: run,
   catch: (cause) => new SetupFailure({
@@ -15353,7 +15593,7 @@ var JsonObjectText, strict2, empty4, fileOperation = (path, what, run) => tryPro
   const mode = options?.mode ?? (exists ? (yield* fileOperation(target, "write", () => Bun.file(target).stat())).mode & 511 : undefined);
   const text = (yield* encodeEffect(JsonObjectText)(value, strict2).pipe(mapError2((error) => new SetupFailure({ message: `cannot encode ${path}: ${error.message}` })))) + `
 `;
-  const temporary = join11(dirname4(target), `.${basename2(target)}.${process.pid}.tmp`);
+  const temporary = join11(dirname4(target), `.${basename4(target)}.${process.pid}.tmp`);
   yield* fileOperation(dirname4(target), "write", () => mkdir3(dirname4(target), { recursive: true }));
   yield* tryPromise2({
     try: () => writeFile(temporary, text, { flag: "wx", ...mode === undefined ? {} : { mode } }),
@@ -16426,6 +16666,7 @@ var statusFrom = (snapshot) => {
   reconcile: reconcileFrom(snapshot, words)
 }))), planNotes = (words) => [
   "`workflow` first: `assignments` are the ids in run order, a writer followed by the review of its work; `assignment dispatch` each for its agent, model, effort and prompt, then write the inline script as the root workflow text says. A single Assignment is a one-entry workflow",
+  ...words.launchNote === undefined ? [] : [words.launchNote],
   `\`continues\` lists Ready work that continues a warm specialist, by ${words.message} beside the workflow. \`fallback\` is the same work as direct subagents, for a session where the ${words.workflowTool} tool is disabled or unavailable: its writers launch together, and the \`afterwards\` reviews launch once the writers they depend on are terminal`
 ], OVERVIEW_COMMANDS;
 var init_overview = __esm(() => {
@@ -21949,7 +22190,7 @@ var isNode = (value) => typeof value === "object" && value !== null && ("type" i
 }, nodesAt = (node, field) => {
   const value = node[field];
   return Array.isArray(value) ? value.map((item) => isNode(item) ? item : undefined) : [];
-}, nameOf = (node) => node?.type === "Identifier" && typeof node["name"] === "string" ? node["name"] : undefined, MAX_WORKFLOW_SCRIPT = 1e6, MAX_DEPTH = 120, MAX_LOOP_COUNT = 1000, MAX_NESTED_ITERATIONS = 1e4, MAX_TEXT_COUNT = 1000, MAX_REPEATED_TEXT = 8, MAX_WRITE_INDEX = 1000, DATA_ITERATIONS = 100, MAX_ANALYSIS_STEPS = 200000, TEXT_COUNTS, GROWING_METHODS, CALLBACK_ARGUMENTS, ITERATING_METHODS, COPYING_METHODS, ARRAY_RESULTS, COMBINING_METHODS, GLOBALS, HOST_GLOBALS, DENIED_NAMES, CALLABLE_PROPERTIES, GLOBAL_CALLS, GLOBAL_FIELDS, MAX_ARGUMENTS, VALUE_GLOBALS, GLOBAL_FUNCTIONS, AGENT_OPTIONS, SPECIALISTS, UNARY, newBinding = () => ({
+}, nameOf = (node) => node?.type === "Identifier" && typeof node["name"] === "string" ? node["name"] : undefined, MAX_WORKFLOW_SCRIPT = 1e6, MAX_DEPTH = 120, MAX_LOOP_COUNT = 1000, MAX_NESTED_ITERATIONS = 1e4, MAX_TEXT_COUNT = 1000, MAX_REPEATED_TEXT = 8, MAX_WRITE_INDEX = 1000, DATA_ITERATIONS = 100, MAX_ANALYSIS_STEPS = 200000, TEXT_COUNTS, GROWING_METHODS, CALLBACK_ARGUMENTS, ITERATING_METHODS, COPYING_METHODS, ARRAY_RESULTS, COMBINING_METHODS, GLOBALS, HOST_GLOBALS, DENIED_NAMES, CALLABLE_PROPERTIES, GLOBAL_CALLS, GLOBAL_FIELDS, MAX_ARGUMENTS, VALUE_GLOBALS, GLOBAL_FUNCTIONS, AGENT_OPTIONS, PLUGIN_NAMESPACE2 = "holyagent", CLAUDE_SPECIALISTS, UNARY, newBinding = () => ({
   unsafe: false,
   inits: [],
   functions: new Set,
@@ -22127,15 +22368,197 @@ var isNode = (value) => typeof value === "object" && value !== null && ("type" i
     if (field !== skipped && typeof value === "object")
       occurrencesIn(value, scope, into, depth + 1);
   return into;
-}, inspect = (script) => {
+}, META_DECLARATION, scanObjectLiteral = (source, open) => {
+  let depth = 0;
+  let i = open;
+  let sawInterpolation = false;
+  let mode = "code";
+  const templateStack = [];
+  while (i < source.length) {
+    const c = source[i];
+    const next = source[i + 1];
+    if (mode === "line-comment") {
+      if (c === `
+`)
+        mode = "code";
+      i++;
+      continue;
+    }
+    if (mode === "block-comment") {
+      if (c === "*" && next === "/") {
+        mode = "code";
+        i += 2;
+        continue;
+      }
+      i++;
+      continue;
+    }
+    if (mode === "single" || mode === "double" || mode === "regex") {
+      if (c === "\\") {
+        i += 2;
+        continue;
+      }
+      if (mode === "single" && c === "'")
+        mode = "code";
+      else if (mode === "double" && c === '"')
+        mode = "code";
+      else if (mode === "regex" && c === "/")
+        mode = "code";
+      else if (c === `
+` && mode !== "double")
+        mode = "code";
+      i++;
+      continue;
+    }
+    if (mode === "template") {
+      if (c === "\\") {
+        i += 2;
+        continue;
+      }
+      if (c === "`") {
+        mode = "code";
+        i++;
+        continue;
+      }
+      if (c === "$" && next === "{") {
+        sawInterpolation = true;
+        templateStack.push(depth);
+        depth++;
+        mode = "code";
+        i += 2;
+        continue;
+      }
+      i++;
+      continue;
+    }
+    if (c === "/" && next === "/") {
+      mode = "line-comment";
+      i += 2;
+      continue;
+    }
+    if (c === "/" && next === "*") {
+      mode = "block-comment";
+      i += 2;
+      continue;
+    }
+    if (c === "'") {
+      mode = "single";
+      i++;
+      continue;
+    }
+    if (c === '"') {
+      mode = "double";
+      i++;
+      continue;
+    }
+    if (c === "`") {
+      mode = "template";
+      i++;
+      continue;
+    }
+    if (c === "/" && isRegexPosition(source, i)) {
+      mode = "regex";
+      i++;
+      continue;
+    }
+    if (c === "{") {
+      depth++;
+      i++;
+      continue;
+    }
+    if (c === "}") {
+      depth--;
+      i++;
+      if (templateStack.length > 0 && depth === templateStack[templateStack.length - 1]) {
+        templateStack.pop();
+        mode = "template";
+        continue;
+      }
+      if (depth === 0)
+        return { end: i, sawInterpolation };
+      continue;
+    }
+    i++;
+  }
+  return { end: -1, sawInterpolation };
+}, isRegexPosition = (source, i) => {
+  let j = i - 1;
+  while (j >= 0 && /\s/.test(source[j] ?? ""))
+    j--;
+  if (j < 0)
+    return true;
+  return !/[\w$)\]]/.test(source[j] ?? "");
+}, literalOnly = (node, depth) => {
+  if (node === undefined || depth > MAX_DEPTH)
+    return false;
+  if (node.type === "Literal")
+    return !("regex" in node) && !("bigint" in node);
+  if (node.type === "ArrayExpression")
+    return nodesAt(node, "elements").every((item) => literalOnly(item, depth + 1));
+  if (node.type !== "ObjectExpression")
+    return false;
+  return nodesAt(node, "properties").every((property) => {
+    const key = nodeAt(property ?? { type: "" }, "key");
+    const name = key?.type === "Literal" && typeof key["value"] === "string" ? key["value"] : nameOf(key);
+    return property?.type === "Property" && property["computed"] === false && property["kind"] === "init" && property["method"] !== true && name !== undefined && !DENIED_NAMES.has(name) && literalOnly(nodeAt(property, "value"), depth + 1);
+  });
+}, WRAPPER_OPEN = "(async () => {", WRAPPER_PRELUDE = "const Date = void 0;", metaFragment = (script) => {
+  const matches = [...script.matchAll(META_DECLARATION)];
+  const found = matches[0];
+  if (found === undefined)
+    return {
+      refusal: "has no line that reads as `export const meta =`, which the package requires"
+    };
+  if (matches.length > 1)
+    return { refusal: "has more than one line that reads as `export const meta =`" };
+  const open = script.indexOf("{", (found.index ?? 0) + found[0].length);
+  if (open === -1)
+    return { refusal: "gives `export const meta` no object literal" };
+  const { end, sawInterpolation } = scanObjectLiteral(script, open);
+  if (end === -1)
+    return { refusal: "has a `meta` object literal that is never closed" };
+  if (sawInterpolation)
+    return { refusal: "uses template interpolation in `meta`" };
+  const fragment = script.slice(open, end);
+  const wrapped = parse2(`(${fragment})`, { ecmaVersion: "latest", sourceType: "script" });
+  const statement = wrapped.body[0];
+  const value = statement === undefined ? undefined : nodeAt(statement, "expression");
+  if (value === undefined || wrapped.body.length !== 1 || statement?.type !== "ExpressionStatement" || value.type !== "ObjectExpression" || startOf(value) !== 1 || endOf(value) !== fragment.length + 1 || !literalOnly(value, 1))
+    return { refusal: "has a `meta` that is not an object literal of plain literals" };
+  return { at: found.index ?? 0, value };
+}, workerProgram = (script) => {
+  const meta = metaFragment(script);
+  if ("refusal" in meta)
+    return meta;
+  const exportAt = script.indexOf("export", meta.at);
+  const body = `${script.slice(0, exportAt)}${" ".repeat(6)}${script.slice(exportAt + 6)}`;
+  const prefix = `${WRAPPER_OPEN}${WRAPPER_PRELUDE}
+`;
+  const source = `${prefix}${body}
+})()`;
+  const program = parse2(source, { ecmaVersion: "latest", sourceType: "script" });
+  const call = nodeAt(program.body[0], "expression");
+  const arrow = call === undefined ? undefined : nodeAt(call, "callee");
+  const block = arrow === undefined ? undefined : nodeAt(arrow, "body");
+  const statements = block === undefined ? [] : nodesAt(block, "body");
+  const prelude = statements[0];
+  if (program.body.length !== 1 || call?.type !== "CallExpression" || nodesAt(call, "arguments").length !== 0 || arrow?.type !== "ArrowFunctionExpression" || arrow["async"] !== true || block?.type !== "BlockStatement" || endOf(block) !== source.length - 3 || prelude?.type !== "VariableDeclaration" || startOf(prelude) !== WRAPPER_OPEN.length || endOf(prelude) !== prefix.length - 1)
+    return { refusal: "closes the wrapper the package puts around a script" };
+  return { program: { type: "Program", body: statements.slice(1) } };
+}, inspect = (script, specialists, classic) => {
   if (script.length > MAX_WORKFLOW_SCRIPT)
     return "the script is too large";
-  const program = parse2(script, {
-    ecmaVersion: "latest",
-    sourceType: "module",
-    allowAwaitOutsideFunction: true,
-    allowReturnOutsideFunction: true
-  });
+  const parsed = classic ? workerProgram(script) : {
+    program: parse2(script, {
+      ecmaVersion: "latest",
+      sourceType: "module",
+      allowAwaitOutsideFunction: true,
+      allowReturnOutsideFunction: true
+    })
+  };
+  if ("refusal" in parsed)
+    return parsed.refusal;
+  const { program } = parsed;
   let refusal;
   const refuse = (why) => {
     refusal ??= why;
@@ -22404,7 +22827,7 @@ var isNode = (value) => typeof value === "object" && value !== null && ("type" i
       const value = nodeAt(property, "value");
       if (name !== "agentType")
         expression(value, scope, depth + 1);
-      else if (value?.type === "Literal" && typeof value["value"] === "string" && SPECIALISTS.has(value["value"]))
+      else if (value?.type === "Literal" && typeof value["value"] === "string" && specialists.has(value["value"]))
         named += 1;
       else
         return refuse("starts an agent that is not a holyagent specialist by a literal agentType");
@@ -22661,6 +23084,8 @@ var isNode = (value) => typeof value === "object" && value !== null && ("type" i
       case "VariableDeclaration":
         return variableDeclaration(node, scope, depth);
       case "FunctionDeclaration": {
+        if (classic && !scope.isFunction)
+          refuse("declares a function inside a block");
         const name = nameOf(nodeAt(node, "id")) ?? "";
         declare(scope, name, "unsafe");
         scope.names.get(name)?.functions.add(node);
@@ -22771,21 +23196,6 @@ var isNode = (value) => typeof value === "object" && value !== null && ("type" i
         return refuse(`uses ${node.type}`);
     }
   }
-  const literalOnly = (node, depth) => {
-    if (node === undefined || depth > MAX_DEPTH)
-      return false;
-    if (node.type === "Literal")
-      return !("regex" in node) && !("bigint" in node);
-    if (node.type === "ArrayExpression")
-      return nodesAt(node, "elements").every((item) => literalOnly(item, depth + 1));
-    if (node.type !== "ObjectExpression")
-      return false;
-    return nodesAt(node, "properties").every((property) => {
-      const key = nodeAt(property ?? { type: "" }, "key");
-      const name = key?.type === "Literal" && typeof key["value"] === "string" ? key["value"] : nameOf(key);
-      return property?.type === "Property" && property["computed"] === false && property["kind"] === "init" && property["method"] !== true && name !== undefined && !DENIED_NAMES.has(name) && literalOnly(nodeAt(property, "value"), depth + 1);
-    });
-  };
   function analyse() {
     const keyOf = (name, scope) => binding(scope, name) ?? (name === "args" ? "args" : undefined);
     const dynamic = new Set;
@@ -23284,15 +23694,14 @@ var isNode = (value) => typeof value === "object" && value !== null && ("type" i
   if (refusal === undefined && agentCalls === 0)
     refuse("starts no agent");
   return refusal;
-}, workflowRefusal = (script) => try_2({
-  try: () => inspect(script),
+}, workflowRefusal = (script, specialists = CLAUDE_SPECIALISTS, host = "claude") => try_2({
+  try: () => inspect(script, specialists, host === "pi"),
   catch: (cause) => `cannot read the script: ${String(cause)}`
 }).pipe(catch_2((reason) => succeed6(reason)));
 var init_workflow_check = __esm(() => {
   init_acorn();
   init_dist();
   init_route();
-  init_assignment2();
   TEXT_COUNTS = new Set(["repeat", "padStart", "padEnd"]);
   GROWING_METHODS = new Set(["push", "unshift", "splice"]);
   CALLBACK_ARGUMENTS = new Map([
@@ -23540,8 +23949,9 @@ var init_workflow_check = __esm(() => {
     "label",
     "phase"
   ]);
-  SPECIALISTS = new Set(ROUTES.map((route) => `${PLUGIN_NAMESPACE}:${route.agent}`));
+  CLAUDE_SPECIALISTS = new Set(ROUTES.map((route) => `${PLUGIN_NAMESPACE2}:${route.agent}`));
   UNARY = new Set(["!", "-", "+", "~", "typeof", "void"]);
+  META_DECLARATION = /(^|[\r\n])[ \t]*export[ \t\r\n]+const[ \t\r\n]+meta[ \t\r\n]*=/g;
 });
 
 var Payload, NOTHING, output = (hookSpecificOutput) => new Verbatim(`${JSON.stringify({ hookSpecificOutput })}
