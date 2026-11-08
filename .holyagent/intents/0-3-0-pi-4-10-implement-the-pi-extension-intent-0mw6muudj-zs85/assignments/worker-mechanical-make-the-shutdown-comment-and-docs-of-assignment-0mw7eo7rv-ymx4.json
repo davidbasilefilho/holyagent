@@ -45,5 +45,25 @@
     "finishedAt": "2026-11-08T05:45:25.110Z"
   },
   "result": "result: Shutdown comment in extension.ts and the session_shutdown sentence in extensions.md now state the 2 s stop grace bound. Build regenerated dist with no diff; verify passes.\nchanged: packages/integrations/pi/src/extension.ts, docs/pi/extensions.md\nchecks:\n- bunx --no-install mise run build -> exit 0, built 38 claude + 16 pi files, no dist diff\n- bunx --no-install mise run verify -> exit 0, lint 183 files clean, tests 1845 pass / 0 fail\nblockers: none\nquestions: none\nnotes: none\nevidence:\n[blocking] The comment and extensions.md state the 2 s stop grace bound on shutdown: extension.ts lines 342-344 (release) and 402-404 (session_shutdown) name STOP_GRACE_MS, 2 s, the graceMs option; extensions.md line 25 adds the 2 s per-command stop grace. Diff: /tmp/claude-0/shutdown-grace.diff\n[blocking] bunx --no-install mise run verify exits 0 and mise run build leaves generated output in sync: verify exit 0 (1845 pass); build exit 0; git status shows only the two source/doc paths changed, dist unchanged. Logs: /tmp/claude-0/build.log, /tmp/claude-0/verify.log\nchanged-paths: packages/integrations/pi/src/extension.ts, docs/pi/extensions.md\n",
+  "acceptance": {
+    "revision": 6,
+    "rationale": "Comment and doc only; diff read; verify 1845 pass, build in sync",
+    "criteria": [
+      {
+        "criterion": "The comment and extensions.md state the 2 s stop grace bound on shutdown",
+        "support": "extension.ts lines 342-344 (release) and 402-404 (session_shutdown) name STOP_GRACE_MS, 2 s, the graceMs option; extensions.md line 25 adds the 2 s per-command stop grace. Diff: /tmp/claude-0/shutdown-grace.diff"
+      },
+      {
+        "criterion": "bunx --no-install mise run verify exits 0 and mise run build leaves generated output in sync",
+        "support": "verify exit 0 (1845 pass); build exit 0; git status shows only the two source/doc paths changed, dist unchanged. Logs: /tmp/claude-0/build.log, /tmp/claude-0/verify.log"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "packages/integrations/pi/src/extension.ts, docs/pi/extensions.md"
+      }
+    ]
+  },
   "createdAt": "2026-11-08T05:42:32.540Z"
 }
