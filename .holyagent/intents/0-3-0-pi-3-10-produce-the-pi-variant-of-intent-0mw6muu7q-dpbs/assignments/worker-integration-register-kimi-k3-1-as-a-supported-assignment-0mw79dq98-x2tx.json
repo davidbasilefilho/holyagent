@@ -1,0 +1,64 @@
+{
+  "id": "assignment-0mw79dq98-x2tx",
+  "intentId": "intent-0mw6muu7q-dpbs",
+  "intentRevision": 5,
+  "roleTask": "Worker.integration",
+  "slug": "register-kimi-k3-1-as-a-supported",
+  "objective": "Register kimi-k3.1 as a supported instruction family in /home/user/holyagent-0.3.0-kimi (branch release/0.3.0/feat/kimi-instructions) so its new translation is covered by the mirror and coverage tests, and point the generated pi package at it.",
+  "state": "Running",
+  "scope": [
+    "Run every command in /home/user/holyagent-0.3.0-kimi; first bun install --frozen-lockfile there (the four writers ran without node_modules, so mise, lint and verify never ran on their files).",
+    "The four translation parts are written under packages/runtime/src/instructions/kimi-k3.1/ (root/, session-*.md, specialist/, shared/, design-core/, roles/, skills/). Their coverage entries are in /home/user/holyagent-notes/kimi-coverage-{root,specialist,roles,skills}.ts. Their reports: .git/holyagent/reports/assignment-0mw79029v-8tm8.md, .git/holyagent/reports/assignment-0mw7902io-g49o.md, .git/holyagent/reports/assignment-0mw7902qy-m8xa.md, .git/holyagent/reports/assignment-0mw7902y6-l0ok.md.",
+    "Add kimi-k3.1 to FAMILIES in packages/runtime/src/instructions/families.ts (removing the note that it joins later), and fold the four coverage files into packages/runtime/src/instructions/coverage.ts in its per-family shape, so the mirror and id-coverage tests run for kimi-k3.1. Run bunx --no-install mise run instructions:scaffold and confirm it creates nothing (the mirror is complete).",
+    "Switch the pi package generator (packages/integrations/pi) to the kimi-k3.1 family, so its skills come from kimi-k3.1/skills; rebuild with bunx --no-install mise run build. The Claude output must stay byte-identical.",
+    "Make every gate pass. Where a test assumed claude-5.5 only (for example the instruction text checks in packages/runtime/tests/instructions.test.ts, the cache rule R-CACHE-STATIC, marker-line or skill-format checks), extend it to every listed family rather than exempting kimi-k3.1. Where a Kimi file fails a real rule (a date, a counter, a Claude tool name, a missing marker line, a SKILL.md frontmatter rule), fix the Kimi file minimally without changing its meaning and list each fix.",
+    "Update docs/development.md and docs/pi/ where they say kimi-k3.1 holds only guide.md or that pi ships the claude-5.5 skills."
+  ],
+  "constraints": [
+    "The maintainer's requirements in the Intent in use bind; do not reword the Kimi translations beyond what a failing gate needs.",
+    "Do not touch claude-5.5/ or requirements/. Make no version-control writes; report changed paths.",
+    "Finish with bunx --no-install mise run build and bunx --no-install mise run verify; write git diff plus the list of untracked files to /home/user/holyagent-notes/kimi-integration.diff.",
+    "Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "FAMILIES lists kimi-k3.1 and the mirror and coverage tests pass for it with every id covered",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The pi package ships the kimi-k3.1 skills and the Claude output is byte-identical",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No test was weakened or exempted for kimi-k3.1; family-specific tests cover every listed family",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "mise run build and mise run verify exit 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime",
+    "packages/integrations/pi",
+    "packages/integrations/claude/tests",
+    "docs"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-08T03:14:25.196Z"
+  },
+  "createdAt": "2026-11-08T03:14:25.196Z"
+}
