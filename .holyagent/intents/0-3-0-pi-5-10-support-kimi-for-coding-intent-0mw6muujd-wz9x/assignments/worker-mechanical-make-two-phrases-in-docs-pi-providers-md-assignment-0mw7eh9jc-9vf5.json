@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "make-two-phrases-in-docs-pi-providers-md",
   "objective": "Make two phrases in docs/pi/providers.md of /home/user/holyagent-0.3.0-provider match the code exactly.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "File: /home/user/holyagent-0.3.0-provider/docs/pi/providers.md.",
     "Edit 1, line 45: replace the exact text 'standard error, else standard output' with 'standard error, then standard output'. The code joins both streams, stderr first (packages/runtime/src/pi/readiness.ts outputDetail).",
@@ -46,7 +46,9 @@
     "agentId": "workflow:wf_0cb9fa66-2a2/assignment-0mw7eh9jc-9vf5",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-08T05:37:08.232Z"
+    "startedAt": "2026-11-08T05:37:08.232Z",
+    "finishedAt": "2026-11-08T05:42:30.320Z"
   },
+  "result": "result: docs/pi/providers.md updated: line 45 now reads \"standard error, then standard output\", and the Catalog bullet names the `ListingNotRecognised` report. No other lines changed.\nchanged: docs/pi/providers.md\nchecks: `bunx --no-install mise run verify` -> exit 0; type-check 182 files no errors; lint 183 files no problems; tests 1890 pass, 0 fail (66 files). Log: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log\nblockers: none\nquestions: none\nnotes: none\nevidence:\nLine 45 reads standard error, then standard output (style): docs/pi/providers.md line 45; diff at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/providers-diff.patch\nThe Catalog bullet names the unrecognised-listing report (style): docs/pi/providers.md Catalog bullet, \"reported as `ListingNotRecognised`\"\nbunx --no-install mise run verify exits 0 (tests): exit 0, log at scratchpad verify.log\nchanged-paths: docs/pi/providers.md\n",
   "createdAt": "2026-11-08T05:37:08.232Z"
 }
