@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "assess-commit-range-172bdf9-release-0-3",
   "objective": "Assess commit range 172bdf9..release/0.3.0/fix/pi-windows-launch for security vulnerabilities: the Pi extension starts the bundled CLI as Bun on scripts/holyagent.js with the sh wrapper's flags on every platform, starts pi through cmd.exe on Windows, and gives powershell the same selection and exclusions as bash in the root and specialist tool lists.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "The committed diff is in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/c-win.diff (diff-file); read the touched files in full in /home/user/holyagent-0.3.0-win for context.",
     "Focus: process spawning (argument injection through paths, project names or arguments passed to Bun or cmd.exe, Windows command-line quoting and cmd.exe metacharacters), PATH resolution of bun and pi, and whether powershell parity lets a role reach a shell it should not have or slip past a gate that bash is held to."
@@ -40,7 +40,33 @@
     "agentId": "workflow:wf_096fa445-a52/assignment-0mw7s1tt8-5bg8",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T11:57:02.636Z"
+    "startedAt": "2026-11-08T11:57:02.636Z",
+    "finishedAt": "2026-11-08T12:05:50.312Z"
+  },
+  "result": "result: No vulnerability introduced by 172bdf9..release/0.3.0/fix/pi-windows-launch. The range does not need to hold the push. The built-in `/security-review` could not run, so this review is manual.\n\n**Built-in coverage:** The `/security-review` skill failed on its own preprocessing step: `git log origin/HEAD...` reported an unknown revision, because the clone has no `origin/HEAD`. I reviewed the range manually from /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/c-win.diff and the full files in /home/user/holyagent-0.3.0-win. The tree is the committed branch.\n\n**findings:** No validated vulnerabilities and no suspicions that reach a sink. What I traced:\n\n1. **Bun launch** (`extension.ts:709`, `runtimeArgs` ~311). The path from untrusted input to the spawn is clean.\n   - The `project` value and the CLI arguments go to `pi.exec(\"bun\", argv)` as separate argv entries, with no shell involved.\n   - `project` follows the fixed `--project` flag, so it is a flag value and cannot become a Bun option.\n   - `cwd` is `packageRoot`, never the project, so a bare `bun` found by the Windows search (which checks `cwd` first) cannot be a project-planted binary.\n   - `--no-env-file` and `--config=<empty-bunfig>` match `wrapper.sh:44`, so project `.env` and `bunfig.toml` still cannot redirect state or preload code. A test (`extension.test.ts`, \"Bun runs the package's holyagent.js…\") compares the flags against the wrapper's last line.\n2. **cmd.exe launch** (`extension.ts:~662`, `shimmed`). The command line is `cmd.exe /d /c pi <args>`, so cmd metacharacters in an argument would matter. They cannot appear here.\n   - The only `pi` callers are `readiness.ts:74` (`auth check --provider <id> --json`) and `catalog.ts:138` (`--list-models`).\n   - `<id>` comes from `providerProfile(config)`. `PiProvider` is the single literal `\"kimi-coding-global\"` (`schema.ts:34`), so no project or user text reaches the command line.\n   - `/d` skips AutoRun. `cwd` is `packageRoot`, so cmd's own search finds no project-planted `pi.cmd`.\n   - The shim is limited to `command === \"pi\"`; `git` and `bun` are still spawned directly.\n3. **Exit code 9009** (`extension.ts:954`). Treating it as \"probe did not start\" can only suppress a readiness notice. It does not grant anything.\n4. **powershell parity.**\n   - `WRITE_TOOLS` and `SHELL_TOOLS` gain `powershell` in one place (`tools.ts:13,19`). The same `WRITE_TOOLS` builds the specialist exclusion floor (`tools.ts:162`), so any role without a shell gets `bash,powershell` excluded. Reviewer.audit and the Explorer roles stay shell-free, and tests assert this.\n   - The root's exclusions are `write` and `edit`, plus its feature-dependent tools. The root already has `bash`, so `+powershell` on Windows (`extension.ts:1008`) gives it no new capability.\n   - `+powershell` is added before the exclusions are applied (`rootActiveTools`, `tools.ts:194`), so `refuseExcludedTool` and the exclusion list still hold.\n   - There is no bash-specific gate in the Pi path to slip past. The `vcs-reminder` and `git-push` logic exists only in the Claude hook (`hook.ts:404`, `payload.tool_name === \"Bash\"`), and it only adds a reminder.\n\n**notes (non-blocking, not security):**\n- The wrapper's `BUN_INSTALL` and `~/.bun` fallback (`wrapper.sh:32`) is not repeated. A Pi launched without Bun on its PATH now fails closed with `CommandFailed` instead of finding Bun. A `bun.cmd` shim, as an npm global install of Bun would create, also cannot be spawned directly.\n- The specialist agent files on non-Windows hosts now name an unregistered `powershell` tool. This is harmless, but it relies on Pi ignoring the name.\n\n**verdict:** No blocker. The range introduces no reachable vulnerability and the push need not be held.\n\nevidence:\n- Every blocking finding has a source-to-sink trace with path:line: None raised. The source-to-sink traces behind that are in findings items 1 and 2: `extension.ts:709`, `extension.ts:~662`, `readiness.ts:74`, `catalog.ts:138` and `schema.ts:34`.\n- The review states whether the range introduces a vulnerability that should hold the push: It does not. See verdict.\n- findings: No findings; the checked areas are items 1 to 4 above (no checks or tests were run, read-only review).\n- verdict: No blocker; push not held.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "No reachable vulnerability; traces cover the Bun and cmd.exe launches",
+    "criteria": [
+      {
+        "criterion": "Every blocking finding has a source-to-sink trace with path:line",
+        "support": "None raised. The source-to-sink traces behind that are in findings items 1 and 2: `extension.ts:709`, `extension.ts:~662`, `readiness.ts:74`, `catalog.ts:138` and `schema.ts:34`."
+      },
+      {
+        "criterion": "The review states whether the range introduces a vulnerability that should hold the push",
+        "support": "It does not. See verdict."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "No findings; the checked areas are items 1 to 4 above (no checks or tests were run, read-only review)."
+      },
+      {
+        "label": "verdict",
+        "support": "No blocker; push not held."
+      }
+    ]
   },
   "createdAt": "2026-11-08T11:57:02.636Z"
 }
