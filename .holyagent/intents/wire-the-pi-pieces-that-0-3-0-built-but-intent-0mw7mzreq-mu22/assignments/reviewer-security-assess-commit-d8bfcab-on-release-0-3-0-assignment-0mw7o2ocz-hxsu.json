@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mw7o2ocz-hxsu",
+  "intentId": "intent-0mw7mzreq-mu22",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.security",
+  "slug": "assess-commit-d8bfcab-on-release-0-3-0",
+  "objective": "Assess commit d8bfcab on release/0.3.0/feat/pi-tool-settings for security vulnerabilities in the new setup step that writes Pi settings files.",
+  "state": "Running",
+  "scope": [
+    "Read /home/user/holyagent-notes/wire-b.diff; sources in /home/user/holyagent-0.3.0-settings.",
+    "Intended behavior: holyagent setup deep-merges the toolSettings output (codemode mode, pi-subagents subagents.json, Billion Context, Moonshot tools, computer-use) into Pi settings at the scope location, writing a key only where unset and different from the package default, never over a user value; malformed files are a failed line and untouched; --dry-run writes nothing; --undo removes only recorded keys whose value still equals what setup wrote; doctor reports missing HolyAgent settings only when Pi is in use; gating as the Pi package step.",
+    "Trace: which paths are written and from which inputs (PI_CODING_AGENT_DIR, BILI_CONFIG_FILE, XDG_CONFIG_HOME, HOME, the project directory), symlink or path traversal on write and on the temp-then-rename, whether a project file can make a user-scope run write or undo elsewhere, whether a hostile setup record can make --undo delete user keys, and whether any written value enables a risky setting the user turned off (the maintainer rule: the user's off wins for risky settings)."
+  ],
+  "constraints": [
+    "Read-only; no edits and no version-control writes.",
+    "Report in under 400 words; put long logs in a file under /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "No untrusted input chooses the written path or makes setup or undo change a value the user set",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No written value turns on a risky setting the user turned off",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "security-findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7ni86j-zlts"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T10:05:43.763Z"
+  },
+  "createdAt": "2026-11-08T10:05:43.763Z"
+}
