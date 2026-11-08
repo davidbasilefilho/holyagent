@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-the-last-hardening-commit-head-1",
   "objective": "Review the last hardening commit (HEAD~1..HEAD) on release/0.3.0/feat/pi-launcher in /home/user/holyagent-0.3.0-launcher.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "The commit strips bidi (U+202A-U+202E, U+2066-U+2069) and zero-width (U+200B-U+200F, U+FEFF) characters from the workflow name the Pi extension draws for a SubagentWorkflow call, cuts it to 80 grapheme clusters with Intl.Segmenter, and memoizes the name by script text (memoizeLast, one entry). Check correctness, that Intl.Segmenter is available in the Node versions Pi supports (Node 22.19 or newer), that the cache cannot return a stale name for a different script, and the tests. Review `git -C /home/user/holyagent-0.3.0-launcher diff HEAD~1..HEAD -- packages/integrations/pi/src packages/integrations/pi/tests`."
   ],
@@ -37,7 +37,24 @@
     "agentId": "workflow:wf_02aa99ee-6de/assignment-0mw7kogx6-94b6",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T08:30:42.090Z"
+    "startedAt": "2026-11-08T08:30:42.090Z",
+    "finishedAt": "2026-11-08T08:34:32.350Z"
+  },
+  "result": "result: The hardening is correct and tested with no blocker; `mise run verify` exits 0. Reading only: I did not run a real Pi.\n\nblockers: none\n\nnotes:\n- The built-in `/code-review` findings (docs/pi/caching-and-subagents.md, runtime `pi/tools.ts` and `pi/tests/tools.test.ts`) are rejected. Those files are outside this commit's diff. The skill most likely read `/home/user/holyagent` rather than the launcher worktree. None of them touch the name sanitizing or the cache.\n- Optional: the 80-cluster cut can leave trailing whitespace, for example `\"x\"*79 + \" \" + \"y\"` draws with a trailing space.\n- Optional: the strip list covers only the ranges the Assignment names. It leaves U+061C, U+2060-U+2064, U+180E and U+00AD.\n- Optional: no test covers a multi-codepoint cluster (ZWJ emoji or a combining mark). The surrogate-pair test would also pass with a code-point cut.\n- The one-slot cache cannot return a stale name. The key is the full script text and the function is pure. Two interleaved streaming calls would only recompute.\n- Pi requires Node 22.19 or newer, per `docs/pi/installation.md`. `Intl.Segmenter` is built in there, and my check on Node 22.23.4 ran fine and counted 3 clusters for `a\\u0301👨‍👩‍👧x`.\n\nevidence:\nThe hardening is correct and tested without new defects: `git diff HEAD~1..HEAD -- packages/integrations/pi/src packages/integrations/pi/tests` read. The strip, trim and cut order in `sanitizeWorkflowName` is right, and the three new tests exercise it.\nmise run verify exits 0: `bunx --no-install mise run verify` -> exit 0; lint, format check and type-check are clean (519 files formatted, 199 files with no type errors, 200 files with no lint problems); tests 2146 pass, 0 fail; log at `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`.\n",
+  "acceptance": {
+    "revision": 7,
+    "rationale": "Hardening correct; verify exit 0 with 2146 pass.",
+    "criteria": [
+      {
+        "criterion": "The hardening is correct and tested without new defects",
+        "support": "`git diff HEAD~1..HEAD -- packages/integrations/pi/src packages/integrations/pi/tests` read. The strip, trim and cut order in `sanitizeWorkflowName` is right, and the three new tests exercise it."
+      },
+      {
+        "criterion": "mise run verify exits 0",
+        "support": "`bunx --no-install mise run verify` -> exit 0; lint, format check and type-check are clean (519 files formatted, 199 files with no type errors, 200 files with no lint problems); tests 2146 pass, 0 fail; log at `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`."
+      }
+    ],
+    "evidence": []
   },
   "createdAt": "2026-11-08T08:30:42.090Z"
 }
