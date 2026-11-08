@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.testing",
   "slug": "review-the-test-only-windows-fix-commit",
   "objective": "Review the test-only Windows fix commit 49a54cf on release/0.3.0/feat/pi-launcher in /home/user/holyagent-0.3.0-launcher.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "The commit changes packages/integrations/pi/tests/extension.test.ts (expects the forward-slash wrapper path the extension writes) and packages/integrations/pi/tests/pi.test.ts (writes the built extension into a mkdtemp folder inside packages/integrations/pi instead of a system temp folder with a junctioned node_modules, because Bun on Windows did not resolve @earendil-works/pi-tui through the junction). Check that both tests still prove what they proved (no weakened assertions), that the temp folder inside the package cannot be picked up by the build, format, lint or git (ignored or always removed, including on failure), and that the tests are platform-neutral. Read `git -C /home/user/holyagent-0.3.0-launcher show 49a54cf`."
   ],
@@ -32,7 +32,20 @@
     "agentId": "workflow:wf_25aedf49-cae/assignment-0mw7lel6z-ddlj",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-08T08:51:00.684Z"
+    "startedAt": "2026-11-08T08:51:00.684Z",
+    "finishedAt": "2026-11-08T08:55:08.154Z"
+  },
+  "result": "result: Both fixes keep their assertions and leave nothing behind after a normal run. One optional risk remains: an interrupted run can leave an untracked folder.\nchanged: none\nchecks: `bunx --no-install mise run verify` -> exit 0; 2146 pass, 0 fail, 71 files; type-check clean (199 files), lint clean (200 files), format check clean (519 files). The base was not run.\nblockers: none\nquestions: none\nnotes:\n- `.gitignore` does not cover `packages/integrations/pi/extension-test-*`. The `finally` block removes the folder on pass and on failure, but a killed process (SIGKILL) would leave an untracked folder. Adding an ignore entry is optional.\n- `mise run verify` runs lint, format and tests in parallel, so a lint or format pass could briefly see the temp folder while the test runs. It did not in this run.\n- The load test still checks the same eight registrations, and the junction and symlink are gone.\n\nevidence:\nThe fixed tests keep their assertions and are platform-neutral and leave nothing behind: `extension.test.ts:352` now uses the existing `WRAPPER` constant (`toPosix(join(...))`, line 62), which is the forward-slash form the extension writes, so the assertion has the same strength. `pi.test.ts:388-407` has an unchanged `toEqual` list of registrations. It also gains a try/finally `rm`, and uses only `join` and `mkdtemp`. A clean `git status` and no leftover folder in `packages/integrations/pi` after `mise run verify`.\n",
+  "acceptance": {
+    "revision": 7,
+    "rationale": "Fixed tests keep their assertions, are platform-neutral and clean up; verify 2146 pass",
+    "criteria": [
+      {
+        "criterion": "The fixed tests keep their assertions and are platform-neutral and leave nothing behind",
+        "support": "`extension.test.ts:352` now uses the existing `WRAPPER` constant (`toPosix(join(...))`, line 62), which is the forward-slash form the extension writes, so the assertion has the same strength. `pi.test.ts:388-407` has an unchanged `toEqual` list of registrations. It also gains a try/finally `rm`, and uses only `join` and `mkdtemp`. A clean `git status` and no leftover folder in `packages/integrations/pi` after `mise run verify`."
+      }
+    ],
+    "evidence": []
   },
   "createdAt": "2026-11-08T08:51:00.684Z"
 }
