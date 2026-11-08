@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-commits-c991ae6-and-b9877c1-on",
   "objective": "Review commits c991ae6 and b9877c1 on release/0.3.0/feat/pi-install (range 7846c9b..b9877c1, worktree /home/user/holyagent-0.3.0-install) for correctness and regressions.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "git -C /home/user/holyagent-0.3.0-install diff 7846c9b..b9877c1 -- . ':(exclude)packages/integrations/claude/dist' ':(exclude)packages/integrations/pi/dist' (also at /home/user/holyagent-notes/install-code.diff).",
     "Intended behavior: the Pi manifest lists no dependencies; holyagent setup runs pi install npm:<pkg>@<pin> for each package piPackages(config) enables and pi remove for HolyAgent feature packages the config turns off; with pi.enable off it removes nothing; scopes project and local map to pi install -l, user to global; doctor checks pi, Node 22.19+ and enabled packages only when HOLYAGENT_HOST=pi or pi is on PATH, otherwise prints one informational line; the Windows installer requires Node 22.19.",
@@ -56,7 +56,41 @@
     "agentId": "workflow:wf_d86ee99c-f44/assignment-0mw7lszv1-i73l",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T09:02:12.877Z"
+    "startedAt": "2026-11-08T09:02:12.877Z",
+    "finishedAt": "2026-11-08T09:08:18.498Z"
+  },
+  "result": "result: no blockers; the built-in `/code-review` (high) reported 9 findings, none of them blocking after I read the cited code.\n\nchanged: none (read-only)\n\nchecks:\n- `bunx --no-install mise run check` -> 0\n- `bunx --no-install mise run lint` -> 0\n- `bunx --no-install mise run test` -> 0 (2195 pass, 0 fail)\n- `bun test packages/runtime/tests/setup-pi.test.ts packages/runtime/tests/setup.test.ts` -> 77 pass\n- `mise run verify` -> exit 1, only because `fmt:check` flags the uncommitted `docs/pi/README.md`, which is out of scope. The committed range is clean.\n- Logs: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/{verify,check,lint,test}.log`\n\nblockers: none\n\nquestions: none\n\nnotes (all optional, with my triage of the built-in findings):\n- Provider package left behind (`pi-install.ts:19`): `MANAGED_NAMES` leaves out the provider-profile package. After `pi.provider` changes, setup keeps the old provider package in the settings. The intended behavior says \"feature packages\", so this is optional.\n- Scope mismatch (`pi-install.ts:63`): setup reads one settings file, while doctor accepts either scope. A package already installed at the other scope is installed again, and a removal at one scope leaves the other scope's entry. Optional.\n- Git ref with a slash (`pi-check.ts:132`): `sourceName` takes the last path segment, so `git:github.com/o/holyagent@release/0.3.0/integration` is not recognised as the HolyAgent package. The fix command itself uses a `holyagent-<v>` tag, which works. Optional.\n- Node floor elsewhere: `install/wsl-install.sh` still accepts Node 22.13, while the Windows installer and the doctor now require 22.19. Docs elsewhere say the same; they are uncommitted and out of scope. Optional.\n- Rejected: `pi remove npm:<name>` without the version. Pi's `getSourceMatchKeyForSettings` matches npm sources by name only (`package-manager.js` ~L1195), so the removal works.\n- Rejected: setup and doctor run Pi work when `pi` is on PATH. That is the stated intent, and doctor prints one info line otherwise.\n- Rejected: `npmCommand` not set by setup. That claim is about the uncommitted docs, which are out of scope.\n- Rejected: setup and doctor use the process cwd for `.pi`. Pi resolves `-l` against cwd too, so this is consistent.\n- Rejected: `PI_HOST_VERSION` and the pre-release version parse. The pin is guarded by a test, and the point is cosmetic.\n- Not run: a real `pi install` or `pi remove`. Everything went through the fake Shell, so end-to-end Pi behavior is read from the code only.\n\nevidence:\n- review-findings: the 9 built-in findings are triaged above; 0 blockers, 4 optional notes, 5 rejected with reasons.\n- Setup installs exactly the enabled packages at their pins, removes only HolyAgent feature packages the config turns off, and reports failures without aborting the other steps: `pi-install.ts:59-113` filters by `listsAtPin`, removes only `MANAGED_NAMES` that are not wanted, and records each failure as a `failed` line. Tests: `setup-pi.test.ts` \"installs every enabled package\", \"removes a feature package the config turns off\", \"leaves a package alone\", \"a failing command is a failed line and the others still run\".\n- Doctor does not fail a user without Pi and reports each missing or mis-pinned enabled package with its fix command: `pi-check.ts:307-310` returns one `~` info line, `checkFeatures` (`:273-289`) returns one line per missing package with its `pi install` command, and `pi.enable` off adds nothing. Tests: \"a machine without Pi gets one informational line\", \"each enabled package missing\", \"a package listed at another version is missing\".\n- Existing setup and doctor behavior for Claude is unchanged: `setup.test.ts` changes are only the added `NOT_IN_USE` line, which is the intended one info line. The Pi step is gated by `!cloud && piInUse`, and the full suite passes.\n- Each new behavior has a test that would fail without it: `setup-pi.test.ts` has about 30 behavior tests that assert exact lines and shell calls, covering all new branches (dry run, scope `-l`, cwd, no pi on PATH, bad settings file, cloud, undo).\n- The change follows the repository's code rules: lint and type-check pass; there is no try/catch, `new Promise` or async function in the new runtime code. It uses Effect, tagged `SetupFailure`, Schema decode with `onExcessProperty: \"error\"`, the Shell service and JSDoc on exports. The only fmt failure is the out-of-scope `docs/pi/README.md`.\n",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "No blocking finding; 9 built-in findings triaged with code reads; tests 2195 pass",
+    "criteria": [
+      {
+        "criterion": "Setup installs exactly the enabled packages at their pins, removes only HolyAgent feature packages the config turns off, and reports failures without aborting the other steps",
+        "support": "`pi-install.ts:59-113` filters by `listsAtPin`, removes only `MANAGED_NAMES` that are not wanted, and records each failure as a `failed` line. Tests: `setup-pi.test.ts` \"installs every enabled package\", \"removes a feature package the config turns off\", \"leaves a package alone\", \"a failing command is a failed line and the others still run\"."
+      },
+      {
+        "criterion": "Doctor does not fail a user without Pi and reports each missing or mis-pinned enabled package with its fix command",
+        "support": "`pi-check.ts:307-310` returns one `~` info line, `checkFeatures` (`:273-289`) returns one line per missing package with its `pi install` command, and `pi.enable` off adds nothing. Tests: \"a machine without Pi gets one informational line\", \"each enabled package missing\", \"a package listed at another version is missing\"."
+      },
+      {
+        "criterion": "Existing setup and doctor behavior for Claude is unchanged",
+        "support": "`setup.test.ts` changes are only the added `NOT_IN_USE` line, which is the intended one info line. The Pi step is gated by `!cloud && piInUse`, and the full suite passes."
+      },
+      {
+        "criterion": "Each new behavior has a test that would fail without it",
+        "support": "`setup-pi.test.ts` has about 30 behavior tests that assert exact lines and shell calls, covering all new branches (dry run, scope `-l`, cwd, no pi on PATH, bad settings file, cloud, undo)."
+      },
+      {
+        "criterion": "The change follows the repository's code rules",
+        "support": "lint and type-check pass; there is no try/catch, `new Promise` or async function in the new runtime code. It uses Effect, tagged `SetupFailure`, Schema decode with `onExcessProperty: \"error\"`, the Shell service and JSDoc on exports. The only fmt failure is the out-of-scope `docs/pi/README.md`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "review-findings",
+        "support": "the 9 built-in findings are triaged above; 0 blockers, 4 optional notes, 5 rejected with reasons."
+      }
+    ]
   },
   "createdAt": "2026-11-08T09:02:12.877Z"
 }
