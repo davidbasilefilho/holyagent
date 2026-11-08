@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mw7qqxzv-e1at",
+  "intentId": "intent-0mw7mzreq-mu22",
+  "intentRevision": 1,
+  "roleTask": "Worker.mechanical",
+  "slug": "correct-the-route-model-id-pattern",
+  "objective": "Correct the route model id pattern stated in docs/pi/configuration.md in /home/user/holyagent-0.3.0-settings so it matches the code.",
+  "state": "Running",
+  "scope": [
+    "docs/pi/configuration.md line ~43 states the pi.routes.<row>.model pattern as ^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$ with the characters . _ : / -; packages/runtime/src/config/schema.ts (~line 51) is ^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$. Update the pattern and the listed characters to include @ and +, matching the code exactly, and nothing else."
+  ],
+  "constraints": [
+    "Change only docs/pi/configuration.md; no version-control writes and no edits under .git/ or .holyagent/.",
+    "Run bunx --no-install mise run fmt:check (or bunx --no-install mise run verify) and report the exit code.",
+    "Report in under 150 words."
+  ],
+  "criteria": [
+    {
+      "text": "docs/pi/configuration.md states the model id pattern and characters exactly as schema.ts defines them",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "diff"
+  ],
+  "ownershipPaths": [
+    "docs/pi/configuration.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-08T11:20:35.228Z"
+  },
+  "createdAt": "2026-11-08T11:20:35.228Z"
+}
