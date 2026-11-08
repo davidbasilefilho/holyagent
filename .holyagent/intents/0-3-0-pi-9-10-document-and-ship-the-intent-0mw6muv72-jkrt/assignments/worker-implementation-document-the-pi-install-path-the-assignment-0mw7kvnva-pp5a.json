@@ -1,0 +1,66 @@
+{
+  "id": "assignment-0mw7kvnva-pp5a",
+  "intentId": "intent-0mw6muv72-jkrt",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "document-the-pi-install-path-the",
+  "objective": "Document the Pi install path, the HolyAgent Pi package and every config option, so a user can install the pinned package and its prerequisites and start the root.",
+  "state": "Running",
+  "scope": [
+    "Binding requirements (Intent pi 9/10): the documented Pi install is Node.js 22.19 or newer plus the official installer or npm install -g --ignore-scripts @earendil-works/pi-coding-agent@<pinned>; the HolyAgent package is installed with pi install npm:...@x.y.z (or a git or local source) so the pin is explicit; Bun is documented as needed by the HolyAgent CLI, not as a Pi install route; pi runs on Node and uses Bun only as its npmCommand for package installs. holyagent doctor checks that pi, Node 22.19 or newer and the package are present, without installing them; the Windows installer Node minimum rises from 22.13 to 22.19. The docs describe every config.json option with its default, and installing the package installs only the dependencies the default config.json enables. docs/components.md no longer says there is no Pi integration; docs/usage.md, docs/development.md (layout and generated paths) and docs/pi/README.md describe the new package and how to start the root. README.md keeps exactly its six sections in order and any Pi mention there is a link into docs/. Tests and fixtures only: never run pi or a live model. Work only in /home/user/holyagent-0.3.0-install (branch release/0.3.0/feat/pi-install, cut from release/0.3.0/feat/pi-launcher at 7846c9b, which ships the Pi package in packages/integrations/pi with its dist, the pinned Pi packages in packages/runtime/src/config/pi-packages.json, and docs under docs/pi/).",
+    "Files: docs/components.md (drop the claim there is no Pi integration; describe packages/integrations/pi), docs/usage.md (installing and starting the root on Pi: global first, plain pi after pi install), docs/development.md (layout and generated paths: packages/integrations/pi/src, dist/agents, dist/extensions, dist/scripts, dist/skills, build), docs/requirements.md and docs/pi/installation.md (Node 22.19 or newer, the official installer or npm install -g --ignore-scripts @earendil-works/pi-coding-agent@<the pinned version, read it from the repository>, pi install npm:<package>@<version> or a git or local source; Bun needed by the HolyAgent CLI, not a Pi install route; the Windows installer minimum 22.19), docs/pi/README.md (what ships now vs planned: launcher, tool surface, provider, extension are built; mark remaining planned parts), docs/pi/configuration.md (every config.json option with its default: read packages/runtime/src/config/schema.ts and the defaults, and list any missing option).",
+    "Doctor: another writer is adding Pi checks to holyagent doctor in parallel: pi on PATH and its version, Node 22.19 or newer, and the HolyAgent Pi package present in the global or project pi settings, each with a fix hint, never installing. Describe that behavior in docs/pi/installation.md (section on what setup and doctor do) in general terms without quoting messages.",
+    "README.md: keep exactly its six sections in order (see AGENTS.md); a Pi mention there may only be a link into docs/; fix the Node 22.13 mention if it concerns Pi or the Windows installer.",
+    "Write for a user: concise, sourced statements, no planning language for what is built."
+  ],
+  "constraints": [
+    "Edit only the ownership paths; no version-control writes and no edits under .git/ or .holyagent/.",
+    "Run bunx --no-install mise run verify (the format check covers Markdown) and report the exit code (echo $?); if it fails only on files outside your ownership, name them.",
+    "Write the diff to /home/user/holyagent-notes/install-b.diff and give it as diff-file evidence.",
+    "Start each evidence line with the criterion text, then a colon.",
+    "Report in under 350 words."
+  ],
+  "criteria": [
+    {
+      "text": "The install path is documented with Node 22.19, the pinned Pi and an explicit HolyAgent package pin, and Bun only for the CLI",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "docs/components.md, usage.md, development.md and pi/README.md describe the shipped Pi package and how to start the root",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Every config.json option is documented with its default",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "README.md keeps its six sections and links into docs/ for Pi",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "docs/components.md",
+    "docs/usage.md",
+    "docs/development.md",
+    "docs/requirements.md",
+    "docs/pi/installation.md",
+    "docs/pi/README.md",
+    "docs/pi/configuration.md",
+    "README.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T08:36:17.686Z"
+  },
+  "createdAt": "2026-11-08T08:36:17.686Z"
+}
