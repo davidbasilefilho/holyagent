@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mw7jlzuu-redd",
+  "intentId": "intent-0mw6muuvl-zq3p",
+  "intentRevision": 7,
+  "roleTask": "Reviewer.security",
+  "slug": "re-assess-the-exact-replication-repair",
+  "objective": "Re-assess the exact-replication repair of the Pi workflow gate for the meta-fragment bypass and any remaining way a script runs host code or launches a non-specialist.",
+  "state": "Running",
+  "scope": [
+    "Previous findings to verify closed. Security (blocking): extractMeta in the package (src/workflow/meta.ts) takes the first { after `export const meta =`, which may sit inside a comment, and evaluates that fragment on the host thread where this.constructor.constructor reaches process; the checker compared only positions, so `export const meta = /* { description: this.constructor.constructor(\\\"return process\\\")()... } */ { name: \\\"a\\\", description: \\\"d\\\" }` (and a // variant) passed. Code (blocking): the raw-source /<!--|-->/ rule refused ordinary Claude scripts with --> in strings, and docs/hooks.md disagreed with the code. The repair adds a Pi mode to workflowRefusal (host argument) that ports the package meta scan (scanObjectLiteral, isRegexPosition) and accepts the fragment only as a literal object, builds the worker source the package runs and parses it as a classic script, and restores the Claude hook to its module reading. Review only ddd4616..HEAD in /home/user/holyagent-0.3.0-launcher (source diff at /home/user/holyagent-notes/launcher-repair3.diff; package source at /home/user/holyagent-notes/pi-probe/node_modules/@tintinweb/pi-subagents). Do not run pi or any live model.",
+    "Compare the ported scan and the wrapper construction line by line against the package (meta.ts, worker-source.ts, index.ts:2795, meta.ts:319), including which source each package call site passes (raw script vs transformed), and the case where the package evaluates meta on a source the checker did not see."
+  ],
+  "constraints": [
+    "Read-only: no edits and no version-control writes.",
+    "Substantiate each finding with a source-to-sink path.",
+    "Start each evidence line with the criterion text, then a colon.",
+    "Report in under 350 words."
+  ],
+  "criteria": [
+    {
+      "text": "Workflow scripts launch only the eighteen specialists and the repair adds no vulnerability",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7jd8fv-f5ck"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T08:00:47.046Z"
+  },
+  "createdAt": "2026-11-08T08:00:47.046Z"
+}
