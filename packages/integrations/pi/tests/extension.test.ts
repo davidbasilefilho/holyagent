@@ -1,13 +1,14 @@
 import { describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { isAbsolute, join, resolve } from "node:path"
+import { isAbsolute, join, resolve, win32 } from "node:path"
 
 import type { ExecResult, ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent"
 import { Effect } from "effect"
 
 import { CONTEXT_BUDGET, SESSION_REMINDER } from "../../../runtime/src/cli/sessioncontext.ts"
 import { defaultConfig } from "../../../runtime/src/config/schema.ts"
+import { toPosix } from "../../../runtime/src/domain/paths.ts"
 import {
   PI_ROOT_CORE,
   PI_ROOT_PLACEHOLDER,
@@ -21,11 +22,14 @@ import {
   NOTICE_MESSAGE,
   ROLE_FLAG,
   SESSION_DEADLINE_MS,
+  wrapperPath,
 } from "../src/extension.ts"
 import { DIST_DIRECTORY, REPOSITORY } from "../src/files.ts"
 
 const PACKAGE_ROOT = join(REPOSITORY, DIST_DIRECTORY)
-const WRAPPER = join(PACKAGE_ROOT, "scripts", "holyagent")
+// The shell reads a script path without a `/` as a bare name, so the extension names it with `/`
+// only, drive letter included on Windows.
+const WRAPPER = toPosix(join(PACKAGE_ROOT, "scripts", "holyagent"))
 const CONFIG = JSON.stringify(await Effect.runPromise(defaultConfig))
 const DISABLED = JSON.stringify({
   ...(await Effect.runPromise(defaultConfig)),
@@ -86,6 +90,8 @@ const fakeApi = (responder: Responder, value?: string | boolean, cwd = SESSION_C
   const calls: Array<Call> = []
   const sent: Array<unknown> = []
   const touched: Array<string> = []
+  // The commands started and not yet settled: a process that is still running.
+  const running = { count: 0 }
   const api = {
     registerFlag: (name: string, options: { type: string; default?: string }) =>
       void flags.set(name, options),
@@ -102,8 +108,13 @@ const fakeApi = (responder: Responder, value?: string | boolean, cwd = SESSION_C
     ): Promise<ExecResult> => {
       const call: Call = { command, args, cwd: options?.cwd, signal: options?.signal }
       calls.push(call)
-      const outcome = await responder(call, subcommand(call) ?? [])
-      return { stdout: "", stderr: "", code: 0, killed: false, truncated: false, ...outcome }
+      running.count += 1
+      try {
+        const outcome = await responder(call, subcommand(call) ?? [])
+        return { stdout: "", stderr: "", code: 0, killed: false, truncated: false, ...outcome }
+      } finally {
+        running.count -= 1
+      }
     },
   }
   // Only `cwd` of the context is read: any other member, the TUI's `ui` included, fails the test.
@@ -130,6 +141,7 @@ const fakeApi = (responder: Responder, value?: string | boolean, cwd = SESSION_C
     calls,
     sent,
     touched,
+    running,
     emit,
   }
 }
@@ -348,6 +360,11 @@ describe("what runs and when", () => {
     await done()
   })
 
+  test("the wrapper of a Windows package is named with / only, so sh does not take it for a bare name", () => {
+    expect(wrapperPath("C:\\Users\\me\\pkg", win32)).toBe("C:/Users/me/pkg/scripts/holyagent")
+    expect(wrapperPath("/opt/pkg")).toBe("/opt/pkg/scripts/holyagent")
+  })
+
   test("the wrapper is the only way to the runtime: sh with the package's scripts/holyagent", async () => {
     const { directory, done } = await withState()
     const { api } = await run(healthy(directory), { start: { reason: "resume" } })
@@ -364,7 +381,12 @@ describe("what runs and when", () => {
       })
     }
     const commands = startedWith(api.calls)
-    for (const expected of ["config /work/project/.holyagent", "status", "reconcile", "state mode"])
+    for (const expected of [
+      `config ${join("/work/project", ".holyagent")}`,
+      "status",
+      "reconcile",
+      "state mode",
+    ])
       expect(commands).toContain(expected)
     await done()
   })
@@ -508,6 +530,8 @@ describe("with the built package and a real project", () => {
         stdout: "pipe",
         stderr: "pipe",
         stdin: "ignore",
+        // Pi's exec kills the process when the signal aborts.
+        ...(call.signal === undefined ? {} : { signal: call.signal }),
       })
       const [stdout, stderr, code] = await Promise.all([
         new Response(child.stdout).text(),
@@ -670,20 +694,22 @@ describe("order and time", () => {
     // Every command answers in time on its own; together they run past the deadline.
     const inner = healthy(directory)
     const api = fakeApi(async (call, runtime) => {
-      await Bun.sleep(60)
+      await Bun.sleep(100)
       return inner(call, runtime)
     })
-    createExtension({ packageRoot: PACKAGE_ROOT, deadlineMs: 150 })(api.pi)
+    // Four steps of 100ms in sequence (git, config with the state folder, status, reconcile) cross
+    // a 250ms deadline in status. A slow runner only brings the deadline earlier.
+    createExtension({ packageRoot: PACKAGE_ROOT, deadlineMs: 250 })(api.pi)
     const began = performance.now()
     await api.emit("session_start", { reason: "resume" })
-    expect(performance.now() - began).toBeLessThan(1_500)
+    expect(performance.now() - began).toBeLessThan(5_000)
     const delivered = (await api.emit("before_agent_start", { prompt: "x" })).at(0) as Delivered
     expect(delivered.message?.customType).toBe(NOTICE_MESSAGE)
     expect(delivered.message?.content).toContain("longer than")
     // The command in flight at the deadline is stopped, and none starts after it.
     expect(api.calls.at(-1)?.signal?.aborted).toBe(true)
     const count = api.calls.length
-    await Bun.sleep(150)
+    await Bun.sleep(500)
     expect(api.calls.length).toBe(count)
     await done()
   })
@@ -728,6 +754,163 @@ describe("order and time", () => {
     await started
     expect(await api.emit("before_agent_start", { prompt: "x" })).toEqual([undefined])
     await done()
+  })
+})
+
+describe("no command outlives a gather", () => {
+  // A stopped command takes a while to exit, as a process does: it settles `delay` ms after the
+  // signal aborts, which a gather that does not wait for it would return before.
+  const slowToStop =
+    (hold: ReturnType<typeof gate>, answer: Outcome, delay = 60) =>
+    (call: Call): Promise<Outcome> =>
+      new Promise((settle) => {
+        hold.enter()
+        const stop = () => void setTimeout(() => settle({ killed: true, code: 143 }), delay)
+        if (call.signal?.aborted) return stop()
+        call.signal?.addEventListener("abort", stop, { once: true })
+        void hold.promise.then(() => settle(answer))
+      })
+
+  test("when the config fails, the state folder command is stopped and awaited before the notice is delivered", async () => {
+    const hold = gate()
+    const inner = healthy("/missing")
+    const api = fakeApi((call, runtime) => {
+      if (runtime[0] === "config")
+        return hold.entered.then(() => ({
+          code: 4,
+          stderr: "error: ConfigInvalid: bad\nhint: Fix it.\n",
+        }))
+      return runtime[0] === "state" ? slowToStop(hold, { stdout: "" })(call) : inner(call, runtime)
+    })
+    createExtension({ packageRoot: PACKAGE_ROOT })(api.pi)
+    await api.emit("session_start", { reason: "startup" })
+    expect(api.running.count).toBe(0)
+    const delivered = (await api.emit("before_agent_start", { prompt: "x" })).at(0) as Delivered
+    expect(delivered.message?.customType).toBe(NOTICE_MESSAGE)
+    expect(api.running.count).toBe(0)
+  })
+
+  test("at the deadline, the command in flight is stopped and awaited before the notice is delivered", async () => {
+    const hold = gate()
+    const inner = healthy("/missing")
+    const api = fakeApi((call, runtime) =>
+      runtime[0] === "status" ? slowToStop(hold, { stdout: STATUS })(call) : inner(call, runtime),
+    )
+    createExtension({ packageRoot: PACKAGE_ROOT, deadlineMs: 100 })(api.pi)
+    await api.emit("session_start", { reason: "startup" })
+    expect(api.running.count).toBe(0)
+    const delivered = (await api.emit("before_agent_start", { prompt: "x" })).at(0) as Delivered
+    expect(delivered.message?.content).toContain("longer than")
+  })
+
+  // A command that exits only when the test lets it, after it was stopped: a process that is slow
+  // to leave, which a shutdown that does not wait for it would return before.
+  const lingering =
+    (hold: ReturnType<typeof gate>, exit: ReturnType<typeof gate>, answer: Outcome) =>
+    (call: Call): Promise<Outcome> =>
+      new Promise((settle) => {
+        hold.enter()
+        const stop = () => void exit.promise.then(() => settle({ killed: true, code: 143 }))
+        if (call.signal?.aborted) return stop()
+        call.signal?.addEventListener("abort", stop, { once: true })
+        void hold.promise.then(() => settle(answer))
+      })
+
+  /** Whether the promise has settled after the other work queued so far has run. */
+  const settledSoon = async (promise: Promise<unknown>): Promise<boolean> => {
+    let settled = false
+    void promise.then(() => void (settled = true))
+    await Bun.sleep(30)
+    return settled
+  }
+
+  test("session_shutdown settles only after the stopped command has exited, awaiting nothing else", async () => {
+    const hold = gate()
+    const exit = gate()
+    const inner = healthy("/missing")
+    const api = fakeApi((call, runtime) =>
+      runtime[0] === "status"
+        ? lingering(hold, exit, { stdout: STATUS })(call)
+        : inner(call, runtime),
+    )
+    createExtension({ packageRoot: PACKAGE_ROOT })(api.pi)
+    // Pi does not wait for the session_start handler, and neither does this test.
+    const started = api.emit("session_start", { reason: "startup" })
+    await hold.entered
+    expect(api.running.count).toBe(1)
+    const shutdown = api.emit("session_shutdown", { reason: "quit" })
+    expect(await settledSoon(shutdown)).toBe(false)
+    expect(api.running.count).toBe(1)
+    exit.open()
+    await shutdown
+    expect(api.running.count).toBe(0)
+    await started
+  })
+
+  test("session_shutdown also waits for the children of an older gather that a compaction stopped", async () => {
+    const hold = gate()
+    const exit = gate()
+    const inner = healthy("/missing")
+    let first = true
+    const api = fakeApi((call, runtime) => {
+      if (runtime[0] !== "status" || !first) return inner(call, runtime)
+      first = false
+      return lingering(hold, exit, { stdout: STATUS })(call)
+    })
+    createExtension({ packageRoot: PACKAGE_ROOT })(api.pi)
+    const started = api.emit("session_start", { reason: "startup" })
+    await hold.entered
+    // The compaction's own gather runs to its end while the older one's command is still leaving.
+    await api.emit("session_compact", { reason: "threshold" })
+    expect(api.running.count).toBe(1)
+    const shutdown = api.emit("session_shutdown", { reason: "quit" })
+    expect(await settledSoon(shutdown)).toBe(false)
+    exit.open()
+    await shutdown
+    expect(api.running.count).toBe(0)
+    await started
+  })
+
+  test("a command that never exits is given up on after the grace, and the shutdown does not hang", async () => {
+    const hold = gate()
+    const inner = healthy("/missing")
+    // It ignores the signal, as a process whose grandchild holds the pipes does.
+    const api = fakeApi((call, runtime) =>
+      runtime[0] === "status" ? new Promise<Outcome>(() => hold.enter()) : inner(call, runtime),
+    )
+    createExtension({ packageRoot: PACKAGE_ROOT, graceMs: 50 })(api.pi)
+    const started = api.emit("session_start", { reason: "startup" })
+    await hold.entered
+    await api.emit("session_shutdown", { reason: "quit" })
+    await started
+    expect(api.running.count).toBe(1)
+  })
+
+  test("a gather ended by its deadline does not wait longer than the grace for a command that never exits", async () => {
+    const inner = healthy("/missing")
+    const api = fakeApi((call, runtime) =>
+      runtime[0] === "status" ? new Promise<Outcome>(() => {}) : inner(call, runtime),
+    )
+    createExtension({ packageRoot: PACKAGE_ROOT, deadlineMs: 50, graceMs: 50 })(api.pi)
+    await api.emit("session_start", { reason: "startup" })
+    const delivered = (await api.emit("before_agent_start", { prompt: "x" })).at(0) as Delivered
+    expect(delivered.message?.customType).toBe(NOTICE_MESSAGE)
+    expect(delivered.message?.content).toContain("longer than")
+  })
+
+  test("a pi.exec that throws before it returns a promise is a notice naming the command, not a defect", async () => {
+    const api = fakeApi(healthy("/missing"))
+    ;(api.pi as unknown as { exec: () => never }).exec = () => {
+      throw new Error("sync boom")
+    }
+    createExtension({ packageRoot: PACKAGE_ROOT })(api.pi)
+    await api.emit("session_start", { reason: "startup" })
+    const delivered = (await api.emit("before_agent_start", { prompt: "x" })).at(0) as Delivered
+    expect(delivered.message?.customType).toBe(NOTICE_MESSAGE)
+    expect(delivered.message?.content).toContain("`holyagent -C")
+    expect(delivered.message?.content).toContain(
+      "rev-parse --show-toplevel` failed: Error: sync boom",
+    )
   })
 })
 

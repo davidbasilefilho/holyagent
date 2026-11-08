@@ -1,4 +1,4 @@
-import { join, resolve } from "node:path"
+import nodePath, { join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import type {
@@ -7,9 +7,10 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent"
-import { Cause, Data, Effect, Schema } from "effect"
+import { Cause, Data, Effect, Exit, Schema } from "effect"
 
 import { Config } from "../../../runtime/src/config/schema.ts"
+import { toPosix } from "../../../runtime/src/domain/paths.ts"
 import {
   DEFAULT_PI_ROLE,
   parseOutput,
@@ -42,6 +43,12 @@ export const COMMAND_TIMEOUT_MS = 8_000
  * every command, however many run, shares.
  */
 export const SESSION_DEADLINE_MS = 10_000
+
+/**
+ * The longest to wait for a stopped command to exit, in milliseconds. A grandchild that holds the
+ * command's pipes would otherwise keep a gather, and the shutdown that waits for it, from ending.
+ */
+export const STOP_GRACE_MS = 2_000
 
 // A notice is one line and never a dump.
 const NOTICE_CHARS = 400
@@ -91,7 +98,8 @@ interface Delivery {
 
 /**
  * What a session holds from its start until its shutdown: the way to stop the commands of its
- * current collection, and its result.
+ * current collection, and its result. The collections that still run are tracked apart, since a
+ * stopped one is no longer current.
  */
 interface Held {
   current: AbortController | undefined
@@ -107,7 +115,23 @@ export interface ExtensionOptions {
   readonly packageRoot?: string
   /** The overall deadline of one collection in milliseconds; {@link SESSION_DEADLINE_MS} by default. */
   readonly deadlineMs?: number
+  /**
+   * The longest to wait for a stopped command to exit in milliseconds; {@link STOP_GRACE_MS} by
+   * default.
+   */
+  readonly graceMs?: number
 }
+
+/**
+ * The wrapper script of an installed package, written with `/` only. The shell reads a `$0` without
+ * a `/` as a bare name and refuses it, which a Windows path (`C:\pkg\scripts\holyagent`) is; Git
+ * for Windows' `sh` takes the `C:/pkg/scripts/holyagent` form. The path module is a parameter so a
+ * test can stand in for Windows.
+ */
+export const wrapperPath = (
+  packageRoot: string,
+  platformPath: Pick<typeof nodePath, "join" | "sep"> = nodePath,
+): string => toPosix(platformPath.join(packageRoot, "scripts", "holyagent"), platformPath.sep)
 
 const oneLine = (text: string): string => text.replace(/\s+/g, " ").trim()
 
@@ -129,6 +153,17 @@ const reasonOf = (result: ExecResult): string => {
   return line === undefined ? `exit ${result.code}` : line.replace(/^error: /, "")
 }
 
+// Ends once the promise settles, or after the grace, whichever comes first.
+const exited = (settled: Promise<unknown>, graceMs: number): Effect.Effect<void> =>
+  Effect.callback<void>((resume) => {
+    const timer = setTimeout(() => resume(Effect.void), graceMs)
+    void settled.then(() => {
+      clearTimeout(timer)
+      resume(Effect.void)
+    })
+    return Effect.sync(() => clearTimeout(timer))
+  })
+
 /**
  * Builds the extension factory. Pi calls the factory with the extension API once per load; the
  * factory registers the launch flag and its handlers and starts nothing. `session_start` takes what
@@ -139,27 +174,63 @@ export const createExtension =
   ({
     packageRoot = resolve(fileURLToPath(new URL("..", import.meta.url))),
     deadlineMs = SESSION_DEADLINE_MS,
+    graceMs = STOP_GRACE_MS,
   }: ExtensionOptions = {}) =>
   (pi: ExtensionAPI): void => {
-    const wrapper = join(packageRoot, "scripts", "holyagent")
+    const wrapper = wrapperPath(packageRoot)
     let held: Held | undefined
+    // Every collection started and not yet ended, the stopped ones included: their commands are
+    // children of this process until they exit, and the shutdown waits for all of them.
+    const running = new Set<Promise<void>>()
 
     // Every program starts in the package's own folder, never the project's: on Windows a bare
     // `sh` or `git` is looked up in the working directory first, where a project could plant one.
     // The project is named in the arguments instead.
-    const exec = (signal: AbortSignal, command: string, args: ReadonlyArray<string>) =>
-      signal.aborted
-        ? Effect.fail(new CommandFailed({ command: args.join(" "), reason: "it was stopped" }))
-        : Effect.tryPromise({
-            // The effect's own signal stops the command when the deadline interrupts the collection.
-            try: (interrupted) =>
-              pi.exec(command, [...args], {
-                cwd: packageRoot,
-                signal: AbortSignal.any([signal, interrupted]),
-                timeout: COMMAND_TIMEOUT_MS,
+    //
+    // A command that is stopped (the deadline, a sibling that failed, a newer collection or the
+    // shutdown) is awaited: the effect ends only once Pi's exec has settled, or the grace has passed
+    // for a process that does not exit, so no process outlives the gather. On Windows a process still
+    // running holds its working directory, here the project's. A start that throws is a failed
+    // command too.
+    const exec = (signal: AbortSignal, command: string, args: ReadonlyArray<string>) => {
+      const failed = (reason: string) => new CommandFailed({ command: args.join(" "), reason })
+      type Answer = Effect.Effect<ExecResult, CommandFailed>
+      return signal.aborted
+        ? Effect.fail(failed("it was stopped"))
+        : Effect.acquireUseRelease(
+            Effect.try({
+              try: () => {
+                const stop = new AbortController()
+                const settled = pi
+                  .exec(command, [...args], {
+                    cwd: packageRoot,
+                    signal: AbortSignal.any([signal, stop.signal]),
+                    timeout: COMMAND_TIMEOUT_MS,
+                  })
+                  .then<Answer, Answer>(
+                    (result) => Effect.succeed(result),
+                    (cause) => Effect.fail(failed(String(cause))),
+                  )
+                return { stop, settled }
+              },
+              catch: (cause) => failed(String(cause)),
+            }),
+            ({ settled }) =>
+              Effect.callback<ExecResult, CommandFailed>((resume) => {
+                void settled.then((answer) => resume(answer))
+                const stopped = () => resume(Effect.fail(failed("it was stopped")))
+                if (signal.aborted) stopped()
+                signal.addEventListener("abort", stopped, { once: true })
+                return Effect.sync(() => signal.removeEventListener("abort", stopped))
               }),
-            catch: (cause) => new CommandFailed({ command: args.join(" "), reason: String(cause) }),
-          })
+            ({ stop, settled }, exit) => {
+              // A command that answered has exited; any other end stops it and waits for its exit.
+              if (Exit.isSuccess(exit)) return Effect.void
+              stop.abort()
+              return exited(settled, graceMs)
+            },
+          )
+    }
 
     // The wrapper runs the package's bundled runtime with Bun, which enters the project first; its
     // stdout is the command's output.
@@ -268,11 +339,19 @@ export const createExtension =
         ),
       )
 
-    // Safe to call twice, and with nothing held.
-    const release = (): void => {
+    // Safe to call twice, and with nothing held. The promise settles once every collection ever
+    // started has ended, the ones of an older start or compaction included, and every child they
+    // started has exited or its stop grace (STOP_GRACE_MS, the graceMs option) has passed.
+    const release = (): Promise<void> => {
       const taken = held
       held = undefined
       taken?.current?.abort()
+      return Effect.runPromise(
+        Effect.forEach([...running], (ended) => Effect.promise(() => ended), {
+          concurrency: "unbounded",
+          discard: true,
+        }),
+      )
     }
 
     // A newer collection stops the older one, and the result of a stopped one is dropped: nobody
@@ -281,9 +360,11 @@ export const createExtension =
       taken.current?.abort()
       const own = new AbortController()
       taken.current = own
-      taken.pending = Effect.runPromise(collect(ctx.cwd, own.signal, reason)).then((delivery) =>
-        own.signal.aborted ? undefined : delivery,
-      )
+      const collected = Effect.runPromise(collect(ctx.cwd, own.signal, reason))
+      const ended = collected.then(() => undefined)
+      running.add(ended)
+      void ended.then(() => running.delete(ended))
+      taken.pending = collected.then((delivery) => (own.signal.aborted ? undefined : delivery))
       return taken.pending.then(() => undefined)
     }
 
@@ -294,7 +375,7 @@ export const createExtension =
     })
 
     pi.on("session_start", (event, ctx) => {
-      release()
+      void release()
       held = { current: undefined, pending: undefined }
       return gather(held, ctx, event.reason)
     })
@@ -318,6 +399,9 @@ export const createExtension =
       },
     )
 
+    // Pi finishes the shutdown when the handler's promise settles, and the folder may be removed
+    // then: it settles only after every child has exited or its stop grace (STOP_GRACE_MS, 2 s,
+    // the graceMs option) has passed.
     pi.on("session_shutdown", () => release())
   }
 
