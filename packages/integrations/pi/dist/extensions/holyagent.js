@@ -2981,9 +2981,11 @@ var OnExitImpl = /* @__PURE__ */ function() {
   OnExitImpl.prototype = Proto;
   return OnExitImpl;
 }();
+var onExitPrimitive = (effect, onExit, interruptible) => new OnExitImpl(effect, onExit, interruptible);
 var onExitUnsafe = (fiber, f) => {
   fiber._stack.push(new OnExitImpl(undefined, f, undefined));
 };
+var acquireUseRelease = (acquire, use, release) => uninterruptibleMask((restore) => flatMap(acquire, (a) => onExitPrimitive(suspend(() => restore(use(a))), (exit) => release(a, exit), true)));
 var uninterruptible = (self) => withFiber((fiber) => {
   if (!fiber.interruptible)
     return self;
@@ -3001,6 +3003,25 @@ var setInterruptible = /* @__PURE__ */ makePrimitive({
   }
 });
 var setInterruptibleTrue = /* @__PURE__ */ setInterruptible(true);
+var setInterruptibleFalse = /* @__PURE__ */ setInterruptible(false);
+var setFiberInterruptible = (fiber) => {
+  fiber.interruptible = true;
+  fiber._stack.push(setInterruptibleFalse);
+  if (fiber._interruptedCause)
+    return failCause(fiber._interruptedCause);
+};
+var interruptible = (self) => withFiber((fiber) => {
+  if (fiber.interruptible)
+    return self;
+  return setFiberInterruptible(fiber) ?? self;
+});
+var uninterruptibleMask = (f) => withFiber((fiber) => {
+  if (!fiber.interruptible)
+    return f(identity);
+  fiber.interruptible = false;
+  fiber._stack.push(setInterruptibleTrue);
+  return f(interruptible);
+});
 var all = (arg, options) => {
   if (isIterable(arg)) {
     return options?.mode === "result" ? forEach(arg, result, options) : forEach(arg, identity, options);
@@ -3416,10 +3437,13 @@ var void_2 = exitVoid;
 var isSuccess3 = exitIsSuccess;
 
 var all2 = all;
+var forEach2 = forEach;
 var promise2 = promise;
 var tryPromise2 = tryPromise;
 var succeed5 = succeed3;
 var suspend2 = suspend;
+var sync2 = sync;
+var void_3 = void_;
 var callback2 = callback;
 var gen2 = gen;
 var fail5 = fail3;
@@ -3437,6 +3461,7 @@ var catchCause2 = catchCause;
 var catchIf2 = catchIf;
 var mapError2 = mapError;
 var timeoutOrElse2 = timeoutOrElse;
+var acquireUseRelease2 = acquireUseRelease;
 var runPromise2 = runPromise;
 var runSyncExit2 = runSyncExit;
 var mapEager2 = mapEager;
@@ -8639,6 +8664,7 @@ var CONTEXT_MESSAGE = "holyagent-context";
 var NOTICE_MESSAGE = "holyagent-notice";
 var COMMAND_TIMEOUT_MS = 8000;
 var SESSION_DEADLINE_MS = 1e4;
+var STOP_GRACE_MS = 2000;
 var NOTICE_CHARS = 400;
 var RECONCILED = new Set(["resume", "compact"]);
 
@@ -8674,24 +8700,49 @@ var reasonOf = (result) => {
 `).map((entry) => entry.trim()).find((entry) => entry !== "");
   return line === undefined ? `exit ${result.code}` : line.replace(/^error: /, "");
 };
+var exited = (settled, graceMs) => callback2((resume) => {
+  const timer = setTimeout(() => resume(void_3), graceMs);
+  settled.then(() => {
+    clearTimeout(timer);
+    resume(void_3);
+  });
+  return sync2(() => clearTimeout(timer));
+});
 var createExtension = ({
   packageRoot = resolve3(fileURLToPath(new URL("..", import.meta.url))),
-  deadlineMs = SESSION_DEADLINE_MS
+  deadlineMs = SESSION_DEADLINE_MS,
+  graceMs = STOP_GRACE_MS
 } = {}) => (pi) => {
   const wrapper = wrapperPath(packageRoot);
   let held;
-  const exec = (signal, command, args) => signal.aborted ? fail5(new CommandFailed({ command: args.join(" "), reason: "it was stopped" })) : callback2((resume, interrupted) => {
-    const stop = new AbortController;
-    const settled = pi.exec(command, [...args], {
-      cwd: packageRoot,
-      signal: AbortSignal.any([signal, interrupted, stop.signal]),
-      timeout: COMMAND_TIMEOUT_MS
-    }).then((result) => resume(succeed5(result)), (cause) => resume(fail5(new CommandFailed({ command: args.join(" "), reason: String(cause) }))));
-    return promise2(() => {
+  const running = new Set;
+  const exec = (signal, command, args) => {
+    const failed = (reason) => new CommandFailed({ command: args.join(" "), reason });
+    return signal.aborted ? fail5(failed("it was stopped")) : acquireUseRelease2(try_2({
+      try: () => {
+        const stop = new AbortController;
+        const settled = pi.exec(command, [...args], {
+          cwd: packageRoot,
+          signal: AbortSignal.any([signal, stop.signal]),
+          timeout: COMMAND_TIMEOUT_MS
+        }).then((result) => succeed5(result), (cause) => fail5(failed(String(cause))));
+        return { stop, settled };
+      },
+      catch: (cause) => failed(String(cause))
+    }), ({ settled }) => callback2((resume) => {
+      settled.then((answer) => resume(answer));
+      const stopped = () => resume(fail5(failed("it was stopped")));
+      if (signal.aborted)
+        stopped();
+      signal.addEventListener("abort", stopped, { once: true });
+      return sync2(() => signal.removeEventListener("abort", stopped));
+    }), ({ stop, settled }, exit) => {
+      if (isSuccess3(exit))
+        return void_3;
       stop.abort();
-      return settled;
+      return exited(settled, graceMs);
     });
-  });
+  };
   const holyagent = (signal, project, ...args) => exec(signal, "sh", [wrapper, PI_PROJECT_FLAG, project, ...args]).pipe(flatMap2((result) => result.code === 0 && !result.killed ? succeed5(result.stdout) : fail5(new CommandFailed({ command: args.join(" "), reason: reasonOf(result) }))));
   const topOf = (signal, project) => exec(signal, "git", ["-C", project, "rev-parse", "--show-toplevel"]).pipe(flatMap2((result) => {
     const top = result.stdout.trim();
@@ -8730,12 +8781,22 @@ var createExtension = ({
     const taken = held;
     held = undefined;
     taken?.current?.abort();
+    return runPromise2(forEach2([...running], (ended) => promise2(() => ended), {
+      concurrency: "unbounded",
+      discard: true
+    }));
   };
   const gather = (taken, ctx, reason) => {
     taken.current?.abort();
     const own = new AbortController;
     taken.current = own;
-    taken.pending = runPromise2(collect(ctx.cwd, own.signal, reason)).then((delivery) => own.signal.aborted ? undefined : delivery);
+    const collected = runPromise2(collect(ctx.cwd, own.signal, reason));
+    const ended = collected.then(() => {
+      return;
+    });
+    running.add(ended);
+    ended.then(() => running.delete(ended));
+    taken.pending = collected.then((delivery) => own.signal.aborted ? undefined : delivery);
     return taken.pending.then(() => {
       return;
     });
@@ -8768,6 +8829,7 @@ export {
   NOTICE_MESSAGE,
   ROLE_FLAG,
   SESSION_DEADLINE_MS,
+  STOP_GRACE_MS,
   createExtension,
   extension_default as default,
   wrapperPath
