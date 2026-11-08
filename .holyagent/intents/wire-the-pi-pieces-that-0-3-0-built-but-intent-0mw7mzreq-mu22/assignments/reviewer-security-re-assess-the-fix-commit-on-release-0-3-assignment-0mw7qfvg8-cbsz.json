@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "re-assess-the-fix-commit-on-release-0-3",
   "objective": "Re-assess the fix commit on release/0.3.0/feat/pi-root-wiring (range edc25d8..HEAD) against the finding that a failing git call or a later failed collection dropped the home-level root exclusions.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read /home/user/holyagent-notes/wire-a-fix2.diff; sources in /home/user/holyagent-0.3.0-wiring.",
     "Finding: topOf (git rev-parse) ran before the user-only config read, so a project-delivered malformed .git lifted the home-level exclusions; gather replaced the excluded list on a later collection; a deadline during the user read dropped them silently. Fix: the user-only read is forked first with its own deadline and a notice when it does not finish; gather unions with the earlier excluded set; only the user's pi.enable false clears it.",
@@ -34,7 +34,25 @@
     "agentId": "workflow:wf_ae60059b-ab6/assignment-0mw7qfvg8-cbsz",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T11:11:58.712Z"
+    "startedAt": "2026-11-08T11:11:58.712Z",
+    "finishedAt": "2026-11-08T11:14:01.204Z"
+  },
+  "result": "result: No blocker. I found no path where project files or project config can lift the root's exclusions, gate or prompt, and no way for a failing or hanging user read to hang session start. I read the code and could not run the tests (no shell). The built-in `/security-review` did not run: its `git log origin/HEAD...` preamble failed because the sandbox has no `origin/HEAD`. The review below is from the diff and the sources in `/home/user/holyagent-0.3.0-wiring`.\n\nchanged: none\n\nchecks: Read only. I did not run `mise run verify` or the new tests.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- Validated, no issue:\n  - The user read (`readUser`, `extension.ts` L778) is forked before `topOf`. It runs `holyagent config` with no state folder, so `loadConfig` reads only `HOLYAGENT_HOME` or `~/.holyagent/config.json` (`load.ts` L121). Pi's process environment sets that path, not the project. Bun starts in the package folder, so no project `.env` or `bunfig` applies.\n  - A malformed `.git` makes `topOf` fail. The `failed` handler then runs `Fiber.await(userRead)` and calls `closedSettings(read, user)`, which includes the user config, so the exclusions are kept.\n  - A deadline or failure after the config was read returns `configured`, which was built with `bound = [defaults, user]`.\n  - `gatesOff` comes only from the user config alone (L835). A project can add exclusions but not remove them, because `rootExclusions` is a union over the defaults, the user's and the merged config. When the user's `pi.enable` is false but a project turns it on, the gates stay on.\n  - `gatesOff` is reassigned on every collection, so a failed read re-arms the gates.\n  - `gather` grows `taken.excluded` as a union. Only `enabled:false` with no `tools` clears it. That result comes from the user-off path (`gatesOff`) or from a non-root role, and neither can be produced by project content.\n  - A result from a stopped collection is dropped (`own.signal.aborted`).\n  - The user read has its own `timeoutOrElse` of 10s, and Pi's exec timeout is 8s, so it ends. The outer `failed` and the success path both wait for it. A hanging `release` is bounded by a 2s grace. The worst case is about 12s, and the project cannot cause it because the user read touches no project file. A hang costs a start delay and a `homeNotice`, nothing more.\n- Non-blocking residual, not introduced by this fix: `session_start` resets `held.excluded` to the defaults' patterns (L1040), and `taken.excluded` takes the user's patterns only when the whole collection ends. Between a reload, resume or fork and that point, a run already in flight is gated by the defaults only.\n  - A user setting of `web: \"pi-web-kit\"` adds `web_search` and `web_fetch`, which the defaults (`provider`) do not exclude.\n  - A project can stretch this window up to the 10s deadline through slow `status` or `reconcile` calls.\n  - New runs wait for `pending`, so only an in-flight run is affected.\n  - Optional hardening: merge the user's patterns into `held.excluded` as soon as the user read finishes, not at collection end.\n- The first ended collection decides `setActiveTools` (`started`). If it ended on defaults because the user file was unreadable, the active set lacks the user's extra exclusions. The `tool_call` gate still blocks them, including calls from `codemode` scripts.\n\nevidence:\nNo project file or project config can lift the root's exclusions, gate or prompt: Held by code reading of `extension.ts` L778-889 and L994-1025 against `config/load.ts` L121 and `pi/tools.ts` L114-128. The only residual is the in-flight window above, which is non-blocking.\nsecurity-findings: No blocking findings. One non-blocking residual, the in-flight window at `extension.ts` L1040 and L1011. The built-in `/security-review` could not run (no `origin/HEAD`).\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "No project path lifts the exclusions; bounded user read; one non-blocking residual",
+    "criteria": [
+      {
+        "criterion": "No project file or project config can lift the root's exclusions, gate or prompt",
+        "support": "Held by code reading of `extension.ts` L778-889 and L994-1025 against `config/load.ts` L121 and `pi/tools.ts` L114-128. The only residual is the in-flight window above, which is non-blocking."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "security-findings",
+        "support": "No blocking findings. One non-blocking residual, the in-flight window at `extension.ts` L1040 and L1011. The built-in `/security-review` could not run (no `origin/HEAD`)."
+      }
+    ]
   },
   "createdAt": "2026-11-08T11:11:58.712Z"
 }
