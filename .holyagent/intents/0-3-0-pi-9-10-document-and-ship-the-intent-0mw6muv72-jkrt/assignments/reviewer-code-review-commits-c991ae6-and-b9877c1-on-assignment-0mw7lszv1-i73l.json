@@ -1,0 +1,61 @@
+{
+  "id": "assignment-0mw7lszv1-i73l",
+  "intentId": "intent-0mw6muv72-jkrt",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.code",
+  "slug": "review-commits-c991ae6-and-b9877c1-on",
+  "objective": "Review commits c991ae6 and b9877c1 on release/0.3.0/feat/pi-install (range 7846c9b..b9877c1, worktree /home/user/holyagent-0.3.0-install) for correctness and regressions.",
+  "state": "Running",
+  "scope": [
+    "git -C /home/user/holyagent-0.3.0-install diff 7846c9b..b9877c1 -- . ':(exclude)packages/integrations/claude/dist' ':(exclude)packages/integrations/pi/dist' (also at /home/user/holyagent-notes/install-code.diff).",
+    "Intended behavior: the Pi manifest lists no dependencies; holyagent setup runs pi install npm:<pkg>@<pin> for each package piPackages(config) enables and pi remove for HolyAgent feature packages the config turns off; with pi.enable off it removes nothing; scopes project and local map to pi install -l, user to global; doctor checks pi, Node 22.19+ and enabled packages only when HOLYAGENT_HOST=pi or pi is on PATH, otherwise prints one informational line; the Windows installer requires Node 22.19.",
+    "Repository rules: Effect for effects and tagged errors (no try/catch, new Promise, async functions in runtime source), Effect Schema at data boundaries with onExcessProperty error, Bun Shell $ for processes, JSDoc on exports."
+  ],
+  "constraints": [
+    "Read-only; make no edits and no version-control writes.",
+    "Only the docs are uncommitted in that worktree and are out of scope.",
+    "Report in under 400 words; put long logs in a file under /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Setup installs exactly the enabled packages at their pins, removes only HolyAgent feature packages the config turns off, and reports failures without aborting the other steps",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Doctor does not fail a user without Pi and reports each missing or mis-pinned enabled package with its fix command",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Existing setup and doctor behavior for Claude is unchanged",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Each new behavior has a test that would fail without it",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The change follows the repository's code rules",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "review-findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7le73w-yrta",
+    "assignment-0mw7kvnm5-wvwo"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T09:02:12.877Z"
+  },
+  "createdAt": "2026-11-08T09:02:12.877Z"
+}
