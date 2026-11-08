@@ -8,6 +8,11 @@
   "keywords": [
     "pi-package"
   ],
+  "files": [
+    "extensions",
+    "scripts",
+    "skills"
+  ],
   "pi": {
     "extensions": [
       "./extensions"

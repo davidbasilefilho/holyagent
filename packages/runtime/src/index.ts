@@ -38,3 +38,7 @@ export {
   sessionContext,
 } from "./cli/sessioncontext.ts"
 export { ROOT_CORE } from "./instructions/claude-5.5/root-core.ts"
+
+// What the Pi extension builds its session context from: the roles, the Kimi core of the root rules
+// and the context builder that mirrors `hook session-start`.
+export * from "./hooks/pi-context.ts"

@@ -1,8 +1,15 @@
 import { join } from "node:path"
 
-import { generatedNote as noteFor } from "../../../runtime/src/instructions/generated.ts"
+import {
+  type GeneratedFile as BaseFile,
+  generatedNote as noteFor,
+} from "../../../runtime/src/instructions/generated.ts"
 
-export type { GeneratedFile } from "../../../runtime/src/instructions/generated.ts"
+/** One generated file: its path relative to the repository root and its content. */
+export interface GeneratedFile extends BaseFile {
+  /** True for a file the package runs, which is written executable. */
+  readonly executable?: true
+}
 
 /** The package's folder, relative to the repository root. */
 export const PACKAGE_DIRECTORY = "packages/integrations/pi"
