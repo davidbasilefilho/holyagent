@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mw7g54fj-mo10",
+  "intentId": "intent-0mw6muupq-5usg",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-repair-commit-head-1-head",
+  "objective": "Re-review the repair commit HEAD~1..HEAD on release/0.3.0/feat/pi-tools in /home/user/holyagent-0.3.0-tools, which addresses the earlier review's root tool-set finding.",
+  "state": "Ready",
+  "scope": [
+    "Previous finding to verify closed: the Pi root (`toolArgs(config, \"root\")` in packages/runtime/src/pi/tools.ts, `--tools +codemode`) kept Pi's default selection, so it directly held the computer-use tools and the web choice's tools; the Claude root has neither. The repair adds those to the root's --exclude-tools while each is enabled, keeping write and edit excluded.",
+    "Earlier finding settled by the root, not to reopen: Reviewer.code keeps bash, mirroring packages/integrations/claude/src/agents.ts:265.",
+    "Review only `git -C /home/user/holyagent-0.3.0-tools diff HEAD~1..HEAD`: correctness for every web choice (pi-web-kit, provider with and without provider web tools, off) and computerUse on and off, the new tests, the JSDoc and docs/pi/extensions.md."
+  ],
+  "constraints": [
+    "Read-only: make no edits and no version-control writes.",
+    "Run `bunx --no-install mise run verify` in the worktree and report exit code and counts.",
+    "Do not run pi or any live model.",
+    "Start each evidence line with the criterion text, then a colon.",
+    "Report in under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "The root tool-set finding is closed without new defects",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The new tests fail without the repair and cover each toggle",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "verify-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7g0a2x-hsc6"
+  ],
+  "createdAt": "2026-11-08T06:23:40.975Z"
+}
