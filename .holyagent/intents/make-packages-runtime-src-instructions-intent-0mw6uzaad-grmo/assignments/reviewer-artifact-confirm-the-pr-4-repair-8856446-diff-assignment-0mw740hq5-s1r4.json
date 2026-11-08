@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "confirm-the-pr-4-repair-8856446-diff",
   "objective": "Confirm the PR 4 repair 8856446 (diff a10b630..8856446 in /home/user/holyagent-0.3.0-req) closes the earlier artifact findings and adds no new gap.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Repair diff: /home/user/holyagent-notes/pr4-repair.diff. Earlier findings: .git/holyagent/reports/assignment-0mw7393ui-i0k7.md (items 1-9). Repair report (claims only): .git/holyagent/reports/assignment-0mw73qt7v-lmp8.md.",
     "Only judge the repair; the rest of PR 4 was reviewed. The merge commits a10b630 and f2323fd change no file relative to their first parent's content beyond the already-merged base."
@@ -44,7 +44,9 @@
     "agentId": "workflow:wf_0473a3bf-00a/assignment-0mw740hq5-s1r4",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T00:44:09.533Z"
+    "startedAt": "2026-11-08T00:44:09.533Z",
+    "finishedAt": "2026-11-08T03:43:58.915Z"
   },
+  "result": "result: the repair closes the blocking finding and adds no gap. I read the diff and the files in /home/user/holyagent-0.3.0-req and ran no commands. I did not re-run verify, so its exit 0 and \"1722 pass\" come from the repair report only.\n\n**Findings**\n1. No blocking gap remains.\n2. Non-blocking: the repair dropped the old AGENTS.md sentence \"Rebuild the plugin with `mise run build` after a change to `claude-5.5/`: `requirements/` and `guide.md` are not shipped.\"\n   - The skill's Gates section keeps the rebuild step, but \"not shipped\" is now recorded nowhere.\n   - Optional: add it to Gates in `/home/user/holyagent-0.3.0-req/.claude/skills/requirements/SKILL.md`.\n3. Non-blocking, leftover: `docs/development.md:76` still names the `bun run instructions:scaffold` route. The repair report already flags this one.\n\n**Notes on the optional items (earlier findings 2–9)**\n- Item 4 (`CLAUDE.md`): `packages/runtime/CLAUDE.md` now exists and contains `@AGENTS.md`.\n- Item 4 (`FAMILIES` holding only `claude-5.5`): this is by design. `families.ts` and the new \"Adding a family\" section both say a family joins with its translations.\n- Items 2, 3 and 5: closed. The skill documents the `- See: R-A, R-B` line, names `families.ts` and `FAMILIES`, and drops the `bun run` route. `packages/runtime/AGENTS.md` is cut to the rule plus a pointer to the skill.\n- Items 6–9: closed. G58 has the date advice moved into the point text, and `model-guides.md` cites ids. I spot-checked about 45 G and K ids against both `guide.md` files, and the mappings are plausible. The `merge-ready.md` intro and bar sentence moved with no id line changed. The S5 truncation note is added. `requirements.ts` now splits on `/\\r?\\n/`.\n\n**Evidence**\n- The blocking finding on the requirements skill's coverage step is closed and the skill matches coverage.ts, requirements.ts and families.ts (behavior): it is closed. Create step 4, Adjust steps 3–4, the four Move or remove bullets, the Coverage section and the Adding a family section all carry the coverage step. The skill matches `requirements.test.ts` lines 96–131 on uncovered ids, unknown entries and missing phrases. It also matches `coverage.ts` lines 10–12 (the `section` and `carriedBy` forms), `requirements.ts` lines 28–29 and 36–44 (`- See:` parsing), and `families.ts` line 11 (`FAMILIES`).\n- The repair changes no requirement's meaning and adds no new gap (regressions): `merge-ready.md` changed only in its intro prose and the bar sentence. The R-MERGE lines are untouched. The instruction-writing skill and the plugin test assertions changed together.\n- findings: items 1–3 above.\n",
   "createdAt": "2026-11-08T00:44:09.533Z"
 }
