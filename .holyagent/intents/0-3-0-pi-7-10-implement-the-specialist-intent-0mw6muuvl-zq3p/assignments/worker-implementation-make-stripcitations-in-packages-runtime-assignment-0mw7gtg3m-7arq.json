@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "make-stripcitations-in-packages-runtime",
   "objective": "Make stripCitations in packages/runtime/src/instructions/skills.ts handle the three edge cases the Kimi set review found, so the Pi root and role prompts can pass through it safely.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Work only in /home/user/holyagent-0.3.0-launcher (branch release/0.3.0/feat/pi-launcher). stripCitations removes citation tags from instruction text but skips code spans and fenced blocks and collapses blank lines (LF and CRLF).",
     "Fix and test: (1) a stray backtick must not pair code spans across list items (a code span does not cross a blank line or a new list item, per CommonMark); (2) a fence indented four or more spaces is an indented code block line, not a fence, and an indented code block containing a blank line is left as written; (3) a citation comment on the final line keeps the preceding newline. Add a test for each that fails without the fix.",
@@ -48,5 +48,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T06:42:44.399Z"
+  },
   "createdAt": "2026-11-08T06:42:35.842Z"
 }
