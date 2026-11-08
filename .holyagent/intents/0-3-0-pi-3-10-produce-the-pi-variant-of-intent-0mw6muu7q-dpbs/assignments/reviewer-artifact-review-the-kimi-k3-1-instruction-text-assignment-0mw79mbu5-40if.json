@@ -1,0 +1,59 @@
+{
+  "id": "assignment-0mw79mbu5-40if",
+  "intentId": "intent-0mw6muu7q-dpbs",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-the-kimi-k3-1-instruction-text",
+  "objective": "Review the Kimi K3.1 instruction text for root specialist shared design-core and session files (commit 2334982 in /home/user/holyagent-0.3.0-kimi) for fidelity to its requirements and to the Claude set's rules, adherence to kimi-k3.1/guide.md, and correct pi host words.",
+  "state": "Running",
+  "scope": [
+    "Diff: /home/user/holyagent-notes/kimi-a.diff. Files: root/, session-reminder.md, session-cloud-identity.md, specialist/, shared/, design-core/ under /home/user/holyagent-0.3.0-kimi/packages/runtime/src/instructions/kimi-k3.1/. For each file compare against /home/user/holyagent-0.3.0-kimi/packages/runtime/src/instructions/requirements/<same path> (the - R-ID and - See lines) and /home/user/holyagent-0.3.0-kimi/packages/runtime/src/instructions/claude-5.5/<same path> (the rules that requirements do not yet list are carried as spec), and against /home/user/holyagent-0.3.0-kimi/packages/runtime/src/instructions/kimi-k3.1/guide.md (K1-K45).",
+    "Writer reports (claims only, with their lists of carried rules): .git/holyagent/reports/assignment-0mw79029v-8tm8.md, .git/holyagent/reports/assignment-0mw7902io-g49o.md.",
+    "Host facts: pi 1.5.0 built-in tools read, bash, edit, write, grep, find, ls; codemode in mode only (model-only tools such as ask_user_question stay directly callable); specialists via @tintinweb/pi-subagents (Agent, SubagentWorkflow, get_subagent_result, steer_subagent); todo tool from rpiv-todo; agent ids pi:<id> and pi-workflow:<run>/<id> (docs/pi/orchestration.md); T3 browser and preview tools optional only; K3.1: thinking always on, effort from the route, no temperature or top_p, no reliance on tool_choice required.",
+    "Judge: a rule lost, weakened or changed in meaning; a rule added beyond the requirements and Claude set that changes behavior (guide-driven form changes are fine when cited); a wrong or invented pi tool name; guide departures without a K citation; contradictions between files."
+  ],
+  "constraints": [
+    "Read-only.",
+    "Report in under 500 words; put a per-file finding table in /home/user/holyagent-notes/kimi-review-root.md and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Every requirement and every Claude-set rule of the reviewed files is carried with its meaning",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The text follows kimi-k3.1/guide.md and cites the guide point where it departs from the Claude wording",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "Host words are pi's and every named tool exists in the stated packages",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No added rule changes behavior beyond the requirements and the Claude set",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "diff-file"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw79029v-8tm8",
+    "assignment-0mw7902io-g49o",
+    "assignment-0mw7902qy-m8xa",
+    "assignment-0mw7902y6-l0ok"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T03:21:06.413Z"
+  },
+  "createdAt": "2026-11-08T03:21:06.413Z"
+}
