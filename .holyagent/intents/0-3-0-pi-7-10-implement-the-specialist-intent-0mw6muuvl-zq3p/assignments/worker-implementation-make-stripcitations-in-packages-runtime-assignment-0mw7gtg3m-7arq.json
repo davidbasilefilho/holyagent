@@ -1,0 +1,52 @@
+{
+  "id": "assignment-0mw7gtg3m-7arq",
+  "intentId": "intent-0mw6muuvl-zq3p",
+  "intentRevision": 7,
+  "roleTask": "Worker.implementation",
+  "slug": "make-stripcitations-in-packages-runtime",
+  "objective": "Make stripCitations in packages/runtime/src/instructions/skills.ts handle the three edge cases the Kimi set review found, so the Pi root and role prompts can pass through it safely.",
+  "state": "Ready",
+  "scope": [
+    "Work only in /home/user/holyagent-0.3.0-launcher (branch release/0.3.0/feat/pi-launcher). stripCitations removes citation tags from instruction text but skips code spans and fenced blocks and collapses blank lines (LF and CRLF).",
+    "Fix and test: (1) a stray backtick must not pair code spans across list items (a code span does not cross a blank line or a new list item, per CommonMark); (2) a fence indented four or more spaces is an indented code block line, not a fence, and an indented code block containing a blank line is left as written; (3) a citation comment on the final line keeps the preceding newline. Add a test for each that fails without the fix.",
+    "Add one sentence to docs/development.md, in the instructions section, stating that stripCitations leaves code spans and fenced blocks as written.",
+    "Another writer will call stripCitations on the root and role prompts; keep its signature."
+  ],
+  "constraints": [
+    "Edit only the ownership paths; no version-control writes and no edits under .git/ or .holyagent/.",
+    "Effect and JSDoc per .claude/CLAUDE.md.",
+    "Run bunx --no-install mise run build and bunx --no-install mise run verify and report exit codes and counts, and whether build changed generated output (if the plugin skills change, say which files).",
+    "Write the diff to /home/user/holyagent-notes/launcher-c.diff and give it as diff-file evidence.",
+    "Start each evidence line with the criterion text, then a colon.",
+    "Report in under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "The three edge cases are handled with tests that fail without the fix",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "docs/development.md states that code spans and fenced blocks are left as written",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "mise run build leaves dist in sync and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions/skills.ts",
+    "packages/runtime/tests/instructions",
+    "docs/development.md",
+    "packages/integrations/claude/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-08T06:42:35.842Z"
+}
