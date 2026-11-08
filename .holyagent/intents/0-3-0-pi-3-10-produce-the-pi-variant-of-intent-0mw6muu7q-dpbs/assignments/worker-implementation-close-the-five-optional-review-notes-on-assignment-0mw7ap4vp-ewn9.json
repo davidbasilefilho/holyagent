@@ -74,5 +74,45 @@
     "finishedAt": "2026-11-08T03:55:57.468Z"
   },
   "result": "result: Items 1, 2, 4 and 5 are done; item 3 needed no edit (details below). `bunx --no-install mise run verify` exits 0, and the Claude dist is byte-identical.\n\nchanged:\n- /home/user/holyagent-0.3.0-kimi/packages/runtime/src/instructions/skills.ts\n- /home/user/holyagent-0.3.0-kimi/packages/runtime/tests/skills.test.ts\n- /home/user/holyagent-0.3.0-kimi/packages/runtime/src/instructions/kimi-k3.1/specialist/writing-bar.md\n- /home/user/holyagent-0.3.0-kimi/packages/runtime/src/instructions/kimi-k3.1/specialist/state-changes.md\n\nchecks:\n- `bunx --no-install mise run verify` -> exit 0: no type errors in 174 files, 1766 pass, 0 fail.\n- `bunx --no-install mise run build` -> exit 0, and `git status` shows only the four files above.\n\nblockers: none\nquestions: none\n\nnotes:\n- `stripCitations` now tokenizes fenced blocks (backtick and tilde), inline code spans and comments in one regex pass, then removes own-line comment lines line by line. CRLF own-line comments are now recognised as own-line; before, they were not.\n- A comment on the last line of a file with no trailing newline now takes its preceding newline with it (\"one\\n<!-- K -->\" gives \"one\"). It used to keep that newline. No source file changes output because of this.\n- Pi dist has no changes. It holds only the skills and the extension. The specialist text is assembled at runtime from the sources, so these edits do not touch it.\n- The old code failed my probes. Before the change, the brief's code-span/fence probe returned \"a `\\n```\\nb --> c\", and the adjacent-comment and CRLF cases left extra blank lines. I did not run the new tests against the old source.\n- Item 3: `worker-visual/purpose.md` and `method.md` already carry their citations only as `<!-- K3 -->` and `<!-- K5 -->` comments at the head commit (0e71e52). No prose-form citation remains in the kimi-k3.1 files outside `skills/instruction-writing/SKILL.md`, whose source tags are an intended part of that skill. I left those files unchanged.\n- Item 4: I removed the last writing-bar rule and the \"(see the last rule)\" clause in the third rule that pointed to it.\n- Item 5: `state-changes.md` now says `holyagent <command>` means `${HOLYAGENT_PI_ROOT}/scripts/holyagent <command>`.\n\nevidence:\n- stripCitations leaves comments inside inline code spans and fenced code blocks unchanged, with unit tests that fail on the old code: `tests/skills.test.ts`, test \"leaves a comment inside an inline code span or a fenced code block as it is\". It covers the brief's probe, tilde fences, double-backtick spans and an unclosed fence. The old code failed the probe before the change.\n- Removing own-line comments leaves no extra blank lines, for LF and CRLF, with unit tests: `tests/skills.test.ts`, test \"leaves no extra blank lines when own-line comments are removed, for LF and CRLF\". It has 7 cases, each run in LF and CRLF.\n- worker-visual purpose.md and method.md carry citations only as comments, with no rule's meaning changed: already true at 0e71e52. Both files hold only `<!-- K3: ... -->` and `<!-- K5: ... -->`, and I made no edit.\n- The Kimi writing bar has no guide.md rule and state-changes.md defines the holyagent shorthand: see the two `.md` hunks in the diff file.\n- Claude dist byte-identical and pi dist regenerated: `mise run build` exit 0, and `git status` lists no dist changes. Pi dist needs none (see notes).\n- bunx --no-install mise run verify exits 0: exit 0, 1766 pass, 0 fail. Log at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log.\n- changed-paths: the four files listed under `changed`.\n- diff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/diff.patch\n",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "Reviewed by assignment-0mw7avkqg-r6ua: criteria pass, verify 1766 pass, Claude dist unchanged",
+    "criteria": [
+      {
+        "criterion": "stripCitations leaves comments inside inline code spans and fenced code blocks unchanged, with unit tests that fail on the old code",
+        "support": "`tests/skills.test.ts`, test \"leaves a comment inside an inline code span or a fenced code block as it is\". It covers the brief's probe, tilde fences, double-backtick spans and an unclosed fence. The old code failed the probe before the change."
+      },
+      {
+        "criterion": "Removing own-line comments leaves no extra blank lines, for LF and CRLF, with unit tests",
+        "support": "`tests/skills.test.ts`, test \"leaves no extra blank lines when own-line comments are removed, for LF and CRLF\". It has 7 cases, each run in LF and CRLF."
+      },
+      {
+        "criterion": "worker-visual purpose.md and method.md carry citations only as comments, with no rule's meaning changed",
+        "support": "already true at 0e71e52. Both files hold only `<!-- K3: ... -->` and `<!-- K5: ... -->`, and I made no edit."
+      },
+      {
+        "criterion": "The Kimi writing bar has no guide.md rule and state-changes.md defines the holyagent shorthand",
+        "support": "see the two `.md` hunks in the diff file."
+      },
+      {
+        "criterion": "Claude dist byte-identical and pi dist regenerated: mise run build exit 0 with only expected pi dist changes",
+        "support": "`mise run build` exit 0, and `git status` lists no dist changes. Pi dist needs none (see notes)."
+      },
+      {
+        "criterion": "bunx --no-install mise run verify exits 0",
+        "support": "exit 0, 1766 pass, 0 fail. Log at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "the four files listed under `changed`."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/diff.patch"
+      }
+    ]
+  },
   "createdAt": "2026-11-08T03:51:16.981Z"
 }
