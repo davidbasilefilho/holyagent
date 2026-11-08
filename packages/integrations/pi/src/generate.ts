@@ -67,7 +67,9 @@ const inPackage = (path: string) => `${DIST_DIRECTORY}/${path}`
  * key lists its resource folders, relative to the package root, which is where a `pi install` of
  * the built folder looks; Pi ignores `pi.subagents`, which `@tintinweb/pi-subagents` reads for the
  * folder of specialist agent files. Every host module is a peer dependency with the range `*`, as
- * Pi's package documentation requires.
+ * Pi's package documentation requires. It lists no `dependencies`: Pi would install every one
+ * whatever the user's config says and load none of them, since it loads a package only from the `pi
+ * install` entry in its settings, which `holyagent setup` writes per config.
  */
 export const manifest = (): GeneratedFile => ({
   path: inPackage("package.json"),

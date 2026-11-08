@@ -84,8 +84,11 @@ export class Shell extends Context.Service<
     ) => Effect.Effect<Option.Option<string>>
     /**
      * Runs a command to completion without a terminal; stdout and stderr are captured. The command
-     * runs in `cwd`, which setup sets to a neutral directory because the process directory is the
-     * user's project, whose .npmrc, bunfig.toml and .env must not steer an install.
+     * runs in `cwd`. Setup passes the home directory for global work, because the process directory
+     * is the user's project, whose .npmrc, bunfig.toml and .env must not steer an install. The one
+     * exception is the project-scope `pi install -l`, which runs in the project directory on
+     * purpose: Pi reads that project's .npmrc and .pi/settings.json there, so it is run only for a
+     * project the user chose and trusts.
      */
     readonly run: (
       command: string,

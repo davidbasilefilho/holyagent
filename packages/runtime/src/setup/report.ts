@@ -23,3 +23,8 @@ export const failed = (what: string, result: ShellResult) => {
 
 /** Renders a JSON value on one line for report lines. */
 export const show = (value: unknown): string => JSON.stringify(value) ?? String(value)
+
+/** A doctor line for a check that passed. */
+export const pass = (name: string, detail: string) => `ok   ${name}: ${detail}`
+/** A doctor line for a check that failed; a report is not ok while one of these is in it. */
+export const fail = (name: string, detail: string) => `FAIL ${name}: ${detail}`

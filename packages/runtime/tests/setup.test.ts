@@ -325,6 +325,10 @@ describe("this repository's settings", () => {
   })
 })
 
+/** The one informational line doctor prints on a machine that does not use Pi. */
+const NOT_IN_USE =
+  "~ pi: not in use (HOLYAGENT_HOST is not pi and pi is not on PATH); Pi checks skipped"
+
 describe("holyagent doctor", () => {
   test("passes when bun, ctx7 and the settings keys are in place", async () => {
     await writeCompleteSettings(claudeDirectory())
@@ -337,6 +341,7 @@ describe("holyagent doctor", () => {
       "ok   bun: /fake/bin/bun",
       "ok   ctx7: /fake/bin/ctx7",
       `ok   settings: ${settingsFile()}`,
+      NOT_IN_USE,
     ])
     expect(shell.calls).toEqual([])
   })
@@ -425,6 +430,7 @@ describe("holyagent doctor", () => {
       "FAIL bun: ",
       "FAIL ctx7:",
       "FAIL setti",
+      "~ pi: not ",
     ])
     expect(report.lines[2]).toContain(settingsFile())
     expect(report.lines[2]).not.toContain(cwdSettings)
@@ -458,10 +464,11 @@ describe("holyagent doctor", () => {
       "ctx7 setup --cli --claude --yes --api-key ctx7sk-test",
     ])
     expect(report.ok).toBe(true)
-    expect(report.lines.slice(-3)).toEqual([
+    expect(report.lines.slice(-4)).toEqual([
       "ok   bun: /fake/bin/bun",
       "ok   ctx7: /fake/bin/ctx7",
       `ok   settings: ${settingsFile()}`,
+      NOT_IN_USE,
     ])
   })
 
