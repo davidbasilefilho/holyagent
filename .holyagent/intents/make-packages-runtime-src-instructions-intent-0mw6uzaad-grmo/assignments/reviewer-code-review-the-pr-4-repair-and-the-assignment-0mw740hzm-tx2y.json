@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-the-pr-4-repair-and-the",
   "objective": "Review the PR 4 repair and the reconciling merges on the head f2323fd of release/0.3.0/feat/requirements-tree (worktree /home/user/holyagent-0.3.0-req; run commands there): the code and test changes in a10b630..8856446 and that the merges a10b630 and f2323fd leave the tree as expected.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Repair diff: /home/user/holyagent-notes/pr4-repair.diff. Earlier review: .git/holyagent/reports/assignment-0mw7393nm-qw1x.md.",
     "Merges: a10b630 merged the PR 3 branch (head 1d15120, whose tree equals a38b600) and f2323fd is a -s ours merge of origin/release/0.3.0/integration (279fd50, the squash of PR 3, whose tree equals 1d15120's). Confirm git diff 279fd50 f2323fd touches only PR 4's own paths."
@@ -45,7 +45,37 @@
     "agentId": "workflow:wf_0473a3bf-00a/assignment-0mw740hzm-tx2y",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T00:44:09.874Z"
+    "startedAt": "2026-11-08T00:44:09.874Z",
+    "finishedAt": "2026-11-08T02:19:42.955Z"
+  },
+  "result": "result: No blockers. The repair is correct, the merges leave the tree as expected, and verify and build pass on f2323fd.\n\nchanged: none (read-only)\n\nchecks:\n- `bunx --no-install mise run verify` on f2323fd: exit 0, 1722 pass, 0 fail, lint clean on 164 files.\n- `bunx --no-install mise run build`: exit 0, `git status --short` empty.\n- Built-in `/code-review medium a10b630...f2323fd` ran and returned 5 findings, classified below. I did not run anything on Windows.\n\nblockers: none\n\nnotes:\n- Merges: f2323fd has the same tree as 8856446 (`git diff` is empty). `git diff 279fd50 f2323fd --name-only` equals `git diff a38b600 8856446 --name-only`, so only PR 4's paths differ from integration. 279fd50, 1d15120 and a38b600 have identical trees.\n- Plugin output: the only change is `dist/skills/instruction-writing/SKILL.md`, which matches the source `claude-5.5/skills/instruction-writing/SKILL.md`. `plugin.test.ts` asserts the new phrases `the \\`requirements/\\` tree` and `the family's \\`guide.md\\``.\n- Other repair changes:\n  - `packages/runtime/CLAUDE.md` imports `@AGENTS.md`, which fixes the queued loading item.\n  - The G58 `guide.md` rewording is not shipped.\n  - The other `requirements.md` references are in `docs/` and name `docs/requirements.md`, a different file.\n- Built-in findings:\n  - Optional: `requirements.ts:37` `split(/\\r?\\n/)` has no CRLF test. `.gitattributes` forces LF, so no CRLF input is reachable. A one-line `parseRequirements(\"- R-A: x\\r\\n- See: R-A\\r\\n\")` test would pin it.\n  - Rejected: the coverage claims in `.claude/skills/requirements/SKILL.md`. `requirements.test.ts` has a test for each rule: a missing id, an unknown id, the phrase in the carrying file, and a See id defined in exactly one other file.\n  - Optional: in `.claude/skills/write-skills/references/model-guides.md`, the G1 (small steps), G21 (lookup) and G33 (over-verify) citations are loose. G25 fits the over-verify claim better.\n  - Optional: the same file uses bare G and K ids without naming `guide.md` at the point of use. It names the guides in its intro, so this is only a lookup-convenience issue.\n  - Optional: in `requirements/specialist/merge-ready.md`, the intro rewording is not mirrored in `claude-5.5/specialist/merge-ready.md`. The id-level coverage still passes.\n\nevidence:\nThe repair's code and test changes are correct and the plugin output changes only in the instruction-writing skill: the `a10b630..8856446` diff has 11 files, and the only plugin-output change is `dist/skills/instruction-writing/SKILL.md`; the `requirements.ts` and `plugin.test.ts` changes pass.\nThe merges introduce no unexpected change against the integration branch: `git diff 8856446 f2323fd` is empty, and the changed-path lists of `279fd50 f2323fd` and `a38b600 8856446` are identical.\nbunx --no-install mise run verify exits 0 on f2323fd and mise run build leaves the tree clean: verify exit 0 (1722 pass, 0 fail); build exit 0 with empty `git status --short`; logs at `/tmp/claude-0/verify.log` and `/tmp/claude-0/build.log`.\nchecks-run: verify and build as above, plus `git diff` tree comparisons and the built-in `/code-review`.\nfindings: none blocking; the 5 built-in findings are classified in notes.\n",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Reviewer ran verify (exit 0, 1722 pass) and build (clean) on f2323fd and compared merge trees.",
+    "criteria": [
+      {
+        "criterion": "The repair's code and test changes are correct and the plugin output changes only in the instruction-writing skill",
+        "support": "the `a10b630..8856446` diff has 11 files, and the only plugin-output change is `dist/skills/instruction-writing/SKILL.md`; the `requirements.ts` and `plugin.test.ts` changes pass."
+      },
+      {
+        "criterion": "The merges introduce no unexpected change against the integration branch",
+        "support": "`git diff 8856446 f2323fd` is empty, and the changed-path lists of `279fd50 f2323fd` and `a38b600 8856446` are identical."
+      },
+      {
+        "criterion": "bunx --no-install mise run verify exits 0 on f2323fd and mise run build leaves the tree clean",
+        "support": "verify exit 0 (1722 pass, 0 fail); build exit 0 with empty `git status --short`; logs at `/tmp/claude-0/verify.log` and `/tmp/claude-0/build.log`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "verify and build as above, plus `git diff` tree comparisons and the built-in `/code-review`."
+      },
+      {
+        "label": "findings",
+        "support": "none blocking; the 5 built-in findings are classified in notes."
+      }
+    ]
   },
   "createdAt": "2026-11-08T00:44:09.874Z"
 }
