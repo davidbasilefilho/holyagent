@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mw7igr5n-s2ua",
+  "intentId": "intent-0mw6muuvl-zq3p",
+  "intentRevision": 7,
+  "roleTask": "Worker.mechanical",
+  "slug": "let-session-file-mode-of-assignment",
+  "objective": "Let session-file mode of assignment reports under the pi host list the pi-workflow Assignments it cannot read, by passing them to piRecordReports.",
+  "state": "Running",
+  "scope": [
+    "Work only in /home/user/holyagent-0.3.0-launcher. In packages/runtime/src/cli/assignment.ts near line 249, the session-file branch keeps only agents with the PI_AGENT_PREFIX (pi:) before calling piRecordReports, so pi-workflow: agents never reach it and are not listed. Change the filter to keep agents starting with PI_AGENT_PREFIX or PI_WORKFLOW_AGENT_PREFIX (import the constant from where PI_AGENT_PREFIX comes). piRecordReports in packages/runtime/src/cli/report.ts already lists a pi-workflow agent as <agent id> not in a session file.",
+    "Add one case to packages/runtime/tests/pi-reports-e2e.test.ts (session-file test) asserting that a dispatched Assignment recorded as pi-workflow:<run>/<id> appears in that listing."
+  ],
+  "constraints": [
+    "Edit only the ownership paths; no version-control writes and no edits under .git/ or .holyagent/.",
+    "Run bunx --no-install mise run build, then bunx --no-install mise run verify; report each exit code (echo $?) and the test counts.",
+    "Start each evidence line with the criterion text, then a colon.",
+    "Report in under 150 words."
+  ],
+  "criteria": [
+    {
+      "text": "Session-file mode lists pi-workflow Assignments, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build exits 0 and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [
+    "packages/runtime/src/cli/assignment.ts",
+    "packages/runtime/tests/pi-reports-e2e.test.ts",
+    "packages/integrations/claude/dist/scripts",
+    "packages/integrations/pi/dist/scripts",
+    "packages/integrations/pi/dist/extensions"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-08T07:28:42.875Z"
+  },
+  "createdAt": "2026-11-08T07:28:42.875Z"
+}
