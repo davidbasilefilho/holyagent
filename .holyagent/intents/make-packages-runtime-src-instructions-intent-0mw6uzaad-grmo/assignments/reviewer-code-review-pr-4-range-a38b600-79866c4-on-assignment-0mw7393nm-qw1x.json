@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-pr-4-range-a38b600-79866c4-on",
   "objective": "Review PR 4 (range a38b600..79866c4 on release/0.3.0/feat/requirements-tree, worktree /home/user/holyagent-0.3.0-req; run every command there) for correctness and regressions: the requirements tree loader, coverage map, mirror and coverage tests, the instructions:scaffold script and mise task, and the plugin generator changes.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Code under packages/runtime/src/instructions/{families,coverage,requirements,scaffold}.ts, packages/runtime/scripts/instructions-scaffold.ts, packages/runtime/package.json, mise.toml, packages/runtime/src/index.ts, packages/integrations/claude/src/agents.ts, the tests packages/runtime/tests/{requirements,scaffold,instructions}.test.ts and packages/integrations/claude/tests/plugin.test.ts. Diff: /home/user/holyagent-notes/pr4.diff.",
     "Writer reports (claims only): .git/holyagent/reports/assignment-0mw6zq6yu-yip7.md and .git/holyagent/reports/assignment-0mw6zqlai-6xjn.md.",
@@ -58,7 +58,45 @@
     "agentId": "workflow:wf_cd79f271-a07/assignment-0mw7393nm-qw1x",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T00:22:51.586Z"
+    "startedAt": "2026-11-08T00:22:51.586Z",
+    "finishedAt": "2026-11-08T00:36:18.925Z"
+  },
+  "result": "result: No new blockers. `bunx --no-install mise run verify` exits 0 on 79866c4, and the plugin output is unchanged. The two queued items (the stale `requirements.md` reference, and `packages/runtime/AGENTS.md` not being loaded) should be repaired before merge.\n\nchanged: none (read-only; `mise run build` left `git status` clean)\n\nchecks:\n- `bunx --no-install mise run verify` -> exit 0 (1722 pass, 0 fail; 163 files type-check; lint and format clean). Log: `/home/user/holyagent-notes/pr4-review-verify.log`.\n- `bunx --no-install mise run build` on HEAD -> exit 0, `git status` clean, so the generated `dist/` matches the committed one. No `guide.md` ships in `dist`.\n- Built-in `/code-review medium a38b600...79866c4` ran fine and returned 7 findings, classified below.\n- Not run: anything on Windows. The Windows reading comes from the code only.\n\nblockers: none new.\n\nQueued items, confirmed:\n- `claude-5.5/skills/instruction-writing/SKILL.md` line \"Write each model's instruction set from `requirements.md`...\" ships in `dist` and points at a deleted file. `plugin.test.ts` asserts the string (the `\"`requirements.md`\"` entry). Fix both together.\n- `packages/runtime/AGENTS.md` has no sibling `CLAUDE.md` importing it, and the root `CLAUDE.md` imports only `../AGENTS.md`. Claude Code does not load it from `packages/runtime`.\n\nnotes: built-in findings, classified\n- CRLF in `requirements.ts:29` (the `- See:` regex): rejected. `.gitattributes` has `* text=auto eol=lf`, so checkouts are LF on Windows too. Splitting on `/\\r?\\n/` would still be a cheap guard (optional).\n- Weak coverage phrases (\"Reproduce\", \"end to end\", \"Cite a path\"): optional. They carry over unchanged from the old `REQUIREMENT_SECTIONS`, so nothing regressed. The 13 new ids (`R-CACHE-*`, `R-COMMIT-*`, `R-CTX-*`, `R-MERGE-*`) use specific phrases.\n- Barrel exports `coverage.ts` and `families.ts`: optional. Importing them by path would be enough. `import.meta.dir` only yields a string, so nothing breaks.\n- `node:fs/promises` in `scaffold.ts`: rejected. Bun has no `mkdir` or `readdir` equivalent, and `wx` exclusive create is needed for never overwriting.\n- Sequential I/O in the scaffold: rejected. It is a dev tool over about 100 files.\n- `InstructionsError` lives in `requirements.ts`: optional placement nit.\n- Multi-line requirements (`R-MERGE-DIMENSIONS` table) are checked on one row only: optional. This is a design limit of the line-based format.\n- `kimi-k3.1/guide.md` is ungated until the family is listed: queued, no action.\n- The 13 new requirement ids are an addition beyond the move, though covered and tested. They come from the old `mergeability.md`, `commit-text.md`, `cache.md` and `context.md`, which had no ids. This is acceptable.\n\nevidence:\nchecks-run: `bunx --no-install mise run verify` -> exit 0, 1722 pass / 0 fail; `mise run build` -> exit 0, tree clean.\nfindings: none new blocking. Classification of the 7 built-in findings and the 2 queued items is under notes.\nThe scaffold and the mirror and coverage tests behave as specified, including Windows path separators: `scaffold.ts` (`createEmpty` uses the `wx` flag, so it never overwrites). `scaffold.test.ts` covers idempotence, no overwrite, extra files left alone and error paths. `listTree` and `isMirrored` use `toPosix`, and `.gitattributes` forces `eol=lf`. Windows itself was not run.\nThe plugin output is unchanged and no existing behavior breaks: rebuild leaves `git status` clean; `REQUIREMENT_SECTIONS` was moved to `REQUIREMENT_COVERAGE` and `plugin.test.ts` passes. The stale `requirements.md` string in the shipped SKILL.md is a queued item.\nThe tests fail without the code they cover and none is weakened: the scaffold tests fail if the exclusive flag or the mkdir step is removed. The coverage tests check the phrase in the named file. The `instructions.test.ts` change swaps three moved files for non-empty folder checks, and the mirror tests cover the rest.\nThe code follows the repository's Effect, Schema, Bun and JSDoc rules: no try/catch, `new Promise` or async functions in the new runtime source. `Effect.runPromise` appears only in the script entry. Every new export has JSDoc. The `node:` use is justified above. No Schema decode in the line parser (minor, optional).\nbunx --no-install mise run verify exits 0 on 79866c4: exit 0; HEAD is 79866c4, log at `/home/user/holyagent-notes/pr4-review-verify.log`.\n",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Reviewer ran verify (exit 0, 1722 pass) and build (tree clean) on 79866c4 and classified every built-in finding.",
+    "criteria": [
+      {
+        "criterion": "The scaffold and the mirror and coverage tests behave as specified, including Windows path separators",
+        "support": "`scaffold.ts` (`createEmpty` uses the `wx` flag, so it never overwrites). `scaffold.test.ts` covers idempotence, no overwrite, extra files left alone and error paths. `listTree` and `isMirrored` use `toPosix`, and `.gitattributes` forces `eol=lf`. Windows itself was not run."
+      },
+      {
+        "criterion": "The plugin output is unchanged and no existing behavior breaks",
+        "support": "rebuild leaves `git status` clean; `REQUIREMENT_SECTIONS` was moved to `REQUIREMENT_COVERAGE` and `plugin.test.ts` passes. The stale `requirements.md` string in the shipped SKILL.md is a queued item."
+      },
+      {
+        "criterion": "The tests fail without the code they cover and none is weakened",
+        "support": "the scaffold tests fail if the exclusive flag or the mkdir step is removed. The coverage tests check the phrase in the named file. The `instructions.test.ts` change swaps three moved files for non-empty folder checks, and the mirror tests cover the rest."
+      },
+      {
+        "criterion": "The code follows the repository's Effect, Schema, Bun and JSDoc rules",
+        "support": "no try/catch, `new Promise` or async functions in the new runtime source. `Effect.runPromise` appears only in the script entry. Every new export has JSDoc. The `node:` use is justified above. No Schema decode in the line parser (minor, optional)."
+      },
+      {
+        "criterion": "bunx --no-install mise run verify exits 0 on 79866c4",
+        "support": "exit 0; HEAD is 79866c4, log at `/home/user/holyagent-notes/pr4-review-verify.log`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bunx --no-install mise run verify` -> exit 0, 1722 pass / 0 fail; `mise run build` -> exit 0, tree clean."
+      },
+      {
+        "label": "findings",
+        "support": "none new blocking. Classification of the 7 built-in findings and the 2 queued items is under notes."
+      }
+    ]
   },
   "createdAt": "2026-11-08T00:22:51.586Z"
 }
