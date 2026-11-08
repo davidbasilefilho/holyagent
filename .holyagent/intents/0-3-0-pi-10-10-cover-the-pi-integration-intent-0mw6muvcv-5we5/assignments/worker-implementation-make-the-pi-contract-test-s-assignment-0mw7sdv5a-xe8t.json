@@ -1,0 +1,71 @@
+{
+  "id": "assignment-0mw7sdv5a-xe8t",
+  "intentId": "intent-0mw6muvcv-5we5",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-pi-contract-test-s",
+  "objective": "Make the Pi contract test's documentation and helpers of commit 0e2dc03 say exactly what the test checks, and tidy the review's small items.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-contract, branch release/0.3.0/test/pi-event-contract, head 0e2dc03 (already committed; your edits are a new change on top).",
+    "docs/development.md: it says the test 'feeds each file through the real consumers' and calls the fixtures 'recorded'. Say that the fixtures are built from Pi's exported types by tests/fixtures/record.ts (not recorded from a Pi run), that the extension-event fixtures run through the extension handlers and the outcome helpers, that the agent_settled run streams are read by a test-local reader because the reader lives in @tintinweb/pi-subagents, and that extension_ui_request is pinned by type only because the extension has no UI consumer yet. Also correct the claim that mise run check fails on any renamed or retyped field: the Pick on before_agent_start and session_compact (record.ts:295) covers only the picked fields.",
+    "record.ts:439-441: give the walk-up loop a stop at the filesystem root.",
+    "contract.test.ts:84: derive FixtureHeaderLine from record.ts's FixtureHeader instead of repeating it; contract.test.ts:143: drop the assertion that proves nothing about the files."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Report in under 400 words; put long logs in a file in the scratchpad above and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "docs/development.md states how each fixture group is checked and that fixtures are built from Pi's types",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "The walk-up loop in record.ts stops at the filesystem root",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "FixtureHeaderLine derives from FixtureHeader",
+      "blocking": false,
+      "dimension": "regressions"
+    },
+    {
+      "text": "mise run build leaves no unexplained changes and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "The change stays inside the Assignment's scope and ownership paths",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi/tests/fixtures",
+    "packages/integrations/pi/tests/contract.test.ts",
+    "docs/development.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw7r2hgt-94bj",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T12:06:24.238Z"
+  },
+  "createdAt": "2026-11-08T12:06:24.238Z"
+}
