@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mw7e4ekp-sezx",
+  "intentId": "intent-0mw6muujd-wz9x",
+  "intentRevision": 9,
+  "roleTask": "Worker.mechanical",
+  "slug": "correct-one-sentence-in-docs-pi",
+  "objective": "Correct one sentence in docs/pi/providers.md of /home/user/holyagent-0.3.0-provider so it matches the code.",
+  "state": "Running",
+  "scope": [
+    "In /home/user/holyagent-0.3.0-provider/docs/pi/providers.md around line 45, the failure detail of the readiness and catalog checks is described as 'standard output, else standard error'. The code (packages/runtime/src/pi/readiness.ts outputDetail) now uses standard error first, then standard output. Reword that phrase to say standard error, then standard output. Change nothing else."
+  ],
+  "constraints": [
+    "Make no version-control writes.",
+    "Run bunx --no-install mise run verify in that worktree.",
+    "Report in under 100 words; start each evidence line with the exact criterion text, a colon, then the support."
+  ],
+  "criteria": [
+    {
+      "text": "providers.md describes the failure detail as standard error, then standard output",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "bunx --no-install mise run verify exits 0",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "docs/pi/providers.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-08T05:27:08.233Z"
+  },
+  "createdAt": "2026-11-08T05:27:08.233Z"
+}
