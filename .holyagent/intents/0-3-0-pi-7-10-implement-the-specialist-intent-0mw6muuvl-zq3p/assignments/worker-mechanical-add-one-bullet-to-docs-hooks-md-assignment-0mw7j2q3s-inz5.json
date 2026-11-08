@@ -1,0 +1,42 @@
+{
+  "id": "assignment-0mw7j2q3s-inz5",
+  "intentId": "intent-0mw6muuvl-zq3p",
+  "intentRevision": 7,
+  "roleTask": "Worker.mechanical",
+  "slug": "add-one-bullet-to-docs-hooks-md",
+  "objective": "Add one bullet to docs/hooks.md describing the refusals the shared workflow check now makes because the Pi runtime runs scripts as classic scripts.",
+  "state": "Running",
+  "scope": [
+    "Work only in /home/user/holyagent-0.3.0-launcher. In docs/hooks.md, section ## `workflow`, the bullet list after the paragraph that starts \"The hook parses the script (with [acorn]\" ends with the bullet that starts \"- **`agent()`.**\". Insert this bullet directly before the \"- **`agent()`.**\" bullet, as written: \"- **Script-mode differences.** The same check gates `SubagentWorkflow` scripts under Pi, where `@tintinweb/pi-subagents` runs the body as a classic script, not a module, so it refuses what the two modes read differently: an HTML-like comment (`<!--`, or `-->` at the start of a line), a function declared inside a block rather than at the top level or in a function body, and any line matching `export const meta =` other than the one vetted `meta` export, which the package evaluates before the script runs. Under Pi the `agentType` names the specialist without the `holyagent:` prefix ([pi/extensions.md](pi/extensions.md)).\" Reason: the Claude hook now prompts for such scripts, and the doc should say why."
+  ],
+  "constraints": [
+    "Edit only docs/hooks.md; no version-control writes and no edits under .git/ or .holyagent/.",
+    "Run bunx --no-install mise run verify and report the exit code (echo $?) and counts; run bunx --no-install mise run fmt first if the format check fails on docs/hooks.md.",
+    "Start each evidence line with the criterion text, then a colon.",
+    "Report in under 120 words."
+  ],
+  "criteria": [
+    {
+      "text": "The bullet is inserted as given before the agent() bullet",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [
+    "docs/hooks.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-08T07:45:47.944Z"
+  },
+  "createdAt": "2026-11-08T07:45:47.944Z"
+}
