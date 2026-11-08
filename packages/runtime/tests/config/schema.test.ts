@@ -94,6 +94,8 @@ describe("a route's model id", () => {
     "anthropic.claude-sonnet-v1:0",
     "meta-llama/Llama-3.1-70B:free",
     "gpt_5",
+    "claude-sonnet-4@20250514",
+    "gpt-5+reasoning",
     "a".repeat(128),
   ])("%s is accepted", async (model) => {
     const result = await decode(model)
@@ -108,6 +110,9 @@ describe("a route's model id", () => {
     ["a bell", "kimi\u0007"],
     ["a space", "kimi for-coding"],
     ["a leading dash, which reads as a flag", "--model"],
+    ["a leading @", "@kimi"],
+    ["a leading +", "+kimi"],
+    ["a space after an @", "kimi@ 1"],
     ["markup", "x](https://example.test)"],
     ["a backtick", "`kimi`"],
     ["a bidi override", "kimi\u202egnidoc"],
