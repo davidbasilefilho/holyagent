@@ -1,0 +1,76 @@
+{
+  "id": "assignment-0mw786u16-gi9a",
+  "intentId": "intent-0mw6mutwc-frer",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "make-pi-install-of-a-holyagent-release",
+  "objective": "Make pi install of a HolyAgent release tag work in /home/user/holyagent-0.3.0-pi (branch release/0.3.0/feat/pi-package, head 4bbaa16) by fixing the three install blockers and adding the pi output to CI's stale-build check.",
+  "state": "Running",
+  "scope": [
+    "Run every command in /home/user/holyagent-0.3.0-pi. The earlier report: .git/holyagent/reports/assignment-0mw77lh0d-07e5.md (questions 1-5) gives the evidence and pi source lines (dist/core/package-manager.js L1566-1578, L1633-1660; utils/git.js splitRef; packages.md L13, L56-L75) in /home/user/holyagent-notes/pi-probe/node_modules/@earendil-works/pi-coding-agent.",
+    "1. workspace protocol: pi runs npm install --omit=dev --legacy-peer-deps at the clone root (or its configured npmCommand; HolyAgent's pi setup will set it to bun). Find which root or workspace manifest field makes npm fail with EUNSUPPORTEDPROTOCOL workspace:, and fix it so npm and bun both install the root with dev dependencies omitted, without breaking the workspace build, bun.lock or the dependency rules (scripts/dependency-ranges.test.ts, scripts/bump-version.test.ts); if a dependency is unused, remove it with bun remove, never by hand-editing bun.lock.",
+    "2. prepare: the root prepare script (mise run prepare) exits 127 when dev dependencies are omitted. Make it a small Bun script that runs the mise prepare task when the repository's dev toolchain is installed and otherwise exits 0 with a one-line note, so a consumer install succeeds while a development install still installs the hooks; mise.toml stays the command source.",
+    "3. ref form: pi splits the git ref on @, so the install command is pi install git:github.com/davidbasilefilho/holyagent@holyagent-<version>; use that form everywhere it is documented (docs/pi/, README if it names pi install) and cite the pi source or doc line.",
+    "4. CI: add packages/integrations/pi/dist to the stale-build check in .github/workflows/validation.yml beside the Claude paths, keeping the pinned-SHA and permissions rules that scripts/workflows.test.ts checks.",
+    "Evidence: re-run the consumer-install simulation on a git archive of the final tree with both npm install --omit=dev --legacy-peer-deps and bun install --production (or the bun equivalent pi would run), each exiting 0, and show that a normal bun install --frozen-lockfile in the worktree still runs the hooks setup."
+  ],
+  "constraints": [
+    "The maintainer's requirements in the Intent in use bind: users install from the release tags, no npm publishing; host modules are peer dependencies with range *.",
+    "Do not run the pi binary. Make no version-control writes; report changed paths.",
+    "Finish with bunx --no-install mise run build and bunx --no-install mise run verify; write git diff 4bbaa16 to /home/user/holyagent-notes/pi1-repair.diff.",
+    "Report in under 350 words."
+  ],
+  "criteria": [
+    {
+      "text": "A consumer install of a git archive of the tree exits 0 with npm --omit=dev and with bun production mode",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A development install still installs the hooks and the workspace build is unchanged",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The documented install command uses the @ ref form pi parses, with a source citation",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "CI's stale-build check covers packages/integrations/pi/dist and the workflow tests pass",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "mise run build and mise run verify exit 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "package.json",
+    "bun.lock",
+    "scripts",
+    "mise.toml",
+    "docs",
+    "README.md",
+    ".github/workflows/validation.yml",
+    "packages/integrations/pi",
+    "packages/integrations/claude",
+    "packages/runtime/package.json"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw77lh0d-07e5",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T02:41:03.882Z"
+  },
+  "createdAt": "2026-11-08T02:41:03.882Z"
+}
