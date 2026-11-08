@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-commit-2cfba72-on-release-0-3-0",
   "objective": "Review commit 2cfba72 on release/0.3.0/feat/pi-extension (worktree /home/user/holyagent-0.3.0-ext; run commands there), the Windows fix for the PR 78 windows job, for correctness and for not weakening any test.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Windows job log: /home/user/holyagent-notes/win78.log (failures from about line 2190). Diff without bundles: /home/user/holyagent-notes/pi-windows.diff.",
     "Stated causes: the extension passed sh a backslash wrapper path, which the wrapper refuses as a bare name (code fix: wrapperPath writes it with forward slashes); mocked-exec assertions hardcoded POSIX paths; the execute-bit check reads mode bits that Windows does not have (falls back to the committed git mode 100755); a Node import of a C:\\ path instead of a file URL. Check that each cause matches the log, that every failing test in the log is addressed, and whether anything else would still fail on Windows (for example bun on PATH, CRLF, the .holyagent path passed through --project)."
@@ -43,7 +43,33 @@
     "agentId": "workflow:wf_2ba36e7d-6ed/assignment-0mw7ddvlw-sg82",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T05:06:30.596Z"
+    "startedAt": "2026-11-08T05:06:30.596Z",
+    "finishedAt": "2026-11-08T05:13:35.844Z"
+  },
+  "result": "result: Commit 2cfba72 fixes every failing test in the Windows log, and I found no skipped or weakened test. `bunx --no-install mise run verify` exits 0 and `mise run build` leaves the tree clean. I could only read the Windows behavior, not run it.\n\nchanged: none (read-only review)\n\nchecks-run:\n- `bunx --no-install mise run verify` in /home/user/holyagent-0.3.0-ext: exit 0. Type-check found no errors in 182 files, lint found no problems in 183 files, and all 501 files are formatted. Tests: 1838 pass, 0 fail. The Windows log shows 11 failures out of 1837 tests, so this run has one more test, the new wrapperPath test.\n- `bunx --no-install mise run build`: exit 0, and `git status --short` is empty afterwards.\n- Built-in `/code-review high 2cfba72^...2cfba72` ran as the real built-in.\n\nLog cause check:\n- **Eight sh failures** (the mocked-exec test at line 2209, plus the real-project and non-git tests at lines 2249 to 2397): the log shows the wrapper's own `WrapperPath: ... bare name` error or exit 127. The fix is `wrapperPath` plus `WRAPPER = toPosix(...)`, and it matches.\n- **`config /work/project/.holyagent` assertion** (the mocked-exec test): the log shows `\\work\\project\\.holyagent` received. The test now builds the expected value with `join`, so this matches. It is not weakened, because it still checks the same argument.\n- **Execute-bit check** (pi.test.ts line 151): Windows has no mode bits. The test now reads the committed git mode, which is 100755 in the index. POSIX still checks the real bit, so it is not weakened.\n- **\"bundle answers config\"**: it spawned sh with a backslash script path, and the log shows empty output. The fix is to use `toPosix` on the script path.\n- **\"loads under Node\"**: a raw `C:\\` path was passed to the import, and the fix is `pathToFileURL`.\n- **Windows concerns:** bun on PATH is not a problem, because the Claude \"built wrapper\" tests pass on Windows in the log. No CRLF issue appears, because the \"in step\" tests pass. The `--project` path passes through unchanged.\n\nblockers: none\n\nnotes (all optional):\n- **Backslash root in prompts** (src/extension.ts:266): `piContext(role, packageRoot, state)` still gets the backslash root. On Windows the prompts' `${HOLYAGENT_PI_ROOT}/scripts/holyagent` would expand to `C:\\...\\pkg/scripts/holyagent`, which sh mangles when the model pastes it into a command. The old code had the same flaw and no CI test covers it. Passing `toPosix(packageRoot)` to `piContext` is the likely follow-up, so I suggest fixing it before release.\n- **No test of `createExtension`'s exec path**: nothing asserts that `createExtension` passes the forward-slash wrapper path to exec for a Windows `packageRoot`. Reverting to a plain `join` would pass on POSIX CI.\n- **Test forces the win32 branch**: the `isExecutable(wrapper, \"win32\")` assertion in pi.test.ts runs `git ls-files` on every platform. This is fine in a checkout but fails in a git-less export.\n- **`wrapperPath` signature**: its injected path-module parameter is an exported seam used only by tests. It duplicates `toPosix`'s separator seam.\n\nevidence:\n- Each failure in the windows log is addressed by a fix that matches its cause: all 11 failing tests in /home/user/holyagent-notes/win78.log (lines 2209 to 2472) map to the fixes in the commit diff `git show 2cfba72`; per-failure mapping is under \"Log cause check\" above.\n- No test is skipped or weakened, and Linux behavior is unchanged: the test diff only adds platform-neutral expectations, the POSIX execute-bit assertion is kept, `wrapperPath` is a no-op on POSIX (`toPosix` returns the path unchanged), and the Linux run of 1838 tests passes.\n- bunx --no-install mise run verify exits 0 and mise run build leaves the tree clean on 2cfba72: verify exit 0 with 1838 pass and 0 fail, build exit 0 with empty `git status`; logs are in `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log` and `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/build.log`.\n- checks-run: the verify, build and code-review runs under \"checks-run\" above. I did not run the Windows job, because the machine is Linux.\n",
+  "acceptance": {
+    "revision": 6,
+    "rationale": "Every Windows failure maps to a matching fix; no test weakened; verify 1838 pass",
+    "criteria": [
+      {
+        "criterion": "Each failure in the windows log is addressed by a fix that matches its cause",
+        "support": "all 11 failing tests in /home/user/holyagent-notes/win78.log (lines 2209 to 2472) map to the fixes in the commit diff `git show 2cfba72`; per-failure mapping is under \"Log cause check\" above."
+      },
+      {
+        "criterion": "No test is skipped or weakened, and Linux behavior is unchanged",
+        "support": "the test diff only adds platform-neutral expectations, the POSIX execute-bit assertion is kept, `wrapperPath` is a no-op on POSIX (`toPosix` returns the path unchanged), and the Linux run of 1838 tests passes."
+      },
+      {
+        "criterion": "bunx --no-install mise run verify exits 0 and mise run build leaves the tree clean on 2cfba72",
+        "support": "verify exit 0 with 1838 pass and 0 fail, build exit 0 with empty `git status`; logs are in `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log` and `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/build.log`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "the verify, build and code-review runs under \"checks-run\" above. I did not run the Windows job, because the machine is Linux."
+      }
+    ]
   },
   "createdAt": "2026-11-08T05:06:30.596Z"
 }
