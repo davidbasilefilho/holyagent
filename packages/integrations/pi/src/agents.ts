@@ -2,14 +2,9 @@ import { Effect } from "effect"
 
 import { FEATURE_PACKAGES, WEB_KIT_PACKAGE } from "../../../runtime/src/config/packages.ts"
 import { type Config, defaultConfig } from "../../../runtime/src/config/schema.ts"
-import { type Route, ROUTES } from "../../../runtime/src/domain/route.ts"
+import type { Route } from "../../../runtime/src/domain/route.ts"
 import type { Family } from "../../../runtime/src/instructions/families.ts"
-import {
-  embedMateriality,
-  instructionsDirectory,
-  MATERIALITY_PATH,
-  stripCitations,
-} from "../../../runtime/src/instructions/skills.ts"
+import { instructionsDirectory } from "../../../runtime/src/instructions/skills.ts"
 import { providerProfile, webChoice } from "../../../runtime/src/pi/provider.ts"
 import {
   CODEMODE_TOOL,
@@ -19,20 +14,10 @@ import {
   toolArgs,
   WRITE_TOOLS,
 } from "../../../runtime/src/pi/tools.ts"
-// The section tables are the Claude plugin's: both families mirror the same files, so one table
-// names what each role and the shared conduct are made of.
-import {
-  CONDITIONAL_SECTIONS,
-  ROLE_SECTIONS,
-  SPECIALIST_SECTIONS,
-} from "../../claude/src/agents.ts"
-import {
-  DIST_DIRECTORY,
-  type GeneratedFile,
-  generatedNote,
-  PI_FAMILY,
-  readSource,
-} from "./files.ts"
+// The specialist prompt is the Claude generator's: both families mirror the same files, so one
+// builder names what each role and the shared conduct are made of.
+import { frontmatter, specialistFiles } from "../../claude/src/agents.ts"
+import { DIST_DIRECTORY, type GeneratedFile, generatedNote, PI_FAMILY } from "./files.ts"
 
 /** The folder of the built package that holds the agent files, relative to the package root. */
 export const AGENTS_FOLDER = "agents"
@@ -69,89 +54,34 @@ export const agentTools = (config: Config, route: Route): ReadonlyArray<string> 
   return [...new Set(entries)]
 }
 
-const sections = async (
-  directory: string,
-  names: ReadonlyArray<string>,
-): Promise<ReadonlyArray<string>> =>
-  (await Promise.all(names.map((name) => readSource(`${directory}/${name}`)))).map((text) =>
-    stripCitations(text).trim(),
-  )
-
-const firstSentence = (text: string): string => {
-  const paragraph = text.trim().split("\n")[0] ?? ""
-  return /^.*?\.(?=\s|$)/.exec(paragraph)?.[0] ?? paragraph
-}
-
-// What the root reads in the `Agent` tool's list to pick the specialist. The model and thinking
-// level are not part of it: the root passes them on each call.
-const describe = (route: Route, role: string): string =>
-  `Use for ${route.agent}: ${firstSentence(role)} ${route.mutability === "ReadOnly" ? "Read-only" : "Writes inside its ownership paths"}; independence ${route.independence}.`
-
-const specialist = async (
-  instructions: string,
-  config: Config,
-  route: Route,
-  conduct: ReadonlyArray<string>,
-  conditional: Readonly<Record<string, string>>,
-): Promise<GeneratedFile> => {
-  const source = `${instructions}/roles/${route.agent}`
-  const [role = "", ...rest] = await sections(source, ROLE_SECTIONS[route.agent] ?? [])
-  // No `model:` or `thinking:`: the package ranks an agent file above the call's parameters on its
-  // `Agent` path, and the route values are per user, so the root passes them on each call. `prompt_mode:
-  // replace` makes the body the child's whole prompt: the child inherits neither the root's prompt nor
-  // AGENTS.md. The `${HOLYAGENT_PI_ROOT}` placeholders in the body are filled when the child starts
-  // (`fillPackageRoot` in the extension), since the install path is not known at build time.
-  const head = [
-    "---",
-    `# ${generatedNote(source)}`,
-    `name: ${route.agent}`,
-    `description: ${JSON.stringify(describe(route, role))}`,
-    "prompt_mode: replace",
-    `tools: ${JSON.stringify(agentTools(config, route).join(", "))}`,
-    "---",
-  ].join("\n")
-  const body = [
-    `You are the holyagent ${route.agent} specialist. Independence: ${route.independence}.`,
-    role,
-    ...rest,
-    ...conduct,
-    ...CONDITIONAL_SECTIONS.filter(({ applies }) => applies(route)).map(
-      ({ file }) => conditional[file] ?? "",
-    ),
-  ].join("\n\n")
-  return {
-    path: `${DIST_DIRECTORY}/${AGENTS_FOLDER}/${route.agent}.md`,
-    content: `${head}\n\n${body}\n`,
-  }
-}
-
 /**
  * One agent file for each of the 18 specialists, for the package `@tintinweb/pi-subagents` loads
- * through `pi.subagents.agents` in the manifest. The body is the Kimi family's specialist prompt:
- * the role sections, the shared conduct and the conditional sections the role needs, with the
- * maintainers' notes stripped. The tools come from the default config (see {@link agentTools}), the
- * same ones the root passes the specialist's route.
+ * through `pi.subagents.agents` in the manifest. The body is the family's specialist prompt, made
+ * by the Claude generator's `specialistFiles` (the role sections, the shared conduct and the
+ * conditional sections the role needs, with the maintainers' notes stripped). The tools come from
+ * the default config (see {@link agentTools}), the same ones the root passes the specialist's route.
  */
 export const agentFiles = async (
   family: Family = PI_FAMILY,
   config?: Config,
 ): Promise<ReadonlyArray<GeneratedFile>> => {
   const resolved = config ?? (await Effect.runPromise(defaultConfig))
-  const instructions = instructionsDirectory(family)
-  const directory = `${instructions}/specialist`
-  const files = CONDITIONAL_SECTIONS.map(({ file }) => file)
-  const [conduct, texts, materiality] = await Promise.all([
-    sections(directory, SPECIALIST_SECTIONS),
-    sections(directory, files),
-    readSource(`${instructions}/${MATERIALITY_PATH}`).then(stripCitations),
-  ])
-  const embedded = await Effect.runPromise(
-    Effect.forEach(files, (file, at) =>
-      embedMateriality(texts[at] ?? "", materiality, `${directory}/${file}`),
-    ),
-  )
-  const conditional = Object.fromEntries(files.map((file, at) => [file, embedded[at] ?? ""]))
-  return Promise.all(
-    ROUTES.map((route) => specialist(instructions, resolved, route, conduct, conditional)),
-  )
+  return specialistFiles({
+    instructions: instructionsDirectory(family),
+    path: (route) => `${DIST_DIRECTORY}/${AGENTS_FOLDER}/${route.agent}.md`,
+    // No `model:` or `thinking:`: the package ranks an agent file above the call's parameters on its
+    // `Agent` path, and the route values are per user, so the root passes them on each call.
+    // `prompt_mode: replace` makes the body the child's whole prompt: the child inherits neither the
+    // root's prompt nor AGENTS.md. The `${HOLYAGENT_PI_ROOT}` placeholders in the body are filled
+    // when the child starts (`fillPackageRoot` in the extension), since the install path is not
+    // known at build time.
+    head: (route, source, description) =>
+      frontmatter(generatedNote(source), [
+        `name: ${route.agent}`,
+        `description: ${JSON.stringify(description)}`,
+        "prompt_mode: replace",
+        `tools: ${JSON.stringify(agentTools(resolved, route).join(", "))}`,
+      ]),
+    runtime: () => "",
+  })
 }

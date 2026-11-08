@@ -249,7 +249,10 @@ const piReports = (call: Call, source: string, text: string) =>
         source,
         project.assignments.flatMap(({ id, specialist }) => {
           const agentId = specialist?.agentId
-          return agentId?.startsWith(PI_AGENT_PREFIX) === true ? [{ id, agentId }] : []
+          return agentId !== undefined &&
+            (agentId.startsWith(PI_AGENT_PREFIX) || agentId.startsWith(PI_WORKFLOW_AGENT_PREFIX))
+            ? [{ id, agentId }]
+            : []
         }),
       )
     const launchOf = yield* launchesOf(call.env, call.root, "pi")

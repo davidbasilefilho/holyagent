@@ -2,7 +2,6 @@ import { parse } from "acorn"
 import { Effect } from "effect"
 
 import { ROUTES } from "../domain/route.ts"
-import { PLUGIN_NAMESPACE } from "./assignment.ts"
 
 // The Workflow tool runs a script the root writes inline, and the only way that script starts an
 // agent is the global `agent()`. The PreToolUse hook lets such a script run without a prompt when
@@ -368,7 +367,15 @@ const AGENT_OPTIONS: ReadonlySet<string> = new Set([
   "phase",
 ])
 
-const SPECIALISTS: ReadonlySet<string> = new Set(
+// Kept here, not imported from assignment.ts: the Pi extension runs this check on Node, and that
+// module reads state through Bun. The Pi extension tests pin the two to the same value.
+const PLUGIN_NAMESPACE = "holyagent"
+
+/**
+ * The `agentType` values of the Claude plugin's specialists, which the host knows under the plugin
+ * namespace (`holyagent:worker-implementation`).
+ */
+export const CLAUDE_SPECIALISTS: ReadonlySet<string> = new Set(
   ROUTES.map((route) => `${PLUGIN_NAMESPACE}:${route.agent}`),
 )
 
@@ -808,7 +815,7 @@ const occurrencesIn = (
  * `agent()` call vetted and at least one of them. A parse error or an overflow throws; the caller
  * turns that into a refusal.
  */
-const inspect = (script: string): string | undefined => {
+const inspect = (script: string, specialists: ReadonlySet<string>): string | undefined => {
   if (script.length > MAX_WORKFLOW_SCRIPT) return "the script is too large"
   const program = parse(script, {
     ecmaVersion: "latest",
@@ -1181,7 +1188,7 @@ const inspect = (script: string): string | undefined => {
       else if (
         value?.type === "Literal" &&
         typeof value["value"] === "string" &&
-        SPECIALISTS.has(value["value"])
+        specialists.has(value["value"])
       )
         named += 1
       else
@@ -2265,9 +2272,14 @@ const inspect = (script: string): string | undefined => {
  * does: the script is plain (see the top of this file) and every `agent()` call in it starts one of
  * this plugin's specialists by a string-literal `agentType`. It never fails: whatever goes wrong
  * while reading the script (a syntax error, a tree too deep for the stack) is a refusal.
+ * `specialists` is the set of `agentType` values that count as specialists: the Claude plugin's by
+ * default, or the bare names the Pi package ships them under.
  */
-export const workflowRefusal = (script: string): Effect.Effect<string | undefined> =>
+export const workflowRefusal = (
+  script: string,
+  specialists: ReadonlySet<string> = CLAUDE_SPECIALISTS,
+): Effect.Effect<string | undefined> =>
   Effect.try({
-    try: () => inspect(script),
+    try: () => inspect(script, specialists),
     catch: (cause) => `cannot read the script: ${String(cause)}`,
   }).pipe(Effect.catch((reason) => Effect.succeed<string | undefined>(reason)))

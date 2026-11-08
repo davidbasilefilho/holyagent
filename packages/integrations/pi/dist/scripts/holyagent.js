@@ -15011,6 +15011,10 @@ var EVIDENCE_HEADING, indentOf = (line) => line.length - line.trimStart().length
   const reports = [];
   const notAssignmentIds = [];
   for (const { id, agentId } of agents) {
+    if (agentId.startsWith(PI_WORKFLOW_AGENT_PREFIX)) {
+      notAssignmentIds.push({ label: id, agentId: `${agentId} not in a session file` });
+      continue;
+    }
     const found = yield* piRecordReport(session, source, agentId.replace(/^pi:/, "")).pipe(catchTag2("PiRecordMissing", () => succeed6(undefined)));
     if (found?.report !== undefined)
       reports.push({ id, report: found.report });
@@ -15021,6 +15025,7 @@ var EVIDENCE_HEADING, indentOf = (line) => line.length - line.trimStart().length
 }).pipe(mapError2(refused("Pass the root session file of the Pi session, unedited.")));
 var init_report = __esm(() => {
   init_dist();
+  init_directive();
   init_errors();
   init_host();
   init_route();
@@ -15149,7 +15154,7 @@ var PLUGIN_NAMESPACE = "holyagent", AssignmentInput, DRAFT_SHAPE, DRAFT_NOTES, c
   if (!basename3(source).endsWith(".workflow.jsonl"))
     return yield* piRecordReports(text, source, project.assignments.flatMap(({ id, specialist }) => {
       const agentId = specialist?.agentId;
-      return agentId?.startsWith(PI_AGENT_PREFIX) === true ? [{ id, agentId }] : [];
+      return agentId !== undefined && (agentId.startsWith(PI_AGENT_PREFIX) || agentId.startsWith(PI_WORKFLOW_AGENT_PREFIX)) ? [{ id, agentId }] : [];
     }));
   const launchOf = yield* launchesOf(call.env, call.root, "pi");
   const calls = yield* forEach2(project.assignments, (assignment) => briefPath(call, assignment.id).pipe(map5((path) => dispatchedCall(assignment, agentTypeFor("pi", routeFor(assignment.roleTask).agent), path, launchOf(assignment.roleTask)))));
@@ -22185,7 +22190,7 @@ var isNode = (value) => typeof value === "object" && value !== null && ("type" i
 }, nodesAt = (node, field) => {
   const value = node[field];
   return Array.isArray(value) ? value.map((item) => isNode(item) ? item : undefined) : [];
-}, nameOf = (node) => node?.type === "Identifier" && typeof node["name"] === "string" ? node["name"] : undefined, MAX_WORKFLOW_SCRIPT = 1e6, MAX_DEPTH = 120, MAX_LOOP_COUNT = 1000, MAX_NESTED_ITERATIONS = 1e4, MAX_TEXT_COUNT = 1000, MAX_REPEATED_TEXT = 8, MAX_WRITE_INDEX = 1000, DATA_ITERATIONS = 100, MAX_ANALYSIS_STEPS = 200000, TEXT_COUNTS, GROWING_METHODS, CALLBACK_ARGUMENTS, ITERATING_METHODS, COPYING_METHODS, ARRAY_RESULTS, COMBINING_METHODS, GLOBALS, HOST_GLOBALS, DENIED_NAMES, CALLABLE_PROPERTIES, GLOBAL_CALLS, GLOBAL_FIELDS, MAX_ARGUMENTS, VALUE_GLOBALS, GLOBAL_FUNCTIONS, AGENT_OPTIONS, SPECIALISTS, UNARY, newBinding = () => ({
+}, nameOf = (node) => node?.type === "Identifier" && typeof node["name"] === "string" ? node["name"] : undefined, MAX_WORKFLOW_SCRIPT = 1e6, MAX_DEPTH = 120, MAX_LOOP_COUNT = 1000, MAX_NESTED_ITERATIONS = 1e4, MAX_TEXT_COUNT = 1000, MAX_REPEATED_TEXT = 8, MAX_WRITE_INDEX = 1000, DATA_ITERATIONS = 100, MAX_ANALYSIS_STEPS = 200000, TEXT_COUNTS, GROWING_METHODS, CALLBACK_ARGUMENTS, ITERATING_METHODS, COPYING_METHODS, ARRAY_RESULTS, COMBINING_METHODS, GLOBALS, HOST_GLOBALS, DENIED_NAMES, CALLABLE_PROPERTIES, GLOBAL_CALLS, GLOBAL_FIELDS, MAX_ARGUMENTS, VALUE_GLOBALS, GLOBAL_FUNCTIONS, AGENT_OPTIONS, PLUGIN_NAMESPACE2 = "holyagent", CLAUDE_SPECIALISTS, UNARY, newBinding = () => ({
   unsafe: false,
   inits: [],
   functions: new Set,
@@ -22363,7 +22368,7 @@ var isNode = (value) => typeof value === "object" && value !== null && ("type" i
     if (field !== skipped && typeof value === "object")
       occurrencesIn(value, scope, into, depth + 1);
   return into;
-}, inspect = (script) => {
+}, inspect = (script, specialists) => {
   if (script.length > MAX_WORKFLOW_SCRIPT)
     return "the script is too large";
   const program = parse2(script, {
@@ -22640,7 +22645,7 @@ var isNode = (value) => typeof value === "object" && value !== null && ("type" i
       const value = nodeAt(property, "value");
       if (name !== "agentType")
         expression(value, scope, depth + 1);
-      else if (value?.type === "Literal" && typeof value["value"] === "string" && SPECIALISTS.has(value["value"]))
+      else if (value?.type === "Literal" && typeof value["value"] === "string" && specialists.has(value["value"]))
         named += 1;
       else
         return refuse("starts an agent that is not a holyagent specialist by a literal agentType");
@@ -23520,15 +23525,14 @@ var isNode = (value) => typeof value === "object" && value !== null && ("type" i
   if (refusal === undefined && agentCalls === 0)
     refuse("starts no agent");
   return refusal;
-}, workflowRefusal = (script) => try_2({
-  try: () => inspect(script),
+}, workflowRefusal = (script, specialists = CLAUDE_SPECIALISTS) => try_2({
+  try: () => inspect(script, specialists),
   catch: (cause) => `cannot read the script: ${String(cause)}`
 }).pipe(catch_2((reason) => succeed6(reason)));
 var init_workflow_check = __esm(() => {
   init_acorn();
   init_dist();
   init_route();
-  init_assignment2();
   TEXT_COUNTS = new Set(["repeat", "padStart", "padEnd"]);
   GROWING_METHODS = new Set(["push", "unshift", "splice"]);
   CALLBACK_ARGUMENTS = new Map([
@@ -23776,7 +23780,7 @@ var init_workflow_check = __esm(() => {
     "label",
     "phase"
   ]);
-  SPECIALISTS = new Set(ROUTES.map((route) => `${PLUGIN_NAMESPACE}:${route.agent}`));
+  CLAUDE_SPECIALISTS = new Set(ROUTES.map((route) => `${PLUGIN_NAMESPACE2}:${route.agent}`));
   UNARY = new Set(["!", "-", "+", "~", "typeof", "void"]);
 });
 

@@ -6,8 +6,10 @@ import { isAbsolute, join, resolve, win32 } from "node:path"
 import type { ExecResult, ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent"
 import { Effect } from "effect"
 
+import { PLUGIN_NAMESPACE } from "../../../runtime/src/cli/assignment.ts"
 import { HOST_VARIABLE, WORKFLOWS_VARIABLE } from "../../../runtime/src/cli/config.ts"
 import { CONTEXT_BUDGET, SESSION_REMINDER } from "../../../runtime/src/cli/sessioncontext.ts"
+import { CLAUDE_SPECIALISTS } from "../../../runtime/src/cli/workflow-check.ts"
 import { defaultConfig } from "../../../runtime/src/config/schema.ts"
 import { toPosix } from "../../../runtime/src/domain/paths.ts"
 import {
@@ -34,8 +36,10 @@ import {
   hostEnvironment,
   NOTICE_MESSAGE,
   refuseNonSpecialist,
+  refuseNonSpecialistWorkflow,
   ROLE_FLAG,
   SESSION_DEADLINE_MS,
+  WORKFLOW_TOOL,
   WORKFLOWS_ENV,
   wrapperPath,
 } from "../src/extension.ts"
@@ -1362,6 +1366,128 @@ describe("the Agent tool", () => {
       input: { ...input, subagent_type: "general-purpose" },
     })
     expect(blocked).toEqual([expect.objectContaining({ block: true })])
+  })
+})
+
+const META = "export const meta = { name: 'w', description: 'd' }\n"
+const workflowScript = (...agentTypes: ReadonlyArray<string | undefined>): string =>
+  `${META}const out = await parallel([${agentTypes
+    .map(
+      (type, at) =>
+        `() => agent('task ${at}', ${type === undefined ? "{ label: 'x' }" : `{ agentType: '${type}' }`})`,
+    )
+    .join(", ")}])\nreturn out`
+
+const refusedWorkflow = (input: Record<string, unknown>) =>
+  Effect.runPromise(refuseNonSpecialistWorkflow({ toolName: WORKFLOW_TOOL, input }))
+
+describe("the SubagentWorkflow tool", () => {
+  test("the workflow check knows the Claude specialists under the namespace it keeps for itself", () => {
+    expect([...CLAUDE_SPECIALISTS]).toEqual(
+      SPECIALIST_NAMES.map((name) => `${PLUGIN_NAMESPACE}:${name}`),
+    )
+  })
+
+  test("a script whose every agent() names a specialist by literal agentType may run", async () => {
+    expect(await refusedWorkflow({ script: workflowScript(...SPECIALIST_NAMES) })).toBeUndefined()
+  })
+
+  test("a script that starts a default, a foreign or a computed agent is refused", async () => {
+    const scripts = [
+      workflowScript(undefined),
+      workflowScript("worker-implementation", undefined),
+      workflowScript("general-purpose"),
+      workflowScript("holyagent:worker-implementation"),
+      `${META}const type = 'worker-implementation'\nreturn await agent('x', { agentType: type })`,
+    ]
+    for (const script of scripts) {
+      const result = await refusedWorkflow({ script })
+      expect(result?.block).toBe(true)
+      expect(result?.reason).toContain(SPECIALIST_NAMES.join(", "))
+    }
+  })
+
+  test("a script that cannot be read is refused", async () => {
+    expect((await refusedWorkflow({ script: "agent(" }))?.block).toBe(true)
+  })
+
+  test("a scriptPath, a saved name or no script is refused, as one cannot be vetted", async () => {
+    for (const input of [
+      { scriptPath: "w.js" },
+      { script: workflowScript("explorer-map"), scriptPath: "w.js" },
+      { name: "saved" },
+      {},
+      { script: "  " },
+    ]) {
+      expect((await refusedWorkflow(input))?.block).toBe(true)
+    }
+  })
+
+  test("another tool is not looked at", async () => {
+    expect(
+      await Effect.runPromise(
+        refuseNonSpecialistWorkflow({ toolName: "bash", input: { script: "agent(" } }),
+      ),
+    ).toBeUndefined()
+  })
+
+  test("the tool_call handler blocks without asking, and lets a specialist script through", async () => {
+    const api = fakeApi(healthy("/missing"))
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
+    expect(
+      await api.emit("tool_call", {
+        toolName: WORKFLOW_TOOL,
+        input: { script: workflowScript("reviewer-code") },
+      }),
+    ).toEqual([undefined])
+    const [blocked] = await api.emit("tool_call", {
+      toolName: WORKFLOW_TOOL,
+      input: { script: workflowScript(undefined) },
+    })
+    expect(blocked).toMatchObject({ block: true })
+    expect(typeof (blocked as { reason: unknown }).reason).toBe("string")
+    expect(api.touched).toEqual([])
+  })
+})
+
+describe("the gates and pi.enable", () => {
+  const refusing = [
+    { toolName: AGENT_TOOL, input: { subagent_type: "general-purpose" } },
+    { toolName: WORKFLOW_TOOL, input: { script: workflowScript(undefined) } },
+  ]
+
+  test("with pi.enable off neither tool is refused", async () => {
+    const { api } = await run(healthy("/missing", { config: { stdout: `${DISABLED}\n` } }))
+    for (const event of refusing) expect(await api.emit("tool_call", event)).toEqual([undefined])
+  })
+
+  test("with pi.enable on both tools are refused", async () => {
+    const { api } = await run(healthy("/missing"))
+    for (const event of refusing)
+      expect(await api.emit("tool_call", event)).toEqual([expect.objectContaining({ block: true })])
+  })
+
+  test("a config that cannot be read leaves both gates on", async () => {
+    const { api } = await run(
+      healthy("/missing", { config: { code: 4, stderr: "error: ConfigInvalid: broken\n" } }),
+    )
+    for (const event of refusing)
+      expect(await api.emit("tool_call", event)).toEqual([expect.objectContaining({ block: true })])
+  })
+
+  test("a later collection that finds the extension on turns the gates back on", async () => {
+    let enabled = false
+    const { api } = await run((call, runtime) =>
+      runtime[0] === "config"
+        ? { stdout: enabled ? CONFIG : DISABLED }
+        : healthy("/missing")(call, runtime),
+    )
+    expect(await api.emit("tool_call", refusing[0])).toEqual([undefined])
+    enabled = true
+    await api.emit("session_compact", {})
+    expect(await api.emit("tool_call", refusing[0])).toEqual([
+      expect.objectContaining({ block: true }),
+    ])
   })
 })
 

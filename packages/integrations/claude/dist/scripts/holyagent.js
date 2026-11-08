@@ -12890,6 +12890,10 @@ var piRecordReports = (session, source, agents) => gen2(function* () {
   const reports = [];
   const notAssignmentIds = [];
   for (const { id, agentId } of agents) {
+    if (agentId.startsWith(PI_WORKFLOW_AGENT_PREFIX)) {
+      notAssignmentIds.push({ label: id, agentId: `${agentId} not in a session file` });
+      continue;
+    }
     const found = yield* piRecordReport(session, source, agentId.replace(/^pi:/, "")).pipe(catchTag2("PiRecordMissing", () => succeed6(undefined)));
     if (found?.report !== undefined)
       reports.push({ id, report: found.report });
@@ -13035,7 +13039,7 @@ var piReports = (call, source, text) => gen2(function* () {
   if (!basename3(source).endsWith(".workflow.jsonl"))
     return yield* piRecordReports(text, source, project.assignments.flatMap(({ id, specialist }) => {
       const agentId = specialist?.agentId;
-      return agentId?.startsWith(PI_AGENT_PREFIX) === true ? [{ id, agentId }] : [];
+      return agentId !== undefined && (agentId.startsWith(PI_AGENT_PREFIX) || agentId.startsWith(PI_WORKFLOW_AGENT_PREFIX)) ? [{ id, agentId }] : [];
     }));
   const launchOf = yield* launchesOf(call.env, call.root, "pi");
   const calls = yield* forEach2(project.assignments, (assignment) => briefPath(call, assignment.id).pipe(map4((path) => dispatchedCall(assignment, agentTypeFor("pi", routeFor(assignment.roleTask).agent), path, launchOf(assignment.roleTask)))));
@@ -20320,7 +20324,8 @@ var AGENT_OPTIONS = new Set([
   "label",
   "phase"
 ]);
-var SPECIALISTS = new Set(ROUTES.map((route) => `${PLUGIN_NAMESPACE}:${route.agent}`));
+var PLUGIN_NAMESPACE2 = "holyagent";
+var CLAUDE_SPECIALISTS = new Set(ROUTES.map((route) => `${PLUGIN_NAMESPACE2}:${route.agent}`));
 var UNARY = new Set(["!", "-", "+", "~", "typeof", "void"]);
 var newBinding = () => ({
   unsafe: false,
@@ -20523,7 +20528,7 @@ var occurrencesIn = (node, scope, into, depth = 0) => {
       occurrencesIn(value, scope, into, depth + 1);
   return into;
 };
-var inspect = (script) => {
+var inspect = (script, specialists) => {
   if (script.length > MAX_WORKFLOW_SCRIPT)
     return "the script is too large";
   const program = parse2(script, {
@@ -20800,7 +20805,7 @@ var inspect = (script) => {
       const value = nodeAt(property, "value");
       if (name !== "agentType")
         expression(value, scope, depth + 1);
-      else if (value?.type === "Literal" && typeof value["value"] === "string" && SPECIALISTS.has(value["value"]))
+      else if (value?.type === "Literal" && typeof value["value"] === "string" && specialists.has(value["value"]))
         named += 1;
       else
         return refuse("starts an agent that is not a holyagent specialist by a literal agentType");
@@ -21681,8 +21686,8 @@ var inspect = (script) => {
     refuse("starts no agent");
   return refusal;
 };
-var workflowRefusal = (script) => try_2({
-  try: () => inspect(script),
+var workflowRefusal = (script, specialists = CLAUDE_SPECIALISTS) => try_2({
+  try: () => inspect(script, specialists),
   catch: (cause) => `cannot read the script: ${String(cause)}`
 }).pipe(catch_2((reason) => succeed6(reason)));
 

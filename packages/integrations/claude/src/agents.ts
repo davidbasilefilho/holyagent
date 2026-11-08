@@ -278,12 +278,19 @@ const firstSentence = (text: string): string => {
   return /^.*?\.(?=\s|$)/.exec(paragraph)?.[0] ?? paragraph
 }
 
-/** What the root reads to pick the specialist: its purpose first, then how it runs. */
-const describe = (route: Route, role: string): string =>
-  `Use for ${route.agent}: ${firstSentence(role)} ${route.mutability === "ReadOnly" ? "Read-only" : "Writes inside its ownership paths"}; independence ${route.independence}; ${route.model}, ${route.effort} effort.`
+/**
+ * What the root reads to pick the specialist: its purpose first, then how it runs. `runtime` is the
+ * host's trailing detail, such as the model and effort where the agent file fixes them.
+ */
+const describe = (route: Route, role: string, runtime: string): string =>
+  `Use for ${route.agent}: ${firstSentence(role)} ${route.mutability === "ReadOnly" ? "Read-only" : "Writes inside its ownership paths"}; independence ${route.independence}${runtime}.`
 
-const frontmatter = (source: string, lines: ReadonlyArray<string>): string =>
-  ["---", `# ${generatedNote(source)}`, ...lines, "---"].join("\n")
+/**
+ * An agent file's head: the generated note for `note`, then `lines`, between the frontmatter
+ * fences.
+ */
+export const frontmatter = (note: string, lines: ReadonlyArray<string>): string =>
+  ["---", `# ${note}`, ...lines, "---"].join("\n")
 
 /** What the specialists of the roles share, read once for all of them. */
 interface Shared {
@@ -292,20 +299,30 @@ interface Shared {
   readonly conditional: Readonly<Record<string, string>>
 }
 
-const specialist = async (route: Route, shared: Shared): Promise<GeneratedFile> => {
-  const source = `${INSTRUCTIONS_DIRECTORY}/roles/${route.agent}`
+/**
+ * What a host adds to the specialist prompt the hosts share: where its instructions are and how its
+ * agent files look.
+ */
+export interface SpecialistHost {
+  /** The instruction sources of the host's model family, relative to the repository root. */
+  readonly instructions: string
+  /** The path of a route's agent file, relative to the repository root. */
+  readonly path: (route: Route) => string
+  /** The head of a route's agent file, from the folder `source` of its role and its description. */
+  readonly head: (route: Route, source: string, description: string) => string
+  /** What the description says after the independence, for example the model; empty for none. */
+  readonly runtime: (route: Route) => string
+}
+
+const specialist = async (
+  host: SpecialistHost,
+  route: Route,
+  shared: Shared,
+): Promise<GeneratedFile> => {
+  const source = `${host.instructions}/roles/${route.agent}`
   const sections = ROLE_SECTIONS[route.agent] ?? []
   const [role = "", ...rest] = await readSections(source, sections)
-  const head = frontmatter(source, [
-    `name: ${route.agent}`,
-    `description: ${JSON.stringify(describe(route, role))}`,
-    `model: ${route.model}`,
-    `effort: ${route.effort}`,
-    "background: true",
-    `disallowedTools: ${denylist(builtinsOf(route))}`,
-    "experimental:",
-    "  cacheTtl: 1h",
-  ])
+  const head = host.head(route, source, describe(route, role, host.runtime(route)))
   const body = [
     `You are the ${PLUGIN_NAME} ${route.agent} specialist. Independence: ${route.independence}.`,
     role,
@@ -315,10 +332,31 @@ const specialist = async (route: Route, shared: Shared): Promise<GeneratedFile> 
       ({ file }) => shared.conditional[file] ?? "",
     ),
   ].join("\n\n")
-  return {
-    path: `${DIST_DIRECTORY}/agents/${route.agent}.md`,
-    content: `${head}\n\n${body}\n`,
-  }
+  return { path: host.path(route), content: `${head}\n\n${body}\n` }
+}
+
+/**
+ * One agent file for each route, built from the host's instructions: the role sections, the shared
+ * conduct and the conditional sections the role needs, with the maintainers' notes stripped. Every
+ * host's specialist prompt is made here, so a change to it is made once.
+ */
+export const specialistFiles = async (
+  host: SpecialistHost,
+): Promise<ReadonlyArray<GeneratedFile>> => {
+  const directory = `${host.instructions}/specialist`
+  const files = CONDITIONAL_SECTIONS.map(({ file }) => file)
+  const [conduct, texts, materiality] = await Promise.all([
+    readSections(directory, SPECIALIST_SECTIONS),
+    readSections(directory, files),
+    readSource(`${host.instructions}/${MATERIALITY_PATH}`).then(stripCitations),
+  ])
+  const embedded = await Effect.runPromise(
+    Effect.forEach(files, (file, at) =>
+      embedMateriality(texts[at] ?? "", materiality, `${directory}/${file}`),
+    ),
+  )
+  const conditional = Object.fromEntries(files.map((file, at) => [file, embedded[at] ?? ""]))
+  return Promise.all(ROUTES.map((route) => specialist(host, route, { conduct, conditional })))
 }
 
 /**
@@ -327,7 +365,7 @@ const specialist = async (route: Route, shared: Shared): Promise<GeneratedFile> 
  */
 const rootAgent = async (): Promise<GeneratedFile> => {
   const source = `${INSTRUCTIONS_DIRECTORY}/root`
-  const head = frontmatter(source, [
+  const head = frontmatter(generatedNote(source), [
     `name: ${PLUGIN_NAME}`,
     `description: ${JSON.stringify(ROOT_DESCRIPTION)}`,
     "model: opus",
@@ -350,27 +388,26 @@ const rootAgent = async (): Promise<GeneratedFile> => {
   }
 }
 
-/** The root agent and one agent for each route, with paths relative to the plugin folder. */
-export const agentFiles = async (): Promise<ReadonlyArray<GeneratedFile>> => {
-  const directory = `${INSTRUCTIONS_DIRECTORY}/specialist`
-  const files = CONDITIONAL_SECTIONS.map(({ file }) => file)
-  const [conduct, texts, materiality] = await Promise.all([
-    readSections(directory, SPECIALIST_SECTIONS),
-    readSections(directory, files),
-    readSource(MATERIALITY_FILE).then(stripCitations),
-  ])
-  const embedded = await Effect.runPromise(
-    Effect.forEach(files, (file, at) =>
-      embedMateriality(texts[at] ?? "", materiality, `${directory}/${file}`),
-    ),
-  )
-  const conditional = Object.fromEntries(files.map((file, at) => [file, embedded[at] ?? ""]))
-  const shared: Shared = {
-    conduct,
-    conditional,
-  }
-  return [
-    await rootAgent(),
-    ...(await Promise.all(ROUTES.map((route) => specialist(route, shared)))),
-  ]
+/** The specialist prompt's host for the Claude plugin. */
+const CLAUDE_HOST: SpecialistHost = {
+  instructions: INSTRUCTIONS_DIRECTORY,
+  path: (route) => `${DIST_DIRECTORY}/agents/${route.agent}.md`,
+  head: (route, source, description) =>
+    frontmatter(generatedNote(source), [
+      `name: ${route.agent}`,
+      `description: ${JSON.stringify(description)}`,
+      `model: ${route.model}`,
+      `effort: ${route.effort}`,
+      "background: true",
+      `disallowedTools: ${denylist(builtinsOf(route))}`,
+      "experimental:",
+      "  cacheTtl: 1h",
+    ]),
+  runtime: (route) => `; ${route.model}, ${route.effort} effort`,
 }
+
+/** The root agent and one agent for each route, with paths relative to the plugin folder. */
+export const agentFiles = async (): Promise<ReadonlyArray<GeneratedFile>> => [
+  await rootAgent(),
+  ...(await specialistFiles(CLAUDE_HOST)),
+]

@@ -12,6 +12,7 @@ import type {
 } from "@earendil-works/pi-coding-agent"
 import { Cause, Data, Effect, Exit, Schema } from "effect"
 
+import { workflowRefusal } from "../../../runtime/src/cli/workflow-check.ts"
 import { Config } from "../../../runtime/src/config/schema.ts"
 import { toPosix } from "../../../runtime/src/domain/paths.ts"
 import {
@@ -153,6 +154,45 @@ export const refuseNonSpecialist = (event: {
   }
 }
 
+const WORKFLOW_SPECIALISTS: ReadonlySet<string> = new Set(SPECIALIST_NAMES)
+
+const present = (value: unknown): value is string =>
+  typeof value === "string" && value.trim() !== ""
+
+/**
+ * Refuses a `SubagentWorkflow` call unless every `agent()` call of its script names one of the 18
+ * specialists by a string-literal `agentType`. Without an `agentType` the package starts its own
+ * `general-purpose` agent with every tool, and settings cannot switch that off on this path, so the
+ * script is read before it runs, with the runtime's check of the Claude `Workflow` tool (the script
+ * must be plain, see `workflow-check.ts`). Only an inline `script` can be read here: a `scriptPath`
+ * or a saved `name` is refused, since the file may change before the package reads it. A refusal
+ * never asks for confirmation. Returns the `tool_call` result that blocks the call, or undefined to
+ * let it run.
+ */
+export const refuseNonSpecialistWorkflow = (event: {
+  readonly toolName: string
+  readonly input: Readonly<Record<string, unknown>>
+}): Effect.Effect<ToolCallEventResult | undefined> => {
+  if (event.toolName !== WORKFLOW_TOOL) return Effect.succeed(undefined)
+  const { script, scriptPath, name } = event.input
+  const refuse = (reason: string): ToolCallEventResult => ({
+    block: true,
+    reason: `${reason} Start only HolyAgent specialists, by a string-literal agentType: ${SPECIALIST_NAMES.join(", ")}.`,
+  })
+  if (present(scriptPath) || (!present(script) && present(name)))
+    return Effect.succeed(
+      refuse(
+        "A workflow is run only from an inline `script`; a `scriptPath` or a saved `name` cannot be checked.",
+      ),
+    )
+  if (!present(script)) return Effect.succeed(refuse("No inline `script` given."))
+  return workflowRefusal(script, WORKFLOW_SPECIALISTS).pipe(
+    Effect.map((why) =>
+      why === undefined ? undefined : refuse(`The workflow script is refused: it ${why}.`),
+    ),
+  )
+}
+
 /** Why a specialist whose last message has no text failed. */
 export const EMPTY_REPORT = "the specialist's final message was empty"
 
@@ -234,6 +274,8 @@ interface Delivery {
 
 /** What one collection yields: what the next run is told, and the settings the config decides. */
 interface Collected {
+  /** False once the config is read and `pi.enable` is off, which switches the tool gates off. */
+  readonly enabled?: false
   readonly delivery?: Delivery
   /**
    * The process-wide variables the config decides (`PI_CODEMODE_MAX_WORKERS`), present once the
@@ -250,6 +292,11 @@ interface Collected {
 interface Held {
   current: AbortController | undefined
   pending: Promise<Collected | undefined> | undefined
+  /**
+   * True once a collection has read the config and found `pi.enable` off. A config that could not
+   * be read leaves the gates on, since the extension cannot tell that it is switched off.
+   */
+  disabled: boolean
 }
 
 /** Where the extension finds what it runs. */
@@ -463,7 +510,7 @@ export const createExtension =
           ],
           { concurrency: "unbounded" },
         )
-        if (!config.pi.enable) return undefined
+        if (!config.pi.enable) return { enabled: false } satisfies Collected
         // A child the package launched is a specialist whatever the flag says: the flag defaults to
         // the root in every Pi session, and a child has no launch line of its own.
         const flag = isChild() ? "specialist" : (pi.getFlag(ROLE_FLAG) ?? DEFAULT_PI_ROLE)
@@ -533,7 +580,11 @@ export const createExtension =
       const ended = collected.then(() => undefined)
       running.add(ended)
       void ended.then(() => running.delete(ended))
-      taken.pending = collected.then((result) => (own.signal.aborted ? undefined : result))
+      taken.pending = collected.then((result) => {
+        if (own.signal.aborted) return undefined
+        taken.disabled = result?.enabled === false
+        return result
+      })
       return taken.pending.then(() => undefined)
     }
 
@@ -545,7 +596,7 @@ export const createExtension =
 
     pi.on("session_start", (event, ctx) => {
       void release()
-      held = { current: undefined, pending: undefined }
+      held = { current: undefined, pending: undefined, disabled: false }
       return gather(held, ctx, event.reason)
     })
 
@@ -598,7 +649,16 @@ export const createExtension =
       return message === undefined ? undefined : { message }
     })
 
-    pi.on("tool_call", (event) => refuseNonSpecialist(event))
+    // A disabled extension adds nothing, the gates included.
+    pi.on("tool_call", (event) =>
+      held?.disabled === true
+        ? undefined
+        : Effect.runPromise(
+            refuseNonSpecialistWorkflow(event).pipe(
+              Effect.map((refusal) => refuseNonSpecialist(event) ?? refusal),
+            ),
+          ),
+    )
 
     // Pi finishes the shutdown when the handler's promise settles, and the folder may be removed
     // then: it settles only after every child has exited or its stop grace (STOP_GRACE_MS, 2 s,

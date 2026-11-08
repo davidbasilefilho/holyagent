@@ -4,6 +4,7 @@ import { Effect, Schema } from "effect"
 
 import type { AcceptanceInput } from "../domain/acceptance.ts"
 import type { Assignment } from "../domain/assignment.ts"
+import { PI_WORKFLOW_AGENT_PREFIX } from "../domain/directive.ts"
 import { InsufficientAcceptance } from "../domain/errors.ts"
 import { CLAUDE_WORDS, type HostWords, PI_WORDS } from "../domain/host.ts"
 import { routeFor } from "../domain/route.ts"
@@ -409,7 +410,9 @@ export const piJournalReports = (
  * The reports of direct agents, read from the root session file: each `pi:<agent-id>` of `agents`
  * (an Assignment id and the agent id recorded for it) whose `subagents:record` entry ended `ok`
  * gives the report of its Assignment. An agent with no record, or one that did not end `ok`, is
- * listed as `<agent id> missing|<outcome>`.
+ * listed as `<agent id> missing|<outcome>`. A `pi-workflow:<run-id>/<id>` agent has no record in
+ * the session file (its report is in the `<run id>.workflow.jsonl`), so it is listed as `<agent id>
+ * not in a session file` rather than dropped.
  */
 export const piRecordReports = (
   session: string,
@@ -420,6 +423,10 @@ export const piRecordReports = (
     const reports: Array<{ readonly id: string; readonly report: string }> = []
     const notAssignmentIds: Array<{ readonly label: string; readonly agentId: string }> = []
     for (const { id, agentId } of agents) {
+      if (agentId.startsWith(PI_WORKFLOW_AGENT_PREFIX)) {
+        notAssignmentIds.push({ label: id, agentId: `${agentId} not in a session file` })
+        continue
+      }
       const found = yield* piRecordReport(session, source, agentId.replace(/^pi:/, "")).pipe(
         Effect.catchTag("PiRecordMissing", () => Effect.succeed(undefined)),
       )

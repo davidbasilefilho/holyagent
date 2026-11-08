@@ -241,4 +241,28 @@ describe("assignment reports under pi", () => {
       (decode(done.stdout) as { reports: Array<{ id: string }> }).reports.map((r) => r.id),
     ).toEqual([String(a.id)])
   })
+
+  test("a session file lists an Assignment recorded as a pi-workflow agent", async () => {
+    await cli(["intent", "create"], { objective: "Parse" })
+    const a = await dispatch(draft("one"))
+    const recorded = await cli([
+      "assignment",
+      "record",
+      String(a.id),
+      "--agent",
+      `pi-workflow:run-1/${String(a.id)}`,
+    ])
+    expect(recorded.code).toBe(0)
+    await Bun.write(join(project, "session.jsonl"), `${JSON.stringify({ type: "session" })}\n`)
+    const done = await cli(["assignment", "reports", "session.jsonl"])
+    expect(done.stderr).toBe("")
+    const rows = decode(done.stdout) as {
+      reports: unknown
+      notAssignmentIds: unknown
+    }
+    expect(rows.reports).toEqual([])
+    expect(rows.notAssignmentIds).toEqual([
+      { label: String(a.id), agentId: `pi-workflow:run-1/${String(a.id)} not in a session file` },
+    ])
+  })
 })

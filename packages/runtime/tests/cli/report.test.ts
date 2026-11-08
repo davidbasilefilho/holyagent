@@ -154,6 +154,19 @@ describe("piRecordReports", () => {
     ])
   })
 
+  test("lists a pi-workflow: agent as not readable from a session file", async () => {
+    const result = await Effect.runPromise(
+      piRecordReports(lines(record("agent-1")), "session.jsonl", [
+        { id: "assignment-a", agentId: "pi:agent-1" },
+        { id: "assignment-b", agentId: "pi-workflow:run-1/assignment-b" },
+      ]),
+    )
+    expect(result.reports).toEqual([{ id: "assignment-a", report: "report of agent-1" }])
+    expect(result.notAssignmentIds).toEqual([
+      { label: "assignment-b", agentId: "pi-workflow:run-1/assignment-b not in a session file" },
+    ])
+  })
+
   test("refuses a record that does not decode", async () => {
     await expect(run(lines(record("agent-1", { status: "done" })))).rejects.toThrow(
       /line 1 is not a subagents:record entry/,
