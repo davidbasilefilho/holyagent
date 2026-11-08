@@ -34,6 +34,9 @@
     "extensions": [
       "./packages/integrations/pi/dist/extensions"
     ],
+    "prompts": [
+      "./packages/integrations/pi/dist/prompts"
+    ],
     "skills": [
       "./packages/integrations/pi/dist/skills"
     ],

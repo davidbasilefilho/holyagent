@@ -11,12 +11,16 @@
   "files": [
     "agents",
     "extensions",
+    "prompts",
     "scripts",
     "skills"
   ],
   "pi": {
     "extensions": [
       "./extensions"
+    ],
+    "prompts": [
+      "./prompts"
     ],
     "skills": [
       "./skills"

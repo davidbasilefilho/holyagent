@@ -120,14 +120,16 @@ describe("the package manifest", () => {
     expect(packageJson.version).toBe(readJson("package.json")["version"] as string)
   })
 
-  test("lists the extension and skill folders under the pi key, and they exist", () => {
+  test("lists the extension, prompt and skill folders under the pi key, and they exist", () => {
     expect(manifest["pi"]).toEqual({
       extensions: ["./extensions"],
+      prompts: ["./prompts"],
       skills: ["./skills"],
       subagents: { agents: ["./agents"] },
     })
     const built = generated.map((file) => file.path.slice(`${DIST_DIRECTORY}/`.length))
     expect(built).toContain(EXTENSION_OUTPUT)
+    expect(built.some((path) => path.startsWith("prompts/"))).toBe(true)
     expect(built.some((path) => path.startsWith("skills/"))).toBe(true)
   })
 
@@ -189,7 +191,7 @@ describe("the runtime scripts", () => {
     expect(await isExecutable(wrapper, "win32")).toBe(true)
   })
 
-  test("the manifest lists the agent, extension, script and skill folders as the package files, and they exist", () => {
+  test("the manifest lists the agent, extension, prompt, script and skill folders as the package files, and they exist", () => {
     const manifest = JSON.parse(scriptsOf("package.json")?.content ?? "{}") as {
       files?: Array<string>
     }

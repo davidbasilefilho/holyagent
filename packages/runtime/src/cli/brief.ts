@@ -3,9 +3,13 @@ import { isAbsolute, join, resolve } from "node:path"
 
 import { Effect } from "effect"
 
+import { firstPassPrompt } from "../../../integrations/pi/src/prompts/index.ts"
+import type { Assignment } from "../domain/assignment.ts"
+import type { AgentHost } from "../domain/host.ts"
 import { io } from "../state/files.ts"
 import { localFile } from "../state/layout.ts"
 import { gitMaybe } from "../vcs/git.ts"
+import { renderPrompt } from "./report.ts"
 import type { Call } from "./types.ts"
 
 /**
@@ -36,6 +40,22 @@ const writeNamed = (call: Call, name: string, assignmentId: string, text: string
     yield* io(path, () => Bun.write(path, `${text}\n`))
     return path
   })
+
+/**
+ * The text of an Assignment's brief file for a host. On Pi, the brief of `Reviewer.code` and
+ * `Reviewer.security` starts with that review's first-pass prompt and then holds the Assignment,
+ * which the prompt takes its range from: the brief is the task the dispatch prompt tells the
+ * specialist to follow, so this is the start of the task. Every other brief, and every brief on
+ * Claude (whose reviewers run the built-in reviews), is the Assignment alone ({@link
+ * renderPrompt}).
+ */
+export const briefText = (assignment: Assignment, agent: string, host: AgentHost): string => {
+  const assignmentText = renderPrompt(assignment, agent)
+  const firstPass = host === "pi" ? firstPassPrompt(assignment.roleTask) : undefined
+  return firstPass === undefined
+    ? assignmentText
+    : `${firstPass}\n\n## Assignment\n\n${assignmentText}`
+}
 
 /** The absolute path of the brief file of an Assignment, where {@link writeBrief} writes it. */
 export const briefPath = (call: Call, assignmentId: string) => pathIn(call, "briefs", assignmentId)

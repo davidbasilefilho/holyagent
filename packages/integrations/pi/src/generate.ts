@@ -7,6 +7,7 @@ import { PI_ROOT_PLACEHOLDER } from "../../../runtime/src/hooks/pi-context.ts"
 import type { Family } from "../../../runtime/src/instructions/families.ts"
 import { jsonText } from "../../../runtime/src/instructions/generated.ts"
 import { skillFiles } from "../../../runtime/src/instructions/skills.ts"
+import { frontmatter } from "../../claude/src/agents.ts"
 import packageJson from "../package.json" with { type: "json" }
 import { agentFiles } from "./agents.ts"
 import {
@@ -18,6 +19,7 @@ import {
   REPOSITORY,
   SOURCES,
 } from "./files.ts"
+import { PROMPT_TEMPLATES } from "./prompts/index.ts"
 
 export { PI_FAMILY }
 
@@ -44,7 +46,13 @@ export const DESCRIPTION =
 export const RUNTIME_SOURCE = "packages/runtime/src/hooks/pi-entry.ts"
 
 /** The folders and files of the built package, which its manifest lists as the package's files. */
-export const PACKAGE_FILES: ReadonlyArray<string> = ["agents", "extensions", "scripts", "skills"]
+export const PACKAGE_FILES: ReadonlyArray<string> = [
+  "agents",
+  "extensions",
+  "prompts",
+  "scripts",
+  "skills",
+]
 
 // The wrapper and its empty Bun config are the Claude plugin's, shared so the two cannot differ.
 const WRAPPER_SOURCE = "packages/integrations/claude/src/wrapper.sh"
@@ -84,6 +92,8 @@ export const manifest = (): GeneratedFile => ({
     files: PACKAGE_FILES,
     pi: {
       extensions: ["./extensions"],
+      // The first-pass review templates, which a person runs as `/code-review` and `/security-review`.
+      prompts: ["./prompts"],
       skills: ["./skills"],
       // `@tintinweb/pi-subagents` loads the specialists from the folder this key names.
       subagents: { agents: ["./agents"] },
@@ -150,6 +160,17 @@ const scripts = async (): Promise<ReadonlyArray<GeneratedFile>> => {
   ]
 }
 
+/**
+ * One prompt template for each of the package's first-pass reviews, which Pi loads from the
+ * `prompts` folder the manifest names. The file is the source with the generated note added to its
+ * frontmatter.
+ */
+const promptFiles = (): ReadonlyArray<GeneratedFile> =>
+  PROMPT_TEMPLATES.map(({ name, head, body }) => ({
+    path: inPackage(`prompts/${name}.md`),
+    content: `${frontmatter(generatedNote(`${SOURCES}/prompts/${name}.md`), head)}\n${body}\n`,
+  }))
+
 const skills = async (family: Family): Promise<ReadonlyArray<GeneratedFile>> =>
   (await Effect.runPromise(skillFiles(family, generatedNote))).map(({ path, content }) => ({
     path: inPackage(`skills/${path}`),
@@ -162,6 +183,7 @@ export const generate = async (family: Family = PI_FAMILY): Promise<ReadonlyArra
     manifest(),
     await extension(),
     ...(await agentFiles(family)),
+    ...promptFiles(),
     ...(await scripts()),
     ...(await skills(family)),
   ].toSorted((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
