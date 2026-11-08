@@ -1,0 +1,75 @@
+{
+  "id": "assignment-0mw7cia5q-k2se",
+  "intentId": "intent-0mw6muudj-zs85",
+  "intentRevision": 6,
+  "roleTask": "Worker.implementation",
+  "slug": "close-the-remaining-optional-review",
+  "objective": "Close the remaining optional review notes on the Pi extension entry (head 3ddedda on release/0.3.0/feat/pi-extension, worktree /home/user/holyagent-0.3.0-ext) so the PR ships with no open item a writer can fix.",
+  "state": "Running",
+  "scope": [
+    "Work only in /home/user/holyagent-0.3.0-ext; gates bunx --no-install mise run verify and bunx --no-install mise run build.",
+    "1. packages/integrations/pi/src/extension.ts topOf: treat only git's not-a-repository failure (exit 128 with 'not a git repository') as non-git; any other git failure (timeout, dubious ownership) becomes the fail-closed notice. Test both.",
+    "2. extension.ts collect: pass resolve(ctx.cwd) to --project and git -C, so a relative cwd cannot resolve against the package folder. Test.",
+    "3. packages/runtime/src/hooks/pi-entry.ts: make the --project handoff explicit instead of relying on Bun.argv.splice before cli/main.ts reads Bun.argv at import; pass the remaining arguments to the CLI entry directly if it allows, or document the coupling in a comment with a test that pins it.",
+    "4. packages/runtime/src/bundle.ts: when Bun.build throws, report each build log message (AggregateError errors or result.logs) rather than String(cause); test with a missing entrypoint.",
+    "5. packages/integrations/pi/tests/extension.test.ts: replace the fixed 30ms settle sleeps in the ordering tests with deterministic signals (resolved deferreds or awaited handler promises), so the tests do not depend on timing on a loaded Windows runner.",
+    "6. The comment in packages/integrations/claude/src/wrapper.sh and docs/pi/extensions.md: state that under Pi, Bun starts in the package folder and enters the project in-process through --project, while the Claude hook starts in the project. Changing the wrapper comment changes the Claude dist wrapper; that is accepted."
+  ],
+  "constraints": [
+    "Unit tests and synthesized fixtures only; do not run the pi binary or a live model.",
+    "Claude dist may change only in the wrapper comment; check git diff on packages/integrations/claude/dist after build.",
+    "Make no version-control writes and no edits under .git/ or .holyagent/; report changed paths.",
+    "Follow .claude/CLAUDE.md.",
+    "Report in under 350 words; start each evidence line with the criterion text, a colon, then the support."
+  ],
+  "criteria": [
+    {
+      "text": "topOf treats only not-a-repository as non-git, and cwd is resolved before use, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The --project handoff in pi-entry.ts is explicit or pinned by a test, and bundle failures report each build message, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The ordering tests use no fixed sleeps",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The wrapper comment and docs/pi/extensions.md describe the Pi start folder correctly, and the Claude dist changes only in that comment",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "bunx --no-install mise run verify exits 0 and mise run build leaves generated output in sync",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi",
+    "packages/integrations/claude/src/wrapper.sh",
+    "packages/integrations/claude/dist",
+    "packages/runtime/src/hooks",
+    "packages/runtime/src/bundle.ts",
+    "packages/runtime/src/cli/main.ts",
+    "packages/runtime/tests",
+    "docs/pi/extensions.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw7bybb7-c3ea",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T04:41:56.462Z"
+  },
+  "createdAt": "2026-11-08T04:41:56.462Z"
+}
