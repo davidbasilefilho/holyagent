@@ -53,5 +53,25 @@
     "finishedAt": "2026-11-08T08:21:00.962Z"
   },
   "result": "result: Pi has a supported hook (`pi.registerToolRenderer`), and I used it. Drawing a SubagentWorkflow call no longer evaluates any script code. `mise run build` and `mise run verify` both exit 0.\n\nchanged:\n- `packages/integrations/pi/src/extension.ts`\n- `packages/runtime/src/cli/workflow-check.ts`\n- `packages/integrations/pi/tests/extension.test.ts`\n- `packages/integrations/pi/tests/pi.test.ts`\n- `packages/runtime/tests/workflow-check.test.ts`\n- `docs/pi/extensions.md`\n- rebuilt dist: `claude/dist/scripts/holyagent.js`, `pi/dist/extensions/holyagent.js`, `pi/dist/scripts/holyagent.js`\n\n**How it works**\n- `workflowRenderers` is registered for every session. For SubagentWorkflow it keeps the package's `renderResult` and `renderShell`. It replaces `renderCall` with a `Text` line that never evaluates the script.\n- Other tools, and an unregistered workflow tool, pass through unchanged.\n- The line shows the workflow `name` only when `literalWorkflowName` (new, in `workflow-check.ts`) finds a vetted literal meta fragment. It uses the same fragment-vetting code as the gate. Otherwise it shows `workflow`.\n- Control characters are stripped from the name and it is capped at 80 characters.\n\n**Tests**\n- Four exploit fragments (constructor chain to `process`, call, getter, IIFE) each run through a package-style `renderCall` that records its args and throws. A global flag stays unset and the package's `renderCall` is never invoked.\n- Also covered: literal name shown, last duplicate `name` wins, sanitising, passthrough for other tools, and registration in root and child sessions.\n- `pi.test.ts`: the extension now imports `@earendil-works/pi-tui` at runtime, so its tmp-dir load test symlinks the package's `node_modules`. It also expects the `registerToolRenderer` call.\n\n**Residual risk (documented in `docs/pi/extensions.md`)**\n- Pi runs resolvers in extension load order. An earlier extension's resolver that returns SubagentWorkflow renderers without calling `next()` would bypass this.\n- The package's `execute` still evaluates the fragment, but only for calls the gate allowed.\n- Print and RPC mode draw nothing and are not exposed.\n\nblockers: none\nquestions: none\nnotes:\n- A `try/catch` in `literalWorkflowName` failed lint, so it is an Effect that is run with `Effect.runSync` at the render boundary.\n- Nothing in HolyAgent keeps another extension's resolver from running first.\n\nevidence:\nRendering a SubagentWorkflow call evaluates no script code on the host, with a test, or the missing Pi support is reported and the risk documented: `packages/integrations/pi/tests/extension.test.ts`, describe \"drawing a SubagentWorkflow call\", exploit rows; passes in `bun test packages/integrations/pi` (184 pass, 0 fail). Implementation is `workflowRenderers` and `workflowCallLine` in `extension.ts`.\nmise run build exits 0 with dist in sync and mise run verify exits 0: `bunx --no-install mise run build` exit 0 (run after the last edit). `bunx --no-install mise run verify` exit 0 (type-check clean, lint and format clean, 2143 pass, 0 fail).\ndiff-file: /home/user/holyagent-notes/launcher-j.diff\n",
+  "acceptance": {
+    "revision": 7,
+    "rationale": "Launcher work reviewed by code and security reviewers through four repair rounds; final head 7846c9b passes verify with 2146 tests and no open blocker.",
+    "criteria": [
+      {
+        "criterion": "Rendering a SubagentWorkflow call evaluates no script code on the host, with a test, or the missing Pi support is reported and the risk documented",
+        "support": "`packages/integrations/pi/tests/extension.test.ts`, describe \"drawing a SubagentWorkflow call\", exploit rows; passes in `bun test packages/integrations/pi` (184 pass, 0 fail). Implementation is `workflowRenderers` and `workflowCallLine` in `extension.ts`."
+      },
+      {
+        "criterion": "mise run build exits 0 with dist in sync and mise run verify exits 0",
+        "support": "`bunx --no-install mise run build` exit 0 (run after the last edit). `bunx --no-install mise run verify` exit 0 (type-check clean, lint and format clean, 2143 pass, 0 fail)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff-file",
+        "support": "/home/user/holyagent-notes/launcher-j.diff"
+      }
+    ]
+  },
   "createdAt": "2026-11-08T08:07:29.019Z"
 }
