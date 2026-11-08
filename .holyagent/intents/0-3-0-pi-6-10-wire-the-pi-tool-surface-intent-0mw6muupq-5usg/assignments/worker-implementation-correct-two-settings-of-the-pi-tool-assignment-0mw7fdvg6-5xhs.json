@@ -57,5 +57,33 @@
     "finishedAt": "2026-11-08T06:12:04.728Z"
   },
   "result": "result: Codemode is now on for the root and every specialist, and the Billion Context settings are cut to the README's single setting. `mise run verify` exits 0 (1961 pass, 0 fail) and `mise run build` leaves generated output unchanged.\n\nchanged:\n- /home/user/holyagent-0.3.0-tools/packages/runtime/src/pi/tools.ts\n- /home/user/holyagent-0.3.0-tools/packages/runtime/tests/pi/tools.test.ts\n- /home/user/holyagent-0.3.0-tools/docs/pi/extensions.md\n- /home/user/holyagent-0.3.0-tools/docs/pi/configuration.md\n\nchecks:\n- `bunx --no-install mise run verify` -> exit 0, 1961 pass, 0 fail (log at `.../scratchpad/verify.log`)\n- `bunx --no-install mise run build` -> exit 0, no dist diff\n\nblockers: none\nquestions: none\n\nnotes:\n- Specialists get plain `codemode` at the end of their allowlist, because Pi cannot mix plain names with `+name` in `--tools`. The root keeps `+codemode`.\n- `ToolArgs` has a new `env` field holding `PI_CODEMODE_MAX_WORKERS` (4 by default, from `pi.codemode.maxWorkers`).\n- No command-line argument sets codemode mode `only`. I added a `{codemode:{mode}}` entry to `toolSettings`, merged into `~/.pi/agent/settings.json`, which the brief allowed as the setting route.\n- The README section \"Pi built-in subagents\" (billion-context.md lines 566-582) gives only `{\"pi\":{\"subagents\":false}}`, and line 582 says compression remains enabled. I dropped `delegate.forceEnable` and `~/.pi/acp.json`. The README never mentions `forceEnable` (the \"ignored\" claim is in a CONFIGURATION.md page I don't have), so the drop follows \"exactly those the README gives\". The README lines are cited in the `toolSettings` code comment and in `docs/pi/extensions.md`.\n- The README does not say whether specialists started by pi-subagents are compressed. I replaced the old flag with a narrower \"to be verified\" line in `docs/pi/extensions.md`.\n- For the root: `docs/pi/caching-and-subagents.md` lines 33-34 still describe `forceEnable`, and the \"behavior is to be verified\" line there needs the same narrowing. That file is outside my ownership paths.\n\nevidence:\nEvery role and the root run codemode in mode only with PI_CODEMODE_MAX_WORKERS 4 exported, and the docs say so, with tests: `tools.ts` (`toolArgs`, `toolSettings`). Tests in `tools.test.ts`: `\"%s runs codemode, with the worker cap exported\"` for each of the 18 roles, the root toEqual with env, the maxWorkers test, and the mode patch tests. Docs in `extensions.md` and `configuration.md`.\nThe Billion Context settings are exactly those the README gives for compression on with its subagents off, cited: `tools.ts` `toolSettings` comment, `extensions.md` settings section, test \"Billion Context gets exactly the README's setting for subagents off, compression on\".\nbunx --no-install mise run verify exits 0 and mise run build leaves generated output in sync: verify exit 0, 1961 pass, 0 fail; build exit 0 with no dist changes in `git status`.\nchanged-paths: the four files above.\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/assignment-0mw7fdvg6-5xhs.diff\n",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Reviewed by Reviewer.code with its blocker repaired and re-reviewed; verify exit 0 with 1963 pass on c965588.",
+    "criteria": [
+      {
+        "criterion": "Every role and the root run codemode in mode only with PI_CODEMODE_MAX_WORKERS 4 exported, and the docs say so, with tests",
+        "support": "`tools.ts` (`toolArgs`, `toolSettings`). Tests in `tools.test.ts`: `\"%s runs codemode, with the worker cap exported\"` for each of the 18 roles, the root toEqual with env, the maxWorkers test, and the mode patch tests. Docs in `extensions.md` and `configuration.md`."
+      },
+      {
+        "criterion": "The Billion Context settings are exactly those the README gives for compression on with its subagents off, cited",
+        "support": "`tools.ts` `toolSettings` comment, `extensions.md` settings section, test \"Billion Context gets exactly the README's setting for subagents off, compression on\"."
+      },
+      {
+        "criterion": "bunx --no-install mise run verify exits 0 and mise run build leaves generated output in sync",
+        "support": "verify exit 0, 1961 pass, 0 fail; build exit 0 with no dist changes in `git status`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "the four files above."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/assignment-0mw7fdvg6-5xhs.diff"
+      }
+    ]
+  },
   "createdAt": "2026-11-08T06:02:29.622Z"
 }
