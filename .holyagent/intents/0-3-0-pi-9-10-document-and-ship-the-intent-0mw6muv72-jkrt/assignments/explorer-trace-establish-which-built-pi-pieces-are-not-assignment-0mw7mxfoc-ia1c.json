@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mw7mxfoc-ia1c",
+  "intentId": "intent-0mw6muv72-jkrt",
+  "intentRevision": 5,
+  "roleTask": "Explorer.trace",
+  "slug": "establish-which-built-pi-pieces-are-not",
+  "objective": "Establish which built Pi pieces are not wired into the running Pi extension on release/0.3.0/feat/pi-install, and for each what wiring the merged PRs and docs intended.",
+  "state": "Running",
+  "scope": [
+    "Code in /home/user/holyagent-0.3.0-install: packages/integrations/pi/src/extension.ts, packages/runtime/src/pi/ (tools.ts, provider.ts, pi-context.ts and the rest), packages/runtime/src/config/, packages/runtime/src/instructions/kimi-k3.1/.",
+    "Claims to confirm or refute, each with file:line: (1) providerReadiness, requireProviderReady, validateModelCatalog and providerEnv have no non-test caller; (2) the root's toolArgs(config, 'root') tool list (--tools, the exclusions) is never applied, only its env; (3) toolSettings (codemode mode, subagents.json, Billion Context setting) is never written; (4) the package ships no prompts/ folder although the Kimi instruction text and docs/pi/claude-parity.md expect code-review and security-review first-pass prompts; (5) the root gets no system prompt on Pi (extension.ts comment near line 719); (6) KIMI_CODE_REGION is never set by non-test code.",
+    "For each confirmed gap, name the Pi extension API that would wire it (for example pi.setActiveTools, before_agent_start systemPrompt, a settings write at setup) by reading the Pi 1.5.0 sources in /home/user/holyagent-0.3.0-install/node_modules/@earendil-works/pi-coding-agent and the docs under docs/pi/, and say which docs/pi page states the intended behavior."
+  ],
+  "constraints": [
+    "Read-only; no edits.",
+    "Separate what the code shows from inference.",
+    "Report in under 500 words; write the full trace with file:line references to /home/user/holyagent-notes/pi-wiring-gaps.md is not possible without Write, so keep the file:line references in the report itself."
+  ],
+  "criteria": [
+    {
+      "text": "Each of the six claims is confirmed or refuted with file:line evidence",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Each confirmed gap names the Pi API that would wire it and the doc that states the intent",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "trace"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-08T09:33:39.613Z"
+  },
+  "createdAt": "2026-11-08T09:33:39.613Z"
+}
