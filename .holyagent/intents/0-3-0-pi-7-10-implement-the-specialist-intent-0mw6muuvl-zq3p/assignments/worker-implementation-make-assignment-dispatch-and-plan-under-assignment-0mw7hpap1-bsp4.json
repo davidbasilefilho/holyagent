@@ -1,0 +1,67 @@
+{
+  "id": "assignment-0mw7hpap1-bsp4",
+  "intentId": "intent-0mw6muuvl-zq3p",
+  "intentRevision": 7,
+  "roleTask": "Worker.implementation",
+  "slug": "make-assignment-dispatch-and-plan-under",
+  "objective": "Make assignment dispatch and plan under HOLYAGENT_HOST=pi print each specialist model and thinking level from the Pi route table in config, in the form @tintinweb/pi-subagents accepts, so the Pi root launches each specialist on the routed Kimi model.",
+  "state": "Running",
+  "scope": [
+    "Work only in /home/user/holyagent-0.3.0-launcher (branch release/0.3.0/feat/pi-launcher, head 43caf17). Today the pi-host dispatch prints the agent as the bare Pi agent name (e.g. worker-implementation) but the model and effort from the Claude route table (sonnet, haiku, high), which the Pi root would pass to agent() and the Agent tool unchanged; the Intent requires each specialist model and thinking level to come from the Pi route table (config.pi.routes, see routeModel and the route helpers in packages/runtime/src/pi/provider.ts, e.g. kimi-for-coding with thinking max) when Kimi for Coding is configured.",
+    "Read how the package takes model and thinking per call: /home/user/holyagent-notes/pi-probe/node_modules/@tintinweb/pi-subagents/src/invocation-config.ts (and the Agent tool and workflow agent() option handling) to learn the accepted model string (provider/id or id) and whether effort maps to thinking. Print those exact values under the pi host from the loaded config (user and project config, as the runtime config command loads it), falling back clearly when the pi section is off.",
+    "The journal key reader (agentTypeFor and the reports path in packages/runtime/src/cli/assignment.ts, packages/runtime/src/pi/journal.ts) must use the same printed model and effort, so the key still matches; keep the e2e test in packages/runtime/tests/pi-reports-e2e.test.ts passing with the new values and assert them.",
+    "Claude output stays unchanged. Update docs/pi/orchestration.md (The runtime under Pi) with what dispatch prints under pi."
+  ],
+  "constraints": [
+    "Edit only the ownership paths; no version-control writes and no edits under .git/ or .holyagent/.",
+    "Effect, Effect Schema at boundaries, JSDoc on exports, Bun APIs per .claude/CLAUDE.md.",
+    "Do not run pi or any live model.",
+    "Run bunx --no-install mise run build, then bunx --no-install mise run verify, and report each exit code (echo $?) and counts.",
+    "Write the diff to /home/user/holyagent-notes/launcher-e.diff and give it as diff-file evidence.",
+    "Start each evidence line with the criterion text, then a colon.",
+    "Report in under 350 words."
+  ],
+  "criteria": [
+    {
+      "text": "Under the pi host dispatch and plan print the Pi route model and thinking in the form the package accepts",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The journal key still matches with the new values, proven by the e2e test",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Claude output is unchanged",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "mise run build exits 0 with dist in sync and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli",
+    "packages/runtime/src/domain",
+    "packages/runtime/src/pi/journal.ts",
+    "packages/runtime/src/pi/provider.ts",
+    "packages/runtime/tests",
+    "docs/pi/orchestration.md",
+    "packages/integrations/pi/dist",
+    "packages/integrations/claude/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T07:07:21.829Z"
+  },
+  "createdAt": "2026-11-08T07:07:21.829Z"
+}
