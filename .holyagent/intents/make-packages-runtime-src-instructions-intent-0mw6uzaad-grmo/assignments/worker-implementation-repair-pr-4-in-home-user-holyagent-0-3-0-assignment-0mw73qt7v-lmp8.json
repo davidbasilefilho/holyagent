@@ -1,0 +1,68 @@
+{
+  "id": "assignment-0mw73qt7v-lmp8",
+  "intentId": "intent-0mw6uzaad-grmo",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-pr-4-in-home-user-holyagent-0-3-0",
+  "objective": "Repair PR 4 in /home/user/holyagent-0.3.0-req (branch release/0.3.0/feat/requirements-tree, head a10b630) so the review findings close: the requirements skill's coverage gap, the stale shipped reference, the unloaded runtime AGENTS.md and the optional notes.",
+  "state": "Running",
+  "scope": [
+    "Run every command in /home/user/holyagent-0.3.0-req. Findings: .git/holyagent/reports/assignment-0mw7393ui-i0k7.md (artifact review, items 1-9) and .git/holyagent/reports/assignment-0mw7393nm-qw1x.md (code review notes and the two queued items).",
+    "Blocking: .claude/skills/requirements/SKILL.md must name REQUIREMENT_COVERAGE in packages/runtime/src/instructions/coverage.ts (each id's entry with its section or carriedBy file and phrase) and add the coverage step to Create, Adjust, Move and Remove; say how a family joins (FAMILIES in families.ts plus its translations and coverage entries); describe the '- See: R-ID' line form that requirements.ts parses; name families.ts and FAMILIES on line 8; drop the second command route (bun run in packages/runtime) so mise is the single source.",
+    "Queued: reword the shipped claude-5.5/skills/instruction-writing/SKILL.md line that says instruction sets are written from requirements.md so it points at the requirements/ tree and the family's guide.md, update the plugin.test.ts assertion of that string, and rebuild the plugin with bunx --no-install mise run build (dist changes are expected for this file only). Add packages/runtime/CLAUDE.md containing only '@AGENTS.md' so Claude loads the runtime AGENTS.md.",
+    "Optional, include: cut packages/runtime/AGENTS.md to the requirements-first rule and the pointer to the skill (the skill owns the steps); move G58's 'give the current date, and avoid blanket always-search rules' from the source label into the point text in claude-5.5/guide.md; cite guide ids (G<n>, K<n>) in .claude/skills/write-skills/references/model-guides.md; in requirements/shared/merge-ready.md (or wherever the 'What an agent kind always needs' intro now heads mergeability content) fix the intro and the trailing bar sentence without changing any requirement's meaning; record in write-skills/references/agent-skills-standard.md that the S5 checklist section was not read; split lines on /\\r?\\n/ in requirements.ts as a cheap CRLF guard."
+  ],
+  "constraints": [
+    "Every maintainer requirement of the Intent in use stays binding; change no requirement's meaning and keep every id once.",
+    "Do not touch .claude/CLAUDE.md. Make no version-control writes; report changed paths.",
+    "Finish with bunx --no-install mise run build and bunx --no-install mise run verify; write the repair diff (git diff a10b630) to /home/user/holyagent-notes/pr4-repair.diff.",
+    "Report in under 350 words."
+  ],
+  "criteria": [
+    {
+      "text": "The requirements skill covers coverage.ts entries in every procedure, the See line form, how a family joins, and one command route",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The shipped instruction-writing skill no longer points at requirements.md and the plugin test matches",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "packages/runtime/CLAUDE.md imports AGENTS.md",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "The optional notes are applied without changing any requirement's meaning",
+      "blocking": false,
+      "dimension": "style"
+    },
+    {
+      "text": "mise run build and mise run verify exit 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime",
+    "packages/integrations/claude",
+    ".claude/skills",
+    "docs"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw6zq6yu-yip7",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T00:36:37.867Z"
+  },
+  "createdAt": "2026-11-08T00:36:37.867Z"
+}
