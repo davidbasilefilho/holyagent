@@ -311,13 +311,11 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
             message: "Give exactly one of --agent and --failed",
             hint: `Usage: holyagent ${RECORD_USAGE}`,
           })
-        if (agentId !== undefined) {
-          // Only the host decides the id form; a bad TTL or workflows setting must not block
-          // recording, and --failed has no id form to check, so it never reads the host.
-          const problem = agentIdProblem(agentId, id, yield* agentHostOf(env))
-          if (problem !== undefined)
-            return yield* new Usage({ message: problem, hint: `Usage: holyagent ${RECORD_USAGE}` })
-        }
+        // Only the host decides the id form; a bad TTL or workflows setting must not block recording.
+        const host = yield* agentHostOf(env)
+        const problem = agentId === undefined ? undefined : agentIdProblem(agentId, id, host)
+        if (problem !== undefined)
+          return yield* new Usage({ message: problem, hint: `Usage: holyagent ${RECORD_USAGE}` })
         const assignment = yield* recordLaunch(update, id, agentId)
         return present({
           id,

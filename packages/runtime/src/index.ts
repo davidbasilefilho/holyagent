@@ -1,3 +1,4 @@
+export * from "./config/index.ts"
 export * from "./domain/acceptance.ts"
 export * from "./domain/assignment.ts"
 export * from "./domain/directive.ts"

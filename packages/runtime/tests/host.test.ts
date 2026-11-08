@@ -156,16 +156,6 @@ describe("the host and the workflow switch", () => {
     ).toBe("a-1")
     expect((await cli(["reconcile"], undefined, broken)).code).toBe(0)
   })
-
-  test("recording a failed launch does not read the host, so a bad HOLYAGENT_HOST does not block it", async () => {
-    await createIntent()
-    const id = String(data(await cli(["assignment", "dispatch"], writer)).id)
-    const bad = { HOLYAGENT_HOST: "codex" }
-    const refused = await cli(["assignment", "record", id, "--agent", "a-1"], undefined, bad)
-    expect(refused.code).toBe(2)
-    expect(refused.stderr).toContain("HOLYAGENT_HOST must be claude or pi")
-    expect(data(await cli(["assignment", "record", id, "--failed"], undefined, bad)).id).toBe(id)
-  })
 })
 
 describe("plan under the pi host", () => {

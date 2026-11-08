@@ -177,6 +177,9 @@ function isNotUndefined(input) {
 function isNotNullish(input) {
   return input != null;
 }
+function isNever(_) {
+  return false;
+}
 function isUnknown(_) {
   return true;
 }
@@ -1371,7 +1374,9 @@ var Number2 = /* @__PURE__ */ make((self, that) => {
   return self < that ? -1 : 1;
 });
 var mapInput = /* @__PURE__ */ dual(2, (self, f) => make((b1, b2) => self(f(b1), f(b2))));
+var isLessThan = (O) => dual(2, (self, that) => O(self, that) === -1);
 var isGreaterThan = (O) => dual(2, (self, that) => O(self, that) === 1);
+var isLessThanOrEqualTo = (O) => dual(2, (self, that) => O(self, that) !== 1);
 var isGreaterThanOrEqualTo = (O) => dual(2, (self, that) => O(self, that) !== -1);
 
 var none2 = () => none;
@@ -5196,6 +5201,16 @@ var Null = class extends ASTNodeImpl {
   }
 };
 var null_ = /* @__PURE__ */ new Null;
+var Never = class extends ASTNodeImpl {
+  _tag = "Never";
+  getParser() {
+    return fromRefinement(this, isNever);
+  }
+  getExpected() {
+    return "never";
+  }
+};
+var never2 = /* @__PURE__ */ new Never;
 var Unknown = class extends ASTNodeImpl {
   _tag = "Unknown";
   getParser() {
@@ -7280,6 +7295,7 @@ function Literal2(literal) {
   });
   return out;
 }
+var Never2 = /* @__PURE__ */ make7(never2);
 var Unknown2 = /* @__PURE__ */ make7(unknown);
 var Null2 = /* @__PURE__ */ make7(null_);
 var String4 = /* @__PURE__ */ make7(string2);
@@ -7431,6 +7447,33 @@ function makeIsGreaterThanOrEqualTo(options) {
     });
   };
 }
+function makeIsBetween(deriveOptions) {
+  const greaterThanOrEqualTo = isGreaterThanOrEqualTo(deriveOptions.order);
+  const greaterThan = isGreaterThan(deriveOptions.order);
+  const lessThanOrEqualTo = isLessThanOrEqualTo(deriveOptions.order);
+  const lessThan = isLessThan(deriveOptions.order);
+  const formatter = deriveOptions.formatter ?? format;
+  return (options, annotations) => {
+    const gte = options.exclusiveMinimum ? greaterThan : greaterThanOrEqualTo;
+    const lte = options.exclusiveMaximum ? lessThan : lessThanOrEqualTo;
+    return makeFilter2((input) => gte(input, options.minimum) && lte(input, options.maximum), {
+      expected: `a value between ${formatter(options.minimum)}${options.exclusiveMinimum ? " (excluded)" : ""} and ${formatter(options.maximum)}${options.exclusiveMaximum ? " (excluded)" : ""}`,
+      arbitraryConstraint: {
+        order: deriveOptions.order,
+        minimum: options.minimum,
+        maximum: options.maximum,
+        ...options.exclusiveMinimum && {
+          exclusiveMinimum: true
+        },
+        ...options.exclusiveMaximum && {
+          exclusiveMaximum: true
+        }
+      },
+      ...deriveOptions.annotate?.(options),
+      ...annotations
+    });
+  };
+}
 function encodeNumberPayload(number) {
   if (!globalThis.Number.isFinite(number)) {
     throw new globalThis.RangeError(`Expected a finite number, got ${format(number)}`);
@@ -7454,6 +7497,36 @@ var isGreaterThanOrEqualTo2 = /* @__PURE__ */ makeIsGreaterThanOrEqualTo({
     })
   })
 });
+var isBetween = /* @__PURE__ */ makeIsBetween({
+  order: Number2,
+  annotate: (options) => {
+    const exclusiveMinimum = options.exclusiveMinimum ? true : undefined;
+    const exclusiveMaximum = options.exclusiveMaximum ? true : undefined;
+    const payload = {
+      minimum: encodeNumberPayload(options.minimum),
+      maximum: encodeNumberPayload(options.maximum),
+      ...exclusiveMinimum && {
+        exclusiveMinimum
+      },
+      ...exclusiveMaximum && {
+        exclusiveMaximum
+      }
+    };
+    return {
+      representation: {
+        id: "effect/schema/isBetween",
+        payload
+      },
+      toJsonSchema: () => ({
+        [exclusiveMinimum ? "exclusiveMinimum" : "minimum"]: options.minimum,
+        [exclusiveMaximum ? "exclusiveMaximum" : "maximum"]: options.maximum
+      }),
+      toCode: () => ({
+        runtime: `Schema.isBetween({ minimum: ${format(options.minimum)}, maximum: ${format(options.maximum)}, exclusiveMinimum: ${format(exclusiveMinimum)}, exclusiveMaximum: ${format(exclusiveMaximum)} })`
+      })
+    };
+  }
+});
 function isInt(annotations) {
   return makeFilter2((n) => globalThis.Number.isSafeInteger(n), {
     expected: "an integer",
@@ -7476,6 +7549,41 @@ function isInt(annotations) {
   });
 }
 var Int = /* @__PURE__ */ Number5.check(/* @__PURE__ */ isInt());
+function makeIsMinLength(minLength, minCodePoints, annotations) {
+  return makeFilter2((input) => input.length >= minLength, {
+    expected: `a value with a length of at least ${minLength}`,
+    representation: {
+      id: "effect/schema/isMinLength",
+      payload: {
+        minLength
+      }
+    },
+    toJsonSchema: ({
+      type
+    }) => type === "string" ? minLength <= 1 ? {
+      minLength: minCodePoints
+    } : [{
+      minLength: minCodePoints
+    }, true] : type === "array" ? {
+      minItems: minLength
+    } : type === undefined ? [{
+      minLength: minCodePoints,
+      minItems: minLength
+    }, true] : [{}, true],
+    toCode: () => ({
+      runtime: `Schema.isMinLength(${minLength})`
+    }),
+    [STRUCTURAL_ANNOTATION_KEY]: true,
+    arbitraryConstraint: {
+      minLength
+    },
+    ...annotations
+  });
+}
+function isNonEmpty(annotations) {
+  return makeIsMinLength(1, 1, annotations);
+}
+var NonEmptyString = /* @__PURE__ */ String4.check(/* @__PURE__ */ isNonEmpty());
 var RegExp2 = /* @__PURE__ */ instanceOf(globalThis.RegExp, {
   representation: {
     id: "effect/schema/RegExp",
@@ -8308,6 +8416,7 @@ var HINTS = {
   StateLocked: "Another process holds the state lock; retry in a moment.",
   StateIo: "Check what the message names: the permissions of the .holyagent folder of the state worktree (under the git directory, or in the project outside git), that git runs there, and that no branch already uses a name the state branch needs (holyagent/state needs no branch called holyagent; git config holyagent.stateBranch picks another name).",
   CorruptRecord: "Fix or delete the file the message names, or restore it from version control.",
+  ConfigInvalid: "Fix the field the message names in that config.json (the keys and values are listed in docs/pi/configuration.md), or delete the file to use the defaults.",
   ...VCS_HINTS
 };
 var describeFailure = (error, words = CLAUDE_WORDS) => {
@@ -11490,11 +11599,8 @@ var SESSION_TRAILER = /^\s*claude-session\s*:/i;
 var GENERATED_FOOTER = /^\s*(?:[^\p{L}\p{N}\s]\s*)*generated\s+with\b.*\bclaude\s+code\b/iu;
 var PI_GENERATED_FOOTER = /^\s*(?:[^\p{L}\p{N}\s]\s*)*generated\s+with\s+\[?pi(?:[\s-]coding[\s-]agent)?\]?(?:\([^\s)]*\))?[^\p{L}\p{N}]*$/iu;
 var CO_AUTHOR = /^\s*co-authored-by\s*:\s*(.*)$/i;
-var CLAUDE_URL = String.raw`https?:\/\/claude\.ai\/[^\s)]*`;
-var PI_URL = String.raw`https?:\/\/(?:[\w-]+\.)*pi\.dev\/session\/[^\s)]*`;
-var sessionLink = (url) => new RegExp(String.raw`\[[^\][]*\]\(${url}\)|${url}`, "gi");
-var SESSION_LINK = sessionLink(CLAUDE_URL);
-var PI_SESSION_LINK = sessionLink(PI_URL);
+var SESSION_LINK = /https?:\/\/claude\.ai\/[^\s)]*/gi;
+var PI_SESSION_LINK = /https?:\/\/(?:[\w-]+\.)*pi\.dev\/session\/[^\s)]*/gi;
 var PI_AGENT_NAME = /^pi[\s-]coding[\s-]agent$/i;
 var namesAgent = (coAuthor) => looksLikeAgent({ name: coAuthor.replace(/<.*$/, ""), email: "" }) || /@(?:[\w-]+\.)*(?:anthropic\.com|pi\.dev)\b/i.test(coAuthor) || PI_AGENT_NAME.test(coAuthor.replace(/<.*$/, "").replace(/\s+/g, " ").trim());
 var isAttribution = (line) => {
@@ -11864,25 +11970,128 @@ var pullRequest = (request) => gen2(function* () {
 });
 
 import { join as join7 } from "path";
+
+class ConfigInvalid extends TaggedError2("ConfigInvalid") {
+  get message() {
+    return `${this.path} is not a valid HolyAgent config: ${this.reason}`;
+  }
+}
+
+var defaulted = (schema, value) => schema.pipe(withDecodingDefaultKey(succeed6(value)));
 var VcsSettings = Struct({
   api: optionalKey2(Boolean3),
   allowWords: optionalKey2(ArraySchema(String4)),
   stateBranch: optionalKey2(String4)
 });
-var File2 = fromJsonString2(Record(String4, Unknown2));
-var readSettings = (directories) => gen2(function* () {
-  for (const directory of directories) {
-    const path = join7(directory, "config.json");
-    const text = yield* readText(path);
-    if (text === undefined)
-      continue;
-    const corrupt = (reason) => new CorruptRecord({ path, reason });
-    const file = yield* decodeUnknownEffect2(File2)(text).pipe(mapError2((error) => corrupt(error.message)));
-    return yield* decodeUnknownEffect2(VcsSettings, { onExcessProperty: "error" })(file["vcs"] ?? {}).pipe(mapError2((error) => corrupt(`vcs: ${error.message}`)));
-  }
-  const defaults = {};
-  return defaults;
+var PiProvider = Literals(["kimi-coding-global"]);
+var Thinking = Literals(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
+var ModelId = NonEmptyString;
+var KIMI_ROOT = "k3.1-pro";
+var KIMI_SPECIALIST = "kimi-for-coding";
+var kimi = (model, thinking) => ({ model, thinking });
+var KIMI_ROUTES = {
+  root: kimi(KIMI_ROOT, "high"),
+  "Explorer.map": kimi(KIMI_SPECIALIST, "high"),
+  "Explorer.lookup": kimi(KIMI_SPECIALIST, "high"),
+  "Explorer.trace": kimi(KIMI_SPECIALIST, "high"),
+  "Librarian.lookup": kimi(KIMI_SPECIALIST, "high"),
+  "Librarian.research": kimi(KIMI_SPECIALIST, "high"),
+  "Worker.mechanical": kimi(KIMI_SPECIALIST, "high"),
+  "Worker.implementation": kimi(KIMI_SPECIALIST, "max"),
+  "Worker.integration": kimi(KIMI_SPECIALIST, "max"),
+  "Worker.operations": kimi(KIMI_SPECIALIST, "high"),
+  "Worker.validation": kimi(KIMI_SPECIALIST, "high"),
+  "Worker.debugging": kimi(KIMI_SPECIALIST, "max"),
+  "Worker.visual": kimi(KIMI_ROOT, "low"),
+  "Reviewer.visual": kimi(KIMI_ROOT, "low"),
+  "Reviewer.code": kimi(KIMI_SPECIALIST, "max"),
+  "Reviewer.testing": kimi(KIMI_SPECIALIST, "max"),
+  "Reviewer.audit": kimi(KIMI_SPECIALIST, "high"),
+  "Reviewer.security": kimi(KIMI_SPECIALIST, "max"),
+  "Reviewer.artifact": kimi(KIMI_SPECIALIST, "max")
+};
+var route = (key) => defaulted(Struct({
+  model: defaulted(ModelId, KIMI_ROUTES[key].model),
+  thinking: defaulted(Thinking, KIMI_ROUTES[key].thinking)
+}), {});
+var ROUTE_FIELDS = Object.fromEntries(Object.keys(KIMI_ROUTES).map((key) => [key, route(key)]));
+var WebMode = Literals(["provider", "pi-web-kit", "off"]);
+var CodemodeMode = Literals(["on", "only"]);
+var T3Scope = Literals(["global", "project"]);
+var Enabled = Boolean3;
+var PiSection = defaulted(Struct({
+  enable: defaulted(Enabled, true),
+  provider: defaulted(PiProvider, "kimi-coding-global"),
+  routes: defaulted(Struct(ROUTE_FIELDS), {}),
+  features: defaulted(Struct({
+    web: defaulted(WebMode, "provider"),
+    processes: defaulted(Enabled, true),
+    todo: defaulted(Enabled, true),
+    ask: defaulted(Enabled, true),
+    computerUse: defaulted(Enabled, true),
+    contextCompression: defaulted(Enabled, true),
+    subagents: defaulted(Enabled, true)
+  }), {}),
+  codemode: defaulted(Struct({
+    mode: defaulted(CodemodeMode, "only"),
+    maxWorkers: defaulted(Int.check(isBetween({ minimum: 1, maximum: 16 })), 4)
+  }), {}),
+  t3: defaulted(Struct({
+    scope: defaulted(T3Scope, "global"),
+    worktrees: defaulted(Enabled, true),
+    deviceAccess: defaulted(Enabled, true)
+  }), {})
+}), {});
+var ClaudeSection = defaulted(Record(String4, Never2), {});
+var Config = Struct({
+  vcs: defaulted(VcsSettings, {}),
+  pi: PiSection,
+  claude: ClaudeSection
 });
+var ConfigFile = toEncoded2(Config);
+var defaultConfig = decodeUnknownEffect2(Config)({});
+
+var HOME_VARIABLE = "HOLYAGENT_HOME";
+var userConfigFile = (env) => join7(firstNonEmpty(env[HOME_VARIABLE]) ?? homeDirectory(env), STATE_DIRECTORY, CONFIG_FILE);
+var isRecord = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+var merge3 = (base, override) => isRecord(base) && isRecord(override) ? {
+  ...base,
+  ...Object.fromEntries(Object.entries(override).map(([key, value]) => [
+    key,
+    Object.hasOwn(base, key) ? merge3(base[key], value) : value
+  ]))
+} : override;
+var FINAL_OFF = [
+  { path: ["pi", "features", "computerUse"], off: false },
+  { path: ["pi", "features", "web"], off: "off" },
+  { path: ["pi", "t3", "deviceAccess"], off: false }
+];
+var valueAt = (value, path) => path.reduce((node, key) => isRecord(node) ? node[key] : undefined, value);
+var setAt = (value, path, leaf) => {
+  const [key, ...rest] = path;
+  return key === undefined ? leaf : { ...isRecord(value) ? value : {}, [key]: setAt(valueAt(value, [key]), rest, leaf) };
+};
+var mergeFiles = (user, project) => FINAL_OFF.reduce((merged, { path, off }) => valueAt(user, path) === off ? setAt(merged, path, off) : merged, merge3(user, project));
+var JsonValue = fromJsonString2(Unknown2);
+var withoutNullVcs = (value) => isRecord(value) && value["vcs"] === null ? Object.fromEntries(Object.entries(value).filter(([key]) => key !== "vcs")) : value;
+var readConfigFile = (path) => readText(path).pipe(flatMap2((text) => text === undefined ? succeed6(undefined) : decodeUnknownEffect2(JsonValue)(text).pipe(map4(withoutNullVcs), flatMap2(decodeUnknownEffect2(ConfigFile, { onExcessProperty: "error" })), mapError2((error) => new ConfigInvalid({ path, reason: error.message })))));
+var loadConfig = ({ projectDirectories, env = process.env }) => gen2(function* () {
+  const userPath = userConfigFile(env);
+  const user = yield* readConfigFile(userPath);
+  let project;
+  let projectPath;
+  for (const directory of projectDirectories) {
+    const path = join7(directory, CONFIG_FILE);
+    project = yield* readConfigFile(path);
+    if (project !== undefined) {
+      projectPath = path;
+      break;
+    }
+  }
+  return yield* decodeUnknownEffect2(Config)(mergeFiles(user ?? {}, project ?? {})).pipe(mapError2((error) => new ConfigInvalid({ path: projectPath ?? userPath, reason: error.message })));
+});
+
+var readSettings = (directories, env = process.env) => loadConfig({ projectDirectories: directories, env }).pipe(map4((config) => config.vcs));
 
 var settingsFolders = (call) => [stateDirectory(call.root)];
 var arguments_ = (call, usage, spec, positionals) => readFlags(call.args.positionals, spec, usage).pipe(filterOrFail2((args) => positionals === "any" || args.positionals.length === positionals, (args) => new Usage({
@@ -11913,7 +12122,7 @@ var VCS_COMMANDS = [
           message: messages.length === 0 ? "Missing -m <headline>" : "Name the paths to commit after --",
           hint: `Usage: holyagent ${COMMIT_USAGE}`
         });
-      const settings = yield* readSettings(settingsFolders(call));
+      const settings = yield* readSettings(settingsFolders(call), call.env);
       const message = yield* prepareMessage(messages, settings.allowWords ?? []);
       const done = yield* commit({
         message,
@@ -11974,7 +12183,7 @@ var VCS_COMMANDS = [
         yield* requiredValue(args, "base", PR_USAGE);
         yield* requiredValue(args, "title", PR_USAGE);
       }
-      const settings = yield* readSettings(settingsFolders(call));
+      const settings = yield* readSettings(settingsFolders(call), call.env);
       return yield* pullRequest({
         state: call,
         root: call.root,
@@ -12251,7 +12460,7 @@ var workflowsAvailable = (env, root) => {
     })));
   return agentHostOf(env).pipe(flatMap2((host) => host === "pi" ? succeed6(false) : claudeWorkflowsAvailable(env, root)));
 };
-var loadConfig = (env, root) => all2({
+var loadConfig2 = (env, root) => all2({
   ttlMinutes: reuseTtl(env),
   workflowsAvailable: workflowsAvailable(env, root),
   host: agentHostOf(env)
@@ -12651,11 +12860,10 @@ var ASSIGNMENT_COMMANDS = [
           message: "Give exactly one of --agent and --failed",
           hint: `Usage: holyagent ${RECORD_USAGE}`
         });
-      if (agentId !== undefined) {
-        const problem = agentIdProblem(agentId, id, yield* agentHostOf(env));
-        if (problem !== undefined)
-          return yield* new Usage({ message: problem, hint: `Usage: holyagent ${RECORD_USAGE}` });
-      }
+      const host = yield* agentHostOf(env);
+      const problem = agentId === undefined ? undefined : agentIdProblem(agentId, id, host);
+      if (problem !== undefined)
+        return yield* new Usage({ message: problem, hint: `Usage: holyagent ${RECORD_USAGE}` });
       const assignment = yield* recordLaunch(update, id, agentId);
       return present({
         id,
@@ -13127,7 +13335,7 @@ var mergeUserSettings = fn2("mergeUserSettings")(function* (options) {
   return [file, ...entries.map(describe2), summary];
 });
 var without = (node, key) => Object.fromEntries(Object.entries(node).filter(([name]) => name !== key));
-var valueAt = (node, path) => {
+var valueAt2 = (node, path) => {
   let current = node;
   for (const key of path) {
     if (!isJsonObject2(current))
@@ -13194,7 +13402,7 @@ var undoUserSettings = fn2("undoUserSettings")(function* (options) {
   const removals = [];
   for (const { path, value } of plan) {
     if (value === undefined) {
-      const existing = valueAt(result, path);
+      const existing = valueAt2(result, path);
       removals.push(existing === undefined ? { path: path.join("."), status: "absent", value: undefined, wanted: undefined } : { path: path.join("."), status: "unrecorded", value: existing, wanted: undefined });
       continue;
     }
@@ -21417,7 +21625,7 @@ var HOOK_COMMANDS = [
       const message = cleaned.split(`
 `).filter((line) => !line.startsWith(comment)).join(`
 `);
-      const phrases = forbiddenPhrases(message, (yield* readSettings([stateDirectory(call.root)])).allowWords);
+      const phrases = forbiddenPhrases(message, (yield* readSettings([stateDirectory(call.root)], call.env)).allowWords);
       if (phrases.length > 0)
         return yield* new MessageRefused({ phrases });
       if (cleaned !== above.trim() || cleanedBelow !== below.trim())
@@ -21923,7 +22131,7 @@ var callFor = (args, host, emit, command) => gen2(function* () {
     root,
     directory,
     update: (transition) => updateState(directory, transition, host.env, undefined, resolved),
-    config: loadConfig(host.env, root),
+    config: loadConfig2(host.env, root),
     text: readReport(host),
     emit,
     vcs: host.vcs ?? vcsLive(root, host.env),
