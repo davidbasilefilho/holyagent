@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mw7esh1o-9fks",
+  "intentId": "intent-0mw6muujd-wz9x",
+  "intentRevision": 9,
+  "roleTask": "Worker.validation",
+  "slug": "validate-the-merge-commit-2d4a68a-on",
+  "objective": "Validate the merge commit 2d4a68a on release/0.3.0/feat/kimi-provider in /home/user/holyagent-0.3.0-provider (the PR 7 head merged into the provider branch) with the repository gates.",
+  "state": "Running",
+  "scope": [
+    "Run in /home/user/holyagent-0.3.0-provider: bunx --no-install mise run verify, then bunx --no-install mise run build, then git status --short. Also run git diff --stat 2d4a68a^1 2d4a68a and git diff --stat 2d4a68a^2 2d4a68a and report both stats, so the merge can be checked to carry only each side's changes."
+  ],
+  "constraints": [
+    "Read-only apart from the build's own output: make no edits and no version-control writes.",
+    "Report in under 150 words: each command, its exit code and counts; put long logs in a file outside the repository."
+  ],
+  "criteria": [
+    {
+      "text": "bunx --no-install mise run verify exits 0 on 2d4a68a",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "mise run build leaves git status empty",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-08T05:45:51.180Z"
+  },
+  "createdAt": "2026-11-08T05:45:51.180Z"
+}
