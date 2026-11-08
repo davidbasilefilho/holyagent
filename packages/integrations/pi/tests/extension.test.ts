@@ -40,10 +40,12 @@ import {
   fillPackageRoot,
   HOST_ENV,
   hostEnvironment,
+  memoizeLast,
   NOTICE_MESSAGE,
   refuseNonSpecialist,
   refuseNonSpecialistWorkflow,
   ROLE_FLAG,
+  sanitizeWorkflowName,
   SESSION_DEADLINE_MS,
   WORKFLOW_TOOL,
   workflowCallLine,
@@ -1716,6 +1718,39 @@ describe("drawing a SubagentWorkflow call", () => {
     expect(line).not.toContain("\u001b")
     expect(line).not.toContain("\n")
     expect(line.length).toBeLessThan(WORKFLOW_TOOL.length + 100)
+  })
+
+  test("bidi overrides and zero-width characters of a name are dropped", () => {
+    const hidden = "\\u202e\\u2066\\u2069\\u200b\\u200f\\ufeff"
+    const line = workflowCallLine(
+      { script: `export const meta = { name: 'rel${hidden}ease${hidden}' }` },
+      PLAIN_THEME,
+    )
+    expect(line).toMatch(/release$/)
+    expect(line).not.toMatch(/[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/)
+    expect(sanitizeWorkflowName("\u200b\u202e\ufeff")).toBeUndefined()
+  })
+
+  test("a name is cut at 80 characters without splitting a surrogate pair", () => {
+    const emoji = "\u{1f600}"
+    const cut = sanitizeWorkflowName(`${"x".repeat(79)}${emoji}${emoji}`)
+    expect(cut).toBe(`${"x".repeat(79)}${emoji}`)
+    expect(cut).not.toMatch(
+      /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/,
+    )
+    expect(sanitizeWorkflowName("y".repeat(200))).toBe("y".repeat(80))
+  })
+
+  test("the last argument's result is reused, and a new argument computes again", () => {
+    const seen: Array<string> = []
+    const cached = memoizeLast((key) => {
+      seen.push(key)
+      return key.length
+    })
+    expect([cached("aa"), cached("aa"), cached("aa")]).toEqual([2, 2, 2])
+    expect(cached("b")).toBe(1)
+    expect(cached("aa")).toBe(2)
+    expect(seen).toEqual(["aa", "b", "aa"])
   })
 
   test("a call without a string script draws the default line", () => {

@@ -208,21 +208,64 @@ export const refuseNonSpecialistWorkflow = (event: {
 /** The longest workflow name the call line shows. */
 const WORKFLOW_NAME_LIMIT = 80
 
+const GRAPHEME_SEGMENTER = new Intl.Segmenter(undefined, { granularity: "grapheme" })
+
+/**
+ * The text of a workflow name that is safe to draw, or undefined when nothing is left: control
+ * characters become spaces, bidi overrides and zero-width characters are dropped, and the result is
+ * trimmed and cut to {@link WORKFLOW_NAME_LIMIT} grapheme clusters.
+ */
+export const sanitizeWorkflowName = (raw: string): string | undefined => {
+  const cleaned = raw
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, " ")
+    .replace(/[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, "")
+    .trim()
+  if (cleaned === "") return undefined
+  let shown = ""
+  let count = 0
+  for (const { segment } of GRAPHEME_SEGMENTER.segment(cleaned)) {
+    if (count++ === WORKFLOW_NAME_LIMIT) break
+    shown += segment
+  }
+  return shown
+}
+
+/**
+ * Wraps a function of one string so that the last argument's result is reused. The call line is
+ * redrawn on every streamed update with the same, growing script, so one slot is enough and the
+ * cache stays bounded.
+ */
+export const memoizeLast = <A>(fn: (key: string) => A): ((key: string) => A) => {
+  let last: { readonly key: string; readonly value: A } | undefined
+  return (key) => {
+    if (last?.key === key) return last.value
+    const value = fn(key)
+    last = { key, value }
+    return value
+  }
+}
+
+/** The name the call line shows for a script, read without evaluating it; cached per script text. */
+const shownWorkflowName = memoizeLast((script: string): string | undefined => {
+  const raw = Effect.runSync(literalWorkflowName(script))
+  return raw === undefined ? undefined : sanitizeWorkflowName(raw)
+})
+
 /**
  * The line that draws a `SubagentWorkflow` call: the tool's name and, when the script's meta
  * fragment is a vetted object of literals, the workflow's `name`, read without evaluating anything.
  * The package draws the call by evaluating that fragment on the host thread (`workflowCallName`),
  * and Pi draws a call on every streamed update and when a session is reloaded, before the
  * `tool_call` gate sees the script, so the script is untrusted here. The name loses its control
- * characters, which could move the cursor or restyle the terminal, and is cut to
- * {@link WORKFLOW_NAME_LIMIT} characters.
+ * characters, which could move the cursor or restyle the terminal, and its bidi overrides and
+ * zero-width characters, which could make the line read as something else; it is cut to
+ * {@link WORKFLOW_NAME_LIMIT} grapheme clusters, so a surrogate pair is never split. The name is
+ * cached per script text (see {@link memoizeLast}), since streaming redraws the same growing call.
  */
 export const workflowCallLine = (args: unknown, theme: Pick<Theme, "fg" | "bold">): string => {
   const script = (args as { readonly script?: unknown } | null | undefined)?.script
-  const raw = typeof script === "string" ? Effect.runSync(literalWorkflowName(script)) : undefined
-  // eslint-disable-next-line no-control-regex
-  const name = raw?.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, " ").trim()
-  const shown = name === undefined || name === "" ? "workflow" : name.slice(0, WORKFLOW_NAME_LIMIT)
+  const shown = (typeof script === "string" ? shownWorkflowName(script) : undefined) ?? "workflow"
   return `${theme.fg("toolTitle", "\u25b8 ")}${theme.bold(theme.fg("toolTitle", WORKFLOW_TOOL))}  ${theme.fg("muted", shown)}`
 }
 

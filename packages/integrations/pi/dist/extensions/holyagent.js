@@ -16023,11 +16023,37 @@ var refuseNonSpecialistWorkflow = (event) => {
   return workflowRefusal(script, WORKFLOW_SPECIALISTS, "pi").pipe(map4((why) => why === undefined ? undefined : refuse(`The workflow script is refused: it ${why}.`)));
 };
 var WORKFLOW_NAME_LIMIT = 80;
+var GRAPHEME_SEGMENTER = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+var sanitizeWorkflowName = (raw) => {
+  const cleaned = raw.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, " ").replace(/[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, "").trim();
+  if (cleaned === "")
+    return;
+  let shown = "";
+  let count = 0;
+  for (const { segment } of GRAPHEME_SEGMENTER.segment(cleaned)) {
+    if (count++ === WORKFLOW_NAME_LIMIT)
+      break;
+    shown += segment;
+  }
+  return shown;
+};
+var memoizeLast = (fn) => {
+  let last;
+  return (key) => {
+    if (last?.key === key)
+      return last.value;
+    const value = fn(key);
+    last = { key, value };
+    return value;
+  };
+};
+var shownWorkflowName = memoizeLast((script) => {
+  const raw = runSync2(literalWorkflowName(script));
+  return raw === undefined ? undefined : sanitizeWorkflowName(raw);
+});
 var workflowCallLine = (args, theme) => {
   const script = args?.script;
-  const raw = typeof script === "string" ? runSync2(literalWorkflowName(script)) : undefined;
-  const name = raw?.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, " ").trim();
-  const shown = name === undefined || name === "" ? "workflow" : name.slice(0, WORKFLOW_NAME_LIMIT);
+  const shown = (typeof script === "string" ? shownWorkflowName(script) : undefined) ?? "workflow";
   return `${theme.fg("toolTitle", "▸ ")}${theme.bold(theme.fg("toolTitle", WORKFLOW_TOOL))}  ${theme.fg("muted", shown)}`;
 };
 var workflowRenderers = (toolName, next) => {
@@ -16264,8 +16290,10 @@ export {
   failedFinalMessage,
   fillPackageRoot,
   hostEnvironment,
+  memoizeLast,
   refuseNonSpecialist,
   refuseNonSpecialistWorkflow,
+  sanitizeWorkflowName,
   workflowCallLine,
   workflowRenderers,
   wrapperPath
