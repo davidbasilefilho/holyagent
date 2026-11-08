@@ -12,7 +12,7 @@
   "scripts": {
     "bump:minor": "mise run bump:minor",
     "bump:patch": "mise run bump:patch",
-    "prepare": "mise run prepare",
+    "prepare": "bun scripts/prepare-dev.ts",
     "build": "mise run build",
     "check": "mise run check",
     "fmt": "mise run fmt",
@@ -29,6 +29,14 @@
     "eslint-plugin-jsdoc": "^65.0.0",
     "lefthook": "^2.0.0",
     "mise": "^2026.0.0"
+  },
+  "pi": {
+    "extensions": [
+      "./packages/integrations/pi/dist/extensions"
+    ],
+    "skills": [
+      "./packages/integrations/pi/dist/skills"
+    ]
   },
   "trustedDependencies": [
     "@anthropic-ai/claude-code",

@@ -31,9 +31,12 @@ pre-commit:
         bunx --no-install mise run build && git add -A --
         .claude-plugin/marketplace.json
         packages/integrations/claude/dist
-    # The build copies the version of the root package.json into the two workspace manifests and
+    # Stages exactly the paths the Pi build generates (GENERATED_PATHS in its src/generate.ts).
+    - name: build-pi
+      run: git add -A -- packages/integrations/pi/dist
+    # The build copies the version of the root package.json into the workspace manifests and
     # bun.lock (`syncVersions`). When a package.json is staged, as in a version bump, those copies
     # are staged too, so the commit carries every copy of the version; otherwise they are left alone.
     - name: versions
       glob: package.json
-      run: git add -- packages/runtime/package.json packages/integrations/claude/package.json bun.lock
+      run: git add -- packages/runtime/package.json packages/integrations/claude/package.json packages/integrations/pi/package.json bun.lock

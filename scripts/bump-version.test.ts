@@ -344,27 +344,32 @@ describe("the command line", () => {
 
 describe("a bump followed by one build", () => {
   // The build bundles the repository it sits in, so the test runs it in a copy of the sources. The
-  // installed dependencies are linked, not copied, and the built plugin is left out: the build
-  // makes it again.
+  // installed dependencies are linked, not copied, and the built plugin and Pi package are left
+  // out: the build makes them again.
   const SKIPPED = ["node_modules", ".git", ".holyagent"]
-  const PLUGIN_DIST = join(repository, "packages/integrations/claude/dist")
+  const BUILT = ["claude", "pi"].map((name) =>
+    join(repository, `packages/integrations/${name}/dist`),
+  )
 
   test("leaves every copy, the plugin and marketplace manifests included, at the new version", async () => {
     const copy = mkdtempSync(join(tmpdir(), "holyagent-build-bump-"))
     try {
       cpSync(repository, copy, {
         recursive: true,
-        filter: (path) => path !== PLUGIN_DIST && !SKIPPED.includes(basename(path)),
+        filter: (path) => !BUILT.includes(path) && !SKIPPED.includes(basename(path)),
       })
       for (const link of ["node_modules", "packages/runtime/node_modules"])
         symlinkSync(join(repository, link), join(copy, link))
       const { to } = await Effect.runPromise(bumpVersions(copy, "minor"))
-      const build =
-        await $`${process.execPath} ${join(copy, "packages/integrations/claude/build.ts")}`
-          .nothrow()
-          .quiet()
-      expect(build.stderr.toString()).toBe("")
-      expect(build.exitCode).toBe(0)
+      // The same two builds, in the same order, as the `build` task.
+      for (const name of ["claude", "pi"]) {
+        const build =
+          await $`${process.execPath} ${join(copy, `packages/integrations/${name}/build.ts`)}`
+            .nothrow()
+            .quiet()
+        expect(build.stderr.toString()).toBe("")
+        expect(build.exitCode).toBe(0)
+      }
       const versionOf = async (file: string) =>
         ((await Bun.file(join(copy, file)).json()) as { version?: string }).version
       const marketplace = (await Bun.file(
@@ -381,14 +386,15 @@ describe("a bump followed by one build", () => {
             VERSION_SOURCE,
             ...VERSION_COPIES,
             "packages/integrations/claude/dist/.claude-plugin/plugin.json",
+            "packages/integrations/pi/dist/package.json",
           ].map(versionOf),
         ),
         marketplace: marketplace.plugins.map(({ version }) => version),
         lockfile: Object.values(lock.workspaces).flatMap(({ version }) => version ?? []),
       }).toEqual({
-        files: [to, to, to, to],
+        files: [to, to, to, to, to, to],
         marketplace: [to],
-        lockfile: [to, to],
+        lockfile: [to, to, to],
       })
     } finally {
       rmSync(copy, { recursive: true, force: true })
@@ -406,6 +412,10 @@ describe("a build whose version sync fails", () => {
         "packages/integrations/claude/build.ts",
         "packages/integrations/claude/src/files.ts",
         "packages/runtime/src/domain/paths.ts",
+        "packages/runtime/src/instructions/families.ts",
+        "packages/runtime/src/instructions/generated.ts",
+        "packages/runtime/src/instructions/requirements.ts",
+        "packages/runtime/src/instructions/skills.ts",
       ])
         cpSync(join(repository, file), join(copy, file), { recursive: true })
       symlinkSync(join(repository, "node_modules"), join(copy, "node_modules"))

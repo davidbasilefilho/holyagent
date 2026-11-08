@@ -17,10 +17,15 @@ packages/
       kimi-k3.1/                guide.md only until its translations are added
       requirements/             the requirements, one file for each Markdown file of a family and the same path: what the family file must say
       families.ts, coverage.ts  the supported families, and where each family carries each requirement
+      skills.ts                 builds a family's skills for a harness: the materiality and design core embedded, a note added
   integrations/claude/          turns the runtime into the Claude Code plugin
     build.ts, src/              the generator and the wrapper source
     tests/
     dist/                       generated: the built plugin (.claude-plugin/, settings.json, agents/, commands/, skills/, hooks/, scripts/)
+  integrations/pi/              turns the runtime into the Pi package
+    build.ts, src/              the generator and the extension source (src/extension.ts)
+    tests/
+    dist/                       generated: the built Pi package (package.json, extensions/, skills/)
 .claude-plugin/marketplace.json generated; the marketplace entry for the plugin
 .github/                        the CI, publish and release workflows and the tag-release action
 scripts/                        Bun scripts behind the mise tasks: toolchain, hooks, vendoring, versions, the dependency updater, PR checks
@@ -59,13 +64,15 @@ bunx --no-install mise run verify
 | `fmt:check`             | `bun fmt --check`                                               |
 | `test`                  | `bun test`                                                      |
 | `vendor`                | Fetches the pinned ripgrep and fd into the plugin               |
-| `build`                 | Generates the Claude plugin (runs `vendor` first)               |
+| `build`                 | Generates the Claude plugin and the Pi package (`vendor` first) |
 | `instructions:scaffold` | Adds the requirements tree to every family as empty files       |
 | `bump:patch`            | Raises the root version by a patch, then `build` (Versioning)   |
 | `bump:minor`            | Raises the root version by a minor, then `build` (Versioning)   |
 | `deps:update`           | Moves every pin to its newest stable release (see Dependencies) |
 | `deps:check`            | Fails when a pin is behind                                      |
 | `verify`                | `check`, `lint`, `fmt:check` and `test`, all read-only          |
+
+The root `prepare` script is `bun scripts/prepare-dev.ts`, which runs the `prepare` task only when `mise` is installed under `node_modules`, so a consumer install that omits dev dependencies (what Pi runs on a release tag) succeeds without hooks and a development install still installs them.
 
 Done means `mise run verify` passes; after changing plugin sources, run `mise run build`. `scripts/repo-paths.test.ts` (part of `test`) fails on a tracked path over 120 characters, which overruns Windows MAX_PATH in the marketplace clone, or under `.holyagent/`, which lives on the `holyagent/state` branch.
 
@@ -77,7 +84,7 @@ A change starts in `requirements/`. `bunx --no-install mise run instructions:sca
 
 ## Dependencies
 
-Every dependency range in every `package.json` is a caret range at its line boundary (`^X.0.0` for X of 1 or more, `^0.X.0`, `^0.0.X`), or `workspace:*` for a workspace package, and `bun.lock` holds the exact versions. A line boundary lets a fresh install take every compatible release without a manifest edit, while the lockfile keeps installs reproducible; `scripts/dependency-ranges.test.ts` fails on any other range, in any dependency field. This includes `@anthropic-ai/claude-code` and `mise`: nothing depends on their exact version, because `trustedDependencies` matches names, `scripts/toolchain.ts` checks only that Bun is a canary build, and CI runs the Claude Code binary the lockfile resolves (`bun run claude`).
+Every dependency range in every `package.json` is a caret range at its line boundary (`^X.0.0` for X of 1 or more, `^0.X.0`, `^0.0.X`), or `workspace:*` for a workspace package, and `bun.lock` holds the exact versions. A line boundary lets a fresh install take every compatible release without a manifest edit, while the lockfile keeps installs reproducible; `scripts/dependency-ranges.test.ts` fails on any other range, in any dependency field. The one exception is Pi's host packages (`PI_HOST_PACKAGES` in `scripts/dependency-pins.ts`: `@earendil-works/pi-ai`, `@earendil-works/pi-agent-core`, `@earendil-works/pi-coding-agent`, `@earendil-works/pi-tui` and `typebox`): the Pi integration declares them as `peerDependencies` with the range `*`, which Pi's package documentation requires so that Pi supplies them and the package bundles none. The exception covers those names in that field only, and the updater leaves them as they are. The same package lists `@earendil-works/pi-coding-agent` as a caret-range `devDependency` for the extension API types. This includes `@anthropic-ai/claude-code` and `mise`: nothing depends on their exact version, because `trustedDependencies` matches names, `scripts/toolchain.ts` checks only that Bun is a canary build, and CI runs the Claude Code binary the lockfile resolves (`bun run claude`).
 
 Dependencies change only through the updater, `scripts/update-dependencies.ts`, so a pin never drifts by hand and a release is never a prerelease. It moves each pin to the newest stable release line (the major, or the minor for a `0.x` project) and the newest stable release within it. For a package, the range it writes comes from the newest stable version that is not deprecated and is no higher than the registry's `latest` dist-tag, so a canary or a version above the publisher's current release is not chosen as the range. The cap covers that range only: `bun update` then resolves the lockfile within it by its own rules and can pick a release above `latest`. The installs run with `--ignore-scripts`, so no package's install script runs during an update; a later plain `bun install` runs the trusted ones, so read the lockfile diff first. The pins:
 
@@ -93,7 +100,7 @@ The commit permalinks in `docs/pi/` are research references and stay as written.
 Everything is configured in `bunfig.toml`. Bun's own `check`, `lint` and `fmt` are the tools (`eslint-plugin-jsdoc` runs inside `bun lint`); the repository adds none beside them.
 
 - **Type-aware lint with type-check and zero warnings** (`typeAware`, `typeCheck`, `maxWarnings = 0`). The `correctness` category is an error. `consistent-type-imports`, `no-floating-promises` and `no-misused-promises` catch errors the type-checker accepts, such as a dropped promise.
-- **Effect enforcement.** In `packages/runtime/src` the lint forbids `async` and `await`, `new Promise`, `try`/`catch` and `Promise` statics. Failures there are tagged Effect errors and effects are composed with Effect; `Effect.runPromise` is for integration boundaries only. One error model keeps failures typed and visible in signatures, and keeps the runtime's behavior testable without exceptions. The plugin generator (`packages/integrations/claude`) is outside the override and uses plain async code.
+- **Effect enforcement.** In `packages/runtime/src` the lint forbids `async` and `await`, `new Promise`, `try`/`catch` and `Promise` statics. Failures there are tagged Effect errors and effects are composed with Effect; `Effect.runPromise` is for integration boundaries only. One error model keeps failures typed and visible in signatures, and keeps the runtime's behavior testable without exceptions. The generators (`packages/integrations/claude` and `packages/integrations/pi`) are outside the override and use plain async code.
 - **JSDoc on the public API.** `jsdoc/require-jsdoc` covers exported functions, classes, methods, interfaces, type aliases, enums and exported variables, and the formatter keeps JSDoc tidy (`jsdoc = true`). Skills open their description with the situation, so a model can tell when to load them.
 - **Formatting.** No semicolons, 100 columns, `sortImports` and `sortPackageJson` so imports and `package.json` keys have one order and diffs carry no reordering noise. `bracketSameLine` keeps the closing `>` of a multi-line tag on its last attribute line. The maintainer requested these three options; the repository has no JSX yet, so `bracketSameLine` only fixes the style for later UI code.
 
@@ -104,7 +111,8 @@ Everything is configured in `bunfig.toml`. Bun's own `check`, `lint` and `fmt` a
 1. `lint`: `bunx --no-install mise run lint:fix -- --staged`, then `stage_fixed` re-stages what lint changed (the `bun lint` docs do not say that `--staged --fix` stages again).
 2. `fmt`: `bunx --no-install mise run fmt -- --staged`, re-staged (Bun leaves a partly staged file unwritten rather than committing its unstaged changes).
 3. `build`: `bunx --no-install mise run build`, then `git add -A --` on exactly the generated paths, deletions included, so a commit always carries a plugin in step with its sources.
-4. `versions`: when the root `package.json` is staged, `git add --` on `packages/runtime/package.json`, `packages/integrations/claude/package.json` and `bun.lock`, the copies `build` rewrites, so a version bump carries every copy of the version; otherwise they are left alone.
+4. `build-pi`: `git add -A --` on the Pi package's generated path, `packages/integrations/pi/dist` (`GENERATED_PATHS` in its `src/generate.ts`); the build job already built it.
+5. `versions`: when the root `package.json` is staged, `git add --` on `packages/runtime/package.json`, `packages/integrations/claude/package.json`, `packages/integrations/pi/package.json` and `bun.lock`, the copies `build` rewrites, so a version bump carries every copy of the version; otherwise they are left alone.
 
 ## The generated plugin
 
@@ -126,9 +134,21 @@ Do not edit generated files; each carries a note naming its source. `.prettierig
 
 `packages/integrations/claude/tests/plugin.test.ts` is the sync test: every committed generated file equals a fresh build byte for byte, the generated paths hold nothing the build does not make (apart from the vendored tools, which `vendor.test.ts` checks against their pins), the build is deterministic, the wrapper is the one executable file, and the commit hook stages exactly `GENERATED_PATHS`. Other tests there cover the hooks (the `Workflow` hook's allowed and refused scripts among them) and the plugin manifest.
 
+## The generated Pi package
+
+`mise run build` also runs `packages/integrations/pi/build.ts`, which removes `packages/integrations/pi/dist/` (`GENERATED_PATHS` in `src/generate.ts`) and writes it again from:
+
+- `packages/runtime/src/instructions/<family>/skills/`, the same sources as the Claude plugin's skills, through `skillFiles` in the runtime's `instructions/skills.ts`, which both generators call. The family is a parameter of `generate` and `PI_FAMILY` is its value (`claude-5.5` until another family is listed in `families.ts`);
+- `packages/integrations/pi/src/extension.ts`, a default-exported factory that takes Pi's `ExtensionAPI` and registers nothing yet, bundled with `Bun.build` for Node as ESM into `extensions/holyagent.js`. The host modules (the `peerDependencies` of the package's `package.json`, and their subpaths) stay imports;
+- `packages/integrations/pi/package.json`, whose `version` the build first syncs from the root and whose `peerDependencies` the generated manifest carries.
+
+The generated `package.json` has the `pi-package` keyword, a `pi` key listing `./extensions` and `./skills`, and the host modules as `peerDependencies` with the range `*`. Each generated file that can hold a comment carries a note naming its source; JSON has none. The root `package.json` has its own `pi` key that points at the same folders under `packages/integrations/pi/dist/`, because `pi install git:<repo>#<ref>` installs the repository root. `.prettierignore` and `.eslintignore` list the folder.
+
+`packages/integrations/pi/tests/pi.test.ts` is its sync test: every committed generated file equals a fresh build byte for byte, the generated path holds nothing the build does not make, the build is deterministic, the commit hook stages exactly `GENERATED_PATHS`, the manifest and the root `pi` key name the same folders, the skills are those of the family, the extension registers nothing, and the host modules are not bundled.
+
 ## Versioning
 
-Versions follow ZeroVer, `0.X.Y`: the major stays 0, a minor bump advances X and resets Y, and a patch bump advances Y; 0.1.0 was the first release. The version lives in the root `package.json` only, and `mise run bump:patch` or `bump:minor` is the only way it changes: `scripts/bump-version.ts` edits that file and nothing else. `mise run build` then runs `bun scripts/bump-version.ts sync`, which copies the version into `packages/runtime/package.json`, `packages/integrations/claude/package.json` and the workspace entries of `bun.lock`, and generates `plugin.json` and `.claude-plugin/marketplace.json` from the integration's copy; the bundled CLI's `--version` reads the root `package.json`. The workspace manifests keep a `version` field because Bun workspaces and the plugin generator read their own package's, so the build writes it rather than the field being dropped. `scripts/bump-version.test.ts` fails when any copy differs from the source. The branch model that carries a version to a release is below.
+Versions follow ZeroVer, `0.X.Y`: the major stays 0, a minor bump advances X and resets Y, and a patch bump advances Y; 0.1.0 was the first release. The version lives in the root `package.json` only, and `mise run bump:patch` or `bump:minor` is the only way it changes: `scripts/bump-version.ts` edits that file and nothing else. `mise run build` then runs `bun scripts/bump-version.ts sync`, which copies the version into `packages/runtime/package.json`, `packages/integrations/claude/package.json`, `packages/integrations/pi/package.json` and the workspace entries of `bun.lock`, and generates `plugin.json` and `.claude-plugin/marketplace.json` from the Claude integration's copy and the Pi package's `package.json` from the Pi integration's; the bundled CLI's `--version` reads the root `package.json`. The workspace manifests keep a `version` field because Bun workspaces and the plugin generator read their own package's, so the build writes it rather than the field being dropped. `scripts/bump-version.test.ts` fails when any copy differs from the source. The branch model that carries a version to a release is below.
 
 ## Branches, CI and releases
 
@@ -138,7 +158,7 @@ Each release `0.X.Y` has an integration branch, `release/0.X.Y/integration`, cut
 
 | Check          | Runs on              | Does                                                                                                                                                       |
 | -------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `check`        | PRs and calls        | The gates, the generated-plugin freshness check, plugin validation and shellcheck                                                                          |
+| `check`        | PRs and calls        | The gates, the freshness check of the generated plugin and Pi package, plugin validation and shellcheck                                                    |
 | `windows`      | PRs and calls        | The test suite on `windows-latest`                                                                                                                         |
 | `installers`   | PRs and calls        | Parses both installers                                                                                                                                     |
 | `branch-model` | PRs only             | `scripts/pr-checks.ts branch-model <base> <head>`: the three branch rules in AGENTS.md, after the inline guard, which runs first, fails a head from a fork |

@@ -3,8 +3,5 @@
   "version": "0.3.0",
   "description": "The holyagent integration for Claude Code: generates the plugin from the runtime.",
   "license": "Apache-2.0",
-  "type": "module",
-  "dependencies": {
-    "@holyagent/runtime": "workspace:*"
-  }
+  "type": "module"
 }

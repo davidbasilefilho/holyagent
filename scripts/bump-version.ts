@@ -84,13 +84,15 @@ export const VERSION_SOURCE = "package.json"
 
 /**
  * The workspace manifests that carry a copy of the version, relative to the repository root. Bun
- * workspaces and the plugin generator read their own package's `version`, so the copy stays and
+ * workspaces and the generators read their own package's `version`, so the copy stays and
  * `syncVersions` writes it. The plugin and marketplace manifests are generated from the Claude
- * integration's copy by `mise run build`, and the CLI's `--version` reads the root manifest.
+ * integration's copy and the Pi package manifest from the Pi integration's by `mise run build`, and
+ * the CLI's `--version` reads the root manifest.
  */
 export const VERSION_COPIES: ReadonlyArray<string> = [
   "packages/runtime/package.json",
   "packages/integrations/claude/package.json",
+  "packages/integrations/pi/package.json",
 ]
 
 /** The lockfile of a Bun workspace repository, relative to the repository root. */

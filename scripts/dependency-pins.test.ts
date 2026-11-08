@@ -260,6 +260,18 @@ describe("package dependencies", () => {
     ])
   })
 
+  test("leaves out the Pi host peers, whose range * the updater must not move", () => {
+    expect(
+      packageDependencies({
+        peerDependencies: { typebox: "*", "@earendil-works/pi-ai": "*", other: "*" },
+        devDependencies: { typebox: "*" },
+      }),
+    ).toEqual([
+      { field: "devDependencies", name: "typebox", range: "*" },
+      { field: "peerDependencies", name: "other", range: "*" },
+    ])
+  })
+
   test("sets ranges by field and name and keeps the rest", () => {
     const result = withPackageRanges(manifest, [
       { field: "devDependencies", name: "mise", range: "^2026.0.0" },
