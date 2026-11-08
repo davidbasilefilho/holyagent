@@ -1,0 +1,58 @@
+{
+  "id": "assignment-0mw7i8f25-qdya",
+  "intentId": "intent-0mw6muuvl-zq3p",
+  "intentRevision": 7,
+  "roleTask": "Worker.implementation",
+  "slug": "close-the-small-report-reader-and",
+  "objective": "Close the small report-reader and documentation findings of the launcher review.",
+  "state": "Running",
+  "scope": [
+    "Work only in /home/user/holyagent-0.3.0-launcher (branch release/0.3.0/feat/pi-launcher, head e55ee8f). The launcher change (7bae86c..e55ee8f) ships the eighteen specialists as @tintinweb/pi-subagents package agents; package source at /home/user/holyagent-notes/pi-probe/node_modules/@tintinweb/pi-subagents. Read the code before changing it.",
+    "(1) docs/pi/orchestration.md line 9 and line 25 still say the launcher and the extension are not built, and line 144 maps aborted to interrupted while the status table maps it to failed; make them match the code (aborted is failed, a user stop is stopped; the launcher ships as package agents with extension glue).",
+    "(2) piRecordReports (packages/runtime/src/cli/report.ts or packages/runtime/src/pi/journal.ts) ignores pi-workflow: Assignments in session-file mode without listing them; list them as not readable from a session file (point to the workflow journal), the way unmatched entries are listed, with a test."
+  ],
+  "constraints": [
+    "Edit only the ownership paths; no version-control writes and no edits under .git/ or .holyagent/.",
+    "Effect and JSDoc per .claude/CLAUDE.md.",
+    "Do not run pi or any live model.",
+    "Run bunx --no-install mise run verify after the other writer in the same tree may also be editing; if verify fails only on files outside your ownership, say so with the failing file names. Report the exit code (echo $?) and counts.",
+    "Write the diff to /home/user/holyagent-notes/launcher-g.diff and give it as diff-file evidence.",
+    "Start each evidence line with the criterion text, then a colon.",
+    "Report in under 250 words."
+  ],
+  "criteria": [
+    {
+      "text": "orchestration.md states the built launcher and maps aborted to failed everywhere",
+      "blocking": false,
+      "dimension": "scope"
+    },
+    {
+      "text": "Session-file mode lists pi-workflow Assignments it cannot read, with a test",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run verify exits 0 on the owned files",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "docs/pi/orchestration.md",
+    "packages/runtime/src/cli/report.ts",
+    "packages/runtime/src/pi/journal.ts",
+    "packages/runtime/tests/cli/report.test.ts",
+    "packages/runtime/tests/pi/journal.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T07:22:13.949Z"
+  },
+  "createdAt": "2026-11-08T07:22:13.949Z"
+}
