@@ -77,5 +77,41 @@
     "finishedAt": "2026-11-08T05:13:36.417Z"
   },
   "result": "result: Every Pi package HolyAgent enables is now an exact pin in one table that `piPackages`, `providerSource` and the updater all use. The four ride-along notes are done. verify exited 0 and build left no generated changes.\n\nchanged:\n- packages/runtime/src/config/pi-packages.json (new)\n- packages/runtime/src/config/pi-packages.ts (new)\n- packages/runtime/src/config/packages.ts\n- packages/runtime/src/pi/provider.ts\n- packages/runtime/src/pi/catalog.ts\n- packages/runtime/src/pi/readiness.ts\n- packages/runtime/tests/config/packages.test.ts\n- packages/runtime/tests/pi/provider.test.ts\n- packages/runtime/tests/pi/catalog.test.ts\n- packages/runtime/tests/pi/readiness.test.ts\n- scripts/dependency-pins.ts\n- scripts/dependency-pins.test.ts\n- scripts/update-dependencies.ts\n- scripts/update-dependencies.test.ts\n- docs/pi/README.md\n- docs/pi/installation.md\n- docs/pi/providers.md\n- docs/pi/configuration.md\n\nThe brief listed `scripts/pi-packages.json`, but I put the table inside the runtime package so runtime never imports from `scripts/`. I did not create that file.\n\nchecks:\n- `bunx --no-install mise run verify` -> exit 0: check, lint and fmt:check clean, 1886 pass, 0 fail.\n- `bunx --no-install mise run build` -> exit 0; `git status` shows no generated-output changes.\n- Focused tests on pi, config and the two scripts -> 191 pass.\n\nblockers: none\nquestions: none\n\nnotes:\n- All eight versions come from `/home/user/holyagent-notes/pi-deps.md`: pi-provider-kimi-code 0.6.13, @tintinweb/pi-subagents 0.23.1, billion-context 0.1.212, @juicesharp/rpiv-todo 2.15.0, @juicesharp/rpiv-ask-user-question 2.15.0, @aliou/pi-processes 0.13.6, @amaster.ai/pi-computer-use 0.1.36, pi-web-kit 0.5.0.\n- The Pi host (1.5.0) is not in the table, so `deps:update` does not move it. The docs said it did; I reworded the README and installation lines to name the extension pins only.\n- Docs outside my ownership still claim the updater re-records the CI fixtures, which it does not. Examples are `docs/pi/orchestration.md`, `t3-code.md`, `extensions.md` and `caching-and-subagents.md`.\n- AGENTS.md and `docs/development.md` list the pin kinds without Pi packages, so the root should add them.\n- Catalog failure detail now reads stdout first, then stderr, so it matches readiness. It previously read stderr first.\n- A listing is now parsed as rows only when a line has as many columns as the header. Real `pi --list-models` output was not available, so that rule rests on the synthesized table.\n\nevidence:\n- Every Pi package HolyAgent enables has one exact pinned version that piPackages and providerSource both read: `pi-packages.json` and `pi-packages.ts`. `PiPackageName` is a type error if a package has no pin. Tests in `packages.test.ts` (table equals the packages named in code, exact versions, sources) and `provider.test.ts` pass.\n- mise run deps:update moves the Pi package pins and deps:check fails when one is behind, with fixture tests: `surveyPiPackages`, `nextPiVersion`, `withPiPackageVersions` and `renderPiPackages` in the `scripts/` files, and `renderPiPins` in `applySurvey`. Tests use a local fixture registry and cover latest cap, deprecated, prerelease, no downgrade and a `--check` failure with count 2. Passing.\n- The catalog parser decodes rows with Schema, ignores non-row lines, and reports an empty listing distinctly, with tests: `catalog.ts` (`CatalogRow`, `NoModelsListed`, `outputDetail`) with tests in `catalog.test.ts` and `readiness.test.ts`.\n- Docs state the exact pins, the updater path and that the launcher functions are provided for the launcher: `docs/pi/README.md`, `installation.md`, `providers.md` and `configuration.md` edited. \"0.6 line\" is gone (grep finds none).\n- bunx --no-install mise run verify exits 0 and mise run build leaves generated output in sync: verify exit 0, 1886 pass; build exit 0 with no dist changes in `git status`.\n- changed-paths: the 18 paths in `changed:` above.\n- diff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/diff.patch\n",
+  "acceptance": {
+    "revision": 9,
+    "rationale": "Provider work confirmed by reviews 3xjk, xm1q, nb2j and 8rme; the last doc mismatch fixed in 6de0371 (diff read); verify 1890 pass",
+    "criteria": [
+      {
+        "criterion": "Every Pi package HolyAgent enables has one exact pinned version that piPackages and providerSource both read",
+        "support": "`pi-packages.json` and `pi-packages.ts`. `PiPackageName` is a type error if a package has no pin. Tests in `packages.test.ts` (table equals the packages named in code, exact versions, sources) and `provider.test.ts` pass."
+      },
+      {
+        "criterion": "mise run deps:update moves the Pi package pins and deps:check fails when one is behind, with fixture tests",
+        "support": "`surveyPiPackages`, `nextPiVersion`, `withPiPackageVersions` and `renderPiPackages` in the `scripts/` files, and `renderPiPins` in `applySurvey`. Tests use a local fixture registry and cover latest cap, deprecated, prerelease, no downgrade and a `--check` failure with count 2. Passing."
+      },
+      {
+        "criterion": "The catalog parser decodes rows with Schema, ignores non-row lines, and reports an empty listing distinctly, with tests",
+        "support": "`catalog.ts` (`CatalogRow`, `NoModelsListed`, `outputDetail`) with tests in `catalog.test.ts` and `readiness.test.ts`."
+      },
+      {
+        "criterion": "Docs state the exact pins, the updater path and that the launcher functions are provided for the launcher",
+        "support": "`docs/pi/README.md`, `installation.md`, `providers.md` and `configuration.md` edited. \"0.6 line\" is gone (grep finds none)."
+      },
+      {
+        "criterion": "bunx --no-install mise run verify exits 0 and mise run build leaves generated output in sync",
+        "support": "verify exit 0, 1886 pass; build exit 0 with no dist changes in `git status`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "the 18 paths in `changed:` above."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/diff.patch"
+      }
+    ]
+  },
   "createdAt": "2026-11-08T05:06:30.880Z"
 }
