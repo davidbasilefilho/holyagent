@@ -1,0 +1,58 @@
+{
+  "id": "assignment-0mw79029v-8tm8",
+  "intentId": "intent-0mw6muu7q-dpbs",
+  "intentRevision": 5,
+  "roleTask": "Worker.implementation",
+  "slug": "write-the-kimi-k3-1-instruction-set-for",
+  "objective": "Write the Kimi K3.1 instruction set for root/ (16 files) and the two session-*.md files of packages/runtime/src/instructions, from the requirements tree and kimi-k3.1/guide.md, for HolyAgent under pi.",
+  "state": "Ready",
+  "scope": [
+    "Work only in /home/user/holyagent-0.3.0-kimi (branch release/0.3.0/feat/kimi-instructions). Three other writers translate the other parts of the tree in parallel in the same worktree; write only your paths.",
+    "Read first: packages/runtime/AGENTS.md, .claude/skills/requirements/SKILL.md (the procedure; follow its translation and coverage sections), packages/runtime/src/instructions/kimi-k3.1/guide.md (K1-K45, the guide every file follows), packages/runtime/src/instructions/families.ts and coverage.ts, and the instruction-writing skill packages/runtime/src/instructions/claude-5.5/skills/instruction-writing/SKILL.md for the house style.",
+    "For each Markdown file under your paths in packages/runtime/src/instructions/requirements/, write packages/runtime/src/instructions/kimi-k3.1/<same path> from its requirements (the - R-ID lines and - See lines) following kimi-k3.1/guide.md, not by adapting the Claude wording: the agent guide's structure (a short role prompt with role, workflow and quality boundaries; details in tool descriptions and on-demand skills), the prompt best-practice guide and the K3.1 Pro quickstart. Where a rule departs from the Claude set's wording because of the guide, cite the guide point (K<n>) in a short HTML comment beside it, the way the Claude set cites Anthropic.",
+    "When a requirements file is empty or does not cover everything its claude-5.5 file says, the claude-5.5 file's rules are the spec for that content: restate them for Kimi per the guide, keep their meaning, and list in your report each such rule (file, short text) so it can become a requirement later. Never drop a rule.",
+    "Host words for pi: the Kimi set runs under the pi coding agent (1.5.0). Its built-in tools are read, bash, edit, write, grep, find and ls; codemode runs in mode only, so the model calls tools from codemode JavaScript, while model-only tools such as ask_user_question stay directly callable (pi docs: /home/user/holyagent-notes/pi-probe/docs/codemode.md, extensions.md). Specialists are launched with @tintinweb/pi-subagents (tools Agent, SubagentWorkflow, get_subagent_result, steer_subagent); the task list is rpiv-todo's todo tool; questions to the person go through ask_user_question; web research uses the web tool of the enabled web feature; T3 Code's browser and preview tools are named only as optional. Agent ids are recorded as pi:<id> and pi-workflow:<run>/<id> (docs/pi/orchestration.md). HolyAgent's CLI is reached through the package's scripts/holyagent wrapper. The scratchpad becomes the system temp area. Pi loads AGENTS.md and CLAUDE.md from the agent directory, the working directory and its parents, so the specialist text drops the sentence that AGENTS.md is not loaded. K3.1 constraints: thinking is always on and effort is set by the route (never by prose), temperature and top_p are not set, and the full assistant message is passed back; do not rely on tool_choice required.",
+    "Cache rules (requirements R-CACHE-*): static material first, no dates, counters or mid-session roster changes in the text.",
+    "Coverage: for every requirement id in your files, write its kimi-k3.1 coverage entry (same shape as the claude-5.5 entries in coverage.ts: section file and a phrase that appears in it, or carriedBy) into /home/user/holyagent-notes/kimi-coverage-root.ts as a plain object literal keyed by id; do not edit coverage.ts or families.ts, which an integration step changes after all four parts are done. Check each phrase really occurs in your file."
+  ],
+  "constraints": [
+    "The maintainer's requirements in the Intent in use bind: written to Moonshot's guides rather than adapted from the Claude 5.5 wording, citing the guide section a departing rule follows; same rules as the Claude agents.",
+    "Write only under packages/runtime/src/instructions/kimi-k3.1/root, packages/runtime/src/instructions/kimi-k3.1/session-reminder.md, packages/runtime/src/instructions/kimi-k3.1/session-cloud-identity.md and /home/user/holyagent-notes/kimi-coverage-root.ts. Do not touch claude-5.5/, requirements/, coverage.ts, families.ts or generated output.",
+    "Make no version-control writes. bunx --no-install mise run fmt:check and lint must pass for your files; the full verify runs after integration.",
+    "Report in under 350 words, listing the rules carried from claude-5.5 files that have no requirement."
+  ],
+  "criteria": [
+    {
+      "text": "Every Markdown requirements file under the assigned paths has its kimi-k3.1 file at the same path, written to the Kimi guide",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Every requirement id and every rule of the matching claude-5.5 file is carried with its meaning",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Every id has a kimi coverage entry whose phrase occurs in the named file",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Host words are pi's, with no Claude Code tool names or plugin paths left",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "coverage-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions/kimi-k3.1/root",
+    "packages/runtime/src/instructions/kimi-k3.1/session-reminder.md",
+    "packages/runtime/src/instructions/kimi-k3.1/session-cloud-identity.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-08T03:03:47.588Z"
+}
