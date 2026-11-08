@@ -1,4 +1,4 @@
-import { join, resolve } from "node:path"
+import nodePath, { join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import type {
@@ -10,6 +10,7 @@ import type {
 import { Cause, Data, Effect, Schema } from "effect"
 
 import { Config } from "../../../runtime/src/config/schema.ts"
+import { toPosix } from "../../../runtime/src/domain/paths.ts"
 import {
   DEFAULT_PI_ROLE,
   parseOutput,
@@ -109,6 +110,17 @@ export interface ExtensionOptions {
   readonly deadlineMs?: number
 }
 
+/**
+ * The wrapper script of an installed package, written with `/` only. The shell reads a `$0` without
+ * a `/` as a bare name and refuses it, which a Windows path (`C:\pkg\scripts\holyagent`) is; Git
+ * for Windows' `sh` takes the `C:/pkg/scripts/holyagent` form. The path module is a parameter so a
+ * test can stand in for Windows.
+ */
+export const wrapperPath = (
+  packageRoot: string,
+  platformPath: Pick<typeof nodePath, "join" | "sep"> = nodePath,
+): string => toPosix(platformPath.join(packageRoot, "scripts", "holyagent"), platformPath.sep)
+
 const oneLine = (text: string): string => text.replace(/\s+/g, " ").trim()
 
 const notice = (text: string): Delivery => ({
@@ -141,7 +153,7 @@ export const createExtension =
     deadlineMs = SESSION_DEADLINE_MS,
   }: ExtensionOptions = {}) =>
   (pi: ExtensionAPI): void => {
-    const wrapper = join(packageRoot, "scripts", "holyagent")
+    const wrapper = wrapperPath(packageRoot)
     let held: Held | undefined
 
     // Every program starts in the package's own folder, never the project's: on Windows a bare

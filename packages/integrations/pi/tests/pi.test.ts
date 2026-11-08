@@ -3,6 +3,9 @@ import { readFileSync, statSync } from "node:fs"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
+import { pathToFileURL } from "node:url"
+
+import { $ } from "bun"
 
 import { PI_HOST_PACKAGES } from "../../../../scripts/dependency-pins.ts"
 import { toPosix } from "../../../runtime/src/domain/paths.ts"
@@ -140,15 +143,28 @@ describe("the package manifest", () => {
   })
 })
 
+/**
+ * True when the file of the repository can be run: its execute bit where the file system keeps one,
+ * and on Windows, which keeps none, the mode the repository commits for it, which is what a
+ * checkout on POSIX gives it.
+ */
+const isExecutable = async (path: string, platform: string = process.platform) =>
+  platform === "win32"
+    ? (await $`git ls-files -s -- ${path}`.cwd(REPOSITORY).quiet().text()).startsWith("100755 ")
+    : (statSync(path).mode & 0o111) !== 0
+
 describe("the runtime scripts", () => {
   const scriptsOf = (path: string) =>
     generated.find((file) => file.path === `${DIST_DIRECTORY}/${path}`)
 
-  test("the package ships the wrapper, its empty Bun config and the runtime bundle", () => {
+  test("the package ships the wrapper, its empty Bun config and the runtime bundle", async () => {
     for (const path of ["scripts/holyagent", "scripts/empty-bunfig.toml", "scripts/holyagent.js"])
       expect({ path, shipped: scriptsOf(path) !== undefined }).toEqual({ path, shipped: true })
     expect(scriptsOf("scripts/holyagent")?.executable).toBe(true)
-    expect(statSync(join(REPOSITORY, DIST_DIRECTORY, "scripts/holyagent")).mode & 0o111).not.toBe(0)
+    const wrapper = join(REPOSITORY, DIST_DIRECTORY, "scripts/holyagent")
+    expect(await isExecutable(wrapper)).toBe(true)
+    // The committed mode, which Windows reads in place of the execute bit it lacks.
+    expect(await isExecutable(wrapper, "win32")).toBe(true)
   })
 
   test("the manifest lists the extension, script and skill folders as the package files, and they exist", () => {
@@ -173,7 +189,8 @@ describe("the runtime scripts", () => {
 
   test("the bundle answers config and otherwise is the CLI", async () => {
     const root = await mkdtemp(join(tmpdir(), "holyagent-pi-bundle-run-"))
-    const script = join(REPOSITORY, DIST_DIRECTORY, "scripts/holyagent")
+    // `/` only: the shell reads a script path without one as a bare name, as it is on Windows.
+    const script = toPosix(join(REPOSITORY, DIST_DIRECTORY, "scripts/holyagent"))
     const call = async (...args: Array<string>) => {
       const child = Bun.spawn(["sh", script, ...args], {
         cwd: root,
@@ -259,7 +276,7 @@ describe("the extension", () => {
         node,
         "--input-type=module",
         "-e",
-        `const m = await import(${JSON.stringify(join(REPOSITORY, DIST_DIRECTORY, EXTENSION_OUTPUT))}); process.stdout.write(typeof m.default + " " + typeof globalThis.Bun)`,
+        `const m = await import(${JSON.stringify(pathToFileURL(join(REPOSITORY, DIST_DIRECTORY, EXTENSION_OUTPUT)).href)}); process.stdout.write(typeof m.default + " " + typeof globalThis.Bun)`,
       ],
       { stdout: "pipe", stderr: "pipe" },
     )

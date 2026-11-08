@@ -1,13 +1,14 @@
 import { describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { isAbsolute, join, resolve } from "node:path"
+import { isAbsolute, join, resolve, win32 } from "node:path"
 
 import type { ExecResult, ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent"
 import { Effect } from "effect"
 
 import { CONTEXT_BUDGET, SESSION_REMINDER } from "../../../runtime/src/cli/sessioncontext.ts"
 import { defaultConfig } from "../../../runtime/src/config/schema.ts"
+import { toPosix } from "../../../runtime/src/domain/paths.ts"
 import {
   PI_ROOT_CORE,
   PI_ROOT_PLACEHOLDER,
@@ -21,11 +22,14 @@ import {
   NOTICE_MESSAGE,
   ROLE_FLAG,
   SESSION_DEADLINE_MS,
+  wrapperPath,
 } from "../src/extension.ts"
 import { DIST_DIRECTORY, REPOSITORY } from "../src/files.ts"
 
 const PACKAGE_ROOT = join(REPOSITORY, DIST_DIRECTORY)
-const WRAPPER = join(PACKAGE_ROOT, "scripts", "holyagent")
+// The shell reads a script path without a `/` as a bare name, so the extension names it with `/`
+// only, drive letter included on Windows.
+const WRAPPER = toPosix(join(PACKAGE_ROOT, "scripts", "holyagent"))
 const CONFIG = JSON.stringify(await Effect.runPromise(defaultConfig))
 const DISABLED = JSON.stringify({
   ...(await Effect.runPromise(defaultConfig)),
@@ -348,6 +352,11 @@ describe("what runs and when", () => {
     await done()
   })
 
+  test("the wrapper of a Windows package is named with / only, so sh does not take it for a bare name", () => {
+    expect(wrapperPath("C:\\Users\\me\\pkg", win32)).toBe("C:/Users/me/pkg/scripts/holyagent")
+    expect(wrapperPath("/opt/pkg")).toBe("/opt/pkg/scripts/holyagent")
+  })
+
   test("the wrapper is the only way to the runtime: sh with the package's scripts/holyagent", async () => {
     const { directory, done } = await withState()
     const { api } = await run(healthy(directory), { start: { reason: "resume" } })
@@ -364,7 +373,12 @@ describe("what runs and when", () => {
       })
     }
     const commands = startedWith(api.calls)
-    for (const expected of ["config /work/project/.holyagent", "status", "reconcile", "state mode"])
+    for (const expected of [
+      `config ${join("/work/project", ".holyagent")}`,
+      "status",
+      "reconcile",
+      "state mode",
+    ])
       expect(commands).toContain(expected)
     await done()
   })
