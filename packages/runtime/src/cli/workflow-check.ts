@@ -17,6 +17,19 @@ import { ROUTES } from "../domain/route.ts"
 // (`[...a, ...a]`, `a.concat(a)`), an array is not given a length or a far index, and what loops,
 // data iteration and calls multiply stays under a total. Nothing here runs the script.
 
+/**
+ * `<!--` and `-->` start a comment in a classic script, which is how the Pi runtime compiles the
+ * script, and are operators in the module this check parses; any script that holds either is read
+ * two ways, so it is refused.
+ */
+const HTML_COMMENT = /<!--|-->/
+
+/**
+ * The line the Pi runtime takes for `export const meta =` (its own pattern): it evaluates the
+ * object after it before the script runs, so the check must have vetted that very export.
+ */
+const META_DECLARATION = /(^|[\r\n])[ \t]*export[ \t\r\n]+const[ \t\r\n]+meta[ \t\r\n]*=/g
+
 /** A node of the syntax tree, read loosely: the walk checks every type before it reads a field. */
 interface JsNode {
   readonly type: string
@@ -817,6 +830,8 @@ const occurrencesIn = (
  */
 const inspect = (script: string, specialists: ReadonlySet<string>): string | undefined => {
   if (script.length > MAX_WORKFLOW_SCRIPT) return "the script is too large"
+  if (HTML_COMMENT.test(script))
+    return "contains `<!--` or `-->`, which only a classic script reads as a comment"
   const program = parse(script, {
     ecmaVersion: "latest",
     sourceType: "module",
@@ -1489,6 +1504,10 @@ const inspect = (script: string, specialists: ReadonlySet<string>): string | und
       case "VariableDeclaration":
         return variableDeclaration(node, scope, depth)
       case "FunctionDeclaration": {
+        // A classic script hoists a function declared in a block to the function around it, a
+        // module keeps it in the block; no name may mean two things, so only a function body
+        // (or the script) declares functions.
+        if (!scope.isFunction) refuse("declares a function inside a block")
         const name = nameOf(nodeAt(node, "id")) ?? ""
         declare(scope, name, "unsafe")
         scope.names.get(name)?.functions.add(node)
@@ -2212,12 +2231,14 @@ const inspect = (script: string, specialists: ReadonlySet<string>): string | und
 
   const moduleScope: Scope = { parent: undefined, names: new Map(), isFunction: true }
   let exported = 0
+  const exportStarts: Array<unknown> = []
   for (const node of nodesAt(program, "body")) {
     if (node?.type !== "ExportNamedDeclaration") {
       statement(node, moduleScope, 1)
       continue
     }
     exported += 1
+    exportStarts.push(node["start"])
     const declaration = nodeAt(node, "declaration")
     const declarators = nodesAt(declaration ?? node, "declarations")
     const meta = declarators[0]
@@ -2233,6 +2254,14 @@ const inspect = (script: string, specialists: ReadonlySet<string>): string | und
       refuse("exports anything but `export const meta = { … }` of literals")
     moduleScope.names.set("meta", { ...newBinding(), unsafe: true })
   }
+  // The runtime reads `meta` from the first line that starts `export const meta =`, wherever it
+  // stands (a comment, a string), and evaluates it before the script runs. Only the checked
+  // export may be that line.
+  const claimed = [...script.matchAll(META_DECLARATION)].map((found) =>
+    script.indexOf("export", found.index),
+  )
+  if (claimed.length !== exportStarts.length || claimed.some((at, i) => at !== exportStarts[i]))
+    refuse("has a line that reads as `export const meta =` other than the one export")
 
   for (const reference of references) {
     const held = binding(reference.scope, reference.name)

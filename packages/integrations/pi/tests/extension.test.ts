@@ -1407,6 +1407,21 @@ describe("the SubagentWorkflow tool", () => {
     }
   })
 
+  test("any input but script and args is refused, though the script alone would pass", async () => {
+    const script = workflowScript("explorer-map")
+    expect(await refusedWorkflow({ script, args: { entries: [] } })).toBeUndefined()
+    for (const extra of [
+      { name: "saved" },
+      { scriptPath: "w.js" },
+      { resume: "run-1" },
+      { x: 1 },
+    ]) {
+      const result = await refusedWorkflow({ script, ...extra })
+      expect(result?.block).toBe(true)
+      expect(result?.reason).toContain("inline `script`")
+    }
+  })
+
   test("a script that cannot be read is refused", async () => {
     expect((await refusedWorkflow({ script: "agent(" }))?.block).toBe(true)
   })
@@ -1463,6 +1478,37 @@ describe("the gates and pi.enable", () => {
 
   test("with pi.enable on both tools are refused", async () => {
     const { api } = await run(healthy("/missing"))
+    for (const event of refusing)
+      expect(await api.emit("tool_call", event)).toEqual([expect.objectContaining({ block: true })])
+  })
+
+  test("pi.enable off in the project's config alone leaves both gates on, and the context off", async () => {
+    // The merged call names the project's state folder; the user's file is read alone, with none.
+    const { api, delivered } = await run((call, runtime) =>
+      runtime[0] === "config"
+        ? { stdout: runtime.length > 1 ? DISABLED : CONFIG }
+        : healthy("/missing")(call, runtime),
+    )
+    expect(delivered).toBeUndefined()
+    for (const event of refusing)
+      expect(await api.emit("tool_call", event)).toEqual([expect.objectContaining({ block: true })])
+  })
+
+  test("pi.enable off in the user's config lifts the gates", async () => {
+    const { api } = await run((call, runtime) =>
+      runtime[0] === "config" ? { stdout: DISABLED } : healthy("/missing")(call, runtime),
+    )
+    for (const event of refusing) expect(await api.emit("tool_call", event)).toEqual([undefined])
+  })
+
+  test("a user config that cannot be read leaves the gates on under a project that says off", async () => {
+    const { api } = await run((call, runtime) =>
+      runtime[0] === "config"
+        ? runtime.length > 1
+          ? { stdout: DISABLED }
+          : { code: 4, stderr: "error: ConfigInvalid: broken\n" }
+        : healthy("/missing")(call, runtime),
+    )
     for (const event of refusing)
       expect(await api.emit("tool_call", event)).toEqual([expect.objectContaining({ block: true })])
   })

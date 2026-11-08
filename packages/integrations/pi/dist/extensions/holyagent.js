@@ -2871,6 +2871,7 @@ var catchIf = /* @__PURE__ */ dual((args) => isEffect(args[0]), (self, predicate
   return f(error.success);
 }));
 var mapError = /* @__PURE__ */ dual(2, (self, f) => catchCause(self, (cause) => failCause(causeMap(cause, f))));
+var orElseSucceed = /* @__PURE__ */ dual(2, (self, f) => catch_(self, (error) => sync(() => f(error))));
 var result = (self) => matchEager(self, {
   onFailure: fail2,
   onSuccess: succeed2
@@ -3460,6 +3461,7 @@ var catch_2 = catch_;
 var catchCause2 = catchCause;
 var catchIf2 = catchIf;
 var mapError2 = mapError;
+var orElseSucceed2 = orElseSucceed;
 var timeoutOrElse2 = timeoutOrElse;
 var acquireUseRelease2 = acquireUseRelease;
 var runPromise2 = runPromise;
@@ -11945,6 +11947,8 @@ var routeFor = (roleTask) => ({
 });
 var ROUTES = RoleTask.literals.map(routeFor);
 
+var HTML_COMMENT = /<!--|-->/;
+var META_DECLARATION = /(^|[\r\n])[ \t]*export[ \t\r\n]+const[ \t\r\n]+meta[ \t\r\n]*=/g;
 var isNode = (value) => typeof value === "object" && value !== null && ("type" in value) && typeof value.type === "string";
 var nodeAt = (node, field) => {
   const value = node[field];
@@ -12418,6 +12422,8 @@ var occurrencesIn = (node, scope, into, depth = 0) => {
 var inspect = (script, specialists) => {
   if (script.length > MAX_WORKFLOW_SCRIPT)
     return "the script is too large";
+  if (HTML_COMMENT.test(script))
+    return "contains `<!--` or `-->`, which only a classic script reads as a comment";
   const program = parse(script, {
     ecmaVersion: "latest",
     sourceType: "module",
@@ -12949,6 +12955,8 @@ var inspect = (script, specialists) => {
       case "VariableDeclaration":
         return variableDeclaration(node, scope, depth);
       case "FunctionDeclaration": {
+        if (!scope.isFunction)
+          refuse("declares a function inside a block");
         const name = nameOf(nodeAt(node, "id")) ?? "";
         declare(scope, name, "unsafe");
         scope.names.get(name)?.functions.add(node);
@@ -13522,12 +13530,14 @@ var inspect = (script, specialists) => {
   }
   const moduleScope = { parent: undefined, names: new Map, isFunction: true };
   let exported = 0;
+  const exportStarts = [];
   for (const node of nodesAt(program, "body")) {
     if (node?.type !== "ExportNamedDeclaration") {
       statement(node, moduleScope, 1);
       continue;
     }
     exported += 1;
+    exportStarts.push(node["start"]);
     const declaration = nodeAt(node, "declaration");
     const declarators = nodesAt(declaration ?? node, "declarations");
     const meta = declarators[0];
@@ -13535,6 +13545,9 @@ var inspect = (script, specialists) => {
       refuse("exports anything but `export const meta = { … }` of literals");
     moduleScope.names.set("meta", { ...newBinding(), unsafe: true });
   }
+  const claimed = [...script.matchAll(META_DECLARATION)].map((found) => script.indexOf("export", found.index));
+  if (claimed.length !== exportStarts.length || claimed.some((at, i) => at !== exportStarts[i]))
+    refuse("has a line that reads as `export const meta =` other than the one export");
   for (const reference of references) {
     const held = binding(reference.scope, reference.name);
     const { name, use } = reference;
@@ -15796,6 +15809,7 @@ var refuseNonSpecialist = (event) => {
   };
 };
 var WORKFLOW_SPECIALISTS = new Set(SPECIALIST_NAMES);
+var INLINE_WORKFLOW_INPUTS = new Set(["script", "args"]);
 var present = (value) => typeof value === "string" && value.trim() !== "";
 var refuseNonSpecialistWorkflow = (event) => {
   if (event.toolName !== WORKFLOW_TOOL)
@@ -15805,6 +15819,8 @@ var refuseNonSpecialistWorkflow = (event) => {
     block: true,
     reason: `${reason} Start only HolyAgent specialists, by a string-literal agentType: ${SPECIALIST_NAMES.join(", ")}.`
   });
+  if (Object.keys(event.input).some((key) => !INLINE_WORKFLOW_INPUTS.has(key)))
+    return succeed5(refuse("A workflow is run only from an inline `script` and its `args`, with no other input."));
   if (present(scriptPath) || !present(script) && present(name))
     return succeed5(refuse("A workflow is run only from an inline `script`; a `scriptPath` or a saved `name` cannot be checked."));
   if (!present(script))
@@ -15915,17 +15931,20 @@ var createExtension = ({
     }));
   }));
   const stateFolderOf = (signal, project, located) => located.git ? holyagent(signal, project, "state", "mode").pipe(flatMap2((text) => parseOutput("state mode", text)), map4((where) => where["directory"])) : succeed5(join(located.top, STATE_DIRECTORY));
+  const decodeConfig = decodeUnknownEffect2(fromJsonString2(Config), {
+    onExcessProperty: "error"
+  });
   const collect = (cwd, signal, reason) => gen2(function* () {
     const project = resolve3(cwd);
     const located = yield* topOf(signal, project);
     const [config, folder] = yield* all2([
-      holyagent(signal, project, "config", join(located.top, STATE_DIRECTORY)).pipe(flatMap2(decodeUnknownEffect2(fromJsonString2(Config), {
-        onExcessProperty: "error"
-      }))),
+      holyagent(signal, project, "config", join(located.top, STATE_DIRECTORY)).pipe(flatMap2(decodeConfig)),
       result2(stateFolderOf(signal, project, located))
     ], { concurrency: "unbounded" });
-    if (!config.pi.enable)
-      return { enabled: false };
+    if (!config.pi.enable) {
+      const userOff = yield* holyagent(signal, project, "config").pipe(flatMap2(decodeConfig), map4((user) => !user.pi.enable), orElseSucceed2(() => false));
+      return userOff ? { enabled: false, gatesOff: true } : { enabled: false };
+    }
     const flag = isChild() ? "specialist" : pi.getFlag(ROLE_FLAG) ?? DEFAULT_PI_ROLE;
     const role = yield* decodeUnknownEffect2(PiRoleSchema)(flag).pipe(mapError2(() => new UnknownRole({ value: String(flag) })));
     const status = yield* holyagent(signal, project, "status").pipe(flatMap2((text) => parseOutput("status", text)));
@@ -15964,7 +15983,7 @@ var createExtension = ({
     taken.pending = collected.then((result) => {
       if (own.signal.aborted)
         return;
-      taken.disabled = result?.enabled === false;
+      taken.gatesOff = result?.gatesOff === true;
       return result;
     });
     return taken.pending.then(() => {
@@ -15978,7 +15997,7 @@ var createExtension = ({
   });
   pi.on("session_start", (event, ctx) => {
     release();
-    held = { current: undefined, pending: undefined, disabled: false };
+    held = { current: undefined, pending: undefined, gatesOff: false };
     return gather(held, ctx, event.reason);
   });
   pi.on("session_compact", (_event, ctx) => held === undefined ? undefined : gather(held, ctx, "compact"));
@@ -16006,7 +16025,7 @@ var createExtension = ({
     const message = failedFinalMessage(event.message);
     return message === undefined ? undefined : { message };
   });
-  pi.on("tool_call", (event) => held?.disabled === true ? undefined : runPromise2(refuseNonSpecialistWorkflow(event).pipe(map4((refusal) => refuseNonSpecialist(event) ?? refusal))));
+  pi.on("tool_call", (event) => held?.gatesOff === true ? undefined : runPromise2(refuseNonSpecialistWorkflow(event).pipe(map4((refusal) => refuseNonSpecialist(event) ?? refusal))));
   pi.on("session_shutdown", () => release());
 };
 var extension_default = createExtension();

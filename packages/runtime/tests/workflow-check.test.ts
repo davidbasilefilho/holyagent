@@ -879,3 +879,75 @@ describe("the workflow check lets the scripts the root writes run", () => {
     ).toBeUndefined()
   })
 })
+
+describe("the workflow check reads the script the way the Pi runtime does", () => {
+  // The runtime compiles the script as a classic script; the check parses a module. A construct the
+  // two read differently must be refused, or the check vets code that is not what runs.
+  test("refuses the HTML-like comment that hides a local workflow() from a classic script", async () => {
+    const reason = await refusal(
+      "let n = 0",
+      "n <!--n; function workflow() { return 1 }",
+      'await workflow({ scriptPath: "x.js" })',
+    )
+    expect(reason).toContain("<!--")
+  })
+
+  test("refuses `-->` at the start of a line, which a classic script reads as a comment", async () => {
+    const reason = await refusal("let n = 1", "/* a */ --> function workflow() { return 1 }")
+    expect(reason).toBeString()
+  })
+
+  test.each<readonly [string, string]>([
+    ["`<!--` as an operator sequence", "const a = 1\nconst b = a <!--a"],
+    ["`-->` as an operator sequence", "let n = 3\nconst done = n-->0"],
+    ["`<!--` in a string", "log('a <!-- b')"],
+    ["`-->` in a template", "log(`a --> b`)"],
+  ])("refuses %s anywhere in the source", async (_label, text) => {
+    expect(await refusal(text)).toContain("classic script")
+  })
+
+  test.each<readonly [string, string]>([
+    ["a block", "var f = () => 1\n{ function f() { return 2 } }\nlog(f())"],
+    ["an if", "const ok = true\nif (ok) { function g() { return 2 } }\nlog(1)"],
+    ["a loop body", "for (let i = 0; i < 2; i++) { function h() { return i } }"],
+    ["a case", "switch (1) { case 1: function k() { return 1 } }"],
+    ["a try block", "try { function t() { return 1 } } catch (e) { log(e) }"],
+  ])(
+    "refuses a function declared in %s, which a classic script hoists out of it",
+    async (_label, text) => {
+      expect(await refusal(text)).toBeString()
+    },
+  )
+
+  test("allows functions declared at the top of the script and of a function", async () => {
+    expect(
+      await refusal(
+        "function one(n) { return n + 1 }",
+        "function two(n) { function inner(m) { return one(m) }\nreturn inner(n) }",
+        "log(two(1))",
+      ),
+    ).toBeUndefined()
+  })
+
+  // The runtime evaluates the object after the first line that starts `export const meta =` before
+  // anything runs, in a context a literal can leave through `this.constructor`.
+  test.each<readonly [string, string]>([
+    [
+      "a comment",
+      `/*\nexport const meta = { name: this.constructor.constructor("return process")(), description: "d" }\n*/\n${AGENT}`,
+    ],
+    ["a template", `const text = \`\n${META}\n\`\n${AGENT}`],
+    ["a comment before the real export", `/*\n${META}\n*/\n${META}\n${AGENT}`],
+  ])("refuses a line that reads as the meta export inside %s", async (_label, script) => {
+    expect(await refusalOf(script)).toContain("export const meta")
+  })
+
+  test("refuses a meta export the runtime would not find", async () => {
+    expect(await refusalOf(`/* a */ ${META}\n${AGENT}`)).toContain("export const meta")
+  })
+
+  test("allows a script with its one meta export, or none", async () => {
+    expect(await refusalOf(`${META}\n${AGENT}`)).toBeUndefined()
+    expect(await refusalOf(AGENT)).toBeUndefined()
+  })
+})

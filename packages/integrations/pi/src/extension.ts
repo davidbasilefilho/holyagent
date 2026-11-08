@@ -156,6 +156,10 @@ export const refuseNonSpecialist = (event: {
 
 const WORKFLOW_SPECIALISTS: ReadonlySet<string> = new Set(SPECIALIST_NAMES)
 
+// The inputs of an inline workflow call; any other key (a scriptPath, a saved name, ...) makes the
+// package run something the script check did not read.
+const INLINE_WORKFLOW_INPUTS: ReadonlySet<string> = new Set(["script", "args"])
+
 const present = (value: unknown): value is string =>
   typeof value === "string" && value.trim() !== ""
 
@@ -179,6 +183,10 @@ export const refuseNonSpecialistWorkflow = (event: {
     block: true,
     reason: `${reason} Start only HolyAgent specialists, by a string-literal agentType: ${SPECIALIST_NAMES.join(", ")}.`,
   })
+  if (Object.keys(event.input).some((key) => !INLINE_WORKFLOW_INPUTS.has(key)))
+    return Effect.succeed(
+      refuse("A workflow is run only from an inline `script` and its `args`, with no other input."),
+    )
   if (present(scriptPath) || (!present(script) && present(name)))
     return Effect.succeed(
       refuse(
@@ -274,8 +282,14 @@ interface Delivery {
 
 /** What one collection yields: what the next run is told, and the settings the config decides. */
 interface Collected {
-  /** False once the config is read and `pi.enable` is off, which switches the tool gates off. */
+  /** False once the config is read and `pi.enable` is off, which adds no context and no settings. */
   readonly enabled?: false
+  /**
+   * True once the user-level config, read alone, has `pi.enable` off: the only thing that switches
+   * the tool gates off. A project's config cannot, since a cloned repository would then lift the
+   * guard.
+   */
+  readonly gatesOff?: true
   readonly delivery?: Delivery
   /**
    * The process-wide variables the config decides (`PI_CODEMODE_MAX_WORKERS`), present once the
@@ -293,10 +307,10 @@ interface Held {
   current: AbortController | undefined
   pending: Promise<Collected | undefined> | undefined
   /**
-   * True once a collection has read the config and found `pi.enable` off. A config that could not
-   * be read leaves the gates on, since the extension cannot tell that it is switched off.
+   * True once a collection has read the user-level config and found `pi.enable` off. A config that
+   * could not be read, and a project config that says off alone, leave the gates on.
    */
-  disabled: boolean
+  gatesOff: boolean
 }
 
 /** Where the extension finds what it runs. */
@@ -488,6 +502,10 @@ export const createExtension =
           )
         : Effect.succeed<unknown>(join(located.top, STATE_DIRECTORY))
 
+    const decodeConfig = Schema.decodeUnknownEffect(Schema.fromJsonString(Config), {
+      onExcessProperty: "error",
+    })
+
     const collect = (cwd: string, signal: AbortSignal, reason: Reason) =>
       Effect.gen(function* () {
         // Every command starts in the package's folder, so a relative `cwd` would resolve against
@@ -500,17 +518,24 @@ export const createExtension =
         const [config, folder] = yield* Effect.all(
           [
             holyagent(signal, project, "config", join(located.top, STATE_DIRECTORY)).pipe(
-              Effect.flatMap(
-                Schema.decodeUnknownEffect(Schema.fromJsonString(Config), {
-                  onExcessProperty: "error",
-                }),
-              ),
+              Effect.flatMap(decodeConfig),
             ),
             Effect.result(stateFolderOf(signal, project, located)),
           ],
           { concurrency: "unbounded" },
         )
-        if (!config.pi.enable) return { enabled: false } satisfies Collected
+        if (!config.pi.enable) {
+          // The merged config says off; only the user's own file may also lift the gates, so it is
+          // read alone (no project folder). A file that cannot be read leaves them on.
+          const userOff = yield* holyagent(signal, project, "config").pipe(
+            Effect.flatMap(decodeConfig),
+            Effect.map((user) => !user.pi.enable),
+            Effect.orElseSucceed(() => false),
+          )
+          return (
+            userOff ? { enabled: false, gatesOff: true } : { enabled: false }
+          ) satisfies Collected
+        }
         // A child the package launched is a specialist whatever the flag says: the flag defaults to
         // the root in every Pi session, and a child has no launch line of its own.
         const flag = isChild() ? "specialist" : (pi.getFlag(ROLE_FLAG) ?? DEFAULT_PI_ROLE)
@@ -582,7 +607,7 @@ export const createExtension =
       void ended.then(() => running.delete(ended))
       taken.pending = collected.then((result) => {
         if (own.signal.aborted) return undefined
-        taken.disabled = result?.enabled === false
+        taken.gatesOff = result?.gatesOff === true
         return result
       })
       return taken.pending.then(() => undefined)
@@ -596,7 +621,7 @@ export const createExtension =
 
     pi.on("session_start", (event, ctx) => {
       void release()
-      held = { current: undefined, pending: undefined, disabled: false }
+      held = { current: undefined, pending: undefined, gatesOff: false }
       return gather(held, ctx, event.reason)
     })
 
@@ -649,9 +674,9 @@ export const createExtension =
       return message === undefined ? undefined : { message }
     })
 
-    // A disabled extension adds nothing, the gates included.
+    // The gates stand down only for the user's own `pi.enable: false`; a project's cannot lift them.
     pi.on("tool_call", (event) =>
-      held?.disabled === true
+      held?.gatesOff === true
         ? undefined
         : Effect.runPromise(
             refuseNonSpecialistWorkflow(event).pipe(

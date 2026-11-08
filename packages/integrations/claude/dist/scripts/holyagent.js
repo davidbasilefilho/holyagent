@@ -20058,6 +20058,8 @@ function parse2(input, options) {
   return Parser.parse(input, options);
 }
 
+var HTML_COMMENT = /<!--|-->/;
+var META_DECLARATION = /(^|[\r\n])[ \t]*export[ \t\r\n]+const[ \t\r\n]+meta[ \t\r\n]*=/g;
 var isNode = (value) => typeof value === "object" && value !== null && ("type" in value) && typeof value.type === "string";
 var nodeAt = (node, field) => {
   const value = node[field];
@@ -20531,6 +20533,8 @@ var occurrencesIn = (node, scope, into, depth = 0) => {
 var inspect = (script, specialists) => {
   if (script.length > MAX_WORKFLOW_SCRIPT)
     return "the script is too large";
+  if (HTML_COMMENT.test(script))
+    return "contains `<!--` or `-->`, which only a classic script reads as a comment";
   const program = parse2(script, {
     ecmaVersion: "latest",
     sourceType: "module",
@@ -21062,6 +21066,8 @@ var inspect = (script, specialists) => {
       case "VariableDeclaration":
         return variableDeclaration(node, scope, depth);
       case "FunctionDeclaration": {
+        if (!scope.isFunction)
+          refuse("declares a function inside a block");
         const name = nameOf(nodeAt(node, "id")) ?? "";
         declare(scope, name, "unsafe");
         scope.names.get(name)?.functions.add(node);
@@ -21635,12 +21641,14 @@ var inspect = (script, specialists) => {
   }
   const moduleScope = { parent: undefined, names: new Map, isFunction: true };
   let exported = 0;
+  const exportStarts = [];
   for (const node of nodesAt(program, "body")) {
     if (node?.type !== "ExportNamedDeclaration") {
       statement(node, moduleScope, 1);
       continue;
     }
     exported += 1;
+    exportStarts.push(node["start"]);
     const declaration = nodeAt(node, "declaration");
     const declarators = nodesAt(declaration ?? node, "declarations");
     const meta = declarators[0];
@@ -21648,6 +21656,9 @@ var inspect = (script, specialists) => {
       refuse("exports anything but `export const meta = { \u2026 }` of literals");
     moduleScope.names.set("meta", { ...newBinding(), unsafe: true });
   }
+  const claimed = [...script.matchAll(META_DECLARATION)].map((found) => script.indexOf("export", found.index));
+  if (claimed.length !== exportStarts.length || claimed.some((at, i) => at !== exportStarts[i]))
+    refuse("has a line that reads as `export const meta =` other than the one export");
   for (const reference of references) {
     const held = binding(reference.scope, reference.name);
     const { name, use } = reference;
