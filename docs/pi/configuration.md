@@ -155,7 +155,7 @@ Full reference: [settings.md](https://github.com/earendil-works/pi/blob/4a080252
 | `packages`, `extensions`, `skills`, `prompts`, `themes`                           | resource and package lists                                                                  | [L154-L158](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/docs/settings.md#L154-L158) |
 | `enableInstallTelemetry`                                                          | anonymous install/update ping, default true                                                 | [L170](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/docs/settings.md#L170)           |
 
-The plan sets two of these: `npmCommand` to `bun` (by `holyagent setup`) and `codemode.mode` to `only` (`toolSettings` merges it into `~/.pi/agent/settings.json`), which takes effect in every process where `codemode` is active: the root and every specialist, by their tool arguments.
+The plan sets two of these: `npmCommand` to `bun` (by `holyagent setup`) and `codemode.mode` to `only` (`holyagent setup` merges it into `~/.pi/agent/settings.json`, or the project's `.pi/settings.json`, only where the key is unset; [installation.md](installation.md#what-setup-and-doctor-do)), which takes effect in every process where `codemode` is active: the root and every specialist, by their tool arguments.
 
 There is **no** settings key for prompt-cache retention or for tool approval: the only keys mentioning caches are `cacheWarming` and `showCacheMissNotices` ([settings.md L7-L25](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/docs/settings.md#L7-L25)). Cache retention is an environment variable (see [caching-and-subagents.md](caching-and-subagents.md)).
 
@@ -169,6 +169,7 @@ There is **no** settings key for prompt-cache retention or for tool approval: th
 
 Built:
 
+- `holyagent setup` writes the settings `toolSettings` returns, merging where a key is unset and differs from the package default ([installation.md](installation.md#what-setup-and-doctor-do)); `holyagent doctor` reports the files that lack them.
 - Pi starts as plain `pi` after the one-time `pi install` ([installation.md](installation.md#how-holyagent-installs)); that session is the root, because the package's `--holyagent-role` flag defaults to `root` ([extensions.md](extensions.md#the-extension-entry)).
 - The root starts specialists through `@tintinweb/pi-subagents`, which runs each as an in-process session of the root's Pi process, so a specialist has no launch line, environment or `--approve` of its own and shares the root's project trust ([extensions.md](extensions.md#specialists-as-package-agents), [orchestration.md](orchestration.md#decision-for-030)). Each specialist's tools are the `tools:` line of its agent file, which `toolArgs` decides from the config ([extensions.md](extensions.md#tool-arguments)).
 - Before each run of the root the extension writes `HOLYAGENT_HOST=pi`, `HOLYAGENT_WORKFLOWS`, `PI_CODEMODE_MAX_WORKERS` (from `pi.codemode.maxWorkers`) and `PI_CACHE_RETENTION=long` into its process environment.
@@ -176,7 +177,7 @@ Built:
 
 Planned:
 
-- `holyagent setup` sets Pi's `npmCommand` setting to `bun`, so Pi installs its packages with Bun, and writes the settings `toolSettings` returns ([installation.md](installation.md#what-setup-and-doctor-do)).
+- `holyagent setup` sets Pi's `npmCommand` setting to `bun`, so Pi installs its packages with Bun ([installation.md](installation.md#what-setup-and-doctor-do)).
 - `PI_SKIP_VERSION_CHECK=1` and `PI_TELEMETRY=0` for the specialists, and an explicit session directory, `--model`, `--tools` or `--exclude-tools` and `--approve` for a reproducible launch rather than the user's `~/.pi/agent/settings.json`. All of those are documented flags and variables ([cli.md L55-L110](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/docs/cli.md#L55-L110)). The 1.5.0 docs word `PI_OFFLINE` as disabling automatic network activity, including model catalog refreshes, so the specialists are not run fully offline.
 
 HolyAgent's own state (Intent revisions, Assignment status) has no place in Pi's settings; Pi offers `pi.appendEntry()` for session-attached data ([extensions.md L337-L355](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/docs/extensions.md#L337-L355)), but the Intent store stays in HolyAgent.

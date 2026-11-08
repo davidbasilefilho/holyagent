@@ -80,8 +80,12 @@ const check = (
     ).pipe(Effect.provide(shell.layer)),
   )
 
-/** The lines the Pi checks added, which come after the three of bun, ctx7 and the settings. */
-const piLines = (report: { readonly lines: ReadonlyArray<string> }) => report.lines.slice(3)
+/**
+ * The lines the Pi checks added, which come after the three of bun, ctx7 and the settings. The tool
+ * settings hints are left out here; setup-pi-settings.test.ts covers them.
+ */
+const piLines = (report: { readonly lines: ReadonlyArray<string> }) =>
+  report.lines.slice(3).filter((line) => !line.startsWith("~ tool settings "))
 
 /** The Pi lines of a project or local scope report, which a notice line may shift; found by name. */
 const lineNamed = (report: { readonly lines: ReadonlyArray<string> }, name: string) =>

@@ -24521,6 +24521,216 @@ var init_pi_check = __esm(() => {
   GIT_LEAD = /^(?:git:|[a-z][a-z0-9+.-]*:\/\/)(?:[^/@]*@)?|^[^/@:\s]+@[^/@:\s]+:/i;
 });
 
+var T3_PREFIX = "mcp__t3*code__", T3_VISUAL_TOOLS, BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json", PI_SETTINGS_FILE = "~/.pi/agent/settings.json", SUBAGENTS_SETTINGS_FILE = "~/.pi/agent/subagents.json", SUBAGENTS_ONLY_SPECIALISTS, toolSettings = (config, profile = providerProfile(config)) => {
+  const { enable, features } = config.pi;
+  if (!enable)
+    return [];
+  const web = webChoice(profile, features.web);
+  return [
+    { file: PI_SETTINGS_FILE, content: { codemode: { mode: config.pi.codemode.mode } } },
+    ...web.source === "provider" ? [
+      {
+        file: profile.toolsFile,
+        content: {
+          tools: Object.fromEntries(web.tools.map((tool) => [tool, { enabled: true }]))
+        }
+      }
+    ] : [],
+    ...features.subagents ? [{ file: SUBAGENTS_SETTINGS_FILE, content: SUBAGENTS_ONLY_SPECIALISTS }] : [],
+    ...features.contextCompression ? [{ file: BILLION_CONTEXT_FILE, content: { pi: { subagents: false } } }] : [],
+    ...features.computerUse ? [
+      {
+        file: PI_SETTINGS_FILE,
+        content: {
+          "pi-computer-use": { confirmAppLaunch: false, confirmDangerousActions: false }
+        }
+      }
+    ] : []
+  ];
+};
+var init_tools = __esm(() => {
+  init_route();
+  init_provider();
+  T3_VISUAL_TOOLS = [
+    `${T3_PREFIX}preview_*`,
+    `${T3_PREFIX}t3_preview_*`,
+    `${T3_PREFIX}html_render`,
+    `${T3_PREFIX}html_preview`,
+    `${T3_PREFIX}device_*`
+  ];
+  SUBAGENTS_ONLY_SPECIALISTS = {
+    disableDefaultAgents: true,
+    fallbackSubagent: "none"
+  };
+});
+
+import { join as join17, resolve as resolve7 } from "path";
+var PACKAGE_DEFAULTS, valueAt3 = (node, path) => path.reduce((current, key) => isJsonObject2(current) ? current[key] : undefined, node), leaves = (content, prefix = []) => Object.entries(content).flatMap(([key, child]) => isJsonObject2(child) ? leaves(child, [...prefix, key]) : [{ path: [...prefix, key], value: child }]), KNOWN_FILES, AGENT_PREFIX = "~/.pi/agent/", PI_PREFIX = "~/.pi/", locate2 = (env, cwd, scope, logical) => {
+  const project = scope !== "user";
+  const home = homeDirectory(env);
+  if (logical === BILLION_CONTEXT_FILE) {
+    if (project)
+      return;
+    const explicit = firstNonEmpty(env["BILI_CONFIG_FILE"]);
+    if (explicit !== undefined)
+      return resolve7(cwd, explicit);
+    const base = firstNonEmpty(env["XDG_CONFIG_HOME"]) ?? join17(home, ".config");
+    return join17(base, "billion-context", "billion-context.json");
+  }
+  if (logical.startsWith(AGENT_PREFIX)) {
+    const name = logical.slice(AGENT_PREFIX.length);
+    return project ? join17(cwd, ".pi", name) : join17(piAgentDirectory(env), name);
+  }
+  if (logical.startsWith(PI_PREFIX)) {
+    const name = logical.slice(PI_PREFIX.length);
+    return project ? join17(cwd, ".pi", name) : join17(home, ".pi", name);
+  }
+  return project || !logical.startsWith("~/") ? undefined : join17(home, logical.slice(2));
+}, planFor = (env, cwd, scope, config) => {
+  const byFile = new Map;
+  for (const patch of toolSettings(config)) {
+    byFile.set(patch.file, [...byFile.get(patch.file) ?? [], ...leaves(patch.content)]);
+  }
+  const targets = [];
+  const unplaced = [];
+  for (const [logical, all] of byFile) {
+    const file = locate2(env, cwd, scope, logical);
+    if (file === undefined) {
+      unplaced.push(logical);
+      continue;
+    }
+    const defaults = PACKAGE_DEFAULTS.get(logical);
+    const isDefault = ({ path, value }) => defaults !== undefined && equals(valueAt3(defaults, path), value);
+    targets.push({
+      file,
+      keys: all.filter((key) => !isDefault(key)),
+      atDefault: all.filter(isDefault).map(({ path }) => path.join("."))
+    });
+  }
+  return { targets, unplaced };
+}, planAt = (env, cwd, scope) => loadPiConfig(env, cwd, scope).pipe(map5((config) => config.pi.enable ? planFor(env, cwd, scope, config) : undefined), orElseSucceed2(() => {
+  return;
+})), label = "tool settings", mergeTarget, installPiToolSettings, undoPiToolSettings, fixFor = (scope) => scope === "user" ? "run `holyagent setup`" : `run \`holyagent setup --scope ${scope}\``, checkPiToolSettings = (env, cwd, scope) => gen2(function* () {
+  if (!(yield* piInUse(env)))
+    return [];
+  const plan = yield* planAt(env, cwd, scope);
+  if (plan === undefined)
+    return [];
+  const lines = [];
+  for (const target of plan.targets) {
+    lines.push(...yield* readJsonObject(target.file).pipe(map5((existing) => {
+      const missing = applyDefaults(existing, target.keys).entries.filter((entry) => entry.status === "added").map((entry) => entry.path);
+      return missing.length === 0 ? [] : [hint(`${label} ${target.file} lacks ${missing.join(", ")}; ${fixFor(scope)}`)];
+    }), catchTag2("SetupFailure", (error) => succeed6([
+      hint(`${label}: ${error.message}; fix the file, then ${fixFor(scope)}`)
+    ]))));
+  }
+  return lines;
+});
+var init_pi_settings = __esm(() => {
+  init_dist();
+  init_provider();
+  init_tools();
+  init_environment();
+  init_json_file();
+  init_pi_check();
+  init_record2();
+  init_settings2();
+  PACKAGE_DEFAULTS = new Map([
+    [
+      PI_SETTINGS_FILE,
+      {
+        codemode: { mode: "on" },
+        "pi-computer-use": { confirmAppLaunch: true, confirmDangerousActions: true }
+      }
+    ],
+    [SUBAGENTS_SETTINGS_FILE, { disableDefaultAgents: false }],
+    ...Object.values(PROVIDERS).map((profile) => [
+      profile.toolsFile,
+      { tools: Object.fromEntries(profile.webTools.map((tool) => [tool, { enabled: false }])) }
+    ])
+  ]);
+  KNOWN_FILES = [
+    PI_SETTINGS_FILE,
+    SUBAGENTS_SETTINGS_FILE,
+    BILLION_CONTEXT_FILE,
+    ...Object.values(PROVIDERS).map((profile) => profile.toolsFile)
+  ];
+  mergeTarget = fn2("mergeToolSettingsFile")(function* (env, target, dryRun) {
+    const { file } = target;
+    const existing = yield* readJsonObject(file);
+    const { merged, entries } = applyDefaults(existing, target.keys);
+    const added = entries.filter((entry) => entry.status === "added");
+    const kept = entries.filter((entry) => entry.status === "kept");
+    const present = entries.filter((entry) => entry.status === "present");
+    if (added.length > 0 && !dryRun) {
+      const names = new Set(added.map((entry) => entry.path));
+      yield* readRecorded(env, file);
+      yield* writeJsonObject(file, merged);
+      yield* addRecorded(env, file, target.keys.filter(({ path }) => names.has(path.join("."))));
+    }
+    const parts = [
+      ...added.length === 0 ? [] : [
+        `${dryRun ? "would add" : "added"} ${added.map((entry) => `${entry.path} ${show(entry.value)}`).join(", ")}`
+      ],
+      ...present.length === 0 ? [] : [`already set: ${present.map((entry) => entry.path).join(", ")}`],
+      ...kept.map((entry) => `kept ${entry.path} ${show(entry.value)} (HolyAgent sets ${show(entry.wanted)}; yours wins)`),
+      ...target.atDefault.length === 0 ? [] : [`left out, the package default: ${target.atDefault.join(", ")}`]
+    ];
+    const mark = added.length > 0 ? "+" : kept.length > 0 ? "~" : "=";
+    return `${mark} ${label} ${file}: ${parts.join("; ")}${added.length > 0 && dryRun ? " (dry run, nothing written)" : ""}`;
+  });
+  installPiToolSettings = fn2("installPiToolSettings")(function* (env, options) {
+    const plan = yield* planAt(env, options.cwd, options.scope);
+    if (plan === undefined)
+      return [];
+    const lines = [];
+    for (const target of plan.targets) {
+      lines.push(yield* mergeTarget(env, target, options.dryRun).pipe(catchTag2("SetupFailure", (error) => succeed6(`! ${label}: ${error.message}`))));
+    }
+    for (const logical of plan.unplaced) {
+      lines.push(skipped(`${label} ${logical}: has no file at ${options.scope} scope; run \`holyagent setup\` at user scope`));
+    }
+    return lines;
+  });
+  undoPiToolSettings = fn2("undoPiToolSettings")(function* (env, options) {
+    const lines = [];
+    const files = new Set(KNOWN_FILES.flatMap((logical) => locate2(env, options.cwd, options.scope, logical) ?? []));
+    for (const file of files) {
+      lines.push(...yield* gen2(function* () {
+        const recorded = yield* readRecorded(env, file);
+        if (recorded.length === 0)
+          return [];
+        let result = yield* readJsonObject(file);
+        const removed = [];
+        const kept = [];
+        for (const { path, value } of recorded) {
+          const [next, removal] = take(result, path, 0, value);
+          result = next;
+          if (removal.status === "removed")
+            removed.push(`${removal.path} ${show(removal.value)}`);
+          if (removal.status === "kept")
+            kept.push(`${removal.path} ${show(removal.value)} (setup wrote ${show(removal.wanted)})`);
+        }
+        if (!options.dryRun) {
+          if (removed.length > 0)
+            yield* writeJsonObject(file, result);
+          yield* clearRecorded(env, file);
+        }
+        const parts = [
+          ...removed.length === 0 ? [] : [`${options.dryRun ? "would remove" : "removed"} ${removed.join(", ")}`],
+          ...kept.length === 0 ? [] : [`kept ${kept.join(", ")}`]
+        ];
+        const mark = removed.length > 0 ? "-" : kept.length > 0 ? "~" : "=";
+        return [
+          `${mark} ${label} ${file}: ${parts.length === 0 ? "nothing of setup's left to remove" : parts.join("; ")}${removed.length > 0 && options.dryRun ? " (dry run, nothing written)" : ""}`
+        ];
+      }).pipe(catchTag2("SetupFailure", (error) => succeed6([`! ${label}: ${error.message}`]))));
+    }
+    return lines;
+  });
+});
+
 var MANAGED_NAMES, staleManagedNames = (listed, wanted, managed = MANAGED_NAMES) => {
   const wantedNames = new Set(wanted.map((source) => parseNpmSource(source)?.name));
   return [
@@ -24595,7 +24805,7 @@ var init_pi_install = __esm(() => {
   });
 });
 
-import { join as join17 } from "path";
+import { join as join18 } from "path";
 var CLOUD_SKIP = "skipped in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true), which has no machine of yours to install it on", neutralDirectory = (env) => homeDirectory(env), ensureGlobal, installCtx7, asStep = (label, step) => step.pipe(catchTag2("SetupFailure", (error) => succeed6([`! ${label}: ${error.message}`]))), setup;
 var init_steps = __esm(() => {
   init_dist();
@@ -24604,6 +24814,7 @@ var init_steps = __esm(() => {
   init_json_file();
   init_pi_check();
   init_pi_install();
+  init_pi_settings();
   init_scope();
   init_settings2();
   init_shell();
@@ -24635,7 +24846,7 @@ var init_steps = __esm(() => {
     const global = yield* ensureGlobal(env, "ctx7", "ctx7", dryRun);
     if (!global.usable)
       return global.lines;
-    const skillReady = (yield* fileExists2(join17(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join17(files.claudeDir, "rules", "context7.md")));
+    const skillReady = (yield* fileExists2(join18(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join18(files.claudeDir, "rules", "context7.md")));
     if (skillReady)
       return [...global.lines, present3("ctx7 skill: already installed")];
     const apiKey = env.CONTEXT7_API_KEY === "" ? undefined : env.CONTEXT7_API_KEY;
@@ -24664,21 +24875,21 @@ var init_steps = __esm(() => {
       const lines = yield* run(target.file);
       return target.notice === undefined ? lines : [hint(`${label}: ${target.notice}`), ...lines];
     }));
+    const piOptions = { scope, cwd: options.cwd ?? process.cwd(), dryRun: options.dryRun };
     if (options.undo === true) {
       const lines = [
         hint("ctx7: left installed; --undo only removes the settings setup recorded adding"),
-        ...yield* onSettings((file) => undoUserSettings({ env, file, dryRun: options.dryRun }))
+        ...yield* onSettings((file) => undoUserSettings({ env, file, dryRun: options.dryRun })),
+        ...yield* asStep("tool settings", undoPiToolSettings(env, piOptions))
       ];
       return { lines, ok: !lines.some((line) => line.startsWith("! ")) };
     }
     const cloud = inCloudSession(env);
+    const piUsed = !cloud && (yield* piInUse(env));
     const lines = [
       ...options.skipCtx7 ? [skipped("ctx7: skipped by flag")] : cloud ? [skipped(`ctx7: ${CLOUD_SKIP}`)] : yield* asStep("ctx7", installCtx7(env, options.dryRun)),
-      ...!cloud && (yield* piInUse(env)) ? yield* asStep("pi packages", installPiPackages(env, {
-        scope,
-        cwd: options.cwd ?? process.cwd(),
-        dryRun: options.dryRun
-      })) : [],
+      ...piUsed ? yield* asStep("pi packages", installPiPackages(env, piOptions)) : [],
+      ...piUsed ? yield* asStep("tool settings", installPiToolSettings(env, piOptions)) : [],
       ...yield* onSettings((file) => mergeUserSettings({
         env,
         file,
@@ -24699,12 +24910,13 @@ var FIX = "run /holyagent:setup, or `holyagent doctor --fix`", checkBun, checkCo
     return pass(command, onPath.value);
   const anywhere = yield* shell.which(command, { includeBunBin: true });
   return isSome2(anywhere) ? pass(command, `${anywhere.value} (not on PATH; add its directory to PATH)`) : fail6(command, `not found on PATH or in Bun's bin directory; ${FIX}`);
-}), fixFor = (scope) => scope === "user" ? FIX : `run /holyagent:setup --scope ${scope}, or \`holyagent doctor --fix --scope ${scope}\``, checkSettings = (file, scope) => missingSettingKeys(file).pipe(map5((missing) => missing.length === 0 ? pass("settings", file) : fail6("settings", `${file} lacks ${missing.join(", ")}; ${fixFor(scope)}`)), catchTag2("SetupFailure", (error) => succeed6(fail6("settings", error.message)))), checks = (env, file, scope) => all2([checkBun, checkCommand(env, "ctx7"), checkSettings(file, scope)]), doctor;
+}), fixFor2 = (scope) => scope === "user" ? FIX : `run /holyagent:setup --scope ${scope}, or \`holyagent doctor --fix --scope ${scope}\``, checkSettings = (file, scope) => missingSettingKeys(file).pipe(map5((missing) => missing.length === 0 ? pass("settings", file) : fail6("settings", `${file} lacks ${missing.join(", ")}; ${fixFor2(scope)}`)), catchTag2("SetupFailure", (error) => succeed6(fail6("settings", error.message)))), checks = (env, file, scope) => all2([checkBun, checkCommand(env, "ctx7"), checkSettings(file, scope)]), doctor;
 var init_doctor = __esm(() => {
   init_dist();
   init_identity();
   init_errors6();
   init_pi_check();
+  init_pi_settings();
   init_scope();
   init_settings2();
   init_shell();
@@ -24717,7 +24929,7 @@ var init_doctor = __esm(() => {
   doctor = fn2("doctor")(function* (env, options) {
     const scope = options.scope ?? "user";
     const cwd = options.cwd ?? process.cwd();
-    const pi = inCloudSession(env) ? [] : yield* piChecks(env, cwd, scope);
+    const pi = inCloudSession(env) ? [] : [...yield* piChecks(env, cwd, scope), ...yield* checkPiToolSettings(env, cwd, scope)];
     const located = yield* settingsFile(env, scope, cwd).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
     if (located instanceof SetupFailure) {
       const lines = yield* all2([
@@ -24850,12 +25062,12 @@ var init_state = __esm(() => {
   ];
 });
 
-import { join as join18 } from "path";
+import { join as join19 } from "path";
 var {$: $5 } = globalThis.Bun;
 var TARGETS, BUNDLED_TOOLS, UnsupportedPlatform, ToolMissing, selectTarget = (platform, arch) => {
   const target = TARGETS.find((candidate) => candidate.platform === platform && candidate.arch === arch);
   return target === undefined ? fail5(new UnsupportedPlatform({ platform, arch })) : succeed6(target);
-}, toolPath = (directory, tool, target) => join18(directory, target.id, `${tool}${target.suffix}`), runTool = (options) => gen2(function* () {
+}, toolPath = (directory, tool, target) => join19(directory, target.id, `${tool}${target.suffix}`), runTool = (options) => gen2(function* () {
   const path = toolPath(options.directory, options.tool, options.target);
   if (!(yield* promise2(() => Bun.file(path).exists())))
     return yield* new ToolMissing({ tool: options.tool, path });
@@ -24887,7 +25099,7 @@ var TARGETS, BUNDLED_TOOLS, UnsupportedPlatform, ToolMissing, selectTarget = (pl
     return new Verbatim("", "", code);
   })
 }), TOOL_COMMANDS;
-var init_tools = __esm(() => {
+var init_tools2 = __esm(() => {
   init_dist();
   init_environment();
   TARGETS = [
@@ -24895,7 +25107,7 @@ var init_tools = __esm(() => {
     { id: "linux-x64", platform: "linux", arch: "x64", suffix: "" },
     { id: "windows-x64", platform: "win32", arch: "x64", suffix: ".exe" }
   ];
-  BUNDLED_TOOLS = join18(import.meta.dir, "vendor");
+  BUNDLED_TOOLS = join19(import.meta.dir, "vendor");
   UnsupportedPlatform = class UnsupportedPlatform extends TaggedError2("UnsupportedPlatform") {
     get message() {
       return `No bundled search tools exist for ${this.platform} ${this.arch}; they exist for ${TARGETS.map((target) => target.id).join(", ")}`;
@@ -24922,7 +25134,7 @@ var init_commands2 = __esm(() => {
   init_overview();
   init_setup();
   init_state();
-  init_tools();
+  init_tools2();
   COMMANDS = [
     ...INTENT_COMMANDS,
     ...ASSIGNMENT_COMMANDS,
@@ -25051,7 +25263,7 @@ var init_program = __esm(() => {
   init_config();
   init_context();
   init_errors3();
-  init_tools();
+  init_tools2();
 });
 
 var stdin, brokenPipe = (cause) => hasCode(cause, "EPIPE"), write = (stream, text) => try_2({ try: () => void stream.write(text), catch: (cause) => cause }).pipe(catch_2((cause) => brokenPipe(cause) ? sync2(() => process.exit(0)) : die3(cause)));
