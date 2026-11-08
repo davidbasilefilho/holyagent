@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mw7qiy7e-i8sr",
+  "intentId": "intent-0mw7mzreq-mu22",
+  "intentRevision": 1,
+  "roleTask": "Worker.operations",
+  "slug": "rebuild-the-generated-plugin-and-run-the",
+  "objective": "Rebuild the generated plugin and run the gates on the heads of three stacked branches, reporting which generated files the build changed and the gate results.",
+  "state": "Running",
+  "scope": [
+    "Worktrees, in this order: /home/user/holyagent-0.3.0-wiring (branch release/0.3.0/feat/pi-root-wiring), /home/user/holyagent-0.3.0-settings (release/0.3.0/feat/pi-tool-settings, just merged the wiring branch), /home/user/holyagent-0.3.0-prompts (release/0.3.0/feat/pi-review-prompts, just merged the settings branch).",
+    "In each: run bunx --no-install mise run build, then git status --short (report the changed paths: merged generated bundles may be out of sync), then bunx --no-install mise run verify (report exit code and the pass and fail counts)."
+  ],
+  "constraints": [
+    "Make no version-control writes (no add, commit, checkout, stash, reset) and no edits under .git/ or .holyagent/; leave the build's file changes in place for the root to commit.",
+    "Never run pi.",
+    "Report in under 150 words; put full logs under /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give the paths."
+  ],
+  "criteria": [
+    {
+      "text": "Each worktree reports the files the build changed and the verify exit code with counts",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "gate-results"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/claude/dist",
+    "packages/integrations/pi/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-08T11:14:22.250Z"
+  },
+  "createdAt": "2026-11-08T11:14:22.250Z"
+}
