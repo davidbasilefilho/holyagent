@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "re-review-repair-commit-95a9099-on",
   "objective": "Re-review repair commit 95a9099 on release/0.3.0/feat/pi-review-prompts (worktree /home/user/holyagent-0.3.0-prompts) against the findings it repairs.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Diff: /home/user/holyagent-notes/wire-c-fix.diff (range 7b935ff..95a9099). Prompts now at packages/runtime/src/prompts/code-review.md and security-review.md; role text at packages/runtime/src/instructions/kimi-k3.1/roles/reviewer-code and reviewer-security.",
     "Findings: (1, blocking) the prompts gave their own final report and labels that disagreed with the role text (verify each finding, one final report with the evidence block, blocker/optional/rejected; security: a validated vulnerability the change introduced or worsened is a blocker); (2, blocking) docs/development.md:28 and docs/pi/installation.md:31 missed the prompts folder and key; optional: argument handling with a literal or missing range, one example entry each, the runtime-to-integration import, the bare Error in parseTemplate."
@@ -39,7 +39,29 @@
     "agentId": "workflow:wf_f96542c0-dd7/assignment-0mw7q8ocw-l9rz",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T11:06:22.928Z"
+    "startedAt": "2026-11-08T11:06:22.928Z",
+    "finishedAt": "2026-11-08T11:11:55.867Z"
+  },
+  "result": "result: both criteria met on a read of the diff and the tree; no new findings. I had no shell, so I ran no tests, build or sync check. Tree: `/home/user/holyagent-0.3.0-prompts`, range 7b935ff..95a9099.\n\nPrior findings:\n1. Role/prompt disagreement (blocking): resolved.\n   - Both prompts now call their list \"working input to the next step, not a final report\". A reviewer role verifies each finding and does the reporting. The prompts' blocker/optional labels match the reviewer role text, and the role adds \"rejected\" at verification.\n   - Security: step 6 says \"A validated finding the range introduced or worsened is a blocker; a suspected one is optional\". That matches `reviewer-security/findings.md:7`.\n   - Both prompts no longer hardcode `git diff <start>...<head>`.\n   - The `${@:-the refs the Assignment below names}` default matches `reviewer-code/builtin-review.md:3` and `reviewer-security/builtin-review.md:3`.\n   - Security reads the diff from the Assignment's diff file when there is no shell, as its role does.\n   - Both prompts now ask for the range and stop when run alone with no range.\n   - Both have one example entry. `packages/runtime/tests/prompts.test.ts` pins these points.\n2. Docs (blocking): resolved.\n   - `docs/development.md` lines 15, 29, 145 and 150 name `src/prompts/`, the `dist/prompts/` folder and the `./prompts` / `files` entries.\n   - They match `PACKAGE_FILES` and `pi.prompts` in `packages/integrations/pi/src/generate.ts` (lines 52 and 96) and the generated `dist/package.json`.\n   - `docs/pi/installation.md:31` lists `prompts/` and matches the root `package.json` `pi` key.\n   - `docs/pi/extensions.md:21` now names `packages/runtime/src/prompts/` as the source, matching `PROMPTS_SOURCE`. Lines 13 and 17 already list the folder.\n   - The dist prompts' generated-note path matches the code and the test.\n   - The other `extensions/`, `skills/` lists (`configuration.md:117,119`, `extensions.md:248`) describe Pi's own conventions, not this package, so they are correctly unchanged. `claude-parity.md:146` already lists `prompts/`.\n\nOptional items:\n- The runtime-to-integration import is fixed. `brief.ts` now imports `../prompts/index.ts`, and a new test forbids runtime imports of `integrations/`.\n- `parseTemplate` no longer throws. It returns an empty head and the whole text as the body. The comment says the tests catch a missing head, and `packages/runtime/tests/prompts.test.ts` and `packages/integrations/pi/tests/prompts.test.ts` do. It is acceptable.\n\nnotes: I could not run `mise run verify` or the generated-file sync test (`packages/integrations/pi/tests/pi.test.ts`). The dist prompt text matches the source hunks line for line in the diff.\n\nblockers: none\n\nevidence:\nEach prompt agrees with the Kimi reviewer role text on where the range comes from, what its findings are and how they are labeled: met. Evidence: `packages/runtime/src/prompts/code-review.md`, `packages/runtime/src/prompts/security-review.md` and the diff hunks, against `roles/reviewer-code/builtin-review.md:3-4`, `roles/reviewer-security/builtin-review.md:3-5` and `roles/reviewer-security/findings.md:7`.\nThe changed docs match the code: met. Evidence: `docs/development.md:15,29,145,150`, `docs/pi/installation.md:31` and `docs/pi/extensions.md:21`, against `packages/integrations/pi/src/generate.ts:52,96,167`, `packages/integrations/pi/dist/package.json` and the root `package.json` `pi` key.\nreview-findings: no new findings; both prior blocking findings and the optional items are resolved. Checks not run: `mise run verify`, the sync test.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Both prior blocking findings resolved, checked against the role text and the generator",
+    "criteria": [
+      {
+        "criterion": "Each prompt agrees with the Kimi reviewer role text on where the range comes from, what its findings are and how they are labeled",
+        "support": "met. Evidence: `packages/runtime/src/prompts/code-review.md`, `packages/runtime/src/prompts/security-review.md` and the diff hunks, against `roles/reviewer-code/builtin-review.md:3-4`, `roles/reviewer-security/builtin-review.md:3-5` and `roles/reviewer-security/findings.md:7`."
+      },
+      {
+        "criterion": "The changed docs match the code",
+        "support": "met. Evidence: `docs/development.md:15,29,145,150`, `docs/pi/installation.md:31` and `docs/pi/extensions.md:21`, against `packages/integrations/pi/src/generate.ts:52,96,167`, `packages/integrations/pi/dist/package.json` and the root `package.json` `pi` key."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "review-findings",
+        "support": "no new findings; both prior blocking findings and the optional items are resolved. Checks not run: `mise run verify`, the sync test."
+      }
+    ]
   },
   "createdAt": "2026-11-08T11:06:22.928Z"
 }
