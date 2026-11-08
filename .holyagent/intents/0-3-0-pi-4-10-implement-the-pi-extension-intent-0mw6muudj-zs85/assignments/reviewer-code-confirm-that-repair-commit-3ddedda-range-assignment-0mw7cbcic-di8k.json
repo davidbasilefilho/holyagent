@@ -1,0 +1,55 @@
+{
+  "id": "assignment-0mw7cbcic-di8k",
+  "intentId": "intent-0mw6muudj-zs85",
+  "intentRevision": 6,
+  "roleTask": "Reviewer.code",
+  "slug": "confirm-that-repair-commit-3ddedda-range",
+  "objective": "Confirm that repair commit 3ddedda (range b7efd82..3ddedda on release/0.3.0/feat/pi-extension, worktree /home/user/holyagent-0.3.0-ext; run commands there) closes the earlier code review findings and adds no regression.",
+  "state": "Running",
+  "scope": [
+    "Earlier findings: BLOCKING, a non-git project with a .holyagent folder lost its status because `holyagent state mode` exits 4 outside git and failed collect in packages/integrations/pi/src/extension.ts. Optional: status and reconcile ran concurrently; session_start had no overall deadline (about five 8s spawns); a newer compaction gather did not abort the older; piContext omissions undocumented; docs/pi/orchestration.md stale; folderExists duplicated hasStateFolder and pi runtime() duplicated the Claude bundle(). Security note: sh and git ran with cwd set to the project (Windows program lookup).",
+    "The repair: non-git uses <cwd>/.holyagent and skips state mode; status then reconcile in sequence; config and state mode together; one 10s SESSION_DEADLINE_MS; newer gather aborts older and shutdown drops a stopped gather; sh and git start in the package folder with git -C <project> and a leading --project <dir> handled in hooks/pi-entry.ts (process.chdir before the CLI); hasStateFolder moved to hooks/state-folder.ts and bundleModule to packages/runtime/src/bundle.ts. The Claude dist bundle changes by one moved line (hasStateFolder emitted earlier), which the root accepts as a generated reorder with no behavior change.",
+    "Diff without dist: /home/user/holyagent-notes/pi-ext-fix.diff."
+  ],
+  "constraints": [
+    "Do not run the pi binary or a live model.",
+    "Read-only: no edits and no version-control writes.",
+    "Report in under 400 words; start each evidence line with the criterion text, a colon, then the support."
+  ],
+  "criteria": [
+    {
+      "text": "Each earlier finding is closed by the repair",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The repair adds no regression: the Claude hook and CLI behave as before and the Claude dist differs only by the hasStateFolder move",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The new tests cover the repaired behavior and would fail without it",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "bunx --no-install mise run verify exits 0 and mise run build leaves the tree clean on 3ddedda",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7bybb7-c3ea"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T04:36:32.916Z"
+  },
+  "createdAt": "2026-11-08T04:36:32.916Z"
+}
