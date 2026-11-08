@@ -10,6 +10,7 @@ import { type Scope, settingsFile } from "./scope.ts"
 import { mergeUserSettings, missingSettingKeys } from "./settings.ts"
 import { Shell } from "./shell.ts"
 import { asStep, installCtx7 } from "./steps.ts"
+import { checkT3Settings } from "./t3-settings.ts"
 
 const FIX = "run /holyagent:setup, or `holyagent doctor --fix`"
 
@@ -66,11 +67,12 @@ const checks = (env: Env, file: string, scope: Scope) =>
  * for `user`, so a repository's own config cannot change what doctor expects of the global install;
  * the project's over it for `project` and `local`). A machine without Pi gets one informational
  * line instead, and a cloud session runs no Pi. When Pi is in use, a `~` line follows for each Pi
- * tool settings file that lacks keys setup writes ({@link checkPiToolSettings}). In a claude.ai
- * cloud session `ctx7` passes, since setup leaves it out there. With `fix`, the setup steps behind
- * a failing check run first, their lines come before the checks, and the checks then run again;
- * Bun, Pi, Node and the Pi packages are never installed, so the Pi lines are read once and name the
- * command that fixes them. The report is ok when no check fails.
+ * tool settings file that lacks keys setup writes ({@link checkPiToolSettings}), and at scope
+ * `user` one line on T3 Code's settings when T3 is installed ({@link checkT3Settings}). In a
+ * claude.ai cloud session `ctx7` passes, since setup leaves it out there. With `fix`, the setup
+ * steps behind a failing check run first, their lines come before the checks, and the checks then
+ * run again; Bun, Pi, Node and the Pi packages are never installed, so the Pi lines are read once
+ * and name the command that fixes them. The report is ok when no check fails.
  */
 export const doctor = Effect.fn("doctor")(function* (
   env: Env,
@@ -80,7 +82,11 @@ export const doctor = Effect.fn("doctor")(function* (
   const cwd = options.cwd ?? process.cwd()
   const pi = inCloudSession(env)
     ? []
-    : [...(yield* piChecks(env, cwd, scope)), ...(yield* checkPiToolSettings(env, cwd, scope))]
+    : [
+        ...(yield* piChecks(env, cwd, scope)),
+        ...(yield* checkPiToolSettings(env, cwd, scope)),
+        ...(scope === "user" ? yield* checkT3Settings(env, cwd) : []),
+      ]
   const located = yield* settingsFile(env, scope, cwd).pipe(
     Effect.catchTag("SetupFailure", (error) => Effect.succeed(error)),
   )

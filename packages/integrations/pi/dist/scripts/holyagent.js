@@ -4694,7 +4694,7 @@ var init_Request = __esm(() => {
 
 var init_Metric = () => {};
 
-var all2, forEach2, promise2, tryPromise2, succeed6, suspend2, sync2, void_3, gen2, fail5, failCauseSync2, die3, try_2, withFiber2, fromResult2, flatMap2, andThen2, tap2, option2, exit2, map5, as2, asVoid2, catch_2, catchTag2, catchCause2, catchDefect2, catchIf2, mapError2, orDie2, tapError2, retry2, ignore2, orElseSucceed2, timeoutOption2, filter3, filterOrFail2, matchEffect3, provide4, provideService2, acquireUseRelease2, ensuring2, onError2, runPromise2, runSyncExit2, fn2, mapEager2, mapErrorEager2, flatMapEager2, fnUntracedEager2;
+var all2, forEach2, promise2, tryPromise2, succeed6, suspend2, sync2, void_3, gen2, fail5, failCauseSync2, die3, try_2, withFiber2, fromResult2, flatMap2, andThen2, tap2, option2, exit2, map5, as2, asVoid2, catch_2, catchTag2, catchCause2, catchDefect2, catchIf2, mapError2, orDie2, tapError2, retry2, ignore2, orElseSucceed2, timeoutOption2, filter3, filterOrFail2, match4, matchEffect3, provide4, provideService2, acquireUseRelease2, ensuring2, onError2, runPromise2, runSyncExit2, fn2, mapEager2, mapErrorEager2, flatMapEager2, fnUntracedEager2;
 var init_Effect = __esm(() => {
   init_core();
   init_effect();
@@ -4737,6 +4737,7 @@ var init_Effect = __esm(() => {
   timeoutOption2 = timeoutOption;
   filter3 = filter2;
   filterOrFail2 = filterOrFail;
+  match4 = match3;
   matchEffect3 = matchEffect;
   provide4 = provide3;
   provideService2 = provideService;
@@ -15706,7 +15707,7 @@ var JsonObjectText, strict2, empty4, fileOperation = (path, what, run) => tryPro
     return { value: empty4, text };
   const value = yield* decodeUnknownEffect2(JsonObjectText)(text, strict2).pipe(mapError2((error) => new SetupFailure({ message: `${path} is not a JSON object: ${error.message}` })));
   return { value, text };
-}), writeJsonObject = (path, value, options) => replaceJsonObject(path, value, options).pipe(asVoid2), replaceJsonObject = (path, value, options, unchangedSince) => gen2(function* () {
+}), writeJsonObject = (path, value, options) => replaceJsonObject(path, value, options).pipe(asVoid2), writeJsonObjectIfUnchanged = (path, value, unchangedSince, options) => replaceJsonObject(path, value, options, unchangedSince), replaceJsonObject = (path, value, options, unchangedSince) => gen2(function* () {
   const exists = yield* fileOperation(path, "write", () => Bun.file(path).exists());
   const target = exists ? yield* fileOperation(path, "write", () => realpath4(path)) : path;
   const mode = options?.mode ?? (exists ? (yield* fileOperation(target, "write", () => Bun.file(target).stat())).mode & 511 : undefined);
@@ -24945,7 +24946,274 @@ var init_pi_install = __esm(() => {
   });
 });
 
+import { rm as rm6, stat as stat3 } from "fs/promises";
 import { join as join18 } from "path";
+var T3_STORAGE_CLEANUP, T3_WRITING_INSTRUCTIONS, label2 = "t3 settings", t3Home = (env) => firstNonEmpty(env["T3CODE_HOME"]) ?? join18(homeDirectory(env), ".t3"), t3SettingsFile = (env) => join18(t3Home(env), "userdata", "settings.json"), isDirectory2 = (path) => tryPromise2(() => stat3(path)).pipe(map5((info) => info.isDirectory()), orElseSucceed2(() => false)), deviceHost, BALANCED, units = (devices, worktrees) => [
+  {
+    name: "Pi provider",
+    keys: [
+      { path: ["providerInstances", "pi", "driver"], value: "pi", default: undefined },
+      { path: ["providerInstances", "pi", "enabled"], value: true, default: undefined }
+    ],
+    refuse: (existing) => {
+      const instance = isJsonObject2(existing["providerInstances"]) ? existing["providerInstances"]["pi"] : undefined;
+      if (!isJsonObject2(instance))
+        return;
+      if (instance["driver"] !== undefined && instance["driver"] !== "pi")
+        return "providerInstances.pi is another driver's instance";
+      const config = instance["config"];
+      return isJsonObject2(config) && config["enabled"] === false ? "providerInstances.pi.config.enabled is false" : undefined;
+    }
+  },
+  ...devices ? [
+    {
+      name: "device access",
+      keys: [
+        { path: ["enableDeviceSupport"], value: true, default: false },
+        { path: ["enableAgentDeviceAccess"], value: true, default: false }
+      ]
+    }
+  ] : [],
+  ...worktrees ? [
+    {
+      name: "worktrees",
+      keys: [{ path: ["defaultThreadEnvMode"], value: "worktree", default: null }]
+    }
+  ] : [],
+  {
+    name: "background activity",
+    whole: "backgroundActivity",
+    keys: [
+      { path: ["backgroundActivity", "schemaVersion"], value: 1, default: undefined },
+      { path: ["backgroundActivity", "profile"], value: "custom", default: "balanced" },
+      { path: ["backgroundActivity", "baseProfile"], value: "balanced", default: undefined },
+      ...[
+        "pauseWhenHostLocked",
+        "pauseWhenHostLowPower",
+        "pauseWhenClientLowPower",
+        "pauseWhenOnBattery"
+      ].map((name) => ({
+        path: ["backgroundActivity", "overrides", name],
+        value: false,
+        default: BALANCED[name]
+      }))
+    ]
+  },
+  {
+    name: "source control writing",
+    whole: "sourceControlWritingStyle",
+    keys: [
+      {
+        path: ["sourceControlWritingStyle", "mode"],
+        value: "conventional_commits",
+        default: "repo_conventions"
+      },
+      {
+        path: ["sourceControlWritingStyle", "customInstructions"],
+        value: T3_WRITING_INSTRUCTIONS,
+        default: ""
+      }
+    ]
+  },
+  {
+    name: "threads and git",
+    keys: [
+      { path: ["removeAgentCreditsOnMerge"], value: true, default: false },
+      { path: ["autoResumeLimitedThreads"], value: true, default: false },
+      { path: ["snoozeLimitedThreads"], value: true, default: false },
+      { path: ["defaultAutoPull"], value: true, default: false }
+    ]
+  },
+  {
+    name: "storage cleanup",
+    keys: [
+      { path: ["storageCleanup", "worktreeOnMerge"], value: true, default: false },
+      ...Object.entries(T3_STORAGE_CLEANUP).map(([name, days]) => ({
+        path: ["storageCleanup", name],
+        value: days,
+        default: null
+      }))
+    ]
+  }
+], wantedKeys = (existing, all) => {
+  const keys = [];
+  const left = [];
+  for (const unit of all) {
+    const reason = unit.whole !== undefined && existing[unit.whole] !== undefined ? `${unit.whole} is set` : unit.refuse?.(existing);
+    if (reason !== undefined) {
+      left.push(`${unit.name} (${reason})`);
+      continue;
+    }
+    keys.push(...unit.keys.filter((key) => !equals(key.value, key.default)));
+  }
+  return { keys, left };
+}, decide, writeVerified, names = (paths) => paths.map((entry) => entry.path).join(", "), installT3Settings, undoT3Settings, checkT3Settings = (env, cwd, options = {}) => gen2(function* () {
+  if (!(yield* piInUse(env)))
+    return [];
+  const decided = yield* decide(env, cwd, options);
+  if (decided === undefined || "line" in decided)
+    return [];
+  const { file, units: wanted } = decided.target;
+  return yield* gen2(function* () {
+    const { value } = yield* readJsonObjectSnapshot(file);
+    const { keys } = wantedKeys(value, wanted);
+    const missing = applyDefaults(value, keys).entries.filter((entry) => entry.status === "added");
+    return [
+      missing.length === 0 ? pass(label2, `${file} holds the settings HolyAgent writes`) : hint(`${label2} ${file} lacks ${names(missing)}; run \`holyagent setup\``)
+    ];
+  }).pipe(catchTag2("SetupFailure", (error) => succeed6([
+    hint(`${label2}: ${error.message}; fix the file, then run \`holyagent setup\``)
+  ])));
+});
+var init_t3_settings = __esm(() => {
+  init_dist();
+  init_environment();
+  init_errors6();
+  init_json_file();
+  init_pi_check();
+  init_record2();
+  init_settings2();
+  T3_STORAGE_CLEANUP = {
+    logsAfterDays: 30,
+    browserArtifactsAfterDays: 14,
+    worktreeSettledAfterDays: 14
+  };
+  T3_WRITING_INSTRUCTIONS = "Write as the author, in the first person or a neutral voice, about what the change does and why. " + "Keep AI agents, assistants, sessions and tools out of commit messages and pull request text, and " + "add no attribution trailers (no Co-authored-by or Generated-by lines).";
+  deviceHost = fn2("t3DeviceHost")(function* (env, platform) {
+    const home = homeDirectory(env);
+    if (platform === "darwin") {
+      const developer = firstNonEmpty(env["DEVELOPER_DIR"]) ?? "/Applications/Xcode.app/Contents/Developer";
+      const simulator = join18(developer, "Platforms", "iPhoneSimulator.platform");
+      if (yield* isDirectory2(simulator))
+        return `Xcode (${developer})`;
+    }
+    const sdkFolders = [
+      firstNonEmpty(env["ANDROID_HOME"]),
+      firstNonEmpty(env["ANDROID_SDK_ROOT"]),
+      platform === "darwin" ? join18(home, "Library", "Android", "sdk") : platform === "win32" ? join18(firstNonEmpty(env["LOCALAPPDATA"]) ?? join18(home, "AppData", "Local"), "Android", "Sdk") : join18(home, "Android", "Sdk")
+    ];
+    for (const folder of sdkFolders) {
+      if (folder !== undefined && (yield* isDirectory2(folder)))
+        return `the Android SDK (${folder})`;
+    }
+    return;
+  });
+  BALANCED = {
+    pauseWhenHostLocked: true,
+    pauseWhenHostLowPower: true,
+    pauseWhenClientLowPower: true,
+    pauseWhenOnBattery: false
+  };
+  decide = fn2("t3SettingsDecide")(function* (env, cwd, options) {
+    const config = yield* loadPiConfig(env, cwd, "user").pipe(orElseSucceed2(() => {
+      return;
+    }));
+    if (config === undefined || !config.pi.enable)
+      return;
+    const home = t3Home(env);
+    if (!(yield* isDirectory2(home)))
+      return {
+        line: skipped(`${label2}: T3 Code is not installed (no ${home}); nothing written`)
+      };
+    if (config.pi.t3.scope === "project")
+      return {
+        line: skipped(`${label2}: pi.t3.scope is "project", whose per-project overrides setup does not write yet; nothing written`)
+      };
+    const wantsDevices = (options.deviceAccess ?? true) && config.pi.t3.deviceAccess;
+    const host = wantsDevices ? yield* deviceHost(env, options.platform ?? process.platform) : undefined;
+    const deviceNote = wantsDevices && host === undefined ? "device access left out: no Xcode or Android SDK found" : undefined;
+    return {
+      target: {
+        file: t3SettingsFile(env),
+        units: units(host !== undefined, (options.worktrees ?? true) && config.pi.t3.worktrees),
+        deviceNote
+      }
+    };
+  });
+  writeVerified = fn2("t3SettingsWriteVerified")(function* (file, value, before, write) {
+    yield* write(file, value);
+    const back = yield* readJsonObjectSnapshot(file).pipe(match4({
+      onFailure: (error) => ({ error: error.message }),
+      onSuccess: (snapshot) => ({ snapshot })
+    }));
+    if ("snapshot" in back && JSON.stringify(back.snapshot.value) === JSON.stringify(value))
+      return;
+    const problem = "error" in back ? `does not decode afterwards: ${back.error}` : "differs from what was written";
+    const current = yield* fileOperation(file, "read", () => Bun.file(file).text());
+    const restored = before.text === undefined ? yield* fileOperation(file, "remove", () => rm6(file, { force: true })).pipe(as2(true), orElseSucceed2(() => false)) : yield* writeJsonObjectIfUnchanged(file, before.value, current).pipe(orElseSucceed2(() => false));
+    return yield* new SetupFailure({
+      message: `${file} ${problem}; ${restored ? "its previous content was put back" : "it changed again, so it was left as it is"}. Close T3 Code and run setup again`
+    });
+  });
+  installT3Settings = fn2("installT3Settings")(function* (env, cwd, options) {
+    const decided = yield* decide(env, cwd, options);
+    if (decided === undefined)
+      return [];
+    if ("line" in decided)
+      return [decided.line];
+    const { file, units: wanted, deviceNote } = decided.target;
+    const before = yield* readJsonObjectSnapshot(file);
+    const { keys, left } = wantedKeys(before.value, wanted);
+    const { merged, entries } = applyDefaults(before.value, keys);
+    const added = entries.filter((entry) => entry.status === "added");
+    const present = entries.filter((entry) => entry.status === "present");
+    const kept = entries.filter((entry) => entry.status === "kept");
+    if (added.length > 0 && !options.dryRun) {
+      const written = new Set(added.map((entry) => entry.path));
+      yield* readRecorded(env, file);
+      yield* writeVerified(file, merged, before, options.write ?? writeJsonObject);
+      yield* addRecorded(env, file, keys.filter(({ path }) => written.has(path.join("."))).map(({ path, value }) => ({ path, value }))).pipe(mapError2((error) => new SetupFailure({
+        message: `${file} was written, but its keys could not be recorded, so --undo will not remove them: ${error.message}`
+      })));
+    }
+    const parts = [
+      ...added.length === 0 ? [] : [
+        `${options.dryRun ? "would add" : "added"} ${added.map((entry) => `${entry.path} ${show(entry.value)}`).join(", ")}`
+      ],
+      ...present.length === 0 ? [] : [`already set: ${names(present)}`],
+      ...kept.map((entry) => `kept ${entry.path} ${show(entry.value)} (HolyAgent sets ${show(entry.wanted)}; yours wins)`),
+      ...left.length === 0 ? [] : [`left out: ${left.join(", ")}`],
+      ...deviceNote === undefined ? [] : [deviceNote]
+    ];
+    const mark = added.length > 0 ? "+" : kept.length > 0 ? "~" : "=";
+    return [
+      `${mark} ${label2} ${file}: ${parts.join("; ")}${added.length > 0 && options.dryRun ? " (dry run, nothing written)" : ""}`
+    ];
+  });
+  undoT3Settings = fn2("undoT3Settings")(function* (env, options) {
+    const file = t3SettingsFile(env);
+    const recorded = yield* readRecorded(env, file);
+    if (recorded.length === 0)
+      return [];
+    const before = yield* readJsonObjectSnapshot(file);
+    let result = before.value;
+    const removed = [];
+    const kept = [];
+    for (const { path, value } of recorded) {
+      const [next, removal] = take(result, path, 0, value);
+      result = next;
+      if (removal.status === "removed")
+        removed.push(`${removal.path} ${show(removal.value)}`);
+      if (removal.status === "kept")
+        kept.push(`${removal.path} ${show(removal.value)} (setup wrote ${show(removal.wanted)})`);
+    }
+    if (!options.dryRun) {
+      if (removed.length > 0)
+        yield* writeVerified(file, result, before, options.write ?? writeJsonObject);
+      yield* clearRecorded(env, file);
+    }
+    const parts = [
+      ...removed.length === 0 ? [] : [`${options.dryRun ? "would remove" : "removed"} ${removed.join(", ")}`],
+      ...kept.length === 0 ? [] : [`kept ${kept.join(", ")}`]
+    ];
+    const mark = removed.length > 0 ? "-" : kept.length > 0 ? "~" : "=";
+    return [
+      `${mark} ${label2} ${file}: ${parts.length === 0 ? "nothing of setup's left to remove" : parts.join("; ")}${removed.length > 0 && options.dryRun ? " (dry run, nothing written)" : ""}`
+    ];
+  });
+});
+
+import { join as join19 } from "path";
 var CLOUD_SKIP = "skipped in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true), which has no machine of yours to install it on", neutralDirectory = (env) => homeDirectory(env), ensureGlobal, installCtx7, asStep = (label, step) => step.pipe(catchTag2("SetupFailure", (error) => succeed6([`! ${label}: ${error.message}`]))), setup;
 var init_steps = __esm(() => {
   init_dist();
@@ -24958,6 +25226,7 @@ var init_steps = __esm(() => {
   init_scope();
   init_settings2();
   init_shell();
+  init_t3_settings();
   ensureGlobal = fn2("ensureGlobal")(function* (env, command, packageName, dryRun) {
     const shell = yield* Shell;
     if (isSome2(yield* shell.which(command, { includeBunBin: true }))) {
@@ -24986,7 +25255,7 @@ var init_steps = __esm(() => {
     const global = yield* ensureGlobal(env, "ctx7", "ctx7", dryRun);
     if (!global.usable)
       return global.lines;
-    const skillReady = (yield* fileExists2(join18(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join18(files.claudeDir, "rules", "context7.md")));
+    const skillReady = (yield* fileExists2(join19(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join19(files.claudeDir, "rules", "context7.md")));
     if (skillReady)
       return [...global.lines, present3("ctx7 skill: already installed")];
     const apiKey = env.CONTEXT7_API_KEY === "" ? undefined : env.CONTEXT7_API_KEY;
@@ -25020,7 +25289,8 @@ var init_steps = __esm(() => {
       const lines = [
         hint("ctx7: left installed; --undo only removes the settings setup recorded adding"),
         ...yield* onSettings((file) => undoUserSettings({ env, file, dryRun: options.dryRun })),
-        ...yield* asStep("tool settings", undoPiToolSettings(env, piOptions))
+        ...yield* asStep("tool settings", undoPiToolSettings(env, piOptions)),
+        ...scope === "user" ? yield* asStep("t3 settings", undoT3Settings(env, { dryRun: options.dryRun })) : []
       ];
       return { lines, ok: !lines.some((line) => line.startsWith("! ")) };
     }
@@ -25030,6 +25300,7 @@ var init_steps = __esm(() => {
       ...options.skipCtx7 ? [skipped("ctx7: skipped by flag")] : cloud ? [skipped(`ctx7: ${CLOUD_SKIP}`)] : yield* asStep("ctx7", installCtx7(env, options.dryRun)),
       ...piUsed ? yield* asStep("pi packages", installPiPackages(env, piOptions)) : [],
       ...piUsed ? yield* asStep("tool settings", installPiToolSettings(env, piOptions)) : [],
+      ...piUsed && scope === "user" ? yield* asStep("t3 settings", installT3Settings(env, piOptions.cwd, { dryRun: options.dryRun })) : [],
       ...yield* onSettings((file) => mergeUserSettings({
         env,
         file,
@@ -25061,6 +25332,7 @@ var init_doctor = __esm(() => {
   init_settings2();
   init_shell();
   init_steps();
+  init_t3_settings();
   checkBun = gen2(function* () {
     const shell = yield* Shell;
     const found = yield* shell.which("bun");
@@ -25069,7 +25341,11 @@ var init_doctor = __esm(() => {
   doctor = fn2("doctor")(function* (env, options) {
     const scope = options.scope ?? "user";
     const cwd = options.cwd ?? process.cwd();
-    const pi = inCloudSession(env) ? [] : [...yield* piChecks(env, cwd, scope), ...yield* checkPiToolSettings(env, cwd, scope)];
+    const pi = inCloudSession(env) ? [] : [
+      ...yield* piChecks(env, cwd, scope),
+      ...yield* checkPiToolSettings(env, cwd, scope),
+      ...scope === "user" ? yield* checkT3Settings(env, cwd) : []
+    ];
     const located = yield* settingsFile(env, scope, cwd).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
     if (located instanceof SetupFailure) {
       const lines = yield* all2([
@@ -25202,12 +25478,12 @@ var init_state = __esm(() => {
   ];
 });
 
-import { join as join19 } from "path";
+import { join as join20 } from "path";
 var {$: $5 } = globalThis.Bun;
 var TARGETS, BUNDLED_TOOLS, UnsupportedPlatform, ToolMissing, selectTarget = (platform, arch) => {
   const target = TARGETS.find((candidate) => candidate.platform === platform && candidate.arch === arch);
   return target === undefined ? fail5(new UnsupportedPlatform({ platform, arch })) : succeed6(target);
-}, toolPath = (directory, tool, target) => join19(directory, target.id, `${tool}${target.suffix}`), runTool = (options) => gen2(function* () {
+}, toolPath = (directory, tool, target) => join20(directory, target.id, `${tool}${target.suffix}`), runTool = (options) => gen2(function* () {
   const path = toolPath(options.directory, options.tool, options.target);
   if (!(yield* promise2(() => Bun.file(path).exists())))
     return yield* new ToolMissing({ tool: options.tool, path });
@@ -25247,7 +25523,7 @@ var init_tools2 = __esm(() => {
     { id: "linux-x64", platform: "linux", arch: "x64", suffix: "" },
     { id: "windows-x64", platform: "win32", arch: "x64", suffix: ".exe" }
   ];
-  BUNDLED_TOOLS = join19(import.meta.dir, "vendor");
+  BUNDLED_TOOLS = join20(import.meta.dir, "vendor");
   UnsupportedPlatform = class UnsupportedPlatform extends TaggedError2("UnsupportedPlatform") {
     get message() {
       return `No bundled search tools exist for ${this.platform} ${this.arch}; they exist for ${TARGETS.map((target) => target.id).join(", ")}`;
