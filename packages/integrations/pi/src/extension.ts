@@ -13,7 +13,7 @@ import type {
   ToolRenderers,
 } from "@earendil-works/pi-coding-agent"
 import { Text } from "@earendil-works/pi-tui"
-import { Cause, Data, Effect, Exit, Schema } from "effect"
+import { Cause, Data, Effect, Exit, Fiber, Schema } from "effect"
 
 import { literalWorkflowName, workflowRefusal } from "../../../runtime/src/cli/workflow-check.ts"
 import { Config, defaultConfig } from "../../../runtime/src/config/schema.ts"
@@ -769,110 +769,124 @@ export const createExtension =
       let read: Config | undefined
       let user: Config | undefined
       let homeNotice: Delivery | undefined
-      const failed = (text: string): Effect.Effect<Collected> =>
-        (configured === undefined ? closedSettings(read, user) : Effect.succeed(configured)).pipe(
-          Effect.map((kept): Collected => ({ ...kept, delivery: notice(text) })),
+      // The user's own file is read alone (no project folder), first and apart from git, the merged
+      // config and the state folder: only it may lift the gates, and its exclusions stay whatever a
+      // project says, so no failure of those (a project's malformed `.git` among them) may keep
+      // it from being used. A file that cannot be read, or that is still being read at the
+      // deadline, counts for nothing, which leaves the gates on and the defaults' exclusions, and
+      // is reported.
+      const readUser = (project: string) =>
+        holyagent(signal, project, "config").pipe(
+          Effect.flatMap(decodeConfig),
+          Effect.map((own) => {
+            user = own
+          }),
+          Effect.timeoutOrElse({
+            duration: deadlineMs,
+            orElse: () =>
+              Effect.fail(
+                new CommandFailed({
+                  command: "config",
+                  reason: `it did not finish within ${deadlineMs / 1000}s`,
+                }),
+              ),
+          }),
+          Effect.catch((error) =>
+            Effect.sync(() => {
+              homeNotice = notice(`the home-level config could not be read: ${error.message}`)
+            }),
+          ),
         )
       return Effect.gen(function* () {
         // Every command starts in the package's folder, so a relative `cwd` would resolve against
         // that folder, not the project's: it is made absolute here, once.
         const project = resolve(cwd)
-        const located = yield* topOf(signal, project)
-        // The loader reads files with Bun, which Pi's Node does not have, so the wrapper loads it.
-        // The state folder does not depend on the config or on `status`, so it is asked meanwhile;
-        // its failure counts only once the config says the extension is on.
-        // The user's own file is read alone (no project folder) beside the merged config: only it
-        // may lift the gates, and its exclusions stay whatever a project says. It is recorded as
-        // soon as it is read, apart from the merged config and the state folder, whose failure
-        // stops the folder command but must not stop this read. A file that cannot be read counts
-        // for nothing, which leaves the gates on and the defaults' exclusions, and is reported.
-        const [attempt] = yield* Effect.all(
-          [
-            Effect.result(
-              Effect.all(
-                [
-                  holyagent(signal, project, "config", join(located.top, STATE_DIRECTORY)).pipe(
-                    Effect.flatMap(decodeConfig),
-                  ),
-                  Effect.result(stateFolderOf(signal, project, located)),
-                ],
-                { concurrency: "unbounded" },
-              ),
+        const userRead = yield* Effect.forkChild(readUser(project))
+        // A failure waits for the user's read, which ends by its own deadline, so that the settings
+        // it leaves are the ones the user's file gives.
+        const failed = (text: string): Effect.Effect<Collected> =>
+          Fiber.await(userRead).pipe(
+            Effect.andThen(() =>
+              configured === undefined ? closedSettings(read, user) : Effect.succeed(configured),
             ),
-            holyagent(signal, project, "config").pipe(
-              Effect.flatMap(decodeConfig),
-              Effect.map((own) => {
-                user = own
-              }),
-              Effect.catch((error) =>
-                Effect.sync(() => {
-                  homeNotice = notice(`the home-level config could not be read: ${error.message}`)
-                }),
-              ),
-            ),
-          ],
-          { concurrency: "unbounded" },
-        )
-        const [config, folder] = yield* Effect.fromResult(attempt)
-        read = config
-        const bound = boundConfigs(yield* defaultConfig, user)
-        if (!config.pi.enable) {
-          if (user !== undefined && !user.pi.enable)
-            return { enabled: false, gatesOff: true } satisfies Collected
-          // Only the user's `pi.enable: false` stands the root's guard down; a project's adds no
-          // context and no settings, and leaves the root its prompt and its exclusions.
-          const off = settingsFor(
-            config,
-            yield* roleOf.pipe(Effect.orElseSucceed((): PiRole => DEFAULT_PI_ROLE)),
-            bound,
+            Effect.map((kept): Collected => ({ ...kept, delivery: notice(text) })),
           )
-          return {
-            enabled: false,
-            ...(off.rootPrompt === undefined ? {} : { rootPrompt: off.rootPrompt }),
-            ...(off.tools === undefined ? {} : { tools: off.tools }),
-          } satisfies Collected
-        }
-        const role = yield* roleOf
-        configured = settingsFor(config, role, bound)
-        // Status first, then reconcile: for a project that keeps state, status makes the state
-        // worktree that the next calls read.
-        const status = yield* holyagent(signal, project, "status").pipe(
-          Effect.flatMap((text) => parseOutput("status", text)),
-        )
-        const reconcile = RECONCILED.has(reason)
-          ? yield* holyagent(signal, project, "reconcile").pipe(
-              Effect.flatMap((text) => parseOutput("reconcile", text)),
+        const collected = yield* Effect.gen(function* () {
+          const located = yield* topOf(signal, project)
+          // The loader reads files with Bun, which Pi's Node does not have, so the wrapper loads
+          // it. The state folder does not depend on the config or on `status`, so it is asked
+          // meanwhile; its failure counts only once the config says the extension is on.
+          const attempt = yield* Effect.result(
+            Effect.all(
+              [
+                holyagent(signal, project, "config", join(located.top, STATE_DIRECTORY)).pipe(
+                  Effect.flatMap(decodeConfig),
+                ),
+                Effect.result(stateFolderOf(signal, project, located)),
+              ],
+              { concurrency: "unbounded" },
+            ),
+          )
+          yield* Fiber.join(userRead)
+          const [config, folder] = yield* Effect.fromResult(attempt)
+          read = config
+          const bound = boundConfigs(yield* defaultConfig, user)
+          if (!config.pi.enable) {
+            if (user !== undefined && !user.pi.enable)
+              return { enabled: false, gatesOff: true } satisfies Collected
+            // Only the user's `pi.enable: false` stands the root's guard down; a project's adds no
+            // context and no settings, and leaves the root its prompt and its exclusions.
+            const off = settingsFor(
+              config,
+              yield* roleOf.pipe(Effect.orElseSucceed((): PiRole => DEFAULT_PI_ROLE)),
+              bound,
             )
-          : undefined
-        const directory = yield* Effect.fromResult(folder)
-        const state: ProjectState | undefined =
-          typeof directory === "string" && (yield* hasStateFolder(directory))
-            ? { status, ...(reconcile === undefined ? {} : { reconcile }) }
+            return {
+              enabled: false,
+              ...(off.rootPrompt === undefined ? {} : { rootPrompt: off.rootPrompt }),
+              ...(off.tools === undefined ? {} : { tools: off.tools }),
+            } satisfies Collected
+          }
+          const role = yield* roleOf
+          configured = settingsFor(config, role, bound)
+          // Status first, then reconcile: for a project that keeps state, status makes the state
+          // worktree that the next calls read.
+          const status = yield* holyagent(signal, project, "status").pipe(
+            Effect.flatMap((text) => parseOutput("status", text)),
+          )
+          const reconcile = RECONCILED.has(reason)
+            ? yield* holyagent(signal, project, "reconcile").pipe(
+                Effect.flatMap((text) => parseOutput("reconcile", text)),
+              )
             : undefined
-        const content = piContext(role, root, state)
-        // The provider is checked only after a collection that ended well: a failed one already
-        // carries a notice, and the checks would start commands after its deadline.
-        const ended = { ...configured, ...(role === "root" ? { config } : {}) }
-        return content === undefined
-          ? ({ ...ended } satisfies Collected)
-          : ({
-              ...ended,
-              delivery: { customType: CONTEXT_MESSAGE, content, display: false },
-            } satisfies Collected)
-      }).pipe(
-        // Every command of the collection shares one deadline, as the Claude hook has one timeout.
-        Effect.timeoutOrElse({
-          duration: deadlineMs,
-          orElse: () => Effect.fail(new DeadlineExceeded({ ms: deadlineMs })),
-        }),
-        // A failure adds one line and never reaches Pi; the settings stay as far as they are known,
-        // and are the defaults' when the config could not be read (see closedSettings).
-        Effect.catch((error) => failed(error.message)),
-        Effect.catchCause((cause) => failed(Cause.pretty(cause))),
-        Effect.map((collected): Collected =>
-          homeNotice === undefined ? collected : { ...collected, homeNotice },
-        ),
-      )
+          const directory = yield* Effect.fromResult(folder)
+          const state: ProjectState | undefined =
+            typeof directory === "string" && (yield* hasStateFolder(directory))
+              ? { status, ...(reconcile === undefined ? {} : { reconcile }) }
+              : undefined
+          const content = piContext(role, root, state)
+          // The provider is checked only after a collection that ended well: a failed one already
+          // carries a notice, and the checks would start commands after its deadline.
+          const ended = { ...configured, ...(role === "root" ? { config } : {}) }
+          return content === undefined
+            ? ({ ...ended } satisfies Collected)
+            : ({
+                ...ended,
+                delivery: { customType: CONTEXT_MESSAGE, content, display: false },
+              } satisfies Collected)
+        }).pipe(
+          // Every command of the collection shares one deadline, as the Claude hook has one timeout.
+          Effect.timeoutOrElse({
+            duration: deadlineMs,
+            orElse: () => Effect.fail(new DeadlineExceeded({ ms: deadlineMs })),
+          }),
+          // A failure adds one line and never reaches Pi; the settings stay as far as they are
+          // known, and are the defaults' when the config could not be read (see closedSettings).
+          Effect.catch((error) => failed(error.message)),
+          Effect.catchCause((cause) => failed(Cause.pretty(cause))),
+        )
+        return homeNotice === undefined ? collected : { ...collected, homeNotice }
+      })
     }
 
     // Safe to call twice, and with nothing held. The promise settles once every collection ever
@@ -990,7 +1004,11 @@ export const createExtension =
         taken.gatesOff = result?.gatesOff === true
         if (result?.rootPrompt === true) taken.rootPrompt = true
         else if (result?.enabled === false) taken.rootPrompt = false
-        if (result?.tools !== undefined) taken.excluded = result.tools.excludeTools
+        // Only the user's own `pi.enable: false` clears the set; otherwise it grows, so a later
+        // collection whose reads failed (and fell back to the defaults) cannot drop a pattern an
+        // earlier one took from the user's config.
+        if (result?.tools !== undefined)
+          taken.excluded = [...new Set([...taken.excluded, ...result.tools.excludeTools])]
         else if (result?.enabled === false) taken.excluded = []
         if (result?.providerEnvironment !== undefined)
           applyEnvironment(env, result.providerEnvironment, true)

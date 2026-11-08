@@ -1120,8 +1120,9 @@ describe("a git failure that does not say the project is not a repository", () =
       expect(delivered?.message?.display).toBe(true)
       expect(delivered?.message?.content).toContain("git rev-parse --show-toplevel")
       expect(delivered?.message?.content).toContain(reason)
-      // Nothing else ran: no command guessed at a config or state folder.
-      expect(startedWith(api.calls)).toEqual([])
+      // Only the user's own config was read, which needs no project folder: no command guessed at
+      // the project's config or state folder.
+      expect(startedWith(api.calls)).toEqual(["config"])
     })
 })
 
@@ -2262,6 +2263,54 @@ describe("the root's excluded tools", () => {
         blocked,
       )
     expect(api.pi.getActiveTools()).not.toContain("web_search")
+  })
+
+  test("the user's own exclusions stay when git fails, as a project's malformed .git makes it", async () => {
+    const { api } = await run(
+      (callOf, runtime) =>
+        callOf.command === "git"
+          ? { code: 128, stderr: "fatal: invalid gitfile format\n" }
+          : configs(CONFIG, webKit)(callOf, runtime),
+      { activeTools: ["read", ...DEFERRED] },
+    )
+    for (const name of [...EXCLUDED, "web_search", "web_fetch"])
+      expect(await api.emit("tool_call", call(name))).toEqual(blocked)
+    expect(api.pi.getActiveTools()).not.toContain("web_search")
+  })
+
+  test("a compaction whose reads fail keeps the exclusions an earlier collection took from the user", async () => {
+    let failing = false
+    const { api } = await run(
+      (callOf, runtime) =>
+        failing && (callOf.command === "git" || runtime[0] === "config")
+          ? { code: 4, stderr: "error: unreadable\n" }
+          : configs(CONFIG, webKit)(callOf, runtime),
+      { startOnly: true },
+    )
+    failing = true
+    await api.emit("session_compact", {})
+    for (const name of [...EXCLUDED, "web_search", "web_fetch"])
+      expect(await api.emit("tool_call", call(name))).toEqual(blocked)
+  })
+
+  test("a deadline during the user's read reports the home-level config and keeps the defaults", async () => {
+    const hold = gate()
+    const { api } = await run(
+      (callOf, runtime) =>
+        runtime[0] === "config" && runtime.length === 1
+          ? gated(hold, { stdout: webKit }, callOf.signal)
+          : healthy("/missing")(callOf, runtime),
+      { startOnly: true, deadlineMs: 100 },
+    )
+    for (const name of EXCLUDED) expect(await api.emit("tool_call", call(name))).toEqual(blocked)
+    const messages = await nextMessages(api)
+    expect(
+      messages.some(
+        (message) =>
+          message?.customType === NOTICE_MESSAGE &&
+          String(message.content).includes("home-level config could not be read"),
+      ),
+    ).toBe(true)
   })
 
   test("a user config that cannot be read is reported, and the defaults' exclusions stay", async () => {
