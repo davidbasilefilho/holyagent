@@ -56,5 +56,29 @@
     "finishedAt": "2026-11-08T06:59:52.614Z"
   },
   "result": "result: `stripCitations` now handles all three cases, with tests that fail on the base; build and verify pass.\n\nchanged:\n- `/home/user/holyagent-0.3.0-launcher/packages/runtime/src/instructions/skills.ts`\n- `/home/user/holyagent-0.3.0-launcher/packages/runtime/tests/instructions/strip-citations.test.ts` (new)\n- `/home/user/holyagent-0.3.0-launcher/docs/development.md`\n- `/home/user/holyagent-0.3.0-launcher/packages/integrations/claude/dist/scripts/holyagent.js` (rebuilt bundle, which also carries other writers' edits; no skills files changed)\n\nchecks:\n- `bunx --no-install mise run build` -> exit 0. Only `claude/dist/scripts/holyagent.js` changed under the Claude `dist`.\n- `bunx --no-install mise run verify` -> exit 0: no type errors, no lint problems, 518 files formatted, 2065 pass, 0 fail across 70 files. The first run failed `fmt:check` on two files; `mise run fmt` fixed them, then build and verify were re-run.\n- Against the base `skills.ts`, 4 of the 6 new tests fail (list-item spans, indented fence, indented block with a blank line, final-line comment); the 2 that pass guard against over-fixing.\n\nblockers: none\nquestions: none\n\nnotes:\n- The brief's ownership path `packages/runtime/tests/instructions` did not exist, so I put the tests in a new file there; the existing `tests/skills.test.ts` is untouched and still passes.\n- Indented code blocks are recognised as 4+ spaces (or a tab) at the start of the text or after a blank line. A 4-space line inside a list item after a blank line is treated as code, though CommonMark may read it as a paragraph. No current source has an indented comment.\n- Spans also stop at list-item starts, bullet or numbered. The `docs/development.md` sentence is a clause added to the existing `stripCitations` sentence, not a separate sentence.\n\nevidence:\nThe three edge cases are handled with tests that fail without the fix: `strip-citations.test.ts` fails 4 of 6 on the base `skills.ts` and passes 6 of 6 with the fix.\ndocs/development.md states that code spans and fenced blocks are left as written: the `stripCitations` sentence in the instructions section now says it \"leaves code spans, fenced blocks and indented code blocks as written\".\nmise run build leaves dist in sync and mise run verify exits 0: build exit 0; verify exit 0 with 2065 pass and 0 fail.\ndiff-file: /home/user/holyagent-notes/launcher-c.diff\n",
+  "acceptance": {
+    "revision": 7,
+    "rationale": "Launcher work reviewed by code and security reviewers through four repair rounds; final head 7846c9b passes verify with 2146 tests and no open blocker.",
+    "criteria": [
+      {
+        "criterion": "The three edge cases are handled with tests that fail without the fix",
+        "support": "`strip-citations.test.ts` fails 4 of 6 on the base `skills.ts` and passes 6 of 6 with the fix."
+      },
+      {
+        "criterion": "docs/development.md states that code spans and fenced blocks are left as written",
+        "support": "the `stripCitations` sentence in the instructions section now says it \"leaves code spans, fenced blocks and indented code blocks as written\"."
+      },
+      {
+        "criterion": "mise run build leaves dist in sync and mise run verify exits 0",
+        "support": "build exit 0; verify exit 0 with 2065 pass and 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff-file",
+        "support": "/home/user/holyagent-notes/launcher-c.diff"
+      }
+    ]
+  },
   "createdAt": "2026-11-08T06:42:35.842Z"
 }
