@@ -1,6 +1,6 @@
 # Pi providers and models
 
-**Status: planned for 0.3.0. The first three sections are the plan for the Kimi provider, the routing and the instructions; the sections after them are research on Pi's provider layer and are not shipped behaviour.**
+**Status: the Kimi provider, its readiness and catalog checks and the routing are implemented in `packages/runtime/src/pi/`; the instructions are in `packages/runtime/src/instructions/kimi-k3.1`. The sections after them are research on Pi's provider layer and are not shipped behaviour.**
 
 Pi 1.4.0, commit `4a080252f06caf63a525d7873c5d94d3c23887e0` for the Pi source facts (the plan pins 1.5.0; see [README.md](README.md#version-risk)). Kimi facts are from the research of 2026-11-07, and the pages it fetched carried no dates unless a line says so. "Inference:" marks a conclusion drawn here, not a stated fact.
 
@@ -34,6 +34,17 @@ How HolyAgent uses the provider:
 - One mapping turns a route-table model and effort into a `provider/id` and a thinking level, so choosing another provider later changes that mapping only.
 - Selecting the provider in `config.json` enables `pi-provider-kimi-code`; deselecting it disables the extension ([configuration.md](configuration.md#holyagent-configjson)).
 
+### In the code
+
+`packages/runtime/src/pi/` holds the integration's whole provider layer; `provider.ts` is the only place a provider is named.
+
+- **Mapping.** `routeModel(config, row)` turns a route-table row into the `--model` value `kimi-coding/<model>:<thinking>` (for example `kimi-coding/k3.1-pro:high`). Kimi Code takes the table's `low`, `high` and `max` as they are.
+- **Environment.** `providerEnv(config)` is what the launcher sets on every Pi process: `KIMI_CODE_REGION=global`, so requests go to `api.kimi.ai` and login to `auth.kimi.ai`.
+- **Extension.** `providerSource(config)` is `npm:pi-provider-kimi-code@0.6.13`, the 0.6 line the integration is tested against; `piPackages` loads the extension while `pi.enable` is on and loads nothing when it is off.
+- **Login.** Readiness runs `pi auth check --provider kimi-coding --json`: exit 0 is ready, 1 is not ready (the fix is `/login kimi-coding` in Pi for the OAuth login the Moonshot-side tools need, or `KIMI_API_KEY` as the fallback) and 2, or any other exit, is invalid. The provider is never replaced, and the credential is never read or printed.
+- **Catalog.** `pi --list-models` prints a table, `provider model context max-out thinking images`, with the models of providers that have credentials only, so readiness comes first. Every `provider/model` of the route table must be a row of it; each missing id is a blocker that names the rows using it.
+- **Cache rule.** A session keeps the one model and effort of its row from launch to its end, because changing either invalidates Kimi's context cache.
+
 ### Models and efforts
 
 Source for the rows: [Kimi Code models](https://www.kimi.com/code/docs/en/kimi-code/models) (K3.1 Pro rollout; K2.8 Preview rollout 2026-09-11).
@@ -57,16 +68,31 @@ Source for the rows: [Kimi Code models](https://www.kimi.com/code/docs/en/kimi-c
 
 **Status: decided for 0.3.0; the table lives in the `config.json` defaults, so it can change without code** ([configuration.md](configuration.md#holyagent-configjson)). It replaces the Claude route table's `haiku`, `sonnet` and `opus` and their efforts for sessions on Kimi. The maintainer's words: "not kimi-for-coding-low, either high or max, kimi k3.1 pro low-high, assess if max is worth it for root".
 
-| Role                                                                                                | Model             | Effort |
-| --------------------------------------------------------------------------------------------------- | ----------------- | ------ |
-| Root                                                                                                | `k3.1-pro`        | high   |
-| Worker.implementation, Worker.debugging, Worker.integration                                         | `kimi-for-coding` | max    |
-| Reviewer.code, Reviewer.security, Reviewer.testing, Reviewer.artifact                               | `kimi-for-coding` | max    |
-| Worker.mechanical, Worker.validation, Worker.operations                                             | `kimi-for-coding` | high   |
-| Explorer.map, Explorer.lookup, Explorer.trace, Librarian.lookup, Librarian.research, Reviewer.audit | `kimi-for-coding` | high   |
-| Worker.visual, Reviewer.visual                                                                      | `k3.1-pro`        | low    |
+| Role                  | Model             | Effort | Reason                                                                                      |
+| --------------------- | ----------------- | ------ | ------------------------------------------------------------------------------------------- |
+| Root                  | `k3.1-pro`        | high   | The strongest model plans, decides and makes the final pass; `max` is selectable, see below |
+| Worker.implementation | `kimi-for-coding` | max    | Writes the change that gets merged, so depth is worth the tokens                            |
+| Worker.debugging      | `kimi-for-coding` | max    | Finding a root cause is the deepest reasoning a worker does                                 |
+| Worker.integration    | `kimi-for-coding` | max    | Spans several systems and contracts, where a missed interaction is the common failure       |
+| Reviewer.code         | `kimi-for-coding` | max    | Judges correctness and maintainability; a missed defect costs more than the tokens          |
+| Reviewer.security     | `kimi-for-coding` | max    | Judges trust boundaries, where a missed finding costs the most                              |
+| Reviewer.testing      | `kimi-for-coding` | max    | Judges whether tests prove the behavior, which needs the same depth as the code             |
+| Reviewer.artifact     | `kimi-for-coding` | max    | Judges an instruction or document against its requirements, where wording errors are subtle |
+| Worker.mechanical     | `kimi-for-coding` | high   | Bounded edits with a known recipe; extra effort adds cost, not quality                      |
+| Worker.validation     | `kimi-for-coding` | high   | Runs the gates and reports their output; the work is execution                              |
+| Worker.operations     | `kimi-for-coding` | high   | Runs commands along a documented procedure                                                  |
+| Explorer.map          | `kimi-for-coding` | high   | Reads the repository and reports its layout                                                 |
+| Explorer.lookup       | `kimi-for-coding` | high   | Answers a narrow question from files                                                        |
+| Explorer.trace        | `kimi-for-coding` | high   | Follows one flow through the code; bounded reading                                          |
+| Librarian.lookup      | `kimi-for-coding` | high   | Fetches one fact from documentation                                                         |
+| Librarian.research    | `kimi-for-coding` | high   | Gathers and compares sources; the root judges the result                                    |
+| Reviewer.audit        | `kimi-for-coding` | high   | Checks records against evidence rather than judging a design                                |
+| Worker.visual         | `k3.1-pro`        | low    | The root makes the final visual pass, so the specialist stays cheap                         |
+| Reviewer.visual       | `k3.1-pro`        | low    | The same: the root makes the final visual pass                                              |
 
-- **Specialists run on `kimi-for-coding`, which is Kimi K2.8 Preview, never at low, except the two visual specialists, which run on `k3.1-pro` at low (below).** The root runs on K3.1 Pro. The sources give no per-role reasons beyond this grouping: the roles that write or judge code run at max, and the mechanical, checking, lookup and research roles run at high.
+The table is `KIMI_ROUTES` in `packages/runtime/src/config/schema.ts`, the defaults of `pi.routes` in `config.json`; any row can be overridden there.
+
+- **Specialists run on `kimi-for-coding`, which is Kimi K2.8 Preview, never at low, except the two visual specialists, which run on `k3.1-pro` at low (below).** The root runs on K3.1 Pro. The maintainer decided the grouping (roles that write or judge code at max, mechanical, checking, lookup and research roles at high); the reasons in the table are the rationale for it, not separate sources.
 - **Both visual specialists run at low** because the root makes the final visual pass. The maintainer's words: "both visual specialists must be low, as root does the final review pass".
 - **Visual tools.** Under T3 Code the two visual specialists use T3's `preview_*` browser, and only they get the computer-use tools of `@amaster.ai/pi-computer-use` ([t3-code.md](t3-code.md#browser), [t3-code.md](t3-code.md#computer-use-through-cua-driver)).
 - **The root's effort is `high`.** `max` is selectable in `config.json`. A later 0.3.x task will measure high against max on real sessions before `max` becomes the default; until then the cost and benefit of `max` for the root are unmeasured.
