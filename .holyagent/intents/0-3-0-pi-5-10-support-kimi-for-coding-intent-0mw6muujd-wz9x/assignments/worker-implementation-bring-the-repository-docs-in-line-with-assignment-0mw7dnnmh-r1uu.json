@@ -1,0 +1,57 @@
+{
+  "id": "assignment-0mw7dnnmh-r1uu",
+  "intentId": "intent-0mw6muujd-wz9x",
+  "intentRevision": 9,
+  "roleTask": "Worker.implementation",
+  "slug": "bring-the-repository-docs-in-line-with",
+  "objective": "Bring the repository docs in line with the new Pi package pins in /home/user/holyagent-0.3.0-provider (branch release/0.3.0/feat/kimi-provider, head 160c191).",
+  "state": "Running",
+  "scope": [
+    "Work only in /home/user/holyagent-0.3.0-provider.",
+    "Commit 160c191 added exact Pi package pins in packages/runtime/src/config/pi-packages.json that scripts/dependency-pins.ts and scripts/update-dependencies.ts move through mise run deps:update and check through deps:check; the Pi host (1.5.0) is not in that table and is not moved by the updater.",
+    "Update: (1) AGENTS.md, Dependencies section: add the Pi package pins to the list of what the updater moves, in the section's existing style and voice; (2) docs/development.md: the same in its dependency section; (3) docs/pi/orchestration.md, docs/pi/t3-code.md, docs/pi/extensions.md and docs/pi/caching-and-subagents.md: remove or correct claims that the updater re-records the CI fixtures, which it does not, and any claim that the updater moves the Pi host; say what actually moves them, as far as the code shows (read scripts/update-dependencies.ts). Change nothing else."
+  ],
+  "constraints": [
+    "Do not edit .claude/CLAUDE.md.",
+    "Keep each file's voice and structure; no new sections.",
+    "Make no version-control writes; report changed paths.",
+    "Run bunx --no-install mise run verify (the format check covers Markdown).",
+    "Report in under 250 words; start each evidence line with the exact criterion text, a colon, then the support."
+  ],
+  "criteria": [
+    {
+      "text": "AGENTS.md and docs/development.md list the Pi package pins among what the updater moves",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "No doc claims the updater re-records CI fixtures or moves the Pi host",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "bunx --no-install mise run verify exits 0",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "AGENTS.md",
+    "docs/development.md",
+    "docs/pi/orchestration.md",
+    "docs/pi/t3-code.md",
+    "docs/pi/extensions.md",
+    "docs/pi/caching-and-subagents.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T05:14:06.809Z"
+  },
+  "createdAt": "2026-11-08T05:14:06.809Z"
+}
