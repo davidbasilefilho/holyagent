@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mw7adjqv-i60l",
+  "intentId": "intent-0mw6muu7q-dpbs",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.artifact",
+  "slug": "confirm-the-kimi-set-repair-diff-home",
+  "objective": "Confirm the Kimi set repair (diff /home/user/holyagent-notes/kimi-repair.diff, worktree /home/user/holyagent-0.3.0-kimi) closes the findings of both earlier artifact reviews and adds no new gap.",
+  "state": "Running",
+  "scope": [
+    "Earlier findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw79mbu5-40if.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw79mc2t-wqw8.md. Repair report (claims only): /home/user/holyagent/.git/holyagent/reports/assignment-0mw79zweh-mm10.md. Compare against packages/runtime/src/instructions/requirements/, claude-5.5/ and kimi-k3.1/guide.md as before; judge only the repair."
+  ],
+  "constraints": [
+    "Read-only.",
+    "Report in under 350 words."
+  ],
+  "criteria": [
+    {
+      "text": "Each earlier finding is closed or left with a sound reason",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The repair changes no rule's meaning and adds no new gap",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw79zweh-mm10"
+  ],
+  "followUpOf": "assignment-0mw79mbu5-40if",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T03:42:16.376Z"
+  },
+  "createdAt": "2026-11-08T03:42:16.376Z"
+}
