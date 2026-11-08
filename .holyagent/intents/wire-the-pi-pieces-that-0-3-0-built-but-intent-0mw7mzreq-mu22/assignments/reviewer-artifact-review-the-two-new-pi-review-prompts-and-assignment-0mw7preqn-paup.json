@@ -1,0 +1,49 @@
+{
+  "id": "assignment-0mw7preqn-paup",
+  "intentId": "intent-0mw7mzreq-mu22",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-the-two-new-pi-review-prompts-and",
+  "objective": "Review the two new Pi review prompts and the docs changed in 7b935ff on release/0.3.0/feat/pi-review-prompts as model-facing instruction text and as documentation.",
+  "state": "Running",
+  "scope": [
+    "Files in /home/user/holyagent-0.3.0-prompts: packages/integrations/pi/src/prompts/code-review.md and security-review.md, packages/runtime/src/instructions/kimi-k3.1/roles/reviewer-security/builtin-review.md and reviewer-code/builtin-review.md, docs/pi/extensions.md, docs/pi/claude-parity.md, docs/pi/README.md; diff at /home/user/holyagent-notes/wire-c.diff.",
+    "Judge the prompts against the Kimi guide (packages/runtime/src/instructions/kimi-k3.1/guide.md) and the repository's skill-writing rules (.claude/skills/write-skills), and against what the Kimi reviewer role text tells the reviewer to do with the first pass (they must agree on where the review range comes from and on the output).",
+    "Intended behavior: the Pi package ships prompts/code-review.md and prompts/security-review.md (original text) as Pi prompt templates listed under the pi key of the generated and root package.json; assignment dispatch under Pi writes the matching first-pass prompt first in a Reviewer.code or Reviewer.security brief file (briefText in cli/brief.ts); the printed dispatch prompt, other roles briefs and every Claude brief are unchanged."
+  ],
+  "constraints": [
+    "Read-only; no edits.",
+    "Report in under 400 words; put long logs in a file under /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Each prompt gives a reviewer a complete, unambiguous first pass that agrees with the Kimi reviewer role text",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The prompts follow the Kimi guide and the repository's writing rules",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "The changed docs match the code",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "review-findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7paoik-bocz"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T10:52:57.311Z"
+  },
+  "createdAt": "2026-11-08T10:52:57.311Z"
+}
