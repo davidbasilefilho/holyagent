@@ -9,7 +9,7 @@
     "Release model: work lands on release/0.3.0/integration cut from main, as one release/0.3.0/<type>/<change> branch and one PR per change; the first PR of the release carries the version bump made with mise run bump:minor.",
     "Done means mise run verify passes with the generated output in sync (mise run build) and CI green on every required check, including the windows job.",
     "The extension is a default-exported factory receiving ExtensionAPI; it starts no process, socket, watcher or timer in the factory, and does that in session_start and releases it in an idempotent session_shutdown.",
-    "A launch flag (pi.registerFlag, pi.getFlag) selects the role: root, specialist child, or any other session. Open: flag name and values.",
+    "A launch flag (pi.registerFlag, pi.getFlag) selects the role. Default (root decision, revisitable): flag --holyagent-role with values root (the default, so plain pi starts the HolyAgent root), specialist (a child the root launches: status only, no root rules) and session (any other session: the marked core span of the root rules plus status).",
     "On session start (startup, reload, new, resume, fork) and after compaction (session_compact) the extension runs holyagent status through pi.exec, and holyagent reconcile after resume and compaction, and adds the result as a message on the next run via before_agent_start or pi.sendMessage, never by changing the system prompt.",
     "The status context stays within the 9,300-character budget of the Claude hook and adds nothing when the project has no .holyagent folder.",
     "In a non-root session the extension adds the marked core span of the root rules; the root process gets the full text in its system prompt and only the status.",
@@ -26,7 +26,7 @@
     "Decided: specialists run with PI_SKIP_VERSION_CHECK=1 and PI_TELEMETRY=0, not fully offline.",
     "Decided (maintainer: \"in the holyagent setup for pi it should set bun as the npmcommand\"): holyagent setup for pi sets pi's npmCommand to bun."
   ],
-  "revision": 5,
+  "revision": 6,
   "state": "Open",
   "createdAt": "2026-11-07T16:43:52.519Z"
 }
