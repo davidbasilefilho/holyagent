@@ -1,0 +1,51 @@
+{
+  "id": "assignment-0mw7eh9jc-9vf5",
+  "intentId": "intent-0mw6muujd-wz9x",
+  "intentRevision": 9,
+  "roleTask": "Worker.mechanical",
+  "slug": "make-two-phrases-in-docs-pi-providers-md",
+  "objective": "Make two phrases in docs/pi/providers.md of /home/user/holyagent-0.3.0-provider match the code exactly.",
+  "state": "Running",
+  "scope": [
+    "File: /home/user/holyagent-0.3.0-provider/docs/pi/providers.md.",
+    "Edit 1, line 45: replace the exact text 'standard error, else standard output' with 'standard error, then standard output'. The code joins both streams, stderr first (packages/runtime/src/pi/readiness.ts outputDetail).",
+    "Edit 2: in the Catalog bullet, which today mentions only 'no models listed', add that a listing in a format the parser does not recognise is reported as such (the error ListingNotRecognised in packages/runtime/src/pi/catalog.ts). One short clause, in the bullet's style.",
+    "Change nothing else."
+  ],
+  "constraints": [
+    "Make no version-control writes.",
+    "Run bunx --no-install mise run verify in that worktree.",
+    "Report in under 100 words; start each evidence line with the exact criterion text, a colon, then the support."
+  ],
+  "criteria": [
+    {
+      "text": "Line 45 reads standard error, then standard output",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "The Catalog bullet names the unrecognised-listing report",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "bunx --no-install mise run verify exits 0",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "docs/pi/providers.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-08T05:37:08.232Z"
+  },
+  "createdAt": "2026-11-08T05:37:08.232Z"
+}
