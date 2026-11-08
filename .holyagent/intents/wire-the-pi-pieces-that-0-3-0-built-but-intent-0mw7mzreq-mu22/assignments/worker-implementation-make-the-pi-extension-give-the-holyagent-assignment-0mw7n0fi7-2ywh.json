@@ -82,5 +82,45 @@
     "finishedAt": "2026-11-08T09:48:48.382Z"
   },
   "result": "result: Pi extension now gives the root its prompt, its tool selection, the provider env, and a non-blocking readiness/catalog notice. `mise run build` exit 0; `mise run verify` exit 0 (2247 pass, 0 fail).\n\nchanged:\n- packages/integrations/pi/src/extension.ts\n- packages/integrations/pi/tests/extension.test.ts\n- packages/integrations/pi/tests/pi.test.ts\n- packages/integrations/pi/dist/extensions/holyagent.js\n- packages/runtime/src/pi/root-prompt.ts (new)\n- packages/runtime/src/pi/tools.ts\n- packages/runtime/src/pi/catalog.ts\n- packages/runtime/src/pi/index.ts\n- packages/runtime/tests/pi/root-prompt.test.ts (new)\n- packages/runtime/tests/pi/tools.test.ts\n- packages/runtime/tests/pi/catalog.test.ts\n- docs/pi/README.md, extensions.md, providers.md\n- docs/usage.md\n- `dispatch.md` and the requirements files are untouched. Its claim that the extension fills the placeholder into the root prompt is now true.\n\nchecks:\n- `bunx --no-install mise run build` -> 0\n- `bunx --no-install mise run verify` -> 0. Log: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log\n- Five mutations of `extension.ts` (prompt, tools, probes, provider env, compaction guard) each made 2 to 11 tests fail; the file is restored.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- **Prompt choice:** I put the root prompt in front of Pi's prompt instead of replacing it. Pi's prompt carries AGENTS.md, the skills list, the date and the cwd. Claude keeps those outside the agent prompt, so a full replace would drop them on Pi. `PI_ROOT_SECTIONS` is checked against the Claude `ROOT_SECTIONS` by a test.\n- **Probes:** they run through `pi.exec`, not Bun Shell, because the extension is bundled for Node. They start beside the session, and the notice arrives on the first run after they end. A probe that cannot start, is killed or times out adds no notice. They do not run for a child, a compaction, a failed collection or `pi.enable` off.\n- **Model notice:** a missing-model notice uses the new `ModelsNotInCatalog.brief`, because the full message is cut at 400 characters before its fix.\n- **Tools:** `rootActiveTools` is applied only at session start. A tool registered later is not excluded. `--no-mcp` cannot be applied from the extension; this is documented.\n- **`--model`:** nothing applies the route's `--model` for the root. That is out of scope.\n- **`pi` on PATH:** a `pi` binary not on PATH is silent.\n- **Test changes:** several existing tests had to change for the new behavior: the root now also gets a prompt, a second `before_agent_start` handler exists, and provider env is set. None was weakened.\n\nevidence:\n- The root on Pi gets a system prompt built from the Kimi root instructions with the package root filled, and a child's prompt is unchanged: tests in `extension.test.ts`, \"the root's system prompt\" and \"telling a child from the root\"; `root-prompt.test.ts` (sections equal the Claude list and cover every file in `kimi-k3.1/root`); `mise run verify` exit 0.\n- At session start the root's active tools are its selection plus its tools minus its excluded tools, and a child's tools are unchanged: tests \"the root's tools\" in `extension.test.ts`; `rootActiveTools` tests in `packages/runtime/tests/pi/tools.test.ts`.\n- The provider environment is applied before provider use, and a not-ready provider or missing model shows a notice with the fix without blocking startup: tests \"the provider\" in `extension.test.ts` (env for root and child, not-ready, invalid, missing model, startup not waiting, deadline, shutdown); `catalog.test.ts` for `brief`.\n- With the home-level pi.enable off, none of this runs: tests \"is not given with pi.enable off\", \"are left alone with pi.enable off\", \"with pi.enable off none of its variables are set\", and the probes-not-run test, all in `extension.test.ts`.\n- Each new behavior has a test that fails without it: the five mutations above each failed tests.\n- The docs describe these as built and match the code: `docs/pi/README.md` rows and decision rows, `docs/pi/extensions.md` (new \"The root on Pi\" section, plus the status and tool lines), `docs/pi/providers.md`, `docs/usage.md`.\n- mise run build and mise run verify exit 0: both commands above, exit 0.\n- diff-file: /home/user/holyagent-notes/wire-a.diff (dist excluded)\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Independent code, security and artifact reviews accepted the branch head after the repair rounds",
+    "criteria": [
+      {
+        "criterion": "The root on Pi gets a system prompt built from the Kimi root instructions with the package root filled, and a child's prompt is unchanged",
+        "support": "tests in `extension.test.ts`, \"the root's system prompt\" and \"telling a child from the root\"; `root-prompt.test.ts` (sections equal the Claude list and cover every file in `kimi-k3.1/root`); `mise run verify` exit 0."
+      },
+      {
+        "criterion": "At session start the root's active tools are its selection plus its tools minus its excluded tools, and a child's tools are unchanged",
+        "support": "tests \"the root's tools\" in `extension.test.ts`; `rootActiveTools` tests in `packages/runtime/tests/pi/tools.test.ts`."
+      },
+      {
+        "criterion": "The provider environment is applied before provider use, and a not-ready provider or missing model shows a notice with the fix without blocking startup",
+        "support": "tests \"the provider\" in `extension.test.ts` (env for root and child, not-ready, invalid, missing model, startup not waiting, deadline, shutdown); `catalog.test.ts` for `brief`."
+      },
+      {
+        "criterion": "With the home-level pi.enable off, none of this runs",
+        "support": "tests \"is not given with pi.enable off\", \"are left alone with pi.enable off\", \"with pi.enable off none of its variables are set\", and the probes-not-run test, all in `extension.test.ts`."
+      },
+      {
+        "criterion": "Each new behavior has a test that fails without it",
+        "support": "the five mutations above each failed tests."
+      },
+      {
+        "criterion": "The docs describe these as built and match the code",
+        "support": "`docs/pi/README.md` rows and decision rows, `docs/pi/extensions.md` (new \"The root on Pi\" section, plus the status and tool lines), `docs/pi/providers.md`, `docs/usage.md`."
+      },
+      {
+        "criterion": "mise run build and mise run verify exit 0",
+        "support": "both commands above, exit 0."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff-file",
+        "support": "/home/user/holyagent-notes/wire-a.diff (dist excluded)"
+      }
+    ]
+  },
   "createdAt": "2026-11-08T09:35:59.359Z"
 }
