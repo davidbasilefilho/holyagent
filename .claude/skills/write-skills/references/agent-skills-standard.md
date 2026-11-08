@@ -8,6 +8,8 @@ Sources (fetched 2026-11-07; re-check them for limits, which change):
 - S4 Reference validator: https://github.com/agentskills/agentskills/blob/main/skills-ref/src/skills_ref/validator.py and its README (`skills-ref`, "for demonstration purposes only")
 - S5 Anthropic skill authoring best practices (stricter than the standard): https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices
 
+The S5 fetch was truncated after its "Advanced: executable code" section, so its "Checklist for effective Skills" and runtime-environment sections were not read; check them before relying on this list as complete.
+
 Contents: layout, frontmatter, Anthropic constraints, body, progressive disclosure, optional directories, file references, validation, portability.
 
 ## Layout (S1, S2, S3)

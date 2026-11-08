@@ -34,7 +34,7 @@ const REFERENCE = /^- See: (.+)$/
  * instructions too. Any other line is prose and is not read.
  */
 export const parseRequirements = (text: string): ParsedRequirements => {
-  const lines = text.split("\n")
+  const lines = text.split(/\r?\n/)
   return {
     ids: lines.flatMap((line) => DEFINITION.exec(line)?.[1] ?? []),
     references: lines.flatMap((line) =>

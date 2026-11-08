@@ -1,4 +1,4 @@
-What an agent kind always needs is fixed text in its instructions, not a skill it may load.
+The mergeability rubric is fixed text in the instructions of every role that writes or reviews code, not a skill it may load. The bar for any change HolyAgent produces: the repository's maintainer would merge it.
 
 - R-MERGE: Roles that write or review code (Worker.mechanical, implementation, integration, debugging and visual; Reviewer.code and testing) apply the mergeability rubric as fixed text: the six dimensions with blocking and non-blocking cases, and tests in proportion.
 
@@ -14,8 +14,6 @@ What an agent kind always needs is fixed text in its instructions, not a skill i
   | repo-standards | Does it follow the project's stated rules and conventions?            | A rule in CLAUDE.md, AGENTS.md or the contributing guide is broken                           | An unstated convention                  |
 
 - R-MERGE-BLOCKER: A blocker in any dimension fails the change. Acceptance needs support for every blocking criterion.
-
-The bar for any change HolyAgent produces: the repository's maintainer would merge it.
 
 Reference only (no id; nothing here is run by HolyAgent):
 

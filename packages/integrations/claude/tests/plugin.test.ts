@@ -1270,7 +1270,8 @@ describe("agents", () => {
       ],
       "instruction-writing": [
         "US English",
-        "`requirements.md`",
+        "the `requirements/` tree",
+        "the family's `guide.md`",
         "prompting guidance",
         "in its own file",
         "`<example>` tags",

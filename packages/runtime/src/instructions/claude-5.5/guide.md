@@ -93,7 +93,7 @@ The tag after a rule of `skills/instruction-writing/SKILL.md` names its page the
 - G55 (S55 Steer initiative and scope): For ideas or plans, give them and stop.
 - G56 (S55 Reasoning tasks with JSON output, H55 adaptive thinking with JSON and tools): Reasoning tasks with JSON output: "Think the problem through…" line, adaptive thinking, parse the last JSON value. [API or harness advice, outside instruction text]
 - G57 (S55 and O55 User-facing progress updates): Progress updates: remove "hold findings for the final response". State update points. Give a message tool for verbatim content.
-- G58 (S55 Tool use in chat; H55 Accurate search results (give the current date, and avoid blanket "always search" rules)): Tool use in chat: remove tool-discouraging text. Use a search tool for facts that may have changed, even when sure.
+- G58 (S55 Tool use in chat; H55 Accurate search results): Tool use in chat: remove tool-discouraging text. Use a search tool for facts that may have changed, even when sure. Give the current date, and avoid blanket "always search" rules.
 - G59 (S55 and H55 Mid-turn user messages): Mid-turn user messages: never put user text in a `tool_result`. Deliver it as a user turn, with harness notices in a separate message.
 - G60 (S55 Verification on coding tasks, H55 Tell coding agents to verify): Verification paragraph: a real check, not syntax-only. Install declared dependencies from the lockfile without sudo. Name any check not run.
 - G61 (S55 Tolerant tool-call handling): Handle tool-name case errors by accepting or by `is_error` with the expected name. [API or harness advice, outside instruction text]

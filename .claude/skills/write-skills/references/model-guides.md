@@ -12,36 +12,36 @@ Contents: shared points, where the guides differ, what stays out of skill text.
 
 ## Shared points (both guides)
 
-- Be explicit and complete. State the task, constraints and context a colleague with no background would need; the less the model guesses, the better the result. (Claude: be clear and direct; Kimi: write clear instructions, include details)
-- Give the reason beside each rule so the model can apply it beyond the example. (Claude: add context)
-- Separate parts with delimiters: headings for sections, XML tags (`<example>`, `<input>`) for inputs and examples, consistent names. (Claude: XML tags; Kimi: delimiters)
-- Use numbered steps when order or completeness matters. (Claude: numbered steps; Kimi: define the steps)
-- Show examples of the output you want, relevant and varied, usually three to five; give general guidance first, because it is more efficient than listing every permutation. (Claude: examples; Kimi: few-shot)
-- Give a role in one sentence only when the skill needs one. (Claude: role; Kimi: role)
-- Ground answers in supplied material and give the fallback when it is absent: tell the model to read the named file or source first, to say what is missing, and not to guess about content it has not opened. (Claude: investigate before answering; Kimi: reference text with a fallback)
-- Break a large task into stages, and load only the instructions the current case needs: one skill per task class, details in references. (Kimi: categorize to find relevant instructions, break down tasks; Claude and the standard: progressive disclosure)
-- Keep prose on role, workflow and boundaries; leave argument details to the tool's own schema and do not restate tool behavior. Where a rule is a hard constraint, say it once, as a boundary. (Kimi: design the prompt; Claude: tool descriptions)
-- Add constraints in small steps as format, compliance or audience change, instead of one long list written up front. (Kimi: incremental constraints; Claude: be specific about what you want)
-- Name independent calls to run together and dependent ones in order; return a failed call's error and continue the others. (Claude: parallel tool calls; Kimi: error handling in the loop)
-- Keep the tool set the skill needs small and non-overlapping: name the one tool or command for a job. (Kimi: expose only needed tools; Claude: say "do X", not "can you suggest X")
-- Set thinking effort through the route or harness, never through prose such as "think harder" or "think less". (Claude: effort is the main control; Kimi: `reasoning_effort` parameter)
-- Ask for a short explanation or summary of actions in the reply, never the step-by-step reasoning: both models think separately, and Claude may decline to restate it. (Claude: keep reasoning in thinking blocks; Kimi: reasoning is a separate field)
-- Require a real check before "done" and have the reader report any check it did not run; treat a truncated or failed result as failure, not as the answer. (Claude: verification; Kimi: fail on truncation)
-- Keep prose terse and calm. (Claude: concise, no emphasis; Kimi: ask for brevity when output runs long)
+- Be explicit and complete. State the task, constraints and context a colleague with no background would need; the less the model guesses, the better the result. (Claude: G1, G2; Kimi: K1, K2)
+- Give the reason beside each rule so the model can apply it beyond the example. (Claude: G4)
+- Separate parts with delimiters: headings for sections, XML tags (`<example>`, `<input>`) for inputs and examples, consistent names. (Claude: G7; Kimi: K4)
+- Use numbered steps when order or completeness matters. (Claude: G3; Kimi: K5)
+- Show examples of the output you want, relevant and varied, usually three to five; give general guidance first, because it is more efficient than listing every permutation. (Claude: G5; Kimi: K6)
+- Give a role in one sentence only when the skill needs one. (Claude: G8; Kimi: K3)
+- Ground answers in supplied material and give the fallback when it is absent: tell the model to read the named file or source first, to say what is missing, and not to guess about content it has not opened. (Claude: G45; Kimi: K8)
+- Break a large task into stages, and load only the instructions the current case needs: one skill per task class, details in references. (Kimi: K9, K25; Claude and the standard: G70)
+- Keep prose on role, workflow and boundaries; leave argument details to the tool's own schema and do not restate tool behavior. Where a rule is a hard constraint, say it once, as a boundary. (Kimi: K28, K36; Claude: G23)
+- Add constraints in small steps as format, compliance or audience change, instead of one long list written up front. (Kimi: K29; Claude: G1)
+- Name independent calls to run together and dependent ones in order; return a failed call's error and continue the others. (Claude: G24; Kimi: K34)
+- Keep the tool set the skill needs small and non-overlapping: name the one tool or command for a job. (Kimi: K37; Claude: G21)
+- Set thinking effort through the route or harness, never through prose such as "think harder" or "think less". (Claude: G27, G52; Kimi: K13)
+- Ask for a short explanation or summary of actions in the reply, never the step-by-step reasoning: both models think separately, and Claude may decline to restate it. (Claude: G32, G62; Kimi: K17)
+- Require a real check before "done" and have the reader report any check it did not run; treat a truncated or failed result as failure, not as the answer. (Claude: G33, G60; Kimi: K33)
+- Keep prose terse and calm. (Claude: G13, G23, G65; Kimi: K1)
 
 ## Where the guides differ, and the text that satisfies both
 
-| Topic             | Claude                                                                  | Kimi                                                            | Write                                                                              |
-| ----------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Length            | Concise by default; ask explicitly for a summary                        | A word count is imprecise; counts of paragraphs or bullets work | State length as a number of bullets or paragraphs, or as "one line per item"       |
-| Tone              | Calm imperative; capitals and "if in doubt" push the model to overreach | Silent                                                          | Calm imperative, a concrete threshold in place of "important"                      |
-| Positive phrasing | Say what to do, not what to avoid                                       | Silent                                                          | State the action; keep a real boundary as the action to take                       |
-| Delimiters        | XML tags, nested, descriptive names                                     | Triple quotes, XML tags or headings                             | Headings for sections, XML tags for inputs and examples; no triple-quote fences    |
-| Role              | A system-prompt sentence                                                | A system-message role                                           | One sentence inside the skill's first paragraph, and only when it changes behavior |
-| Style match       | Markdown in the prompt produces markdown in the reply                   | Show the format you want                                        | Write the skill in the style of the output wanted, and show one sample             |
-| Forcing a lookup  | Ask directly ("search for X")                                           | `tool_choice: required` on the first turn                       | Make the lookup the first numbered step, with its reason                           |
-| Long input        | Long inputs first, the question last                                    | Chunk, summarize, then summarize the summaries                  | Put the long material in a reference file and name what to extract from it         |
-| Checking          | A self-check line helps; one model over-verifies if it is repeated      | Cap tool rounds; check results                                  | Name the single check that proves done, once                                       |
+| Topic             | Claude                                                                             | Kimi                                                                 | Write                                                                              |
+| ----------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Length            | Concise by default; ask explicitly for a summary (G13)                             | A word count is imprecise; counts of paragraphs or bullets work (K7) | State length as a number of bullets or paragraphs, or as "one line per item"       |
+| Tone              | Calm imperative; capitals and "if in doubt" push the model to overreach (G23, G25) | Silent                                                               | Calm imperative, a concrete threshold in place of "important"                      |
+| Positive phrasing | Say what to do, not what to avoid (G14)                                            | Silent                                                               | State the action; keep a real boundary as the action to take                       |
+| Delimiters        | XML tags, nested, descriptive names (G7, G15)                                      | Triple quotes, XML tags or headings (K4)                             | Headings for sections, XML tags for inputs and examples; no triple-quote fences    |
+| Role              | A system-prompt sentence (G8)                                                      | A system-message role (K3)                                           | One sentence inside the skill's first paragraph, and only when it changes behavior |
+| Style match       | Markdown in the prompt produces markdown in the reply (G16)                        | Show the format you want (K1)                                        | Write the skill in the style of the output wanted, and show one sample             |
+| Forcing a lookup  | Ask directly ("search for X") (G21)                                                | `tool_choice: required` on the first turn (K21, K42)                 | Make the lookup the first numbered step, with its reason                           |
+| Long input        | Long inputs first, the question last (G9)                                          | Chunk, summarize, then summarize the summaries (K11)                 | Put the long material in a reference file and name what to extract from it         |
+| Checking          | A self-check line helps; one model over-verifies if it is repeated (G33)           | Cap tool rounds; check results (K32, K33)                            | Name the single check that proves done, once                                       |
 
 ## Stays out of skill text
 
