@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mw7s1u43-o3po",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 11,
+  "roleTask": "Reviewer.security",
+  "slug": "assess-commit-range-172bdf9-release-0-3",
+  "objective": "Assess commit range 172bdf9..release/0.3.0/feat/t3-settings for security vulnerabilities: holyagent setup for Pi merges the agreed T3 Code server settings into ~/.t3/userdata/settings.json (key only when unset and different from T3's default), writes atomically, reads back and restores on mismatch, undoes only what its record says it wrote, and doctor reports missing keys.",
+  "state": "Running",
+  "scope": [
+    "The committed diff is in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/c-t3set.diff (diff-file); read the touched files in full in /home/user/holyagent-0.3.0-t3set for context.",
+    "Focus: writes into a file in the user's home (path resolution under T3CODE_HOME, symlinks and TOCTOU on the settings file and its temp file, permissions of the written file), trust of the existing file's content, the restore and undo paths deleting or overwriting user data, and whether a project-level HolyAgent config can make setup write settings the user's own config turned off."
+  ],
+  "constraints": [
+    "Read-only.",
+    "Substantiate each finding with a source-to-sink trace and path:line; mark it blocking only when the vulnerability is reachable and introduced by this range.",
+    "Report in under 500 words; put long output in a file in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Every blocking finding has a source-to-sink trace with path:line",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The review states whether the range introduces a vulnerability that should hold the push",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "verdict"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7r2ysz-ko3o"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T11:57:03.027Z"
+  },
+  "createdAt": "2026-11-08T11:57:03.027Z"
+}
