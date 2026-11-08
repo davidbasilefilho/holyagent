@@ -16,7 +16,9 @@
     "Decided (maintainer): holyagent doctor checks that pi, Node 22.19 or newer and the package are present, without installing them; the Windows installer's Node minimum rises from 22.13 to 22.19.",
     "Decided: pi runs on Node; Bun is used by pi only as its npmCommand for package installs.",
     "Default (research 2026-11-08, Pi 1.5.0 package-manager.js and pi-manifest.js): Pi loads a dependency package only through explicit pi.* paths into node_modules and never adds packages to settings itself, so a static dependencies list would install and load every feature package regardless of config. The HolyAgent manifest lists no Pi package dependencies; holyagent setup runs pi install npm:<pkg>@<pin> for each package piPackages(config) enables and pi remove for HolyAgent's feature packages the config turns off, and holyagent doctor reports each enabled package that is missing with that command as the fix.",
-    "Default: holyagent doctor runs its Pi checks when the host is pi or pi is on PATH; otherwise it prints one informational line that Pi is not in use, so a Claude-only user without Pi gets no failure from the default pi.enable true."
+    "Default: holyagent doctor runs its Pi checks when the host is pi or pi is on PATH; otherwise it prints one informational line that Pi is not in use, so a Claude-only user without Pi gets no failure from the default pi.enable true.",
+    "Default: with pi.enable off, holyagent setup removes no Pi packages and says so, because removing what a user installed is destructive and the setting only disables HolyAgent on Pi.",
+    "Default: setup scopes project and local both map to the project .pi/settings.json (pi install -l), since Pi has no local scope; user maps to the global settings."
   ],
   "revision": 5,
   "state": "Open",
