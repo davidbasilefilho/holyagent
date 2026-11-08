@@ -1,0 +1,60 @@
+{
+  "id": "assignment-0mw7mavmm-25b4",
+  "intentId": "intent-0mw6muv72-jkrt",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-the-pi-install-documentation-on",
+  "objective": "Review the Pi install documentation on release/0.3.0/feat/pi-install for correctness and completeness against the shipped setup and doctor code and the Intent's documentation requirements.",
+  "state": "Running",
+  "scope": [
+    "Read /home/user/holyagent-notes/install-docs.diff (docs and README.md, range 076ef58..56a18a2); the docs and code are in /home/user/holyagent-0.3.0-install (packages/runtime/src/setup/pi-install.ts, pi-check.ts, steps.ts, doctor.ts, cli/setup.ts, packages/runtime/src/config/).",
+    "Also check docs/pi/extensions.md, which was not changed and may still call the Kimi provider, setup and doctor later changes."
+  ],
+  "constraints": [
+    "Read-only; no edits.",
+    "Report in under 400 words; put long logs in a file under /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "The documented Pi install is Node.js 22.19 or newer plus the official installer or npm install -g --ignore-scripts @earendil-works/pi-coding-agent@<pinned>, the HolyAgent package is installed with an explicit pin, and Bun is documented as needed by the HolyAgent CLI, not as a Pi install route",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "docs/components.md no longer says there is no Pi integration, and docs/usage.md, docs/development.md and docs/pi/README.md describe the package and how to start the root",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The docs describe every config.json option with its default, and what setup and doctor do matches the code",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "README.md keeps exactly its six sections in order and any Pi mention there is a link into docs/",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "No doc in the repository describes shipped Pi behavior as planned or later",
+      "blocking": false,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "review-findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7lszlt-yqxn",
+    "assignment-0mw7m1no2-ud08",
+    "assignment-0mw7kvnva-pp5a"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T09:16:07.198Z"
+  },
+  "createdAt": "2026-11-08T09:16:07.198Z"
+}
