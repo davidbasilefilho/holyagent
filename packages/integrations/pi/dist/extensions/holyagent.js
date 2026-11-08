@@ -13781,7 +13781,7 @@ var VcsSettings = Struct({
 });
 var PiProvider = Literals(["kimi-coding-global"]);
 var Thinking = Literals(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
-var ModelId = String4.check(isPattern2(/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/));
+var ModelId = String4.check(isPattern2(/^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$/));
 var KIMI_ROOT = "k3.1-pro";
 var KIMI_SPECIALIST = "kimi-for-coding";
 var kimi = (model, thinking) => ({ model, thinking });
@@ -16373,7 +16373,7 @@ var refuseNonSpecialistWorkflow = (event) => {
 var WORKFLOW_NAME_LIMIT = 80;
 var GRAPHEME_SEGMENTER = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 var CONTROLS = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g;
-var INVISIBLES = /[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g;
+var INVISIBLES = /[\p{Cf}\p{Variation_Selector}\u{e0000}-\u{e007f}]/gu;
 var printable = (raw) => raw.replace(CONTROLS, " ").replace(INVISIBLES, "").trim();
 var sanitizeWorkflowName = (raw) => {
   const cleaned = printable(raw);
@@ -16447,14 +16447,20 @@ class DeadlineExceeded extends TaggedError2("DeadlineExceeded") {
     return `the status took longer than ${this.ms / 1000}s and was stopped`;
   }
 }
-var settingsFor = (config, role) => {
+var rootExclusions = (configs) => [
+  ...new Set(configs.flatMap((config) => toolArgs(config, "root").excludeTools))
+];
+var settingsFor = (config, role, bound = []) => {
   const rootArgs = toolArgs(config, "root");
   return {
     environment: rootArgs.env,
     providerEnvironment: providerEnv(config),
     ...role === "root" ? {
       rootPrompt: true,
-      tools: { tools: rootArgs.tools, excludeTools: rootArgs.excludeTools }
+      tools: {
+        tools: rootArgs.tools,
+        excludeTools: rootExclusions([config, ...bound])
+      }
     } : {}
   };
 };
@@ -16536,6 +16542,7 @@ var createExtension = ({
     }));
   }));
   const stateFolderOf = (signal, project, located) => located.git ? holyagent(signal, project, "state", "mode").pipe(flatMap2((text) => parseOutput("state mode", text)), map4((where) => where["directory"])) : succeed5(join(located.top, STATE_DIRECTORY));
+  const boundConfigs = (defaults, user) => user === undefined ? [defaults] : [defaults, user];
   const decodeConfig = decodeUnknownEffect2(fromJsonString2(Config), {
     onExcessProperty: "error"
   });
@@ -16543,28 +16550,45 @@ var createExtension = ({
     const flag = isChild() ? "specialist" : pi.getFlag(ROLE_FLAG) ?? DEFAULT_PI_ROLE;
     return decodeUnknownEffect2(PiRoleSchema)(flag).pipe(mapError2(() => new UnknownRole({ value: String(flag) })));
   });
-  const closedSettings = (config) => gen2(function* () {
+  const closedSettings = (config, user) => gen2(function* () {
     const role = yield* roleOf.pipe(orElseSucceed2(() => DEFAULT_PI_ROLE));
-    return settingsFor(config ?? (yield* defaultConfig), role);
+    const defaults = yield* defaultConfig;
+    return settingsFor(config ?? defaults, role, boundConfigs(defaults, user));
+  }).pipe(orDie2);
+  const startingExclusions = gen2(function* () {
+    const role = yield* roleOf.pipe(orElseSucceed2(() => DEFAULT_PI_ROLE));
+    return role === "root" ? rootExclusions([yield* defaultConfig]) : [];
   }).pipe(orDie2);
   const collect = (cwd, signal, reason) => {
     let configured;
     let read;
-    const failed = (text) => (configured === undefined ? closedSettings(read) : succeed5(configured)).pipe(map4((kept) => ({ ...kept, delivery: notice(text) })));
+    let user;
+    const failed = (text) => (configured === undefined ? closedSettings(read, user) : succeed5(configured)).pipe(map4((kept) => ({ ...kept, delivery: notice(text) })));
     return gen2(function* () {
       const project = resolve3(cwd);
       const located = yield* topOf(signal, project);
-      const [config, folder] = yield* all2([
+      const [config, folder, own] = yield* all2([
         holyagent(signal, project, "config", join(located.top, STATE_DIRECTORY)).pipe(flatMap2(decodeConfig)),
-        result2(stateFolderOf(signal, project, located))
+        result2(stateFolderOf(signal, project, located)),
+        holyagent(signal, project, "config").pipe(flatMap2(decodeConfig), orElseSucceed2(() => {
+          return;
+        }))
       ], { concurrency: "unbounded" });
       read = config;
+      user = own;
+      const bound = boundConfigs(yield* defaultConfig, user);
       if (!config.pi.enable) {
-        const userOff = yield* holyagent(signal, project, "config").pipe(flatMap2(decodeConfig), map4((user) => !user.pi.enable), orElseSucceed2(() => false));
-        return userOff ? { enabled: false, gatesOff: true } : { enabled: false };
+        if (user !== undefined && !user.pi.enable)
+          return { enabled: false, gatesOff: true };
+        const off = settingsFor(config, yield* roleOf.pipe(orElseSucceed2(() => DEFAULT_PI_ROLE)), bound);
+        return {
+          enabled: false,
+          ...off.rootPrompt === undefined ? {} : { rootPrompt: off.rootPrompt },
+          ...off.tools === undefined ? {} : { tools: off.tools }
+        };
       }
       const role = yield* roleOf;
-      configured = settingsFor(config, role);
+      configured = settingsFor(config, role, bound);
       const status = yield* holyagent(signal, project, "status").pipe(flatMap2((text) => parseOutput("status", text)));
       const reconcile = RECONCILED.has(reason) ? yield* holyagent(signal, project, "reconcile").pipe(flatMap2((text) => parseOutput("reconcile", text))) : undefined;
       const directory = yield* fromResult2(folder);
@@ -16672,7 +16696,7 @@ var createExtension = ({
       pending: undefined,
       gatesOff: false,
       rootPrompt: false,
-      excluded: [],
+      excluded: runSync2(startingExclusions),
       started: false,
       probe: undefined,
       readiness: undefined,

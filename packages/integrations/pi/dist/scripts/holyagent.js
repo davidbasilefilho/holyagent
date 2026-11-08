@@ -10609,7 +10609,7 @@ var init_schema = __esm(() => {
   });
   PiProvider = Literals(["kimi-coding-global"]);
   Thinking = Literals(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
-  ModelId = String6.check(isPattern2(/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/));
+  ModelId = String6.check(isPattern2(/^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$/));
   KIMI_ROUTES = {
     root: kimi(KIMI_ROOT, "high"),
     "Explorer.map": kimi(KIMI_SPECIALIST, "high"),

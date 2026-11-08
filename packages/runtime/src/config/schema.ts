@@ -43,11 +43,12 @@ export type Thinking = typeof Thinking.Type
 /**
  * A model id as the provider names it, such as `kimi-for-coding` or `kimi-coding/kimi-for-coding`:
  * a letter or digit first (so the id is never read as a flag), then letters, digits and `.`, `_`,
- * `-`, `:` and `/`, up to 128 characters. The id reaches `--model`, the model's context and the
- * user's terminal in notices, so a control character, space or quote is refused when the config is
- * decoded. It is also checked against the user's catalog at launch.
+ * `-`, `:`, `/`, `@` and `+` (some providers' ids carry the last two), up to 128 characters. The id
+ * reaches `--model`, the model's context and the user's terminal in notices, so a control
+ * character, space or quote is refused when the config is decoded. It is also checked against the
+ * user's catalog at launch.
  */
-const ModelId = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/))
+const ModelId = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$/))
 
 /** The id of a route-table row: the root, or one of the specialists. */
 export type RouteKey = "root" | RoleTask

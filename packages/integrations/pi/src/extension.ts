@@ -225,11 +225,14 @@ const GRAPHEME_SEGMENTER = new Intl.Segmenter(undefined, { granularity: "graphem
 // eslint-disable-next-line no-control-regex
 const CONTROLS = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g
 
-// Bidi overrides and zero-width characters, which can make a line read as something else.
-const INVISIBLES = /[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g
+// Unicode format characters (category Cf: bidi overrides and marks, zero-width characters, word
+// joiners, the Arabic letter mark, the Mongolian vowel separator, the tag block and the like) and the
+// variation selectors. They draw nothing, so they can make a line read as something else or
+// carry text only the model reads.
+const INVISIBLES = /[\p{Cf}\p{Variation_Selector}\u{e0000}-\u{e007f}]/gu
 
 // Text that is safe to draw in the terminal and to hand to the model: control characters become
-// spaces, bidi overrides and zero-width characters are dropped, and the result is trimmed.
+// spaces, invisible format characters are dropped, and the result is trimmed.
 const printable = (raw: string): string => raw.replace(CONTROLS, " ").replace(INVISIBLES, "").trim()
 
 /**
@@ -385,7 +388,10 @@ interface Delivery {
 
 /** What one collection yields: what the next run is told, and the settings the config decides. */
 interface Collected {
-  /** False once the config is read and `pi.enable` is off, which adds no context and no settings. */
+  /**
+   * False once the config is read and `pi.enable` is off, which adds no context and no settings;
+   * only the root's prompt and exclusions remain, unless the user's own config is off.
+   */
   readonly enabled?: false
   /**
    * True once the user-level config, read alone, has `pi.enable` off: the only thing that switches
@@ -425,11 +431,15 @@ interface Held {
    * could not be read, and a project config that says off alone, leave the gates on.
    */
   gatesOff: boolean
-  /** True once a collection has found the root with `pi.enable` on: every run gets the root prompt. */
+  /**
+   * True once a collection has found the root with `pi.enable` on or off in a project's config
+   * alone: every run gets the root prompt. Only the user's `pi.enable: false` takes it away.
+   */
   rootPrompt: boolean
   /**
-   * The patterns of the tools the root may not call, from the config or, when it cannot be read,
-   * the defaults. Empty for every other session and with `pi.enable` off.
+   * The patterns of the tools the root may not call: the defaults' from the session's start, then
+   * the union of the defaults', the user's and the merged config's, or the defaults' when the
+   * config cannot be read. Empty for every other session and with the user's `pi.enable` off.
    */
   excluded: ReadonlyArray<string>
   /**
@@ -447,10 +457,25 @@ interface Held {
 }
 
 /**
- * What a config decides for a session of `role`: the worker cap and the provider's variables for
- * every role, and for the root also its prompt and its tool selection.
+ * The tools the root may not use under every config given, each once: a config can add an exclusion
+ * but never take away another's, so turning a feature off in a project (computer use, a web mode)
+ * cannot lift the tools its packages still register.
  */
-const settingsFor = (config: Config, role: PiRole): Collected => {
+const rootExclusions = (configs: ReadonlyArray<Config>): ReadonlyArray<string> => [
+  ...new Set(configs.flatMap((config) => toolArgs(config, "root").excludeTools)),
+]
+
+/**
+ * What a config decides for a session of `role`: the worker cap and the provider's variables for
+ * every role, and for the root also its prompt and its tool selection. The root's exclusions are
+ * those of `config` and of `bound`, the configs whose exclusions it keeps whatever `config` says
+ * (the defaults and the user's).
+ */
+const settingsFor = (
+  config: Config,
+  role: PiRole,
+  bound: ReadonlyArray<Config> = [],
+): Collected => {
   const rootArgs = toolArgs(config, "root")
   return {
     environment: rootArgs.env,
@@ -458,7 +483,10 @@ const settingsFor = (config: Config, role: PiRole): Collected => {
     ...(role === "root"
       ? {
           rootPrompt: true,
-          tools: { tools: rootArgs.tools, excludeTools: rootArgs.excludeTools },
+          tools: {
+            tools: rootArgs.tools,
+            excludeTools: rootExclusions([config, ...bound]),
+          },
         }
       : {}),
   }
@@ -678,6 +706,10 @@ export const createExtension =
           )
         : Effect.succeed<unknown>(join(located.top, STATE_DIRECTORY))
 
+    // The configs whose exclusions the root keeps whatever the merged config says.
+    const boundConfigs = (defaults: Config, user: Config | undefined): ReadonlyArray<Config> =>
+      user === undefined ? [defaults] : [defaults, user]
+
     const decodeConfig = Schema.decodeUnknownEffect(Schema.fromJsonString(Config), {
       onExcessProperty: "error",
     })
@@ -695,19 +727,31 @@ export const createExtension =
     // the defaults, so that the root keeps its prompt and its tool exclusions and a config nobody
     // can read cannot lift them. A role that cannot be read is the default role, the root. `config`
     // is the one that was read, when the failure came after it.
-    const closedSettings = (config: Config | undefined): Effect.Effect<Collected> =>
+    const closedSettings = (
+      config: Config | undefined,
+      user: Config | undefined,
+    ): Effect.Effect<Collected> =>
       Effect.gen(function* () {
         const role = yield* roleOf.pipe(Effect.orElseSucceed((): PiRole => DEFAULT_PI_ROLE))
-        return settingsFor(config ?? (yield* defaultConfig), role)
+        const defaults = yield* defaultConfig
+        return settingsFor(config ?? defaults, role, boundConfigs(defaults, user))
       }).pipe(Effect.orDie)
+
+    // The root's exclusions before any config is known: the defaults', so a run in flight while a
+    // reload, resume or fork collects is gated. Other roles have none.
+    const startingExclusions = Effect.gen(function* () {
+      const role = yield* roleOf.pipe(Effect.orElseSucceed((): PiRole => DEFAULT_PI_ROLE))
+      return role === "root" ? rootExclusions([yield* defaultConfig]) : []
+    }).pipe(Effect.orDie)
 
     const collect = (cwd: string, signal: AbortSignal, reason: Reason) => {
       // What the config decided, kept once known so a later failure of the collection (the status
       // command, the deadline) still leaves the root its prompt, tools and provider settings.
       let configured: Collected | undefined
       let read: Config | undefined
+      let user: Config | undefined
       const failed = (text: string): Effect.Effect<Collected> =>
-        (configured === undefined ? closedSettings(read) : Effect.succeed(configured)).pipe(
+        (configured === undefined ? closedSettings(read, user) : Effect.succeed(configured)).pipe(
           Effect.map((kept): Collected => ({ ...kept, delivery: notice(text) })),
         )
       return Effect.gen(function* () {
@@ -718,30 +762,43 @@ export const createExtension =
         // The loader reads files with Bun, which Pi's Node does not have, so the wrapper loads it.
         // The state folder does not depend on the config or on `status`, so it is asked meanwhile;
         // its failure counts only once the config says the extension is on.
-        const [config, folder] = yield* Effect.all(
+        // The user's own file is read alone (no project folder) beside the merged config: only it
+        // may lift the gates, and its exclusions stay whatever a project says. A file that cannot
+        // be read counts for nothing, which leaves the gates on.
+        const [config, folder, own] = yield* Effect.all(
           [
             holyagent(signal, project, "config", join(located.top, STATE_DIRECTORY)).pipe(
               Effect.flatMap(decodeConfig),
             ),
             Effect.result(stateFolderOf(signal, project, located)),
+            holyagent(signal, project, "config").pipe(
+              Effect.flatMap(decodeConfig),
+              Effect.orElseSucceed((): Config | undefined => undefined),
+            ),
           ],
           { concurrency: "unbounded" },
         )
         read = config
+        user = own
+        const bound = boundConfigs(yield* defaultConfig, user)
         if (!config.pi.enable) {
-          // The merged config says off; only the user's own file may also lift the gates, so it is
-          // read alone (no project folder). A file that cannot be read leaves them on.
-          const userOff = yield* holyagent(signal, project, "config").pipe(
-            Effect.flatMap(decodeConfig),
-            Effect.map((user) => !user.pi.enable),
-            Effect.orElseSucceed(() => false),
+          if (user !== undefined && !user.pi.enable)
+            return { enabled: false, gatesOff: true } satisfies Collected
+          // Only the user's `pi.enable: false` stands the root's guard down; a project's adds no
+          // context and no settings, and leaves the root its prompt and its exclusions.
+          const off = settingsFor(
+            config,
+            yield* roleOf.pipe(Effect.orElseSucceed((): PiRole => DEFAULT_PI_ROLE)),
+            bound,
           )
-          return (
-            userOff ? { enabled: false, gatesOff: true } : { enabled: false }
-          ) satisfies Collected
+          return {
+            enabled: false,
+            ...(off.rootPrompt === undefined ? {} : { rootPrompt: off.rootPrompt }),
+            ...(off.tools === undefined ? {} : { tools: off.tools }),
+          } satisfies Collected
         }
         const role = yield* roleOf
-        configured = settingsFor(config, role)
+        configured = settingsFor(config, role, bound)
         // Status first, then reconcile: for a project that keeps state, status makes the state
         // worktree that the next calls read.
         const status = yield* holyagent(signal, project, "status").pipe(
@@ -922,7 +979,7 @@ export const createExtension =
         pending: undefined,
         gatesOff: false,
         rootPrompt: false,
-        excluded: [],
+        excluded: Effect.runSync(startingExclusions),
         started: false,
         probe: undefined,
         readiness: undefined,
@@ -1008,8 +1065,8 @@ export const createExtension =
     // The drawing is replaced for every session, since the render path runs ahead of any gate.
     pi.registerToolRenderer(workflowRenderers)
 
-    // The gates stand down only for the user's own `pi.enable: false`; a project's cannot lift them.
-    // The root's excluded tools are refused first, whatever else the call is.
+    // The gates stand down only for the user's own `pi.enable: false`; a project's cannot lift them,
+    // nor take an exclusion away. The root's excluded tools are refused first, whatever else the call is.
     pi.on("tool_call", (event) =>
       held?.gatesOff === true
         ? undefined
