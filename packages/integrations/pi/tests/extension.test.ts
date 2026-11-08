@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { isAbsolute, join, resolve } from "node:path"
 
 import type { ExecResult, ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent"
 import { Effect } from "effect"
@@ -74,8 +74,13 @@ const healthy =
     }
   }
 
+const SESSION_CWD = "/work/project/src"
+// What the extension makes of the session's folder, which differs on Windows where a root-relative
+// path gets a drive.
+const SESSION_PROJECT = resolve(SESSION_CWD)
+
 /** A fake ExtensionAPI that records what the extension registers and runs. */
-const fakeApi = (responder: Responder, value?: string | boolean, cwd = "/work/project/src") => {
+const fakeApi = (responder: Responder, value?: string | boolean, cwd = SESSION_CWD) => {
   const flags = new Map<string, { type: string; default?: string }>()
   const handlers = new Map<string, Array<(...args: Array<never>) => unknown>>()
   const calls: Array<Call> = []
@@ -355,7 +360,7 @@ describe("what runs and when", () => {
       }).toEqual({
         command: "sh",
         script: WRAPPER,
-        project: [PI_PROJECT_FLAG, "/work/project/src"],
+        project: [PI_PROJECT_FLAG, SESSION_PROJECT],
       })
     }
     const commands = startedWith(api.calls)
@@ -580,23 +585,35 @@ describe("with the built package and a real project", () => {
   })
 })
 
-/** A promise and the way to settle it, to hold a command until the test lets it go. */
+/**
+ * Two promises that hold a command and tell the test where it is: `entered` settles when the
+ * command reaches the gate, and `promise` holds it until the test calls `open`. The tests wait for
+ * `entered` instead of for time.
+ */
 const gate = () => {
   let open = () => {}
-  const promise = new Promise<void>((resolve) => void (open = resolve))
-  return { promise, open }
+  let enter = () => {}
+  const promise = new Promise<void>((release) => void (open = release))
+  const entered = new Promise<void>((reached) => void (enter = reached))
+  return { promise, open, entered, enter }
 }
 
-/** Answers once the gate opens, or as a stopped command when the signal aborts first. */
-const gated = (hold: Promise<void>, answer: Outcome, signal?: AbortSignal): Promise<Outcome> =>
-  new Promise((resolve) => {
-    const stop = () => resolve({ killed: true, code: 143 })
+/**
+ * Answers once the gate opens, or as a stopped command when the signal aborts first. The gate's
+ * `entered` settles as the command arrives.
+ */
+const gated = (
+  hold: ReturnType<typeof gate>,
+  answer: Outcome,
+  signal?: AbortSignal,
+): Promise<Outcome> =>
+  new Promise((settle) => {
+    hold.enter()
+    const stop = () => settle({ killed: true, code: 143 })
     if (signal?.aborted) return stop()
     signal?.addEventListener("abort", stop, { once: true })
-    void hold.then(() => resolve(answer))
+    void hold.promise.then(() => settle(answer))
   })
-
-const settle = () => Bun.sleep(30)
 
 describe("order and time", () => {
   const state = async () => {
@@ -609,13 +626,11 @@ describe("order and time", () => {
     const hold = gate()
     const inner = healthy(directory)
     const api = fakeApi((call, runtime) =>
-      runtime[0] === "status"
-        ? gated(hold.promise, { stdout: STATUS }, call.signal)
-        : inner(call, runtime),
+      runtime[0] === "status" ? gated(hold, { stdout: STATUS }, call.signal) : inner(call, runtime),
     )
     createExtension({ packageRoot: PACKAGE_ROOT })(api.pi)
     const started = api.emit("session_start", { reason: "resume" })
-    await settle()
+    await hold.entered
     expect(startedWith(api.calls)).toContain("status")
     expect(startedWith(api.calls)).not.toContain("reconcile")
     hold.open()
@@ -628,15 +643,18 @@ describe("order and time", () => {
   test("the config and the state folder are asked together, before status", async () => {
     const { directory, done } = await state()
     const hold = gate()
+    const folderAsked = gate()
     const inner = healthy(directory)
-    const api = fakeApi((call, runtime) =>
-      runtime[0] === "config"
-        ? gated(hold.promise, { stdout: `${CONFIG}\n` }, call.signal)
-        : inner(call, runtime),
-    )
+    const api = fakeApi((call, runtime) => {
+      if (runtime[0] === "state") folderAsked.enter()
+      return runtime[0] === "config"
+        ? gated(hold, { stdout: `${CONFIG}\n` }, call.signal)
+        : inner(call, runtime)
+    })
     createExtension({ packageRoot: PACKAGE_ROOT })(api.pi)
     const started = api.emit("session_start", { reason: "startup" })
-    await settle()
+    // The config is held, and the state folder is asked while it is.
+    await Promise.all([hold.entered, folderAsked.entered])
     expect(startedWith(api.calls)).toContain("state mode")
     expect(startedWith(api.calls)).not.toContain("status")
     hold.open()
@@ -678,11 +696,11 @@ describe("order and time", () => {
     const api = fakeApi((call, runtime) => {
       if (runtime[0] !== "status" || !first) return inner(call, runtime)
       first = false
-      return gated(hold.promise, { stdout: STATUS }, call.signal)
+      return gated(hold, { stdout: STATUS }, call.signal)
     })
     createExtension({ packageRoot: PACKAGE_ROOT })(api.pi)
     const started = api.emit("session_start", { reason: "startup" })
-    await settle()
+    await hold.entered
     const older = api.calls.filter((call) => subcommand(call)?.[0] === "status")[0]?.signal
     expect(older?.aborted).toBe(false)
     await api.emit("session_compact", { reason: "threshold" })
@@ -701,13 +719,11 @@ describe("order and time", () => {
     const hold = gate()
     const inner = healthy(directory)
     const api = fakeApi((call, runtime) =>
-      runtime[0] === "status"
-        ? gated(hold.promise, { stdout: STATUS }, call.signal)
-        : inner(call, runtime),
+      runtime[0] === "status" ? gated(hold, { stdout: STATUS }, call.signal) : inner(call, runtime),
     )
     createExtension({ packageRoot: PACKAGE_ROOT })(api.pi)
     const started = api.emit("session_start", { reason: "startup" })
-    await settle()
+    await hold.entered
     await api.emit("session_shutdown", { reason: "quit" })
     await started
     expect(await api.emit("before_agent_start", { prompt: "x" })).toEqual([undefined])
@@ -718,8 +734,8 @@ describe("order and time", () => {
 describe("where programs start", () => {
   test("git and sh run in the package's folder, never the project's, and the project is an argument", async () => {
     const directory = await mkdtemp(join(tmpdir(), "holyagent-pi-cwd-"))
-    const project = "/work/project/src"
-    const { api } = await run(healthy(directory), { start: { reason: "resume" }, cwd: project })
+    const project = SESSION_PROJECT
+    const { api } = await run(healthy(directory), { start: { reason: "resume" }, cwd: SESSION_CWD })
     expect(api.calls.length).toBeGreaterThan(4)
     for (const call of api.calls) {
       expect(call.cwd).toBe(PACKAGE_ROOT)
@@ -731,6 +747,49 @@ describe("where programs start", () => {
       expect(call.args.slice(0, 3)).toEqual([WRAPPER, PI_PROJECT_FLAG, project])
     await rm(directory, { recursive: true, force: true })
   })
+
+  test("a relative session folder is made absolute, so it cannot resolve against the package's folder", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "holyagent-pi-relative-"))
+    const relative = join("relative", "project")
+    const { api } = await run(healthy(directory), { start: { reason: "resume" }, cwd: relative })
+    const project = resolve(relative)
+    expect(isAbsolute(project)).toBe(true)
+    const git = api.calls.filter((call) => call.command === "git")
+    expect(git.map((call) => call.args)).toEqual([["-C", project, "rev-parse", "--show-toplevel"]])
+    const wrapped = api.calls.filter((call) => call.command === "sh")
+    expect(wrapped.length).toBeGreaterThan(3)
+    for (const call of wrapped)
+      expect(call.args.slice(0, 3)).toEqual([WRAPPER, PI_PROJECT_FLAG, project])
+    await rm(directory, { recursive: true, force: true })
+  })
+})
+
+describe("a git failure that does not say the project is not a repository", () => {
+  const failing =
+    (outcome: Outcome): Responder =>
+    (call, runtime) =>
+      call.command === "git" ? outcome : healthy("/unused")(call, runtime)
+
+  const cases: ReadonlyArray<readonly [string, Outcome, string]> = [
+    ["a timeout", { killed: true, code: 143 }, "timed out"],
+    [
+      "dubious ownership",
+      { code: 128, stderr: "fatal: detected dubious ownership in repository at '/work/project'\n" },
+      "dubious ownership",
+    ],
+    ["a failure without a message", { code: 1 }, "exit 1"],
+  ]
+
+  for (const [name, outcome, reason] of cases)
+    test(`${name} fails closed as the notice and the project is not taken for non-git`, async () => {
+      const { api, delivered } = await run(failing(outcome))
+      expect(delivered?.message?.customType).toBe(NOTICE_MESSAGE)
+      expect(delivered?.message?.display).toBe(true)
+      expect(delivered?.message?.content).toContain("git rev-parse --show-toplevel")
+      expect(delivered?.message?.content).toContain(reason)
+      // Nothing else ran: no command guessed at a config or state folder.
+      expect(startedWith(api.calls)).toEqual([])
+    })
 })
 
 describe("a project that is not a git repository", () => {

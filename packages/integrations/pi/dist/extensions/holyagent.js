@@ -2868,7 +2868,6 @@ var catchIf = /* @__PURE__ */ dual((args) => isEffect(args[0]), (self, predicate
   return f(error.success);
 }));
 var mapError = /* @__PURE__ */ dual(2, (self, f) => catchCause(self, (cause) => failCause(causeMap(cause, f))));
-var orElseSucceed = /* @__PURE__ */ dual(2, (self, f) => catch_(self, (error) => sync(() => f(error))));
 var result = (self) => matchEager(self, {
   onFailure: fail2,
   onSuccess: succeed2
@@ -3432,7 +3431,6 @@ var catch_2 = catch_;
 var catchCause2 = catchCause;
 var catchIf2 = catchIf;
 var mapError2 = mapError;
-var orElseSucceed2 = orElseSucceed;
 var timeoutOrElse2 = timeoutOrElse;
 var runPromise2 = runPromise;
 var runSyncExit2 = runSyncExit;
@@ -8660,6 +8658,7 @@ var notice = (text) => ({
   content: `holyagent: ${oneLine(text).slice(0, NOTICE_CHARS)}`,
   display: true
 });
+var NOT_A_REPOSITORY = /not a git repository/i;
 var reasonOf = (result) => {
   if (result.killed)
     return "it timed out or was stopped";
@@ -8682,9 +8681,18 @@ var createExtension = ({
     catch: (cause) => new CommandFailed({ command: args.join(" "), reason: String(cause) })
   });
   const holyagent = (signal, project, ...args) => exec(signal, "sh", [wrapper, PI_PROJECT_FLAG, project, ...args]).pipe(flatMap2((result) => result.code === 0 && !result.killed ? succeed5(result.stdout) : fail5(new CommandFailed({ command: args.join(" "), reason: reasonOf(result) }))));
-  const topOf = (signal, project) => exec(signal, "git", ["-C", project, "rev-parse", "--show-toplevel"]).pipe(map4((result) => result.code === 0 ? result.stdout.trim() : ""), orElseSucceed2(() => ""), map4((top) => top === "" ? { top: project, git: false } : { top, git: true }));
+  const topOf = (signal, project) => exec(signal, "git", ["-C", project, "rev-parse", "--show-toplevel"]).pipe(flatMap2((result) => {
+    const top = result.stdout.trim();
+    if (result.code === 0 && !result.killed && top !== "")
+      return succeed5({ top, git: true });
+    return !result.killed && result.code === 128 && NOT_A_REPOSITORY.test(result.stderr) ? succeed5({ top: project, git: false }) : fail5(new CommandFailed({
+      command: "git rev-parse --show-toplevel",
+      reason: reasonOf(result)
+    }));
+  }));
   const stateFolderOf = (signal, project, located) => located.git ? holyagent(signal, project, "state", "mode").pipe(flatMap2((text) => parseOutput("state mode", text)), map4((where) => where["directory"])) : succeed5(join(located.top, STATE_DIRECTORY));
-  const collect = (project, signal, reason) => gen2(function* () {
+  const collect = (cwd, signal, reason) => gen2(function* () {
+    const project = resolve3(cwd);
     const located = yield* topOf(signal, project);
     const [config, folder] = yield* all2([
       holyagent(signal, project, "config", join(located.top, STATE_DIRECTORY)).pipe(flatMap2(decodeUnknownEffect2(fromJsonString2(Config), {

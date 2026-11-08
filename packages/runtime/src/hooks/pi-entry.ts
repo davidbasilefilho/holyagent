@@ -68,8 +68,12 @@ if (import.meta.main) {
     process.stderr.write(result.stderr)
     process.exitCode = result.code
   } else {
-    // The CLI reads its own arguments from `Bun.argv`: take the flag and its directory off.
-    if (directory !== undefined) Bun.argv.splice(2, 2)
+    // Coupled to `cli/main.ts`, which runs when imported and reads its arguments from `Bun.argv`
+    // and its working directory from `process.cwd()` at that moment. So the project is entered
+    // above and the arguments after the flag are put in `Bun.argv` here, both before the import.
+    // `main.ts` takes no arguments because it is also the Claude plugin's entry, whose bundle stays
+    // as it is. `session-context.test.ts` pins the handoff by running this entry with `--project`.
+    Bun.argv.splice(2, Bun.argv.length - 2, ...rest)
     await import("../cli/main.ts")
   }
 }

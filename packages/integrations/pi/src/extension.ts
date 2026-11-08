@@ -117,6 +117,9 @@ const notice = (text: string): Delivery => ({
   display: true,
 })
 
+// What `git rev-parse` says, with exit 128, outside a repository.
+const NOT_A_REPOSITORY = /not a git repository/i
+
 const reasonOf = (result: ExecResult): string => {
   if (result.killed) return "it timed out or was stopped"
   const line = result.stderr
@@ -170,12 +173,26 @@ export const createExtension =
       )
 
     // The top of the work tree holds the project's config; outside git the project folder does, and
-    // so does its state.
+    // so does its state. Only git's own answer that the folder is not in a repository means "not
+    // git": a timeout, a refusal over ownership or a missing git would otherwise put a project in a
+    // work tree under the wrong config, so those fail closed as the notice. Git exits 128 for every
+    // fatal error and says which in English unless its locale is set otherwise, so a localized git
+    // fails closed too.
     const topOf = (signal: AbortSignal, project: string) =>
       exec(signal, "git", ["-C", project, "rev-parse", "--show-toplevel"]).pipe(
-        Effect.map((result) => (result.code === 0 ? result.stdout.trim() : "")),
-        Effect.orElseSucceed(() => ""),
-        Effect.map((top) => (top === "" ? { top: project, git: false } : { top, git: true })),
+        Effect.flatMap((result) => {
+          const top = result.stdout.trim()
+          if (result.code === 0 && !result.killed && top !== "")
+            return Effect.succeed({ top, git: true })
+          return !result.killed && result.code === 128 && NOT_A_REPOSITORY.test(result.stderr)
+            ? Effect.succeed({ top: project, git: false })
+            : Effect.fail(
+                new CommandFailed({
+                  command: "git rev-parse --show-toplevel",
+                  reason: reasonOf(result),
+                }),
+              )
+        }),
       )
 
     // The folder that holds the project's state: the one `holyagent state mode` reports in a git
@@ -192,8 +209,11 @@ export const createExtension =
           )
         : Effect.succeed<unknown>(join(located.top, STATE_DIRECTORY))
 
-    const collect = (project: string, signal: AbortSignal, reason: Reason) =>
+    const collect = (cwd: string, signal: AbortSignal, reason: Reason) =>
       Effect.gen(function* () {
+        // Every command starts in the package's folder, so a relative `cwd` would resolve against
+        // that folder, not the project's: it is made absolute here, once.
+        const project = resolve(cwd)
         const located = yield* topOf(signal, project)
         // The loader reads files with Bun, which Pi's Node does not have, so the wrapper loads it.
         // The state folder does not depend on the config or on `status`, so it is asked meanwhile;

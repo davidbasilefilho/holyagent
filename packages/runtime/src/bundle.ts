@@ -13,6 +13,16 @@ export class BundleFailed extends Data.TaggedError("BundleFailed")<{
   }
 }
 
+// Bun throws when a build fails: an AggregateError with one error per build message for errors in
+// the sources (an unresolved import), a plain Error for a failure before any (a missing entrypoint).
+const describe = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error)
+
+const messagesOf = (cause: unknown): string =>
+  cause instanceof AggregateError && cause.errors.length > 0
+    ? cause.errors.map(describe).join("\n")
+    : describe(cause)
+
 /** What {@link bundleModule} builds for. */
 export interface BundleOptions {
   /** The runtime that loads the bundle: `bun` for the CLI, `node` for a Pi extension. */
@@ -38,7 +48,7 @@ export const bundleModule = (
   return Effect.tryPromise({
     try: () =>
       Bun.build({ entrypoints: [entrypoint], target, format: "esm", external: [...external] }),
-    catch: (cause) => failed(String(cause)),
+    catch: (cause) => failed(messagesOf(cause)),
   }).pipe(
     Effect.flatMap((result) => {
       const output = result.outputs[0]

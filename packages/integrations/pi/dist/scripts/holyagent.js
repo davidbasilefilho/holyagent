@@ -24436,8 +24436,7 @@ if (import.meta.main) {
     process.stderr.write(result.stderr);
     process.exitCode = result.code;
   } else {
-    if (directory !== undefined)
-      Bun.argv.splice(2, 2);
+    Bun.argv.splice(2, Bun.argv.length - 2, ...rest);
     await init_main().then(() => ({}));
   }
 }

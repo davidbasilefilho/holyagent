@@ -37,7 +37,9 @@ if [ -z "$bun" ] || [ ! -f "$here/holyagent.js" ]; then
   printf 'error: BunMissing: Bun or holyagent.js was not found.\nhint: Install Bun from https://bun.sh, then run the command again.\n' >&2
   exit 127
 fi
-# The working directory is the project, and Bun would load its .env and bunfig.toml there: an .env
-# could redirect the state folder and a bunfig preload would run code on every call. Neither may
-# change this CLI, so Bun reads no env file and a config file that is empty.
+# Under the Claude hook the working directory is the project, and Bun would load its .env and
+# bunfig.toml there: an .env could redirect the state folder and a bunfig preload would run code on
+# every call. Under Pi, Bun starts in the package's folder and enters the project in-process through
+# `--project`, after it has read its config. Neither may change this CLI, so Bun reads no env file
+# and a config file that is empty.
 exec "$bun" --no-env-file --config="$here/empty-bunfig.toml" "$here/holyagent.js" "$@"

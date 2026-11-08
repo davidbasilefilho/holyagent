@@ -59,5 +59,21 @@ describe("bundleModule", () => {
     )
     expect(error._tag).toBe("BundleFailed")
     expect(error.message).toContain(missing)
+    // The reason is the build's message, not the `Error: ` string of the thrown value.
+    expect(error.reason).not.toStartWith("Error: ")
+    expect(error.reason).toContain("ENOENT")
+  })
+
+  test("a source that does not build reports each build message", async () => {
+    await inFolder(async (folder) => {
+      await Bun.write(join(folder, "entry.ts"), 'import "./one.ts"\nimport "./two.ts"\n')
+      const error = await Effect.runPromise(
+        Effect.flip(bundleModule(join(folder, "entry.ts"), { target: "bun", note: "n" })),
+      )
+      expect(error._tag).toBe("BundleFailed")
+      expect(error.reason).toContain('Could not resolve: "./one.ts"')
+      expect(error.reason).toContain('Could not resolve: "./two.ts"')
+      expect(error.reason.split("\n")).toHaveLength(2)
+    })
   })
 })
