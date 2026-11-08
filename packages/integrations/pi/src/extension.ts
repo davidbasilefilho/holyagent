@@ -340,8 +340,8 @@ export const createExtension =
       )
 
     // Safe to call twice, and with nothing held. The promise settles once every collection ever
-    // started has ended, the ones of an older start or compaction included, so no child of this
-    // process is left when it resolves.
+    // started has ended, the ones of an older start or compaction included, and every child they
+    // started has exited or its stop grace (STOP_GRACE_MS, the graceMs option) has passed.
     const release = (): Promise<void> => {
       const taken = held
       held = undefined
@@ -400,7 +400,8 @@ export const createExtension =
     )
 
     // Pi finishes the shutdown when the handler's promise settles, and the folder may be removed
-    // then: it settles only after every child has exited.
+    // then: it settles only after every child has exited or its stop grace (STOP_GRACE_MS, 2 s,
+    // the graceMs option) has passed.
     pi.on("session_shutdown", () => release())
   }
 
