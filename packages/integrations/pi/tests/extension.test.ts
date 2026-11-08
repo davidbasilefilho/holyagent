@@ -44,6 +44,7 @@ import {
   hostEnvironment,
   memoizeLast,
   NOTICE_MESSAGE,
+  refuseExcludedTool,
   refuseNonSpecialist,
   refuseNonSpecialistWorkflow,
   ROLE_FLAG,
@@ -585,6 +586,19 @@ describe("failing closed", () => {
     await rm(directory, { recursive: true, force: true })
   })
 
+  test("a notice carries no control character, however the failure is written", async () => {
+    // ESC and CSI start escape sequences; the others move the cursor or end a line.
+    const hostile =
+      "a\u001b[31mred\u001b]0;title\u0007\u009b2Jb\u0000c\rd\u0085e\u200ff\u202eg\u007fh"
+    const { delivered } = await run(
+      healthy("/missing", { status: { code: 4, stderr: `error: ${hostile}\n` } }),
+    )
+    const content = delivered?.message?.content ?? ""
+    expect(content).toContain("red")
+    expect(unsafeCharacters(content)).toEqual([])
+    expect(content).toContain("holyagent: ")
+  })
+
   test("a notice is short even when the failure is long", async () => {
     const { delivered } = await run(
       healthy("/missing", { status: { code: 4, stderr: `error: StateIo: ${"x".repeat(5000)}\n` } }),
@@ -979,6 +993,8 @@ describe("no command outlives a gather", () => {
     await hold.entered
     // The compaction's own gather runs to its end while the older one's command is still leaving.
     await api.emit("session_compact", { reason: "threshold" })
+    // The compaction did the start's work, so its provider probes have to end first.
+    await Bun.sleep(30)
     expect(api.running.count).toBe(1)
     const shutdown = api.emit("session_shutdown", { reason: "quit" })
     expect(await settledSoon(shutdown)).toBe(false)
@@ -1290,7 +1306,7 @@ describe("telling a child from the root", () => {
     await rm(directory, { recursive: true, force: true })
   })
 
-  test("a child fills the package folder into its prompt and leaves the process environment alone", async () => {
+  test("a child fills the package folder into its prompt and leaves the root's process variables alone", async () => {
     const prompt = `run ${PI_ROOT_PLACEHOLDER}/scripts/holyagent status, then ${PI_ROOT_PLACEHOLDER}/scripts/holyagent rg x .`
     const { delivered, env } = await run(healthy("/missing"), {
       sessionName: "worker-implementation#a1b2c3d4",
@@ -1302,7 +1318,10 @@ describe("telling a child from the root", () => {
     expect(delivered?.systemPrompt).toBe(
       "run C:/Users/me/pkg/scripts/holyagent status, then C:/Users/me/pkg/scripts/holyagent rg x .",
     )
-    expect(env).toEqual({})
+    // The wrapper of a Windows root is not the one the fake answers for, so the config is
+    // unreadable and the provider's variables are the defaults'; the host and the worker cap are
+    // the root's alone.
+    expect(env).toEqual(providerEnv(DEFAULTS))
   })
 
   test("a prompt without the placeholder is left as it is: no override is returned", async () => {
@@ -1854,6 +1873,22 @@ const nextMessages = async (
     >
   ).flatMap((result) => (result?.message === undefined ? [] : [result.message]))
 
+/**
+ * The characters of a text that are unsafe to draw or to hand to the model: the C0 and C1 controls
+ * (ESC and CSI among them), the line and paragraph separators, bidi overrides and zero-width
+ * characters, as UTF-16 code units (all of them are in the basic plane).
+ */
+const unsafeCharacters = (text: string): ReadonlyArray<number> =>
+  Array.from(text, (_, at) => text.charCodeAt(at)).filter(
+    (code) =>
+      code <= 0x1f ||
+      (code >= 0x7f && code <= 0x9f) ||
+      code === 0x2028 ||
+      code === 0x2029 ||
+      (code >= 0x200b && code <= 0x200f) ||
+      (code >= 0x202a && code <= 0x202e),
+  )
+
 const piCalls = (api: ReturnType<typeof fakeApi>) =>
   api.calls.filter((call) => call.command === "pi").map((call) => call.args.join(" "))
 
@@ -1905,16 +1940,51 @@ describe("the root's system prompt", () => {
     expect(child.delivered?.systemPrompt).toBeUndefined()
   })
 
-  test("is not given when the config is unreadable or an unknown role is asked for", async () => {
-    const unreadable = await run((call, runtime) =>
-      runtime[0] === "config"
-        ? { code: 4, stderr: "error: bad\n" }
-        : healthy("/missing")(call, runtime),
-    )
-    expect(unreadable.delivered?.systemPrompt).toBeUndefined()
-    expect(
-      (await run(healthy("/missing"), { flag: "nonsense" })).delivered?.systemPrompt,
-    ).toBeUndefined()
+  test("is given when the config cannot be read or the role is unknown, beside the notice", async () => {
+    const broken: ReadonlyArray<readonly [string, Responder, { flag?: string }]> = [
+      [
+        "a config the loader refuses",
+        (call, runtime) =>
+          runtime[0] === "config"
+            ? { code: 4, stderr: "error: bad\n" }
+            : healthy("/missing")(call, runtime),
+        {},
+      ],
+      [
+        "a config with an unknown key",
+        (call, runtime) =>
+          runtime[0] === "config"
+            ? { stdout: `${JSON.stringify({ pi: {}, extra: 1 })}\n` }
+            : healthy("/missing")(call, runtime),
+        {},
+      ],
+      [
+        "a git that fails",
+        (call, runtime) =>
+          call.command === "git" ? { code: 1 } : healthy("/missing")(call, runtime),
+        {},
+      ],
+      ["an unknown role", healthy("/missing"), { flag: "nonsense" }],
+    ]
+    for (const [label, responder, options] of broken) {
+      const { delivered } = await run(responder, { systemPrompt: PI_PROMPT, ...options })
+      expect(delivered?.message?.customType, label).toBe(NOTICE_MESSAGE)
+      expect(delivered?.systemPrompt, label).toBe(`${filledPrompt}\n\n${PI_PROMPT}`)
+    }
+  })
+
+  test("is not given to a specialist or a plain session whose config cannot be read", async () => {
+    for (const options of [
+      { flag: "specialist" },
+      { flag: "session" },
+      { sessionName: "reviewer-code#a1b2c3d4" },
+    ]) {
+      const { delivered } = await run(
+        healthy("/missing", { config: { code: 4, stderr: "error: bad\n" } }),
+        options,
+      )
+      expect(delivered?.systemPrompt).toBeUndefined()
+    }
   })
 
   test("is not given with pi.enable off, in the user's config or the project's", async () => {
@@ -1935,14 +2005,14 @@ describe("the root's tools", () => {
 
   test("are its active selection plus codemode, minus the tools it excludes", async () => {
     const { api } = await run(healthy("/missing"), {
-      activeTools: ACTIVE,
+      activeTools: [...ACTIVE],
       allTools: [...ACTIVE, "codemode", "moonshot_fetch"],
     })
     expect(api.toolSets).toEqual([["read", "bash", "todo", "codemode"]])
   })
 
   test("are set before the first run reads them, once per start", async () => {
-    const { api } = await run(healthy("/missing"), { activeTools: ACTIVE })
+    const { api } = await run(healthy("/missing"), { activeTools: [...ACTIVE] })
     expect(api.toolSets).toHaveLength(1)
     await api.emit("session_compact", { reason: "manual" })
     await api.emit("before_agent_start", { prompt: "x", systemPrompt: "p" })
@@ -1950,7 +2020,7 @@ describe("the root's tools", () => {
   })
 
   test("a compaction leaves a change the user made to the tools", async () => {
-    const { api } = await run(healthy("/missing"), { activeTools: ACTIVE })
+    const { api } = await run(healthy("/missing"), { activeTools: [...ACTIVE] })
     api.pi.setActiveTools(["read", "write"])
     await api.emit("session_compact", { reason: "manual" })
     await api.emit("before_agent_start", { prompt: "x", systemPrompt: "p" })
@@ -1963,7 +2033,7 @@ describe("the root's tools", () => {
       { flag: "specialist" },
       { flag: "session" },
     ]) {
-      const { api } = await run(healthy("/missing"), { activeTools: ACTIVE, ...options })
+      const { api } = await run(healthy("/missing"), { activeTools: [...ACTIVE], ...options })
       expect(api.toolSets).toEqual([])
       expect(api.pi.getActiveTools()).toEqual(ACTIVE)
     }
@@ -1973,20 +2043,197 @@ describe("the root's tools", () => {
     const { api } = await run(
       (call, runtime) =>
         runtime[0] === "config" ? { stdout: DISABLED } : healthy("/missing")(call, runtime),
-      { activeTools: ACTIVE },
+      { activeTools: [...ACTIVE] },
     )
     expect(api.toolSets).toEqual([])
     expect(api.pi.getActiveTools()).toEqual(ACTIVE)
   })
 
   test("a setActiveTools that throws is a notice, not an error that reaches Pi", async () => {
-    const { delivered } = await run(healthy("/missing"), {
-      activeTools: ACTIVE,
+    const { api } = await run(healthy("/missing"), {
+      activeTools: [...ACTIVE],
       toolsFail: new Error("no such loadout"),
+      startOnly: true,
     })
+    const [notice] = await nextMessages(api)
+    expect(notice?.customType).toBe(NOTICE_MESSAGE)
+    expect(notice?.content).toContain("the root's tools were not applied")
+    expect(notice?.content).toContain("no such loadout")
+  })
+
+  test("a setActiveTools that throws is reported beside the status, which it does not replace", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "holyagent-pi-tools-"))
+    const { api, delivered } = await run(healthy(directory), {
+      activeTools: [...ACTIVE],
+      toolsFail: new Error("no such loadout"),
+      startOnly: true,
+    })
+    expect(delivered).toBeUndefined()
+    const messages = await nextMessages(api)
+    expect(messages.map((message) => message?.customType)).toEqual([
+      CONTEXT_MESSAGE,
+      NOTICE_MESSAGE,
+    ])
+    expect(messages[1]?.content).toContain("no such loadout")
+    expect(await nextMessages(api)).toEqual([])
+    await rm(directory, { recursive: true, force: true })
+  })
+
+  test("are the defaults' when the config cannot be read: the root keeps its exclusions", async () => {
+    const { api, delivered } = await run(
+      healthy("/missing", { config: { code: 4, stderr: "error: bad\n" } }),
+      { activeTools: [...ACTIVE], allTools: [...ACTIVE, "codemode", "moonshot_fetch"] },
+    )
     expect(delivered?.message?.customType).toBe(NOTICE_MESSAGE)
-    expect(delivered?.message?.content).toContain("the root's tools were not applied")
-    expect(delivered?.message?.content).toContain("no such loadout")
+    expect(api.toolSets).toEqual([["read", "bash", "todo", "codemode"]])
+  })
+
+  test("a compaction that stops the start's collection does the start's work, once", async () => {
+    const hold = gate()
+    const inner = healthy("/missing")
+    let first = true
+    const api = fakeApi(
+      (call, runtime) => {
+        if (runtime[0] !== "status" || !first) return inner(call, runtime)
+        first = false
+        return gated(hold, { stdout: STATUS }, call.signal)
+      },
+      undefined,
+      SESSION_CWD,
+      { activeTools: [...ACTIVE] },
+    )
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
+    const started = api.emit("session_start", { reason: "startup" })
+    await hold.entered
+    await api.emit("session_compact", { reason: "threshold" })
+    await started
+    await probesEnded(api, 2)
+    expect(api.toolSets).toEqual([["read", "bash", "todo", "codemode"]])
+    expect(piCalls(api)).toEqual(["auth check --provider kimi-coding --json", "--list-models"])
+    await api.emit("session_compact", { reason: "threshold" })
+    await Bun.sleep(20)
+    expect(api.toolSets).toHaveLength(1)
+    expect(piCalls(api)).toHaveLength(2)
+  })
+})
+
+describe("the root's excluded tools", () => {
+  const call = (toolName: string, extra: object = {}) => ({
+    toolName,
+    toolCallId: "call-1/1",
+    input: {},
+    ...extra,
+  })
+  const blocked = [expect.objectContaining({ block: true })]
+  // The tools Pi lets a codemode script call whether or not they are active: the computer-use
+  // tools beyond the core set and pi-web-kit's, registered `deferred`.
+  const DEFERRED = [
+    "computer_use_scroll",
+    "computer_use_get_screen_size",
+    "web_search",
+    "web_fetch",
+  ]
+  const EXCLUDED = ["write", "edit", "computer_use_click", "moonshot_search", "moonshot_fetch"]
+  const webKit = JSON.stringify({
+    ...DEFAULTS,
+    pi: { ...DEFAULTS.pi, features: { ...DEFAULTS.pi.features, web: "pi-web-kit" } },
+  })
+
+  test("a call to one is refused for the root, from the model and from a codemode script", async () => {
+    const { api } = await run(healthy("/missing"))
+    for (const name of EXCLUDED) {
+      expect(await api.emit("tool_call", call(name))).toEqual(blocked)
+      // A script's call carries the id of the codemode call that made it.
+      expect(await api.emit("tool_call", call(name, { parentToolCallId: "call-1" }))).toEqual(
+        blocked,
+      )
+    }
+    for (const name of ["read", "bash", "codemode", "todo"])
+      expect(await api.emit("tool_call", call(name))).toEqual([undefined])
+  })
+
+  test("the reason says which tool and what to do instead", async () => {
+    const { api } = await run(healthy("/missing"))
+    const [refusal] = (await api.emit("tool_call", call("computer_use_scroll"))) as Array<
+      { reason: string } | undefined
+    >
+    expect(refusal?.reason).toContain("computer_use_scroll")
+    expect(refusal?.reason).toContain("specialist")
+  })
+
+  test("the deferred tools stay refused though no longer active, and pi-web-kit's follow the config", async () => {
+    const { api } = await run(
+      (call, runtime) =>
+        runtime[0] === "config" ? { stdout: webKit } : healthy("/missing")(call, runtime),
+      { activeTools: ["read", ...DEFERRED] },
+    )
+    expect(api.pi.getActiveTools()).not.toContain("web_search")
+    for (const name of DEFERRED)
+      expect(await api.emit("tool_call", call(name, { parentToolCallId: "call-1" }))).toEqual(
+        blocked,
+      )
+    // With the web mode on pi-web-kit the provider's own tools are the root's to leave.
+    expect(await api.emit("tool_call", call("moonshot_search"))).toEqual([undefined])
+  })
+
+  test("a config that cannot be read leaves the defaults' exclusions", async () => {
+    const { api } = await run(healthy("/missing", { config: { code: 4, stderr: "error: bad\n" } }))
+    for (const name of EXCLUDED)
+      expect(await api.emit("tool_call", call(name, { parentToolCallId: "call-1" }))).toEqual(
+        blocked,
+      )
+  })
+
+  test("a failing git or status leaves them too", async () => {
+    for (const responder of [
+      (callOf: Call, runtime: ReadonlyArray<string>) =>
+        callOf.command === "git"
+          ? { code: 128, stderr: "fatal: unsafe\n" }
+          : healthy("/missing")(callOf, runtime),
+      healthy("/missing", { status: { code: 3, stderr: "error: boom\n" } }),
+    ]) {
+      const { api } = await run(responder)
+      for (const name of EXCLUDED) expect(await api.emit("tool_call", call(name))).toEqual(blocked)
+    }
+  })
+
+  test("other sessions and a pi.enable that is off are not held to them", async () => {
+    for (const options of [
+      { flag: "specialist" },
+      { flag: "session" },
+      { sessionName: "worker-implementation#a1b2c3d4" },
+    ]) {
+      const { api } = await run(healthy("/missing"), options)
+      for (const name of EXCLUDED)
+        expect(await api.emit("tool_call", call(name))).toEqual([undefined])
+    }
+    for (const config of [DISABLED]) {
+      const { api } = await run(healthy("/missing", { config: { stdout: config } }))
+      for (const name of EXCLUDED)
+        expect(await api.emit("tool_call", call(name))).toEqual([undefined])
+    }
+  })
+
+  test("a later collection that finds the extension off lifts them, and one that finds it on sets them", async () => {
+    let enabled = true
+    const { api } = await run((callOf, runtime) =>
+      runtime[0] === "config"
+        ? { stdout: enabled ? CONFIG : DISABLED }
+        : healthy("/missing")(callOf, runtime),
+    )
+    expect(await api.emit("tool_call", call("write"))).toEqual(blocked)
+    enabled = false
+    await api.emit("session_compact", {})
+    expect(await api.emit("tool_call", call("write"))).toEqual([undefined])
+    enabled = true
+    await api.emit("session_compact", {})
+    expect(await api.emit("tool_call", call("write"))).toEqual(blocked)
+  })
+
+  test("refuseExcludedTool matches names and patterns, and an empty list refuses nothing", () => {
+    expect(refuseExcludedTool({ toolName: "computer_use_x" }, ["computer_use_*"])?.block).toBe(true)
+    expect(refuseExcludedTool({ toolName: "computer_use" }, ["computer_use_*"])).toBeUndefined()
+    expect(refuseExcludedTool({ toolName: "write" }, [])).toBeUndefined()
   })
 })
 
@@ -2004,6 +2251,36 @@ describe("the provider", () => {
     expect(child.env).toEqual(providerEnv(DEFAULTS))
     const own = await run(healthy("/missing"), { env: { KIMI_CODE_REGION: "cn" } })
     expect(own.env["KIMI_CODE_REGION"]).toBe("cn")
+  })
+
+  test("its variables are set before the first probe starts, and the user's own win there too", async () => {
+    for (const [own, expected] of [
+      [{}, "global"],
+      [{ KIMI_CODE_REGION: "cn" }, "cn"],
+    ] as const) {
+      const env: Record<string, string | undefined> = { ...own }
+      const seen: Array<string | undefined> = []
+      const { api } = await run(healthy("/missing"), {
+        env,
+        startOnly: true,
+        pi: (args) => {
+          seen.push(env["KIMI_CODE_REGION"])
+          return readyPi(args)
+        },
+      })
+      await probesEnded(api, 2)
+      expect(seen).toEqual([expected, expected])
+    }
+  })
+
+  test("its variables are the defaults' when the config cannot be read, and no probe runs", async () => {
+    const { api, env } = await run(
+      healthy("/missing", { config: { code: 4, stderr: "error: bad\n" } }),
+      { startOnly: true },
+    )
+    await Bun.sleep(20)
+    expect(env["KIMI_CODE_REGION"]).toBe("global")
+    expect(piCalls(api)).toEqual([])
   })
 
   test("with pi.enable off none of its variables are set", async () => {
@@ -2029,6 +2306,21 @@ describe("the provider", () => {
     expect(notice?.content).toContain("kimi-coding is not ready")
     expect(notice?.content).toContain(LOGIN_FIX)
     expect(piCalls(api)).toHaveLength(1)
+  })
+
+  test("what Pi printed reaches the notice without its control characters", async () => {
+    const { api } = await run(healthy("/missing"), {
+      pi: () => ({
+        code: 2,
+        stderr: "error: \u001b[2J\u001b]8;;http://x\u0007broken\u009b31m auth.json\n",
+      }),
+      startOnly: true,
+    })
+    await probesEnded(api, 1)
+    const content = (await nextMessages(api))[0]?.content ?? ""
+    expect(content).toContain("broken")
+    expect(content).toContain("auth.json")
+    expect(unsafeCharacters(content)).toEqual([])
   })
 
   test("a provider Pi finds invalid is a notice with what Pi printed", async () => {
@@ -2085,6 +2377,10 @@ describe("the provider", () => {
       (): Outcome => {
         throw new Error("spawn pi ENOENT")
       },
+      // Pi's exec maps a program that is not found to exit 1 with the spawn error on stderr, which
+      // `pi auth check` itself uses for "not logged in".
+      (): Outcome => ({ code: 1, stderr: "spawn pi ENOENT" }),
+      (): Outcome => ({ code: 1, stderr: "spawn pi EACCES\n" }),
     ]) {
       const { api } = await run(healthy("/missing"), { pi, startOnly: true })
       await probesEnded(api, 1)
@@ -2103,7 +2399,16 @@ describe("the provider", () => {
     }
   })
 
-  test("the probes share the deadline: a hanging one is stopped and adds no notice", async () => {
+  test("a probe that did start and exits 1 with other output is still not logged in", async () => {
+    const { api } = await run(healthy("/missing"), {
+      pi: () => ({ code: 1, stderr: "not logged in to kimi-coding" }),
+      startOnly: true,
+    })
+    await probesEnded(api, 1)
+    expect((await nextMessages(api))[0]?.content).toContain("not ready")
+  })
+
+  test("the probes have a deadline of their own: a hanging one is stopped and adds no notice", async () => {
     const hold = gate()
     const { api } = await run(healthy("/missing"), {
       deadlineMs: 80,

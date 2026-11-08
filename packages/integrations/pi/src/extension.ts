@@ -16,7 +16,7 @@ import { Text } from "@earendil-works/pi-tui"
 import { Cause, Data, Effect, Exit, Schema } from "effect"
 
 import { literalWorkflowName, workflowRefusal } from "../../../runtime/src/cli/workflow-check.ts"
-import { Config } from "../../../runtime/src/config/schema.ts"
+import { Config, defaultConfig } from "../../../runtime/src/config/schema.ts"
 import { toPosix } from "../../../runtime/src/domain/paths.ts"
 import {
   DEFAULT_PI_ROLE,
@@ -24,6 +24,7 @@ import {
   PI_ROLES,
   PI_ROOT_PLACEHOLDER,
   piContext,
+  type PiRole,
   PiRoleSchema,
   type ProjectState,
 } from "../../../runtime/src/hooks/pi-context.ts"
@@ -33,7 +34,12 @@ import { validateModelCatalog } from "../../../runtime/src/pi/catalog.ts"
 import { providerEnv } from "../../../runtime/src/pi/provider.ts"
 import { type CommandRunner, requireProviderReady } from "../../../runtime/src/pi/readiness.ts"
 import { PI_ROOT_PROMPT } from "../../../runtime/src/pi/root-prompt.ts"
-import { rootActiveTools, type ToolArgs, toolArgs } from "../../../runtime/src/pi/tools.ts"
+import {
+  rootActiveTools,
+  type ToolArgs,
+  toolArgs,
+  toolMatches,
+} from "../../../runtime/src/pi/tools.ts"
 import { STATE_DIRECTORY } from "../../../runtime/src/state/layout.ts"
 import { SPECIALIST_NAMES } from "./specialists.ts"
 
@@ -214,17 +220,24 @@ const WORKFLOW_NAME_LIMIT = 80
 
 const GRAPHEME_SEGMENTER = new Intl.Segmenter(undefined, { granularity: "grapheme" })
 
+// The C0 and C1 controls (ESC and CSI among them, which start escape sequences) and the Unicode
+// line and paragraph separators.
+// eslint-disable-next-line no-control-regex
+const CONTROLS = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g
+
+// Bidi overrides and zero-width characters, which can make a line read as something else.
+const INVISIBLES = /[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g
+
+// Text that is safe to draw in the terminal and to hand to the model: control characters become
+// spaces, bidi overrides and zero-width characters are dropped, and the result is trimmed.
+const printable = (raw: string): string => raw.replace(CONTROLS, " ").replace(INVISIBLES, "").trim()
+
 /**
- * The text of a workflow name that is safe to draw, or undefined when nothing is left: control
- * characters become spaces, bidi overrides and zero-width characters are dropped, and the result is
- * trimmed and cut to {@link WORKFLOW_NAME_LIMIT} grapheme clusters.
+ * The text of a workflow name that is safe to draw, or undefined when nothing is left: it is
+ * {@link printable}, cut to {@link WORKFLOW_NAME_LIMIT} grapheme clusters.
  */
 export const sanitizeWorkflowName = (raw: string): string | undefined => {
-  const cleaned = raw
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, " ")
-    .replace(/[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, "")
-    .trim()
+  const cleaned = printable(raw)
   if (cleaned === "") return undefined
   let shown = ""
   let count = 0
@@ -351,7 +364,7 @@ class CommandFailed extends Data.TaggedError("CommandFailed")<{
 class UnknownRole extends Data.TaggedError("UnknownRole")<{ readonly value: string }> {
   /** The description shown to the user. */
   override get message() {
-    return `unknown --${ROLE_FLAG} value "${this.value.slice(0, 40)}": use ${PI_ROLES.join(", ")}; no HolyAgent context was added`
+    return `unknown --${ROLE_FLAG} value "${this.value.slice(0, 40)}": use ${PI_ROLES.join(", ")}; no HolyAgent context was added, and the session is held to the root's tools and prompt`
   }
 }
 
@@ -414,11 +427,63 @@ interface Held {
   gatesOff: boolean
   /** True once a collection has found the root with `pi.enable` on: every run gets the root prompt. */
   rootPrompt: boolean
+  /**
+   * The patterns of the tools the root may not call, from the config or, when it cannot be read,
+   * the defaults. Empty for every other session and with `pi.enable` off.
+   */
+  excluded: ReadonlyArray<string>
+  /**
+   * True once the work of a session's start (the root's tools and the provider checks) has run. The
+   * first collection that ends does it, whether it is the start's or a compaction's that stopped
+   * the start's, so it runs once.
+   */
+  started: boolean
   /** Stops the provider checks of the session. */
   probe: AbortController | undefined
   /** The notice the provider checks produced, until the next run delivers it. */
   readiness: Delivery | undefined
+  /** The notice that the root's tools were not applied, until the next run delivers it. */
+  toolsNotice: Delivery | undefined
 }
+
+/**
+ * What a config decides for a session of `role`: the worker cap and the provider's variables for
+ * every role, and for the root also its prompt and its tool selection.
+ */
+const settingsFor = (config: Config, role: PiRole): Collected => {
+  const rootArgs = toolArgs(config, "root")
+  return {
+    environment: rootArgs.env,
+    providerEnvironment: providerEnv(config),
+    ...(role === "root"
+      ? {
+          rootPrompt: true,
+          tools: { tools: rootArgs.tools, excludeTools: rootArgs.excludeTools },
+        }
+      : {}),
+  }
+}
+
+/**
+ * Refuses a call to a tool the root may not use. Taking a tool out of the active set does not stop
+ * a `codemode` script from calling it: Pi lets a script call every registered tool whose exposure
+ * is `codemode` or `deferred`, active or not, which is how the computer-use tools beyond the core
+ * set and `pi-web-kit`'s web tools are registered. Pi runs a script's call through `tool_call`
+ * (with a `parentToolCallId`), so the same gate stops the call from a script, from `tool_search`
+ * once it activates the tool, and from the model. `excluded` is the root's `--exclude-tools`
+ * patterns; it is empty for every other session. Returns the `tool_call` result that blocks the
+ * call, or undefined to let it run.
+ */
+export const refuseExcludedTool = (
+  event: { readonly toolName: string },
+  excluded: ReadonlyArray<string>,
+): ToolCallEventResult | undefined =>
+  excluded.some((pattern) => toolMatches(pattern, event.toolName))
+    ? {
+        block: true,
+        reason: `The root may not use ${event.toolName}. Delegate the work to a specialist that has it.`,
+      }
+    : undefined
 
 /** Where the extension finds what it runs. */
 export interface ExtensionOptions {
@@ -457,7 +522,8 @@ export const wrapperPath = (
   platformPath: Pick<typeof nodePath, "join" | "sep"> = nodePath,
 ): string => toPosix(platformPath.join(packageRoot, "scripts", "holyagent"), platformPath.sep)
 
-const oneLine = (text: string): string => text.replace(/\s+/g, " ").trim()
+// A notice is built from text a project or Pi printed, so it loses its control characters.
+const oneLine = (text: string): string => printable(text).replace(/\s+/g, " ").trim()
 
 const notice = (text: string): Delivery => ({
   customType: NOTICE_MESSAGE,
@@ -467,6 +533,9 @@ const notice = (text: string): Delivery => ({
 
 // What `git rev-parse` says, with exit 128, outside a repository.
 const NOT_A_REPOSITORY = /not a git repository/i
+
+// What Node says when a program cannot be started, which Pi's exec passes on as exit 1.
+const SPAWN_FAILURE = /^spawn \S+ E[A-Z0-9]+$/
 
 const reasonOf = (result: ExecResult): string => {
   if (result.killed) return "it timed out or was stopped"
@@ -613,10 +682,34 @@ export const createExtension =
       onExcessProperty: "error",
     })
 
+    // The session's role: a child the package launched is a specialist whatever the flag says, since
+    // the flag defaults to the root in every Pi session and a child has no launch line of its own.
+    const roleOf = Effect.suspend(() => {
+      const flag = isChild() ? "specialist" : (pi.getFlag(ROLE_FLAG) ?? DEFAULT_PI_ROLE)
+      return Schema.decodeUnknownEffect(PiRoleSchema)(flag).pipe(
+        Effect.mapError(() => new UnknownRole({ value: String(flag) })),
+      )
+    })
+
+    // What a failed collection leaves the session when the config decided nothing: the settings of
+    // the defaults, so that the root keeps its prompt and its tool exclusions and a config nobody
+    // can read cannot lift them. A role that cannot be read is the default role, the root. `config`
+    // is the one that was read, when the failure came after it.
+    const closedSettings = (config: Config | undefined): Effect.Effect<Collected> =>
+      Effect.gen(function* () {
+        const role = yield* roleOf.pipe(Effect.orElseSucceed((): PiRole => DEFAULT_PI_ROLE))
+        return settingsFor(config ?? (yield* defaultConfig), role)
+      }).pipe(Effect.orDie)
+
     const collect = (cwd: string, signal: AbortSignal, reason: Reason) => {
       // What the config decided, kept once known so a later failure of the collection (the status
       // command, the deadline) still leaves the root its prompt, tools and provider settings.
-      let configured: Collected = {}
+      let configured: Collected | undefined
+      let read: Config | undefined
+      const failed = (text: string): Effect.Effect<Collected> =>
+        (configured === undefined ? closedSettings(read) : Effect.succeed(configured)).pipe(
+          Effect.map((kept): Collected => ({ ...kept, delivery: notice(text) })),
+        )
       return Effect.gen(function* () {
         // Every command starts in the package's folder, so a relative `cwd` would resolve against
         // that folder, not the project's: it is made absolute here, once.
@@ -634,6 +727,7 @@ export const createExtension =
           ],
           { concurrency: "unbounded" },
         )
+        read = config
         if (!config.pi.enable) {
           // The merged config says off; only the user's own file may also lift the gates, so it is
           // read alone (no project folder). A file that cannot be read leaves them on.
@@ -646,23 +740,8 @@ export const createExtension =
             userOff ? { enabled: false, gatesOff: true } : { enabled: false }
           ) satisfies Collected
         }
-        // A child the package launched is a specialist whatever the flag says: the flag defaults to
-        // the root in every Pi session, and a child has no launch line of its own.
-        const flag = isChild() ? "specialist" : (pi.getFlag(ROLE_FLAG) ?? DEFAULT_PI_ROLE)
-        const role = yield* Schema.decodeUnknownEffect(PiRoleSchema)(flag).pipe(
-          Effect.mapError(() => new UnknownRole({ value: String(flag) })),
-        )
-        const rootArgs = toolArgs(config, "root")
-        configured = {
-          environment: rootArgs.env,
-          providerEnvironment: providerEnv(config),
-          ...(role === "root"
-            ? {
-                rootPrompt: true,
-                tools: { tools: rootArgs.tools, excludeTools: rootArgs.excludeTools },
-              }
-            : {}),
-        } satisfies Collected
+        const role = yield* roleOf
+        configured = settingsFor(config, role)
         // Status first, then reconcile: for a project that keeps state, status makes the state
         // worktree that the next calls read.
         const status = yield* holyagent(signal, project, "status").pipe(
@@ -694,16 +773,10 @@ export const createExtension =
           duration: deadlineMs,
           orElse: () => Effect.fail(new DeadlineExceeded({ ms: deadlineMs })),
         }),
-        // A failure adds one line and nothing else, and never reaches Pi.
-        Effect.catch((error) =>
-          Effect.succeed<Collected | undefined>({ ...configured, delivery: notice(error.message) }),
-        ),
-        Effect.catchCause((cause) =>
-          Effect.succeed<Collected | undefined>({
-            ...configured,
-            delivery: notice(Cause.pretty(cause)),
-          }),
-        ),
+        // A failure adds one line and never reaches Pi; the settings stay as far as they are known,
+        // and are the defaults' when the config could not be read (see closedSettings).
+        Effect.catch((error) => failed(error.message)),
+        Effect.catchCause((cause) => failed(Cause.pretty(cause))),
       )
     }
 
@@ -727,14 +800,24 @@ export const createExtension =
     // provider is fine or could not be asked. The checks are Pi's own CLI probes (`pi auth check`,
     // `pi --list-models`), run through `pi.exec` since the extension runs under Node and has no
     // Bun Shell. A probe that did not start, was stopped or timed out says nothing about the
-    // provider, so it adds no notice; the deadline bounds both probes together.
+    // provider, so it adds no notice; the probes have one deadline of their own, of the collection's
+    // length, which bounds both together. They run with the provider's variables already applied,
+    // since Pi's exec starts them with the process environment.
     const checkProvider = (signal: AbortSignal, config: Config) => {
       let unanswered = false
       const run: CommandRunner = (command, args) =>
         exec(signal, command, args).pipe(
           Effect.map((result) => {
-            unanswered ||= result.killed
-            return { exitCode: result.code, stdout: result.stdout, stderr: result.stderr }
+            // Pi's exec reports a program that did not start (a missing `pi`) as exit 1 with the
+            // spawn error on standard error, which `pi auth check` would read as "not logged in".
+            const unstarted =
+              result.code === 1 && result.stdout === "" && SPAWN_FAILURE.test(result.stderr.trim())
+            unanswered ||= result.killed || unstarted
+            return {
+              exitCode: unstarted ? 127 : result.code,
+              stdout: result.stdout,
+              stderr: result.stderr,
+            }
           }),
           Effect.catch(() => {
             unanswered = true
@@ -795,8 +878,10 @@ export const createExtension =
 
     // A newer collection stops the older one, and the result of a stopped one is dropped: nobody
     // reads it, and a session that ended has nothing to be told. The root's tools and provider
-    // checks belong to a session's start, not to a compaction, which must not undo a change the
-    // user made to the tools since.
+    // checks belong to a session's start, so they run once, from the first collection that ends:
+    // a compaction that ends after the start's collection must not undo a change the user made to
+    // the tools since, and one that stopped the start's collection must not skip them. The provider's
+    // variables are applied before the checks start, since the checks inherit the environment.
     const gather = (taken: Held, ctx: ExtensionContext, reason: Reason): Promise<void> => {
       taken.current?.abort()
       const own = new AbortController()
@@ -810,12 +895,16 @@ export const createExtension =
         taken.gatesOff = result?.gatesOff === true
         if (result?.rootPrompt === true) taken.rootPrompt = true
         else if (result?.enabled === false) taken.rootPrompt = false
-        if (reason === "compact") return result
-        if (result?.config !== undefined) startProviderCheck(taken, result.config)
-        const failure = result?.tools === undefined ? undefined : applyRootTools(result.tools)
-        return failure === undefined || result === undefined
-          ? result
-          : { ...result, delivery: result.delivery ?? failure }
+        if (result?.tools !== undefined) taken.excluded = result.tools.excludeTools
+        else if (result?.enabled === false) taken.excluded = []
+        if (result?.providerEnvironment !== undefined)
+          applyEnvironment(env, result.providerEnvironment, true)
+        if (!taken.started && result?.enabled !== false) {
+          taken.started = true
+          if (result?.config !== undefined) startProviderCheck(taken, result.config)
+          if (result?.tools !== undefined) taken.toolsNotice = applyRootTools(result.tools)
+        }
+        return result
       })
       return taken.pending.then(() => undefined)
     }
@@ -833,8 +922,11 @@ export const createExtension =
         pending: undefined,
         gatesOff: false,
         rootPrompt: false,
+        excluded: [],
+        started: false,
         probe: undefined,
         readiness: undefined,
+        toolsNotice: undefined,
       }
       return gather(held, ctx, event.reason)
     })
@@ -851,8 +943,9 @@ export const createExtension =
     // Before each run of the root the host variables are written, since the `holyagent` calls of
     // the run read them and the active tools can change; the settings the config decides are
     // written once, when the config is known, and a variable the user set stays. The provider's
-    // variables go to every session, root or child, since both use the provider. A child fills the
-    // package folder into its prompt instead and leaves the rest of the environment to the root.
+    // variables go to every session, root or child, since both use the provider, but are written when
+    // the collection ends (see gather), ahead of the provider checks. A child fills the package
+    // folder into its prompt instead and leaves the rest of the environment to the root.
     pi.on(
       "before_agent_start",
       (
@@ -872,8 +965,6 @@ export const createExtension =
         const result = (
           collected: Collected | undefined,
         ): BeforeAgentStartEventResult | undefined => {
-          if (collected?.providerEnvironment !== undefined)
-            applyEnvironment(env, collected.providerEnvironment, true)
           if (!child && collected?.environment !== undefined)
             applyEnvironment(env, { ...collected.environment, [CACHE_RETENTION_ENV]: "long" }, true)
           const rooted =
@@ -892,13 +983,18 @@ export const createExtension =
       },
     )
 
-    // The provider notice is its own message, so it never replaces the context. The checks run
-    // beside the session, so it reaches the first run that starts after they end, and once.
-    pi.on("before_agent_start", (): BeforeAgentStartEventResult | undefined => {
-      const message = isChild() ? undefined : held?.readiness
-      if (held !== undefined) held.readiness = undefined
-      return message === undefined ? undefined : { message }
-    })
+    // The root's notices are their own messages, one per handler since a handler returns one, so
+    // they never replace the context or each other. The tools notice is ready after the start's
+    // collection; the provider notice comes from the checks that run beside the session, so it
+    // reaches the first run that starts after they end. Each is delivered once.
+    const noticeOnce =
+      (slot: "readiness" | "toolsNotice") => (): BeforeAgentStartEventResult | undefined => {
+        const message = isChild() ? undefined : held?.[slot]
+        if (held !== undefined) held[slot] = undefined
+        return message === undefined ? undefined : { message }
+      }
+    pi.on("before_agent_start", noticeOnce("toolsNotice"))
+    pi.on("before_agent_start", noticeOnce("readiness"))
 
     // Only a specialist the package launched is held to a complete report.
     pi.on("message_end", (event) => {
@@ -913,14 +1009,16 @@ export const createExtension =
     pi.registerToolRenderer(workflowRenderers)
 
     // The gates stand down only for the user's own `pi.enable: false`; a project's cannot lift them.
+    // The root's excluded tools are refused first, whatever else the call is.
     pi.on("tool_call", (event) =>
       held?.gatesOff === true
         ? undefined
-        : Effect.runPromise(
+        : (refuseExcludedTool(event, held?.excluded ?? []) ??
+          Effect.runPromise(
             refuseNonSpecialistWorkflow(event).pipe(
               Effect.map((refusal) => refuseNonSpecialist(event) ?? refusal),
             ),
-          ),
+          )),
     )
 
     // Pi finishes the shutdown when the handler's promise settles, and the folder may be removed
