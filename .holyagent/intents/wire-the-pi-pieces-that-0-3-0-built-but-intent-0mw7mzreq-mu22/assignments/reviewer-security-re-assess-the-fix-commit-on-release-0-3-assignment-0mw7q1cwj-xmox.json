@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mw7q1cwj-xmox",
+  "intentId": "intent-0mw7mzreq-mu22",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.security",
+  "slug": "re-assess-the-fix-commit-on-release-0-3",
+  "objective": "Re-assess the fix commit on release/0.3.0/feat/pi-root-wiring (range 7d8c92f..HEAD) against the finding that a malformed project config dropped the user's own root exclusions.",
+  "state": "Running",
+  "scope": [
+    "Read /home/user/holyagent-notes/wire-a-fix.diff; sources in /home/user/holyagent-0.3.0-wiring.",
+    "Finding: extension.ts ran the merged and user-only config reads in one Effect.all; a failing merged read (malformed project config, failing git) left only the defaults' exclusions, so a user's pi-web-kit exclusion of web_search and web_fetch was lifted for the root. The fix reads the user-only config on its own and reports a failed home-level read with the defaults kept.",
+    "Check every remaining path where the user's exclusions could be lost (timeouts, a deadline, the compaction path, a session restart) and that the joined setupNotice is sanitized like other notices."
+  ],
+  "constraints": [
+    "Read-only; no edits and no version-control writes.",
+    "Report in under 400 words; put long logs in a file under /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "No project file or project config can lift the root's exclusions, gate or prompt",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "security-findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7pre7o-12ae"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T11:00:41.491Z"
+  },
+  "createdAt": "2026-11-08T11:00:41.491Z"
+}
