@@ -1,0 +1,55 @@
+{
+  "id": "assignment-0mw7avkqg-r6ua",
+  "intentId": "intent-0mw6muu7q-dpbs",
+  "intentRevision": 5,
+  "roleTask": "Reviewer.code",
+  "slug": "review-commit-135c8c1-on-release-0-3-0",
+  "objective": "Review commit 135c8c1 on release/0.3.0/feat/kimi-instructions (range 0e71e52..135c8c1, worktree /home/user/holyagent-0.3.0-kimi; run commands there) for correctness and regressions.",
+  "state": "Running",
+  "scope": [
+    "The commit rewrites stripCitations in packages/runtime/src/instructions/skills.ts so comments inside inline code spans and fenced code blocks (backtick and tilde) are left as written, and so removing own-line comments leaves no extra blank lines for LF and CRLF; tests in packages/runtime/tests/skills.test.ts. It also drops one rule from kimi-k3.1/specialist/writing-bar.md and adds a sentence defining the holyagent shorthand to kimi-k3.1/specialist/state-changes.md.",
+    "Earlier review notes this answers: a prose `<!--` pairing with a later `-->` deleted text; adjacent own-line comments left extra blank lines; CRLF own-line comments were not recognised.",
+    "Diff file: /home/user/holyagent-notes/kimi-polish.diff."
+  ],
+  "constraints": [
+    "stripCitations must keep `<!-- materiality -->` and `<!-- design-core -->` markers and leave the Claude generated output byte-identical.",
+    "Read-only: make no edits or version-control writes.",
+    "Report in under 400 words; start each evidence line with the criterion text, a colon, then the support; put long logs in a file outside the repository."
+  ],
+  "criteria": [
+    {
+      "text": "stripCitations strips only provenance comments in prose, leaves code spans, fenced blocks and markers intact, and handles unclosed fences and spans safely",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No regression: Claude dist byte-identical after mise run build and no other generator output changes unexpectedly",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The new tests cover the code-span, fence and blank-line cases and would fail on the previous implementation",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "bunx --no-install mise run verify exits 0 on 135c8c1",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7ap4vp-ewn9"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T03:56:17.464Z"
+  },
+  "createdAt": "2026-11-08T03:56:17.464Z"
+}
