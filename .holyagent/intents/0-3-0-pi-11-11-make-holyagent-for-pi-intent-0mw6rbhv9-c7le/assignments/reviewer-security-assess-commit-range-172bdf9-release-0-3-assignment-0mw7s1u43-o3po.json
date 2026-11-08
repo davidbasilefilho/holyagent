@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "assess-commit-range-172bdf9-release-0-3",
   "objective": "Assess commit range 172bdf9..release/0.3.0/feat/t3-settings for security vulnerabilities: holyagent setup for Pi merges the agreed T3 Code server settings into ~/.t3/userdata/settings.json (key only when unset and different from T3's default), writes atomically, reads back and restores on mismatch, undoes only what its record says it wrote, and doctor reports missing keys.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "The committed diff is in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/c-t3set.diff (diff-file); read the touched files in full in /home/user/holyagent-0.3.0-t3set for context.",
     "Focus: writes into a file in the user's home (path resolution under T3CODE_HOME, symlinks and TOCTOU on the settings file and its temp file, permissions of the written file), trust of the existing file's content, the restore and undo paths deleting or overwriting user data, and whether a project-level HolyAgent config can make setup write settings the user's own config turned off."
@@ -40,7 +40,33 @@
     "agentId": "workflow:wf_096fa445-a52/assignment-0mw7s1u43-o3po",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T11:57:03.027Z"
+    "startedAt": "2026-11-08T11:57:03.027Z",
+    "finishedAt": "2026-11-08T12:05:50.658Z"
+  },
+  "result": "result: No vulnerability that should hold the push. I found three non-blocking weaknesses, all in the restore and undo paths.\n\nBuilt-in `/security-review`: it could not run. It failed on `git log origin/HEAD...` because this checkout has no `origin/HEAD`, so it covered nothing. The review below is a manual source-to-sink read of the committed diff and the touched files in `/home/user/holyagent-0.3.0-t3set`. This session has no shell, so I read the code and ran no tests. The `dist/scripts/holyagent.js` hunks I read were generated bundles of the same source (about 650 of the 2045 diff lines); I did not read the rest.\n\nverdict: do not hold the push.\n\nfindings (validated, non-blocking):\n1. **Unconditional `rm` on restore.** `t3-settings.ts:350-355`: when `before.text === undefined` (T3's file did not exist at the first read), the read-back-mismatch path runs `rm(file, {force:true})` without checking the file's content.\n   - If T3 rewrites the file between our write and the read-back (the issue #18571 race), setup deletes T3's own fresh content. This also contradicts the doc comment at `:330-331` (\"restored only while the file still holds what the read-back saw\"), which holds only for the `writeJsonObjectIfUnchanged` branch at `:356`.\n   - Precondition: a first install into an absent file, plus a concurrent T3 write.\n   - Impact: loss of a few seconds of T3 settings. Setup then reports the file as \"put back\".\n   - Fix: compare `current` before removing.\n2. **Lost update on the main write.** Install (`:406`) and undo (`:471`) write with plain `writeJsonObject`, which has no unchanged-since check, between the first snapshot (`:396`, `:458`) and the rename (`json-file.ts:155`).\n   - A T3 save in that window is overwritten.\n   - The read-back catches this only when the final file differs from what we wrote. The restore then puts back the pre-race snapshot (`before.value`), so the user's newer T3 change is lost on that path too.\n   - The impact is a user setting lost during an unusual race, which the docs tell the user to retry.\n3. **New file mode.** For an absent `settings.json`, `mode` is `undefined` (`json-file.ts:104-108`), so the file is created at the umask default, usually 0644.\n   - The values setup writes are not secrets. T3's Pi `config.environment` could later hold secrets, but T3 rewrites its own file.\n   - The result is low-risk.\n\nChecked and sound:\n- **Project config cannot steer setup.** `decide` calls `loadPiConfig(env, cwd, \"user\")` (`t3-settings.ts:296`). With scope `user` that passes `projectDirectories: []` (`pi-check.ts:269`), and `loadConfig` reads only the user file (`load.ts:123-134`). A project `.holyagent/config.json` cannot enable T3 writes the user turned off. Install and doctor run only at `--scope user` (`steps.ts:186`, `doctor.ts:88`).\n- **Symlinks and the temp file.** The write resolves `realpath` and puts the temp file next to the real file (`json-file.ts:103,115`). It is created with `wx` and the final mode, then renamed, so a planted symlink or stale temp is never followed (`:119-124`).\n- **Existing files keep their mode.** An existing target keeps its mode (`:104-108`).\n- **Paths come from the user's own environment.** `T3CODE_HOME` is the user's environment, a fixed suffix is appended, and the home directory must already exist (`:263`). A project cannot set the path, except through user-trusted env tooling such as mise or direnv. That could only merge keys into `<dir>/userdata/settings.json`.\n- **Existing content.** A file that does not decode stops the step and is left alone (`readJsonObjectSnapshot`, strict decode). Existing keys are never overwritten (`place`, `json-file.ts:195`).\n- **Undo.** It removes only keys named in the record, and only while the value still equals what setup wrote (`take`, `settings.ts:181`). The record lives under `~/.claude/holyagent` with mode 0600 (`record.ts:66`). A dry run writes nothing.\n- **Prototype pollution.** Paths are constants, and the object spreads with computed keys define own properties.\n- **Minor, not security.** A relative `T3CODE_HOME` makes the record key depend on `cwd` (`record.ts:34`), so undo from another directory may miss the record.\n\nDetails are in the diff file `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/c-t3set.diff`.\n\nevidence:\nEvery blocking finding has a source-to-sink trace with path:line: No blocking findings. The non-blocking ones are traced above, source to sink (`t3-settings.ts:350-356`; `:406` and `:471` to `json-file.ts:155`; `json-file.ts:104-108`). The config-steering path is traced `t3-settings.ts:296` -> `pi-check.ts:269` -> `load.ts:123-134`.\nThe review states whether the range introduces a vulnerability that should hold the push: Verdict above: none that should hold the push; three low-severity hardening items.\nfindings: The three findings above (`t3-settings.ts:350-355`, `:406/:471`, `json-file.ts:104-108`).\nverdict: Do not hold; no blocker.\n",
+  "acceptance": {
+    "revision": 11,
+    "rationale": "No hold; restore and write races taken as repairs",
+    "criteria": [
+      {
+        "criterion": "Every blocking finding has a source-to-sink trace with path:line",
+        "support": "No blocking findings. The non-blocking ones are traced above, source to sink (`t3-settings.ts:350-356`; `:406` and `:471` to `json-file.ts:155`; `json-file.ts:104-108`). The config-steering path is traced `t3-settings.ts:296` -> `pi-check.ts:269` -> `load.ts:123-134`."
+      },
+      {
+        "criterion": "The review states whether the range introduces a vulnerability that should hold the push",
+        "support": "Verdict above: none that should hold the push; three low-severity hardening items."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "The three findings above (`t3-settings.ts:350-355`, `:406/:471`, `json-file.ts:104-108`)."
+      },
+      {
+        "label": "verdict",
+        "support": "Do not hold; no blocker."
+      }
+    ]
   },
   "createdAt": "2026-11-08T11:57:03.027Z"
 }
