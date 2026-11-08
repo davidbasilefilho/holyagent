@@ -1,0 +1,68 @@
+{
+  "id": "assignment-0mw79zweh-mm10",
+  "intentId": "intent-0mw6muu7q-dpbs",
+  "intentRevision": 5,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-kimi-k3-1-instruction-set-pr",
+  "objective": "Repair the Kimi K3.1 instruction set PR in /home/user/holyagent-0.3.0-kimi (branch release/0.3.0/feat/kimi-instructions, head 6b0a934) so every review finding closes.",
+  "state": "Running",
+  "scope": [
+    "Run every command in /home/user/holyagent-0.3.0-kimi. Findings: .git/holyagent/reports/assignment-0mw79mbu5-40if.md (root, specialist, shared, design-core: notes 1-10), .git/holyagent/reports/assignment-0mw79mc2t-wqw8.md (roles and skills table) and .git/holyagent/reports/assignment-0mw79mcbn-o9wi.md (code). Files under packages/runtime/src/instructions/kimi-k3.1/ unless named.",
+    "Decisions already made (apply them): (a) guide-citation HTML comments (<!-- K.. -->, <!-- P.. --> provenance notes) stay in the sources for maintainers but are stripped from generated output for every family by the shared generation code (packages/runtime/src/instructions/skills.ts and wherever the root and role text will be generated), while functional marker comments such as <!-- materiality --> and <!-- design-core --> are kept; add a test. Use HTML comments for citations everywhere (instruction-guidelines.md uses visible (K5) tags). (b) Keep the visual-judging fallback that saves the explanatory page as a file when T3's html tools are absent, since T3-only features must fall back or report unavailable in the plain pi terminal. (c) The CLI: every Kimi file names the HolyAgent CLI through one placeholder that the pi extension substitutes with the installed wrapper's absolute path, the way the Claude set uses its plugin-root path; pick a name such as ${HOLYAGENT_PI_ROOT}/scripts/holyagent, use it consistently (working.md, delegating.md and every other invocation), and document the substitution in docs/pi/claude-parity.md.",
+    "Fix the rest as the reports describe: remove the cache reasoning in specialist/report.md (R-CACHE-STATIC); merge-ready.md's added 'unverified' rule stays only if the Claude set states the same rule elsewhere (cite it), else remove; identity.md: drop the added Quality boundaries bullet unless a requirement or Claude rule carries it, replace the per-reply cap with the Claude set's terse-reply rule, restore 'information to weigh'; writing-bar.md: apply each family's own guide.md to that family's text instead of imposing Kimi form on all instruction text; workflows.md: state why the script returns reports (docs/pi/orchestration.md) and remove or source the sandbox claim from pi's codemode.md; dispatch.md: match orchestration.md on who records agent ids; search.md: do not ban pi's ls; fix the K4, K10, K8 and P1 mis-citations and the overstated 'does not change it' claim in skills/instruction-writing; interface-inspection.md: restore the dropped preview options if T3's preview tools take them (docs/pi/t3-code.md), else say why; assignments.md: fix the temp-area wording; reviewer-code/builtin-review.md: restore 'if it cannot run, say so'; librarian roles: match docs/pi/claude-parity.md on their tools and drop the Exa-only search advice; reviewer-visual/captures.md: say to open each capture with read and report when only text comes back; skills/ci-watch: state the pi-processes wake-up as the planned path with a fallback, matching docs/pi/extensions.md; skills/dev-server: do not give Worker.operations the computer-use tools (docs/pi/providers.md); packages/integrations/pi/src/generate.ts: fix the stale PI_FAMILY JSDoc; run the CLI-flag check in packages/runtime/tests/instructions.test.ts per family.",
+    "Keep every requirement id covered (coverage.ts) and every rule's meaning; change nothing in claude-5.5/ or requirements/ except where the comment-strip test needs it. Rebuild with bunx --no-install mise run build: the Claude output must stay byte-identical unless the strip removes a provenance comment from it (list any)."
+  ],
+  "constraints": [
+    "The maintainer's requirements in the Intent in use bind.",
+    "Make no version-control writes; report changed paths.",
+    "Finish with bunx --no-install mise run build and bunx --no-install mise run verify; write git diff 6b0a934 to /home/user/holyagent-notes/kimi-repair.diff.",
+    "Report in under 450 words, one line per finding: closed (how) or left (why)."
+  ],
+  "criteria": [
+    {
+      "text": "Every review finding is closed or left with a stated reason",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Guide-citation comments are stripped from generated output for every family, markers are kept, with a test",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Every CLI invocation in the Kimi set uses the one documented placeholder",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Every requirement id stays covered and no rule changes meaning",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "mise run build and mise run verify exit 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime",
+    "packages/integrations/pi",
+    "packages/integrations/claude",
+    "docs"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw79dq98-x2tx",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T03:31:39.594Z"
+  },
+  "createdAt": "2026-11-08T03:31:39.594Z"
+}
