@@ -11,8 +11,20 @@ export const WRITE_TOOLS: ReadonlyArray<string> = ["write", "edit", "bash"]
 /** The tools a role needs to run commands but not to change files: the Shell capability. */
 export const SHELL_TOOLS: ReadonlyArray<string> = ["bash"]
 
-/** The `--tools` entry that turns Pi's built-in `codemode` extension on beside the defaults. */
+/**
+ * The `--tools` entry that turns Pi's built-in `codemode` extension on beside the defaults (the
+ * root).
+ */
 export const CODEMODE_ENTRY = "+codemode"
+
+/**
+ * The allowlist entry that turns `codemode` on for a specialist: plain names cannot mix with
+ * `+name`.
+ */
+export const CODEMODE_TOOL = "codemode"
+
+/** The environment variable that caps the codemode workers alive in one Pi process. */
+export const CODEMODE_MAX_WORKERS_ENV = "PI_CODEMODE_MAX_WORKERS"
 
 /**
  * The prefix of T3 Code's tools as a pattern. Pi names an MCP tool `mcp__<server>__<tool>` with
@@ -48,6 +60,8 @@ export interface ToolArgs {
   readonly excludeTools: ReadonlyArray<string>
   /** True when `pi.features.mcp` is off and the process starts with `--no-mcp`. */
   readonly noMcp: boolean
+  /** The environment variables the launcher sets on the process: `PI_CODEMODE_MAX_WORKERS`. */
+  readonly env: Readonly<Record<string, string>>
   /** The arguments in the order the launcher passes them to Pi. */
   readonly argv: ReadonlyArray<string>
 }
@@ -56,10 +70,12 @@ const build = (
   tools: ReadonlyArray<string>,
   excludeTools: ReadonlyArray<string>,
   noMcp: boolean,
+  maxWorkers: number,
 ): ToolArgs => ({
   tools,
   excludeTools,
   noMcp,
+  env: { [CODEMODE_MAX_WORKERS_ENV]: String(maxWorkers) },
   argv: [
     "--tools",
     tools.join(","),
@@ -73,10 +89,12 @@ const has = (capabilities: ReadonlyArray<Capability>, capability: Capability) =>
 
 /**
  * The Pi tool arguments of the root or of one specialist; the one place a role's tools are decided.
- * The root keeps the default selection (`read` and `bash`, the extension tools of the enabled
- * packages) and adds `codemode`, which hosts its workflow scripts; it writes no files, so `write`
- * and `edit` are excluded. A specialist gets an allowlist: the read tools, then what its route
- * grants, which `--exclude-tools` repeats as a floor for the write tools it must not have:
+ * Every role runs `codemode` (mode `only`, from `pi.codemode.mode`, written by `toolSettings`) with
+ * `PI_CODEMODE_MAX_WORKERS` from `pi.codemode.maxWorkers` in `env`. The root keeps the default
+ * selection (`read` and `bash`, the extension tools of the enabled packages) and adds `+codemode`;
+ * it writes no files, so `write` and `edit` are excluded. A specialist gets an allowlist: the read
+ * tools, then what its route grants, then `codemode`, and `--exclude-tools` repeats as a floor the
+ * write tools it must not have:
  *
  * - Write: `write`, `edit` and `bash`;
  * - Shell: `bash` (Worker.operations, Worker.validation, Reviewer.testing), and Reviewer.code, which
@@ -85,9 +103,10 @@ const has = (capabilities: ReadonlyArray<Capability>, capability: Capability) =>
  * - VisualInspection: T3 Code's browser, render and device tools while `pi.features.mcp` is on, and
  *   the computer-use tools while `pi.features.computerUse` is on.
  *
- * A specialist's allowlist never names `codemode`, `todo`, `ask_user_question` or the process
- * tools: the root alone has them. With `pi.features.mcp` off every process starts with `--no-mcp`.
- * The profile defaults to the selected provider's; a test passes another.
+ * A specialist's allowlist never names `todo`, `ask_user_question` or the process tools: the root
+ * alone has them. Tools registered `model-only` (`ask_user_question`) stay directly callable under
+ * mode `only`. With `pi.features.mcp` off every process starts with `--no-mcp`. The profile
+ * defaults to the selected provider's; a test passes another.
  */
 export const toolArgs = (
   config: Config,
@@ -96,7 +115,8 @@ export const toolArgs = (
 ): ToolArgs => {
   const { features } = config.pi
   const noMcp = !features.mcp
-  if (key === "root") return build([CODEMODE_ENTRY], ["write", "edit"], noMcp)
+  const { maxWorkers } = config.pi.codemode
+  if (key === "root") return build([CODEMODE_ENTRY], ["write", "edit"], noMcp, maxWorkers)
   const { capabilities, roleTask } = routeFor(key)
   const tools = [
     ...READ_TOOLS,
@@ -112,9 +132,10 @@ export const toolArgs = (
   ]
   const unique = [...new Set(tools)]
   return build(
-    unique,
+    [...unique, CODEMODE_TOOL],
     WRITE_TOOLS.filter((tool) => !unique.includes(tool)),
     noMcp,
+    maxWorkers,
   )
 }
 
@@ -145,10 +166,10 @@ export interface SettingsPatch {
 /** Billion Context's settings file; `BILI_CONFIG_FILE` can relocate it, and setup then writes there. */
 export const BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json"
 
-/** The file that holds the delegate settings Billion Context reads from Pi's agent directory. */
-export const BILLION_CONTEXT_DELEGATE_FILE = "~/.pi/acp.json"
-
-/** Pi's agent-directory settings file, where `@amaster.ai/pi-computer-use` reads its options. */
+/**
+ * Pi's agent-directory settings file: the codemode mode and the options of
+ * `@amaster.ai/pi-computer-use`.
+ */
 export const PI_SETTINGS_FILE = "~/.pi/agent/settings.json"
 
 /**
@@ -157,9 +178,13 @@ export const PI_SETTINGS_FILE = "~/.pi/agent/settings.json"
  *
  * - The provider's web tools, enabled in the provider extension's settings, while the web choice is
  *   the provider's (they are off by default);
- * - Billion Context compressing the root and the specialists (`delegate.forceEnable`), with its own
- *   `acp_delegate` subagents off (`pi.subagents` false) because `@tintinweb/pi-subagents` runs the
- *   specialists;
+ * - The codemode mode (`pi.codemode.mode`, `only` by default) in Pi's settings, since no command-line
+ *   argument sets it;
+ * - Billion Context's own `acp_delegate` subagents off while context compression stays on, because
+ *   `@tintinweb/pi-subagents` runs the specialists. This is the one setting the package's README
+ *   gives for it, "Pi built-in subagents": merge `{"pi":{"subagents":false}}` into
+ *   `billion-context.json` (README lines 566-582; line 582: "context compression remains
+ *   enabled");
  * - The computer-use confirmations off, the decided "full access, no prompts".
  */
 export const toolSettings = (
@@ -170,6 +195,7 @@ export const toolSettings = (
   if (!enable) return []
   const web = webChoice(profile, features.web)
   return [
+    { file: PI_SETTINGS_FILE, content: { codemode: { mode: config.pi.codemode.mode } } },
     ...(web.source === "provider"
       ? [
           {
@@ -181,10 +207,7 @@ export const toolSettings = (
         ]
       : []),
     ...(features.contextCompression
-      ? [
-          { file: BILLION_CONTEXT_FILE, content: { pi: { subagents: false } } },
-          { file: BILLION_CONTEXT_DELEGATE_FILE, content: { delegate: { forceEnable: true } } },
-        ]
+      ? [{ file: BILLION_CONTEXT_FILE, content: { pi: { subagents: false } } }]
       : []),
     ...(features.computerUse
       ? [

@@ -6,8 +6,8 @@ import { RoleTask, routeFor } from "../../src/domain/route.ts"
 import { type ProviderProfile, PROVIDERS, webChoice } from "../../src/pi/provider.ts"
 import {
   allToolArgs,
-  BILLION_CONTEXT_DELEGATE_FILE,
   BILLION_CONTEXT_FILE,
+  CODEMODE_MAX_WORKERS_ENV,
   COMPUTER_USE_TOOLS,
   PI_SETTINGS_FILE,
   T3_VISUAL_TOOLS,
@@ -28,7 +28,7 @@ const READ = ["read", "grep", "find", "ls"]
 const MOONSHOT = ["moonshot_search", "moonshot_fetch"]
 const WEB_KIT = ["web_search", "web_fetch"]
 
-/** The decided `--tools` allowlist of each specialist with the default config. */
+/** The decided `--tools` allowlist of each specialist with the default config, before `codemode`. */
 const EXPECTED: Readonly<Record<RoleTask, ReadonlyArray<string>>> = {
   "Explorer.map": READ,
   "Explorer.lookup": READ,
@@ -52,7 +52,7 @@ const EXPECTED: Readonly<Record<RoleTask, ReadonlyArray<string>>> = {
 
 describe("toolArgs for the specialists", () => {
   test.each(RoleTask.literals)("%s gets the decided allowlist", (role) => {
-    expect(toolArgs(DEFAULT_CONFIG, role).tools).toEqual(EXPECTED[role])
+    expect(toolArgs(DEFAULT_CONFIG, role).tools).toEqual([...EXPECTED[role], "codemode"])
   })
 
   test("the write tools a role lacks are excluded, and only those", () => {
@@ -75,24 +75,31 @@ describe("toolArgs for the specialists", () => {
     }
   })
 
-  test("no specialist gets the root's tools", () => {
+  test.each(RoleTask.literals)("%s runs codemode, with the worker cap exported", (role) => {
+    const { tools, env, argv } = toolArgs(DEFAULT_CONFIG, role)
+    expect(tools.at(-1)).toBe("codemode")
+    expect(tools).not.toContain("+codemode")
+    expect(env).toEqual({ [CODEMODE_MAX_WORKERS_ENV]: "4" })
+    expect(argv[1]).toBe(tools.join(","))
+  })
+
+  test("no specialist gets the root's other tools", () => {
     for (const role of RoleTask.literals) {
       const { tools } = toolArgs(DEFAULT_CONFIG, role)
-      expect(tools).not.toContain("+codemode")
-      expect(tools).not.toContain("codemode")
+      for (const name of ["todo", "ask_user_question", "process"]) expect(tools).not.toContain(name)
     }
   })
 
   test("argv renders --tools, then --exclude-tools only when something is excluded", () => {
     expect(toolArgs(DEFAULT_CONFIG, "Explorer.map").argv).toEqual([
       "--tools",
-      "read,grep,find,ls",
+      "read,grep,find,ls,codemode",
       "--exclude-tools",
       "write,edit,bash",
     ])
     expect(toolArgs(DEFAULT_CONFIG, "Worker.implementation").argv).toEqual([
       "--tools",
-      "read,grep,find,ls,write,edit,bash",
+      "read,grep,find,ls,write,edit,bash,codemode",
     ])
   })
 })
@@ -103,8 +110,19 @@ describe("toolArgs for the root", () => {
       tools: ["+codemode"],
       excludeTools: ["write", "edit"],
       noMcp: false,
+      env: { PI_CODEMODE_MAX_WORKERS: "4" },
       argv: ["--tools", "+codemode", "--exclude-tools", "write,edit"],
     })
+  })
+
+  test("the worker cap follows pi.codemode.maxWorkers for the root and every specialist", () => {
+    const config: Config = {
+      ...DEFAULT_CONFIG,
+      pi: { ...DEFAULT_CONFIG.pi, codemode: { ...DEFAULT_CONFIG.pi.codemode, maxWorkers: 7 } },
+    }
+    for (const args of Object.values(allToolArgs(config))) {
+      expect(args.env).toEqual({ PI_CODEMODE_MAX_WORKERS: "7" })
+    }
   })
 
   test("allToolArgs covers the root and all 18 specialists", () => {
@@ -116,7 +134,11 @@ describe("toolArgs for the root", () => {
 
 describe("the web tools of the Librarian roles", () => {
   test("the provider's own tools are used by default, and pi-web-kit is not loaded", () => {
-    expect(toolArgs(DEFAULT_CONFIG, "Librarian.research").tools).toEqual([...READ, ...MOONSHOT])
+    expect(toolArgs(DEFAULT_CONFIG, "Librarian.research").tools).toEqual([
+      ...READ,
+      ...MOONSHOT,
+      "codemode",
+    ])
     expect(piPackages(DEFAULT_CONFIG)).not.toContain("npm:pi-web-kit@0.5.0")
   })
 
@@ -124,19 +146,20 @@ describe("the web tools of the Librarian roles", () => {
     expect(toolArgs(DEFAULT_CONFIG, "Librarian.lookup", NO_WEB_PROVIDER).tools).toEqual([
       ...READ,
       ...WEB_KIT,
+      "codemode",
     ])
     expect(piPackages(DEFAULT_CONFIG, NO_WEB_PROVIDER)).toContain("npm:pi-web-kit@0.5.0")
   })
 
   test("pi-web-kit selected in config.json is loaded and its tools are named", () => {
     const config = withFeatures({ web: "pi-web-kit" })
-    expect(toolArgs(config, "Librarian.research").tools).toEqual([...READ, ...WEB_KIT])
+    expect(toolArgs(config, "Librarian.research").tools).toEqual([...READ, ...WEB_KIT, "codemode"])
     expect(piPackages(config)).toContain("npm:pi-web-kit@0.5.0")
   })
 
   test("web off gives the Librarian roles no web tool and loads no web package", () => {
     const config = withFeatures({ web: "off" })
-    expect(toolArgs(config, "Librarian.research").tools).toEqual(READ)
+    expect(toolArgs(config, "Librarian.research").tools).toEqual([...READ, "codemode"])
     expect(piPackages(config)).not.toContain("npm:pi-web-kit@0.5.0")
   })
 
@@ -166,7 +189,11 @@ describe("the feature switches and the tool arguments", () => {
       expect(args.argv.at(-1)).toBe("--no-mcp")
       expect(args.tools.some((tool) => tool.startsWith("mcp__"))).toBe(false)
     }
-    expect(toolArgs(config, "Reviewer.visual").tools).toEqual([...READ, ...COMPUTER_USE_TOOLS])
+    expect(toolArgs(config, "Reviewer.visual").tools).toEqual([
+      ...READ,
+      ...COMPUTER_USE_TOOLS,
+      "codemode",
+    ])
   })
 
   test("mcp on leaves --no-mcp out", () => {
@@ -184,8 +211,13 @@ describe("the feature switches and the tool arguments", () => {
       "edit",
       "bash",
       ...T3_VISUAL_TOOLS,
+      "codemode",
     ])
-    expect(toolArgs(config, "Reviewer.visual").tools).toEqual([...READ, ...T3_VISUAL_TOOLS])
+    expect(toolArgs(config, "Reviewer.visual").tools).toEqual([
+      ...READ,
+      ...T3_VISUAL_TOOLS,
+      "codemode",
+    ])
     expect(piPackages(config)).not.toContain("npm:@amaster.ai/pi-computer-use@0.1.36")
   })
 
@@ -231,6 +263,7 @@ describe("the feature switches and the tool arguments", () => {
 describe("toolSettings", () => {
   test("the default config yields the provider tools, Billion Context and computer-use settings", () => {
     expect(toolSettings(DEFAULT_CONFIG)).toEqual([
+      { file: PI_SETTINGS_FILE, content: { codemode: { mode: "only" } } },
       {
         file: "~/.pi/providers/kimi-coding/config.json",
         content: {
@@ -238,7 +271,6 @@ describe("toolSettings", () => {
         },
       },
       { file: BILLION_CONTEXT_FILE, content: { pi: { subagents: false } } },
-      { file: BILLION_CONTEXT_DELEGATE_FILE, content: { delegate: { forceEnable: true } } },
       {
         file: PI_SETTINGS_FILE,
         content: { "pi-computer-use": { confirmAppLaunch: false, confirmDangerousActions: false } },
@@ -246,28 +278,40 @@ describe("toolSettings", () => {
     ])
   })
 
-  test("Billion Context compresses the root and specialists with its own subagents off", () => {
-    const patches = toolSettings(DEFAULT_CONFIG)
-    expect(patches).toContainEqual({
-      file: "~/.config/billion-context/billion-context.json",
-      content: { pi: { subagents: false } },
-    })
-    expect(patches).toContainEqual({
-      file: "~/.pi/acp.json",
-      content: { delegate: { forceEnable: true } },
+  test("Billion Context gets exactly the README's setting for subagents off, compression on", () => {
+    const files = toolSettings(DEFAULT_CONFIG).map((patch) => patch.file)
+    expect(files).not.toContain("~/.pi/acp.json")
+    expect(toolSettings(DEFAULT_CONFIG).filter((p) => p.file.includes("billion-context"))).toEqual([
+      {
+        file: "~/.config/billion-context/billion-context.json",
+        content: { pi: { subagents: false } },
+      },
+    ])
+  })
+
+  test("the codemode mode in Pi's settings follows pi.codemode.mode", () => {
+    const config: Config = {
+      ...DEFAULT_CONFIG,
+      pi: { ...DEFAULT_CONFIG.pi, codemode: { ...DEFAULT_CONFIG.pi.codemode, mode: "on" } },
+    }
+    expect(toolSettings(config)).toContainEqual({
+      file: PI_SETTINGS_FILE,
+      content: { codemode: { mode: "on" } },
     })
   })
 
   test("contextCompression off writes no Billion Context settings", () => {
     const files = toolSettings(withFeatures({ contextCompression: false })).map((p) => p.file)
     expect(files).not.toContain(BILLION_CONTEXT_FILE)
-    expect(files).not.toContain(BILLION_CONTEXT_DELEGATE_FILE)
+    expect(files).not.toContain("~/.pi/acp.json")
   })
 
   test("computerUse off writes no computer-use setting", () => {
-    expect(toolSettings(withFeatures({ computerUse: false })).map((p) => p.file)).not.toContain(
-      PI_SETTINGS_FILE,
-    )
+    expect(
+      toolSettings(withFeatures({ computerUse: false })).filter(
+        (p) => "pi-computer-use" in p.content,
+      ),
+    ).toEqual([])
   })
 
   test("the provider's web tools are enabled only in provider mode with a provider that has some", () => {
