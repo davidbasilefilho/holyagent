@@ -1,0 +1,46 @@
+{
+  "id": "assignment-0mw7s1smh-1gjo",
+  "intentId": "intent-0mw6muvcv-5we5",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.code",
+  "slug": "review-commit-range-172bdf9-release-0-3",
+  "objective": "Review commit range 172bdf9..release/0.3.0/fix/pi-windows-launch in the worktree /home/user/holyagent-0.3.0-win for correctness and regressions against the merge-ready bar: the Pi extension starts the bundled CLI as Bun on scripts/holyagent.js with the sh wrapper's flags on every platform, starts pi through cmd.exe on Windows, and gives powershell the same selection and exclusions as bash in the root and specialist tool lists.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-win; review `git diff 172bdf9..HEAD` and `git log 172bdf9..HEAD` there, and read surrounding code as needed. Start with /code-review on that range if it is available to you.",
+    "Judge behavior, error paths, tests (each new behavior has a test that fails without it, none weakened), duplication, and the repository rules in .claude/CLAUDE.md and AGENTS.md (Effect, Schema at boundaries, JSDoc, Bun APIs). The generated dist files are build output; check only that they match a fresh build."
+  ],
+  "constraints": [
+    "Read-only: make no edits and no git writes.",
+    "Testing in this project is unit tests and fixtures only: never start pi, T3 Code or a Kimi request.",
+    "Mark each finding blocking or non-blocking with path:line and a concrete failure scenario; a finding without a reproducible path to a wrong result is non-blocking.",
+    "Report in under 500 words; put long output in a file in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Every blocking finding names path:line and a concrete failure scenario",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The review states whether the range is merge-ready",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "verdict"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7r2y8r-tn1g"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T11:57:01.098Z"
+  },
+  "createdAt": "2026-11-08T11:57:01.098Z"
+}
