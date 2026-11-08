@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "confirm-the-kimi-set-repair-diff-home",
   "objective": "Confirm the Kimi set repair (diff /home/user/holyagent-notes/kimi-repair.diff, worktree /home/user/holyagent-0.3.0-kimi) closes the findings of both earlier artifact reviews and adds no new gap.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Earlier findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw79mbu5-40if.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw79mc2t-wqw8.md. Repair report (claims only): /home/user/holyagent/.git/holyagent/reports/assignment-0mw79zweh-mm10.md. Compare against packages/runtime/src/instructions/requirements/, claude-5.5/ and kimi-k3.1/guide.md as before; judge only the repair."
   ],
@@ -38,7 +38,29 @@
     "agentId": "workflow:wf_e74f9230-3f5/assignment-0mw7adjqv-i60l",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T03:42:16.376Z"
+    "startedAt": "2026-11-08T03:42:16.376Z",
+    "finishedAt": "2026-11-08T03:50:31.190Z"
+  },
+  "result": "result: The repair closes every earlier finding or leaves it for a sound reason, and I found no meaning change or new blocking gap. Three optional notes remain.\nchanged: none (read-only)\nchecks: none run. I read the diff `/home/user/holyagent-notes/kimi-repair.diff` in full and checked it against the worktree. I did not re-run the repair's `mise run verify` (exit 0, 1764 pass).\nblockers: none\nquestions: Keep or drop the new \"follow the target family's guide.md\" rule in `specialist/writing-bar.md`?\nnotes:\n- Closed in the text (first review, notes 1-9):\n  - note 1: the cache-reasoning sentence is gone from `specialist/report.md`.\n  - note 2: the CLI placeholder `${HOLYAGENT_PI_ROOT}/scripts/holyagent` is defined in `dispatch.md`. The commands in `delegating.md`, `session-cloud-identity.md` and `specialist/working.md` use it.\n  - note 3: the unverified-inference rule is removed from `specialist/merge-ready.md`.\n  - note 4: `root/identity.md` drops the \"Quality boundaries\" bullet and the \"few sentences\" cap, and restores \"information to weigh\".\n  - note 5: `specialist/writing-bar.md` matches the Claude bar again.\n  - note 6: `root/workflows.md` states why reports travel in the result, which `docs/pi/orchestration.md:32` supports.\n  - note 7: `root/dispatch.md` makes the launcher's recording conditional and keeps the root's `assignment record` for other launches.\n  - note 8: `root/search.md` no longer bans `ls`.\n  - note 9: citation mismatches fixed and the citations are now comments.\n- Note 10 is partly closed with a sound reason. `drag` is restored. `reuseExistingTab` and `tabId` are restored as \"when its description lists them\", because `docs/pi/t3-code.md` does not document them. The temp-path wording in `root/assignments.md` is fixed.\n- Closed in the roles and skills:\n  - `reviewer-code/builtin-review.md` covers \"cannot run\".\n  - Librarian tool lists are read-only plus web, which `claude-parity.md` supports.\n  - `reviewer-visual/captures.md` adds a fallback when `read` returns no image.\n  - `ci-watch/SKILL.md` has a foreground fallback.\n  - `dev-server` (skill and role) drops computer-use and T3 aids from Worker.operations, which `t3-code.md:20` and `:119` support.\n  - `instruction-writing/SKILL.md` has the P1 cites and the \"does not change it\" claim fixed.\n  - `visual-judging/SKILL.md` keeps its HTML fallback with its source cited.\n- `stripCitations` is called from `skillFiles` (every family) and the Claude `agents.ts` reader. It keeps the `materiality` and `design-core` markers. The Claude sources hold only those markers, so Claude output stays unchanged. No `<!--` remains in `pi/dist`.\n- Three optional findings are in the findings list above.\n\nevidence:\nEach earlier finding is closed or left with a sound reason: first-review notes 1-9 and the second review's items are closed in the text. Note 10 is partly closed because `reuseExistingTab` and `tabId` are undocumented in `t3-code.md`. I read all of `kimi-repair.diff`.\nThe repair changes no rule's meaning and adds no new gap: no blocker found. The one added rule is the guide.md rule in `specialist/writing-bar.md`, listed as optional. `requirements/` and `coverage.ts` are untouched. `rg` found no `<!--` in `pi/dist` and only markers in `claude-5.5`.\nfindings: three optional findings, listed above.\n",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "Repair closes every earlier artifact finding; no blocker, three optional notes",
+    "criteria": [
+      {
+        "criterion": "Each earlier finding is closed or left with a sound reason",
+        "support": "first-review notes 1-9 and the second review's items are closed in the text. Note 10 is partly closed because `reuseExistingTab` and `tabId` are undocumented in `t3-code.md`. I read all of `kimi-repair.diff`."
+      },
+      {
+        "criterion": "The repair changes no rule's meaning and adds no new gap",
+        "support": "no blocker found. The one added rule is the guide.md rule in `specialist/writing-bar.md`, listed as optional. `requirements/` and `coverage.ts` are untouched. `rg` found no `<!--` in `pi/dist` and only markers in `claude-5.5`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "three optional findings, listed above."
+      }
+    ]
   },
   "createdAt": "2026-11-08T03:42:16.376Z"
 }
