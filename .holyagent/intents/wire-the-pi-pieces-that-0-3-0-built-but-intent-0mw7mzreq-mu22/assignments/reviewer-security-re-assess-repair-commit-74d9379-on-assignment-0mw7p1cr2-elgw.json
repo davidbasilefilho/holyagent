@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "re-assess-repair-commit-74d9379-on",
   "objective": "Re-assess repair commit 74d9379 on release/0.3.0/feat/pi-tool-settings against the two security findings it repairs.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read /home/user/holyagent-notes/wire-b-repair.diff; sources in /home/user/holyagent-0.3.0-settings.",
     "Finding 1: a symlinked .pi folder or target at project/local scope redirected the write and --undo. Finding 2: at project/local scope a project write could override a value the global file set (computer-use confirmations, Moonshot tools).",
@@ -39,7 +39,29 @@
     "agentId": "workflow:wf_1db59d9e-82e/assignment-0mw7p1cr2-elgw",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T10:32:41.678Z"
+    "startedAt": "2026-11-08T10:32:41.678Z",
+    "finishedAt": "2026-11-08T10:39:20.935Z"
+  },
+  "result": "result: Both blocking criteria are met on a read-only review. I found no blocker, only low-severity residuals. I could not run tests: this role has no shell.\n\nbuilt-in /security-review: it could not run. The skill failed on `git diff origin/HEAD...` because `origin/HEAD` is unresolved here. I reviewed `/home/user/holyagent/../holyagent-notes/wire-b-repair.diff` and the sources in `/home/user/holyagent-0.3.0-settings` by hand. The tree could have been moving, since I did not pin the commit.\n\n**Validated sound**\n- **Finding 1, symlinks:** `refuseLinks` in `pi-settings.ts` runs `lstat` on every component from `cwd` down (`.pi`, each folder below it, the file) at project and local scope. A symlink, dangling or not, fails the step. Install, `--undo` (after the record read) and doctor all call it before any read or write.\n- **Hard links:** `writeJsonObject` writes a `wx` temp file in the same folder and renames it over the entry. The rename replaces the directory entry rather than the inode, so a hard-linked project file is detached and the global inode is never modified. Git cannot store hard links anyway.\n- **Undo:** it is driven by the record at `~/.claude/holyagent/setup-records.json`, which lives outside the repo. It also refuses links and only removes keys whose value still equals what setup wrote.\n- **Parent above `.pi`:** a symlinked ancestor of `cwd` is not checked. That path is the user's own choice of working directory, not repo content.\n- **Finding 2, global override:** at project and local scope, `resolveTarget` drops any key the global file already sets, to any value, including null, a scalar where an object was expected, or an `off`. A missing global file means nothing is set. A global file that is not a JSON object stops the write with a `!` line.\n- **Package-default skip:** it applies only to keys the global file does not set, so it cannot hide a global value.\n- **Written values:** they come only from fixed `toolSettings` constants. Repo input can switch features on or off but cannot choose a value or a path.\n\n**Residuals (low, none block)**\n1. **Race, suspicion:** a symlink swapped in after `refuseLinks` and before the write. `replaceJsonObject` calls `realpath` on an existing file and `mkdir -p` on the folder, both of which follow links, so the write would go through. The attacker needs a concurrent local process with write access to the repo. This matches the existing `.claude` step. A fix would re-check `lstat` just before the rename, or open the parent with `O_NOFOLLOW`. The temp file itself never follows a link.\n2. **Order dependence, validated but inherent:** if project setup runs first and the user later sets a global value, the project file keeps its value and overrides the global one. Pi's layering makes this unavoidable, and the doctor and docs only cover the opposite order.\n3. **Repo config, note:** at project scope the repo's `.holyagent/config.json` is read over the user's, so a repo can turn on the computer-use confirmations-off write. This is not a regression, it is gated by \"run only in a repository you trust\", and it is skipped when the global file sets the key.\n4. **User-scope undo, preexisting:** it follows links by design, and it can remove a key the user later set to the identical value.\n\nevidence:\n- No untrusted input chooses the written path or makes setup or undo change a value the user set: `/home/user/holyagent-0.3.0-settings/packages/runtime/src/setup/pi-settings.ts` lines 192-208 (`refuseLinks`), 231, 345 and 402, and `json-file.ts` lines 95-162 (`wx` temp file, rename). Residual: the swap race above, low and requires a concurrent local attacker.\n- No written value overrides a risky setting the user chose in the global file: `pi-settings.ts` lines 172-185 (`resolveTarget`/`setGlobally`) and the test at lines 435-457 of the diff `/home/user/holyagent-notes/wire-b-repair.diff`. Residual: order dependence.\n- security-findings: no blockers, four low residuals as listed. Built-in `/security-review` could not run, and tests were not run for lack of a shell.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Both criteria validated by reading the write and undo paths; four low residuals only",
+    "criteria": [
+      {
+        "criterion": "No untrusted input chooses the written path or makes setup or undo change a value the user set",
+        "support": "`/home/user/holyagent-0.3.0-settings/packages/runtime/src/setup/pi-settings.ts` lines 192-208 (`refuseLinks`), 231, 345 and 402, and `json-file.ts` lines 95-162 (`wx` temp file, rename). Residual: the swap race above, low and requires a concurrent local attacker."
+      },
+      {
+        "criterion": "No written value overrides a risky setting the user chose in the global file",
+        "support": "`pi-settings.ts` lines 172-185 (`resolveTarget`/`setGlobally`) and the test at lines 435-457 of the diff `/home/user/holyagent-notes/wire-b-repair.diff`. Residual: order dependence."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "security-findings",
+        "support": "no blockers, four low residuals as listed. Built-in `/security-review` could not run, and tests were not run for lack of a shell."
+      }
+    ]
   },
   "createdAt": "2026-11-08T10:32:41.678Z"
 }
