@@ -1,5 +1,6 @@
 import { Data } from "effect"
 
+import { CLAUDE_WORDS, type HostWords } from "../domain/host.ts"
 import { VCS_HINTS, VCS_REFUSED_ERRORS } from "../vcs/errors.ts"
 
 /** The command line does not match the command's usage. */
@@ -91,6 +92,9 @@ const REFUSED_ERRORS = new Set([
   ...VCS_REFUSED_ERRORS,
 ])
 
+const insufficientAcceptanceHint = (words: HostWords) =>
+  `Nothing was recorded. ${words.askForSupport} for the missing support the message names, then run \`holyagent assignment close <id> --outcome success --accept <rationale>\` again with the corrected report on stdin (also for a Succeeded Assignment that is not accepted yet), or \`holyagent assignment accept <id> --rationale <text> --report\` with it; a workflow agent cannot be messaged, so draft a follow-up with followUpOf.`
+
 const HINTS: Readonly<Record<string, string>> = {
   StdinMissing:
     "Give the input as --input '<json>' or pipe it in, for example: echo '...' | holyagent <command>; see --help.",
@@ -112,8 +116,6 @@ const HINTS: Readonly<Record<string, string>> = {
   OwnershipConflict: "Wait for the Running writer to close, or narrow the ownership paths.",
   DependencyNotAccepted:
     "Close and accept the dependency first (`holyagent assignment accept <id>`), then dispatch.",
-  InsufficientAcceptance:
-    "Nothing was recorded. SendMessage the subagent for the missing support the message names, then run `holyagent assignment close <id> --outcome success --accept <rationale>` again with the corrected report on stdin (also for a Succeeded Assignment that is not accepted yet), or `holyagent assignment accept <id> --rationale <text> --report` with it; a workflow agent cannot be messaged, so draft a follow-up with followUpOf.",
   SpecialistMismatch: "Record the agent that was actually launched, or dispatch again.",
   SpecialistNotRecorded:
     "Run `holyagent assignment record <id> --agent <agentId>` first, or close with another outcome.",
@@ -144,8 +146,11 @@ export interface Failure {
   readonly code: number
 }
 
-/** Describes any failure of a command. Anything that is not a known error exits as a state error. */
-export const describeFailure = (error: unknown): Failure => {
+/**
+ * Describes any failure of a command. Anything that is not a known error exits as a state error.
+ * The hints that name a host's tools use its `words` (Claude's by default).
+ */
+export const describeFailure = (error: unknown, words: HostWords = CLAUDE_WORDS): Failure => {
   const tag =
     typeof error === "object" && error !== null && "_tag" in error ? String(error._tag) : "Defect"
   const message = (
@@ -161,7 +166,9 @@ export const describeFailure = (error: unknown): Failure => {
     hint:
       error instanceof Usage
         ? error.hint
-        : (HINTS[tag] ?? "Run `holyagent --help` for the commands."),
+        : tag === "InsufficientAcceptance"
+          ? insufficientAcceptanceHint(words)
+          : (HINTS[tag] ?? "Run `holyagent --help` for the commands."),
     code: USAGE_ERRORS.has(tag) ? EXIT.usage : REFUSED_ERRORS.has(tag) ? EXIT.refused : EXIT.state,
   }
 }

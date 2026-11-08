@@ -7648,6 +7648,507 @@ var commitFile = (path, content) => {
   return io(path, () => Bun.write(temporary, content)).pipe(andThen2(io(path, () => rename(temporary, path))), tapError2(() => io(temporary, () => rm(temporary, { force: true })).pipe(ignore2)));
 };
 
+class UnknownRecord extends TaggedError2("UnknownRecord") {
+  get message() {
+    return `Unknown ${this.kind} ${this.id}`;
+  }
+}
+
+class DuplicateRecord extends TaggedError2("DuplicateRecord") {
+  get message() {
+    return `A ${this.kind} with id ${this.id} already exists`;
+  }
+}
+
+class InvalidPath extends TaggedError2("InvalidPath") {
+  get message() {
+    return `Invalid path "${this.path}": ${this.reason}`;
+  }
+}
+
+class InvalidDraft extends TaggedError2("InvalidDraft") {
+}
+
+class MissingOwnership extends TaggedError2("MissingOwnership") {
+  get message() {
+    return `${this.roleTask} writes, so it needs at least one ownership path`;
+  }
+}
+
+class StaleRevision extends TaggedError2("StaleRevision") {
+  get message() {
+    return `Stale intent revision ${this.given}; the live revision is ${this.live}`;
+  }
+}
+
+class IntentClosed extends TaggedError2("IntentClosed") {
+  get message() {
+    return `Intent ${this.intentId} is closed; reopen it first`;
+  }
+}
+
+class IntentHasOpenWork extends TaggedError2("IntentHasOpenWork") {
+  get message() {
+    return `Intent ${this.intentId} has Running (${this.running.join(", ")}) or unaccepted (${this.unaccepted.join(", ")}) Assignments; settle them or give a reason to drop them`;
+  }
+}
+
+class InvalidTransition extends TaggedError2("InvalidTransition") {
+  get message() {
+    return `Cannot ${this.action} ${this.id} while it is ${this.state}`;
+  }
+}
+
+class OwnershipConflict extends TaggedError2("OwnershipConflict") {
+  get message() {
+    return `${this.id} cannot start: ${this.runningId} is Running and owns an overlapping path (${this.path})`;
+  }
+}
+
+class DependencyNotAccepted extends TaggedError2("DependencyNotAccepted") {
+  get message() {
+    return `${this.id} cannot start: dependency ${this.dependency} ${this.reason}`;
+  }
+}
+
+class InsufficientAcceptance extends TaggedError2("InsufficientAcceptance") {
+  get message() {
+    return `Acceptance of ${this.id} rejected: ${this.detail}`;
+  }
+}
+
+class SpecialistMismatch extends TaggedError2("SpecialistMismatch") {
+  get message() {
+    return `Specialist ${this.agentId}: ${this.detail}`;
+  }
+}
+
+class SpecialistNotRecorded extends TaggedError2("SpecialistNotRecorded") {
+  get message() {
+    return `${this.id} has no recorded specialist, so it cannot be closed as Succeeded`;
+  }
+}
+
+var identifier2 = (kind) => String4.check(isPattern2(new RegExp(`^${kind}-[a-z0-9]+(?:-[a-z0-9]+)*$`)));
+var IntentId = identifier2("intent");
+var AssignmentId = identifier2("assignment");
+var BranchId = identifier2("branch");
+var PullId = identifier2("pull");
+var AgentId = String4.check(isPattern2(/\S/));
+var newId = (kind) => gen2(function* () {
+  const time = (yield* currentTimeMillis2).toString(36).padStart(9, "0");
+  const digits = yield* forEach2([0, 1, 2, 3], () => nextIntBetween(0, 35));
+  return `${kind}-${time}-${digits.map((digit) => digit.toString(36)).join("")}`;
+});
+
+var decodeInput = (schema, input) => decodeUnknownEffect2(schema, { onExcessProperty: "error" })(input).pipe(mapError2((error) => new InvalidDraft({ message: error.message })));
+
+import { sep } from "path";
+var UNSAFE_CHARACTERS = /[\\:*?"<>|\p{Cc}]/u;
+var pathProblem = (path) => {
+  if (path.startsWith("/"))
+    return "absolute path";
+  if (UNSAFE_CHARACTERS.test(path))
+    return "character that is not portable";
+  for (const segment of path.split("/")) {
+    if (segment === "")
+      return "empty segment";
+    if (segment === "." || segment === "..")
+      return `"${segment}" segment`;
+    if (segment.endsWith(".") || segment.endsWith(" "))
+      return "trailing dot or space";
+  }
+  return;
+};
+var PortablePath = String4.check(makeFilter2((path) => pathProblem(path) ?? undefined));
+var pathsOverlap = (a, b) => {
+  const left = a.toLowerCase();
+  const right = b.toLowerCase();
+  return left === right || left.startsWith(`${right}/`) || right.startsWith(`${left}/`);
+};
+var firstOverlap = (a, b) => a.find((left) => b.some((right) => pathsOverlap(left, right)));
+var toPosix = (path, separator = sep) => separator === "/" ? path : path.replaceAll(separator, "/");
+var fromGitPath = (path, separator = sep) => separator === "/" ? path : path.replaceAll("/", separator);
+
+var Text = String4.check(isPattern2(/\S/));
+var Revision = Int.check(isGreaterThanOrEqualTo2(1));
+var INSTANT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?Z$/;
+var isInstant = (text) => {
+  const match = INSTANT.exec(text);
+  if (match === null || Number.isNaN(Date.parse(text)))
+    return false;
+  const [year, month, day, hour, minute, second] = match.slice(1).map(Number);
+  const date = new Date(text);
+  return date.getUTCFullYear() === year && date.getUTCMonth() + 1 === month && date.getUTCDate() === day && date.getUTCHours() === hour && date.getUTCMinutes() === minute && date.getUTCSeconds() === second;
+};
+var Timestamp = String4.check(makeFilter2((text) => isInstant(text) || "a real UTC instant such as 2026-01-02T03:04:05Z"));
+var TextList = ArraySchema(Text);
+
+var findIntent = (project, id) => {
+  const found = project.intents.find((intent) => intent.id === id);
+  return found === undefined ? fail5(new UnknownRecord({ kind: "intent", id })) : succeed6(found);
+};
+var findAssignment = (project, id) => {
+  const found = project.assignments.find((assignment) => assignment.id === id);
+  return found === undefined ? fail5(new UnknownRecord({ kind: "assignment", id })) : succeed6(found);
+};
+var requireOpen = (intent) => intent.state === "Open" ? void_3 : fail5(new IntentClosed({ intentId: intent.id }));
+var requireLive = (intent, revision) => revision === intent.revision ? void_3 : fail5(new StaleRevision({ given: revision, live: intent.revision }));
+
+var Role = Literals(["Explorer", "Librarian", "Worker", "Reviewer"]);
+var Task = Literals([
+  "map",
+  "lookup",
+  "trace",
+  "research",
+  "mechanical",
+  "implementation",
+  "integration",
+  "operations",
+  "validation",
+  "debugging",
+  "visual",
+  "code",
+  "testing",
+  "audit",
+  "security",
+  "artifact"
+]);
+var RoleTask = Literals([
+  "Explorer.map",
+  "Explorer.lookup",
+  "Explorer.trace",
+  "Librarian.lookup",
+  "Librarian.research",
+  "Worker.mechanical",
+  "Worker.implementation",
+  "Worker.integration",
+  "Worker.operations",
+  "Worker.validation",
+  "Worker.debugging",
+  "Worker.visual",
+  "Reviewer.visual",
+  "Reviewer.code",
+  "Reviewer.testing",
+  "Reviewer.audit",
+  "Reviewer.security",
+  "Reviewer.artifact"
+]);
+var Model = Literals(["haiku", "sonnet"]);
+var Effort = Literals(["medium", "high", "xhigh"]);
+var Mutability = Literals(["ReadOnly", "ScopedWrite"]);
+var Independence = Literals([
+  "DisjointWrites",
+  "DependenciesTerminal",
+  "IndependentReview"
+]);
+var Capability = Literals(["Search", "Shell", "VisualInspection", "Write"]);
+var spec = (role, task, model, effort, mutability, independence, capabilities = []) => ({ role, task, model, effort, mutability, independence, capabilities });
+var SPECS = {
+  "Explorer.map": spec("Explorer", "map", "haiku", "medium", "ReadOnly", "DisjointWrites"),
+  "Explorer.lookup": spec("Explorer", "lookup", "haiku", "medium", "ReadOnly", "DisjointWrites"),
+  "Explorer.trace": spec("Explorer", "trace", "sonnet", "medium", "ReadOnly", "DependenciesTerminal"),
+  "Librarian.lookup": spec("Librarian", "lookup", "haiku", "medium", "ReadOnly", "DisjointWrites", [
+    "Search"
+  ]),
+  "Librarian.research": spec("Librarian", "research", "sonnet", "medium", "ReadOnly", "DependenciesTerminal", ["Search"]),
+  "Worker.mechanical": spec("Worker", "mechanical", "haiku", "medium", "ScopedWrite", "DisjointWrites", ["Write"]),
+  "Worker.implementation": spec("Worker", "implementation", "sonnet", "high", "ScopedWrite", "DisjointWrites", ["Write"]),
+  "Worker.integration": spec("Worker", "integration", "sonnet", "medium", "ScopedWrite", "DependenciesTerminal", ["Write"]),
+  "Worker.operations": spec("Worker", "operations", "haiku", "medium", "ScopedWrite", "DisjointWrites", ["Shell"]),
+  "Worker.validation": spec("Worker", "validation", "haiku", "medium", "ReadOnly", "DependenciesTerminal", ["Shell"]),
+  "Worker.debugging": spec("Worker", "debugging", "sonnet", "high", "ScopedWrite", "DependenciesTerminal", ["Write"]),
+  "Worker.visual": spec("Worker", "visual", "sonnet", "high", "ScopedWrite", "DisjointWrites", [
+    "Write",
+    "VisualInspection"
+  ]),
+  "Reviewer.visual": spec("Reviewer", "visual", "sonnet", "high", "ReadOnly", "IndependentReview", [
+    "VisualInspection"
+  ]),
+  "Reviewer.code": spec("Reviewer", "code", "sonnet", "high", "ReadOnly", "IndependentReview"),
+  "Reviewer.testing": spec("Reviewer", "testing", "sonnet", "medium", "ReadOnly", "IndependentReview", ["Shell"]),
+  "Reviewer.audit": spec("Reviewer", "audit", "haiku", "high", "ReadOnly", "IndependentReview"),
+  "Reviewer.security": spec("Reviewer", "security", "sonnet", "high", "ReadOnly", "IndependentReview"),
+  "Reviewer.artifact": spec("Reviewer", "artifact", "sonnet", "high", "ReadOnly", "IndependentReview")
+};
+var routeFor = (roleTask) => ({
+  roleTask,
+  agent: `${SPECS[roleTask].role}-${SPECS[roleTask].task}`.toLowerCase(),
+  ...SPECS[roleTask]
+});
+var ROUTES = RoleTask.literals.map(routeFor);
+var isWriter = (roleTask) => SPECS[roleTask].mutability === "ScopedWrite";
+var isReviewer = (roleTask) => SPECS[roleTask].role === "Reviewer";
+
+var Slug = String4.check(isPattern2(/^(?:[a-z0-9]+(?:-[a-z0-9]+)*)?$/));
+var MAX_LENGTH = 40;
+var READ_LENGTH = 512;
+var slugOf = (text) => {
+  const words = text.slice(0, READ_LENGTH).normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().split(/[^a-z0-9]+/).filter((word) => word !== "");
+  let slug = "";
+  for (const word of words) {
+    const next = slug === "" ? word : `${slug}-${word}`;
+    if (next.length > MAX_LENGTH)
+      break;
+    slug = next;
+  }
+  return slug === "" ? (words[0] ?? "").slice(0, MAX_LENGTH) : slug;
+};
+var recordName = (slug, id) => slug === "" ? id : `${slug}-${id}`;
+
+var Dimension = Literals([
+  "behavior",
+  "regressions",
+  "tests",
+  "scope",
+  "style",
+  "repo-standards"
+]);
+var Criterion = Struct({
+  text: Text,
+  blocking: Boolean3,
+  dimension: Dimension
+});
+var Acceptance = Struct({
+  revision: Revision,
+  carriedFrom: optionalKey2(Revision),
+  rationale: Text,
+  criteria: ArraySchema(Struct({ criterion: Text, support: Text })),
+  evidence: ArraySchema(Struct({ label: Text, support: Text }))
+});
+var Specialist = Struct({
+  agentId: optionalKey2(AgentId),
+  model: Model,
+  effort: Effort,
+  startedAt: Timestamp,
+  finishedAt: optionalKey2(Timestamp),
+  workTree: optionalKey2(Text)
+});
+var AssignmentState = Literals([
+  "Ready",
+  "Running",
+  "Succeeded",
+  "Failed",
+  "Cancelled"
+]);
+var AssignmentDraft = Struct({
+  intentId: IntentId,
+  intentRevision: Revision,
+  roleTask: RoleTask,
+  objective: Text,
+  scope: TextList.pipe(withDecodingDefaultKey(succeed6([]))),
+  constraints: TextList.pipe(withDecodingDefaultKey(succeed6([]))),
+  criteria: NonEmptyArray(Criterion),
+  evidence: TextList.pipe(withDecodingDefaultKey(succeed6([]))),
+  ownershipPaths: TextList.pipe(withDecodingDefaultKey(succeed6([]))),
+  dependencies: ArraySchema(AssignmentId).pipe(withDecodingDefaultKey(succeed6([]))),
+  independentFrom: ArraySchema(AssignmentId).pipe(withDecodingDefaultKey(succeed6([]))),
+  followUpOf: optionalKey2(AssignmentId)
+});
+var fields = {
+  id: AssignmentId,
+  intentId: IntentId,
+  intentRevision: Revision,
+  roleTask: RoleTask,
+  slug: Slug,
+  objective: Text,
+  state: AssignmentState,
+  scope: TextList,
+  constraints: TextList,
+  criteria: NonEmptyArray(Criterion),
+  evidence: TextList,
+  ownershipPaths: ArraySchema(PortablePath),
+  dependencies: ArraySchema(AssignmentId),
+  independentFrom: ArraySchema(AssignmentId),
+  followUpOf: optionalKey2(AssignmentId),
+  specialist: optionalKey2(Specialist),
+  result: optionalKey2(Text),
+  acceptance: optionalKey2(Acceptance),
+  createdAt: Timestamp
+};
+var coherenceProblem = (row) => {
+  const { state, specialist, result, acceptance } = row;
+  if (state === "Ready")
+    return specialist || result || acceptance ? "a Ready Assignment has no run yet" : undefined;
+  if (state === "Running")
+    return specialist && !specialist.finishedAt && !result && !acceptance ? undefined : "a Running Assignment has a started specialist and no result";
+  if (!result)
+    return `a ${state} Assignment records its result`;
+  if (acceptance && state !== "Succeeded")
+    return "only a Succeeded Assignment can be accepted";
+  return;
+};
+var Assignment = Struct(fields).check(makeFilter2((row) => coherenceProblem(row)));
+var relatedIds = (assignment) => [
+  ...assignment.dependencies,
+  ...assignment.independentFrom,
+  ...assignment.followUpOf === undefined ? [] : [assignment.followUpOf]
+];
+var Creation = Struct({ id: AssignmentId, now: Timestamp });
+var createAssignment = (project, rawDraft, rawCreation) => gen2(function* () {
+  const draft = yield* decodeInput(AssignmentDraft, rawDraft);
+  const creation = yield* decodeInput(Creation, rawCreation);
+  if (project.assignments.some((row) => row.id === creation.id))
+    return yield* new DuplicateRecord({ kind: "assignment", id: creation.id });
+  const intent = yield* findIntent(project, draft.intentId);
+  yield* requireOpen(intent);
+  yield* requireLive(intent, draft.intentRevision);
+  if (isWriter(draft.roleTask) && draft.ownershipPaths.length === 0)
+    return yield* new MissingOwnership({ roleTask: draft.roleTask });
+  for (const path of draft.ownershipPaths) {
+    const reason = pathProblem(path);
+    if (reason !== undefined)
+      return yield* new InvalidPath({ path, reason });
+  }
+  for (const [what, labels] of [
+    ["criterion", draft.criteria.map((criterion) => criterion.text)],
+    ["evidence label", draft.evidence]
+  ]) {
+    const repeated = labels.find((label, index) => labels.indexOf(label) !== index);
+    if (repeated !== undefined)
+      return yield* new InvalidDraft({ message: `Duplicate ${what}: ${repeated}` });
+  }
+  const siblings = new Set(project.assignments.filter((row) => row.intentId === intent.id).map((row) => row.id));
+  const unknown = relatedIds(draft).find((id) => !siblings.has(id));
+  if (unknown !== undefined)
+    return yield* new UnknownRecord({ kind: "assignment", id: unknown });
+  const assignment = {
+    id: creation.id,
+    intentId: draft.intentId,
+    intentRevision: draft.intentRevision,
+    roleTask: draft.roleTask,
+    slug: slugOf(draft.objective),
+    objective: draft.objective,
+    state: "Ready",
+    scope: draft.scope,
+    constraints: draft.constraints,
+    criteria: draft.criteria,
+    evidence: draft.evidence,
+    ownershipPaths: draft.ownershipPaths,
+    dependencies: draft.dependencies,
+    independentFrom: draft.independentFrom,
+    ...draft.followUpOf === undefined ? {} : { followUpOf: draft.followUpOf },
+    createdAt: creation.now
+  };
+  return { assignment, assignments: [assignment] };
+});
+var Outcome = Literals(["Succeeded", "Failed", "Cancelled"]);
+var settle = (assignment, outcome, result, now) => ({
+  ...assignment,
+  state: outcome,
+  result,
+  ...assignment.specialist === undefined ? {} : { specialist: { ...assignment.specialist, finishedAt: now } }
+});
+
+var DEFAULT_CONFIG = {
+  ttlMinutes: 55,
+  workflowsAvailable: false,
+  host: "claude"
+};
+var WORKFLOW_AGENT_PREFIX = "workflow:";
+var PI_AGENT_PREFIX = "pi:";
+var PI_WORKFLOW_AGENT_PREFIX = "pi-workflow:";
+var isWorkflowAgent = (agentId) => agentId.startsWith(WORKFLOW_AGENT_PREFIX) || agentId.startsWith(PI_WORKFLOW_AGENT_PREFIX);
+var independenceSubjects = (assignment) => isReviewer(assignment.roleTask) ? [...assignment.dependencies, ...assignment.independentFrom] : assignment.independentFrom;
+var touched = (entry, id) => entry.assignments.includes(id) || entry.related.includes(id);
+var STAGES = [
+  [
+    "idle specialist of this role task",
+    (entry, c) => !entry.running && entry.roleTask === c.assignment.roleTask
+  ],
+  [
+    "specialist with the same model and effort",
+    (entry, c) => entry.model === c.model && entry.effort === c.effort
+  ],
+  [
+    "specialist inside the cache window",
+    (entry, c) => entry.lastFinishedAt !== undefined && c.now - Date.parse(entry.lastFinishedAt) <= c.ttlMs
+  ],
+  [
+    "independent specialist",
+    (entry, c) => !independenceSubjects(c.assignment).some((id) => touched(entry, id))
+  ]
+];
+var RELEVANCE = [
+  [
+    "follow-up of its own Assignment",
+    (entry, a) => a.followUpOf !== undefined && entry.assignments.includes(a.followUpOf)
+  ],
+  [
+    "overlapping ownership paths",
+    (entry, a) => firstOverlap(a.ownershipPaths, entry.paths) !== undefined
+  ],
+  ["shared related Assignments", (entry, a) => relatedIds(a).some((id) => touched(entry, id))]
+];
+var relevance = (entry, assignment) => RELEVANCE.findIndex(([, relevant]) => relevant(entry, assignment));
+var compareEntries = (assignment) => (a, b) => relevance(a, assignment) - relevance(b, assignment) || Date.parse(b.lastFinishedAt ?? "") - Date.parse(a.lastFinishedAt ?? "") || (a.agentId < b.agentId ? -1 : 1);
+var directiveFor = (assignment, registry, now, config) => {
+  const route = routeFor(assignment.roleTask);
+  const candidate = {
+    assignment,
+    model: route.model,
+    effort: route.effort,
+    now: Date.parse(now),
+    ttlMs: config.ttlMinutes * 60000
+  };
+  let pool = registry.filter((entry) => !isWorkflowAgent(entry.agentId));
+  for (const [name, passes] of STAGES) {
+    pool = pool.filter((entry) => passes(entry, candidate));
+    if (pool.length === 0)
+      return {
+        action: "spawn",
+        agent: route.agent,
+        model: route.model,
+        effort: route.effort,
+        reason: `no ${name}`
+      };
+  }
+  const relevant = pool.filter((entry) => relevance(entry, assignment) >= 0);
+  const best = relevant.toSorted(compareEntries(assignment))[0];
+  if (best === undefined)
+    return {
+      action: "spawn",
+      agent: route.agent,
+      model: route.model,
+      effort: route.effort,
+      reason: "no specialist with relevant context"
+    };
+  return {
+    action: "continue",
+    agentId: best.agentId,
+    reason: RELEVANCE[relevance(best, assignment)]?.[0] ?? "relevant context"
+  };
+};
+
+var AGENT_HOSTS = ["claude", "pi"];
+var CLAUDE_WORDS = {
+  workflowTool: "Workflow",
+  agentTool: "Agent",
+  readTool: "Read",
+  message: "SendMessage",
+  confirmGone: "SendMessage or transcript",
+  askForSupport: "SendMessage the subagent",
+  askAgain: "SendMessage the missing support to the same subagent",
+  workflowAgentPrefix: WORKFLOW_AGENT_PREFIX,
+  journal: "Workflow run's journal",
+  recordNote: "a hook records an agent spawned from a dispatch prompt and says so in its note; record it yourself when the note says it did not, or for a continued agent"
+};
+var PI_WORDS = {
+  workflowTool: "SubagentWorkflow",
+  agentTool: "Agent",
+  readTool: "read",
+  message: "the Agent tool's resume",
+  confirmGone: "get_subagent_result or transcript",
+  askForSupport: "Resume the subagent with the Agent tool",
+  askAgain: "resume the same subagent with the Agent tool and ask for the missing support",
+  workflowAgentPrefix: PI_WORKFLOW_AGENT_PREFIX,
+  journal: "workflow run's journal",
+  recordNote: "the pi launcher records no agent by hook: the launcher glue or the root records each agent, with the ID the Agent tool returns, including a continued one",
+  reportsNote: "under the pi host this reads Claude workflow journals only for now",
+  agentIdNote: "under the pi host an agent is recorded as pi:<agent-id>, the ID the Agent tool returns (strip pi: to message it), and a workflow's agent as pi-workflow:<run-id>/<id>, with the run ID and the label the script gave the agent (the Assignment id); any other form is refused"
+};
+var wordsFor = (host) => host === "pi" ? PI_WORDS : CLAUDE_WORDS;
+
 class GitFailed extends TaggedError2("GitFailed") {
   get message() {
     return `git ${this.args.join(" ")} exited ${this.code}: ${this.output}`;
@@ -7781,6 +8282,7 @@ var REFUSED_ERRORS = new Set([
   "StateModeRefused",
   ...VCS_REFUSED_ERRORS
 ]);
+var insufficientAcceptanceHint = (words) => `Nothing was recorded. ${words.askForSupport} for the missing support the message names, then run \`holyagent assignment close <id> --outcome success --accept <rationale>\` again with the corrected report on stdin (also for a Succeeded Assignment that is not accepted yet), or \`holyagent assignment accept <id> --rationale <text> --report\` with it; a workflow agent cannot be messaged, so draft a follow-up with followUpOf.`;
 var HINTS = {
   StdinMissing: "Give the input as --input '<json>' or pipe it in, for example: echo '...' | holyagent <command>; see --help.",
   NoActiveIntent: "Pick one with `holyagent intent use <id>`, or start one with `holyagent intent create`.",
@@ -7795,7 +8297,6 @@ var HINTS = {
   InvalidTransition: "Check the state with `holyagent assignment show <id>` and use the command that fits it.",
   OwnershipConflict: "Wait for the Running writer to close, or narrow the ownership paths.",
   DependencyNotAccepted: "Close and accept the dependency first (`holyagent assignment accept <id>`), then dispatch.",
-  InsufficientAcceptance: "Nothing was recorded. SendMessage the subagent for the missing support the message names, then run `holyagent assignment close <id> --outcome success --accept <rationale>` again with the corrected report on stdin (also for a Succeeded Assignment that is not accepted yet), or `holyagent assignment accept <id> --rationale <text> --report` with it; a workflow agent cannot be messaged, so draft a follow-up with followUpOf.",
   SpecialistMismatch: "Record the agent that was actually launched, or dispatch again.",
   SpecialistNotRecorded: "Run `holyagent assignment record <id> --agent <agentId>` first, or close with another outcome.",
   MigrationRefused: "Run `holyagent migrate --dry-run` to see everything that blocks it. Settle a Running legacy Assignment with the legacy tool first; the command never overwrites an existing .holyagent record.",
@@ -7809,13 +8310,13 @@ var HINTS = {
   CorruptRecord: "Fix or delete the file the message names, or restore it from version control.",
   ...VCS_HINTS
 };
-var describeFailure = (error) => {
+var describeFailure = (error, words = CLAUDE_WORDS) => {
   const tag = typeof error === "object" && error !== null && "_tag" in error ? String(error._tag) : "Defect";
   const message = (typeof error === "object" && error !== null && "message" in error ? String(error.message) : String(error)).replace(/\s+/g, " ").trim();
   return {
     tag,
     message,
-    hint: error instanceof Usage ? error.hint : HINTS[tag] ?? "Run `holyagent --help` for the commands.",
+    hint: error instanceof Usage ? error.hint : tag === "InsufficientAcceptance" ? insufficientAcceptanceHint(words) : HINTS[tag] ?? "Run `holyagent --help` for the commands.",
     code: USAGE_ERRORS.has(tag) ? EXIT.usage : REFUSED_ERRORS.has(tag) ? EXIT.refused : EXIT.state
   };
 };
@@ -9545,108 +10046,6 @@ function resolveOptions(options) {
 var version = "0.3.0";
 
 import { join } from "path";
-
-var Role = Literals(["Explorer", "Librarian", "Worker", "Reviewer"]);
-var Task = Literals([
-  "map",
-  "lookup",
-  "trace",
-  "research",
-  "mechanical",
-  "implementation",
-  "integration",
-  "operations",
-  "validation",
-  "debugging",
-  "visual",
-  "code",
-  "testing",
-  "audit",
-  "security",
-  "artifact"
-]);
-var RoleTask = Literals([
-  "Explorer.map",
-  "Explorer.lookup",
-  "Explorer.trace",
-  "Librarian.lookup",
-  "Librarian.research",
-  "Worker.mechanical",
-  "Worker.implementation",
-  "Worker.integration",
-  "Worker.operations",
-  "Worker.validation",
-  "Worker.debugging",
-  "Worker.visual",
-  "Reviewer.visual",
-  "Reviewer.code",
-  "Reviewer.testing",
-  "Reviewer.audit",
-  "Reviewer.security",
-  "Reviewer.artifact"
-]);
-var Model = Literals(["haiku", "sonnet"]);
-var Effort = Literals(["medium", "high", "xhigh"]);
-var Mutability = Literals(["ReadOnly", "ScopedWrite"]);
-var Independence = Literals([
-  "DisjointWrites",
-  "DependenciesTerminal",
-  "IndependentReview"
-]);
-var Capability = Literals(["Search", "Shell", "VisualInspection", "Write"]);
-var spec = (role, task, model, effort, mutability, independence, capabilities = []) => ({ role, task, model, effort, mutability, independence, capabilities });
-var SPECS = {
-  "Explorer.map": spec("Explorer", "map", "haiku", "medium", "ReadOnly", "DisjointWrites"),
-  "Explorer.lookup": spec("Explorer", "lookup", "haiku", "medium", "ReadOnly", "DisjointWrites"),
-  "Explorer.trace": spec("Explorer", "trace", "sonnet", "medium", "ReadOnly", "DependenciesTerminal"),
-  "Librarian.lookup": spec("Librarian", "lookup", "haiku", "medium", "ReadOnly", "DisjointWrites", [
-    "Search"
-  ]),
-  "Librarian.research": spec("Librarian", "research", "sonnet", "medium", "ReadOnly", "DependenciesTerminal", ["Search"]),
-  "Worker.mechanical": spec("Worker", "mechanical", "haiku", "medium", "ScopedWrite", "DisjointWrites", ["Write"]),
-  "Worker.implementation": spec("Worker", "implementation", "sonnet", "high", "ScopedWrite", "DisjointWrites", ["Write"]),
-  "Worker.integration": spec("Worker", "integration", "sonnet", "medium", "ScopedWrite", "DependenciesTerminal", ["Write"]),
-  "Worker.operations": spec("Worker", "operations", "haiku", "medium", "ScopedWrite", "DisjointWrites", ["Shell"]),
-  "Worker.validation": spec("Worker", "validation", "haiku", "medium", "ReadOnly", "DependenciesTerminal", ["Shell"]),
-  "Worker.debugging": spec("Worker", "debugging", "sonnet", "high", "ScopedWrite", "DependenciesTerminal", ["Write"]),
-  "Worker.visual": spec("Worker", "visual", "sonnet", "high", "ScopedWrite", "DisjointWrites", [
-    "Write",
-    "VisualInspection"
-  ]),
-  "Reviewer.visual": spec("Reviewer", "visual", "sonnet", "high", "ReadOnly", "IndependentReview", [
-    "VisualInspection"
-  ]),
-  "Reviewer.code": spec("Reviewer", "code", "sonnet", "high", "ReadOnly", "IndependentReview"),
-  "Reviewer.testing": spec("Reviewer", "testing", "sonnet", "medium", "ReadOnly", "IndependentReview", ["Shell"]),
-  "Reviewer.audit": spec("Reviewer", "audit", "haiku", "high", "ReadOnly", "IndependentReview"),
-  "Reviewer.security": spec("Reviewer", "security", "sonnet", "high", "ReadOnly", "IndependentReview"),
-  "Reviewer.artifact": spec("Reviewer", "artifact", "sonnet", "high", "ReadOnly", "IndependentReview")
-};
-var routeFor = (roleTask) => ({
-  roleTask,
-  agent: `${SPECS[roleTask].role}-${SPECS[roleTask].task}`.toLowerCase(),
-  ...SPECS[roleTask]
-});
-var ROUTES = RoleTask.literals.map(routeFor);
-var isWriter = (roleTask) => SPECS[roleTask].mutability === "ScopedWrite";
-var isReviewer = (roleTask) => SPECS[roleTask].role === "Reviewer";
-
-var Slug = String4.check(isPattern2(/^(?:[a-z0-9]+(?:-[a-z0-9]+)*)?$/));
-var MAX_LENGTH = 40;
-var READ_LENGTH = 512;
-var slugOf = (text) => {
-  const words = text.slice(0, READ_LENGTH).normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().split(/[^a-z0-9]+/).filter((word) => word !== "");
-  let slug = "";
-  for (const word of words) {
-    const next = slug === "" ? word : `${slug}-${word}`;
-    if (next.length > MAX_LENGTH)
-      break;
-    slug = next;
-  }
-  return slug === "" ? (words[0] ?? "").slice(0, MAX_LENGTH) : slug;
-};
-var recordName = (slug, id) => slug === "" ? id : `${slug}-${id}`;
-
 var STATE_DIRECTORY = ".holyagent";
 var CONFIG_FILE = "config.json";
 var TRACKED_STATE_PATHSPEC = [
@@ -9660,297 +10059,6 @@ var assignmentFile = (intentFolderPath, assignment) => join(intentFolderPath, "a
 var branchFile = (intentFolderPath, record) => join(intentFolderPath, "branches", `${record.id}.json`);
 var pullFile = (intentFolderPath, record) => join(intentFolderPath, "pulls", `${record.id}.json`);
 var localFile = (directory, name) => join(directory, "local", name);
-
-var identifier2 = (kind) => String4.check(isPattern2(new RegExp(`^${kind}-[a-z0-9]+(?:-[a-z0-9]+)*$`)));
-var IntentId = identifier2("intent");
-var AssignmentId = identifier2("assignment");
-var BranchId = identifier2("branch");
-var PullId = identifier2("pull");
-var AgentId = String4.check(isPattern2(/\S/));
-var newId = (kind) => gen2(function* () {
-  const time = (yield* currentTimeMillis2).toString(36).padStart(9, "0");
-  const digits = yield* forEach2([0, 1, 2, 3], () => nextIntBetween(0, 35));
-  return `${kind}-${time}-${digits.map((digit) => digit.toString(36)).join("")}`;
-});
-
-var Text = String4.check(isPattern2(/\S/));
-var Revision = Int.check(isGreaterThanOrEqualTo2(1));
-var INSTANT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?Z$/;
-var isInstant = (text) => {
-  const match = INSTANT.exec(text);
-  if (match === null || Number.isNaN(Date.parse(text)))
-    return false;
-  const [year, month, day, hour, minute, second] = match.slice(1).map(Number);
-  const date = new Date(text);
-  return date.getUTCFullYear() === year && date.getUTCMonth() + 1 === month && date.getUTCDate() === day && date.getUTCHours() === hour && date.getUTCMinutes() === minute && date.getUTCSeconds() === second;
-};
-var Timestamp = String4.check(makeFilter2((text) => isInstant(text) || "a real UTC instant such as 2026-01-02T03:04:05Z"));
-var TextList = ArraySchema(Text);
-
-class UnknownRecord extends TaggedError2("UnknownRecord") {
-  get message() {
-    return `Unknown ${this.kind} ${this.id}`;
-  }
-}
-
-class DuplicateRecord extends TaggedError2("DuplicateRecord") {
-  get message() {
-    return `A ${this.kind} with id ${this.id} already exists`;
-  }
-}
-
-class InvalidPath extends TaggedError2("InvalidPath") {
-  get message() {
-    return `Invalid path "${this.path}": ${this.reason}`;
-  }
-}
-
-class InvalidDraft extends TaggedError2("InvalidDraft") {
-}
-
-class MissingOwnership extends TaggedError2("MissingOwnership") {
-  get message() {
-    return `${this.roleTask} writes, so it needs at least one ownership path`;
-  }
-}
-
-class StaleRevision extends TaggedError2("StaleRevision") {
-  get message() {
-    return `Stale intent revision ${this.given}; the live revision is ${this.live}`;
-  }
-}
-
-class IntentClosed extends TaggedError2("IntentClosed") {
-  get message() {
-    return `Intent ${this.intentId} is closed; reopen it first`;
-  }
-}
-
-class IntentHasOpenWork extends TaggedError2("IntentHasOpenWork") {
-  get message() {
-    return `Intent ${this.intentId} has Running (${this.running.join(", ")}) or unaccepted (${this.unaccepted.join(", ")}) Assignments; settle them or give a reason to drop them`;
-  }
-}
-
-class InvalidTransition extends TaggedError2("InvalidTransition") {
-  get message() {
-    return `Cannot ${this.action} ${this.id} while it is ${this.state}`;
-  }
-}
-
-class OwnershipConflict extends TaggedError2("OwnershipConflict") {
-  get message() {
-    return `${this.id} cannot start: ${this.runningId} is Running and owns an overlapping path (${this.path})`;
-  }
-}
-
-class DependencyNotAccepted extends TaggedError2("DependencyNotAccepted") {
-  get message() {
-    return `${this.id} cannot start: dependency ${this.dependency} ${this.reason}`;
-  }
-}
-
-class InsufficientAcceptance extends TaggedError2("InsufficientAcceptance") {
-  get message() {
-    return `Acceptance of ${this.id} rejected: ${this.detail}`;
-  }
-}
-
-class SpecialistMismatch extends TaggedError2("SpecialistMismatch") {
-  get message() {
-    return `Specialist ${this.agentId}: ${this.detail}`;
-  }
-}
-
-class SpecialistNotRecorded extends TaggedError2("SpecialistNotRecorded") {
-  get message() {
-    return `${this.id} has no recorded specialist, so it cannot be closed as Succeeded`;
-  }
-}
-
-var decodeInput = (schema, input) => decodeUnknownEffect2(schema, { onExcessProperty: "error" })(input).pipe(mapError2((error) => new InvalidDraft({ message: error.message })));
-
-import { sep } from "path";
-var UNSAFE_CHARACTERS = /[\\:*?"<>|\p{Cc}]/u;
-var pathProblem = (path) => {
-  if (path.startsWith("/"))
-    return "absolute path";
-  if (UNSAFE_CHARACTERS.test(path))
-    return "character that is not portable";
-  for (const segment of path.split("/")) {
-    if (segment === "")
-      return "empty segment";
-    if (segment === "." || segment === "..")
-      return `"${segment}" segment`;
-    if (segment.endsWith(".") || segment.endsWith(" "))
-      return "trailing dot or space";
-  }
-  return;
-};
-var PortablePath = String4.check(makeFilter2((path) => pathProblem(path) ?? undefined));
-var pathsOverlap = (a, b) => {
-  const left = a.toLowerCase();
-  const right = b.toLowerCase();
-  return left === right || left.startsWith(`${right}/`) || right.startsWith(`${left}/`);
-};
-var firstOverlap = (a, b) => a.find((left) => b.some((right) => pathsOverlap(left, right)));
-var toPosix = (path, separator = sep) => separator === "/" ? path : path.replaceAll(separator, "/");
-var fromGitPath = (path, separator = sep) => separator === "/" ? path : path.replaceAll("/", separator);
-
-var findIntent = (project, id) => {
-  const found = project.intents.find((intent) => intent.id === id);
-  return found === undefined ? fail5(new UnknownRecord({ kind: "intent", id })) : succeed6(found);
-};
-var findAssignment = (project, id) => {
-  const found = project.assignments.find((assignment) => assignment.id === id);
-  return found === undefined ? fail5(new UnknownRecord({ kind: "assignment", id })) : succeed6(found);
-};
-var requireOpen = (intent) => intent.state === "Open" ? void_3 : fail5(new IntentClosed({ intentId: intent.id }));
-var requireLive = (intent, revision) => revision === intent.revision ? void_3 : fail5(new StaleRevision({ given: revision, live: intent.revision }));
-
-var Dimension = Literals([
-  "behavior",
-  "regressions",
-  "tests",
-  "scope",
-  "style",
-  "repo-standards"
-]);
-var Criterion = Struct({
-  text: Text,
-  blocking: Boolean3,
-  dimension: Dimension
-});
-var Acceptance = Struct({
-  revision: Revision,
-  carriedFrom: optionalKey2(Revision),
-  rationale: Text,
-  criteria: ArraySchema(Struct({ criterion: Text, support: Text })),
-  evidence: ArraySchema(Struct({ label: Text, support: Text }))
-});
-var Specialist = Struct({
-  agentId: optionalKey2(AgentId),
-  model: Model,
-  effort: Effort,
-  startedAt: Timestamp,
-  finishedAt: optionalKey2(Timestamp),
-  workTree: optionalKey2(Text)
-});
-var AssignmentState = Literals([
-  "Ready",
-  "Running",
-  "Succeeded",
-  "Failed",
-  "Cancelled"
-]);
-var AssignmentDraft = Struct({
-  intentId: IntentId,
-  intentRevision: Revision,
-  roleTask: RoleTask,
-  objective: Text,
-  scope: TextList.pipe(withDecodingDefaultKey(succeed6([]))),
-  constraints: TextList.pipe(withDecodingDefaultKey(succeed6([]))),
-  criteria: NonEmptyArray(Criterion),
-  evidence: TextList.pipe(withDecodingDefaultKey(succeed6([]))),
-  ownershipPaths: TextList.pipe(withDecodingDefaultKey(succeed6([]))),
-  dependencies: ArraySchema(AssignmentId).pipe(withDecodingDefaultKey(succeed6([]))),
-  independentFrom: ArraySchema(AssignmentId).pipe(withDecodingDefaultKey(succeed6([]))),
-  followUpOf: optionalKey2(AssignmentId)
-});
-var fields = {
-  id: AssignmentId,
-  intentId: IntentId,
-  intentRevision: Revision,
-  roleTask: RoleTask,
-  slug: Slug,
-  objective: Text,
-  state: AssignmentState,
-  scope: TextList,
-  constraints: TextList,
-  criteria: NonEmptyArray(Criterion),
-  evidence: TextList,
-  ownershipPaths: ArraySchema(PortablePath),
-  dependencies: ArraySchema(AssignmentId),
-  independentFrom: ArraySchema(AssignmentId),
-  followUpOf: optionalKey2(AssignmentId),
-  specialist: optionalKey2(Specialist),
-  result: optionalKey2(Text),
-  acceptance: optionalKey2(Acceptance),
-  createdAt: Timestamp
-};
-var coherenceProblem = (row) => {
-  const { state, specialist, result, acceptance } = row;
-  if (state === "Ready")
-    return specialist || result || acceptance ? "a Ready Assignment has no run yet" : undefined;
-  if (state === "Running")
-    return specialist && !specialist.finishedAt && !result && !acceptance ? undefined : "a Running Assignment has a started specialist and no result";
-  if (!result)
-    return `a ${state} Assignment records its result`;
-  if (acceptance && state !== "Succeeded")
-    return "only a Succeeded Assignment can be accepted";
-  return;
-};
-var Assignment = Struct(fields).check(makeFilter2((row) => coherenceProblem(row)));
-var relatedIds = (assignment) => [
-  ...assignment.dependencies,
-  ...assignment.independentFrom,
-  ...assignment.followUpOf === undefined ? [] : [assignment.followUpOf]
-];
-var Creation = Struct({ id: AssignmentId, now: Timestamp });
-var createAssignment = (project, rawDraft, rawCreation) => gen2(function* () {
-  const draft = yield* decodeInput(AssignmentDraft, rawDraft);
-  const creation = yield* decodeInput(Creation, rawCreation);
-  if (project.assignments.some((row) => row.id === creation.id))
-    return yield* new DuplicateRecord({ kind: "assignment", id: creation.id });
-  const intent = yield* findIntent(project, draft.intentId);
-  yield* requireOpen(intent);
-  yield* requireLive(intent, draft.intentRevision);
-  if (isWriter(draft.roleTask) && draft.ownershipPaths.length === 0)
-    return yield* new MissingOwnership({ roleTask: draft.roleTask });
-  for (const path of draft.ownershipPaths) {
-    const reason = pathProblem(path);
-    if (reason !== undefined)
-      return yield* new InvalidPath({ path, reason });
-  }
-  for (const [what, labels] of [
-    ["criterion", draft.criteria.map((criterion) => criterion.text)],
-    ["evidence label", draft.evidence]
-  ]) {
-    const repeated = labels.find((label, index) => labels.indexOf(label) !== index);
-    if (repeated !== undefined)
-      return yield* new InvalidDraft({ message: `Duplicate ${what}: ${repeated}` });
-  }
-  const siblings = new Set(project.assignments.filter((row) => row.intentId === intent.id).map((row) => row.id));
-  const unknown = relatedIds(draft).find((id) => !siblings.has(id));
-  if (unknown !== undefined)
-    return yield* new UnknownRecord({ kind: "assignment", id: unknown });
-  const assignment = {
-    id: creation.id,
-    intentId: draft.intentId,
-    intentRevision: draft.intentRevision,
-    roleTask: draft.roleTask,
-    slug: slugOf(draft.objective),
-    objective: draft.objective,
-    state: "Ready",
-    scope: draft.scope,
-    constraints: draft.constraints,
-    criteria: draft.criteria,
-    evidence: draft.evidence,
-    ownershipPaths: draft.ownershipPaths,
-    dependencies: draft.dependencies,
-    independentFrom: draft.independentFrom,
-    ...draft.followUpOf === undefined ? {} : { followUpOf: draft.followUpOf },
-    createdAt: creation.now
-  };
-  return { assignment, assignments: [assignment] };
-});
-var Outcome = Literals(["Succeeded", "Failed", "Cancelled"]);
-var settle = (assignment, outcome, result, now) => ({
-  ...assignment,
-  state: outcome,
-  result,
-  ...assignment.specialist === undefined ? {} : { specialist: { ...assignment.specialist, finishedAt: now } }
-});
 
 var SpecialistEntry = Struct({
   agentId: AgentId,
@@ -11380,11 +11488,17 @@ var commit = (request) => gen2(function* () {
 
 var SESSION_TRAILER = /^\s*claude-session\s*:/i;
 var GENERATED_FOOTER = /^\s*(?:[^\p{L}\p{N}\s]\s*)*generated\s+with\b.*\bclaude\s+code\b/iu;
+var PI_GENERATED_FOOTER = /^\s*(?:[^\p{L}\p{N}\s]\s*)*generated\s+with\s+\[?pi(?:[\s-]coding[\s-]agent)?\]?(?:\([^\s)]*\))?[^\p{L}\p{N}]*$/iu;
 var CO_AUTHOR = /^\s*co-authored-by\s*:\s*(.*)$/i;
-var SESSION_LINK = /https?:\/\/claude\.ai\/\S*/gi;
-var namesAgent = (coAuthor) => looksLikeAgent({ name: coAuthor.replace(/<.*$/, ""), email: "" }) || /@(?:[\w-]+\.)*anthropic\.com\b/i.test(coAuthor);
+var CLAUDE_URL = String.raw`https?:\/\/claude\.ai\/[^\s)]*`;
+var PI_URL = String.raw`https?:\/\/(?:[\w-]+\.)*pi\.dev\/session\/[^\s)]*`;
+var sessionLink = (url) => new RegExp(String.raw`\[[^\][]*\]\(${url}\)|${url}`, "gi");
+var SESSION_LINK = sessionLink(CLAUDE_URL);
+var PI_SESSION_LINK = sessionLink(PI_URL);
+var PI_AGENT_NAME = /^pi[\s-]coding[\s-]agent$/i;
+var namesAgent = (coAuthor) => looksLikeAgent({ name: coAuthor.replace(/<.*$/, ""), email: "" }) || /@(?:[\w-]+\.)*(?:anthropic\.com|pi\.dev)\b/i.test(coAuthor) || PI_AGENT_NAME.test(coAuthor.replace(/<.*$/, "").replace(/\s+/g, " ").trim());
 var isAttribution = (line) => {
-  if (SESSION_TRAILER.test(line) || GENERATED_FOOTER.test(line))
+  if (SESSION_TRAILER.test(line) || GENERATED_FOOTER.test(line) || PI_GENERATED_FOOTER.test(line))
     return true;
   const coAuthor = CO_AUTHOR.exec(line);
   return coAuthor !== null && namesAgent(coAuthor[1] ?? "");
@@ -11404,7 +11518,7 @@ var DEFAULT_PHRASES = [
 ];
 var cleanMessage = (text) => text.split(`
 `).filter((line) => !isAttribution(line)).flatMap((line) => {
-  const stripped = line.replace(SESSION_LINK, "");
+  const stripped = line.replace(SESSION_LINK, "").replace(PI_SESSION_LINK, "");
   return stripped === line ? [line] : stripped.trim() === "" ? [] : [stripped.trimEnd()];
 }).join(`
 `).replace(/\n{3,}/g, `
@@ -11945,80 +12059,6 @@ var accept = (project, assignmentId, input) => gen2(function* () {
   return { assignment: accepted, assignments: [accepted] };
 });
 
-var DEFAULT_CONFIG = { ttlMinutes: 55, workflowsAvailable: false };
-var WORKFLOW_AGENT_PREFIX = "workflow:";
-var isWorkflowAgent = (agentId) => agentId.startsWith(WORKFLOW_AGENT_PREFIX);
-var independenceSubjects = (assignment) => isReviewer(assignment.roleTask) ? [...assignment.dependencies, ...assignment.independentFrom] : assignment.independentFrom;
-var touched = (entry, id) => entry.assignments.includes(id) || entry.related.includes(id);
-var STAGES = [
-  [
-    "idle specialist of this role task",
-    (entry, c) => !entry.running && entry.roleTask === c.assignment.roleTask
-  ],
-  [
-    "specialist with the same model and effort",
-    (entry, c) => entry.model === c.model && entry.effort === c.effort
-  ],
-  [
-    "specialist inside the cache window",
-    (entry, c) => entry.lastFinishedAt !== undefined && c.now - Date.parse(entry.lastFinishedAt) <= c.ttlMs
-  ],
-  [
-    "independent specialist",
-    (entry, c) => !independenceSubjects(c.assignment).some((id) => touched(entry, id))
-  ]
-];
-var RELEVANCE = [
-  [
-    "follow-up of its own Assignment",
-    (entry, a) => a.followUpOf !== undefined && entry.assignments.includes(a.followUpOf)
-  ],
-  [
-    "overlapping ownership paths",
-    (entry, a) => firstOverlap(a.ownershipPaths, entry.paths) !== undefined
-  ],
-  ["shared related Assignments", (entry, a) => relatedIds(a).some((id) => touched(entry, id))]
-];
-var relevance = (entry, assignment) => RELEVANCE.findIndex(([, relevant]) => relevant(entry, assignment));
-var compareEntries = (assignment) => (a, b) => relevance(a, assignment) - relevance(b, assignment) || Date.parse(b.lastFinishedAt ?? "") - Date.parse(a.lastFinishedAt ?? "") || (a.agentId < b.agentId ? -1 : 1);
-var directiveFor = (assignment, registry, now, config) => {
-  const route = routeFor(assignment.roleTask);
-  const candidate = {
-    assignment,
-    model: route.model,
-    effort: route.effort,
-    now: Date.parse(now),
-    ttlMs: config.ttlMinutes * 60000
-  };
-  let pool = registry.filter((entry) => !isWorkflowAgent(entry.agentId));
-  for (const [name, passes] of STAGES) {
-    pool = pool.filter((entry) => passes(entry, candidate));
-    if (pool.length === 0)
-      return {
-        action: "spawn",
-        agent: route.agent,
-        model: route.model,
-        effort: route.effort,
-        reason: `no ${name}`
-      };
-  }
-  const relevant = pool.filter((entry) => relevance(entry, assignment) >= 0);
-  const best = relevant.toSorted(compareEntries(assignment))[0];
-  if (best === undefined)
-    return {
-      action: "spawn",
-      agent: route.agent,
-      model: route.model,
-      effort: route.effort,
-      reason: "no specialist with relevant context"
-    };
-  return {
-    action: "continue",
-    agentId: best.agentId,
-    reason: RELEVANCE[relevance(best, assignment)]?.[0] ?? "relevant context"
-  };
-};
-
 var dispatchBlock = (project, assignment, assumeAccepted = new Set, workTree) => {
   if (assignment.state !== "Ready")
     return new InvalidTransition({ id: assignment.id, state: assignment.state, action: "dispatch" });
@@ -12165,6 +12205,57 @@ var closeAssignment = (project, registry, assignmentId, input, now) => gen2(func
     ...agentId === undefined ? {} : { registry: releaseSpecialist(registry, agentId, { finishedAt: now }) }
   };
 });
+
+import { join as join8 } from "path";
+var TTL_VARIABLE = "HOLYAGENT_REUSE_TTL_MINUTES";
+var HOST_VARIABLE = "HOLYAGENT_HOST";
+var WORKFLOWS_VARIABLE = "HOLYAGENT_WORKFLOWS";
+var Minutes = NumberFromString.check(isFinite2(), isGreaterThanOrEqualTo2(0));
+var reuseTtl = (env) => {
+  const raw = env[TTL_VARIABLE];
+  return raw === undefined || raw.trim() === "" ? succeed6(DEFAULT_CONFIG.ttlMinutes) : decodeUnknownEffect2(Minutes)(raw.trim()).pipe(mapError2(() => new Usage({
+    message: `${TTL_VARIABLE} must be a number of minutes, not "${raw}"`,
+    hint: `Unset ${TTL_VARIABLE} for the default of ${DEFAULT_CONFIG.ttlMinutes}.`
+  })));
+};
+var given = (raw) => raw === undefined || raw.trim() === "" ? undefined : raw.trim();
+var agentHostOf = (env) => {
+  const value = given(env[HOST_VARIABLE]);
+  return value === undefined ? succeed6("claude") : decodeUnknownEffect2(Literals(AGENT_HOSTS))(value).pipe(mapError2(() => new Usage({
+    message: `${HOST_VARIABLE} must be ${AGENT_HOSTS.join(" or ")}, not "${value}"`,
+    hint: `Unset ${HOST_VARIABLE} for the default of claude.`
+  })));
+};
+var WorkflowsSwitch = Literals(["0", "1"]);
+var WorkflowSettings = Struct({
+  disableWorkflows: optionalKey2(Boolean3),
+  enableWorkflows: optionalKey2(Boolean3)
+});
+var disablesWorkflows = (path) => readText(path).pipe(flatMap2((text) => text === undefined ? succeed6(false) : decodeUnknownEffect2(fromJsonString2(WorkflowSettings))(text).pipe(map4((settings) => settings.disableWorkflows === true || settings.enableWorkflows === false))), orElseSucceed2(() => false));
+var claudeWorkflowsAvailable = (env, root) => {
+  if (env.CLAUDE_CODE_DISABLE_WORKFLOWS === "1")
+    return succeed6(false);
+  const files = [
+    join8(claudeConfigDirectory(env), "settings.json"),
+    join8(root, ".claude", "settings.json"),
+    join8(root, ".claude", "settings.local.json")
+  ];
+  return forEach2(files, disablesWorkflows).pipe(map4((disabled) => !disabled.includes(true)));
+};
+var workflowsAvailable = (env, root) => {
+  const setting = given(env[WORKFLOWS_VARIABLE]);
+  if (setting !== undefined)
+    return decodeUnknownEffect2(WorkflowsSwitch)(setting).pipe(map4((value) => value === "1"), mapError2(() => new Usage({
+      message: `${WORKFLOWS_VARIABLE} must be 1 or 0, not "${setting}"`,
+      hint: `Unset ${WORKFLOWS_VARIABLE} to let the host decide.`
+    })));
+  return agentHostOf(env).pipe(flatMap2((host) => host === "pi" ? succeed6(false) : claudeWorkflowsAvailable(env, root)));
+};
+var loadConfig = (env, root) => all2({
+  ttlMinutes: reuseTtl(env),
+  workflowsAvailable: workflowsAvailable(env, root),
+  host: agentHostOf(env)
+}).pipe(map4((config) => config));
 
 var REPORT_FIELDS = Struct({
   status: Literals(["done", "partial", "blocked"]),
@@ -12328,9 +12419,9 @@ var renderPrompt = (assignment, agent) => [
   "End your report with an `evidence:` line followed by one `<criterion or evidence label>: <support>` line for each blocking criterion and each required evidence label above. A criterion may be named by its text before the first colon."
 ].join(`
 `);
-var dispatchPrompt = (assignment, agent, briefPath) => [
+var dispatchPrompt = (assignment, agent, briefPath, words = CLAUDE_WORDS) => [
   `Role: ${assignment.roleTask} (${agent}). Assignment: ${assignment.id}.`,
-  `Read the brief at ${briefPath} with the Read tool and follow it as your full task.`
+  `Read the brief at ${briefPath} with the ${words.readTool} tool and follow it as your full task.`
 ].join(`
 `);
 var Started = Struct({
@@ -12441,6 +12532,30 @@ var OUTCOMES = {
   interrupted: "Cancelled",
   stopped: "Cancelled"
 };
+var dispatchOutput = (words) => ({
+  output: `TOON fields (id, state, agent/model/effort or continue, reason), then a line \`prompt:\` alone, then a two-line specialist prompt that names the brief file the full Assignment was written to; pass that text as it is: as the prompt of its agent() in your inline workflow script first, to the ${words.agentTool} tool only when the ${words.workflowTool} tool is disabled or unavailable, and by ${words.message} only for a warm continuation. The brief itself is never printed: the specialist reads it with the ${words.readTool} tool`
+});
+var recordHelp = (words) => ({
+  summary: `Record the launch of a dispatched Assignment (a workflow's agent as ${words.workflowAgentPrefix}<run-id>/<id>), or roll it back when the launch failed`,
+  notes: [
+    "the agent id is in the Agent result, or is the continued agent's; --failed returns the Assignment to Ready",
+    words.recordNote,
+    ...words.agentIdNote === undefined ? [] : [words.agentIdNote]
+  ]
+});
+var closeNotes = (words) => [
+  "pass the report through a quoted heredoc so it stays intact",
+  "--accept applies to success only and reads the last `evidence:` block: one `<criterion text or evidence label>: <support>` line per blocking criterion and per required label. The text before the colon matches the criterion, or its label (the criterion's text before its first colon, unless two criteria share it), ignoring case, spacing, trailing punctuation, a leading `[blocking]` and a trailing `(dimension)`; a support may continue on indented lines below its entry. Evidence for a different criterion matches nothing. Accept only support you judge true",
+  `an evidence gap (InsufficientAcceptance) records nothing: ${words.askAgain}, then close again with the corrected report, or when the Assignment is already Succeeded and not accepted, close it as success again or run \`assignment accept <id> --rationale <text> --report\` with the corrected report on stdin; a workflow agent cannot be messaged, so draft a follow-up with followUpOf`,
+  "outcomes: success; failure (the work failed); errored (the agent died or returned no report); interrupted (its agent is gone after a resume or compaction); stopped (you stopped it). A report from an inline workflow script is the specialist's own text: pass it verbatim on stdin, with --report-json only for a JSON report object"
+];
+var reportsSummary = (words) => `Write the results of a ${words.journal} to report files named by Assignment id, and list them`;
+var reportsNotes = (words) => [
+  "the journal is the run's journal.jsonl: `started` entries (key, agentId, label) and `result` entries (key, agentId, result) joined by key; label each agent() with its Assignment id so its report lands in <id>.md",
+  "reports go to holyagent/reports in the git common directory (local/reports of the state folder outside git), beside the briefs; a repeated label keeps its last result; closing the Intent removes the brief and report files of its Assignments. Read a report there, or close from it: `assignment close <id> --outcome success --accept <rationale> < <report-file>`",
+  "a journal line that is not JSON, or a started or result entry without its fields, refuses the whole journal and writes nothing",
+  ...words.reportsNote === undefined ? [] : [words.reportsNote]
+];
 var RECORD_USAGE = "assignment record <id> (--agent <agentId> | --failed)";
 var CLOSE_USAGE = "assignment close <id> --outcome success|failure|errored|interrupted|stopped [--accept <rationale>] [--report-json]";
 var LIST_USAGE = "assignment list [--state <state>] [--all] [--full]";
@@ -12455,11 +12570,18 @@ var recordLaunch = (update, id, agentId, launchedAs) => update((snapshot) => gen
   return yield* record2(snapshot.project, snapshot.specialists, id, agentId === undefined ? { launched: false } : { launched: true, agentId, model, effort });
 })).pipe(map4(({ assignment }) => assignment));
 var idArgument = (positionals) => positionals[0] ?? "";
-var workflowAgentProblem = (agentId, id) => {
-  if (!isWorkflowAgent(agentId))
-    return;
-  const [run = "", assignment, ...rest] = agentId.slice(WORKFLOW_AGENT_PREFIX.length).split("/");
-  return /^\S+$/.test(run) && assignment === id && rest.length === 0 ? undefined : `A workflow agent is recorded as workflow:<run-id>/${id}`;
+var piAgentProblem = (id) => `Under the pi host an agent is recorded as ${PI_AGENT_PREFIX}<agent-id>, or as ${PI_WORKFLOW_AGENT_PREFIX}<run-id>/${id} for a workflow's agent`;
+var agentIdProblem = (agentId, id, host) => {
+  const workflowPrefix = [WORKFLOW_AGENT_PREFIX, PI_WORKFLOW_AGENT_PREFIX].find((prefix) => agentId.startsWith(prefix));
+  if (workflowPrefix !== undefined) {
+    if (host === "pi" && workflowPrefix === WORKFLOW_AGENT_PREFIX)
+      return piAgentProblem(id);
+    const [run = "", assignment, ...rest] = agentId.slice(workflowPrefix.length).split("/");
+    return /^\S+$/.test(run) && assignment === id && rest.length === 0 ? undefined : `A workflow agent is recorded as ${workflowPrefix}<run-id>/${id}`;
+  }
+  if (agentId.startsWith(PI_AGENT_PREFIX))
+    return /^\S+$/.test(agentId.slice(PI_AGENT_PREFIX.length)) ? undefined : `A pi agent is recorded as ${PI_AGENT_PREFIX}<agent-id>`;
+  return host === "pi" ? piAgentProblem(id) : undefined;
 };
 var ASSIGNMENT_COMMANDS = [
   {
@@ -12483,7 +12605,8 @@ var ASSIGNMENT_COMMANDS = [
     usage: "assignment dispatch [--input <json>]",
     summary: "Start an Assignment and say how to run it: spawn an agent or continue a warm one. A new draft is created and started in one step",
     input: `{id} for a Ready Assignment, or a new draft ${DRAFT_SHAPE}`,
-    output: "TOON fields (id, state, agent/model/effort or continue, reason), then a line `prompt:` alone, then a two-line specialist prompt that names the brief file the full Assignment was written to; pass that text as it is: as the prompt of its agent() in your inline workflow script first, to the Agent tool only when the Workflow tool is disabled or unavailable, and by SendMessage only for a warm continuation. The brief itself is never printed: the specialist reads it with the Read tool",
+    ...dispatchOutput(CLAUDE_WORDS),
+    forHost: dispatchOutput,
     notes: [...DRAFT_NOTES, 'dispatching a Ready Assignment takes {"id": "<id>"}'],
     flags: { input: "string" },
     positionals: 0,
@@ -12501,7 +12624,10 @@ var ASSIGNMENT_COMMANDS = [
         const dispatched = yield* dispatch(project, snapshot.specialists, id, now, settings, workTreeKey(call.root));
         const agent = `${PLUGIN_NAMESPACE}:${routeFor(dispatched.assignment.roleTask).agent}`;
         const path = yield* writeBrief(call, dispatched.assignment.id, renderPrompt(dispatched.assignment, agent));
-        return { ...dispatched, prompt: dispatchPrompt(dispatched.assignment, agent, path) };
+        return {
+          ...dispatched,
+          prompt: dispatchPrompt(dispatched.assignment, agent, path, wordsFor(settings.host))
+        };
       }));
       return new WithTrailer({
         id: started.assignment.id,
@@ -12513,14 +12639,11 @@ var ASSIGNMENT_COMMANDS = [
   {
     path: ["assignment", "record"],
     usage: RECORD_USAGE,
-    summary: "Record the launch of a dispatched Assignment (a workflow's agent as workflow:<run-id>/<id>), or roll it back when the launch failed",
-    notes: [
-      "the agent id is in the Agent result, or is the continued agent's; --failed returns the Assignment to Ready",
-      "a hook records an agent spawned from a dispatch prompt and says so in its note; record it yourself when the note says it did not, or for a continued agent"
-    ],
+    ...recordHelp(CLAUDE_WORDS),
+    forHost: recordHelp,
     flags: { agent: "string", failed: "boolean" },
     positionals: 1,
-    run: ({ update, args }) => gen2(function* () {
+    run: ({ update, args, env }) => gen2(function* () {
       const id = idArgument(args.positionals);
       const agentId = stringFlag(args, "agent");
       if (agentId !== undefined === booleanFlag(args, "failed"))
@@ -12528,9 +12651,11 @@ var ASSIGNMENT_COMMANDS = [
           message: "Give exactly one of --agent and --failed",
           hint: `Usage: holyagent ${RECORD_USAGE}`
         });
-      const problem = agentId === undefined ? undefined : workflowAgentProblem(agentId, id);
-      if (problem !== undefined)
-        return yield* new Usage({ message: problem, hint: `Usage: holyagent ${RECORD_USAGE}` });
+      if (agentId !== undefined) {
+        const problem = agentIdProblem(agentId, id, yield* agentHostOf(env));
+        if (problem !== undefined)
+          return yield* new Usage({ message: problem, hint: `Usage: holyagent ${RECORD_USAGE}` });
+      }
       const assignment = yield* recordLaunch(update, id, agentId);
       return present({
         id,
@@ -12544,12 +12669,8 @@ var ASSIGNMENT_COMMANDS = [
     usage: CLOSE_USAGE,
     summary: "Finish an Assignment with the specialist's report on stdin; --accept also accepts it from the report's evidence block",
     input: "the specialist's report as raw text. Required for success; optional for the other outcomes, which store the outcome name when it is empty. With --accept it ends with `evidence:` and one `<criterion or evidence label>: <support>` line per blocking criterion and required label. With --report-json it is a JSON report object returned by an agent() that was given a schema ({status: done|partial|blocked, changed_paths, checks: [{command, exit}], blockers, notes, evidence: [{key, support}]}), which is stored as the text of such a report (fields beyond these are kept in it)",
-    notes: [
-      "pass the report through a quoted heredoc so it stays intact",
-      "--accept applies to success only and reads the last `evidence:` block: one `<criterion text or evidence label>: <support>` line per blocking criterion and per required label. The text before the colon matches the criterion, or its label (the criterion's text before its first colon, unless two criteria share it), ignoring case, spacing, trailing punctuation, a leading `[blocking]` and a trailing `(dimension)`; a support may continue on indented lines below its entry. Evidence for a different criterion matches nothing. Accept only support you judge true",
-      "an evidence gap (InsufficientAcceptance) records nothing: SendMessage the missing support to the same subagent, then close again with the corrected report, or when the Assignment is already Succeeded and not accepted, close it as success again or run `assignment accept <id> --rationale <text> --report` with the corrected report on stdin; a workflow agent cannot be messaged, so draft a follow-up with followUpOf",
-      "outcomes: success; failure (the work failed); errored (the agent died or returned no report); interrupted (its agent is gone after a resume or compaction); stopped (you stopped it). A report from an inline workflow script is the specialist's own text: pass it verbatim on stdin, with --report-json only for a JSON report object"
-    ],
+    notes: closeNotes(CLAUDE_WORDS),
+    forHost: (words) => ({ notes: closeNotes(words) }),
     flags: { outcome: "string", accept: "string", "report-json": "boolean" },
     positionals: 1,
     run: (call) => gen2(function* () {
@@ -12616,13 +12737,10 @@ var ASSIGNMENT_COMMANDS = [
   {
     path: ["assignment", "reports"],
     usage: REPORTS_USAGE,
-    summary: "Write the results of a Workflow run's journal to report files named by Assignment id, and list them",
+    summary: reportsSummary(CLAUDE_WORDS),
+    forHost: (words) => ({ summary: reportsSummary(words), notes: reportsNotes(words) }),
     output: "TOON: `reports` rows of id, path and words, one per Assignment id, and `notAssignmentIds` rows of label and agentId for results whose label is not an Assignment id (not written)",
-    notes: [
-      "the journal is the run's journal.jsonl: `started` entries (key, agentId, label) and `result` entries (key, agentId, result) joined by key; label each agent() with its Assignment id so its report lands in <id>.md",
-      "reports go to holyagent/reports in the git common directory (local/reports of the state folder outside git), beside the briefs; a repeated label keeps its last result; closing the Intent removes the brief and report files of its Assignments. Read a report there, or close from it: `assignment close <id> --outcome success --accept <rationale> < <report-file>`",
-      "a journal line that is not JSON, or a started or result entry without its fields, refuses the whole journal and writes nothing"
-    ],
+    notes: reportsNotes(CLAUDE_WORDS),
     flags: {},
     positionals: 1,
     state: "peek",
@@ -12716,12 +12834,12 @@ var history_rules_default = "- Never bypass hooks or signing (`--no-verify`, `--
 var state_changes_default = "## Leave state changes to the root\n\nLeave to the root every command that changes git, GitHub or holyagent state (`git commit`, `branch`, `push`, `checkout`, `stash`, `merge`, `reset`, `gh` writes, and `holyagent vcs`, `assignment` and `intent` commands) and anything under `.git/` or `.holyagent/`. The root owns the branch, PR and state records and records your changed paths from the report; a stray write corrupts the shared tree, and nothing blocks one, so it rests on you. When you need such a change, say so in the report. Read-only commands are open: `git status`, `diff`, `log`, `show`, `blame`, `fetch`, and `holyagent status`, `plan`, `assignment show` and `assignment list`. Never change HEAD, a branch, the index or the working tree of a checkout other workers share with git commands (`switch`, `restore`, `clean`, `add`, `rebase`, `cherry-pick`): they would find their tree changed under them. To read or test a commit, use `git show <sha>:<path>`, `git diff`, or `git archive <sha>` extracted into the scratchpad. To undo your own edit, edit the file back.\n";
 
 import { lstat as lstat3, realpath as realpath3 } from "fs/promises";
-import { dirname as dirname3, isAbsolute as isAbsolute2, join as join9, relative as relative4, resolve as resolve5, sep as sep6 } from "path";
+import { dirname as dirname3, isAbsolute as isAbsolute2, join as join10, relative as relative4, resolve as resolve5, sep as sep6 } from "path";
 
 class SetupFailure extends TaggedError2("SetupFailure") {
 }
 
-import { delimiter, join as join8 } from "path";
+import { delimiter, join as join9 } from "path";
 var {$: $3 } = globalThis.Bun;
 var pathKey = (env, insensitive = process.platform === "win32") => {
   if (!insensitive || env.PATH !== undefined)
@@ -12730,8 +12848,8 @@ var pathKey = (env, insensitive = process.platform === "win32") => {
 };
 var pathWithBunBin = (env, options) => {
   const key = pathKey(env, options.insensitive);
-  const root = options.bunInstall ? options.bunInstall : join8(options.home, ".bun");
-  const bunBin = join8(root, "bin");
+  const root = options.bunInstall ? options.bunInstall : join9(options.home, ".bun");
+  const bunBin = join9(root, "bin");
   return { key, value: `${env[key] ?? ""}${options.delimiter ?? delimiter}${bunBin}`, bunBin };
 };
 var findCommand = (env, command, options) => {
@@ -12740,7 +12858,7 @@ var findCommand = (env, command, options) => {
     PATH: options?.includeBunBin ? bunBin.value : env[bunBin.key] ?? ""
   }));
 };
-var EMPTY_BUNFIG = join8(import.meta.dir, "empty-bunfig.toml");
+var EMPTY_BUNFIG = join9(import.meta.dir, "empty-bunfig.toml");
 
 class Shell extends Service()("holyagent/Shell") {
   static live = (env) => {
@@ -12781,11 +12899,11 @@ var settingsFile = fn2("settingsFile")(function* (env, scope, cwd) {
   const named = top.exitCode === 0 && line !== "" ? resolve5(line) : undefined;
   const realTop = named === undefined ? undefined : yield* real(named);
   const realCwd = yield* real(cwd);
-  const trusted = named !== undefined && realTop !== undefined && realCwd !== undefined && within(realTop, realCwd) && (yield* present2(join9(named, ".git")));
+  const trusted = named !== undefined && realTop !== undefined && realCwd !== undefined && within(realTop, realCwd) && (yield* present2(join10(named, ".git")));
   const root = trusted ? named : cwd;
   const notice = trusted ? undefined : named === undefined ? `not inside a git repository; using ${cwd}` : `git names ${named} as the top-level, which is not the current directory or an ancestor holding a .git entry; using ${cwd}`;
-  const folder = join9(root, ".claude");
-  const file = join9(folder, scope === "project" ? "settings.json" : "settings.local.json");
+  const folder = join10(root, ".claude");
+  const file = join10(folder, scope === "project" ? "settings.json" : "settings.local.json");
   for (const path of [folder, file]) {
     if (yield* isSymlink(path)) {
       return yield* new SetupFailure({
@@ -12798,7 +12916,7 @@ var settingsFile = fn2("settingsFile")(function* (env, scope, cwd) {
 var projectSettingsFiles = fn2("projectSettingsFiles")(function* (cwd) {
   const roots = [resolve5(cwd)];
   for (let folder = resolve5(cwd);; folder = dirname3(folder)) {
-    if (yield* present2(join9(folder, ".git"))) {
+    if (yield* present2(join10(folder, ".git"))) {
       if (folder !== roots[0])
         roots.push(folder);
       break;
@@ -12807,13 +12925,13 @@ var projectSettingsFiles = fn2("projectSettingsFiles")(function* (cwd) {
       break;
   }
   return roots.flatMap((root) => [
-    join9(root, ".claude", "settings.json"),
-    join9(root, ".claude", "settings.local.json")
+    join10(root, ".claude", "settings.json"),
+    join10(root, ".claude", "settings.local.json")
   ]);
 });
 
 import { chmod, mkdir as mkdir3, realpath as realpath4, rename as rename4, rm as rm5, writeFile } from "fs/promises";
-import { basename as basename2, dirname as dirname4, join as join10 } from "path";
+import { basename as basename2, dirname as dirname4, join as join11 } from "path";
 var JsonObjectText = fromJsonString2(Record(String4, Unknown2), {
   space: 2
 });
@@ -12845,7 +12963,7 @@ var replaceJsonObject = (path, value, options, unchangedSince) => gen2(function*
   const mode = options?.mode ?? (exists ? (yield* fileOperation(target, "write", () => Bun.file(target).stat())).mode & 511 : undefined);
   const text = (yield* encodeEffect(JsonObjectText)(value, strict2).pipe(mapError2((error) => new SetupFailure({ message: `cannot encode ${path}: ${error.message}` })))) + `
 `;
-  const temporary = join10(dirname4(target), `.${basename2(target)}.${process.pid}.tmp`);
+  const temporary = join11(dirname4(target), `.${basename2(target)}.${process.pid}.tmp`);
   yield* fileOperation(dirname4(target), "write", () => mkdir3(dirname4(target), { recursive: true }));
   yield* tryPromise2({
     try: () => writeFile(temporary, text, { flag: "wx", ...mode === undefined ? {} : { mode } }),
@@ -12896,7 +13014,7 @@ var applyDefaults = (existing, defaults) => {
   return { merged, entries: [...entries.values()] };
 };
 
-import { join as join11, resolve as resolve6 } from "path";
+import { join as join12, resolve as resolve6 } from "path";
 var RecordedKey = Struct({
   path: NonEmptyArray(String4),
   value: Unknown2
@@ -12904,7 +13022,7 @@ var RecordedKey = Struct({
 var RecordFile = Struct({
   files: Record(String4, Struct({ keys: ArraySchema(RecordedKey) }))
 });
-var recordPath = (env) => join11(userFiles(env).claudeDir, "holyagent", "setup-records.json");
+var recordPath = (env) => join12(userFiles(env).claudeDir, "holyagent", "setup-records.json");
 var keyOf = (file) => resolve6(file);
 var load = (env) => gen2(function* () {
   const path = recordPath(env);
@@ -13120,11 +13238,11 @@ var setupNotice = (env, cwd) => {
 
 import { lstat as lstat4, mkdir as mkdir4, open as open3 } from "fs/promises";
 import { tmpdir, userInfo } from "os";
-import { join as join12 } from "path";
+import { join as join13 } from "path";
 var SAFE_SESSION = /^[\w.-]{1,80}$/;
 var isSessionId = (id) => id !== undefined && SAFE_SESSION.test(id) && !/^\.+$/.test(id);
-var markers = () => join12(tmpdir(), `holyagent-sessions-${(process.getuid?.() ?? userInfo().username).toString().replace(/[^\w.-]/g, "_")}`);
-var markerOf = (sessionId) => join12(markers(), sessionId);
+var markers = () => join13(tmpdir(), `holyagent-sessions-${(process.getuid?.() ?? userInfo().username).toString().replace(/[^\w.-]/g, "_")}`);
+var markerOf = (sessionId) => join13(markers(), sessionId);
 var ensureMarkers = () => {
   const folder = markers();
   const uid = process.getuid?.();
@@ -13137,7 +13255,7 @@ var create2 = (sessionId) => ensureMarkers().pipe(andThen2(io(markerOf(sessionId
 var markRulesDelivered = (sessionId) => create2(sessionId).pipe(asVoid2);
 var claimRulesDelivery = create2;
 
-import { join as join13 } from "path";
+import { join as join14 } from "path";
 var LEGACY_FOLDERS = {
   holyclaude: ".holyclaude",
   holycodex: ".holycodex"
@@ -13293,7 +13411,7 @@ var byFolder = (paths) => {
   return folders;
 };
 var convertibleFolders = (source, files) => byFolder(source === "holyclaude" ? files.filter((path) => path.startsWith("intents/")).map((path) => path.slice(8)) : files.filter((path) => !path.startsWith(".")));
-var legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join13(root, LEGACY_FOLDERS[source])).pipe(map4((files) => convertibleFolders(source, files).size > 0))).pipe(map4((sources) => sources.map((source) => LEGACY_FOLDERS[source])));
+var legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join14(root, LEGACY_FOLDERS[source])).pipe(map4((files) => convertibleFolders(source, files).size > 0))).pipe(map4((sources) => sources.map((source) => LEGACY_FOLDERS[source])));
 var isoOf = (millis) => {
   const date = new Date(millis);
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
@@ -13414,13 +13532,13 @@ var holyclaudeAssignment = (legacy, roleTask, siblings) => {
 };
 var gatherHolyclaude = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holyclaude;
-  const legacy = join13(root, folderName);
+  const legacy = join14(root, folderName);
   const intents = convertibleFolders("holyclaude", yield* listFiles(legacy));
   if (intents.size === 0)
     return;
   const state = collector("holyclaude");
   for (const [folder, inside] of intents) {
-    const base = join13(legacy, "intents", folder);
+    const base = join14(legacy, "intents", folder);
     const shown = (relative) => `${folderName}/intents/${folder}/${relative}`;
     if (!inside.includes("intent.json")) {
       unconvertible(state, shown("").slice(0, -1), "the folder has no intent.json");
@@ -13428,7 +13546,7 @@ var gatherHolyclaude = (root, directory) => gen2(function* () {
     }
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.json$/.test(path));
     const notes = inside.filter((path) => path !== "intent.json" && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join13(base, "intent.json"));
+    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join14(base, "intent.json"));
     const intent = yield* intentRecord(directory, shown("intent.json"), "problem" in read ? read : holyclaudeIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.json"), intent.problem);
@@ -13439,10 +13557,10 @@ var gatherHolyclaude = (root, directory) => gen2(function* () {
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join13(base, path), to: join13(target, path) });
+      state.notes.push({ from: join14(base, path), to: join14(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join13(base, path));
+      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join14(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (assignment.value.intent_id !== intent.value.intent.id)
@@ -13544,13 +13662,13 @@ var holycodexAssignment = (legacy, roleTask, intent, siblings) => {
 var TRANSACTION_FILE = ".holycodex-transaction.toon";
 var gatherHolycodex = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holycodex;
-  const legacy = join13(root, folderName);
+  const legacy = join14(root, folderName);
   const folders = convertibleFolders("holycodex", yield* listFiles(legacy));
   if (folders.size === 0)
     return;
   const state = collector("holycodex");
   for (const [folder, inside] of folders) {
-    const base = join13(legacy, folder);
+    const base = join14(legacy, folder);
     const shown = (relative) => `${folderName}/${folder}/${relative}`;
     if (!inside.includes("intent.toon")) {
       unconvertible(state, `${folderName}/${folder}`, "the folder has no intent.toon");
@@ -13564,7 +13682,7 @@ var gatherHolycodex = (root, directory) => gen2(function* () {
       });
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.toon$/.test(path));
     const notes = inside.filter((path) => path !== "intent.toon" && path !== TRANSACTION_FILE && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join13(base, "intent.toon"));
+    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join14(base, "intent.toon"));
     const intent = yield* intentRecord(directory, shown("intent.toon"), "problem" in read ? read : holycodexIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.toon"), intent.problem);
@@ -13575,10 +13693,10 @@ var gatherHolycodex = (root, directory) => gen2(function* () {
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join13(base, path), to: join13(target, path) });
+      state.notes.push({ from: join14(base, path), to: join14(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join13(base, path));
+      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join14(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (mapId("intent", assignment.value.intent_id) !== intent.value.intent.id)
@@ -13823,6 +13941,7 @@ var continuations = (rows, beside, registry, now, config) => parallelSet(rows.fi
 var recommend = (project, registry, now, config, workTree) => {
   const ready = project.assignments.filter((row) => row.state === "Ready");
   const dispatchable = ready.filter((row) => dispatchBlock(project, row, undefined, workTree) === undefined && awaited(project, row).length === 0);
+  const words = wordsFor(config.host);
   if (config.workflowsAvailable) {
     const spawns = (row) => directiveFor(row, registry, now, config).action === "spawn";
     const pool = {
@@ -13846,7 +13965,7 @@ var recommend = (project, registry, now, config, workTree) => {
           assignmentIds,
           fallback,
           continues,
-          reason: continues.length === 0 ? reason : `${reason}; the Assignments in continues go by SendMessage to their warm specialists`
+          reason: continues.length === 0 ? reason : `${reason}; the Assignments in continues go by ${words.message} to their warm specialists`
         };
       }
     }
@@ -13861,14 +13980,14 @@ var recommend = (project, registry, now, config, workTree) => {
       action: "continue",
       assignmentIds: continues.map((row) => row.assignmentId),
       continues,
-      reason: "each continues a warm specialist by SendMessage"
+      reason: `each continues a warm specialist by ${words.message}`
     };
   }
   if (chosen.length > 1)
     return {
       action: "subagent",
       assignmentIds,
-      reason: "the Workflow tool is disabled or unavailable"
+      reason: `the ${words.workflowTool} tool is disabled or unavailable`
     };
   const [first] = chosen;
   if (first === undefined)
@@ -13909,7 +14028,7 @@ var statusFrom = (snapshot) => {
   };
 };
 var statusOf = (directory) => readOpenState(directory).pipe(map4(statusFrom));
-var reconcileFrom = ({ project }) => {
+var reconcileFrom = ({ project }, words) => {
   const running = byId(project.assignments.filter((row) => row.state === "Running"));
   return {
     running: running.map((row) => ({
@@ -13919,25 +14038,26 @@ var reconcileFrom = ({ project }) => {
       startedAt: row.specialist?.startedAt ?? null
     })),
     ...present({
-      next: running.length === 0 ? undefined : "close as interrupted only an agent confirmed gone (SendMessage or transcript; an exited parent session proves nothing): holyagent assignment close <id> --outcome interrupted"
+      next: running.length === 0 ? undefined : `close as interrupted only an agent confirmed gone (${words.confirmGone}; an exited parent session proves nothing): holyagent assignment close <id> --outcome interrupted`
     })
   };
 };
-var reconcileOf = (directory) => readOpenState(directory).pipe(map4(reconcileFrom));
-var resumeOf = (directory) => readOpenState(directory).pipe(map4((snapshot) => ({
+var reconcileOf = (directory, words) => readOpenState(directory).pipe(map4((snapshot) => reconcileFrom(snapshot, words)));
+var resumeOf = (directory, words = CLAUDE_WORDS) => readOpenState(directory).pipe(map4((snapshot) => ({
   status: statusFrom(snapshot),
-  reconcile: reconcileFrom(snapshot)
+  reconcile: reconcileFrom(snapshot, words)
 })));
-var PLAN_NOTES = [
+var planNotes = (words) => [
   "`workflow` first: `assignments` are the ids in run order, a writer followed by the review of its work; `assignment dispatch` each for its agent, model, effort and prompt, then write the inline script as the root workflow text says. A single Assignment is a one-entry workflow",
-  "`continues` lists Ready work that continues a warm specialist, by SendMessage beside the workflow. `fallback` is the same work as direct subagents, for a session where the Workflow tool is disabled or unavailable: its writers launch together, and the `afterwards` reviews launch once the writers they depend on are terminal"
+  `\`continues\` lists Ready work that continues a warm specialist, by ${words.message} beside the workflow. \`fallback\` is the same work as direct subagents, for a session where the ${words.workflowTool} tool is disabled or unavailable: its writers launch together, and the \`afterwards\` reviews launch once the writers they depend on are terminal`
 ];
 var OVERVIEW_COMMANDS = [
   {
     path: ["plan"],
     usage: "plan",
     summary: "Say how to run the Ready Assignments of the Intent in use: a workflow first (with the direct subagents as its fallback), else subagents or a warm agent",
-    notes: PLAN_NOTES,
+    notes: planNotes(CLAUDE_WORDS),
+    forHost: (words) => ({ notes: planNotes(words) }),
     flags: {},
     positionals: 0,
     run: ({ directory, config, root }) => gen2(function* () {
@@ -13962,7 +14082,7 @@ var OVERVIEW_COMMANDS = [
         parallel: recommendation.assignmentIds.length > 1 ? true : undefined,
         fallback: recommendation.action === "workflow" ? present({
           action: "subagent",
-          when: "only if the Workflow tool is disabled or unavailable",
+          when: `only if the ${wordsFor(settings.host).workflowTool} tool is disabled or unavailable`,
           assignments: recommendation.fallback.assignmentIds,
           parallel: recommendation.fallback.assignmentIds.length > 1 ? true : undefined,
           afterwards: recommendation.fallback.afterwards
@@ -13985,7 +14105,7 @@ var OVERVIEW_COMMANDS = [
     summary: "List the Running Assignments with their agent ids, to confirm after a resume",
     flags: {},
     positionals: 0,
-    run: ({ directory }) => reconcileOf(directory)
+    run: ({ directory, env }) => agentHostOf(env).pipe(flatMap2((host) => reconcileOf(directory, wordsFor(host))))
   }
 ];
 
@@ -21133,6 +21253,7 @@ var hook = (name, summary, run, stateless) => ({
   path: ["hook", name],
   usage: `hook ${name}`,
   summary,
+  hosts: ["claude"],
   input: "the host's hook payload as JSON",
   output: "the JSON the host reads, or nothing; exit 1 with a stderr line on failure",
   flags: {},
@@ -21317,7 +21438,7 @@ ${cleanedBelow}
   }, true)
 ];
 
-import { join as join14, relative as relative5 } from "path";
+import { join as join15, relative as relative5 } from "path";
 var {$: $4 } = globalThis.Bun;
 class NothingToMigrate extends TaggedError2("NothingToMigrate") {
   get message() {
@@ -21406,7 +21527,7 @@ var mentionsOf = (root, folders) => gen2(function* () {
   const names = yield* io(root, () => Array.fromAsync(new Bun.Glob("*").scan({ cwd: root, dot: true, onlyFiles: true })));
   const hits = [];
   for (const name of names.toSorted()) {
-    const text = yield* readText(join14(root, name));
+    const text = yield* readText(join15(root, name));
     if (text !== undefined && folders.some((folder) => text.includes(folder)))
       hits.push(name);
   }
@@ -21480,7 +21601,7 @@ var MIGRATE_COMMANDS = [
   }
 ];
 
-import { join as join15 } from "path";
+import { join as join16 } from "path";
 var CLOUD_SKIP = "skipped in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true), which has no machine of yours to install it on";
 var neutralDirectory = (env) => homeDirectory(env);
 var ensureGlobal = fn2("ensureGlobal")(function* (env, command, packageName, dryRun) {
@@ -21511,7 +21632,7 @@ var installCtx7 = fn2("installCtx7")(function* (env, dryRun) {
   const global = yield* ensureGlobal(env, "ctx7", "ctx7", dryRun);
   if (!global.usable)
     return global.lines;
-  const skillReady = (yield* fileExists2(join15(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join15(files.claudeDir, "rules", "context7.md")));
+  const skillReady = (yield* fileExists2(join16(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join16(files.claudeDir, "rules", "context7.md")));
   if (skillReady)
     return [...global.lines, present3("ctx7 skill: already installed")];
   const apiKey = env.CONTEXT7_API_KEY === "" ? undefined : env.CONTEXT7_API_KEY;
@@ -21695,14 +21816,14 @@ var STATE_COMMANDS = [
   }
 ];
 
-import { join as join16 } from "path";
+import { join as join17 } from "path";
 var {$: $5 } = globalThis.Bun;
 var TARGETS = [
   { id: "darwin-arm64", platform: "darwin", arch: "arm64", suffix: "" },
   { id: "linux-x64", platform: "linux", arch: "x64", suffix: "" },
   { id: "windows-x64", platform: "win32", arch: "x64", suffix: ".exe" }
 ];
-var BUNDLED_TOOLS = join16(import.meta.dir, "vendor");
+var BUNDLED_TOOLS = join17(import.meta.dir, "vendor");
 
 class UnsupportedPlatform extends TaggedError2("UnsupportedPlatform") {
   get message() {
@@ -21719,7 +21840,7 @@ var selectTarget = (platform, arch) => {
   const target = TARGETS.find((candidate) => candidate.platform === platform && candidate.arch === arch);
   return target === undefined ? fail5(new UnsupportedPlatform({ platform, arch })) : succeed6(target);
 };
-var toolPath = (directory, tool, target) => join16(directory, target.id, `${tool}${target.suffix}`);
+var toolPath = (directory, tool, target) => join17(directory, target.id, `${tool}${target.suffix}`);
 var runTool = (options) => gen2(function* () {
   const path = toolPath(options.directory, options.tool, options.target);
   if (!(yield* promise2(() => Bun.file(path).exists())))
@@ -21770,46 +21891,25 @@ var COMMANDS = [
   ...HOOK_COMMANDS
 ];
 
-import { join as join17 } from "path";
-var TTL_VARIABLE = "HOLYAGENT_REUSE_TTL_MINUTES";
-var Minutes = NumberFromString.check(isFinite2(), isGreaterThanOrEqualTo2(0));
-var reuseTtl = (env) => {
-  const raw = env[TTL_VARIABLE];
-  return raw === undefined || raw.trim() === "" ? succeed6(DEFAULT_CONFIG.ttlMinutes) : decodeUnknownEffect2(Minutes)(raw.trim()).pipe(mapError2(() => new Usage({
-    message: `${TTL_VARIABLE} must be a number of minutes, not "${raw}"`,
-    hint: `Unset ${TTL_VARIABLE} for the default of ${DEFAULT_CONFIG.ttlMinutes}.`
-  })));
-};
-var WorkflowSettings = Struct({
-  disableWorkflows: optionalKey2(Boolean3),
-  enableWorkflows: optionalKey2(Boolean3)
-});
-var disablesWorkflows = (path) => readText(path).pipe(flatMap2((text) => text === undefined ? succeed6(false) : decodeUnknownEffect2(fromJsonString2(WorkflowSettings))(text).pipe(map4((settings) => settings.disableWorkflows === true || settings.enableWorkflows === false))), orElseSucceed2(() => false));
-var workflowsAvailable = (env, root) => {
-  if (env.CLAUDE_CODE_DISABLE_WORKFLOWS === "1")
-    return succeed6(false);
-  const files = [
-    join17(claudeConfigDirectory(env), "settings.json"),
-    join17(root, ".claude", "settings.json"),
-    join17(root, ".claude", "settings.local.json")
-  ];
-  return forEach2(files, disablesWorkflows).pipe(map4((disabled) => !disabled.includes(true)));
-};
-var loadConfig = (env, root) => all2({ ttlMinutes: reuseTtl(env), workflowsAvailable: workflowsAvailable(env, root) }).pipe(map4((config) => config));
-
-var help = (command) => [
-  `${command.usage}  ${command.summary}`,
-  ...command.input === undefined ? [] : [
-    `${INPUT_FLAG in command.flags ? "input (--input '<json>' or stdin)" : "stdin"}: ${command.input}`
-  ],
-  ...command.output === undefined ? [] : [`stdout: ${command.output}`],
-  ...(command.notes ?? []).map((note) => `note: ${note}`)
-].join(`
+var forWords = (command, words) => command.forHost === undefined ? command : { ...command, ...command.forHost(words) };
+var help = (command, words) => {
+  const { usage, summary, input, output, notes, flags } = forWords(command, words);
+  return [
+    `${usage}  ${summary}`,
+    ...input === undefined ? [] : [`${INPUT_FLAG in flags ? "input (--input '<json>' or stdin)" : "stdin"}: ${input}`],
+    ...output === undefined ? [] : [`stdout: ${output}`],
+    ...(notes ?? []).map((note) => `note: ${note}`)
+  ].join(`
 `);
-var topHelp = () => [
+};
+var listed = (host) => COMMANDS.filter((command) => command.hosts === undefined || command.hosts.includes(host));
+var topHelp = (host, words) => [
   "holyagent <command> [args]; JSON inline as `--input '<json>'` or on stdin, TOON on stdout; errors go to stderr as `error:` and `hint:` lines",
   "exit codes: 2 usage, 3 refused by the current state, 4 state or I/O failure; every error's `hint:` says what to do next",
-  ...COMMANDS.map((command) => `${command.usage}  ${command.summary}`),
+  ...listed(host).map((command) => {
+    const { usage, summary } = forWords(command, words);
+    return `${usage}  ${summary}`;
+  }),
   "help [command] or <command> --help shows a command's input shape, stdout and rules"
 ].join(`
 `);
@@ -21832,32 +21932,45 @@ var callFor = (args, host, emit, command) => gen2(function* () {
     inputBy: (pick) => readInputBy(host, pick, inline)
   };
 });
+var hostForText = (env) => agentHostOf(env).pipe(orElseSucceed2(() => "claude"));
 var asFlag = (argv) => argv[0] === "help" ? argv.length === 1 ? ["--help"] : [...argv.slice(1), "--help"] : argv;
 var execute = (given, host) => gen2(function* () {
   const argv = asFlag(given);
   const [first] = argv;
-  if (first === undefined || first === "--help" || first === "-h")
-    return { stdout: `${topHelp()}
+  if (first === undefined || first === "--help" || first === "-h") {
+    const agent = yield* hostForText(host.env);
+    return { stdout: `${topHelp(agent, wordsFor(agent))}
 `, stderr: "", code: 0 };
+  }
   if (first === "--version")
     return { stdout: `${version}
 `, stderr: "", code: 0 };
   const command = COMMANDS.find((candidate) => candidate.path.every((word, index) => argv[index] === word));
   if (command === undefined) {
     const group = COMMANDS.filter((candidate) => candidate.path[0] === first);
-    if (group.length > 0 && (argv.length === 1 || argv.includes("--help") || argv.includes("-h")))
-      return { stdout: `${group.map(help).join(`
+    if (group.length > 0 && (argv.length === 1 || argv.includes("--help") || argv.includes("-h"))) {
+      const agent = yield* hostForText(host.env);
+      const words = wordsFor(agent);
+      const shown = listed(agent).filter((candidate) => group.includes(candidate));
+      return {
+        stdout: `${shown.map((entry) => help(entry, words)).join(`
 `)}
-`, stderr: "", code: 0 };
+`,
+        stderr: "",
+        code: 0
+      };
+    }
     return yield* new Usage({
       message: `Unknown command ${argv.slice(0, 2).join(" ")}`,
       hint: group.length > 0 ? `Run \`holyagent ${first} --help\` for its commands.` : "Run `holyagent --help` for the commands."
     });
   }
   const rest = argv.slice(command.path.length);
-  if (command.passthrough !== true && (rest.includes("--help") || rest.includes("-h")))
-    return { stdout: `${help(command)}
+  if (command.passthrough !== true && (rest.includes("--help") || rest.includes("-h"))) {
+    const agent = yield* hostForText(host.env);
+    return { stdout: `${help(command, wordsFor(agent))}
 `, stderr: "", code: 0 };
+  }
   const args = command.raw === true ? { positionals: rest, flags: {} } : yield* parseArgs(rest, command.flags, command.usage);
   const count = args.positionals.length;
   if (command.raw !== true && count !== command.positionals && !(command.optional && count === command.positionals - 1))
@@ -21880,13 +21993,13 @@ ${output.text}
 `;
   return { stdout, stderr: "", code: 0 };
 });
-var failed3 = (error) => {
-  const { tag, message, hint, code } = describeFailure(error);
+var failed3 = (error, env) => hostForText(env).pipe(map4((agent) => {
+  const { tag, message, hint, code } = describeFailure(error, wordsFor(agent));
   return { stdout: "", stderr: `error: ${tag}: ${message}
 hint: ${hint}
 `, code };
-};
-var run2 = (argv, host) => execute(argv, host).pipe(catch_2((error) => succeed6(failed3(error))), catchCause2((cause) => succeed6(failed3({ _tag: "Defect", message: pretty(cause) }))));
+}));
+var run2 = (argv, host) => execute(argv, host).pipe(catch_2((error) => failed3(error, host.env)), catchCause2((cause) => failed3({ _tag: "Defect", message: pretty(cause) }, host.env)));
 
 var stdin = suspend2(() => process.stdin.isTTY ? fail5(new StdinMissing({ reason: "stdin is a terminal" })) : tryPromise2({
   try: () => Bun.stdin.text(),

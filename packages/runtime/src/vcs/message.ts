@@ -8,17 +8,41 @@ import { looksLikeAgent } from "./identity.ts"
 // trailers and the "Generated with … Claude Code" footer (alone on its line, after an optional
 // emoji or bracket) always go; a Co-authored-by trailer goes only when it names the agent, so
 // human co-authors stay.
+//
+// Pi adds no commit text of its own: the installed @earendil-works/pi-coding-agent 1.5.0 and the
+// packages under it hold no Co-authored-by, "Generated with" or trailer string, and its system
+// prompt says nothing about git. Its attribution is the name `pi` and the address https://pi.dev
+// (`PI_ATTRIBUTION` in @earendil-works/pi-ai, dist/utils/identity.js), and its /share command links
+// the session viewer https://pi.dev/session/#<gist> (`getShareViewerUrl` in pi-coding-agent,
+// dist/config.js). A model running in pi copies those forms, so the cleaner also removes the footer
+// "Generated with [pi](https://pi.dev)", a Co-authored-by trailer for an address at pi.dev or for
+// "Pi Coding Agent" under any address, and pi.dev session links. A bare "Pi" is a name a person can
+// have, so it goes only with a pi.dev address.
+//
+// Links stop at whitespace and at ')'. A session link that is the URL of a Markdown "[text](url)"
+// goes with its text and parentheses; a bare one goes alone. The link text excludes brackets, so
+// a run of '[' cannot make the pattern rescan, and the footer pattern cannot backtrack across a
+// run of ')'.
 const SESSION_TRAILER = /^\s*claude-session\s*:/i
 const GENERATED_FOOTER = /^\s*(?:[^\p{L}\p{N}\s]\s*)*generated\s+with\b.*\bclaude\s+code\b/iu
+const PI_GENERATED_FOOTER =
+  /^\s*(?:[^\p{L}\p{N}\s]\s*)*generated\s+with\s+\[?pi(?:[\s-]coding[\s-]agent)?\]?(?:\([^\s)]*\))?[^\p{L}\p{N}]*$/iu
 const CO_AUTHOR = /^\s*co-authored-by\s*:\s*(.*)$/i
-const SESSION_LINK = /https?:\/\/claude\.ai\/\S*/gi
+const CLAUDE_URL = String.raw`https?:\/\/claude\.ai\/[^\s)]*`
+const PI_URL = String.raw`https?:\/\/(?:[\w-]+\.)*pi\.dev\/session\/[^\s)]*`
+const sessionLink = (url: string) => new RegExp(String.raw`\[[^\][]*\]\(${url}\)|${url}`, "gi")
+const SESSION_LINK = sessionLink(CLAUDE_URL)
+const PI_SESSION_LINK = sessionLink(PI_URL)
+const PI_AGENT_NAME = /^pi[\s-]coding[\s-]agent$/i
 
 const namesAgent = (coAuthor: string) =>
   looksLikeAgent({ name: coAuthor.replace(/<.*$/, ""), email: "" }) ||
-  /@(?:[\w-]+\.)*anthropic\.com\b/i.test(coAuthor)
+  /@(?:[\w-]+\.)*(?:anthropic\.com|pi\.dev)\b/i.test(coAuthor) ||
+  PI_AGENT_NAME.test(coAuthor.replace(/<.*$/, "").replace(/\s+/g, " ").trim())
 
 const isAttribution = (line: string) => {
-  if (SESSION_TRAILER.test(line) || GENERATED_FOOTER.test(line)) return true
+  if (SESSION_TRAILER.test(line) || GENERATED_FOOTER.test(line) || PI_GENERATED_FOOTER.test(line))
+    return true
   const coAuthor = CO_AUTHOR.exec(line)
   return coAuthor !== null && namesAgent(coAuthor[1] ?? "")
 }
@@ -40,14 +64,14 @@ export const DEFAULT_PHRASES: ReadonlyArray<string> = [
 
 /**
  * Removes the agent's session trailers, its Co-authored-by trailers, the "Generated with … Claude
- * Code" footer and claude.ai session links.
+ * Code" footer and claude.ai session links, and pi's forms of them (see the notes above).
  */
 export const cleanMessage = (text: string): string =>
   text
     .split("\n")
     .filter((line) => !isAttribution(line))
     .flatMap((line) => {
-      const stripped = line.replace(SESSION_LINK, "")
+      const stripped = line.replace(SESSION_LINK, "").replace(PI_SESSION_LINK, "")
       return stripped === line ? [line] : stripped.trim() === "" ? [] : [stripped.trimEnd()]
     })
     .join("\n")

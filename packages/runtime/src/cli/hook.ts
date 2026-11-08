@@ -74,6 +74,7 @@ const hook = (
   path: ["hook", name],
   usage: `hook ${name}`,
   summary,
+  hosts: ["claude"],
   input: "the host's hook payload as JSON",
   output: "the JSON the host reads, or nothing; exit 1 with a stderr line on failure",
   flags: {},
@@ -94,7 +95,11 @@ const hook = (
 /** The agent types of the root: the plugin's `agent` setting applied, with or without namespace. */
 const ROOT_AGENTS: ReadonlySet<string | undefined> = new Set(["holyagent", "holyagent:holyagent"])
 
-const hasStateFolder = (directory: string) =>
+/**
+ * Whether the project has a `.holyagent` state folder at `directory`; a missing folder is false,
+ * not a failure.
+ */
+export const hasStateFolder = (directory: string) =>
   io(directory, () => stat(directory)).pipe(
     Effect.as(true),
     Effect.catchIf(
@@ -104,13 +109,13 @@ const hasStateFolder = (directory: string) =>
   )
 
 /** The SessionStart sources after which pending notices are lost and the Running rows need a check. */
-const RESUMED: ReadonlySet<string | undefined> = new Set(["resume", "compact"])
+export const RESUMED: ReadonlySet<string | undefined> = new Set(["resume", "compact"])
 
 /**
  * The requirements of the Intent in use, as `intent show` resolves it, for a session that lost
  * them; nothing when no Intent is in use.
  */
-const requirementsOf = (
+export const requirementsOf = (
   directory: string,
 ): Effect.Effect<IntentRequirements | undefined, unknown> =>
   readOpenState(directory).pipe(

@@ -3,6 +3,7 @@ import { Effect, Schema } from "effect"
 import type { AcceptanceInput } from "../domain/acceptance.ts"
 import type { Assignment } from "../domain/assignment.ts"
 import { InsufficientAcceptance } from "../domain/errors.ts"
+import { CLAUDE_WORDS, type HostWords } from "../domain/host.ts"
 import { Usage } from "./errors.ts"
 import { JsonReport, renderJsonReport } from "./jsonreport.ts"
 
@@ -241,12 +242,18 @@ export const renderPrompt = (assignment: Assignment, agent: string): string =>
 /**
  * The prompt the root sends in place of the brief: the role line of {@link renderPrompt}, so the
  * launch hook still reads the Assignment from it, and the path of the brief file, which the
- * specialist reads with its Read tool and follows as its whole task.
+ * specialist reads with the read tool of the host (`words`, Claude's by default) and follows as its
+ * whole task.
  */
-export const dispatchPrompt = (assignment: Assignment, agent: string, briefPath: string): string =>
+export const dispatchPrompt = (
+  assignment: Assignment,
+  agent: string,
+  briefPath: string,
+  words: HostWords = CLAUDE_WORDS,
+): string =>
   [
     `Role: ${assignment.roleTask} (${agent}). Assignment: ${assignment.id}.`,
-    `Read the brief at ${briefPath} with the Read tool and follow it as your full task.`,
+    `Read the brief at ${briefPath} with the ${words.readTool} tool and follow it as your full task.`,
   ].join("\n")
 
 const Started = Schema.Struct({

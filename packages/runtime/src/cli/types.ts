@@ -2,6 +2,7 @@ import type { Effect, Layer, Schema } from "effect"
 
 import type { ExecutionConfig } from "../domain/directive.ts"
 import type { InvalidDraft } from "../domain/errors.ts"
+import type { AgentHost, HostWords } from "../domain/host.ts"
 import type { Snapshot, StateChange, updateState } from "../state/store.ts"
 import type { Ensure } from "../state/tree.ts"
 import type { Git } from "../vcs/git.ts"
@@ -121,6 +122,15 @@ export interface Command {
   readonly output?: string
   /** Further help lines, for what the model must know to use the command without a manual. */
   readonly notes?: ReadonlyArray<string>
+  /**
+   * The help text that names a host's tools, for that host's `words`; the fields above hold the
+   * Claude form. A command whose help names none leaves it out.
+   */
+  readonly forHost?: (
+    words: HostWords,
+  ) => Partial<Pick<Command, "summary" | "input" | "output" | "notes">>
+  /** The hosts whose help lists the command; every host when absent. It still runs under any. */
+  readonly hosts?: ReadonlyArray<AgentHost>
   readonly flags: FlagSpec
   /** True when the command needs neither the state root nor git, so no git runs before it. */
   readonly stateless?: true

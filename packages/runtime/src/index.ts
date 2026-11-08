@@ -2,6 +2,7 @@ export * from "./domain/acceptance.ts"
 export * from "./domain/assignment.ts"
 export * from "./domain/directive.ts"
 export * from "./domain/errors.ts"
+export * from "./domain/host.ts"
 export * from "./domain/ids.ts"
 export * from "./domain/input.ts"
 export * from "./domain/intent.ts"
@@ -18,3 +19,19 @@ export * from "./state/errors.ts"
 export * from "./state/layout.ts"
 export * from "./state/local.ts"
 export * from "./state/store.ts"
+
+// What `hook session-start` builds its context from, for a host that does not run the Claude hook:
+// the status and reconcile result, the core of the root rules, and the context builders.
+export { hasStateFolder, RESUMED, requirementsOf } from "./cli/hook.ts"
+export { resumeOf, statusOf } from "./cli/overview.ts"
+export {
+  bareContext,
+  CLOUD_IDENTITY,
+  CONTEXT_BUDGET,
+  type IntentRequirements,
+  legacyContext,
+  ROOT_TAKEOVER,
+  SESSION_REMINDER,
+  sessionContext,
+} from "./cli/sessioncontext.ts"
+export { ROOT_CORE } from "./instructions/claude-5.5/root-core.ts"

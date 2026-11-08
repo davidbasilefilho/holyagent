@@ -9,8 +9,14 @@ import {
   createAssignment,
   type Outcome,
 } from "../domain/assignment.ts"
-import { type Directive, isWorkflowAgent, WORKFLOW_AGENT_PREFIX } from "../domain/directive.ts"
+import {
+  type Directive,
+  PI_AGENT_PREFIX,
+  PI_WORKFLOW_AGENT_PREFIX,
+  WORKFLOW_AGENT_PREFIX,
+} from "../domain/directive.ts"
 import { InvalidDraft } from "../domain/errors.ts"
+import { type AgentHost, CLAUDE_WORDS, type HostWords, wordsFor } from "../domain/host.ts"
 import { AssignmentId, IntentId, newId } from "../domain/ids.ts"
 import { closeAssignment, dispatch, record } from "../domain/lifecycle.ts"
 import { Revision } from "../domain/primitives.ts"
@@ -21,6 +27,7 @@ import { workTreeKey } from "../state/local.ts"
 import { readState, type Snapshot } from "../state/store.ts"
 import { booleanFlag, choiceFlag, requiredFlag, stringFlag } from "./args.ts"
 import { writeBrief, writeReport } from "./brief.ts"
+import { agentHostOf } from "./config.ts"
 import { nowIso } from "./context.ts"
 import { AgentMismatch, Usage } from "./errors.ts"
 import { resolveIntent } from "./intent.ts"
@@ -99,6 +106,36 @@ const OUTCOMES: Readonly<Record<typeof OutcomeFlag.Type, Outcome>> = {
   stopped: "Cancelled",
 }
 
+const dispatchOutput = (words: HostWords) => ({
+  output: `TOON fields (id, state, agent/model/effort or continue, reason), then a line \`prompt:\` alone, then a two-line specialist prompt that names the brief file the full Assignment was written to; pass that text as it is: as the prompt of its agent() in your inline workflow script first, to the ${words.agentTool} tool only when the ${words.workflowTool} tool is disabled or unavailable, and by ${words.message} only for a warm continuation. The brief itself is never printed: the specialist reads it with the ${words.readTool} tool`,
+})
+
+const recordHelp = (words: HostWords) => ({
+  summary: `Record the launch of a dispatched Assignment (a workflow's agent as ${words.workflowAgentPrefix}<run-id>/<id>), or roll it back when the launch failed`,
+  notes: [
+    "the agent id is in the Agent result, or is the continued agent's; --failed returns the Assignment to Ready",
+    words.recordNote,
+    ...(words.agentIdNote === undefined ? [] : [words.agentIdNote]),
+  ],
+})
+
+const closeNotes = (words: HostWords): ReadonlyArray<string> => [
+  "pass the report through a quoted heredoc so it stays intact",
+  "--accept applies to success only and reads the last `evidence:` block: one `<criterion text or evidence label>: <support>` line per blocking criterion and per required label. The text before the colon matches the criterion, or its label (the criterion's text before its first colon, unless two criteria share it), ignoring case, spacing, trailing punctuation, a leading `[blocking]` and a trailing `(dimension)`; a support may continue on indented lines below its entry. Evidence for a different criterion matches nothing. Accept only support you judge true",
+  `an evidence gap (InsufficientAcceptance) records nothing: ${words.askAgain}, then close again with the corrected report, or when the Assignment is already Succeeded and not accepted, close it as success again or run \`assignment accept <id> --rationale <text> --report\` with the corrected report on stdin; a workflow agent cannot be messaged, so draft a follow-up with followUpOf`,
+  "outcomes: success; failure (the work failed); errored (the agent died or returned no report); interrupted (its agent is gone after a resume or compaction); stopped (you stopped it). A report from an inline workflow script is the specialist's own text: pass it verbatim on stdin, with --report-json only for a JSON report object",
+]
+
+const reportsSummary = (words: HostWords) =>
+  `Write the results of a ${words.journal} to report files named by Assignment id, and list them`
+
+const reportsNotes = (words: HostWords): ReadonlyArray<string> => [
+  "the journal is the run's journal.jsonl: `started` entries (key, agentId, label) and `result` entries (key, agentId, result) joined by key; label each agent() with its Assignment id so its report lands in <id>.md",
+  "reports go to holyagent/reports in the git common directory (local/reports of the state folder outside git), beside the briefs; a repeated label keeps its last result; closing the Intent removes the brief and report files of its Assignments. Read a report there, or close from it: `assignment close <id> --outcome success --accept <rationale> < <report-file>`",
+  "a journal line that is not JSON, or a started or result entry without its fields, refuses the whole journal and writes nothing",
+  ...(words.reportsNote === undefined ? [] : [words.reportsNote]),
+]
+
 const RECORD_USAGE = "assignment record <id> (--agent <agentId> | --failed)"
 const CLOSE_USAGE =
   "assignment close <id> --outcome success|failure|errored|interrupted|stopped [--accept <rationale>] [--report-json]"
@@ -140,13 +177,32 @@ export const recordLaunch = (
 
 const idArgument = (positionals: ReadonlyArray<string>): string => positionals[0] ?? ""
 
-/** A workflow's agent is recorded as `workflow:<run-id>/<assignment-id>`, naming its own Assignment. */
-const workflowAgentProblem = (agentId: string, id: string): string | undefined => {
-  if (!isWorkflowAgent(agentId)) return undefined
-  const [run = "", assignment, ...rest] = agentId.slice(WORKFLOW_AGENT_PREFIX.length).split("/")
-  return /^\S+$/.test(run) && assignment === id && rest.length === 0
-    ? undefined
-    : `A workflow agent is recorded as workflow:<run-id>/${id}`
+const piAgentProblem = (id: string) =>
+  `Under the pi host an agent is recorded as ${PI_AGENT_PREFIX}<agent-id>, or as ${PI_WORKFLOW_AGENT_PREFIX}<run-id>/${id} for a workflow's agent`
+
+/**
+ * The reason an agent id cannot be recorded for an Assignment, or undefined when it can. A
+ * workflow's agent is recorded as `workflow:<run-id>/<assignment-id>` (Claude) or
+ * `pi-workflow:<run-id>/<assignment-id>` (pi), naming its own Assignment; a pi agent launched
+ * directly as `pi:<agent-id>`, with the ID the `Agent` tool of `@tintinweb/pi-subagents` returns.
+ * Under the pi host only the pi forms are accepted; under Claude any other id is the host's own.
+ */
+const agentIdProblem = (agentId: string, id: string, host: AgentHost): string | undefined => {
+  const workflowPrefix = [WORKFLOW_AGENT_PREFIX, PI_WORKFLOW_AGENT_PREFIX].find((prefix) =>
+    agentId.startsWith(prefix),
+  )
+  if (workflowPrefix !== undefined) {
+    if (host === "pi" && workflowPrefix === WORKFLOW_AGENT_PREFIX) return piAgentProblem(id)
+    const [run = "", assignment, ...rest] = agentId.slice(workflowPrefix.length).split("/")
+    return /^\S+$/.test(run) && assignment === id && rest.length === 0
+      ? undefined
+      : `A workflow agent is recorded as ${workflowPrefix}<run-id>/${id}`
+  }
+  if (agentId.startsWith(PI_AGENT_PREFIX))
+    return /^\S+$/.test(agentId.slice(PI_AGENT_PREFIX.length))
+      ? undefined
+      : `A pi agent is recorded as ${PI_AGENT_PREFIX}<agent-id>`
+  return host === "pi" ? piAgentProblem(id) : undefined
 }
 
 /** The `assignment` commands. */
@@ -178,8 +234,8 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
     summary:
       "Start an Assignment and say how to run it: spawn an agent or continue a warm one. A new draft is created and started in one step",
     input: `{id} for a Ready Assignment, or a new draft ${DRAFT_SHAPE}`,
-    output:
-      "TOON fields (id, state, agent/model/effort or continue, reason), then a line `prompt:` alone, then a two-line specialist prompt that names the brief file the full Assignment was written to; pass that text as it is: as the prompt of its agent() in your inline workflow script first, to the Agent tool only when the Workflow tool is disabled or unavailable, and by SendMessage only for a warm continuation. The brief itself is never printed: the specialist reads it with the Read tool",
+    ...dispatchOutput(CLAUDE_WORDS),
+    forHost: dispatchOutput,
     notes: [...DRAFT_NOTES, 'dispatching a Ready Assignment takes {"id": "<id>"}'],
     flags: { input: "string" },
     positionals: 0,
@@ -222,7 +278,10 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
               dispatched.assignment.id,
               renderPrompt(dispatched.assignment, agent),
             )
-            return { ...dispatched, prompt: dispatchPrompt(dispatched.assignment, agent, path) }
+            return {
+              ...dispatched,
+              prompt: dispatchPrompt(dispatched.assignment, agent, path, wordsFor(settings.host)),
+            }
           }),
         )
         return new WithTrailer(
@@ -239,15 +298,11 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
   {
     path: ["assignment", "record"],
     usage: RECORD_USAGE,
-    summary:
-      "Record the launch of a dispatched Assignment (a workflow's agent as workflow:<run-id>/<id>), or roll it back when the launch failed",
-    notes: [
-      "the agent id is in the Agent result, or is the continued agent's; --failed returns the Assignment to Ready",
-      "a hook records an agent spawned from a dispatch prompt and says so in its note; record it yourself when the note says it did not, or for a continued agent",
-    ],
+    ...recordHelp(CLAUDE_WORDS),
+    forHost: recordHelp,
     flags: { agent: "string", failed: "boolean" },
     positionals: 1,
-    run: ({ update, args }) =>
+    run: ({ update, args, env }) =>
       Effect.gen(function* () {
         const id = idArgument(args.positionals)
         const agentId = stringFlag(args, "agent")
@@ -256,9 +311,13 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
             message: "Give exactly one of --agent and --failed",
             hint: `Usage: holyagent ${RECORD_USAGE}`,
           })
-        const problem = agentId === undefined ? undefined : workflowAgentProblem(agentId, id)
-        if (problem !== undefined)
-          return yield* new Usage({ message: problem, hint: `Usage: holyagent ${RECORD_USAGE}` })
+        if (agentId !== undefined) {
+          // Only the host decides the id form; a bad TTL or workflows setting must not block
+          // recording, and --failed has no id form to check, so it never reads the host.
+          const problem = agentIdProblem(agentId, id, yield* agentHostOf(env))
+          if (problem !== undefined)
+            return yield* new Usage({ message: problem, hint: `Usage: holyagent ${RECORD_USAGE}` })
+        }
         const assignment = yield* recordLaunch(update, id, agentId)
         return present({
           id,
@@ -274,12 +333,8 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
       "Finish an Assignment with the specialist's report on stdin; --accept also accepts it from the report's evidence block",
     input:
       "the specialist's report as raw text. Required for success; optional for the other outcomes, which store the outcome name when it is empty. With --accept it ends with `evidence:` and one `<criterion or evidence label>: <support>` line per blocking criterion and required label. With --report-json it is a JSON report object returned by an agent() that was given a schema ({status: done|partial|blocked, changed_paths, checks: [{command, exit}], blockers, notes, evidence: [{key, support}]}), which is stored as the text of such a report (fields beyond these are kept in it)",
-    notes: [
-      "pass the report through a quoted heredoc so it stays intact",
-      "--accept applies to success only and reads the last `evidence:` block: one `<criterion text or evidence label>: <support>` line per blocking criterion and per required label. The text before the colon matches the criterion, or its label (the criterion's text before its first colon, unless two criteria share it), ignoring case, spacing, trailing punctuation, a leading `[blocking]` and a trailing `(dimension)`; a support may continue on indented lines below its entry. Evidence for a different criterion matches nothing. Accept only support you judge true",
-      "an evidence gap (InsufficientAcceptance) records nothing: SendMessage the missing support to the same subagent, then close again with the corrected report, or when the Assignment is already Succeeded and not accepted, close it as success again or run `assignment accept <id> --rationale <text> --report` with the corrected report on stdin; a workflow agent cannot be messaged, so draft a follow-up with followUpOf",
-      "outcomes: success; failure (the work failed); errored (the agent died or returned no report); interrupted (its agent is gone after a resume or compaction); stopped (you stopped it). A report from an inline workflow script is the specialist's own text: pass it verbatim on stdin, with --report-json only for a JSON report object",
-    ],
+    notes: closeNotes(CLAUDE_WORDS),
+    forHost: (words) => ({ notes: closeNotes(words) }),
     flags: { outcome: "string", accept: "string", "report-json": "boolean" },
     positionals: 1,
     run: (call) =>
@@ -399,15 +454,11 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
   {
     path: ["assignment", "reports"],
     usage: REPORTS_USAGE,
-    summary:
-      "Write the results of a Workflow run's journal to report files named by Assignment id, and list them",
+    summary: reportsSummary(CLAUDE_WORDS),
+    forHost: (words) => ({ summary: reportsSummary(words), notes: reportsNotes(words) }),
     output:
       "TOON: `reports` rows of id, path and words, one per Assignment id, and `notAssignmentIds` rows of label and agentId for results whose label is not an Assignment id (not written)",
-    notes: [
-      "the journal is the run's journal.jsonl: `started` entries (key, agentId, label) and `result` entries (key, agentId, result) joined by key; label each agent() with its Assignment id so its report lands in <id>.md",
-      "reports go to holyagent/reports in the git common directory (local/reports of the state folder outside git), beside the briefs; a repeated label keeps its last result; closing the Intent removes the brief and report files of its Assignments. Read a report there, or close from it: `assignment close <id> --outcome success --accept <rationale> < <report-file>`",
-      "a journal line that is not JSON, or a started or result entry without its fields, refuses the whole journal and writes nothing",
-    ],
+    notes: reportsNotes(CLAUDE_WORDS),
     flags: {},
     positionals: 1,
     state: "peek",

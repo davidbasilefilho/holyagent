@@ -72,6 +72,16 @@ describe("execution directive", () => {
     })
   })
 
+  test("never continues a specialist a pi workflow launched, but continues one pi launched directly", () => {
+    const launched = warmFor({ agentId: "pi-workflow:run-1/assignment-old" })
+    expect(directive([launched]).action).toBe("spawn")
+    const direct = warmFor({ agentId: "pi:0f3a9c1e-77b2-4d1" })
+    expect(directive([launched, direct])).toMatchObject({
+      action: "continue",
+      agentId: "pi:0f3a9c1e-77b2-4d1",
+    })
+  })
+
   test("a specialist that never finished is not warm", () => {
     const { lastFinishedAt: _gone, ...unfinished } = warmFor()
     expect(directive([unfinished]).action).toBe("spawn")
@@ -129,7 +139,7 @@ describe("reviewer independence", () => {
 })
 
 describe("workflow recommendation", () => {
-  const on: ExecutionConfig = { ttlMinutes: 55, workflowsAvailable: true }
+  const on: ExecutionConfig = { ttlMinutes: 55, workflowsAvailable: true, host: "claude" }
   /** The reasons of the two shapes: writer and review pairs, and Assignments side by side. */
   const PAIRS = "a writer and the review of its work are both ready"
   const PARALLEL = "independent Assignments can start together"
@@ -342,5 +352,38 @@ describe("workflow recommendation", () => {
     })
     const blocker = running({ id: "assignment-holder", ownershipPaths: ["src/w.ts"] })
     expect(plan([row, blocker], [warmFor()])).toBeUndefined()
+  })
+})
+
+describe("workflow recommendation under the pi host", () => {
+  const pi: ExecutionConfig = { ttlMinutes: 55, workflowsAvailable: true, host: "pi" }
+  const reviews = [
+    assignment({ id: "r1", roleTask: "Reviewer.code", ownershipPaths: [] }),
+    assignment({ id: "r2", roleTask: "Reviewer.security", ownershipPaths: [] }),
+  ]
+
+  test("without workflows the direct subagents are named by pi's workflow tool", () => {
+    expect(recommend(project(reviews), [], NOW, { ...pi, workflowsAvailable: false })).toEqual({
+      action: "subagent",
+      assignmentIds: ["r1", "r2"],
+      reason: "the SubagentWorkflow tool is disabled or unavailable",
+    })
+  })
+
+  test("warm work beside a workflow goes by the Agent tool's resume, not SendMessage", () => {
+    const warm = entry({ lastFinishedAt: after(-5), assignments: ["assignment-old"] })
+    const rows = [
+      ...reviews,
+      assignment({ id: "again", followUpOf: "assignment-old", ownershipPaths: ["src/a.ts"] }),
+    ]
+    const recommendation = recommend(project(rows), [warm], NOW, pi)
+    expect(recommendation).toMatchObject({
+      action: "workflow",
+      continues: [{ assignmentId: "again" }],
+    })
+    expect(recommendation?.reason).toBe(
+      "independent Assignments can start together; the Assignments in continues go by the Agent tool's resume to their warm specialists",
+    )
+    expect(JSON.stringify(recommendation)).not.toContain("SendMessage")
   })
 })
