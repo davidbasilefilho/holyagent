@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "confirm-that-repair-commit-3ddedda-range",
   "objective": "Confirm that repair commit 3ddedda (range b7efd82..3ddedda on release/0.3.0/feat/pi-extension, worktree /home/user/holyagent-0.3.0-ext; run commands there) closes the earlier code review findings and adds no regression.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Earlier findings: BLOCKING, a non-git project with a .holyagent folder lost its status because `holyagent state mode` exits 4 outside git and failed collect in packages/integrations/pi/src/extension.ts. Optional: status and reconcile ran concurrently; session_start had no overall deadline (about five 8s spawns); a newer compaction gather did not abort the older; piContext omissions undocumented; docs/pi/orchestration.md stale; folderExists duplicated hasStateFolder and pi runtime() duplicated the Claude bundle(). Security note: sh and git ran with cwd set to the project (Windows program lookup).",
     "The repair: non-git uses <cwd>/.holyagent and skips state mode; status then reconcile in sequence; config and state mode together; one 10s SESSION_DEADLINE_MS; newer gather aborts older and shutdown drops a stopped gather; sh and git start in the package folder with git -C <project> and a leading --project <dir> handled in hooks/pi-entry.ts (process.chdir before the CLI); hasStateFolder moved to hooks/state-folder.ts and bundleModule to packages/runtime/src/bundle.ts. The Claude dist bundle changes by one moved line (hasStateFolder emitted earlier), which the root accepts as a generated reorder with no behavior change.",
@@ -50,7 +50,37 @@
     "agentId": "workflow:wf_36714a58-16a/assignment-0mw7cbcic-di8k",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T04:36:32.916Z"
+    "startedAt": "2026-11-08T04:36:32.916Z",
+    "finishedAt": "2026-11-08T04:42:10.447Z"
+  },
+  "result": "result: The repair closes the earlier findings and adds no regression. I found no blockers, only optional notes.\nchanged: none (read-only review)\nchecks:\n- `bunx --no-install mise run verify` in `/home/user/holyagent-0.3.0-ext` → exit 0. Type-check clean in 182 files, lint clean in 183 files, format clean in 501 files, 1831 tests pass, 0 fail. Log: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`.\n- `bunx --no-install mise run build` → exit 0, and `git status --short` was empty afterwards.\n- `git diff b7efd82 3ddedda -- packages/integrations/claude/dist` is one moved line, `hasStateFolder` emitted earlier. That is no behavior change.\n- The built-in `/code-review` ran on `b7efd82...3ddedda`, and I read the cited code for each of its six findings.\n- Not run: the pi binary and a live model, as instructed. The Windows program-lookup behavior is read from the code only.\n\nblockers: none\n\nnotes (all optional):\n- `extension.ts` `topOf`: any `git rev-parse` failure (timeout, dubious ownership) is treated as non-git, so `state mode` is skipped. The base code also swallowed that failure to `\"\"`, so this is not new. Narrowing it to exit 128 with \"not a git repository\" would be better.\n- `extension.ts` collect: `state mode` is spawned alongside `config` even when `pi.enable` is false. The brief asked for the two to run together, so I treat it as accepted cost. The disabled-project test was loosened to `not.toContain('status')`.\n- `bundle.ts`: a failed `Bun.build` that throws surfaces as `String(cause)`, so the per-error messages are lost and the `result.logs` branch is probably unreachable. The old code behaved the same way, so this is not a regression.\n- `pi-entry.ts`: the bundle strips `--project <dir>` with `Bun.argv.splice` and relies on `cli/main.ts` reading `Bun.argv` at import. The real-exec tests prove it works today, but the coupling is hidden.\n- `extension.test.ts`: the ordering tests use fixed 30ms `settle` sleeps, which could be flaky on a loaded Windows runner.\n- `wrapper.sh` comment and the docs still say Bun starts in the project, but the Pi path now starts in the package folder and enters the project in-process.\n- The extra serial stage (status, then reconcile) under one 10s deadline is the repair's stated design.\n\nevidence:\n- Each earlier finding is closed by the repair: **Non-git blocker.** `topOf` returns `{top: project, git: false}` and `stateFolderOf` then uses `<project>/.holyagent` without asking `state mode`. The real-exec test \"with the built package and a project that is not a git repository\" gives a project with `.holyagent` its status, and the unit test with git exit 128 covers the same path. **Other findings.** `status` then `reconcile` run in sequence, and `config` runs together with `state mode`. One `Effect.timeoutOrElse` sets a `SESSION_DEADLINE_MS` deadline of 10s. A newer gather aborts the older one, and shutdown drops a stopped gather's result. `sh` and `git` start in `packageRoot` with `git -C <project>` and `--project`. `hasStateFolder` now lives in `hooks/state-folder.ts` and `bundleModule` in `runtime/src/bundle.ts`, and `pi/generate.ts` and `claude/generate.ts` both call it. The `docs/pi/orchestration.md` and `docs/pi/extensions.md` edits were not read.\n- The repair adds no regression: the Claude hook and CLI behave as before and the Claude dist differs only by the hasStateFolder move: `git diff b7efd82 3ddedda -- packages/integrations/claude/dist` shows the one moved line. `mise run build` leaves the tree clean. The Claude hook code only moved `hasStateFolder` to `state-folder.ts`.\n- The new tests cover the repaired behavior and would fail without it: the new `extension.test.ts` describes \"order and time\", \"where programs start\" and \"a project that is not a git repository\", plus the real-exec describe on the built package. They assert status-before-reconcile, the deadline abort, abort of the older gather, shutdown drop, the cwd and `-C` arguments, and non-git state skipping `state mode`. `packages/runtime/tests/bundle.test.ts` is new. I did not run the tests against the base, so \"would fail without it\" comes from reading the assertions.\n- bunx --no-install mise run verify exits 0 and mise run build leaves the tree clean on 3ddedda: verify exit 0 with 1831 pass and 0 fail; build exit 0 with an empty `git status --short`.\n- checks-run: `bunx --no-install mise run verify` exit 0; `bunx --no-install mise run build` exit 0 and clean tree; `git diff` of the Claude dist; the `/code-review` skill on `b7efd82...3ddedda`.\n",
+  "acceptance": {
+    "revision": 6,
+    "rationale": "Repair closes the blocker and optional notes; verify 1831 pass, build clean",
+    "criteria": [
+      {
+        "criterion": "Each earlier finding is closed by the repair",
+        "support": "**Non-git blocker.** `topOf` returns `{top: project, git: false}` and `stateFolderOf` then uses `<project>/.holyagent` without asking `state mode`. The real-exec test \"with the built package and a project that is not a git repository\" gives a project with `.holyagent` its status, and the unit test with git exit 128 covers the same path. **Other findings.** `status` then `reconcile` run in sequence, and `config` runs together with `state mode`. One `Effect.timeoutOrElse` sets a `SESSION_DEADLINE_MS` deadline of 10s. A newer gather aborts the older one, and shutdown drops a stopped gather's result. `sh` and `git` start in `packageRoot` with `git -C <project>` and `--project`. `hasStateFolder` now lives in `hooks/state-folder.ts` and `bundleModule` in `runtime/src/bundle.ts`, and `pi/generate.ts` and `claude/generate.ts` both call it. The `docs/pi/orchestration.md` and `docs/pi/extensions.md` edits were not read."
+      },
+      {
+        "criterion": "The repair adds no regression: the Claude hook and CLI behave as before and the Claude dist differs only by the hasStateFolder move",
+        "support": "`git diff b7efd82 3ddedda -- packages/integrations/claude/dist` shows the one moved line. `mise run build` leaves the tree clean. The Claude hook code only moved `hasStateFolder` to `state-folder.ts`."
+      },
+      {
+        "criterion": "The new tests cover the repaired behavior and would fail without it",
+        "support": "the new `extension.test.ts` describes \"order and time\", \"where programs start\" and \"a project that is not a git repository\", plus the real-exec describe on the built package. They assert status-before-reconcile, the deadline abort, abort of the older gather, shutdown drop, the cwd and `-C` arguments, and non-git state skipping `state mode`. `packages/runtime/tests/bundle.test.ts` is new. I did not run the tests against the base, so \"would fail without it\" comes from reading the assertions."
+      },
+      {
+        "criterion": "bunx --no-install mise run verify exits 0 and mise run build leaves the tree clean on 3ddedda",
+        "support": "verify exit 0 with 1831 pass and 0 fail; build exit 0 with an empty `git status --short`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bunx --no-install mise run verify` exit 0; `bunx --no-install mise run build` exit 0 and clean tree; `git diff` of the Claude dist; the `/code-review` skill on `b7efd82...3ddedda`."
+      }
+    ]
   },
   "createdAt": "2026-11-08T04:36:32.916Z"
 }
