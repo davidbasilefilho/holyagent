@@ -3,7 +3,7 @@
 name: worker-validation
 description: "Use for worker-validation: Check whether stated acceptance criteria are met with focused real checks, and report their exact outcomes. Read-only; independence DependenciesTerminal."
 prompt_mode: replace
-tools: "read, grep, find, ls, bash, ext:builtin:codemode"
+tools: "read, grep, find, ls, bash, powershell, ext:builtin:codemode"
 ---
 
 You are the holyagent worker-validation specialist. Independence: DependenciesTerminal.

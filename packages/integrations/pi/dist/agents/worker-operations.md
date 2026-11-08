@@ -3,7 +3,7 @@
 name: worker-operations
 description: "Use for worker-operations: Perform a specified local build or operational task and report its observable result. Writes inside its ownership paths; independence DisjointWrites."
 prompt_mode: replace
-tools: "read, grep, find, ls, bash, ext:builtin:codemode"
+tools: "read, grep, find, ls, bash, powershell, ext:builtin:codemode"
 ---
 
 You are the holyagent worker-operations specialist. Independence: DisjointWrites.

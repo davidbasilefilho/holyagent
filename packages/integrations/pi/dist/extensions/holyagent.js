@@ -16272,8 +16272,9 @@ var PI_ROOT_PROMPT = PI_ROOT_SECTIONS.map((file) => stripCitations(TEXTS[file] ?
 `}${section}`, "");
 
 var READ_TOOLS = ["read", "grep", "find", "ls"];
-var WRITE_TOOLS = ["write", "edit", "bash"];
-var SHELL_TOOLS = ["bash"];
+var WRITE_TOOLS = ["write", "edit", "bash", "powershell"];
+var SHELL_TOOLS = ["bash", "powershell"];
+var POWERSHELL_ENTRY = "+powershell";
 var CODEMODE_ENTRY = "+codemode";
 var CODEMODE_TOOL = "codemode";
 var CODEMODE_MAX_WORKERS_ENV = "PI_CODEMODE_MAX_WORKERS";
@@ -16505,7 +16506,12 @@ var refuseExcludedTool = (event, excluded) => excluded.some((pattern) => toolMat
   block: true,
   reason: `The root may not use ${event.toolName}. Delegate the work to a specialist that has it.`
 } : undefined;
-var wrapperPath = (packageRoot, platformPath = nodePath) => toPosix(platformPath.join(packageRoot, "scripts", "holyagent"), platformPath.sep);
+var runtimeArgs = (packageRoot, platformPath = nodePath) => [
+  "--no-env-file",
+  `--config=${platformPath.join(packageRoot, "scripts", "empty-bunfig.toml")}`,
+  platformPath.join(packageRoot, "scripts", "holyagent.js")
+];
+var CMD_NOT_FOUND = 9009;
 var oneLine = (text) => printable(text).replace(/\s+/g, " ").trim();
 var notice = (text) => ({
   customType: NOTICE_MESSAGE,
@@ -16538,19 +16544,23 @@ var createExtension = ({
   deadlineMs = SESSION_DEADLINE_MS,
   graceMs = STOP_GRACE_MS,
   env = process.env,
-  platformPath = nodePath
+  platformPath = nodePath,
+  platform = process.platform
 } = {}) => (pi) => {
-  const wrapper = wrapperPath(packageRoot, platformPath);
+  const bundled = runtimeArgs(packageRoot, platformPath);
+  const windows = platform === "win32";
   const root = toPosix(packageRoot, platformPath.sep);
   const isChild = () => childAgent(pi.getSessionName()) !== undefined;
   let held;
   const running = new Set;
   const exec = (signal, command, args) => {
     const failed = (reason) => new CommandFailed({ command: args.join(" "), reason });
+    const shimmed = windows && command === "pi";
+    const [program, programArgs] = shimmed ? ["cmd.exe", ["/d", "/c", command, ...args]] : [command, args];
     return signal.aborted ? fail5(failed("it was stopped")) : acquireUseRelease2(try_2({
       try: () => {
         const stop = new AbortController;
-        const settled = pi.exec(command, [...args], {
+        const settled = pi.exec(program, [...programArgs], {
           cwd: packageRoot,
           signal: AbortSignal.any([signal, stop.signal]),
           timeout: COMMAND_TIMEOUT_MS
@@ -16572,7 +16582,7 @@ var createExtension = ({
       return exited(settled, graceMs);
     });
   };
-  const holyagent = (signal, project, ...args) => exec(signal, "sh", [wrapper, PI_PROJECT_FLAG, project, ...args]).pipe(flatMap2((result) => result.code === 0 && !result.killed ? succeed5(result.stdout) : fail5(new CommandFailed({ command: args.join(" "), reason: reasonOf(result) }))));
+  const holyagent = (signal, project, ...args) => exec(signal, "bun", [...bundled, PI_PROJECT_FLAG, project, ...args]).pipe(flatMap2((result) => result.code === 0 && !result.killed ? succeed5(result.stdout) : fail5(new CommandFailed({ command: args.join(" "), reason: reasonOf(result) }))));
   const topOf = (signal, project) => exec(signal, "git", ["-C", project, "rev-parse", "--show-toplevel"]).pipe(flatMap2((result) => {
     const top = result.stdout.trim();
     if (result.code === 0 && !result.killed && top !== "")
@@ -16672,7 +16682,7 @@ var createExtension = ({
   const checkProvider = (signal, config) => {
     let unanswered = false;
     const run = (command, args) => exec(signal, command, args).pipe(map4((result) => {
-      const unstarted = result.code === 1 && result.stdout === "" && SPAWN_FAILURE.test(result.stderr.trim());
+      const unstarted = result.code === 1 && result.stdout === "" && SPAWN_FAILURE.test(result.stderr.trim()) || windows && result.code === CMD_NOT_FOUND;
       unanswered ||= result.killed || unstarted;
       return {
         exitCode: unstarted ? 127 : result.code,
@@ -16698,7 +16708,7 @@ var createExtension = ({
   };
   const applyRootTools = (tools) => runSync2(try_2({
     try: () => pi.setActiveTools([
-      ...rootActiveTools(tools, pi.getActiveTools(), pi.getAllTools().map(({ name }) => name))
+      ...rootActiveTools(windows ? { ...tools, tools: [...tools.tools, POWERSHELL_ENTRY] } : tools, pi.getActiveTools(), pi.getAllTools().map(({ name }) => name))
     ]),
     catch: (cause) => notice(`the root's tools were not applied: ${String(cause)}`)
   }).pipe(as2(undefined), catch_2((failure) => succeed5(failure))));
@@ -16806,6 +16816,7 @@ var extension_default = createExtension();
 export {
   AGENT_TOOL,
   CACHE_RETENTION_ENV,
+  CMD_NOT_FOUND,
   CODEMODE_TOOL_NAME,
   COMMAND_TIMEOUT_MS,
   CONTEXT_MESSAGE,
@@ -16829,8 +16840,8 @@ export {
   refuseExcludedTool,
   refuseNonSpecialist,
   refuseNonSpecialistWorkflow,
+  runtimeArgs,
   sanitizeWorkflowName,
   workflowCallLine,
-  workflowRenderers,
-  wrapperPath
+  workflowRenderers
 };

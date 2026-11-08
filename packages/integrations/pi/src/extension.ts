@@ -35,6 +35,7 @@ import { providerEnv } from "../../../runtime/src/pi/provider.ts"
 import { type CommandRunner, requireProviderReady } from "../../../runtime/src/pi/readiness.ts"
 import { PI_ROOT_PROMPT } from "../../../runtime/src/pi/root-prompt.ts"
 import {
+  POWERSHELL_ENTRY,
   rootActiveTools,
   type ToolArgs,
   toolArgs,
@@ -134,9 +135,9 @@ export const applyEnvironment = (
 
 /**
  * A specialist's prompt with `${HOLYAGENT_PI_ROOT}` replaced by the package folder, written with
- * `/` only so the shell takes it for a path (see {@link wrapperPath}). The agent files hold the
- * placeholder because the install folder is not known when they are built; the extension fills it
- * when the child starts.
+ * `/` only, as the model writes it into shell commands (a `\` escapes there). The agent files hold
+ * the placeholder because the install folder is not known when they are built; the extension fills
+ * it when the child starts.
  */
 export const fillPackageRoot = (
   prompt: string,
@@ -350,7 +351,7 @@ type Reason = "startup" | "reload" | "new" | "resume" | "fork" | "compact"
 const RECONCILED: ReadonlySet<Reason> = new Set(["resume", "compact"])
 
 /**
- * A `holyagent` command of the package's wrapper that did not start, ran out of time or exited
+ * A `holyagent` command of the package's bundled CLI that did not start, ran out of time or exited
  * non-zero.
  */
 class CommandFailed extends Data.TaggedError("CommandFailed")<{
@@ -524,7 +525,7 @@ export const refuseExcludedTool = (
 /** Where the extension finds what it runs. */
 export interface ExtensionOptions {
   /**
-   * The folder of the installed package, which holds `scripts/holyagent`; the extension's own by
+   * The folder of the installed package, which holds `scripts/holyagent.js`; the extension's own by
    * default.
    */
   readonly packageRoot?: string
@@ -545,18 +546,36 @@ export interface ExtensionOptions {
    * test passes `win32` to stand in for Windows.
    */
   readonly platformPath?: Pick<typeof nodePath, "join" | "sep">
+  /**
+   * The platform the package is installed on; the process's own by default. A test passes `win32`
+   * to stand in for Windows.
+   */
+  readonly platform?: NodeJS.Platform
 }
 
 /**
- * The wrapper script of an installed package, written with `/` only. The shell reads a `$0` without
- * a `/` as a bare name and refuses it, which a Windows path (`C:\pkg\scripts\holyagent`) is; Git
- * for Windows' `sh` takes the `C:/pkg/scripts/holyagent` form. The path module is a parameter so a
- * test can stand in for Windows.
+ * The Bun arguments that run an installed package's bundled CLI: no env file and the empty Bun
+ * config, as the `scripts/holyagent` wrapper passes them, then `scripts/holyagent.js`. The wrapper
+ * would read the project's `.env` and `bunfig.toml` otherwise, which the project could use to
+ * redirect the state folder or preload code. Bun is started directly, since the extension has to
+ * work where there is no `sh` (native Windows); the path module is a parameter so a test can stand
+ * in for Windows.
  */
-export const wrapperPath = (
+export const runtimeArgs = (
   packageRoot: string,
-  platformPath: Pick<typeof nodePath, "join" | "sep"> = nodePath,
-): string => toPosix(platformPath.join(packageRoot, "scripts", "holyagent"), platformPath.sep)
+  platformPath: Pick<typeof nodePath, "join"> = nodePath,
+): ReadonlyArray<string> => [
+  "--no-env-file",
+  `--config=${platformPath.join(packageRoot, "scripts", "empty-bunfig.toml")}`,
+  platformPath.join(packageRoot, "scripts", "holyagent.js"),
+]
+
+/**
+ * What `cmd.exe` reports as the exit code of a program it cannot find. Pi's `exec` starts a program
+ * without a shell, and on Windows Node refuses to start the `pi.cmd` that npm installs that way, so
+ * `pi` runs through `cmd.exe /c`.
+ */
+export const CMD_NOT_FOUND = 9009
 
 // A notice is built from text a project or Pi printed, so it loses its control characters.
 const oneLine = (text: string): string => printable(text).replace(/\s+/g, " ").trim()
@@ -616,9 +635,11 @@ export const createExtension =
     graceMs = STOP_GRACE_MS,
     env = process.env,
     platformPath = nodePath,
+    platform = process.platform,
   }: ExtensionOptions = {}) =>
   (pi: ExtensionAPI): void => {
-    const wrapper = wrapperPath(packageRoot, platformPath)
+    const bundled = runtimeArgs(packageRoot, platformPath)
+    const windows = platform === "win32"
     // The text the model reads names the package folder with `/` only, for the same reason.
     const root = toPosix(packageRoot, platformPath.sep)
     const isChild = () => childAgent(pi.getSessionName()) !== undefined
@@ -628,7 +649,7 @@ export const createExtension =
     const running = new Set<Promise<void>>()
 
     // Every program starts in the package's own folder, never the project's: on Windows a bare
-    // `sh` or `git` is looked up in the working directory first, where a project could plant one.
+    // `bun` or `git` is looked up in the working directory first, where a project could plant one.
     // The project is named in the arguments instead.
     //
     // A command that is stopped (the deadline, a sibling that failed, a newer collection or the
@@ -638,6 +659,12 @@ export const createExtension =
     // command too.
     const exec = (signal: AbortSignal, command: string, args: ReadonlyArray<string>) => {
       const failed = (reason: string) => new CommandFailed({ command: args.join(" "), reason })
+      // On Windows `pi` is a `.cmd` shim, which only a shell starts. Its arguments are fixed words
+      // and the provider's id, nothing `cmd.exe` reads as syntax.
+      const shimmed = windows && command === "pi"
+      const [program, programArgs] = shimmed
+        ? ["cmd.exe", ["/d", "/c", command, ...args]]
+        : [command, args]
       type Answer = Effect.Effect<ExecResult, CommandFailed>
       return signal.aborted
         ? Effect.fail(failed("it was stopped"))
@@ -646,7 +673,7 @@ export const createExtension =
               try: () => {
                 const stop = new AbortController()
                 const settled = pi
-                  .exec(command, [...args], {
+                  .exec(program, [...programArgs], {
                     cwd: packageRoot,
                     signal: AbortSignal.any([signal, stop.signal]),
                     timeout: COMMAND_TIMEOUT_MS,
@@ -676,10 +703,10 @@ export const createExtension =
           )
     }
 
-    // The wrapper runs the package's bundled runtime with Bun, which enters the project first; its
-    // stdout is the command's output.
+    // Bun runs the package's bundled runtime, which enters the project first; its stdout is the
+    // command's output.
     const holyagent = (signal: AbortSignal, project: string, ...args: ReadonlyArray<string>) =>
-      exec(signal, "sh", [wrapper, PI_PROJECT_FLAG, project, ...args]).pipe(
+      exec(signal, "bun", [...bundled, PI_PROJECT_FLAG, project, ...args]).pipe(
         Effect.flatMap((result) =>
           result.code === 0 && !result.killed
             ? Effect.succeed(result.stdout)
@@ -813,8 +840,8 @@ export const createExtension =
           )
         const collected = yield* Effect.gen(function* () {
           const located = yield* topOf(signal, project)
-          // The loader reads files with Bun, which Pi's Node does not have, so the wrapper loads
-          // it. The state folder does not depend on the config or on `status`, so it is asked
+          // The loader reads files with Bun, which Pi's Node does not have, so the bundled CLI
+          // loads it. The state folder does not depend on the config or on `status`, so it is asked
           // meanwhile; its failure counts only once the config says the extension is on.
           const attempt = yield* Effect.result(
             Effect.all(
@@ -919,8 +946,12 @@ export const createExtension =
           Effect.map((result) => {
             // Pi's exec reports a program that did not start (a missing `pi`) as exit 1 with the
             // spawn error on standard error, which `pi auth check` would read as "not logged in".
+            // Under `cmd.exe` on Windows a missing `pi` is its exit code 9009 instead.
             const unstarted =
-              result.code === 1 && result.stdout === "" && SPAWN_FAILURE.test(result.stderr.trim())
+              (result.code === 1 &&
+                result.stdout === "" &&
+                SPAWN_FAILURE.test(result.stderr.trim())) ||
+              (windows && result.code === CMD_NOT_FOUND)
             unanswered ||= result.killed || unstarted
             return {
               exitCode: unstarted ? 127 : result.code,
@@ -965,7 +996,8 @@ export const createExtension =
       void ended.then(() => running.delete(ended))
     }
 
-    // The root's tools: its active selection plus its own tools, minus its excluded ones. A
+    // The root's tools: its active selection plus its own tools, minus its excluded ones. On
+    // Windows its own tools include `powershell`, beside the default `bash` that needs Git Bash. A
     // failure is a notice, not an error that reaches Pi.
     const applyRootTools = (tools: NonNullable<Collected["tools"]>): Delivery | undefined =>
       Effect.runSync(
@@ -973,7 +1005,7 @@ export const createExtension =
           try: () =>
             pi.setActiveTools([
               ...rootActiveTools(
-                tools,
+                windows ? { ...tools, tools: [...tools.tools, POWERSHELL_ENTRY] } : tools,
                 pi.getActiveTools(),
                 pi.getAllTools().map(({ name }) => name),
               ),

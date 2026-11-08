@@ -10,6 +10,7 @@ import {
   CODEMODE_MAX_WORKERS_ENV,
   COMPUTER_USE_TOOLS,
   PI_SETTINGS_FILE,
+  POWERSHELL_ENTRY,
   rootActiveTools,
   SUBAGENTS_SETTINGS_FILE,
   T3_VISUAL_TOOLS,
@@ -30,6 +31,8 @@ const NO_WEB_PROVIDER: ProviderProfile = { ...PROVIDERS["kimi-coding-global"], w
 const READ = ["read", "grep", "find", "ls"]
 const MOONSHOT = ["moonshot_search", "moonshot_fetch"]
 const WEB_KIT = ["web_search", "web_fetch"]
+// Pi offers `powershell` beside `bash` on Windows; a role has both or neither.
+const SHELLS = ["bash", "powershell"]
 
 /** The decided `--tools` allowlist of each specialist with the default config, before `codemode`. */
 const EXPECTED: Readonly<Record<RoleTask, ReadonlyArray<string>>> = {
@@ -38,16 +41,16 @@ const EXPECTED: Readonly<Record<RoleTask, ReadonlyArray<string>>> = {
   "Explorer.trace": READ,
   "Librarian.lookup": [...READ, ...MOONSHOT],
   "Librarian.research": [...READ, ...MOONSHOT],
-  "Worker.mechanical": [...READ, "write", "edit", "bash"],
-  "Worker.implementation": [...READ, "write", "edit", "bash"],
-  "Worker.integration": [...READ, "write", "edit", "bash"],
-  "Worker.debugging": [...READ, "write", "edit", "bash"],
-  "Worker.operations": [...READ, "bash"],
-  "Worker.validation": [...READ, "bash"],
-  "Worker.visual": [...READ, "write", "edit", "bash", ...T3_VISUAL_TOOLS, ...COMPUTER_USE_TOOLS],
+  "Worker.mechanical": [...READ, "write", "edit", ...SHELLS],
+  "Worker.implementation": [...READ, "write", "edit", ...SHELLS],
+  "Worker.integration": [...READ, "write", "edit", ...SHELLS],
+  "Worker.debugging": [...READ, "write", "edit", ...SHELLS],
+  "Worker.operations": [...READ, ...SHELLS],
+  "Worker.validation": [...READ, ...SHELLS],
+  "Worker.visual": [...READ, "write", "edit", ...SHELLS, ...T3_VISUAL_TOOLS, ...COMPUTER_USE_TOOLS],
   "Reviewer.visual": [...READ, ...T3_VISUAL_TOOLS, ...COMPUTER_USE_TOOLS],
-  "Reviewer.code": [...READ, "bash"],
-  "Reviewer.testing": [...READ, "bash"],
+  "Reviewer.code": [...READ, ...SHELLS],
+  "Reviewer.testing": [...READ, ...SHELLS],
   "Reviewer.audit": READ,
   "Reviewer.security": READ,
   "Reviewer.artifact": READ,
@@ -62,12 +65,26 @@ describe("toolArgs for the specialists", () => {
     for (const role of RoleTask.literals) {
       const { tools, excludeTools } = toolArgs(DEFAULT_CONFIG, role)
       expect(excludeTools).toEqual(
-        ["write", "edit", "bash"].filter((tool) => !tools.includes(tool)),
+        ["write", "edit", ...SHELLS].filter((tool) => !tools.includes(tool)),
       )
     }
-    expect(toolArgs(DEFAULT_CONFIG, "Explorer.map").excludeTools).toEqual(["write", "edit", "bash"])
+    expect(toolArgs(DEFAULT_CONFIG, "Explorer.map").excludeTools).toEqual([
+      "write",
+      "edit",
+      ...SHELLS,
+    ])
     expect(toolArgs(DEFAULT_CONFIG, "Worker.validation").excludeTools).toEqual(["write", "edit"])
     expect(toolArgs(DEFAULT_CONFIG, "Worker.implementation").excludeTools).toEqual([])
+  })
+
+  test("powershell goes wherever bash goes, and is excluded wherever bash is", () => {
+    for (const role of RoleTask.literals) {
+      const { tools, excludeTools } = toolArgs(DEFAULT_CONFIG, role)
+      expect(tools.includes("powershell")).toBe(tools.includes("bash"))
+      expect(excludeTools.includes("powershell")).toBe(excludeTools.includes("bash"))
+    }
+    expect(toolArgs(DEFAULT_CONFIG, "Worker.operations").excludeTools).not.toContain("powershell")
+    expect(toolArgs(DEFAULT_CONFIG, "Reviewer.audit").excludeTools).toContain("powershell")
   })
 
   test("only the Write capability grants write and edit", () => {
@@ -98,11 +115,11 @@ describe("toolArgs for the specialists", () => {
       "--tools",
       "read,grep,find,ls,codemode",
       "--exclude-tools",
-      "write,edit,bash",
+      "write,edit,bash,powershell",
     ])
     expect(toolArgs(DEFAULT_CONFIG, "Worker.implementation").argv).toEqual([
       "--tools",
-      "read,grep,find,ls,write,edit,bash,codemode",
+      "read,grep,find,ls,write,edit,bash,powershell,codemode",
     ])
   })
 })
@@ -237,7 +254,7 @@ describe("the feature switches and the tool arguments", () => {
       ...READ,
       "write",
       "edit",
-      "bash",
+      ...SHELLS,
       ...T3_VISUAL_TOOLS,
       "codemode",
     ])
@@ -374,6 +391,25 @@ describe("toolSettings", () => {
   test("pi.enable off writes nothing", () => {
     const off: Config = { ...DEFAULT_CONFIG, pi: { ...DEFAULT_CONFIG.pi, enable: false } }
     expect(toolSettings(off)).toEqual([])
+  })
+})
+
+describe("POWERSHELL_ENTRY", () => {
+  test("adds powershell to the root's tools unless the root excludes it", () => {
+    const root = toolArgs(DEFAULT_CONFIG, "root")
+    const withShell = { ...root, tools: [...root.tools, POWERSHELL_ENTRY] }
+    const active = ["read", "bash"]
+    expect(rootActiveTools(withShell, active, ["read", "bash", "powershell"])).toEqual([
+      "read",
+      "bash",
+      "codemode",
+      "powershell",
+    ])
+    expect(rootActiveTools(root, active, ["read", "bash", "powershell"])).toEqual([
+      "read",
+      "bash",
+      "codemode",
+    ])
   })
 })
 

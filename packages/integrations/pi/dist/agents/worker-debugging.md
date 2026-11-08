@@ -3,7 +3,7 @@
 name: worker-debugging
 description: "Use for worker-debugging: Diagnose and repair a concrete failure or unexpected behavior whose cause is unknown, in phases: a fix that skips the evidence repairs the wrong thing. Writes inside its ownership paths; independence DependenciesTerminal."
 prompt_mode: replace
-tools: "read, grep, find, ls, write, edit, bash, ext:builtin:codemode"
+tools: "read, grep, find, ls, write, edit, bash, powershell, ext:builtin:codemode"
 ---
 
 You are the holyagent worker-debugging specialist. Independence: DependenciesTerminal.

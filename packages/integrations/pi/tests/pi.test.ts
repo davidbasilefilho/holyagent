@@ -20,6 +20,7 @@ import { CONDITIONAL_SECTIONS } from "../../claude/src/agents.ts"
 import { build } from "../build.ts"
 import packageJson from "../package.json" with { type: "json" }
 import { agentTools } from "../src/agents.ts"
+import { runtimeArgs } from "../src/extension.ts"
 import { DIST_DIRECTORY, PACKAGE_DIRECTORY, REPOSITORY } from "../src/files.ts"
 import {
   bundleExtension,
@@ -211,30 +212,39 @@ describe("the runtime scripts", () => {
     expect(pi.join("\n")).not.toContain("CLAUDE")
   })
 
-  test("the bundle answers config and otherwise is the CLI", async () => {
-    const root = await mkdtemp(join(tmpdir(), "holyagent-pi-bundle-run-"))
+  // The extension starts Bun on the bundle; the wrapper is what the model runs through its shell.
+  const packageRoot = join(REPOSITORY, DIST_DIRECTORY)
+  const launchers: ReadonlyArray<readonly [string, ReadonlyArray<string>]> = [
+    ["Bun on holyagent.js, as the extension starts it", ["bun", ...runtimeArgs(packageRoot)]],
     // `/` only: the shell reads a script path without one as a bare name, as it is on Windows.
-    const script = toPosix(join(REPOSITORY, DIST_DIRECTORY, "scripts/holyagent"))
-    const call = async (...args: Array<string>) => {
-      const child = Bun.spawn(["sh", script, ...args], {
-        cwd: root,
-        env: { ...process.env, HOLYAGENT_HOME: join(root, "home") },
-        stdout: "pipe",
-        stderr: "pipe",
-      })
-      return {
-        stdout: await new Response(child.stdout).text(),
-        stderr: await new Response(child.stderr).text(),
-        code: await child.exited,
+    ["the sh wrapper", ["sh", toPosix(join(packageRoot, "scripts/holyagent"))]],
+  ]
+
+  test.each(launchers)(
+    "the bundle answers config and otherwise is the CLI: %s",
+    async (_name, launcher) => {
+      const root = await mkdtemp(join(tmpdir(), "holyagent-pi-bundle-run-"))
+      const call = async (...args: Array<string>) => {
+        const child = Bun.spawn([...launcher, ...args], {
+          cwd: root,
+          env: { ...process.env, HOLYAGENT_HOME: join(root, "home") },
+          stdout: "pipe",
+          stderr: "pipe",
+        })
+        return {
+          stdout: await new Response(child.stdout).text(),
+          stderr: await new Response(child.stderr).text(),
+          code: await child.exited,
+        }
       }
-    }
-    expect((await call("--version")).stdout.trim()).toBe(packageJson.version)
-    const config = await call("config", join(root, ".holyagent"))
-    expect(config.code).toBe(0)
-    expect(JSON.parse(config.stdout)).toMatchObject({ pi: { enable: true } })
-    expect((await call("status")).stdout).toBe("intents: []\n")
-    await rm(root, { recursive: true, force: true })
-  })
+      expect((await call("--version")).stdout.trim()).toBe(packageJson.version)
+      const config = await call("config", join(root, ".holyagent"))
+      expect(config.code).toBe(0)
+      expect(JSON.parse(config.stdout)).toMatchObject({ pi: { enable: true } })
+      expect((await call("status")).stdout).toBe("intents: []\n")
+      await rm(root, { recursive: true, force: true })
+    },
+  )
 })
 
 describe("the skills", () => {
@@ -325,7 +335,13 @@ describe("the specialists", () => {
       agentTools(config, ROUTES.find((route) => route.agent === agent) as Route)
     expect(tools("explorer-map")).toEqual(["read", "grep", "find", "ls", "ext:builtin:codemode"])
     expect(tools("worker-implementation")).toContain("write")
-    expect(tools("reviewer-code")).toContain("bash")
+    // A shell is `bash` and Windows' `powershell` together, in the agent files of every role.
+    for (const agent of ["worker-implementation", "worker-operations", "reviewer-code"]) {
+      expect(tools(agent)).toContain("bash")
+      expect(tools(agent)).toContain("powershell")
+    }
+    expect(tools("explorer-map")).not.toContain("powershell")
+    expect(tools("reviewer-audit")).not.toContain("powershell")
     expect(tools("reviewer-code")).not.toContain("write")
     expect(tools("librarian-research")).toContain("ext:pi-provider-kimi-code/moonshot_search")
     expect(tools("reviewer-visual").some((tool) => tool.startsWith("mcp__t3"))).toBe(true)

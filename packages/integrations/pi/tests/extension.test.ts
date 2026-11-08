@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { readFileSync } from "node:fs"
 import { mkdir, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { isAbsolute, join, resolve, win32 } from "node:path"
@@ -32,6 +33,7 @@ import {
   applyEnvironment,
   CACHE_RETENTION_ENV,
   childAgent,
+  CMD_NOT_FOUND,
   COMMAND_TIMEOUT_MS,
   CONTEXT_MESSAGE,
   createExtension,
@@ -48,21 +50,22 @@ import {
   refuseNonSpecialist,
   refuseNonSpecialistWorkflow,
   ROLE_FLAG,
+  runtimeArgs,
   sanitizeWorkflowName,
   SESSION_DEADLINE_MS,
   WORKFLOW_TOOL,
   workflowCallLine,
   workflowRenderers,
   WORKFLOWS_ENV,
-  wrapperPath,
 } from "../src/extension.ts"
 import { DIST_DIRECTORY, REPOSITORY } from "../src/files.ts"
 import { SPECIALIST_NAMES } from "../src/specialists.ts"
 
 const PACKAGE_ROOT = join(REPOSITORY, DIST_DIRECTORY)
-// The shell reads a script path without a `/` as a bare name, so the extension names it with `/`
-// only, drive letter included on Windows.
+// The model reads the wrapper's path with `/` only, drive letter included on Windows.
 const WRAPPER = toPosix(join(PACKAGE_ROOT, "scripts", "holyagent"))
+// What the extension starts Bun with: the bundled CLI, never the `sh` wrapper.
+const RUNTIME = runtimeArgs(PACKAGE_ROOT)
 const DEFAULTS = await Effect.runPromise(defaultConfig)
 const CONFIG = JSON.stringify(DEFAULTS)
 const DISABLED = JSON.stringify({
@@ -94,11 +97,21 @@ interface Call {
 type Outcome = Partial<Pick<ExecResult, "stdout" | "stderr" | "code" | "killed">>
 type Responder = (call: Call, runtime: ReadonlyArray<string>) => Outcome | Promise<Outcome>
 
-/** The holyagent subcommand a call runs through the wrapper, or undefined for another program. */
+/** The holyagent subcommand a call runs through the bundled CLI, or undefined for another program. */
 const subcommand = (call: Call): ReadonlyArray<string> | undefined =>
-  call.command === "sh" && call.args[0] === WRAPPER && call.args[1] === PI_PROJECT_FLAG
-    ? call.args.slice(3)
+  call.command === "bun" &&
+  call.args[0] === "--no-env-file" &&
+  call.args[RUNTIME.length] === PI_PROJECT_FLAG
+    ? call.args.slice(RUNTIME.length + 2)
     : undefined
+
+/** The arguments of a `pi` probe: a plain call, or the one `cmd.exe` makes on Windows. */
+const probeArgs = (call: Call): ReadonlyArray<string> | undefined =>
+  call.command === "pi"
+    ? call.args
+    : call.command === "cmd.exe" && call.args.slice(0, 3).join(" ") === "/d /c pi"
+      ? call.args.slice(3)
+      : undefined
 
 const STATUS =
   "intents[1]{id,revision,objective,running,unaccepted}:\n  intent-a,1,Ship the thing,0,0\n"
@@ -189,9 +202,10 @@ const fakeApi = (
       calls.push(call)
       running.count += 1
       try {
+        const probe = probeArgs(call)
         const outcome =
-          command === "pi"
-            ? await (session.pi ?? readyPi)(args, options?.signal)
+          probe !== undefined
+            ? await (session.pi ?? readyPi)(probe, options?.signal)
             : await responder(call, subcommand(call) ?? [])
         return { stdout: "", stderr: "", code: 0, killed: false, truncated: false, ...outcome }
       } finally {
@@ -257,6 +271,7 @@ const run = async (
     systemPrompt?: string
     packageRoot?: string
     platformPath?: ExtensionOptions["platformPath"]
+    platform?: ExtensionOptions["platform"]
   } = {},
 ) => {
   const api = fakeApi(responder, options.flag, options.cwd, {
@@ -272,6 +287,7 @@ const run = async (
     env,
     ...(options.deadlineMs === undefined ? {} : { deadlineMs: options.deadlineMs }),
     ...(options.platformPath === undefined ? {} : { platformPath: options.platformPath }),
+    ...(options.platform === undefined ? {} : { platform: options.platform }),
   })(api.pi)
   await api.emit("session_start", options.start ?? { reason: "startup" })
   await options.afterwards?.(api)
@@ -480,23 +496,46 @@ describe("what runs and when", () => {
     await done()
   })
 
-  test("the wrapper of a Windows package is named with / only, so sh does not take it for a bare name", () => {
-    expect(wrapperPath("C:\\Users\\me\\pkg", win32)).toBe("C:/Users/me/pkg/scripts/holyagent")
-    expect(wrapperPath("/opt/pkg")).toBe("/opt/pkg/scripts/holyagent")
+  test("Bun runs the package's holyagent.js with no env file and the empty config, as the wrapper does", () => {
+    expect(runtimeArgs("/opt/pkg")).toEqual([
+      "--no-env-file",
+      `--config=${join("/opt/pkg", "scripts", "empty-bunfig.toml")}`,
+      join("/opt/pkg", "scripts", "holyagent.js"),
+    ])
+    expect(runtimeArgs("C:\\Users\\me\\pkg", win32)).toEqual([
+      "--no-env-file",
+      "--config=C:\\Users\\me\\pkg\\scripts\\empty-bunfig.toml",
+      "C:\\Users\\me\\pkg\\scripts\\holyagent.js",
+    ])
+    // The wrapper's last line is the call these arguments repeat: the same Bun flags, then the file.
+    const exec = readFileSync(
+      join(REPOSITORY, "packages/integrations/claude/src/wrapper.sh"),
+      "utf8",
+    )
+      .trim()
+      .split("\n")
+      .at(-1)
+    for (const part of [
+      "--no-env-file",
+      '--config="$here/empty-bunfig.toml"',
+      '"$here/holyagent.js"',
+    ])
+      expect(exec).toContain(part)
   })
 
-  test("the wrapper is the only way to the runtime: sh with the package's scripts/holyagent", async () => {
+  test("Bun on holyagent.js is the only way to the runtime: never sh or the wrapper", async () => {
     const { directory, done } = await withState()
     const { api } = await run(healthy(directory), { start: { reason: "resume" } })
+    expect(api.calls.some((call) => call.command === "sh")).toBe(false)
     for (const call of api.calls) {
       if (call.command === "git" || call.command === "pi") continue
       expect({
         command: call.command,
-        script: call.args[0],
-        project: call.args.slice(1, 3),
+        runtime: call.args.slice(0, RUNTIME.length),
+        project: call.args.slice(RUNTIME.length, RUNTIME.length + 2),
       }).toEqual({
-        command: "sh",
-        script: WRAPPER,
+        command: "bun",
+        runtime: [...RUNTIME],
         project: [PI_PROJECT_FLAG, SESSION_PROJECT],
       })
     }
@@ -707,8 +746,8 @@ describe("with the built package and a real project", () => {
     expect((await real(root, home))?.message).toBeUndefined()
     const created = Bun.spawn(
       [
-        "sh",
-        WRAPPER,
+        "bun",
+        ...RUNTIME,
         "intent",
         "create",
         "--input",
@@ -1076,8 +1115,10 @@ describe("where programs start", () => {
     }
     const git = api.calls.filter((call) => call.command === "git")
     expect(git.map((call) => call.args)).toEqual([["-C", project, "rev-parse", "--show-toplevel"]])
-    for (const call of api.calls.filter((entry) => entry.command === "sh"))
-      expect(call.args.slice(0, 3)).toEqual([WRAPPER, PI_PROJECT_FLAG, project])
+    const bundled = api.calls.filter((entry) => entry.command === "bun")
+    expect(bundled.length).toBeGreaterThan(3)
+    for (const call of bundled)
+      expect(call.args.slice(0, RUNTIME.length + 2)).toEqual([...RUNTIME, PI_PROJECT_FLAG, project])
     await rm(directory, { recursive: true, force: true })
   })
 
@@ -1089,10 +1130,10 @@ describe("where programs start", () => {
     expect(isAbsolute(project)).toBe(true)
     const git = api.calls.filter((call) => call.command === "git")
     expect(git.map((call) => call.args)).toEqual([["-C", project, "rev-parse", "--show-toplevel"]])
-    const wrapped = api.calls.filter((call) => call.command === "sh")
+    const wrapped = api.calls.filter((call) => call.command === "bun")
     expect(wrapped.length).toBeGreaterThan(3)
     for (const call of wrapped)
-      expect(call.args.slice(0, 3)).toEqual([WRAPPER, PI_PROJECT_FLAG, project])
+      expect(call.args.slice(0, RUNTIME.length + 2)).toEqual([...RUNTIME, PI_PROJECT_FLAG, project])
     await rm(directory, { recursive: true, force: true })
   })
 })
@@ -1195,8 +1236,8 @@ describe("with the built package and a project that is not a git repository", ()
   const createIntent = async (root: string, home: string) => {
     const created = Bun.spawn(
       [
-        "sh",
-        WRAPPER,
+        "bun",
+        ...RUNTIME,
         PI_PROJECT_FLAG,
         root,
         "intent",
@@ -1247,9 +1288,15 @@ describe("with the built package and a project that is not a git repository", ()
     await done()
   })
 
-  test("the wrapper fails as a state error for a project folder that does not exist", async () => {
+  test("the bundled CLI fails as a state error for a project folder that does not exist", async () => {
     const child = Bun.spawn(
-      ["sh", WRAPPER, PI_PROJECT_FLAG, join(tmpdir(), "holyagent-pi-no-such-project"), "status"],
+      [
+        "bun",
+        ...RUNTIME,
+        PI_PROJECT_FLAG,
+        join(tmpdir(), "holyagent-pi-no-such-project"),
+        "status",
+      ],
       { cwd: PACKAGE_ROOT, stdout: "pipe", stderr: "pipe", stdin: "ignore" },
     )
     const [stderr, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
@@ -1261,15 +1308,71 @@ describe("with the built package and a project that is not a git repository", ()
 describe("a Windows package root", () => {
   const WINDOWS_ROOT = "C:\\Users\\me\\pkg"
 
-  test("the wrapper passed to exec is written with / only, and the programs still start in the package folder", async () => {
+  const WINDOWS = { packageRoot: WINDOWS_ROOT, platformPath: win32, platform: "win32" } as const
+
+  test("the CLI starts as bun on holyagent.js with the wrapper's flags, never sh, and every program starts in the package folder", async () => {
     const { api } = await run(
       (call) => (call.command === "git" ? { stdout: "/work/project\n" } : { stdout: CONFIG }),
-      { packageRoot: WINDOWS_ROOT, platformPath: win32 },
+      WINDOWS,
     )
-    const wrappers = api.calls.filter((call) => call.command === "sh").map((call) => call.args[0])
-    expect(wrappers.length).toBeGreaterThan(0)
-    for (const wrapper of wrappers) expect(wrapper).toBe("C:/Users/me/pkg/scripts/holyagent")
+    const bundled = api.calls.filter((call) => call.command === "bun")
+    expect(bundled.length).toBeGreaterThan(0)
+    for (const call of bundled)
+      expect(call.args.slice(0, 3)).toEqual([
+        "--no-env-file",
+        "--config=C:\\Users\\me\\pkg\\scripts\\empty-bunfig.toml",
+        "C:\\Users\\me\\pkg\\scripts\\holyagent.js",
+      ])
+    expect(api.calls.map((call) => call.command)).not.toContain("sh")
     for (const call of api.calls) expect(call.cwd).toBe(WINDOWS_ROOT)
+  })
+
+  test("pi starts through cmd.exe, since Node cannot start its pi.cmd shim without a shell", async () => {
+    const { api } = await run(healthy("/missing"), { ...WINDOWS, startOnly: true })
+    await probesEnded(api, 2)
+    const probes = api.calls.filter((call) => probeArgs(call) !== undefined)
+    expect(probes.map((call) => call.command)).toEqual(["cmd.exe", "cmd.exe"])
+    expect(probes.map((call) => call.args.slice(0, 3))).toEqual([
+      ["/d", "/c", "pi"],
+      ["/d", "/c", "pi"],
+    ])
+    expect(probes.map((call) => probeArgs(call)?.[0])).toEqual(["auth", "--list-models"])
+    for (const call of probes) expect(call.cwd).toBe(WINDOWS_ROOT)
+    expect(api.calls.some((call) => call.command === "pi")).toBe(false)
+  })
+
+  test("cmd.exe's not-found code says nothing about the provider, as a missing pi does elsewhere", async () => {
+    for (const code of [CMD_NOT_FOUND, 1]) {
+      const { api } = await run(healthy("/missing"), {
+        ...WINDOWS,
+        pi: () => ({ code, stderr: "pi is not recognized" }),
+        startOnly: true,
+      })
+      await probesEnded(api, 1)
+      expect(await nextMessages(api)).toHaveLength(code === 1 ? 1 : 0)
+    }
+  })
+
+  test("another platform starts pi itself, and 9009 is then an ordinary exit code", async () => {
+    const { api } = await run(healthy("/missing"), {
+      pi: () => ({ code: CMD_NOT_FOUND, stderr: "not logged in" }),
+      startOnly: true,
+    })
+    await probesEnded(api, 1)
+    expect(api.calls.some((call) => call.command === "cmd.exe")).toBe(false)
+    expect((await nextMessages(api))[0]?.content).toContain("not logged in")
+  })
+
+  test("the root gets powershell beside bash on Windows, and not elsewhere", async () => {
+    // A fresh list for each run: the fake API edits the active tools in place.
+    const options = () => ({
+      activeTools: ["read", "bash", "write", "edit"],
+      allTools: ["read", "bash", "write", "edit", "powershell", "codemode"],
+    })
+    const windows = await run(healthy("/missing"), { ...WINDOWS, ...options() })
+    expect(windows.api.toolSets).toEqual([["read", "bash", "codemode", "powershell"]])
+    const elsewhere = await run(healthy("/missing"), options())
+    expect(elsewhere.api.toolSets).toEqual([["read", "bash", "codemode"]])
   })
 
   test("the session role's core names the package folder with / only too", async () => {
@@ -1279,14 +1382,14 @@ describe("a Windows package root", () => {
       (call) =>
         call.command === "git"
           ? { stdout: "/work/project\n" }
-          : call.args[3] === "config"
+          : call.args[5] === "config"
             ? { stdout: CONFIG }
-            : call.args[3] === "status"
+            : call.args[5] === "status"
               ? { stdout: STATUS }
-              : call.args[3] === "state"
+              : call.args[5] === "state"
                 ? { stdout: `mode: work\nconfigured: true\ndirectory: ${directory}\n` }
                 : { code: 2 },
-      { packageRoot: WINDOWS_ROOT, platformPath: win32, flag: "session" },
+      { ...WINDOWS, flag: "session" },
     )
     expect(delivered?.message?.content).toContain(wrapper)
     expect(delivered?.message?.content).not.toContain("C:\\Users")
@@ -1880,7 +1983,7 @@ describe("drawing a SubagentWorkflow call", () => {
 
 /** Waits until the provider probes ended: `count` of them ran and none is left running. */
 const probesEnded = async (api: ReturnType<typeof fakeApi>, count: number) => {
-  const probes = () => api.calls.filter((call) => call.command === "pi").length
+  const probes = () => api.calls.filter((call) => probeArgs(call) !== undefined).length
   for (let tries = 0; tries < 400 && (probes() < count || api.running.count > 0); tries++)
     await Bun.sleep(5)
   expect(probes()).toBe(count)
@@ -1915,7 +2018,7 @@ const unsafeCharacters = (text: string): ReadonlyArray<number> =>
   )
 
 const piCalls = (api: ReturnType<typeof fakeApi>) =>
-  api.calls.filter((call) => call.command === "pi").map((call) => call.args.join(" "))
+  api.calls.flatMap((call) => probeArgs(call)?.join(" ") ?? [])
 
 describe("the root's system prompt", () => {
   const PI_PROMPT = "Pi's own prompt, with AGENTS.md and the skills"
