@@ -1,0 +1,73 @@
+{
+  "id": "assignment-0mw7jd8fv-f5ck",
+  "intentId": "intent-0mw6muuvl-zq3p",
+  "intentRevision": 7,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-pi-workflow-gate-check-exactly",
+  "objective": "Make the Pi workflow gate check exactly the program and meta fragment that @tintinweb/pi-subagents runs, instead of approximating its quirks, and restore the Claude hook to its earlier verdicts.",
+  "state": "Running",
+  "scope": [
+    "Work only in /home/user/holyagent-0.3.0-launcher (head ddd4616). Package source: /home/user/holyagent-notes/pi-probe/node_modules/@tintinweb/pi-subagents (src/workflow/meta.ts, worker-source.ts, index.ts:2795).",
+    "Two rounds of review found that approximating the package in packages/runtime/src/cli/workflow-check.ts does not hold: (a) security, blocking: extractMeta finds `export const meta =` by regex, takes the first `{` after the match (which may sit inside a comment), brace-scans and evaluates that fragment with new Script(\"(\" + fragment + \")\").runInContext(createContext({})) on the host thread, where this.constructor.constructor reaches process; the checker only compares the match position with the AST export, so `export const meta = /* { description: this.constructor.constructor(\"return process\")()... } */ { name: \"a\", description: \"d\" }` passes and runs host code; (b) code, blocking: the raw-source rule /<!--|-->/ refuses ordinary Claude scripts with \"A --> B\" in a string or template, and docs/hooks.md says `-->` only at line start while the code refuses it anywhere.",
+    "Fix by replicating the package rather than approximating it: add a Pi-mode check used by the Pi gate (packages/integrations/pi/src/extension.ts refuseNonSpecialistWorkflow) that (1) computes the meta fragment with the package algorithm exactly (same regex, same first-brace and brace-scan rules; read meta.ts and port it with a comment citing the lines) and refuses unless that fragment parses as an object expression of literal-only plain-key properties (strings, numbers, booleans, nested arrays and objects of those, no identifiers, calls, this, templates with expressions, getters or computed keys), and unless there is at most one regex match; (2) builds the exact source the worker runs (the same export blanking and wrapping as worker-source.ts) and parses it with acorn in script mode (sourceType script, allowAwaitOutsideFunction, allowReturnOutsideFunction as the wrapper requires) so HTML-like comments and Annex B behave as at runtime, then applies the existing node, scope, global and agent() rules to that AST, with bare specialist names. Keep the refusal of block-level function declarations if the script-mode AST still needs it to match runtime hoisting.",
+    "Restore the Claude hook (module parse, holyagent:<agent> names) to its verdicts before ddd4616: remove the raw-source HTML-comment and meta-line rules from the Claude path, so `log(`a --> b`)` and agent prompts containing --> or <!-- inside strings are allowed again, with tests that pin it.",
+    "Tests: the comment-before-object meta payload and the // variant refused under Pi; the earlier <!-- exploit refused under Pi; strings and templates containing <!-- and --> allowed under both hosts; a legitimate meta export allowed. Update docs/hooks.md (the Script-mode differences bullet) and docs/pi/extensions.md to describe the Pi check as parsing what the package runs."
+  ],
+  "constraints": [
+    "Edit only the ownership paths; no version-control writes and no edits under .git/ or .holyagent/.",
+    "Effect and JSDoc per .claude/CLAUDE.md; the Pi extension bundle runs on Node.",
+    "Do not run pi or any live model.",
+    "Run bunx --no-install mise run build, then bunx --no-install mise run verify; report each exit code (echo $?) and counts; confirm Claude dist agents and skills unchanged.",
+    "Write the source diff (no dist bundles) to /home/user/holyagent-notes/launcher-i.diff and give it as diff-file evidence.",
+    "Start each evidence line with the criterion text, then a colon.",
+    "Report in under 350 words."
+  ],
+  "criteria": [
+    {
+      "text": "Under Pi the gate vets the exact meta fragment and the exact script the package runs, refusing the comment-before-object and HTML-comment exploits",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The Claude hook verdicts are as before ddd4616, with strings containing --> or <!-- allowed",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Tests cover the exploits and the allowed cases and fail without the change",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "docs/hooks.md and docs/pi/extensions.md match the code",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "mise run build exits 0 with dist in sync and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli/workflow-check.ts",
+    "packages/runtime/tests",
+    "packages/integrations/pi/src/extension.ts",
+    "packages/integrations/pi/tests",
+    "packages/integrations/pi/dist",
+    "packages/integrations/claude/dist",
+    "docs/hooks.md",
+    "docs/pi/extensions.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T07:53:58.267Z"
+  },
+  "createdAt": "2026-11-08T07:53:58.267Z"
+}
