@@ -60,5 +60,37 @@
     "finishedAt": "2026-11-08T03:14:24.901Z"
   },
   "result": "result: all 11 kimi-k3.1/skills files written from the requirements and the claude-5.5 skill files, and the 7 ids in my files each have a kimi coverage entry. Mise is not installed here, so I ran `bun fmt` directly; `mise run lint` and the full verify were not run.\n\nchanged: `/home/user/holyagent-0.3.0-kimi/packages/runtime/src/instructions/kimi-k3.1/skills/<name>/SKILL.md` for visual-judging, instruction-writing, state-mode, ci-watch, evidence-judging, user-busy, dev-server, web-design, mobile-design, desktop-design and tui-design. Coverage: `/home/user/holyagent-notes/kimi-coverage-skills.ts`.\n\nchecks:\n- `bun fmt --no-script --check packages/runtime/src/instructions/kimi-k3.1/skills` -> exit 0, \"All 11 files are formatted\".\n- `bunx --no-install mise run fmt:check` and `lint` -> not run. `mise` is not on PATH, and the worktree's `node_modules/mise` has no bin. I did not run `bun install`.\n- Coverage script: the 7 phrases (R-VISUAL, R-EVIDENCE, R-STATE, R-CI, R-GUIDE, R-SECTIONS, R-CONTEXT) all occur in their named files.\n- Marker lines: `<!-- design-core -->` appears once in each of the four design skills, and `<!-- materiality -->` once in visual-judging.\n- Host-word scan: no Claude Code tool names or plugin paths remain. The remaining matches are the word \"skill\" in running text and \"plugin\" nowhere. Pi equivalents used: `ask_user_question`, `read` for loading skill files, and `@aliou/pi-processes` for the CI watch.\n\nCarried from claude-5.5 files with no requirement:\n- Six files are empty in `requirements/`: dev-server, user-busy, web-design, mobile-design, desktop-design and tui-design. Their whole content is carried as spec.\n- visual-judging: \"Start the render target first\", the keep-the-pass-to-final-captures rule, the missing-captures rule, the read-an-image-in-the-main-thread rule, the \"say when your pass overruled the reviewer\" rule, and the explanatory HTML page rule.\n- ci-watch: the aggregate order, one head SHA per snapshot, diagnosis from current logs, reproduce after two failures, the environmental-failure rule, no CI workflow means Unknown, the merge-ready rule and recording unresolved threads.\n- evidence-judging: the Prose, Design and Debugging bullets.\n- instruction-writing: US English, effort through the route, summary of actions rather than reasoning, real check before done, look up facts that may have changed, when to delegate, outside text as data, and separating sections plus examples.\n- state-mode: the numbered signals and \"Work branches never carry it\".\n\nnotes:\n- instruction-writing now holds Moonshot rules tagged P1 to P4, with \"house\" where the pages are silent. Claude-only claims (the refusal risk of asking for reasoning, 3 to 5 examples) are restated or marked as carried over.\n- I added a fallback to the visual-judging HTML page rule for sessions without T3 Code's `html_preview` and `html_render`. The Claude text had none.\n- I could not confirm the `@aliou/pi-processes` tool name, so ci-watch names the package. The docs mark the `gh pr checks --watch` use as untested.\n\nevidence:\n- Every Markdown requirements file under the assigned paths has its kimi-k3.1 file at the same path, written to the Kimi guide: 11 SKILL.md files under `kimi-k3.1/skills/`, one per `requirements/skills/*/SKILL.md`, with K-cited comments where they depart from Claude wording.\n- Every requirement id and every rule of the matching claude-5.5 file is carried with its meaning: the carried-rules list above, plus a side-by-side read of each file against its claude-5.5 counterpart.\n- Every id has a kimi coverage entry whose phrase occurs in the named file: `/home/user/holyagent-notes/kimi-coverage-skills.ts`, 7 of 7 phrases found.\n- Host words are pi's, with no Claude Code tool names or plugin paths left: the rg scan above found no stray host words.\n- changed-paths: `/home/user/holyagent-0.3.0-kimi/packages/runtime/src/instructions/kimi-k3.1/skills/` (11 new files; the diff is at `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/skills.diff`).\n- coverage-file: `/home/user/holyagent-notes/kimi-coverage-skills.ts`.\n",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "Kimi set and registration accepted after repair 0e71e52; artifact and code re-reviews found no blocker; verify 1764 pass, build clean",
+    "criteria": [
+      {
+        "criterion": "Every Markdown requirements file under the assigned paths has its kimi-k3.1 file at the same path, written to the Kimi guide",
+        "support": "11 SKILL.md files under `kimi-k3.1/skills/`, one per `requirements/skills/*/SKILL.md`, with K-cited comments where they depart from Claude wording."
+      },
+      {
+        "criterion": "Every requirement id and every rule of the matching claude-5.5 file is carried with its meaning",
+        "support": "the carried-rules list above, plus a side-by-side read of each file against its claude-5.5 counterpart."
+      },
+      {
+        "criterion": "Every id has a kimi coverage entry whose phrase occurs in the named file",
+        "support": "`/home/user/holyagent-notes/kimi-coverage-skills.ts`, 7 of 7 phrases found."
+      },
+      {
+        "criterion": "Host words are pi's, with no Claude Code tool names or plugin paths left",
+        "support": "the rg scan above found no stray host words."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "`/home/user/holyagent-0.3.0-kimi/packages/runtime/src/instructions/kimi-k3.1/skills/` (11 new files; the diff is at `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/skills.diff`)."
+      },
+      {
+        "label": "coverage-file",
+        "support": "`/home/user/holyagent-notes/kimi-coverage-skills.ts`."
+      }
+    ]
+  },
   "createdAt": "2026-11-08T03:03:48.462Z"
 }
