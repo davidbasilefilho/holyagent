@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "assess-repair-commit-3ddedda-of-the-pi",
   "objective": "Assess repair commit 3ddedda of the Pi extension entry (range b7efd82..3ddedda, worktree /home/user/holyagent-0.3.0-ext) for security regressions, focusing on the new --project argument and process.chdir in the pi bundle entry and the neutral exec cwd.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "The earlier security review found no blocker and one low suspicion: pi.exec of bare sh and git with cwd set to the project could resolve a program from the project folder on Windows. The repair runs sh and git in the package folder, passes git -C <project>, and adds a leading --project <dir> to the pi bundle (packages/runtime/src/hooks/pi-entry.ts, pi-project.ts) which chdirs before the CLI runs. It also shares hasStateFolder (hooks/state-folder.ts) and a bundler (packages/runtime/src/bundle.ts).",
     "Diff without dist: /home/user/holyagent-notes/pi-ext-fix.diff; read worktree files as needed."
@@ -38,7 +38,29 @@
     "agentId": "workflow:wf_36714a58-16a/assignment-0mw7cbcq8-0ale",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T04:36:33.200Z"
+    "startedAt": "2026-11-08T04:36:33.200Z",
+    "finishedAt": "2026-11-08T04:42:10.162Z"
+  },
+  "result": "result: no blocker; both criteria hold. The built-in `/security-review` could not run: the skill's `git diff origin/HEAD...` failed because `origin/HEAD` does not exist in this checkout. I reviewed `/home/user/holyagent-notes/pi-ext-fix.diff` and the worktree files by reading them. I had no shell, so I ran no tests.\n\nchanged: none (read-only)\nchecks: none run. Review was by reading only.\nblockers: none\nquestions: none\n\nnotes:\n- Low, hardening: the extension passes `ctx.cwd` to `--project` and `git -C` as-is. If a host ever gave a relative `ctx.cwd`, `chdir` would resolve it against the package folder instead of the project. That fails closed unless a same-named subfolder exists there. Pi's `ctx.cwd` is absolute, so this is theoretical. `resolve(ctx.cwd)` in `collect` would remove it.\n- Pre-existing and unchanged: `git -C <project>` and the CLI after `chdir` read the project's own git config and `.holyagent/config.json`. That is the same trust as launching Pi in that repo, and git's `safe.directory` check still applies.\n- Pre-existing and out of scope: the CLI spawns its own children with the project as cwd. The Claude plugin does the same.\n\nevidence:\n- The --project argument cannot be confused with an option or used to run the CLI against an unintended folder, and a missing folder fails closed:\n  - `projectOf` in `pi-project.ts` only reads a leading `--project` plus `args[1]` as one separate argv element. A dash-prefixed folder name is still just the directory, and `chdir` parses no options. In the wrapper (`claude/src/wrapper.sh:42`), `exec bun … holyagent.js \"$@\"` puts the arguments after the script file, so Bun does not parse them.\n  - A bare `--project` or a non-leading one is left in place, so the CLI rejects it as an unknown command. The Claude plugin bundle has no such flag.\n  - `enterProject` (`pi-entry.ts:967-971`) turns a failed `chdir` (ENOENT, ENOTDIR, empty string) into `StateIo`. `pi-entry.ts:1011-1013` writes the error, sets a nonzero exit code and never reaches `config` or the CLI. The extension also requires exit code 0. A test covers the missing-folder case (exit code 4).\n  - `main.ts` is imported only after `chdir` and reads `process.cwd()` at run time (`cli/main.ts:38`). `Bun.argv.splice(2,2)` strips exactly the flag and its folder.\n- sh and git no longer start in the project folder, and no new command, path or context injection is introduced:\n  - `exec` in `extension.ts` always uses `cwd: packageRoot`, which comes from `import.meta.url`.\n  - The wrapper is an absolute path as the first operand to `sh`. It never changes directory.\n  - Bun now starts in the package folder, so project `.env` and `bunfig.toml` are not read at all.\n  - `git -C <project> rev-parse --show-toplevel` is an argv array with no shell, and the project is the value of `-C`.\n  - The command strings are fixed: `config`, `status`, `reconcile`, `state mode`. The non-git state folder is `join(top, \".holyagent\")`, which is only `stat`-ed.\n  - `bundleModule` (`bundle.ts`) is build-time only, with repo-constant entrypoints.\n- diff-file: `/home/user/holyagent-notes/pi-ext-fix.diff`\n",
+  "acceptance": {
+    "revision": 6,
+    "rationale": "The project flag fails closed and is not parsed as an option; sh and git start in the package folder; no new injection",
+    "criteria": [
+      {
+        "criterion": "The --project argument cannot be confused with an option or used to run the CLI against an unintended folder, and a missing folder fails closed",
+        "support": "`projectOf` in `pi-project.ts` only reads a leading `--project` plus `args[1]` as one separate argv element. A dash-prefixed folder name is still just the directory, and `chdir` parses no options. In the wrapper (`claude/src/wrapper.sh:42`), `exec bun … holyagent.js \"$@\"` puts the arguments after the script file, so Bun does not parse them.; A bare `--project` or a non-leading one is left in place, so the CLI rejects it as an unknown command. The Claude plugin bundle has no such flag.; `enterProject` (`pi-entry.ts:967-971`) turns a failed `chdir` (ENOENT, ENOTDIR, empty string) into `StateIo`. `pi-entry.ts:1011-1013` writes the error, sets a nonzero exit code and never reaches `config` or the CLI. The extension also requires exit code 0. A test covers the missing-folder case (exit code 4).; `main.ts` is imported only after `chdir` and reads `process.cwd()` at run time (`cli/main.ts:38`). `Bun.argv.splice(2,2)` strips exactly the flag and its folder."
+      },
+      {
+        "criterion": "sh and git no longer start in the project folder, and no new command, path or context injection is introduced",
+        "support": "`exec` in `extension.ts` always uses `cwd: packageRoot`, which comes from `import.meta.url`.; The wrapper is an absolute path as the first operand to `sh`. It never changes directory.; Bun now starts in the package folder, so project `.env` and `bunfig.toml` are not read at all.; `git -C <project> rev-parse --show-toplevel` is an argv array with no shell, and the project is the value of `-C`.; The command strings are fixed: `config`, `status`, `reconcile`, `state mode`. The non-git state folder is `join(top, \".holyagent\")`, which is only `stat`-ed.; `bundleModule` (`bundle.ts`) is build-time only, with repo-constant entrypoints."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff-file",
+        "support": "`/home/user/holyagent-notes/pi-ext-fix.diff`"
+      }
+    ]
   },
   "createdAt": "2026-11-08T04:36:33.200Z"
 }
