@@ -1,0 +1,63 @@
+{
+  "id": "assignment-0mw7393nm-qw1x",
+  "intentId": "intent-0mw6uzaad-grmo",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.code",
+  "slug": "review-pr-4-range-a38b600-79866c4-on",
+  "objective": "Review PR 4 (range a38b600..79866c4 on release/0.3.0/feat/requirements-tree, worktree /home/user/holyagent-0.3.0-req; run every command there) for correctness and regressions: the requirements tree loader, coverage map, mirror and coverage tests, the instructions:scaffold script and mise task, and the plugin generator changes.",
+  "state": "Running",
+  "scope": [
+    "Code under packages/runtime/src/instructions/{families,coverage,requirements,scaffold}.ts, packages/runtime/scripts/instructions-scaffold.ts, packages/runtime/package.json, mise.toml, packages/runtime/src/index.ts, packages/integrations/claude/src/agents.ts, the tests packages/runtime/tests/{requirements,scaffold,instructions}.test.ts and packages/integrations/claude/tests/plugin.test.ts. Diff: /home/user/holyagent-notes/pr4.diff.",
+    "Writer reports (claims only): .git/holyagent/reports/assignment-0mw6zq6yu-yip7.md and .git/holyagent/reports/assignment-0mw6zqlai-6xjn.md.",
+    "Known open items already queued for the repair (confirm or refine, do not re-litigate): the shipped claude-5.5/skills/instruction-writing/SKILL.md still says it draws on requirements.md and plugin.test.ts asserts that string; packages/runtime/AGENTS.md has no CLAUDE.md importing it, so Claude may not load it; FAMILIES holds only claude-5.5 by root default, with kimi-k3.1 joining in the Kimi PR together with its translations (kimi-k3.1/guide.md already exists)."
+  ],
+  "constraints": [
+    "Repository rules in .claude/CLAUDE.md and AGENTS.md bind: Effect (no try/catch, new Promise or async functions in runtime source), Effect Schema at data boundaries, Bun APIs, JSDoc on exports, mise.toml as the command source.",
+    "The scaffold only adds missing paths and never overwrites or deletes a file with content; the families list is one place in code read by the scaffold and the tests.",
+    "Read-only: no edits and no version-control writes. The built-in /code-review does not work in this worktree (no origin/HEAD); review the range yourself.",
+    "Report in under 450 words; long logs in /home/user/holyagent-notes/."
+  ],
+  "criteria": [
+    {
+      "text": "The scaffold and the mirror and coverage tests behave as specified, including Windows path separators",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The plugin output is unchanged and no existing behavior breaks",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The tests fail without the code they cover and none is weakened",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The code follows the repository's Effect, Schema, Bun and JSDoc rules",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "bunx --no-install mise run verify exits 0 on 79866c4",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw6zq6yu-yip7",
+    "assignment-0mw6zqlai-6xjn"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T00:22:51.586Z"
+  },
+  "createdAt": "2026-11-08T00:22:51.586Z"
+}
