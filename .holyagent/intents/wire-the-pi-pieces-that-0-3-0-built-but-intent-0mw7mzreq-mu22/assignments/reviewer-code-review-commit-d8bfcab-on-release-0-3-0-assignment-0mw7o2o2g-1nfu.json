@@ -1,0 +1,49 @@
+{
+  "id": "assignment-0mw7o2o2g-1nfu",
+  "intentId": "intent-0mw7mzreq-mu22",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.code",
+  "slug": "review-commit-d8bfcab-on-release-0-3-0",
+  "objective": "Review commit d8bfcab on release/0.3.0/feat/pi-tool-settings (worktree /home/user/holyagent-0.3.0-settings, range 5307d43..d8bfcab) for correctness and regressions.",
+  "state": "Running",
+  "scope": [
+    "Diff: /home/user/holyagent-notes/wire-b.diff (dist excluded).",
+    "Intended behavior: holyagent setup deep-merges the toolSettings output (codemode mode, pi-subagents subagents.json, Billion Context, Moonshot tools, computer-use) into Pi settings at the scope location, writing a key only where unset and different from the package default, never over a user value; malformed files are a failed line and untouched; --dry-run writes nothing; --undo removes only recorded keys whose value still equals what setup wrote; doctor reports missing HolyAgent settings only when Pi is in use; gating as the Pi package step.",
+    "Check the package defaults cited in PACKAGE_DEFAULTS against the pinned package sources, deep-merge semantics for nested objects and arrays, the setup record used by --undo, and atomic writes."
+  ],
+  "constraints": [
+    "Read-only; no edits and no version-control writes.",
+    "Report in under 400 words; put long logs in a file under /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Setup writes, skips, keeps and undoes settings as intended across scopes, and Claude-only output is unchanged",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Each new behavior has a test that would fail without it",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The change follows the repository's code rules",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "review-findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7ni86j-zlts"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T10:05:43.384Z"
+  },
+  "createdAt": "2026-11-08T10:05:43.384Z"
+}
