@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mw7qfvg8-cbsz",
+  "intentId": "intent-0mw7mzreq-mu22",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.security",
+  "slug": "re-assess-the-fix-commit-on-release-0-3",
+  "objective": "Re-assess the fix commit on release/0.3.0/feat/pi-root-wiring (range edc25d8..HEAD) against the finding that a failing git call or a later failed collection dropped the home-level root exclusions.",
+  "state": "Running",
+  "scope": [
+    "Read /home/user/holyagent-notes/wire-a-fix2.diff; sources in /home/user/holyagent-0.3.0-wiring.",
+    "Finding: topOf (git rev-parse) ran before the user-only config read, so a project-delivered malformed .git lifted the home-level exclusions; gather replaced the excluded list on a later collection; a deadline during the user read dropped them silently. Fix: the user-only read is forked first with its own deadline and a notice when it does not finish; gather unions with the earlier excluded set; only the user's pi.enable false clears it.",
+    "Check every remaining path where the root's exclusions could shrink or be lifted by project content within a session, and that a hanging or failing user read cannot hang the session start."
+  ],
+  "constraints": [
+    "Read-only; no edits and no version-control writes.",
+    "Report in under 400 words; put long logs in a file under /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "No project file or project config can lift the root's exclusions, gate or prompt",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "security-findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7q8o3a-1sb3"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T11:11:58.712Z"
+  },
+  "createdAt": "2026-11-08T11:11:58.712Z"
+}
