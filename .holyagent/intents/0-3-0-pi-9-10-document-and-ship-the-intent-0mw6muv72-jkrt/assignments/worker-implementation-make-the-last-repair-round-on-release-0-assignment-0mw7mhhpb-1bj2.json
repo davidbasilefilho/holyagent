@@ -1,0 +1,75 @@
+{
+  "id": "assignment-0mw7mhhpb-1bj2",
+  "intentId": "intent-0mw6muv72-jkrt",
+  "intentRevision": 5,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-last-repair-round-on-release-0",
+  "objective": "Make the last repair round on release/0.3.0/feat/pi-install (worktree /home/user/holyagent-0.3.0-install, head 56a18a2): user-scope presence from the global Pi settings only, and every Pi doc stating shipped behavior as shipped.",
+  "state": "Running",
+  "scope": [
+    "1 (code): in packages/runtime/src/setup/pi-install.ts and pi-check.ts, a user-scope setup and doctor count a package as present only when Pi's global settings list it at its pin; the project .pi/settings.json counts only for project and local scope (which also count the global file, since Pi loads global packages in a project). Why: a repository's .pi/settings.json must not suppress a global install, the same steering the previous repair removed for config. Update the tests (the 'either settings file' case) and the docs sentence that says setup and doctor agree across both files.",
+    "2 (test): tighten the loose doctor assertion for scope local in packages/runtime/tests/setup-pi.test.ts (/pi[ :]/ and not settings) and make the project-scope doctor test fail if the project config were ignored.",
+    "3 (docs, blocking): docs/README.md lines 10, 27, 28 say the Pi integration is planned and not shipped; state what ships in 0.3.0 (the Pi package, the Kimi for Coding provider, the launcher, setup and doctor) and what remains planned (the root's system prompt on Pi and anything else docs/pi/README.md marks Planned).",
+    "4 (docs): docs/pi/extensions.md lines 3, 9, 14, 21, 64; the status banners at line 3 of docs/pi/orchestration.md and docs/pi/caching-and-subagents.md; docs/pi/README.md finding 2 ('the plan uses it only as Pi's npmCommand') and lines 130-131 (check against the code that the Kimi wording is accurate). Make each match shipped code; keep planned only what is not built, and say so per item. Note holyagent setup does not write Pi's settings beyond pi install and pi remove.",
+    "5 (docs): README.md says Node.js 22.13 or later, 22.19 on Windows; state that Pi needs 22.19 or later on every OS while keeping README's six sections and linking into docs/. Document in docs/pi/installation.md that doctor prints no Pi lines when pi.enable is off (check pi-check.ts)."
+  ],
+  "constraints": [
+    "Change only the ownership paths; no version-control writes and no edits under .git/ or .holyagent/.",
+    "Follow .claude/CLAUDE.md code rules (Effect, tagged errors, Schema, Bun Shell, JSDoc on exports). Every behavior change gets a test that fails without it.",
+    "README.md keeps exactly its six sections in order; Pi mentions there are links into docs/.",
+    "Describe only what the code does; read the code for each claim.",
+    "Run bunx --no-install mise run build and bunx --no-install mise run verify before reporting.",
+    "Report in under 400 words; put long logs in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give the path; write a diff-file of your changes (dist excluded) at /home/user/holyagent-notes/install-last.diff."
+  ],
+  "criteria": [
+    {
+      "text": "A user-scope setup and doctor count only Pi's global settings for presence, with a test where a project .pi/settings.json listing a package does not stop the global install",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The scope local and project doctor tests fail if the project config or settings were ignored",
+      "blocking": false,
+      "dimension": "tests"
+    },
+    {
+      "text": "docs/README.md describes the Pi integration as shipped in 0.3.0 and names what remains planned",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No doc in the repository describes shipped Pi behavior as planned or later",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "README.md states the Node.js 22.19 requirement for Pi and keeps its six sections",
+      "blocking": false,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "mise run build and mise run verify exit 0",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/setup",
+    "packages/runtime/tests",
+    "packages/integrations/claude/dist/scripts/holyagent.js",
+    "packages/integrations/pi/dist/scripts/holyagent.js",
+    "docs",
+    "README.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T09:21:15.744Z"
+  },
+  "createdAt": "2026-11-08T09:21:15.744Z"
+}
