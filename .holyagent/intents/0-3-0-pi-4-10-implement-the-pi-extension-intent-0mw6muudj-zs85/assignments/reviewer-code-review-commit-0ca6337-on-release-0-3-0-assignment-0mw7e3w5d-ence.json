@@ -1,0 +1,48 @@
+{
+  "id": "assignment-0mw7e3w5d-ence",
+  "intentId": "intent-0mw6muudj-zs85",
+  "intentRevision": 6,
+  "roleTask": "Reviewer.code",
+  "slug": "review-commit-0ca6337-on-release-0-3-0",
+  "objective": "Review commit 0ca6337 on release/0.3.0/feat/pi-extension (worktree /home/user/holyagent-0.3.0-ext; run commands there), which makes interrupted commands wait for their process, for correctness and regressions.",
+  "state": "Running",
+  "scope": [
+    "Windows log of the failure it fixes: /home/user/holyagent-notes/win78b.log (EBUSY removing the temp project after 'a bad .holyagent/config.json is reported'). Diff: /home/user/holyagent-notes/pi-exec.diff.",
+    "The writer notes that an older gather aborted by a compaction is not awaited by the newer one, so its children can still be exiting briefly. Judge whether that can leave a child holding the project folder when a session ends or a test cleans up, and whether session_shutdown waits for all children."
+  ],
+  "constraints": [
+    "Read-only: no edits and no version-control writes.",
+    "Report in under 300 words; start each evidence line with the exact criterion text (no backticks), a colon, then the support."
+  ],
+  "criteria": [
+    {
+      "text": "No child process outlives a gather or session_shutdown, including an aborted older gather",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The tests would fail without the fix and no test is weakened",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "bunx --no-install mise run verify exits 0 and mise run build leaves the tree clean",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw7dvz88-ts1d"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-08T05:26:44.353Z"
+  },
+  "createdAt": "2026-11-08T05:26:44.353Z"
+}
