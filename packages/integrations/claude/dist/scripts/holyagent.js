@@ -12706,7 +12706,8 @@ var CAPABILITIES = [
       {
         file: BILLION_CONTEXT_FILE,
         content: BILLION_CONTEXT_GUARDRAILS_FILE,
-        whileOn: "contextCompression"
+        whileOn: "contextCompression",
+        revertWhenOff: true
       }
     ],
     health: ["needs"]
@@ -13865,6 +13866,18 @@ var clearRecorded = fn2("clearRecorded")(function* (env, file) {
   if (!(key in files))
     return;
   yield* save(env, Object.fromEntries(Object.entries(files).filter(([name]) => name !== key)));
+});
+var removeRecorded = fn2("removeRecorded")(function* (env, file, removed) {
+  if (removed.length === 0)
+    return;
+  const files = yield* load(env);
+  const key = keyOf(file);
+  const names = new Set(removed.map((path) => path.join("\x00")));
+  const left = (files[key] ?? []).filter((item) => !names.has(item.path.join("\x00")));
+  if (left.length === (files[key] ?? []).length)
+    return;
+  const others = Object.entries(files).filter(([name]) => name !== key);
+  yield* save(env, Object.fromEntries(left.length === 0 ? others : [...others, [key, left]]));
 });
 
 var added = (text) => `+ ${text}`;
@@ -23229,6 +23242,53 @@ var mergeTarget = fn2("mergeToolSettingsFile")(function* (env, options, planned)
   const mark = added.length > 0 ? "+" : kept.length > 0 ? "~" : "=";
   return `${mark} ${label} ${file}: ${parts.join("; ")}${added.length > 0 && dryRun ? " (dry run, nothing written)" : ""}`;
 });
+var REVERTABLE = CAPABILITIES.flatMap((capability) => capability.settings).filter((patch) => patch.revertWhenOff === true).flatMap((patch) => leaves(patch.content).map((leaf) => ({ file: patch.file, leaf })));
+var revertFile = fn2("revertToolSettingsFile")(function* (env, options, file, wanted) {
+  const recorded = yield* readRecorded(env, file);
+  const mine = wanted.filter((leaf) => recorded.some((item) => item.path.join(".") === keyName(leaf) && equals(item.value, leaf.value)));
+  if (mine.length === 0)
+    return [];
+  yield* refuseLinks(options.cwd, options.scope, file, "edit");
+  let result = yield* readJsonObject(file);
+  const removed = [];
+  const kept = [];
+  for (const { path, value } of mine) {
+    const [next, removal] = take(result, path, 0, value);
+    result = next;
+    if (removal.status === "removed")
+      removed.push(`${removal.path} ${show(removal.value)}`);
+    if (removal.status === "kept")
+      kept.push(`${removal.path} ${show(removal.value)} (setup wrote ${show(removal.wanted)})`);
+  }
+  if (!options.dryRun) {
+    if (removed.length > 0)
+      yield* writeJsonObject(file, result);
+    yield* removeRecorded(env, file, mine.map(({ path }) => path));
+  }
+  const parts = [
+    ...removed.length === 0 ? [] : [`${options.dryRun ? "would remove" : "removed"} ${removed.join(", ")}`],
+    ...kept.length === 0 ? [] : [`kept ${kept.join(", ")}`]
+  ];
+  const mark = removed.length > 0 ? "-" : kept.length > 0 ? "~" : "=";
+  return [
+    `${mark} ${label} ${file}: ${parts.length === 0 ? "nothing of setup's left to remove" : parts.join("; ")}${removed.length > 0 && options.dryRun ? " (dry run, nothing written)" : ""}`
+  ];
+});
+var revertUnplanned = fn2("revertUnplannedToolSettings")(function* (env, options, plan) {
+  const byFile = new Map;
+  for (const { file: logical, leaf } of REVERTABLE) {
+    const file = locate2(env, options.cwd, options.scope, logical);
+    if (file === undefined)
+      continue;
+    const planned = plan.targets.some((target) => target.file === file && target.all.some((key) => keyName(key) === keyName(leaf) && equals(key.value, leaf.value)));
+    if (!planned)
+      byFile.set(file, [...byFile.get(file) ?? [], leaf]);
+  }
+  const lines = [];
+  for (const [file, wanted] of byFile)
+    lines.push(...yield* revertFile(env, options, file, wanted).pipe(catchTag2("SetupFailure", (error) => succeed6([`! ${label}: ${error.message}`]))));
+  return lines;
+});
 var installPiToolSettings = fn2("installPiToolSettings")(function* (env, options) {
   const plan = yield* planAt(env, options.cwd, options.scope, options.form, options.choices);
   if (plan === undefined)
@@ -23240,6 +23300,7 @@ var installPiToolSettings = fn2("installPiToolSettings")(function* (env, options
   for (const logical of plan.unplaced) {
     lines.push(skipped(`${label} ${logical}: has no file at ${options.scope} scope; run \`holyagent setup\` at user scope`));
   }
+  lines.push(...yield* revertUnplanned(env, options, plan));
   return lines;
 });
 var undoPiToolSettings = fn2("undoPiToolSettings")(function* (env, options) {

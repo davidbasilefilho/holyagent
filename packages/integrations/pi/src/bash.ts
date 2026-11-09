@@ -175,7 +175,7 @@ export const createJustBashOperations = (host: BashHost): BashOperations => {
             `The bash tool's shell ended without a result (${exit.signal ?? `exit ${exit.code}`})${said === "" ? "" : `: ${said}`}`,
           )
         }
-        state = afterCall(state, cwd, ended.cwd, ended.changes)
+        state = afterCall(state, cwd, folder, ended.cwd, ended.changes)
         return { exitCode: ended.exitCode }
       } finally {
         if (timer !== undefined) clearTimeout(timer)

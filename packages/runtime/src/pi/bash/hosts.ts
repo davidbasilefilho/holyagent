@@ -25,11 +25,14 @@ export const variable = (
 // program, so it is never searched.
 const ROOTED = { posix: /^\//, win32: /^(?:[a-zA-Z]:[\\/]|[\\/]{2})/ }
 
+const isRooted = (folder: string, platform: NodeJS.Platform): boolean =>
+  ROOTED[platform === "win32" ? "win32" : "posix"].test(folder)
+
 const splitPath = (value: string, platform: NodeJS.Platform): ReadonlyArray<string> =>
   value
     .split(platform === "win32" ? ";" : delimiter)
     .map((folder) => (platform === "win32" ? folder.replace(/^"(.*)"$/, "$1") : folder))
-    .filter((folder) => ROOTED[platform === "win32" ? "win32" : "posix"].test(folder))
+    .filter((folder) => isRooted(folder, platform))
 
 /**
  * The folders the shell finds host programs in: the `PATH` of the call, then the places a program
@@ -77,16 +80,28 @@ export const hostSearchFolders = (
         "/usr/bin",
         "/bin",
       ]
+  // The extra folders come from variables (`HOME`, `BUN_INSTALL`, ...) that a call can set, so they
+  // pass the same rooted test as `PATH`: a relative value must not name a folder below the project.
   const seen = new Set<string>()
-  return [...splitPath(variable(env, "PATH", platform) ?? "", platform), ...extra].filter(
-    (folder) => {
-      const key = windows ? folder.toLowerCase() : folder
-      if (seen.has(key)) return false
-      seen.add(key)
-      return true
-    },
-  )
+  return [
+    ...splitPath(variable(env, "PATH", platform) ?? "", platform),
+    ...extra.filter((folder) => isRooted(folder, platform)),
+  ].filter((folder) => {
+    const key = windows ? folder.toLowerCase() : folder
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
+
+/**
+ * The rooted folders of a `PATH` value, as {@link hostSearchFolders} reads them from the call's
+ * `PATH`: relative entries are left out, and on Windows quotes around an entry are removed.
+ */
+export const pathFolders = (
+  value: string | undefined,
+  platform: NodeJS.Platform = process.platform,
+): ReadonlyArray<string> => splitPath(value ?? "", platform)
 
 /** `PATH` for a host program: {@link hostSearchFolders} joined the way the platform joins `PATH`. */
 export const hostPathValue = (env: Env, platform: NodeJS.Platform = process.platform): string =>
@@ -107,7 +122,11 @@ const readNames = (folder: string): ReadonlyArray<string> =>
     Effect.try(() => readdirSync(folder)).pipe(Effect.orElseSucceed((): Array<string> => [])),
   )
 
-const isRunnable = (path: string, windows: boolean): boolean =>
+/**
+ * Whether a path is a file a program may be started from: any file on Windows, else an executable
+ * one.
+ */
+export const isRunnable = (path: string, windows: boolean): boolean =>
   Effect.runSync(
     Effect.try(() => {
       if (!statSync(path).isFile()) return false

@@ -6,6 +6,7 @@ import { dirname, join, parse } from "node:path"
 import type { BashOperations, ExtensionAPI } from "@earendil-works/pi-coding-agent"
 
 import { BASH_GUIDELINES } from "../../../runtime/src/pi/bash/guidelines.ts"
+import { afterCall, NO_STATE } from "../../../runtime/src/pi/bash/state.ts"
 import { PROCESS_TIMEOUT_MS } from "../../../runtime/tests/fixtures.ts"
 import {
   type BashHost,
@@ -107,6 +108,36 @@ describe("the bash tool's operations on just-bash", () => {
       expect(next.text).toBe(`${join(work, "kept")}\nyes:local\n`)
       await call(operations, "unset KEPT")
       expect((await call(operations, 'echo "[$KEPT]"')).text).toBe("[]\n")
+    },
+    PROCESS_TIMEOUT_MS,
+  )
+
+  test(
+    "keep the folder and the variables of a call that ends with exit",
+    async () => {
+      await mkdir(join(work, "exited"), { recursive: true })
+      const operations = createJustBashOperations(host())
+      expect((await call(operations, "cd exited && export EXITED=yes && exit 2")).exitCode).toBe(2)
+      expect((await call(operations, 'pwd; echo "$EXITED"')).text).toBe(
+        `${join(work, "exited")}\nyes\n`,
+      )
+    },
+    PROCESS_TIMEOUT_MS,
+  )
+
+  test(
+    "overlapping calls each keep what they changed, and a call that stayed put does not undo another's cd",
+    async () => {
+      await mkdir(join(work, "overlap"), { recursive: true })
+      const operations = createJustBashOperations(host())
+      // The slow call starts first and ends last, without leaving the folder it started in.
+      const slow = call(operations, "sleep 1; export SLOW=1")
+      await Bun.sleep(150)
+      await call(operations, "cd overlap && export FAST=1")
+      await slow
+      expect((await call(operations, 'pwd; echo "$FAST $SLOW"')).text).toBe(
+        `${join(work, "overlap")}\n1 1\n`,
+      )
     },
     PROCESS_TIMEOUT_MS,
   )
@@ -248,6 +279,35 @@ describe("the bash tool's operations on just-bash", () => {
     expect(seen).toEqual([`echo off @ ${work}`])
     active = true
     await expect(call(operations, "echo on")).rejects.toThrow("started the shell while off")
+  })
+})
+
+describe("the state after a call", () => {
+  const none = { set: {}, unset: [] }
+
+  test("adds what the call changed to the state at the end of the call", () => {
+    const first = afterCall(NO_STATE, "/p", "/p", "/p/a", { set: { A: "1" }, unset: [] })
+    expect(first).toEqual({ cwd: "/p/a", from: "/p", delta: { A: "1" } })
+    // Another call changed B meanwhile; this one sets A again and unsets C.
+    const second = afterCall(
+      { ...first, delta: { ...first.delta, B: "2" } },
+      "/p",
+      "/p/a",
+      "/p/a",
+      {
+        set: { A: "3" },
+        unset: ["C"],
+      },
+    )
+    expect(second.delta).toEqual({ A: "3", B: "2", C: null })
+  })
+
+  test("a call that did not change folder keeps the folder another call moved to", () => {
+    const moved = { cwd: "/p/other", from: "/p", delta: {} }
+    expect(afterCall(moved, "/p", "/p", "/p", none)).toEqual(moved)
+    // One that did move wins, and so does one that follows another folder Pi passed.
+    expect(afterCall(moved, "/p", "/p", "/p/new", none).cwd).toBe("/p/new")
+    expect(afterCall(moved, "/q", "/q", "/q", none)).toEqual({ cwd: "/q", from: "/q", delta: {} })
   })
 })
 

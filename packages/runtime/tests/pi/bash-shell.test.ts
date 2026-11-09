@@ -5,6 +5,7 @@ import { delimiter, dirname, join, parse } from "node:path"
 
 import { Effect } from "effect"
 
+import { cmdExeArguments } from "../../src/pi/bash/cmd.ts"
 import {
   hostPathValue,
   hostSearchFolders,
@@ -13,10 +14,19 @@ import {
   scanHostPrograms,
 } from "../../src/pi/bash/hosts.ts"
 import { toHostArgument, toHostPath, toVirtualPath } from "../../src/pi/bash/paths.ts"
+import {
+  interpreterOf,
+  programKind,
+  RUNNER_PATH,
+  trampoline,
+  withProgramLaunch,
+} from "../../src/pi/bash/programs.ts"
 import type { ShellFrame } from "../../src/pi/bash/protocol.ts"
 import {
+  emittedOrder,
   envChanges,
   HOST_PREFIX,
+  hostLaunch,
   planCommands,
   runShell,
   SHELL_PATH,
@@ -153,6 +163,21 @@ describe("where host programs are looked for", () => {
     expect(folders).toContain("/mise/shims")
   })
 
+  test("the extra folders are rooted too: a relative HOME or BUN_INSTALL names no folder", () => {
+    const folders = hostSearchFolders(
+      { PATH: "/a", HOME: "home", BUN_INSTALL: ".", MISE_DATA_DIR: "mise" },
+      "linux",
+    )
+    expect(folders.filter((folder) => !folder.startsWith("/"))).toEqual([])
+    expect(folders).not.toContain("bin")
+    expect(folders).toContain("/usr/local/bin")
+    const windows = hostSearchFolders(
+      { Path: "C:\\a", USERPROFILE: "profile", LOCALAPPDATA: "local", APPDATA: ".\\roaming" },
+      "win32",
+    )
+    expect(windows).toEqual(["C:\\a"])
+  })
+
   test("Windows reads Path without regard to case, keeps drive folders only and adds its own places", () => {
     const folders = hostSearchFolders(
       {
@@ -280,11 +305,12 @@ describe("the shell runs commands", () => {
   )
 
   test(
-    "the host program gets the real PATH, and the shell's own PATH is its two folders",
+    "the host program gets the real PATH, and the shell's own PATH is its two folders and then the call's",
     async () => {
       const seen = await shell(`${HOST} -e "console.log(process.env.PATH)"`)
       expect(seen.text.split(delimiter)).toContain(HOST_DIR)
-      expect((await shell("echo $PATH")).text.trim()).toBe(SHELL_PATH)
+      expect(seen.text.trim().startsWith(SHELL_PATH)).toBe(false)
+      expect((await shell("echo $PATH")).text.trim()).toBe(`${SHELL_PATH}:${HOST_DIR}`)
       expect((await shell("which git cat")).text).toBe("/usr/bin/git\n/usr/bin/cat\n")
     },
     PROCESS_TIMEOUT_MS,
@@ -382,4 +408,330 @@ describe("the shell runs commands", () => {
   test("the exit code of exit is the call's", async () => {
     expect((await shell("exit 3")).exitCode).toBe(3)
   })
+})
+
+describe("what the shell can read as a script and what only the machine can run", () => {
+  test("names the interpreter of a #! line, through env too", () => {
+    expect(interpreterOf(Buffer.from("#!/bin/bash\n"))).toBe("bash")
+    expect(interpreterOf(Buffer.from("#!/usr/bin/env node\n"))).toBe("node")
+    expect(interpreterOf(Buffer.from("#!/usr/bin/env -S bash -e\n"))).toBe("bash")
+    expect(interpreterOf(Buffer.from("#! /bin/sh -e\n"))).toBe("sh")
+    expect(interpreterOf(Buffer.from("echo hi\n"))).toBeUndefined()
+  })
+
+  test.skipIf(WINDOWS)(
+    "a shell script is the shell's, a binary and a script for another interpreter are the machine's",
+    async () => {
+      const files: ReadonlyArray<
+        readonly [string, Uint8Array | string, number, "native" | "script" | undefined]
+      > = [
+        ["kind-sh", "#!/bin/sh\necho hi\n", 0o755, "script"],
+        ["kind-bash", "#!/usr/bin/env bash\necho hi\n", 0o755, "script"],
+        ["kind-bare", "echo hi\n", 0o755, "script"],
+        ["kind-node", "#!/usr/bin/env node\nconsole.log(1)\n", 0o755, "native"],
+        ["kind-zsh", "#!/bin/zsh\necho hi\n", 0o755, "native"],
+        ["kind-elf", Uint8Array.from([0x7f, 0x45, 0x4c, 0x46, 2, 1, 1, 0]), 0o755, "native"],
+        ["kind-plain", "#!/usr/bin/env node\n", 0o644, undefined],
+      ]
+      for (const [name, content, mode, kind] of files) {
+        await writeFile(join(work, name), content)
+        await chmod(join(work, name), mode)
+        expect(programKind(join(work, name), "linux", [])).toBe(kind)
+      }
+      expect(programKind(join(work, "kind-missing"), "linux", [])).toBeUndefined()
+      expect(programKind(work, "linux", [])).toBeUndefined()
+    },
+  )
+
+  test("on Windows a file with a PATHEXT extension is the machine's whatever it holds", async () => {
+    await writeFile(join(work, "kind.cmd"), "@echo off\n")
+    await writeFile(join(work, "kind.txt"), "text\n")
+    const extensions = programExtensions({})
+    expect(programKind(join(work, "kind.cmd"), "win32", extensions)).toBe("native")
+    expect(programKind(join(work, "kind.txt"), "win32", extensions)).toBe("script")
+  })
+})
+
+describe("the file system that points a program given by path at the machine", () => {
+  const fake = (files: Record<string, string>) => {
+    const calls: Array<string> = []
+    const fs = {
+      exists: (path: string) => {
+        calls.push(`exists ${path}`)
+        return Effect.runPromise(Effect.succeed(path in files))
+      },
+      stat: (path: string) => {
+        calls.push(`stat ${path}`)
+        return Effect.runPromise(
+          Effect.succeed({ isFile: true, isDirectory: false, mode: 0o644, size: 1 }),
+        )
+      },
+      readFile: (path: string) => {
+        calls.push(`readFile ${path}`)
+        return Effect.runPromise(Effect.succeed(files[path] ?? ""))
+      },
+    }
+    return { fs: fs as never, calls }
+  }
+  const options = { toHost: (path: string) => path, platform: process.platform, extensions: [] }
+
+  test.skipIf(WINDOWS)(
+    "reads a native file as the one-line script when the shell asks the way it runs a script, and any other read as the file",
+    async () => {
+      const native = join(work, "launch-native")
+      const script = join(work, "launch-script")
+      await writeFile(native, "#!/usr/bin/env node\nthe bytes\n")
+      await writeFile(script, "#!/bin/sh\necho hi\n")
+      await chmod(native, 0o755)
+      await chmod(script, 0o755)
+      const { fs } = fake({ [native]: "the bytes", [script]: "echo hi" })
+      const wrapped = withProgramLaunch(fs, options)
+      // `cat` and `grep` read without the `exists` before the `stat`.
+      expect(await wrapped.readFile(native)).toBe("the bytes")
+      await wrapped.stat(native)
+      expect(await wrapped.readFile(native)).toBe("the bytes")
+      // The way the shell resolves a command and then reads it as a script.
+      await wrapped.exists(native)
+      await wrapped.stat(native)
+      expect(await wrapped.readFile(native)).toBe(trampoline(native))
+      expect(trampoline(native)).toContain(`${RUNNER_PATH} '${native}' "$@"`)
+      // A shell script, and a read of another file after the two calls, stay as they are.
+      await wrapped.exists(script)
+      await wrapped.stat(script)
+      expect(await wrapped.readFile(script)).toBe("echo hi")
+      await wrapped.exists(native)
+      await wrapped.stat(native)
+      expect(await wrapped.readFile(script)).toBe("echo hi")
+    },
+  )
+
+  test("a path with a quote in it is quoted for the script", () => {
+    expect(trampoline("/a/it's")).toContain(`'/a/it'\\''s'`)
+  })
+
+  test("on Windows stat reports the execute bit of a file with a program extension, as just-bash requires", async () => {
+    const { fs } = fake({})
+    const wrapped = withProgramLaunch(fs, {
+      toHost: (path) => path,
+      platform: "win32",
+      extensions: [".exe", ".cmd"],
+    })
+    expect((await wrapped.stat("/c/tools/git.exe")).mode & 0o111).toBe(0o111)
+    expect((await wrapped.stat("/c/tools/notes.txt")).mode & 0o111).toBe(0)
+  })
+})
+
+describe("how a host program is started", () => {
+  test("a program is started as it is, with its arguments", () => {
+    expect(hostLaunch("/bin/git", ["status", "a b"], "linux")).toEqual({
+      ok: true,
+      cmd: ["/bin/git", "status", "a b"],
+    })
+    expect(hostLaunch("C:\\tools\\git.exe", ["status"], "win32")).toEqual({
+      ok: true,
+      cmd: ["C:\\tools\\git.exe", "status"],
+    })
+    // A .cmd file on another system is a file like any other.
+    expect(hostLaunch("/x/run.cmd", ["a"], "linux")).toEqual({ ok: true, cmd: ["/x/run.cmd", "a"] })
+  })
+
+  test("a .cmd or .bat file on Windows goes through cmd.exe with the arguments quoted by the shim rules", () => {
+    for (const file of ["C:\\npm\\tsc.cmd", "C:\\npm\\RUN.BAT"])
+      expect(
+        hostLaunch(file, ["--project", "C:\\a b\\x"], "win32", "C:\\Windows\\system32\\cmd.exe"),
+      ).toEqual({
+        ok: true,
+        cmd: [
+          "C:\\Windows\\system32\\cmd.exe",
+          "/d",
+          "/s",
+          "/c",
+          "call",
+          file,
+          "--project",
+          "C:\\a b\\x",
+        ],
+      })
+    expect(hostLaunch("C:\\npm\\tsc.cmd", [], "win32")).toMatchObject({ ok: true })
+  })
+
+  test("a word cmd.exe would read as syntax is refused, and nothing is started", () => {
+    const shim = "C:\\npm\\tsc.cmd"
+    for (const word of ['a"b', "50%", "a^b", "a!b", "a\nb", "a b%PATH%", 'x y" & calc & "z']) {
+      expect(cmdExeArguments(shim, ["--project", word]).ok).toBe(false)
+      expect(hostLaunch(shim, ["--project", word], "win32").ok).toBe(false)
+    }
+    expect(cmdExeArguments("C:\\a&b\\tsc.cmd", []).ok).toBe(false)
+    for (const word of ["C:\\a&b", "C:\\a|b", "C:\\a<b", "C:\\a>b", "C:\\(x86)"])
+      expect(cmdExeArguments(shim, [word]).ok).toBe(false)
+    // In quotes, which Node adds to a word with a space, the same characters are literal.
+    expect(cmdExeArguments(shim, ["C:\\Program Files (x86)\\a&b"])).toEqual({
+      ok: true,
+      args: ["/d", "/s", "/c", "call", shim, "C:\\Program Files (x86)\\a&b"],
+    })
+  })
+})
+
+describe("a host program's output keeps the order it arrived in", () => {
+  const chunk = (stream: "out" | "err", text: string) => ({
+    stream,
+    bytes: Buffer.from(text),
+  })
+  const log = [chunk("out", "a\n"), chunk("err", "b\n"), chunk("out", "c\n")]
+  const text = (chunks: ReadonlyArray<Uint8Array> | undefined) =>
+    chunks === undefined ? undefined : Buffer.concat(chunks).toString()
+
+  test("is the log's order when the result is exactly that output, split or merged by 2>&1", () => {
+    expect(text(emittedOrder(log, Buffer.from("a\nc\n"), Buffer.from("b\n")))).toBe("a\nb\nc\n")
+    expect(text(emittedOrder(log, Buffer.from("a\nc\nb\n"), Buffer.from("")))).toBe("a\nb\nc\n")
+  })
+
+  test("is left to the caller when the result holds anything else", () => {
+    expect(emittedOrder(log, Buffer.from("a\nc\nmore\n"), Buffer.from("b\n"))).toBeUndefined()
+    expect(emittedOrder(log, Buffer.from("c\n"), Buffer.from("b\n"))).toBeUndefined()
+    expect(emittedOrder([], Buffer.from(""), Buffer.from(""))).toBeUndefined()
+  })
+})
+
+describe("the shell runs a program given by path on the machine", () => {
+  // A program the machine's Bun runs: its #! line names Bun by its full path, as the kernel needs.
+  const program = async (path: string, code: string) => {
+    await mkdir(dirname(path), { recursive: true })
+    await writeFile(path, `#!${process.execPath}\n${code}\n`)
+    await chmod(path, 0o755)
+  }
+  const ARGS = "console.log('prog:' + process.argv.slice(2).join(','))"
+
+  test.skipIf(WINDOWS)(
+    "a relative path, an absolute path and a symlink in a .bin folder, with arguments and the exit code",
+    async () => {
+      await program(join(work, "path-prog"), `${ARGS}; process.exit(4)`)
+      const relative = await shell("./path-prog a 'b c'")
+      expect(relative.text).toBe("prog:a,b c\n")
+      expect(relative.exitCode).toBe(4)
+      expect((await shell(`${join(work, "path-prog")} x`)).text).toBe("prog:x\n")
+
+      await program(join(work, "path-lib", "tsc.js"), ARGS)
+      await mkdir(join(work, "path-modules", ".bin"), { recursive: true })
+      await symlink("../../path-lib/tsc.js", join(work, "path-modules", ".bin", "tsc"))
+      const linked = await shell("path-modules/.bin/tsc --version")
+      expect(linked.text).toBe("prog:--version\n")
+      expect(linked.exitCode).toBe(0)
+    },
+    PROCESS_TIMEOUT_MS,
+  )
+
+  test.skipIf(WINDOWS)(
+    "a binary runs, standard input reaches the program, and it sits in a pipeline",
+    async () => {
+      await symlink(process.execPath, join(work, "path-native")).catch(() => undefined)
+      expect((await shell("./path-native --version")).text.trim()).toBe(Bun.version)
+      await program(
+        join(work, "path-upper"),
+        "console.log((await Bun.stdin.text()).trim().toUpperCase())",
+      )
+      expect((await shell("echo piped | ./path-upper | tr a-z A-Z")).text).toBe("PIPED\n")
+    },
+    PROCESS_TIMEOUT_MS,
+  )
+
+  test.skipIf(WINDOWS)(
+    "a shell script given by path still runs in the shell, and reading a program shows its text",
+    async () => {
+      await writeFile(join(work, "path-script"), '#!/bin/sh\necho "script:$1"\n')
+      await chmod(join(work, "path-script"), 0o755)
+      expect((await shell("./path-script z")).text).toBe("script:z\n")
+      await program(join(work, "path-readable"), ARGS)
+      const read = await shell("head -1 ./path-readable; grep -c prog: ./path-readable")
+      expect(read.text).toBe(`#!${process.execPath}\n1\n`)
+    },
+    PROCESS_TIMEOUT_MS,
+  )
+
+  test.skipIf(WINDOWS)(
+    "a folder added to PATH in the call is searched, and the program gets it in its PATH",
+    async () => {
+      const bin = join(work, "path-added")
+      await program(
+        join(bin, "added-tool"),
+        "console.log(process.env.PATH.split(':')[0] + ' ' + process.argv.slice(2))",
+      )
+      const out = await shell(`export PATH=${bin}:$PATH; added-tool q; echo $PATH`)
+      expect(out.text.split("\n")[0]).toBe(`${bin} q`)
+      expect(out.text.split("\n")[1]?.startsWith(`${bin}:${SHELL_PATH}`)).toBe(true)
+      // Reported as the machine's PATH, without the shell's own folders, so the next call can use it.
+      expect(out.changes.set["PATH"]).toBe(`${bin}${delimiter}${HOST_DIR}`)
+      const next = await shell("added-tool again", { path: out.changes.set["PATH"] ?? "" })
+      expect(next.text).toBe(`${bin} again\n`)
+      expect((await shell("added-tool nope")).exitCode).toBe(127)
+    },
+    PROCESS_TIMEOUT_MS,
+  )
+
+  test.skipIf(WINDOWS)(
+    "a program given by path is the whole command, and a PATH the call left alone is not reported",
+    async () => {
+      await program(join(work, "path-stream"), ARGS)
+      const out = await shell("./path-stream s")
+      expect(out.text).toBe("prog:s\n")
+      expect(out.changes.set["PATH"]).toBeUndefined()
+    },
+    PROCESS_TIMEOUT_MS,
+  )
+})
+
+describe("exit keeps the state the run had", () => {
+  test("the folder, the variables and the exit code", async () => {
+    await mkdir(join(work, "exit-sub"), { recursive: true })
+    const out = await shell("cd exit-sub; export B=2; unset A; exit 3", { env: { A: "1" } })
+    expect(out.exitCode).toBe(3)
+    expect(out.cwd).toBe(join(work, "exit-sub"))
+    expect(out.changes).toEqual({ set: { B: "2" }, unset: ["A"] })
+  })
+
+  test("a bare exit keeps the status of the last command, also from a function and a condition", async () => {
+    await mkdir(join(work, "exit-fn"), { recursive: true })
+    expect((await shell("false; exit")).exitCode).toBe(1)
+    const inFunction = await shell("f() { cd exit-fn; X=1; exit 6; }; f; echo not reached")
+    expect(inFunction).toMatchObject({ exitCode: 6, text: "" })
+    expect(inFunction.cwd).toBe(join(work, "exit-fn"))
+    expect(inFunction.changes.set).toEqual({ X: "1" })
+    const guarded = await shell("cd exit-fn && true || exit 9; test -d nope && exit 8; Y=2")
+    expect(guarded.exitCode).toBe(0)
+    expect(guarded.changes.set).toEqual({ Y: "2" })
+    expect((await shell("true && cd exit-fn && exit")).cwd).toBe(join(work, "exit-fn"))
+  })
+
+  test("an exit in a subshell ends the subshell only, and a script that ends by itself reports as before", async () => {
+    const out = await shell("(cd /usr; exit 5); echo after; export Z=1")
+    expect(out).toMatchObject({ exitCode: 0, text: "after\n", cwd: work })
+    expect(out.changes.set).toEqual({ Z: "1" })
+    // `bash -c` is another script: its exit is its own, and this script's state still reports.
+    const nested = await shell("bash -c 'exit 3'; echo \"rc=$?\"; export N=1")
+    expect(nested.text).toBe("rc=3\n")
+    expect(nested.changes.set).toEqual({ N: "1" })
+  })
+})
+
+describe("a host program's output keeps its order in a run that is not streamed", () => {
+  test.skipIf(WINDOWS)(
+    "standard output and standard error come back as they were written, also with 2>&1 in a pipe",
+    async () => {
+      await writeFile(
+        join(work, "order.ts"),
+        [
+          "process.stdout.write('a\\n')",
+          "await Bun.sleep(120)",
+          "process.stderr.write('b\\n')",
+          "await Bun.sleep(120)",
+          "process.stdout.write('c\\n')",
+        ].join("\n"),
+      )
+      expect((await shell(`${HOST} order.ts; true`)).text).toBe("a\nb\nc\n")
+      expect((await shell(`${HOST} order.ts 2>&1 | cat`)).text).toBe("a\nb\nc\n")
+      // With anything else in the output the order of just-bash's own result stands.
+      expect((await shell(`echo first; ${HOST} order.ts | cat`)).text).toBe("first\na\nc\nb\n")
+    },
+    PROCESS_TIMEOUT_MS,
+  )
 })

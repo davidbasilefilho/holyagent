@@ -334,6 +334,7 @@ describe("toolSettings", () => {
         file: BILLION_CONTEXT_FILE,
         content: BILLION_CONTEXT_GUARDRAILS_FILE,
         whileOn: "contextCompression",
+        revertWhenOff: true,
       },
     ])
   })

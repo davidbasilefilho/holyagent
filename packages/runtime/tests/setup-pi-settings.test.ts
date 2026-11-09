@@ -378,6 +378,83 @@ describe("holyagent setup, Pi tool settings", () => {
     expect(await read(globalKimi())).toEqual(KIMI)
   })
 
+  describe("turning just-bash off", () => {
+    const GUARDRAILS =
+      "guardrails.bashTimeout 0, guardrails.maxOutputBytes 0, guardrails.repetition false"
+    const off = { pi: { features: { justBash: false } } }
+
+    test("takes the guardrails setup wrote back out, by its record, and keeps the other keys", async () => {
+      await installed()
+      await runSetup(withPi())
+      expect(await read(billion())).toEqual(BILLION)
+      await setConfig(off)
+      const report = await runSetup(withPi())
+      expect(report.ok).toBe(true)
+      expect(await read(billion())).toEqual(BILLION_SUBAGENTS)
+      expect(toolLines(report)).toContain(`- tool settings ${billion()}: removed ${GUARDRAILS}`)
+      // The record forgot them: another run has nothing to revert, and turning it on writes them again.
+      expect(toolLines(await runSetup(withPi())).join("\n")).not.toContain("removed guardrails")
+      await setConfig({})
+      await runSetup(withPi())
+      expect(await read(billion())).toEqual(BILLION)
+    })
+
+    test("leaves a guardrail key the user set before setup, and one the user changed since", async () => {
+      await installed()
+      await write(billion(), { guardrails: { bashTimeout: 30 } })
+      await runSetup(withPi())
+      expect(await read(billion())).toEqual({
+        ...BILLION_SUBAGENTS,
+        guardrails: { bashTimeout: 30, maxOutputBytes: 0, repetition: false },
+      })
+      await write(billion(), {
+        ...BILLION_SUBAGENTS,
+        guardrails: { bashTimeout: 30, maxOutputBytes: 1000, repetition: false },
+      })
+      await setConfig(off)
+      const report = await runSetup(withPi())
+      expect(await read(billion())).toEqual({
+        ...BILLION_SUBAGENTS,
+        guardrails: { bashTimeout: 30, maxOutputBytes: 1000 },
+      })
+      expect(toolLines(report).join("\n")).toContain(
+        "removed guardrails.repetition false; kept guardrails.maxOutputBytes 1000 (setup wrote 0)",
+      )
+    })
+
+    test("touches nothing setup did not write, whatever the file holds", async () => {
+      await installed()
+      // The user's own file already has every key at setup's value, so setup records none of them.
+      await write(billion(), BILLION)
+      await runSetup(withPi())
+      await setConfig(off)
+      const report = await runSetup(withPi())
+      expect(await read(billion())).toEqual(BILLION)
+      expect(toolLines(report).join("\n")).not.toContain("guardrails")
+    })
+
+    test("a dry run says what it would remove and changes neither the file nor the record", async () => {
+      await installed()
+      await runSetup(withPi())
+      await setConfig(off)
+      const report = await runSetup(withPi(), { dryRun: true })
+      expect(await read(billion())).toEqual(BILLION)
+      expect(toolLines(report)).toContain(
+        `- tool settings ${billion()}: would remove ${GUARDRAILS} (dry run, nothing written)`,
+      )
+      await runSetup(withPi())
+      expect(await read(billion())).toEqual(BILLION_SUBAGENTS)
+    })
+
+    test("also takes them out while Billion Context itself is off, which the guardrails are written for", async () => {
+      await installed()
+      await runSetup(withPi())
+      await setConfig({ pi: { features: { contextCompression: false } } })
+      await runSetup(withPi())
+      expect(await read(billion())).toEqual(BILLION_SUBAGENTS)
+    })
+  })
+
   test("PI_CODING_AGENT_DIR moves Pi's agent files, and BILI_CONFIG_FILE or XDG_CONFIG_HOME Billion Context's", async () => {
     const agent = join(home, "elsewhere", "agent")
     const bili = join(home, "bili.json")

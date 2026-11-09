@@ -3556,7 +3556,8 @@ var CAPABILITIES = [
       {
         file: BILLION_CONTEXT_FILE,
         content: BILLION_CONTEXT_GUARDRAILS_FILE,
-        whileOn: "contextCompression"
+        whileOn: "contextCompression",
+        revertWhenOff: true
       }
     ],
     health: ["needs"]

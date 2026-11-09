@@ -68132,6 +68132,7 @@ var OnExitImpl = /* @__PURE__ */ function() {
 var onExitPrimitive = (effect, onExit, interruptible) => new OnExitImpl(effect, onExit, interruptible);
 var onExit = /* @__PURE__ */ dual(2, onExitPrimitive);
 var ensuring = /* @__PURE__ */ dual(2, (self2, finalizer) => onExit(self2, (_) => finalizer));
+var acquireUseRelease = (acquire, use, release) => uninterruptibleMask((restore) => flatMap(acquire, (a) => onExitPrimitive(suspend(() => restore(use(a))), (exit) => release(a, exit), true)));
 var uninterruptible = (self2) => withFiber((fiber) => {
   if (!fiber.interruptible)
     return self2;
@@ -68149,6 +68150,13 @@ var setInterruptible = /* @__PURE__ */ makePrimitive({
   }
 });
 var setInterruptibleTrue = /* @__PURE__ */ setInterruptible(true);
+var setInterruptibleFalse = /* @__PURE__ */ setInterruptible(false);
+var setFiberInterruptible = (fiber) => {
+  fiber.interruptible = true;
+  fiber._stack.push(setInterruptibleFalse);
+  if (fiber._interruptedCause)
+    return failCause(fiber._interruptedCause);
+};
 var fiberEnterUninterruptibleUnsafe = (fiber) => {
   const impl = fiber;
   if (!impl.interruptible)
@@ -68156,6 +68164,18 @@ var fiberEnterUninterruptibleUnsafe = (fiber) => {
   impl.interruptible = false;
   impl._stack.push(setInterruptibleTrue);
 };
+var interruptible = (self2) => withFiber((fiber) => {
+  if (fiber.interruptible)
+    return self2;
+  return setFiberInterruptible(fiber) ?? self2;
+});
+var uninterruptibleMask = (f) => withFiber((fiber) => {
+  if (!fiber.interruptible)
+    return f(identity);
+  fiber.interruptible = false;
+  fiber._stack.push(setInterruptibleTrue);
+  return f(interruptible);
+});
 var all = (arg, options) => {
   if (isIterable(arg)) {
     return options?.mode === "result" ? forEach(arg, result, options) : forEach(arg, identity, options);
@@ -68560,6 +68580,7 @@ var catchCause2 = catchCause;
 var mapError2 = mapError;
 var orElseSucceed2 = orElseSucceed;
 var matchCauseEffect2 = matchCauseEffect;
+var acquireUseRelease2 = acquireUseRelease;
 var ensuring2 = ensuring;
 var onExit2 = onExit;
 var forever2 = forever;
@@ -71510,6 +71531,7 @@ var parseRequest = (text) => decodeRequest(text).pipe(mapError2((error) => new P
 
 import { statSync as statSync3 } from "fs";
 import { constants as osConstants } from "os";
+import { delimiter as delimiter2, posix as posix3 } from "path";
 
 init_chunk_353VO5TF();
 init_chunk_SRB6FXRH();
@@ -89787,6 +89809,96 @@ try {
   Hf = null;
 }
 
+var UNQUOTABLE = /["%^!]|\p{Cc}/u;
+var BARE_SYNTAX = /[&|<>()]/;
+var cmdExeArguments = (command, args) => {
+  for (const word of [command, ...args]) {
+    if (UNQUOTABLE.test(word))
+      return {
+        ok: false,
+        reason: `cmd.exe would read part of ${JSON.stringify(word)} as syntax (a quote, %, ^, ! or control character)`
+      };
+    if (BARE_SYNTAX.test(word) && !/[ \t]/.test(word))
+      return {
+        ok: false,
+        reason: `cmd.exe would read part of ${JSON.stringify(word)} as an operator (& | < > or a parenthesis), since it holds no space to be quoted for`
+      };
+  }
+  return { ok: true, args: ["/d", "/s", "/c", "call", command, ...args] };
+};
+var isBatchFile = (path) => /\.(?:cmd|bat)$/i.test(path);
+
+var SNAPSHOT = "holyagent-snapshot";
+var DONE = "holyagent-done";
+var isExit3 = (node) => {
+  if (typeof node !== "object" || node === null)
+    return false;
+  const { type, name } = node;
+  if (type !== "SimpleCommand" || name?.parts?.length !== 1)
+    return false;
+  const [part] = name.parts;
+  return part?.type === "Literal" && part.value === "exit";
+};
+var around = (exit) => {
+  const [statement] = He8(`{ ${SNAPSHOT}; exit; }`).statements;
+  const group = statement?.pipelines[0]?.commands[0];
+  if (group?.type !== "Group")
+    return exit;
+  const last = group.body[1]?.pipelines[0];
+  if (last === undefined)
+    return exit;
+  last.commands[0] = exit;
+  return group;
+};
+var wrapExits = (node) => {
+  if (Array.isArray(node)) {
+    let count = 0;
+    node.forEach((item, at) => {
+      count += wrapExits(item);
+      if (isExit3(item)) {
+        node[at] = around(item);
+        count += 1;
+      }
+    });
+    return count;
+  }
+  if (typeof node !== "object" || node === null)
+    return 0;
+  return Object.values(node).reduce((count, value) => count + wrapExits(value), 0);
+};
+var status = (ctx) => succeed5({ stdout: "", stderr: "", exitCode: Number(ctx.env.get("?") ?? 0) || 0 });
+var watchExit = () => {
+  let first = true;
+  let completed = false;
+  let recorded;
+  const snapshot = id(SNAPSHOT, (_args, ctx) => {
+    recorded = { cwd: ctx.cwd, env: Object.fromEntries(ctx.env) };
+    return runPromise2(status(ctx));
+  });
+  const done = id(DONE, (_args, ctx) => {
+    completed = true;
+    return runPromise2(status(ctx));
+  });
+  return {
+    plugin: {
+      name: "holyagent-exit",
+      transform: ({ ast }) => {
+        if (!first)
+          return { ast };
+        first = false;
+        if (wrapExits(ast.statements) > 0) {
+          const [end] = He8(DONE).statements;
+          if (end !== undefined)
+            ast.statements.push(end);
+        }
+        return { ast };
+      }
+    },
+    commands: [snapshot, done],
+    exited: () => completed ? undefined : recorded
+  };
+};
+
 import { accessSync, constants as constants2, readdirSync as readdirSync2, statSync as statSync2 } from "fs";
 import { delimiter, join as join4, win32 as win322 } from "path";
 var variable = (env, name, platform = process.platform) => {
@@ -89795,7 +89907,8 @@ var variable = (env, name, platform = process.platform) => {
   return value === "" ? undefined : value;
 };
 var ROOTED = { posix: /^\//, win32: /^(?:[a-zA-Z]:[\\/]|[\\/]{2})/ };
-var splitPath = (value, platform) => value.split(platform === "win32" ? ";" : delimiter).map((folder) => platform === "win32" ? folder.replace(/^"(.*)"$/, "$1") : folder).filter((folder) => ROOTED[platform === "win32" ? "win32" : "posix"].test(folder));
+var isRooted = (folder, platform) => ROOTED[platform === "win32" ? "win32" : "posix"].test(folder);
+var splitPath = (value, platform) => value.split(platform === "win32" ? ";" : delimiter).map((folder) => platform === "win32" ? folder.replace(/^"(.*)"$/, "$1") : folder).filter((folder) => isRooted(folder, platform));
 var hostSearchFolders = (env, platform = process.platform) => {
   const windows = platform === "win32";
   const home = windows ? variable(env, "USERPROFILE", platform) ?? variable(env, "HOME", platform) : variable(env, "HOME", platform);
@@ -89824,7 +89937,10 @@ var hostSearchFolders = (env, platform = process.platform) => {
     "/bin"
   ];
   const seen = new Set;
-  return [...splitPath(variable(env, "PATH", platform) ?? "", platform), ...extra].filter((folder) => {
+  return [
+    ...splitPath(variable(env, "PATH", platform) ?? "", platform),
+    ...extra.filter((folder) => isRooted(folder, platform))
+  ].filter((folder) => {
     const key = windows ? folder.toLowerCase() : folder;
     if (seen.has(key))
       return false;
@@ -89832,6 +89948,7 @@ var hostSearchFolders = (env, platform = process.platform) => {
     return true;
   });
 };
+var pathFolders = (value, platform = process.platform) => splitPath(value ?? "", platform);
 var hostPathValue = (env, platform = process.platform) => hostSearchFolders(env, platform).join(platform === "win32" ? ";" : delimiter);
 var programExtensions = (env) => (variable(env, "PATHEXT", "win32") ?? ".COM;.EXE;.BAT;.CMD").split(";").filter((extension) => extension.startsWith(".")).map((extension) => extension.toLowerCase());
 var COMMAND_NAME = /^[A-Za-z0-9_][A-Za-z0-9._+@-]*$/;
@@ -89899,6 +90016,72 @@ var toHostArgument = (argument, drives, platform = process.platform) => {
 };
 var DRIVE_ROOTS = Array.from({ length: 26 }, (_, index) => `${String.fromCharCode(65 + index)}:\\`);
 
+import { closeSync, openSync, readSync } from "fs";
+import { basename as basename3, extname } from "path";
+var RUNNER = "holyagent-run";
+var RUNNER_PATH = `/usr/bin/${RUNNER}`;
+var SHELL_INTERPRETERS = new Set(["sh", "bash", "dash", "ash"]);
+var HEAD_BYTES = 4096;
+var readHead = (path) => acquireUseRelease2(try_2(() => openSync(path, "r")), (descriptor) => try_2(() => {
+  const head = Buffer.alloc(HEAD_BYTES);
+  return head.subarray(0, readSync(descriptor, head, 0, HEAD_BYTES, 0));
+}), (descriptor) => sync2(() => closeSync(descriptor))).pipe(orElseSucceed2(() => {
+  return;
+}));
+var interpreterOf = (head) => {
+  if (head[0] !== 35 || head[1] !== 33)
+    return;
+  const [first = "", ...rest] = Buffer.from(head).toString("latin1").split(`
+`, 1)[0].slice(2).trim().split(/\s+/);
+  const name = basename3(first);
+  return name === "env" ? basename3(rest.find((word) => !word.startsWith("-") && !word.includes("=")) ?? "") : name;
+};
+var programKind = (path, platform, extensions) => {
+  const windows = platform === "win32";
+  if (!isRunnable(path, windows))
+    return;
+  if (windows && extensions.includes(extname(path).toLowerCase()))
+    return "native";
+  const head = runSync2(readHead(path));
+  if (head === undefined)
+    return;
+  const interpreter = interpreterOf(head);
+  if (interpreter !== undefined)
+    return SHELL_INTERPRETERS.has(interpreter) ? "script" : "native";
+  return head.includes(0) ? "native" : "script";
+};
+var trampoline = (path) => `#!/bin/sh
+${RUNNER_PATH} '${path.replaceAll("'", "'\\''")}' "$@"
+`;
+var withProgramLaunch = (fs, options) => {
+  const windows = options.platform === "win32";
+  const recent = [];
+  return new Proxy(fs, {
+    get: (target, name) => {
+      const member = Reflect.get(target, name, target);
+      if (typeof member !== "function" || typeof name !== "string")
+        return member;
+      return (...args) => {
+        const path = typeof args[0] === "string" ? args[0] : "";
+        const [first, second] = recent;
+        const asScript = name === "readFile" && first?.[0] === "exists" && second?.[0] === "stat" && first[1] === path && second[1] === path;
+        recent.push([name, path]);
+        if (recent.length > 2)
+          recent.shift();
+        if (asScript && programKind(options.toHost(path), options.platform, options.extensions) === "native")
+          return runPromise2(succeed5(trampoline(options.toHost(path))));
+        const result = Reflect.apply(member, target, args);
+        if (!windows || name !== "stat" && name !== "lstat" || !options.extensions.includes(extname(path).toLowerCase()))
+          return result;
+        return result.then((stat) => ({
+          ...stat,
+          mode: stat.mode | 73
+        }));
+      };
+    }
+  });
+};
+
 var transpiler;
 var typeScriptFirst = (code) => try_2(() => {
   transpiler ??= new Bun.Transpiler({ loader: "ts" });
@@ -89956,7 +90139,12 @@ var SHELL_MANAGED = new Set([
   "HOSTNAME",
   "SHELLOPTS",
   "BASHOPTS",
-  "SHLVL"
+  "SHLVL",
+  "#",
+  "@",
+  "*",
+  "0",
+  ...Array.from({ length: 9 }, (_, index) => String(index + 1))
 ]);
 var envChanges = (before, after) => {
   const set = {};
@@ -89976,7 +90164,7 @@ var emitData = (emit, bytes) => {
     });
 };
 var folderExists = (path) => runSync2(try_2(() => statSync3(path).isDirectory()).pipe(orElseSucceed2(() => false)));
-var isSingleHostCommand = (command, hosts) => runSync2(try_2(() => {
+var isSingleHostCommand = (command, isHost) => runSync2(try_2(() => {
   const [statement, ...more] = He8(command).statements;
   if (statement === undefined || more.length > 0 || statement.background)
     return false;
@@ -89989,19 +90177,51 @@ var isSingleHostCommand = (command, hosts) => runSync2(try_2(() => {
   if (simple.redirections.length > 0 || simple.assignments.length > 0)
     return false;
   const [part, ...others] = simple.name?.parts ?? [];
-  return part?.type === "Literal" && others.length === 0 && hosts.has(part.value);
+  return part?.type === "Literal" && others.length === 0 && isHost(part.value);
 }).pipe(orElseSucceed2(() => false)));
+var emittedOrder = (log, stdout, stderr) => {
+  if (log.length === 0)
+    return;
+  const joined = (stream) => Buffer.concat(log.filter((entry) => entry.stream === stream).map((entry) => entry.bytes));
+  const out = joined("out");
+  const err = joined("err");
+  const separate = out.equals(stdout) && err.equals(stderr);
+  const merged = stderr.length === 0 && Buffer.concat([out, err]).equals(stdout);
+  return separate || merged ? log.map((entry) => entry.bytes) : undefined;
+};
+var hostLaunch = (path, args, platform, cmdProgram = "cmd.exe") => {
+  if (platform !== "win32" || !isBatchFile(path))
+    return { ok: true, cmd: [path, ...args] };
+  const launch = cmdExeArguments(path, args);
+  return launch.ok ? { ok: true, cmd: [cmdProgram, ...launch.args] } : launch;
+};
+var isPathName = (name, platform) => platform === "win32" ? name.toUpperCase() === "PATH" : name === "PATH";
+var childPath = (run, shellPath) => hostPathValue({
+  ...Object.fromEntries(Object.entries(run.env).filter(([name]) => !isPathName(name, run.platform))),
+  PATH: machinePath(shellPath, run.drives, run.platform)
+}, run.platform);
+var machinePath = (value, drives, platform) => {
+  const entries = (value ?? "").split(":");
+  const own = SHELL_PATH.split(":");
+  const at = entries.findIndex((_, index) => own.every((entry, step) => entries[index + step] === entry));
+  const kept = at < 0 ? entries : [...entries.slice(0, at), ...entries.slice(at + own.length)];
+  const separator = platform === "win32" ? ";" : delimiter2;
+  return pathFolders(kept.filter((folder) => folder !== "").map((folder) => toHostPath(folder, drives, platform)).join(separator), platform).filter((folder, index, all) => all.indexOf(folder) === index).join(separator);
+};
 var exitCodeOf = (code, signal) => code ?? 128 + (typeof signal === "number" ? signal : signal === null ? 0 : osConstants.signals[signal] ?? 0);
 var runHost = (path, args, ctx, run) => gen2(function* () {
   const stdin = Buffer.from(p(ctx.stdin), "latin1");
   const env = {
     ...run.outsideEnv,
     ...ctx.exportedEnv ?? Object.fromEntries(ctx.env),
-    PATH: run.hostPath
+    PATH: childPath(run, ctx.env.get("PATH"))
   };
+  const launch = hostLaunch(path, args.map((arg) => toHostArgument(arg, run.drives, run.platform)), run.platform, run.cmdProgram);
+  if (!launch.ok)
+    return yield* fail5(new ShellFailed({ reason: launch.reason }));
   const proc = yield* try_2({
     try: () => Bun.spawn({
-      cmd: [path, ...args.map((arg) => toHostArgument(arg, run.drives, run.platform))],
+      cmd: [...launch.cmd],
       cwd: toHostPath(ctx.cwd, run.drives, run.platform),
       env,
       stdin: stdin.length > 0 ? stdin : "ignore",
@@ -90012,16 +90232,18 @@ var runHost = (path, args, ctx, run) => gen2(function* () {
   });
   const out = [];
   const err = [];
-  const pump = (stream, sink) => runForEach2(fromReadableStream2({
+  const pump = (stream, sink, name) => runForEach2(fromReadableStream2({
     evaluate: () => stream,
     onError: (cause) => new ShellFailed({ reason: String(cause) })
   }), (chunk) => sync2(() => {
     if (run.streaming)
       emitData(run.emit, chunk);
-    else
+    else {
       sink.push(chunk);
+      run.log.push({ stream: name, bytes: chunk });
+    }
   }));
-  yield* all2([pump(proc.stdout, out), pump(proc.stderr, err)], {
+  yield* all2([pump(proc.stdout, out, "out"), pump(proc.stderr, err, "err")], {
     concurrency: "unbounded"
   });
   const code = yield* promise2(() => proc.exited);
@@ -90063,7 +90285,8 @@ var runShell = (request, options) => gen2(function* () {
   const platform = options.platform ?? process.platform;
   const windows = platform === "win32";
   const folders = hostSearchFolders(request.env, platform);
-  const hosts = yield* scanHostPrograms(folders, platform, windows ? programExtensions(request.env) : []);
+  const extensions = windows ? programExtensions(request.env) : [];
+  const hosts = yield* scanHostPrograms(folders, platform, extensions);
   const coreNames = Jf().filter((name) => !UNAVAILABLE_BUILTINS.includes(name));
   const plan = planCommands(hosts, [...coreNames, ...nd()]);
   const drives = new Set(windows ? DRIVE_ROOTS.filter((root) => folderExists(root)).map((root) => (root[0] ?? "").toLowerCase()) : []);
@@ -90074,30 +90297,44 @@ var runShell = (request, options) => gen2(function* () {
       shellEnv[name] = value;
     else
       outsideEnv[name] = value;
-  const pathKey = Object.keys(shellEnv).find((name) => variable({ [name]: "x" }, "PATH", platform) !== undefined);
+  const pathKey = Object.keys(shellEnv).find((name) => isPathName(name, platform));
   if (pathKey !== undefined)
     delete shellEnv[pathKey];
-  shellEnv["PATH"] = SHELL_PATH;
+  const startPath = [
+    SHELL_PATH,
+    ...pathFolders(variable(request.env, "PATH", platform), platform).map((folder) => toVirtualPath(folder, platform))
+  ].join(":");
+  shellEnv["PATH"] = startPath;
   const cwd = toVirtualPath(request.cwd, platform);
   shellEnv["PWD"] = cwd;
   const before = { ...shellEnv };
+  const isHostProgram = (name) => plan.passthrough.has(name) || name.includes("/") && programKind(toHostPath(posix3.resolve(cwd, name), drives, platform), platform, extensions) === "native";
   const run = {
-    streaming: isSingleHostCommand(request.command, new Set(plan.passthrough.keys())),
-    hostPath: hostPathValue(request.env, platform),
+    streaming: isSingleHostCommand(request.command, isHostProgram),
+    env: request.env,
     outsideEnv,
     drives,
     platform,
-    emit: options.emit
+    cmdProgram: variable(request.env, "ComSpec", platform) ?? "cmd.exe",
+    emit: options.emit,
+    log: []
   };
   const stubs = {};
-  for (const name of [...plan.builtins, ...plan.passthrough.keys(), ...plan.aliases.keys()])
+  for (const name of [
+    ...plan.builtins,
+    ...plan.passthrough.keys(),
+    ...plan.aliases.keys(),
+    RUNNER,
+    SNAPSHOT,
+    DONE
+  ])
     stubs[`/${name}`] = { content: "", mode: 493 };
   const stubMounts = ["/usr/bin", "/bin"].map((mountPoint) => ({
     mountPoint,
     filesystem: new gt7(stubs)
   }));
   const hostFs = (root) => new ei({ root, allowSymlinks: true });
-  const fs = windows ? new Kt4({
+  const fs = withProgramLaunch(windows ? new Kt4({
     base: new gt7,
     mounts: [
       ...stubMounts,
@@ -90106,33 +90343,48 @@ var runShell = (request, options) => gen2(function* () {
         filesystem: hostFs(`${letter.toUpperCase()}:\\`)
       }))
     ]
-  }) : new Kt4({ base: hostFs("/"), mounts: stubMounts });
+  }) : new Kt4({ base: hostFs("/"), mounts: stubMounts }), { toHost: (path) => toHostPath(path, drives, platform), platform, extensions });
   const hostCommands = [...plan.passthrough, ...plan.aliases].map(([name, path]) => id(name, (args, ctx) => runPromise2(runHost(path, args, ctx, run))));
+  const runner = id(RUNNER, (args, ctx) => runPromise2(runHost(args[0] ?? "", args.slice(1), ctx, run)));
   const jsExec = id("js-exec", (args, ctx) => runPromise2(runJsExec(args, ctx)));
+  const exit = watchExit();
   const bash = new Ir2({
     fs,
     cwd,
     env: shellEnv,
     javascript: true,
     commands: coreNames,
-    customCommands: [jsExec, ...hostCommands],
+    customCommands: [jsExec, runner, ...exit.commands, ...hostCommands],
     defenseInDepth: { excludeViolationTypes: ["finalization_registry"] },
     executionLimits: SHELL_LIMITS
   });
+  bash.registerTransformPlugin(exit.plugin);
   const result = yield* tryPromise2({
     try: () => bash.exec(request.command, { cwd, env: shellEnv, replaceEnv: true, rawScript: true }),
     catch: (cause) => new ShellFailed({ reason: String(cause) })
   });
-  if (!run.streaming) {
-    emitData(options.emit, Buffer.from(p(F(result)), "latin1"));
-    emitData(options.emit, Buffer.from(result.stderr, "utf8"));
-  } else
-    emitData(options.emit, Buffer.from(result.stderr, "utf8"));
+  const stdout = Buffer.from(p(F(result)), "latin1");
+  const stderr = Buffer.from(result.stderr, "utf8");
+  if (run.streaming)
+    emitData(options.emit, stderr);
+  else
+    for (const chunk of emittedOrder(run.log, stdout, stderr) ?? [stdout, stderr])
+      emitData(options.emit, chunk);
+  const left = exit.exited();
+  const finalEnv = left?.env ?? result.env;
+  const changes = envChanges(before, finalEnv);
+  const finalPath = finalEnv["PATH"];
   options.emit({
     type: "end",
     exitCode: result.exitCode,
-    cwd: toHostPath(result.env["PWD"] ?? cwd, drives, platform),
-    changes: envChanges(before, result.env)
+    cwd: toHostPath(left?.cwd ?? result.env["PWD"] ?? cwd, drives, platform),
+    changes: finalPath === undefined || finalPath === startPath ? changes : {
+      ...changes,
+      set: {
+        ...changes.set,
+        [pathKey ?? "PATH"]: machinePath(finalPath, drives, platform)
+      }
+    }
   });
 });
 

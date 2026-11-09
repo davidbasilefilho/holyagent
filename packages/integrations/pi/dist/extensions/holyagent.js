@@ -14261,7 +14261,8 @@ var CAPABILITIES = [
       {
         file: BILLION_CONTEXT_FILE,
         content: BILLION_CONTEXT_GUARDRAILS_FILE,
-        whileOn: "contextCompression"
+        whileOn: "contextCompression",
+        revertWhenOff: true
       }
     ],
     health: ["needs"]
@@ -17441,9 +17442,9 @@ import {
 } from "@earendil-works/pi-coding-agent";
 
 var BASH_GUIDELINES = [
-  "The shell is just-bash. Commands it implements (rg, grep, sed, awk, jq, find, ls, xargs, tar, diff and the rest) run inside it and win over a program of the same name on the machine; every other command (git, bun, bunx, mise, gh, node, the holyagent CLI) runs the real program on PATH. host-<name> reaches the machine's program that a built-in shadows (host-cat). A program given by path (./node_modules/.bin/tsc) is read as a shell script, so run it by name or through bunx.",
+  "The shell is just-bash. Commands it implements (rg, grep, sed, awk, jq, find, ls, xargs, tar, diff and the rest) run inside it and win over a program of the same name on the machine; every other command (git, bun, bunx, mise, gh, node, the holyagent CLI) runs the real program on PATH. host-<name> reaches the machine's program that a built-in shadows (host-cat). A program given by path (./target/debug/app, node_modules/.bin/tsc) or found in a folder you added to PATH runs on the machine; a shell script given by path runs in the shell.",
   "js-exec runs TypeScript first and JavaScript when TypeScript cannot read the code: js-exec -c '<code>', code on standard input, or js-exec file.ts. node is the machine's real node.",
-  "The working directory and variables stay as the last call left them, except after a call that runs exit."
+  "The working directory and variables stay as the last call left them, exit included."
 ];
 
 import { statSync } from "node:fs";
@@ -17462,13 +17463,14 @@ var startEnvironment = (passed, state) => {
       env[name] = value;
   return env;
 };
-var afterCall = (state, passed, cwd, changes) => {
+var afterCall = (state, passed, started, cwd, changes) => {
   const delta = { ...state.delta };
   for (const [name, value] of Object.entries(changes.set))
     delta[name] = value;
   for (const name of changes.unset)
     delta[name] = null;
-  return { cwd, from: passed, delta };
+  const kept = cwd === started && state.from === passed && state.cwd !== undefined;
+  return kept ? { ...state, delta } : { cwd, from: passed, delta };
 };
 
 var killTree = (pid, platform) => {
@@ -17592,7 +17594,7 @@ Cannot execute bash commands.`);
           const said = Buffer.concat(diagnostics).toString("utf8").trim().slice(-500);
           throw new Error(`The bash tool's shell ended without a result (${exit.signal ?? `exit ${exit.code}`})${said === "" ? "" : `: ${said}`}`);
         }
-        state = afterCall(state, cwd, ended.cwd, ended.changes);
+        state = afterCall(state, cwd, folder, ended.cwd, ended.changes);
         return { exitCode: ended.exitCode };
       } finally {
         if (timer !== undefined)

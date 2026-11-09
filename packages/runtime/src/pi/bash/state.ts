@@ -53,17 +53,21 @@ export const startEnvironment = (
 }
 
 /**
- * The state after a call that ended in `cwd` with `changes`, given the folder Pi passed. A change
- * overrides an earlier one of the same variable, and a variable set again drops its unset mark.
+ * The state after a call that started in `started`, ended in `cwd` with `changes`, given the folder
+ * Pi passed. Calls can overlap, so `state` is the state when this call ends, and a call adds only
+ * what it changed: a variable set again overrides an earlier one and drops its unset mark, and a
+ * call that did not leave `started` keeps the folder another call moved to meanwhile.
  */
 export const afterCall = (
   state: ShellState,
   passed: string,
+  started: string,
   cwd: string,
   changes: EnvChanges,
 ): ShellState => {
   const delta: Record<string, string | null> = { ...state.delta }
   for (const [name, value] of Object.entries(changes.set)) delta[name] = value
   for (const name of changes.unset) delta[name] = null
-  return { cwd, from: passed, delta }
+  const kept = cwd === started && state.from === passed && state.cwd !== undefined
+  return kept ? { ...state, delta } : { cwd, from: passed, delta }
 }
