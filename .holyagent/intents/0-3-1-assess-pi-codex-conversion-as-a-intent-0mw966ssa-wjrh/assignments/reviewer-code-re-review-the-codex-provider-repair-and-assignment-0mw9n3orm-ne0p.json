@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-the-codex-provider-repair-and",
   "objective": "Re-review the Codex provider repair and the merge of the integration branch on release/0.3.1/feat/codex-provider.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.1-codex. Repair commit eb8adb2 (git show eb8adb2) and merge ce16cb6 (HEAD, brings in the state-branch test hook fix #104). Previous findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9m7qzk-l2pa.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9m7r8p-90gx.md; the writer's account: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9mgiy9-d5km.md.",
     "Check both blockers are closed (Codex specialists get pi-web-kit web tools; a same-path move updates), and the non-blocking repairs (apply_patch rollback, real-path containment, Luna Reserve redirect error, provider check, session reset, effort cap, activation failure notice, the contextManagement switch). Note the Kimi Librarian agent files now also list ext:pi-web-kit entries: confirm they do nothing unless pi-web-kit is loaded. Then run bun install --frozen-lockfile, mise run build (git status must stay empty) and mise run verify on HEAD."
@@ -33,7 +33,25 @@
     "agentId": "workflow:wf_f51116ee-ed4/assignment-0mw9n3orm-ne0p",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T19:14:03.682Z"
+    "startedAt": "2026-11-09T19:14:03.682Z",
+    "finishedAt": "2026-11-09T19:19:41.353Z"
+  },
+  "result": "result: both blockers are closed, the non-blocking repairs are in, and I found no new blocking defect. `bun install --frozen-lockfile` made no changes. `bunx --no-install mise run build` exited 0 and `git status --short` stayed empty. `bunx --no-install mise run verify` exited 0 with 2896 pass and 0 fail.\n\n**Built-in /code-review:** it ran as the built-in on `9d549024...ce16cb67` and returned 8 findings, classified below. I checked the Kimi Librarian entries by reading `@tintinweb/pi-subagents` 0.23.1 in `/home/user/holyagent-notes/pi-probe`. I did not run the new tests against the old code to confirm they fail there.\n\n**Blockers closed**\n**Web tools for Codex specialists:** `agentTools` (`packages/integrations/pi/src/agents.ts:36`) now lists every provider's web source. The Codex Librarian files carry `ext:pi-web-kit/web_search` and `web_fetch`.\n**Same-path move:** `apply-patch.ts:428` treats a move to the file's own path as a plain update, with tests.\n\n**Kimi Librarian entries:** `parseExtSelectors` in `agent-runner.ts` turns `ext:` entries into a keep-set of extension names plus per-extension tool narrowing. An entry for an extension that is not loaded matches nothing, so the `ext:pi-web-kit` entries do nothing unless `pi-web-kit` is loaded. I read this and did not run it.\n\n**Non-blocking repairs, all present:**\napply_patch rollback\nreal-path containment\n`redirect: \"error\"` on the Luna Reserve usage request\nprovider check on `message_end`\nsession reset\neffort cap\nactivation failure notice\nthe `contextManagement` switch\n\n**Non-blocking findings**\n1. `packages/integrations/pi/src/codex.ts:87`: for a dangling symlink inside a symlinked directory, `realPath` resolves the link's relative target against the unresolved parent, so containment can be bypassed. It needs an existing outward symlink plus a dangling link, and bash already gives the same reach. Resolving `dirname` first would fix it.\n2. `apply-patch.ts:394` and `:428`: `planned` is keyed by the lexical path. A case-only move (`a.txt` to `A.txt` on a case-insensitive filesystem) or a symlink alias is not treated as the same file, so the file can be deleted or one hunk overwritten.\n3. `apply-patch.ts:435`: rollback restores from decoded text, so a non-UTF-8 file would be corrupted. Keep the bytes for restore.\n4. `apply-patch.ts:378`: `Delete File` on an in-project symlink that points outside the project is refused. Unlinking the link cannot touch the target.\n5. `codex.ts:179`: `session_start` also fires on reload, resume and fork. It clears the open reserve without an exit notice, so the next turn hits the exhausted model once.\n6. `luna-reserve.ts:128`: `redirect: \"error\"` makes a redirect read as \"not offered\", with no notice. This is intended fail-safe behavior.\n7. `agents.ts:36`: the agent file lists every provider's web tools. Under Kimi with `web: off`, or with the user's own `pi-web-kit` installed, the file no longer narrows what the specialist gets. This is a minor leak of intent.\n\nblockers: none\n\nevidence:\nThe repair closes both blockers and the non-blocking notes without new defects, and the merged head builds unchanged and passes verify: `bun install --frozen-lockfile` made no changes. `bunx --no-install mise run build` exited 0 and `git status --short` stayed empty. `bunx --no-install mise run verify` exited 0 with 2896 pass and 0 fail (log `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/rverify.log`). I read `agents.ts:36` and `apply-patch.ts:428`; no new defect is blocking.\nfindings: the 7 non-blocking items above; no blocking findings.\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "Both blockers closed; merged head builds unchanged and verify exit 0 (2896 pass); seven non-blocking findings with file and line.",
+    "criteria": [
+      {
+        "criterion": "The repair closes both blockers and the non-blocking notes without new defects, and the merged head builds unchanged and passes verify",
+        "support": "`bun install --frozen-lockfile` made no changes. `bunx --no-install mise run build` exited 0 and `git status --short` stayed empty. `bunx --no-install mise run verify` exited 0 with 2896 pass and 0 fail (log `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/rverify.log`). I read `agents.ts:36` and `apply-patch.ts:428`; no new defect is blocking."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "the 7 non-blocking items above; no blocking findings."
+      }
+    ]
   },
   "createdAt": "2026-11-09T19:14:03.682Z"
 }
