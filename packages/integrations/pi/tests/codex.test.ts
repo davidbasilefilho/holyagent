@@ -342,6 +342,15 @@ describe("the apply_patch tool", () => {
         await chmod(join(folder, "secret.txt"), 0o600)
         await writeFile(join(folder, "run.sh"), "echo\n")
         await chmod(join(folder, "run.sh"), 0o755)
+        // Windows keeps no POSIX permission bits (chmod only toggles the read-only flag), so the
+        // mode to compare with is the one the file reports before the patch, not a literal.
+        const modeOf = async (name: string) => (await lstat(join(folder, name))).mode & 0o7777
+        const secretMode = await modeOf("secret.txt")
+        const runMode = await modeOf("run.sh")
+        if (process.platform !== "win32") {
+          expect(secretMode).toBe(0o600)
+          expect(runMode).toBe(0o755)
+        }
         await mkdir(join(folder, "dir"))
         await expect(
           attempt(
@@ -358,8 +367,8 @@ describe("the apply_patch tool", () => {
         ).rejects.toThrow()
         expect(await readFile(join(folder, "secret.txt"), "utf8")).toBe("s\n")
         expect(await readFile(join(folder, "run.sh"), "utf8")).toBe("echo\n")
-        expect((await lstat(join(folder, "secret.txt"))).mode & 0o7777).toBe(0o600)
-        expect((await lstat(join(folder, "run.sh"))).mode & 0o7777).toBe(0o755)
+        expect(await modeOf("secret.txt")).toBe(secretMode)
+        expect(await modeOf("run.sh")).toBe(runMode)
       })
     })
 
