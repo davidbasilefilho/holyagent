@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
+import * as filesystem from "node:fs/promises"
 import { link, mkdir, readdir, realpath, stat, symlink, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
@@ -817,6 +818,52 @@ describe("the default scope is user unless the local settings enable the plugin"
     expect(lines[0]).toBe(DEFAULT)
     expect(lines[1]).toBe(
       `~ scope: ${target.local} enables HolyAgent but git tracks it, so it is not taken for your own uncommitted file; using user; --scope local targets it`,
+    )
+  })
+
+  test("a tracked top-level entry that is the .claude folder by identity never infers local", async () => {
+    const target = await initRepo()
+    await write(files().local, enabled)
+    // Git lists `.claude.` apart from `.claude`, so no pathspec for the folder finds it.
+    await write(join(repo(), ".claude.", "settings.local.json"), {})
+    await $`git -C ${repo()} add -f .claude./settings.local.json`.quiet()
+    expect(await $`git -C ${repo()} ls-files --cached -- ${":(icase,literal).claude"}`.text()).toBe(
+      "",
+    )
+    // A folding file system (a trailing dot on Windows, an 8.3 short name, an HFS+ ignorable code
+    // point) answers for the tracked name with the identity of the .claude folder. Linux cannot
+    // fold names and cannot hard-link folders, so the test makes lstat answer that way.
+    const original = filesystem.lstat
+    const folded = join(await realpath(repo()), ".claude.")
+    const spy = spyOn(filesystem, "lstat").mockImplementation(((
+      ...args: Parameters<typeof filesystem.lstat>
+    ) =>
+      original(
+        args[0] === folded ? join(dirname(folded), ".claude") : args[0],
+        args[1],
+      )) as typeof filesystem.lstat)
+    try {
+      const result = await cli(["setup", "--skip-ctx7"], nested())
+      expect(result.code).toBe(0)
+      const lines = result.stdout.split("\n")
+      expect(lines[0]).toBe(DEFAULT)
+      expect(lines[1]).toBe(
+        `~ scope: ${target.local} enables HolyAgent but git tracks .claude. as .claude, so it is not taken for your own uncommitted file; using user; --scope local targets it`,
+      )
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  test("tracked top-level entries that are other folders leave an untracked local file inferring local", async () => {
+    const target = await initRepo()
+    await write(files().local, enabled)
+    await write(join(repo(), "src", "index.ts"), {})
+    await write(join(repo(), "README.md"), {})
+    await $`git -C ${repo()} add -f src/index.ts README.md`.quiet()
+    const result = await cli(["setup", "--skip-ctx7"], nested())
+    expect(result.stdout.split("\n")[0]).toBe(
+      `~ scope: local (inferred: holyagent@holyagent is enabled in ${target.local})`,
     )
   })
 

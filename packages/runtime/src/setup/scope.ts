@@ -187,10 +187,12 @@ const enablement = Effect.fn("enablement")(function* (folder: string, file: stri
  * The index entries are listed for the folder as a whole, not for the file alone, because a
  * repository can commit `.claude` as a submodule (a gitlink entry, whose checkout holds the file
  * while `git ls-files` for the file prints nothing) and, on a case-insensitive file system, a
- * tracked `Settings.Local.json` is read as the file though the literal name misses it. The pathspec
- * ignores case and the names are compared without it. Folding beyond letter case (Unicode
- * equivalents, ignorable code points, a trailing dot or space on Windows) is caught by identity: a
- * tracked entry that exists on disk with the device and inode of the file is the file.
+ * tracked `Settings.Local.json` is read as the file though the literal name misses it. The names
+ * are compared without case. Folding beyond letter case (Unicode equivalents, ignorable code
+ * points, a trailing dot or space, a Windows 8.3 short name) is caught by identity: a tracked entry
+ * that exists on disk with the device and inode of the file is the file, and a tracked top-level
+ * entry with the device and inode of the `.claude` folder is the folder, so the repository controls
+ * the file. Each distinct top-level name is inspected once, stopping at a match.
  *
  * Known limit: an archive that ships its own `.git` with an index that omits the file still counts
  * as untracked, since the index is all git has to say. Pass `--scope` to choose a scope then.
@@ -203,20 +205,32 @@ const repositoryControl = Effect.fn("repositoryControl")(function* (
   const shell = yield* Shell
   const name = relative(root, file).split(sep).join("/")
   const folderName = relative(root, folder).split(sep).join("/")
-  const listed = yield* shell.run(
-    "git",
-    ["ls-files", "--cached", "-z", "--", `:(icase,literal)${folderName}`],
-    { cwd: root },
-  )
+  const listed = yield* shell.run("git", ["ls-files", "--cached", "-z"], { cwd: root })
   if (listed.exitCode !== 0) return "git could not say whether it tracks it"
-  const tracked = listed.stdout.split("\0").filter((entry) => entry !== "")
+  const everything = listed.stdout.split("\0").filter((entry) => entry !== "")
+  const lowerFolder = folderName.toLowerCase()
+  const tracked = everything.filter((entry) => {
+    const lower = entry.toLowerCase()
+    return lower === lowerFolder || lower.startsWith(`${lowerFolder}/`)
+  })
   const entries = tracked.map((entry) => entry.toLowerCase())
   if (entries.includes(name.toLowerCase())) return "git tracks it"
-  if (entries.includes(folderName.toLowerCase())) return `git tracks ${folderName} itself`
+  if (entries.includes(lowerFolder)) return `git tracks ${folderName} itself`
   const own = yield* identity(file)
   if (own !== undefined) {
     for (const entry of tracked) {
       if ((yield* identity(join(root, entry))) === own) return "git tracks it"
+    }
+  }
+  const home = yield* identity(folder)
+  if (home !== undefined) {
+    const seen = new Set<string>()
+    for (const entry of everything) {
+      const component = entry.split("/")[0] ?? entry
+      if (component === folderName || seen.has(component)) continue
+      seen.add(component)
+      if ((yield* identity(join(root, component))) === home)
+        return `git tracks ${component} as ${folderName}`
     }
   }
   const top = yield* shell.run("git", ["rev-parse", "--show-toplevel"], { cwd: folder })
@@ -233,17 +247,17 @@ const repositoryControl = Effect.fn("repositoryControl")(function* (
  * `.claude/settings.local.json` moves it off `user`: when that file sets the plugin to `true`, the
  * folder is a git work tree that `claudeFolder` trusts, and the file is untracked (see
  * `repositoryControl`: no index entry for the file or `.claude`, in any letter case, none that is
- * the same file by device and inode, and `.claude` is no other repository), the scope is `local`.
- * An enabled file in a folder that is not a trusted git work tree (a source archive, say) or that
- * git tracks might have come with a cloned repository, so the scope stays `user` and a notice names
- * the file and `--scope local`. An archive that ships its own `.git` with an index that omits the
- * file still counts as untracked. An explicit `false` there means the plugin is disabled for this
- * project, so the search stops and `user` is used with a notice saying so. A committed
- * `.claude/settings.json` that enables the plugin never selects a scope, because a cloned
- * repository must not choose where setup writes or which registry a Pi install reads; the notice
- * names the file and `--scope project`. A symlinked `local` or `project` file is not read, with a
- * notice for `local`. A `local` file that is not a JSON object fails with SetupFailure naming it; a
- * bad `project` file is ignored.
+ * the same file by device and inode, no top-level entry that is the `.claude` folder by device and
+ * inode, and `.claude` is no other repository), the scope is `local`. An enabled file in a folder
+ * that is not a trusted git work tree (a source archive, say) or that git tracks might have come
+ * with a cloned repository, so the scope stays `user` and a notice names the file and `--scope
+ * local`. An archive that ships its own `.git` with an index that omits the file still counts as
+ * untracked. An explicit `false` there means the plugin is disabled for this project, so the search
+ * stops and `user` is used with a notice saying so. A committed `.claude/settings.json` that
+ * enables the plugin never selects a scope, because a cloned repository must not choose where setup
+ * writes or which registry a Pi install reads; the notice names the file and `--scope project`. A
+ * symlinked `local` or `project` file is not read, with a notice for `local`. A `local` file that
+ * is not a JSON object fails with SetupFailure naming it; a bad `project` file is ignored.
  */
 export const installedScope = Effect.fn("installedScope")(function* (cwd: string) {
   const { folder, root, trusted } = yield* claudeFolder(cwd)

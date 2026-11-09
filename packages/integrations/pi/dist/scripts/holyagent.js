@@ -15993,20 +15993,37 @@ var init_scope = __esm(() => {
     const shell = yield* Shell;
     const name = relative4(root, file).split(sep6).join("/");
     const folderName = relative4(root, folder).split(sep6).join("/");
-    const listed = yield* shell.run("git", ["ls-files", "--cached", "-z", "--", `:(icase,literal)${folderName}`], { cwd: root });
+    const listed = yield* shell.run("git", ["ls-files", "--cached", "-z"], { cwd: root });
     if (listed.exitCode !== 0)
       return "git could not say whether it tracks it";
-    const tracked = listed.stdout.split("\x00").filter((entry) => entry !== "");
+    const everything = listed.stdout.split("\x00").filter((entry) => entry !== "");
+    const lowerFolder = folderName.toLowerCase();
+    const tracked = everything.filter((entry) => {
+      const lower = entry.toLowerCase();
+      return lower === lowerFolder || lower.startsWith(`${lowerFolder}/`);
+    });
     const entries = tracked.map((entry) => entry.toLowerCase());
     if (entries.includes(name.toLowerCase()))
       return "git tracks it";
-    if (entries.includes(folderName.toLowerCase()))
+    if (entries.includes(lowerFolder))
       return `git tracks ${folderName} itself`;
     const own = yield* identity2(file);
     if (own !== undefined) {
       for (const entry of tracked) {
         if ((yield* identity2(join12(root, entry))) === own)
           return "git tracks it";
+      }
+    }
+    const home = yield* identity2(folder);
+    if (home !== undefined) {
+      const seen = new Set;
+      for (const entry of everything) {
+        const component = entry.split("/")[0] ?? entry;
+        if (component === folderName || seen.has(component))
+          continue;
+        seen.add(component);
+        if ((yield* identity2(join12(root, component))) === home)
+          return `git tracks ${component} as ${folderName}`;
       }
     }
     const top = yield* shell.run("git", ["rev-parse", "--show-toplevel"], { cwd: folder });
