@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mw9buq4o-ix1y",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 13,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-latest-commit-head-on-release",
+  "objective": "Review the latest commit (HEAD) on release/0.3.0/feat/setup-tui in /home/user/holyagent-0.3.0-tui, which makes the setup screen's cache paths use the separator of the platform argument.",
+  "state": "Running",
+  "scope": [
+    "Run git -C /home/user/holyagent-0.3.0-tui show HEAD; the source change is packages/runtime/src/setup/tui/load.ts and its test packages/runtime/tests/setup-tui-load.test.ts; the dist bundles are generated.",
+    "It fixes the windows CI failure at setup-tui-load.test.ts:102 (cacheHome with platform 'linux' returned a backslash path on the Windows runner).",
+    "Check that behavior at the real process.platform is unchanged on Windows, macOS and Linux, that every path built for a platform argument uses that platform's separator, and that the changed test expectations are not weakened."
+  ],
+  "constraints": [
+    "Do not check out other commits in any checkout and make no edits.",
+    "Report in under 350 words; mark each finding blocking or non-blocking with file and line."
+  ],
+  "criteria": [
+    {
+      "text": "The fix is correct on every platform and changes no behavior at the real platform",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The test changes keep every earlier assertion's strength",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9biju1-jh8s"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T13:59:09.768Z"
+  },
+  "createdAt": "2026-11-09T13:59:09.768Z"
+}
