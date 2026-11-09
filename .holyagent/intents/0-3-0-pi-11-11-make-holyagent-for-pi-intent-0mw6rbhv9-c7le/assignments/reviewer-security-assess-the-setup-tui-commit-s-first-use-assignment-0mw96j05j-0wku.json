@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mw96j05j-0wku",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 13,
+  "roleTask": "Reviewer.security",
+  "slug": "assess-the-setup-tui-commit-s-first-use",
+  "objective": "Assess the setup TUI commit's first-use package install and cache loading for security vulnerabilities.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-tui, commit df6a410; diff: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-review.diff. Focus: packages/runtime/src/setup/tui/ (install into a per-user cache with the Bun Shell, then import a bundle from there), bundle.ts and the generate.ts changes.",
+    "Trace sources to sinks: the cache path (environment variables XDG_CACHE_HOME, HOME, LOCALAPPDATA), the version strings embedded at build time, the Bun Shell command that installs, the registry used, lockfile or integrity checking, what is imported and from where, a cache another local user or process could write to, a half-written install, symlinks in the cache, and whether a project's own bunfig.toml or .npmrc in the current directory can redirect the install."
+  ],
+  "constraints": [
+    "Read-only.",
+    "Substantiate each finding with path:line and a realistic attack path; rate severity.",
+    "Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "Each finding has path:line, an attack path and a severity",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The review states whether the install and import can be redirected or tampered with",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "verdict"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9588qp-wtzk"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T11:30:04.807Z"
+  },
+  "createdAt": "2026-11-09T11:30:04.807Z"
+}
