@@ -196,6 +196,11 @@ const enablement = Effect.fn("enablement")(function* (folder: string, file: stri
  *
  * Known limit: an archive that ships its own `.git` with an index that omits the file still counts
  * as untracked, since the index is all git has to say. Pass `--scope` to choose a scope then.
+ *
+ * The identity comparison runs only on index entries under the `.claude` prefix, so a tracked path
+ * such as `link/settings.local.json` that reaches the file through a symlinked folder is not
+ * compared. Git does not write through symlinks, so only a hand-crafted index or a git bug produces
+ * such an entry; statting every tracked file to close the gap would cost a stat per index entry.
  */
 const repositoryControl = Effect.fn("repositoryControl")(function* (
   root: string,
