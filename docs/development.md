@@ -115,6 +115,8 @@ Nothing starts Pi.
 
 The test also fails when a fixture file differs from what `record.ts` writes, so do not edit the JSONL by hand.
 
+`packages/integrations/pi/tests/t3-rpc.test.ts` replays the traffic of T3 Code driving `pi --mode rpc`, from the JSONL files in `packages/integrations/pi/tests/fixtures/t3/`. They are synthesized, not recorded from T3: each header says `synthesized` and lists its sources (T3's `buildPiRpcLaunch` and Pi adapter, Pi's RPC types, `@tintinweb/pi-subagents`' new-turn trigger), and the Pi messages are built with `satisfies` on Pi's exported RPC types like the fixtures above. The replay pins the T3 session start (`T3_PI_RUNTIME_MODE`, `T3_MCP_URL` and the injected bridge), the `extension_ui_request` messages T3 renders (`select`, `confirm`, `input`, `editor`, `notify`, `setStatus`) with their `extension_ui_response` messages, a check that no request uses a method T3 ignores (`setWidget`, `setTitle`, `set_editor_text`) or `custom`, a scan of the extension's source for `ui` calls outside that set, and a specialist completion after `agent_settled` that opens a new root turn. After `mise run deps:update` moves Pi, run `bun packages/integrations/pi/tests/fixtures/t3/record.ts` as well, and read the diff of `fixtures/t3/` the same way; `fixtures/record.ts` does not write these files.
+
 ## Lint and format rules
 
 Everything is configured in `bunfig.toml`. Bun's own `check`, `lint` and `fmt` are the tools (`eslint-plugin-jsdoc` runs inside `bun lint`); the repository adds none beside them.
