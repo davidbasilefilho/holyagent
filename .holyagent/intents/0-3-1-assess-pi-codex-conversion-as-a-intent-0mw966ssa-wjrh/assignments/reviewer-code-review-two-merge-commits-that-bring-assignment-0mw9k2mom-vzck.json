@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mw9k2mom-vzck",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Reviewer.code",
+  "slug": "review-two-merge-commits-that-bring",
+  "objective": "Review two merge commits that bring release/0.3.1/integration (with the cloud start-branch fix and the Windows cleanup fix) into the capability and GPT-6 branches, and confirm each merged head builds to identical generated output and passes the gates.",
+  "state": "Running",
+  "scope": [
+    "Worktrees: /home/user/holyagent-0.3.1-cap (HEAD edd4c34, merge into release/0.3.1/feat/capabilities) and /home/user/holyagent-0.3.1-gpt6 (HEAD 6628bc0, merge into release/0.3.1/feat/gpt-6-instructions). Both merged without conflicts.",
+    "For each: inspect git show --stat HEAD and git diff HEAD^1 HEAD; the generated bundles under packages/integrations/*/dist were merged textually, so run `bun install --frozen-lockfile`, `bunx --no-install mise run build` and confirm `git status --short` is empty afterwards (the merged bundle equals a fresh build), then `bunx --no-install mise run verify`. If the build changes files, report them; do not keep the changes (run git restore? no: make no git writes; just report)."
+  ],
+  "constraints": [
+    "Do not check out other commits in any checkout. Make no git writes and no source edits; the build may rewrite generated files, report any it changes.",
+    "Report in under 250 words; give command, exit code and test counts per worktree."
+  ],
+  "criteria": [
+    {
+      "text": "Each merged head builds with no change to generated files and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9jrkrg-ve74",
+    "assignment-0mw9jrl2w-g2er"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T17:49:15.478Z"
+  },
+  "createdAt": "2026-11-09T17:49:15.478Z"
+}
