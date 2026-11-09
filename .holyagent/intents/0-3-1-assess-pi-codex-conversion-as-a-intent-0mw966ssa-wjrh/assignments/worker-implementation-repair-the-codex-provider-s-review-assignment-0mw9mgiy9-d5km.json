@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-codex-provider-s-review",
   "objective": "Repair the Codex provider's review findings: web tools for Codex specialists, the same-path move that deletes a file, and the non-blocking apply_patch, Luna Reserve and context_management notes.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.1-codex, branch release/0.3.1/feat/codex-provider (HEAD 9d54902). Reviews with file:line: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9m7qzk-l2pa.md (code) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9m7r8p-90gx.md (security). Read both.",
     "Blocking: (1) the gpt-6 agent files are generated from the Kimi config, so Codex Librarian and other web-using specialists list Kimi's moonshot tools and no pi-web-kit web_search/web_fetch; generate per provider or map web entries per provider, with a test that a Codex Librarian lists the pi-web-kit tools. (2) apply_patch: an Update File whose Move to equals its own path deletes the file; treat it as a plain update, with a test.",
@@ -64,7 +64,45 @@
     "agentId": "workflow:wf_62d34829-360/assignment-0mw9mgiy9-d5km",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T18:56:03.057Z"
+    "startedAt": "2026-11-09T18:56:03.057Z",
+    "finishedAt": "2026-11-09T19:13:27.864Z"
+  },
+  "result": "result: all fixes are in and `mise run build` and `mise run verify` exit 0 (2896 pass, 0 fail). I did not run the new tests against the old code to confirm they fail there.\n\n**Blocking**\n**Web tools for Codex specialists.**\n  - The specialist's tools come only from the shared `agents/<name>.md` file. The extension swaps just the prompt body for the GPT-6 file, so changing the GPT-6 files alone would not have fixed it.\n  - `agentTools` in `packages/integrations/pi/src/agents.ts` now lists a web tool through every provider's web source: Kimi's extension and `pi-web-kit`. A source a session did not load matches nothing. It also skips `apply_patch` instead of throwing, because the extension activates that tool.\n  - The Kimi `agents/` Librarian files (`librarian-lookup.md`, `librarian-research.md`) gain the `ext:pi-web-kit/web_search` and `web_fetch` entries. That is a visible change under Kimi, but the entries only take effect when `pi-web-kit` is loaded.\n  - The new test in `pi.test.ts` checks the Librarian roles under both configs and in the `agents/` and `families/gpt-6/agents/` files.\n**Same-path move.** `Move to` equal to the file's own path (also `./a.txt` and `src/../a.txt`) is now a plain update. Tests are in `codex-apply-patch.test.ts` and, on the real disk, in `codex.test.ts`.\n\n**Non-blocking, all done**\n`apply_patch` is now all-or-nothing: a failed write puts back the earlier writes, newest first. If a restore also fails, the error names the files that could not be put back. Folders the patch created stay.\nThe symlink check is new: `PatchFs` gained a `real` method, and the real path of each target, or of its nearest existing ancestor, must stay inside the project. Tests cover an outward link, a dangling link and a link that stays inside.\nFile I/O in `nodePatchFs` now uses Bun's file API; `realpath` and `readlink` stay on `node:fs` because Bun has no equivalent.\nThe Luna Reserve usage request sets `redirect: \"error\"`.\n`message_end` only triggers Luna Reserve when the message's own provider is Codex.\n`session_start` clears the reserve.\nReserve requests lower `reasoning.effort` of `xhigh` or `max` to `high`. The only evidence is that Luna never runs at `xhigh`; I found nothing else on the reserve model's limits, so `high` is an unmeasured ceiling.\nA failed `apply_patch` activation, including a tool that stays inactive, is now told to that specialist on its first run, once.\n`context_management` has its own switch, `pi.features.contextManagement`: Codex only, default on, still sent only while Billion Context is off. It is a registry entry like Luna Reserve, with a test.\nDocs are updated in `docs/pi/configuration.md`, `docs/pi/extensions.md`, `docs/pi/providers.md` and `docs/usage.md`.\n\nchanged:\n`packages/integrations/pi/src/` (`agents.ts`, `codex.ts`, `extension.ts`)\n`packages/integrations/pi/tests/` (`codex.test.ts`, `extension.test.ts`, `pi.test.ts`)\n`packages/runtime/src/config/capabilities.ts`\n`packages/runtime/src/pi/codex/` (`apply-patch.ts`, `context-management.ts`, `luna-reserve.ts`)\n`packages/runtime/tests/config/` (`capabilities.test.ts`, `schema.test.ts`)\n`packages/runtime/tests/pi/` (`codex-apply-patch.test.ts`, `codex-context-management.test.ts`, `codex-luna-reserve.test.ts`)\n`packages/runtime/tests/setup-tui-capabilities.test.ts`\n`docs/pi/` (`configuration.md`, `extensions.md`, `providers.md`), `docs/usage.md`\nBuild output: `packages/integrations/claude/dist/scripts/` (`holyagent.js`, `setup-tui.js`) and `packages/integrations/pi/dist/` (`agents/librarian-*.md`, `families/gpt-6/agents/librarian-*.md`, `extensions/holyagent.js`, `scripts/holyagent.js`, `scripts/setup-tui.js`)\n\nnotes:\nThe extension still takes only the GPT-6 prompt body, so the `tools:` line of the `families/gpt-6/agents/` files is never read.\nAuto-review stays out of scope.\n\nevidence:\nCodex specialists that use the web get the pi-web-kit web tools, with a test: `pi.test.ts` \"every web-using specialist lists the web tools of every provider…\" passes. The `agents/` and `families/gpt-6/agents/` Librarian files list `ext:pi-web-kit/web_search` and `web_fetch`.\nA same-path move updates the file instead of deleting it, with a test: `codex-apply-patch.test.ts` (\"a move to the file's own path is a plain update…\") and `codex.test.ts` (\"on the real disk\"), both pass.\nThe non-blocking notes are fixed, each with a test where it changes behavior: `codex-apply-patch.test.ts`, `codex.test.ts`, `codex-luna-reserve.test.ts`, `codex-context-management.test.ts` and `extension.test.ts` (\"a failed activation is told to the specialist…\") cover each, all pass.\nmise run build and mise run verify exit 0: `bunx --no-install mise run build` exit 0. `bunx --no-install mise run verify` exit 0: no type errors in 262 files, lint clean on 263 files, format check clean, 2896 pass, 0 fail. Log: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify3.log`.\nchecks-run: `bunx --no-install mise run build` exit 0; `bunx --no-install mise run verify` exit 0, 2896 pass, 0 fail.\nchanged-paths: listed under `changed`.\ndiff-file: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/codex-repair.diff`\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "Both blockers fixed with tests; all non-blocking notes done with tests; build and verify exit 0 (2896 pass).",
+    "criteria": [
+      {
+        "criterion": "Codex specialists that use the web get the pi-web-kit web tools, with a test",
+        "support": "`pi.test.ts` \"every web-using specialist lists the web tools of every provider…\" passes. The `agents/` and `families/gpt-6/agents/` Librarian files list `ext:pi-web-kit/web_search` and `web_fetch`."
+      },
+      {
+        "criterion": "A same-path move updates the file instead of deleting it, with a test",
+        "support": "`codex-apply-patch.test.ts` (\"a move to the file's own path is a plain update…\") and `codex.test.ts` (\"on the real disk\"), both pass."
+      },
+      {
+        "criterion": "The non-blocking notes are fixed, each with a test where it changes behavior",
+        "support": "`codex-apply-patch.test.ts`, `codex.test.ts`, `codex-luna-reserve.test.ts`, `codex-context-management.test.ts` and `extension.test.ts` (\"a failed activation is told to the specialist…\") cover each, all pass."
+      },
+      {
+        "criterion": "mise run build and mise run verify exit 0",
+        "support": "`bunx --no-install mise run build` exit 0. `bunx --no-install mise run verify` exit 0: no type errors in 262 files, lint clean on 263 files, format check clean, 2896 pass, 0 fail. Log: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify3.log`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bunx --no-install mise run build` exit 0; `bunx --no-install mise run verify` exit 0, 2896 pass, 0 fail."
+      },
+      {
+        "label": "changed-paths",
+        "support": "listed under `changed`."
+      },
+      {
+        "label": "diff-file",
+        "support": "`/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/codex-repair.diff`"
+      }
+    ]
   },
   "createdAt": "2026-11-09T18:56:03.057Z"
 }
