@@ -1,0 +1,46 @@
+{
+  "id": "assignment-0mw9c0mrg-47dt",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 13,
+  "roleTask": "Reviewer.artifact",
+  "slug": "re-review-the-last-two-docs-commits-on",
+  "objective": "Re-review the last two docs commits on release/0.3.0/docs/t3-first-pi-docs and say whether they close the earlier non-blocking findings without new false claims.",
+  "state": "Running",
+  "scope": [
+    "Diff: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/docs-final.diff (commits c1b3e89 and the one after it, worktree /home/user/holyagent-0.3.0-docs).",
+    "Earlier findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9bgglr-dml4.md item 1 (claude-parity.md named two root-text carriers) and the claim-B corrections in /home/user/holyagent/.git/holyagent/reports/assignment-0mw9bjvi7-07jb.md (image metadata only; a user --no-context-files launch arg).",
+    "Check the parity page against packages/integrations/pi/src/extension.ts in the worktree; take the T3 facts from the research report's cited sources."
+  ],
+  "constraints": [
+    "Do not check out other commits in any checkout and make no edits.",
+    "Judge only these two commits.",
+    "Report in under 300 words; mark each finding blocking or non-blocking with file and line."
+  ],
+  "criteria": [
+    {
+      "text": "The parity page names one root-text carrier and the T3 paragraph carries both corrections",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No changed line states something its source contradicts",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9bjldr-6gsx",
+    "assignment-0mw9bw0la-cdf6"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T14:03:45.340Z"
+  },
+  "createdAt": "2026-11-09T14:03:45.340Z"
+}
