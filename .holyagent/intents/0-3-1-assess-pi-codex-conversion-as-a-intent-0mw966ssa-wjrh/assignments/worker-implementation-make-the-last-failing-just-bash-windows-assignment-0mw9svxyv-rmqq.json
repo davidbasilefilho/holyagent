@@ -1,0 +1,62 @@
+{
+  "id": "assignment-0mw9svxyv-rmqq",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 20,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-last-failing-just-bash-windows",
+  "objective": "Make the last failing just-bash Windows test pass for the right reason, and make sure Git for Windows is found by host passthrough when it sits in its standard install folder.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.1-bash at 4e042337 (PR davidbasilefilho/holyagent#106)",
+    "Windows CI log of e6f334c7: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/win-106b.txt. packages/runtime/tests/pi/bash-shell.test.ts:423 expects `which git cat` to print /usr/bin/git and /usr/bin/cat; on the Windows runner it printed only /usr/bin/cat. Find out from the code why git was not registered there: the test's PATH (it may hold only the Bun folder), the Windows extra search folders in hosts.ts, or how .exe names are registered."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Fix the cause: if the Windows search folders miss Git for Windows' standard locations (%ProgramFiles%\\Git\\cmd and similar), add them with a Linux-run test through the platform parameter; if the test relies on a PATH the runner does not give, make it use a program the test itself controls or the host program it already uses. Do not skip the test on Windows.",
+    "Leave packages/integrations/pi/src/codex.ts and packages/runtime/src/pi/codex/ untouched.",
+    "Report in under 300 words; start each evidence line with the exact criterion text, a colon and the support inline; put long logs in a file in the scratchpad."
+  ],
+  "criteria": [
+    {
+      "text": "The `which` assertion in bash-shell.test.ts holds on Windows for a stated reason, without a platform skip",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Host passthrough on Windows finds git in Git for Windows' standard install folders when PATH lacks them, with a Linux-run test, or the report shows from code that it already does",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Gates: mise run build leaves no unexplained changes and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/pi/bash/hosts.ts",
+    "packages/runtime/tests/pi/bash-shell.test.ts",
+    "packages/integrations/pi/dist/scripts/just-bash.js",
+    "docs/pi/shell.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw9rc4gj-gk3c",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T21:56:00.055Z"
+  },
+  "createdAt": "2026-11-09T21:56:00.055Z"
+}
