@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mw9n3orm-ne0p",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-codex-provider-repair-and",
+  "objective": "Re-review the Codex provider repair and the merge of the integration branch on release/0.3.1/feat/codex-provider.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.1-codex. Repair commit eb8adb2 (git show eb8adb2) and merge ce16cb6 (HEAD, brings in the state-branch test hook fix #104). Previous findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9m7qzk-l2pa.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9m7r8p-90gx.md; the writer's account: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9mgiy9-d5km.md.",
+    "Check both blockers are closed (Codex specialists get pi-web-kit web tools; a same-path move updates), and the non-blocking repairs (apply_patch rollback, real-path containment, Luna Reserve redirect error, provider check, session reset, effort cap, activation failure notice, the contextManagement switch). Note the Kimi Librarian agent files now also list ext:pi-web-kit entries: confirm they do nothing unless pi-web-kit is loaded. Then run bun install --frozen-lockfile, mise run build (git status must stay empty) and mise run verify on HEAD."
+  ],
+  "constraints": [
+    "Do not check out other commits in any checkout and make no edits.",
+    "Report in under 350 words; mark findings blocking or non-blocking with file and line."
+  ],
+  "criteria": [
+    {
+      "text": "The repair closes both blockers and the non-blocking notes without new defects, and the merged head builds unchanged and passes verify",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9mgiy9-d5km"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T19:14:03.682Z"
+  },
+  "createdAt": "2026-11-09T19:14:03.682Z"
+}
