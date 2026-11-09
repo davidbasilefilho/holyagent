@@ -35,6 +35,7 @@ import {
   CACHE_RETENTION_ENV,
   childAgent,
   CMD_NOT_FOUND,
+  cmdExeArguments,
   COMMAND_TIMEOUT_MS,
   CONTEXT_MESSAGE,
   createExtension,
@@ -120,8 +121,8 @@ const subcommand = (call: Call): ReadonlyArray<string> | undefined =>
 const probeArgs = (call: Call): ReadonlyArray<string> | undefined =>
   call.command === "pi"
     ? call.args
-    : call.command === "cmd.exe" && call.args.slice(0, 3).join(" ") === "/d /c pi"
-      ? call.args.slice(3)
+    : call.command === "cmd.exe" && call.args.slice(0, 5).join(" ") === "/d /s /c call pi"
+      ? call.args.slice(5)
       : undefined
 
 const STATUS =
@@ -313,6 +314,14 @@ const run = async (
   const delivered = results.find((result) => result !== undefined) as Delivered | undefined
   return { api, delivered, env }
 }
+
+/**
+ * The command line Node builds from an argv on Windows when it spawns without a shell and without
+ * `windowsVerbatimArguments`, as Pi's `exec` does: a word with a space, a tab or a quote is wrapped
+ * in quotes (a quote inside is escaped as `\"`), any other word is left bare.
+ */
+const nodeCommandLine = (args: ReadonlyArray<string>): string =>
+  args.map((word) => (/[ \t"]/.test(word) ? `"${word.replace(/"/g, '\\"')}"` : word)).join(" ")
 
 const startedWith = (calls: ReadonlyArray<Call>) =>
   calls.map((call) => subcommand(call)?.join(" ")).filter((entry) => entry !== undefined)
@@ -1451,8 +1460,8 @@ describe("finding Bun", () => {
     expect(bundled.length).toBeGreaterThan(0)
     for (const call of bundled) {
       expect(call.command).toBe("cmd.exe")
-      expect(call.args.slice(0, 3)).toEqual(["/d", "/c", "C:\\npm\\bun.cmd"])
-      expect(call.args.slice(3, 6)).toEqual([...runtimeArgs(root, win32)])
+      expect(call.args.slice(0, 5)).toEqual(["/d", "/s", "/c", "call", "C:\\npm\\bun.cmd"])
+      expect(call.args.slice(5, 8)).toEqual([...runtimeArgs(root, win32)])
     }
     // A bun.exe is a program and starts directly.
     const direct = await run(healthy("/missing"), {
@@ -1463,6 +1472,59 @@ describe("finding Bun", () => {
     })
     expect(direct.api.calls.some((call) => call.command === "cmd.exe")).toBe(false)
     expect(direct.api.calls.some((call) => call.command === "C:\\npm\\bun.exe")).toBe(true)
+  })
+
+  test("a bun.cmd under a folder with spaces starts with the program and every argument as its own word", async () => {
+    const root = "C:\\Users\\Jane Doe\\pkg dir"
+    const shim = "C:\\Users\\Jane Doe\\AppData\\Roaming\\npm\\bun.cmd"
+    const project = "D:\\my work\\project"
+    const { api } = await run(healthy(project), {
+      packageRoot: root,
+      platformPath: win32,
+      platform: "win32",
+      cwd: project,
+      bunSearch: machine({ Path: "C:\\Users\\Jane Doe\\AppData\\Roaming\\npm" }, [shim]),
+    })
+    const bundled = api.calls.filter((call) =>
+      call.args.includes(runtimeArgs(root, win32)[2] ?? ""),
+    )
+    expect(bundled.length).toBeGreaterThan(0)
+    for (const call of bundled) {
+      expect(call.command).toBe("cmd.exe")
+      expect(call.args.slice(0, 5)).toEqual(["/d", "/s", "/c", "call", shim])
+      expect(call.args.slice(5, 8)).toEqual([...runtimeArgs(root, win32)])
+      // Node quotes a word with a space and joins them, so cmd.exe reads this line, which does not
+      // start with a quote (it would strip the first and last of them).
+      const line = nodeCommandLine(call.args)
+      expect(line).toStartWith(
+        `/d /s /c call "${shim}" --no-env-file "--config=${root}\\scripts\\empty-bunfig.toml" "${root}\\scripts\\holyagent.js" ${PI_PROJECT_FLAG} `,
+      )
+    }
+  })
+
+  test("a word cmd.exe would read as syntax is refused, and nothing is started", () => {
+    const shim = "C:\\npm\\bun.cmd"
+    for (const word of ['a"b', "50%", "a^b", "a!b", "a\nb", "a b%PATH%", 'x y" & calc & "z'])
+      expect(cmdExeArguments(shim, ["--project", word]).ok).toBe(false)
+    expect(cmdExeArguments("C:\\a&b\\bun.cmd", []).ok).toBe(false)
+    for (const word of ["C:\\a&b", "C:\\a|b", "C:\\a<b", "C:\\a>b", "C:\\(x86)"])
+      expect(cmdExeArguments(shim, [word]).ok).toBe(false)
+    // In quotes, which Node adds to a word with a space, the same characters are literal.
+    expect(cmdExeArguments(shim, ["C:\\Program Files (x86)\\a&b"])).toEqual({
+      ok: true,
+      args: ["/d", "/s", "/c", "call", shim, "C:\\Program Files (x86)\\a&b"],
+    })
+  })
+
+  test("a bun.cmd on a PATH folder with an operator and no space is not started", async () => {
+    const { api, delivered } = await run(healthy("/missing"), {
+      packageRoot: "C:\\pkg",
+      platformPath: win32,
+      platform: "win32",
+      bunSearch: machine({ Path: "C:\\a&b" }, ["C:\\a&b\\bun.cmd"]),
+    })
+    expect(api.calls.some((call) => call.command === "cmd.exe")).toBe(false)
+    expect(delivered?.message?.content ?? "").toContain("as an operator")
   })
 
   test("with no Bun the command fails with where it looked, and nothing is started", async () => {
@@ -1518,9 +1580,9 @@ describe("a Windows package root", () => {
     await probesEnded(api, 2)
     const probes = api.calls.filter((call) => probeArgs(call) !== undefined)
     expect(probes.map((call) => call.command)).toEqual(["cmd.exe", "cmd.exe"])
-    expect(probes.map((call) => call.args.slice(0, 3))).toEqual([
-      ["/d", "/c", "pi"],
-      ["/d", "/c", "pi"],
+    expect(probes.map((call) => call.args.slice(0, 5))).toEqual([
+      ["/d", "/s", "/c", "call", "pi"],
+      ["/d", "/s", "/c", "call", "pi"],
     ])
     expect(probes.map((call) => probeArgs(call)?.[0])).toEqual(["auth", "--list-models"])
     for (const call of probes) expect(call.cwd).toBe(WINDOWS_ROOT)

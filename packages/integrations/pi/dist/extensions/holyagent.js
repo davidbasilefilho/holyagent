@@ -16544,6 +16544,23 @@ var runtimeArgs = (packageRoot, platformPath = nodePath) => [
   platformPath.join(packageRoot, "scripts", "holyagent.js")
 ];
 var CMD_NOT_FOUND = 9009;
+var UNQUOTABLE = /["%^!]|\p{Cc}/u;
+var BARE_SYNTAX = /[&|<>()]/;
+var cmdExeArguments = (command, args) => {
+  for (const word of [command, ...args]) {
+    if (UNQUOTABLE.test(word))
+      return {
+        ok: false,
+        reason: `cmd.exe would read part of ${JSON.stringify(word)} as syntax (a quote, %, ^, ! or control character)`
+      };
+    if (BARE_SYNTAX.test(word) && !/[ \t]/.test(word))
+      return {
+        ok: false,
+        reason: `cmd.exe would read part of ${JSON.stringify(word)} as an operator (& | < > or a parenthesis), since it holds no space to be quoted for`
+      };
+  }
+  return { ok: true, args: ["/d", "/s", "/c", "call", command, ...args] };
+};
 var oneLine = (text) => printable(text).replace(/\s+/g, " ").trim();
 var notice = (text) => ({
   customType: NOTICE_MESSAGE,
@@ -16590,11 +16607,12 @@ var createExtension = ({
   const exec = (signal, command, args) => {
     const failed = (reason) => new CommandFailed({ command: args.join(" "), reason });
     const shimmed = windows && (command === "pi" || /\.cmd$/i.test(command));
-    const [program, programArgs] = shimmed ? ["cmd.exe", ["/d", "/c", command, ...args]] : [command, args];
-    return signal.aborted ? fail5(failed("it was stopped")) : acquireUseRelease2(try_2({
+    const launch = shimmed ? cmdExeArguments(command, args) : { ok: true, args };
+    const program = shimmed ? "cmd.exe" : command;
+    return !launch.ok ? fail5(failed(launch.reason)) : signal.aborted ? fail5(failed("it was stopped")) : acquireUseRelease2(try_2({
       try: () => {
         const stop = new AbortController;
-        const settled = pi.exec(program, [...programArgs], {
+        const settled = pi.exec(program, [...launch.args], {
           cwd: packageRoot,
           signal: AbortSignal.any([signal, stop.signal]),
           timeout: COMMAND_TIMEOUT_MS
@@ -16873,6 +16891,7 @@ export {
   WORKFLOW_TOOL,
   applyEnvironment,
   childAgent,
+  cmdExeArguments,
   createExtension,
   extension_default as default,
   failedFinalMessage,
