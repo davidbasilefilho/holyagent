@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "confirm-the-apply-patch-file-layer",
   "objective": "Confirm the apply_patch file-layer repair closes the earlier optional findings without regressions and meets the merge-ready bar.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Commit d5604d4 on release/0.3.1/feat/codex-provider in /home/user/holyagent-0.3.1-codex (range 956092de..d5604d4); diff at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/codex-filelayer-commit.diff",
     "Previous findings this commit repairs: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9os3gn-w3sc.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9os3rf-7qip.md; repair report: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9pye41-curp.md",
@@ -57,7 +57,41 @@
     "agentId": "workflow:wf_8accb238-25b/assignment-0mw9q5aef-p1y2",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T20:39:17.223Z"
+    "startedAt": "2026-11-09T20:39:17.223Z",
+    "finishedAt": "2026-11-09T20:48:29.274Z"
+  },
+  "result": "result: The repair closes all seven earlier findings and adds no blocker. `mise run verify` exits 0 on d5604d4, and the generated dist matches the build.\n\nchanged: none (read-only; a rebuild left no diff)\n\nchecks:\n- `bunx --no-install mise run verify` (in `/home/user/holyagent-0.3.1-codex`) -> exit 0, 2910 pass, 0 fail, no type errors in 262 files, lint clean. Log: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/rr2-verify.log`\n- `bunx --no-install mise run build` -> exit 0, `git status` clean, so `dist/extensions/holyagent.js` matches the build.\n- Built-in `/code-review` on `956092de..d5604d4` ran as the built-in and returned 6 findings. I read the cited code for each; none is a blocker. They are in the findings I reported through ReportFindings.\n- Read, not run: I did not run the new tests against the base. I judged from reading that each fails without the repair.\n\nblockers: none\n\nquestions: none\n\nnotes (all optional):\n1. The repair's flagged case (delete a link, add the path, then Update or Add it again) is a real defect, but low severity and not a blocker.\n   - **Cause:** `apply-patch.ts:459` only handles `planned.get(entry) === null`. A later op on the path goes through `locate`, which follows the on-disk link and so reads or writes the link target.\n   - **No escape:** a target outside the project fails with `PatchPathError`.\n   - **Why optional:** it takes an unusual patch, and the base wrote through the link too, so it is not a regression. Switching the condition to \"entry already planned\" would fix it.\n2. `kindOf` returns \"file\" for a directory, so deleting a directory fails late with a raw EISDIR in the write phase. Rollback keeps the patch all-or-nothing.\n3. Restore does `chmod` after `Bun.write`, so a private file is briefly at the default mode. A failing `chmod` is reported as a failed restore.\n4. `isMissing` and `isNoLink` match on message text, which includes the path. A path containing `ENOENT` or `EINVAL` can be misclassified. Checking `error.code` would fix it.\n5. `restore` still calls `fs.snapshot` (reads the whole file) to test whether a created file exists. `fs.kind` would do.\n6. A `Move to` drops the source's mode. The base had the same behavior.\n\nThe `PatchFs.kind` addition and `Snapshot.mode` are additive. The Effect tagged errors, JSDoc on the changed exports and the in-memory test fs are consistent. No test was weakened; the rollback and missing-file tests were tightened.\n\nevidence:\nEach previous blocking code finding is closed by the repair: the link-loop hang is bounded by `MAX_LINKS` and fails with a tagged ELOOP (`codex.ts:134-206`, test \"links that lead back to each other...\"). Rollback restores modes (test at `codex.test.ts` for 0600/0755). Delete-then-add of a link makes a regular file and leaves the target (`apply-patch.ts:459-461`; tests in both test files). readlink failures other than ENOENT, ENOTDIR and EINVAL now fail with a tagged error. Existence checks use `kind`. The missing-delete message and `need` helper are in place.\nNo regression in apply_patch updates, adds, deletes, moves, rollback, Luna Reserve persistence across resume and fork, or the Codex-only usage check: the diff does not touch the reserve or usage code, and the full suite passes (2910 pass, 0 fail). The only residual edge is note 1, which already existed.\nChanged behavior has tests that fail without the change, and no test is weakened: new real-disk and in-memory tests cover loop, mode, link replacement, link rollback and `Bun.file().delete()` on a symlink. The in-memory fs gained `kind` and `mode`. Judged by reading, not run against the base.\nRepository rules hold: Effect composition with `tryPromise`, `Effect.gen` and the tagged `PatchFileError`. No try/catch, `new Promise` or async functions in the source. JSDoc on `Snapshot`, `PatchFs`, `PatchFs.kind` and `nodePatchFs`. Build exit 0 with a clean tree, so the dist matches.\nGates: mise run verify exits 0 on d5604d4: `bunx --no-install mise run verify` -> exit 0, 2910 pass, 0 fail, 262 files type-checked, 263 files linted.\nfindings: no blockers. Six optional findings, listed above and reported through ReportFindings. The repair's flagged delete-then-add-then-update case is optional, not a defect that blocks merge.\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "Seven findings closed, verify 2910 pass, build clean; six optional notes stay as reported items.",
+    "criteria": [
+      {
+        "criterion": "Each previous blocking code finding is closed by the repair",
+        "support": "the link-loop hang is bounded by `MAX_LINKS` and fails with a tagged ELOOP (`codex.ts:134-206`, test \"links that lead back to each other...\"). Rollback restores modes (test at `codex.test.ts` for 0600/0755). Delete-then-add of a link makes a regular file and leaves the target (`apply-patch.ts:459-461`; tests in both test files). readlink failures other than ENOENT, ENOTDIR and EINVAL now fail with a tagged error. Existence checks use `kind`. The missing-delete message and `need` helper are in place."
+      },
+      {
+        "criterion": "No regression in apply_patch updates, adds, deletes, moves, rollback, Luna Reserve persistence across resume and fork, or the Codex-only usage check",
+        "support": "the diff does not touch the reserve or usage code, and the full suite passes (2910 pass, 0 fail). The only residual edge is note 1, which already existed."
+      },
+      {
+        "criterion": "Changed behavior has tests that fail without the change, and no test is weakened",
+        "support": "new real-disk and in-memory tests cover loop, mode, link replacement, link rollback and `Bun.file().delete()` on a symlink. The in-memory fs gained `kind` and `mode`. Judged by reading, not run against the base."
+      },
+      {
+        "criterion": "Repository rules hold: Effect composition with tagged errors, Schema at boundaries, JSDoc on exports, generated dist matches the build",
+        "support": "Effect composition with `tryPromise`, `Effect.gen` and the tagged `PatchFileError`. No try/catch, `new Promise` or async functions in the source. JSDoc on `Snapshot`, `PatchFs`, `PatchFs.kind` and `nodePatchFs`. Build exit 0 with a clean tree, so the dist matches."
+      },
+      {
+        "criterion": "Gates: mise run verify exits 0 on d5604d4",
+        "support": "`bunx --no-install mise run verify` -> exit 0, 2910 pass, 0 fail, 262 files type-checked, 263 files linted."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "no blockers. Six optional findings, listed above and reported through ReportFindings. The repair's flagged delete-then-add-then-update case is optional, not a defect that blocks merge."
+      }
+    ]
   },
   "createdAt": "2026-11-09T20:39:17.223Z"
 }
