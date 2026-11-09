@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-just-bash-pi-bash-backend-so",
   "objective": "Repair the just-bash Pi bash backend so programs given by path run on the host and turning the capability off reverts the Billion guardrail settings, and close the review's non-blocking notes.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree /home/user/holyagent-0.3.1-bash, branch release/0.3.1/feat/just-bash at 971b9ea0",
     "Code review findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9odug6-6vgw.md; security review findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9odupl-x2zg.md; original writer report: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9n3pas-ln21.md",
@@ -90,5 +90,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mw9n3pas-ln21",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T20:01:17.910Z"
+  },
   "createdAt": "2026-11-09T20:01:02.854Z"
 }
