@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
-import { mkdir, mkdtemp, rm } from "node:fs/promises"
+import { mkdir, mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -22,6 +22,7 @@ import { ROOT_CORE_FILES } from "../../../runtime/src/instructions/claude-5.5/ro
 import { instructionsDirectory, stripCitations } from "../../../runtime/src/instructions/skills.ts"
 import { PROCESS_TIMEOUT_MS } from "../../../runtime/tests/fixtures.ts"
 import { REPOSITORY } from "../src/files.ts"
+import { removeTemporary } from "./temp-folder.ts"
 
 const kimi = (file: string) =>
   readFileSync(join(REPOSITORY, instructionsDirectory("kimi-k3.1"), "root", file), "utf8")
@@ -126,7 +127,7 @@ describe("the config command of the runtime bundle", () => {
     return {
       root,
       env: { HOLYAGENT_HOME: join(root, "home") },
-      done: () => rm(root, { recursive: true, force: true }),
+      done: () => removeTemporary(root),
     }
   }
 
@@ -235,7 +236,7 @@ describe("the project flag of the runtime bundle", () => {
         expect(status.code).toBe(0)
         expect(status.stdout).toContain("Entry objective")
       } finally {
-        await rm(root, { recursive: true, force: true })
+        await removeTemporary(root)
       }
     },
     PROCESS_TIMEOUT_MS,
