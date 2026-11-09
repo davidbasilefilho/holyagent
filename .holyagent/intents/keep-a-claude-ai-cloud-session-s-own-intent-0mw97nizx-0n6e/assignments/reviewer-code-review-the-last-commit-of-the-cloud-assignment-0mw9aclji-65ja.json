@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mw9aclji-65ja",
+  "intentId": "intent-0mw97nizx-0n6e",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-last-commit-of-the-cloud",
+  "objective": "Review the last commit of the cloud-session checkout change.",
+  "state": "Running",
+  "scope": [
+    "Review commit b1a82c5 in /home/user/holyagent-0.3.0-cloudbranch (git show b1a82c5). Its brief items came from /home/user/holyagent/.git/holyagent/reports/assignment-0mw99k563-xfap.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw99k5gu-yh66.md; the writer report is /home/user/holyagent/.git/holyagent/reports/assignment-0mw9a4789-yzgd.md. Also say whether vcs/git.ts currentBranch has the same same-named-tag issue the writer noted.",
+    "Run only bun test packages/runtime/tests/cloud-checkout.test.ts."
+  ],
+  "constraints": [
+    "Read-only: no edits and no git writes.",
+    "Do not check out other commits in any checkout.",
+    "Report in under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "The tag, fallback-branch, DetachedHead hint and hooks.md items are correct, or each defect is reported with file and line",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No regression in the notice or session start",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "tests"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9a4789-yzgd"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T13:17:04.398Z"
+  },
+  "createdAt": "2026-11-09T13:17:04.398Z"
+}
