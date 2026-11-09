@@ -1,0 +1,97 @@
+{
+  "id": "assignment-0mw8qq14e-no4k",
+  "intentId": "intent-0mw6ry92f-k0w1",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "change-the-inferred-default-scope-of",
+  "objective": "Change the inferred default scope of holyagent setup and doctor (commit 0bf97b7) to the maintainer's decision: only the user's own uncommitted local settings move the default off user, for both the Claude Code and the Pi steps, and fix the review's blocker and follow-ups.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-scope, branch release/0.3.0/feat/installed-scope-default, head 0bf97b7 (committed; your edits are a new change on top).",
+    "Maintainer's decision (binding, verbatim parts quoted): \"both should default to user btw, but option 1\", then \"User for both\". Without --scope: when holyagent@holyagent is enabled in .claude/settings.local.json (the uncommitted local file), both the Claude Code and the Pi steps run at local scope; otherwise both run at user scope. A committed .claude/settings.json that enables the plugin never moves either off user; setup and doctor then print one line saying the repository enables HolyAgent in that file and that --scope project targets it. An explicit --scope always wins. Reason: a cloned repository must not choose where setup writes or which registry a Pi install uses (pi install -l reads the repository's .npmrc).",
+    "Review blocker to fix: installedScope (packages/runtime/src/setup/scope.ts:149-151) calls settingsFile, which refuses a symlinked .claude or settings file, so a bare run in a repository with a symlinked .claude fails even for a user install. Inference only reads: read the local file without the write-time symlink refusal (or skip it with a note), and keep the refusal for the scope actually written.",
+    "Review follow-ups: an explicit false in the local file means the plugin is disabled for this project; stop the search there and use user with a line that says so. Update the stale statements that user is the default or that describe the old inference: docs/usage.md (the inference paragraph and line 166), docs/components.md:64, docs/decisions.md:57, docs/pi/installation.md:59 (keep its point that project and local scope run only in a trusted repository, and say a committed project file cannot select them). Keep the existing tests that still hold, change the ones the decision changes, and add tests for: local enabled, local false, project-only (user plus the notice line), symlinked .claude with a user install, and --scope project explicit."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Report in under 400 words; put long logs in a file in the scratchpad above and give its path.",
+    "The generated packages/integrations/claude/dist and packages/integrations/pi/dist are rewritten by mise run build; include those regenerated files in your changed paths, though they are not listed in your ownership paths."
+  ],
+  "criteria": [
+    {
+      "text": "Without --scope, an enabled entry in .claude/settings.local.json makes both the Claude Code and the Pi steps local, and otherwise both run at user, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A committed .claude/settings.json that enables the plugin leaves the scope at user and prints the line naming the file and --scope project, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "An explicit false in the local file stops the search and uses user with a line saying so, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A symlinked .claude no longer fails a bare run for a user install, and writing through a symlink is still refused, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "An explicit --scope overrides the inferred one, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "docs/usage.md, docs/components.md, docs/decisions.md and docs/pi/installation.md describe the decided default",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "mise run build leaves no unexplained changes and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "No test is weakened or removed to pass; every new behavior has a test that fails without it",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The change stays inside the Assignment's scope and ownership paths",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli/setup.ts",
+    "packages/runtime/src/setup/scope.ts",
+    "packages/runtime/tests/setup-scope.test.ts",
+    "packages/runtime/tests/setup-cli.test.ts",
+    "docs/usage.md",
+    "docs/components.md",
+    "docs/decisions.md",
+    "docs/pi/installation.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw7r2yig-qb6p",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T04:07:38.798Z"
+  },
+  "createdAt": "2026-11-09T04:07:38.798Z"
+}
