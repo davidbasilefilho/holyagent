@@ -1,0 +1,51 @@
+{
+  "id": "assignment-0mw9it5vj-3462",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-the-new-gpt-6-instruction-family",
+  "objective": "Review the new GPT-6 instruction family (guide, a translation of every requirements file, and the spacing rules) on release/0.3.1/feat/gpt-6-instructions for correctness, completeness and faithful translation.",
+  "state": "Running",
+  "scope": [
+    "Files in /home/user/holyagent-0.3.1-gpt6: packages/runtime/src/instructions/gpt-6/ (guide.md and 90 mirrored files), families.ts, coverage.ts, tests/instructions.test.ts, docs/development.md. Diffs: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/gpt6.diff (the family) and /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/gpt6-spacing.diff (the spacing rules). Compare against the requirements tree packages/runtime/src/instructions/requirements and the closest precedent packages/runtime/src/instructions/kimi-k3.1.",
+    "Research the guide must cite: /home/user/holyagent/.git/holyagent/reports/assignment-0mw97j4zi-5mk4.md. Check that each guide point is supported by its cited source and that inferences are marked.",
+    "Check, sampling every role and the root files and reading the visual ones in full: each GPT-6 file carries every requirement of its requirements file with nothing dropped, weakened or added beyond what the guide justifies; the translation follows the guide; text is host-neutral where the worker said so; and the spacing rules (one scale, padding on all sides, gaps around blocks, shared column edges, no line starting with a dash, a measured check on final captures) are clear, actionable and consistent across design-core, worker-visual, reviewer-visual and visual-judging.",
+    "Maintainer context for the spacing rules (verbatim): \"gpt models always mess up padding and spacing in some places like this\", then \"fix it\"; screenshot at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/images/2.png."
+  ],
+  "constraints": [
+    "Do not check out other commits in any checkout and make no edits.",
+    "Report in under 400 words; mark each finding blocking or non-blocking with file and line."
+  ],
+  "criteria": [
+    {
+      "text": "Every GPT-6 file faithfully carries its requirements file's requirements",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Guide points are supported by their cited sources",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Spacing rules and the capture check are clear, actionable and consistent",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9hdj9q-me5q",
+    "assignment-0mw9hx4wd-lvym"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T17:13:54.176Z"
+  },
+  "createdAt": "2026-11-09T17:13:54.176Z"
+}
