@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "re-assess-commit-3869116-against-the",
   "objective": "Re-assess commit 3869116 against the residual that a tracked name folding onto .claude/settings.local.json (case, Unicode such as U+017F, or a Windows trailing dot or space) could still make a bare setup infer local scope.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "The repair diff is in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/identity-review.diff (diff-file); read packages/runtime/src/setup/scope.ts and the new test in packages/runtime/tests/setup-scope.test.ts in full in /home/user/holyagent-0.3.0-scope.",
     "Trace whether the device-and-inode comparison closes the folding residual on case-insensitive or normalizing file systems, and whether it opens anything new: symlink following, a stat error that flips the result, a tracked entry deleted from disk, cost on a large .claude tree."
@@ -40,7 +40,33 @@
     "agentId": "workflow:wf_5eb0711b-46c/assignment-0mw8s8hov-9jat",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T04:49:59.696Z"
+    "startedAt": "2026-11-09T04:49:59.696Z",
+    "finishedAt": "2026-11-09T04:51:37.120Z"
+  },
+  "result": "result: Folding is closed for names inside `.claude/`. Folding of the `.claude` folder name itself is not, so I recommend holding the push for a small repair.\n\n**Built-in `/security-review`:** it could not run. The skill's `git log origin/HEAD...` failed because the worktree has no `origin/HEAD`. Everything below comes from reading `scope.ts` and the diff.\n\n**Findings**\n\n1. **Folder-level folding is not covered** (`packages/runtime/src/setup/scope.ts:208-221`).\n   - The index listing is limited to `:(icase,literal).claude`. That pathspec is ASCII-only case folding, so `identity()` only ever sees entries under a `.claude` prefix.\n   - Source: a repository commits `.claude./settings.local.json`, `.claude /settings.local.json`, a `.claude` name with an ignorable code point (HFS+), or `CLAUDE~1/…` (8.3 short name on Windows).\n   - Path: on checkout the file system folds that folder onto the user's `.claude`. `git ls-files` never returns the entry, so `tracked` is empty and the identity loop does not run.\n   - Sink: `repositoryControl` returns `undefined` at line 226, and `installedScope` returns `local` inferred (`scope.ts:258-259`).\n   - Impact: the repository steers where setup writes and which registry a Pi install reads.\n   - Precondition: a Windows or HFS+ checkout, and the file must enable the plugin.\n   - Status: reachable from repository input, so it blocks. I did not check Git's refusal rules on Windows or run it on that platform, so treat it as a plausible, not confirmed, vulnerability.\n   - Fix: list the whole index with `git ls-files --cached -z`, take the distinct first path components, and compare each one's identity to the `.claude` folder's identity.\n\n**Checked and sound**\n- **Folding inside `.claude/`:** case, U+017F and trailing dot or space names are listed by prefix and caught by the inode match. A hard-link test covers this.\n- **Symlinks:** `lstat` does not follow the final component. A tracked symlink gets its own identity, and an intermediate symlink to the same file only gives a conservative \"tracks it\". No data is read or leaked.\n- **Stat errors:**\n  - A failed stat on the file skips the identity check and falls to untracked, but `readJsonObject` has already read that file.\n  - A failed stat on an entry gives `undefined`, which never equals `own`, so it fails open, but a name that cannot be stat'd cannot be the same file either.\n  - A deleted tracked entry fails the stat and is correctly not the file.\n- **Cost:** `lstat` runs sequentially, one per tracked entry under `.claude`, with early exit on a match. A repository with 100k committed files there causes a slowdown only, not a hang.\n- **Unreliable inodes:** where the file system reports `ino` as 0 (FAT, SMB, some Windows volumes), every entry compares equal. That fails closed to \"git tracks it\" and blocks inference, not a bypass.\n- **Path safety:** index paths cannot contain `..`.\n\nevidence:\nfindings: One blocking finding, folder-level folding, at `packages/runtime/src/setup/scope.ts:208-226`. Plausible, not run on Windows or HFS+. The remaining checks above are sound.\nverdict: Residual closed for names inside `.claude/`, not for folding of the `.claude` folder name itself. Hold the push for the small repair above, plus a test.\nEvery blocking finding has a source-to-sink trace with path:line: Finding 1 is traced from the committed `.claude.` path to `scope.ts:226` and `scope.ts:258-259`.\nThe review states whether the folding residual is closed and whether the range should hold the push: Partially closed, and hold.\n",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Finding traced to scope.ts:208-226 and 258-259; aliasing of the .claude folder name is outside the ASCII icase pathspec, so a repair is warranted.",
+    "criteria": [
+      {
+        "criterion": "Every blocking finding has a source-to-sink trace with path:line",
+        "support": "Finding 1 is traced from the committed `.claude.` path to `scope.ts:226` and `scope.ts:258-259`."
+      },
+      {
+        "criterion": "The review states whether the folding residual is closed and whether the range should hold the push",
+        "support": "Partially closed, and hold."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "One blocking finding, folder-level folding, at `packages/runtime/src/setup/scope.ts:208-226`. Plausible, not run on Windows or HFS+. The remaining checks above are sound."
+      },
+      {
+        "label": "verdict",
+        "support": "Residual closed for names inside `.claude/`, not for folding of the `.claude` folder name itself. Hold the push for the small repair above, plus a test."
+      }
+    ]
   },
   "createdAt": "2026-11-09T04:49:59.696Z"
 }
