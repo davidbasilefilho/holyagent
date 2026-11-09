@@ -1,0 +1,70 @@
+{
+  "id": "assignment-0mw8tircf-3kht",
+  "intentId": "intent-0mw7mzreq-mu22",
+  "intentRevision": 2,
+  "roleTask": "Worker.implementation",
+  "slug": "make-holyagent-setup-for-pi-write-the",
+  "objective": "Make holyagent setup for Pi write the root route model into Pi's settings (defaultProvider, defaultModel, defaultThinkingLevel) only where each is unset and differs from Pi's default, with undo and a doctor report.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-model, branch release/0.3.0/feat/pi-root-model. Research to rely on (read both before starting): /home/user/holyagent/.git/holyagent/reports/assignment-0mw8td52p-27ab.md (Pi 1.5.0 extension API: ctx.mode, hasUI, RPC ui methods, session_tree, setActiveTools, trust, setModel) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw8tdgpq-hfsl.md (T3 Code pi driver: T3_PI_RUNTIME_MODE, T3_MCP_URL, the mcp__t3-code__ tool names and mcp__t3_code__ hidden aliases, which ui requests T3 renders, the bridge extension re-adding tools in reconcileDiscovery).",
+    "Decision (Intent requirement, root default): the root model on Pi follows the route table through Pi's own settings; the extension never calls setModel, because T3 owns launch arguments and its model picker stays manual, and a user's own choice wins.",
+    "The root route is in packages/runtime/src/domain/route.ts (routeFor) and the provider/model/thinking value is built in packages/runtime/src/pi/provider.ts. The Pi settings writer is packages/runtime/src/setup/pi-settings.ts (merge, record, undo, resolveTarget skipping defaults) with doctor reporting in packages/runtime/src/setup/doctor.ts; follow how the Pi tool settings are written there, at the scope setup resolves (user ~/.pi/agent/settings.json or the project .pi/settings.json).",
+    "Find Pi's own defaults for these three keys in the pinned host (settings schema in the Pi package under node_modules/.bun/@earendil-works+pi-coding-agent@1.5.0*/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-schema.js) so a value equal to Pi's default is not written.",
+    "Update docs/pi/installation.md or docs/pi/providers.md where they describe what setup writes."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Report in under 400 words; put long logs in a file in the scratchpad above and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Setup writes defaultProvider, defaultModel and defaultThinkingLevel from the root route only where each is unset and differs from Pi's default, and undo restores the prior state, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A value the user set is left alone and doctor reports the route model as set or as overridden by the user, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build leaves no unexplained changes and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The change stays inside the Assignment scope and ownership paths",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/setup/pi-settings.ts",
+    "packages/runtime/src/setup/doctor.ts",
+    "packages/runtime/src/pi/provider.ts",
+    "packages/runtime/tests/setup-pi-settings.test.ts",
+    "packages/runtime/tests/setup-doctor.test.ts",
+    "docs/pi/installation.md",
+    "docs/pi/providers.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T05:25:58.383Z"
+  },
+  "createdAt": "2026-11-09T05:25:58.383Z"
+}
