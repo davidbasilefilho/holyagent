@@ -3,7 +3,7 @@ import { join, relative, resolve, sep } from "node:path"
 import { Effect, Equal } from "effect"
 
 import type { Config } from "../config/schema.ts"
-import { PROVIDERS, rootModelSettings } from "../pi/provider.ts"
+import { PROVIDERS, ROOT_MODEL_PAIR, rootModelSettings } from "../pi/provider.ts"
 import {
   BILLION_CONTEXT_FILE,
   PI_SETTINGS_FILE,
@@ -131,6 +131,12 @@ interface Target {
   readonly defaults: JsonObject | undefined
 }
 
+/** The settings key of a leaf as a dotted name. */
+const keyName = ({ path }: Default): string => path.join(".")
+
+/** Whether a settings leaf is one of the root model's provider and model, which go as a pair. */
+const inPair = (leaf: Default): boolean => ROOT_MODEL_PAIR.includes(keyName(leaf))
+
 /** The root model of the config as settings leaves, written to Pi's `settings.json`. */
 const routeLeaves = (config: Config): ReadonlyArray<Default> => leaves(rootModelSettings(config))
 
@@ -169,31 +175,47 @@ const planFor = (env: Env, cwd: string, scope: Scope, config: Config): Plan => {
 /** A {@link Target} after layering: the keys to set, and the leaves left out and why. */
 interface Resolved {
   readonly file: string
+  /** What the file holds now, read once for the layering and for the merge or check after it. */
+  readonly existing: JsonObject
   readonly keys: ReadonlyArray<Default>
   readonly atDefault: ReadonlyArray<string>
   readonly atGlobal: ReadonlyArray<string>
+  /** The unset half of the root model's pair, left out because the other half is the user's. */
+  readonly atPair: ReadonlyArray<string>
 }
 
 /**
  * Layers a target. At project and local scope a key the user's global file already sets, to any
  * value, is left out: the global value is the user's choice and a repository's file must not
- * override it (a user's `off` wins for the risky settings). Of the rest, a key equal to the package
- * default is left out, since writing it would only freeze today's default. Because a global key is
- * never written at project scope, leaving a default out there cannot hide a global value. Fails
- * with SetupFailure when the global file is not a JSON object, since what it sets is unknown.
+ * override it (a user's `off` wins for the risky settings). The root model's provider and model go
+ * as a pair: when either is set, in the file or at project and local scope in the global file, the
+ * unset one is left out too, since a route model beside another provider may not exist for it. Of
+ * the rest, a key equal to the package default is left out, since writing it would only freeze
+ * today's default. Because a global key is never written at project scope, leaving a default out
+ * there cannot hide a global value. Fails with SetupFailure when the global file or the file itself
+ * is not a JSON object, since what it sets is unknown.
  */
 const resolveTarget = Effect.fn("resolveToolSettingsTarget")(function* (target: Target) {
   const global = target.global === undefined ? undefined : yield* readJsonObject(target.global)
-  const setGlobally = (key: Default) =>
-    global !== undefined && applyDefaults(global, [key]).entries[0]?.status !== "added"
+  const existing = yield* readJsonObject(target.file)
+  const setIn = (content: JsonObject | undefined, key: Default) =>
+    content !== undefined && applyDefaults(content, [key]).entries[0]?.status !== "added"
+  const setGlobally = (key: Default) => setIn(global, key)
   const isDefault = ({ path, value }: Default) =>
     target.defaults !== undefined && Equal.equals(valueAt(target.defaults, path), value)
-  const free = target.all.filter((key) => !setGlobally(key))
+  const pairHeld = target.all.some(
+    (key) => inPair(key) && (setIn(existing, key) || setGlobally(key)),
+  )
+  const leftWithPair = (key: Default) =>
+    pairHeld && inPair(key) && !setIn(existing, key) && !setGlobally(key)
+  const free = target.all.filter((key) => !setGlobally(key) && !leftWithPair(key))
   return {
     file: target.file,
+    existing,
     keys: free.filter((key) => !isDefault(key)),
-    atDefault: free.filter(isDefault).map(({ path }) => path.join(".")),
-    atGlobal: target.all.filter(setGlobally).map(({ path }) => path.join(".")),
+    atDefault: free.filter(isDefault).map(keyName),
+    atGlobal: target.all.filter(setGlobally).map(keyName),
+    atPair: target.all.filter(leftWithPair).map(keyName),
   } satisfies Resolved
 })
 
@@ -243,8 +265,7 @@ const mergeTarget = Effect.fn("mergeToolSettingsFile")(function* (
   const { file } = planned
   yield* refuseLinks(options.cwd, options.scope, file, "write")
   const target = yield* resolveTarget(planned)
-  const existing = yield* readJsonObject(file)
-  const { merged, entries } = applyDefaults(existing, target.keys)
+  const { merged, entries } = applyDefaults(target.existing, target.keys)
   const added = entries.filter((entry) => entry.status === "added")
   const kept = entries.filter((entry) => entry.status === "kept")
   const present = entries.filter((entry) => entry.status === "present")
@@ -283,6 +304,11 @@ const mergeTarget = Effect.fn("mergeToolSettingsFile")(function* (
     ...(target.atGlobal.length === 0
       ? []
       : [`left out, set in your global file: ${target.atGlobal.join(", ")}`]),
+    ...(target.atPair.length === 0
+      ? []
+      : [
+          `left out, the other of ${ROOT_MODEL_PAIR.join(" and ")} is yours: ${target.atPair.join(", ")}`,
+        ]),
     ...(target.atDefault.length === 0
       ? []
       : [`left out, the package default: ${target.atDefault.join(", ")}`]),
@@ -296,16 +322,17 @@ const mergeTarget = Effect.fn("mergeToolSettingsFile")(function* (
  * the HolyAgent config of the scope into the files the Pi packages read them from, one report line
  * per file. A key is written only where it is unset in the file and its value differs from the
  * package's own default ({@link PACKAGE_DEFAULTS}); a value the user set stays, whatever it is, so
- * a user's `off` wins for the risky settings too. At project and local scope a key the user's
- * global file sets is not written either ({@link resolveTarget}), and a symlinked `.pi` folder or
- * file is a `!` line with nothing written ({@link refuseLinks}). Keys the file already holds are
- * never touched. The keys it adds are recorded outside the project, which is what
- * {@link undoPiToolSettings} removes. Scope `user` writes Pi's global files, `project` and `local`
- * the project's `.pi` folder (Billion Context's file, which has no project location, is skipped
- * with a `-` line). A file that is not a JSON object is a `!` line and stays as it is, and the
- * other files are still written. Each write goes through a temporary file renamed over the target.
- * With `dryRun` nothing is written or recorded. With `pi.enable` off, or a config that cannot be
- * loaded, there are no lines.
+ * a user's `off` wins for the risky settings too. The root model's `defaultProvider` and
+ * `defaultModel` are one choice, written together only when both are unset and neither when either
+ * is set ({@link resolveTarget}). At project and local scope a key the user's global file sets is
+ * not written either ({@link resolveTarget}), and a symlinked `.pi` folder or file is a `!` line
+ * with nothing written ({@link refuseLinks}). Keys the file already holds are never touched. The
+ * keys it adds are recorded outside the project, which is what {@link undoPiToolSettings} removes.
+ * Scope `user` writes Pi's global files, `project` and `local` the project's `.pi` folder (Billion
+ * Context's file, which has no project location, is skipped with a `-` line). A file that is not a
+ * JSON object is a `!` line and stays as it is, and the other files are still written. Each write
+ * goes through a temporary file renamed over the target. With `dryRun` nothing is written or
+ * recorded. With `pi.enable` off, or a config that cannot be loaded, there are no lines.
  */
 export const installPiToolSettings = Effect.fn("installPiToolSettings")(function* (
   env: Env,
@@ -336,7 +363,8 @@ export const installPiToolSettings = Effect.fn("installPiToolSettings")(function
  * recorded key is removed only while its value still equals what setup wrote, so a value the user
  * changed since stays and is named in the line; a key setup did not record (it was there before, or
  * the user added it) is never removed. A parent object the removal empties is dropped, and the
- * record of the file is cleared after a real run. It follows the record, not the config or Pi's
+ * record of the file is cleared after a real run. The recorded provider and model go or stay
+ * together: when either was changed since, both stay. It follows the record, not the config or Pi's
  * presence, so a feature turned off since still gets its keys backed out. Files with no record get
  * no line, and a file that is not a JSON object is a `!` line left as it is. With `dryRun` nothing
  * is written and the record stays. At project and local scope a symlinked `.pi` folder or file is a
@@ -359,7 +387,24 @@ export const undoPiToolSettings = Effect.fn("undoPiToolSettings")(function* (
         let result = yield* readJsonObject(file)
         const removed: Array<string> = []
         const kept: Array<string> = []
-        for (const { path, value } of recorded) {
+        // The pair goes whole or stays whole: with one half changed since, removing the other
+        // would leave a model beside a provider that is not its own.
+        const pairChanged = recorded.some(
+          (leaf) =>
+            inPair(leaf) &&
+            valueAt(result, leaf.path) !== undefined &&
+            !Equal.equals(valueAt(result, leaf.path), leaf.value),
+        )
+        for (const leaf of recorded) {
+          const { path, value } = leaf
+          if (pairChanged && inPair(leaf)) {
+            const current = valueAt(result, path)
+            if (current !== undefined)
+              kept.push(
+                `${path.join(".")} ${show(current)} (setup wrote ${show(value)}${Equal.equals(current, value) ? "; kept with its changed pair" : ""})`,
+              )
+            continue
+          }
           const [next, removal] = take(result, path, 0, value)
           result = next
           if (removal.status === "removed") removed.push(`${removal.path} ${show(removal.value)}`)
@@ -399,19 +444,23 @@ const fixFor = (scope: Scope) =>
 /**
  * Doctor's line on the root model of a target: `ok` when each of `defaultProvider`, `defaultModel`
  * and `defaultThinkingLevel` is what the route table says (or unset where Pi's own default is the
- * wanted value), a `~` line naming each key the user set to another value, which Pi follows and
- * setup leaves alone, and nothing while a key is unset, since the "lacks" line names it. At project
- * and local scope the project's file wins over the user's global one, as it does in Pi.
+ * wanted value), and a `~` line naming each key the user set to another value, which Pi follows and
+ * setup leaves alone. The provider and model are one choice: when either is set, the unset other is
+ * named in the same `~` line, since setup does not fill it and Pi picks it. Nothing while a key of
+ * an unchosen pair or the thinking level is unset, since the "lacks" line names it. At project and
+ * local scope the project's file wins over the user's global one, as it does in Pi.
  */
 const routeLine = Effect.fn("checkRootModel")(function* (planned: Target, existing: JsonObject) {
   if (planned.route.length === 0) return []
   const global = planned.global === undefined ? undefined : yield* readJsonObject(planned.global)
-  const states = planned.route.map(({ path, value }) => {
+  const states = planned.route.map((leaf) => {
+    const { path, value } = leaf
     const current = valueAt(existing, path) ?? valueAt(global, path)
     const atDefault =
       planned.defaults !== undefined && Equal.equals(valueAt(planned.defaults, path), value)
     return {
-      key: path.join("."),
+      key: keyName(leaf),
+      pair: inPair(leaf),
       wanted: value,
       current,
       status:
@@ -424,11 +473,20 @@ const routeLine = Effect.fn("checkRootModel")(function* (planned: Target, existi
             : "overridden",
     } as const
   })
-  const overridden = states.filter((state) => state.status === "overridden")
-  if (overridden.length > 0) {
+  const pairHeld = states.some((state) => state.pair && state.current !== undefined)
+  const yours = states
+    .filter((state) => state.status === "overridden")
+    .map(
+      (state) =>
+        `${state.key} ${show(state.current)} is yours (the route sets ${show(state.wanted)})`,
+    )
+  const alone = states
+    .filter((state) => pairHeld && state.pair && state.status === "unset")
+    .map((state) => `${state.key} is unset, so Pi picks it (the route sets ${show(state.wanted)})`)
+  if (yours.length + alone.length > 0) {
     return [
       hint(
-        `root model ${planned.file}: ${overridden.map((state) => `${state.key} ${show(state.current)} is yours (the route sets ${show(state.wanted)})`).join(", ")}; Pi follows yours`,
+        `root model ${planned.file}: ${[...yours, ...alone].join(", ")}${yours.length > 0 ? "; Pi follows yours" : ""}`,
       ),
     ]
   }
@@ -458,15 +516,14 @@ export const checkPiToolSettings = (env: Env, cwd: string, scope: Scope) =>
         ...(yield* Effect.gen(function* () {
           yield* refuseLinks(cwd, scope, planned.file, "write")
           const target = yield* resolveTarget(planned)
-          const existing = yield* readJsonObject(target.file)
-          const missing = applyDefaults(existing, target.keys)
+          const missing = applyDefaults(target.existing, target.keys)
             .entries.filter((entry) => entry.status === "added")
             .map((entry) => entry.path)
           return [
             ...(missing.length === 0
               ? []
               : [hint(`${label} ${target.file} lacks ${missing.join(", ")}; ${fixFor(scope)}`)]),
-            ...(yield* routeLine(planned, existing)),
+            ...(yield* routeLine(planned, target.existing)),
           ]
         }).pipe(
           Effect.catchTag("SetupFailure", (error) =>

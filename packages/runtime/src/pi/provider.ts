@@ -68,9 +68,17 @@ export const routeModel = (config: Config, key: RouteKey): ModelRoute => {
 }
 
 /**
+ * The two Pi settings keys that name one model and so are written, kept and removed as a pair: a
+ * model id means something only beside its provider, so a route's model next to a provider chosen
+ * by hand (or the reverse) could name a model that provider lacks.
+ */
+export const ROOT_MODEL_PAIR: ReadonlyArray<string> = ["defaultProvider", "defaultModel"]
+
+/**
  * The root's route as the three keys Pi's settings hold for the model a session starts on:
- * `defaultProvider`, `defaultModel` and `defaultThinkingLevel`. Setup writes them where the user
- * has not chosen, so the root starts on the route table's row without a launch argument.
+ * `defaultProvider`, `defaultModel` and `defaultThinkingLevel`. Setup writes the provider and the
+ * model ({@link ROOT_MODEL_PAIR}) together where the user has chosen neither, and the thinking
+ * level where it is unset, so the root starts on the route table's row without a launch argument.
  */
 export const rootModelSettings = (config: Config) => {
   const { provider, model, thinking } = routeModel(config, "root")
