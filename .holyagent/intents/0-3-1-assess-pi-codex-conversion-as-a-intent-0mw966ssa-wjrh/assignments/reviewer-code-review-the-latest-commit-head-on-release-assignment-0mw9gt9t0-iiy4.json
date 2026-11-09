@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-the-latest-commit-head-on-release",
   "objective": "Review the latest commit (HEAD) on release/0.3.1/fix/cloud-start-branch in /home/user/holyagent-0.3.1-cloudstart, which changes how the cloud-checkout notice finds a session's start branch.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Run git -C /home/user/holyagent-0.3.1-cloudstart show HEAD; the source change is startBranch in packages/runtime/src/cli/status.ts, the test is packages/runtime/tests/cloud-checkout.test.ts, and the dist bundles are generated.",
     "Real reflog of a claude.ai session, oldest last: 'checkout: moving from main to claude/charming-brown-rksw3f', then 'checkout: moving from <40-hex sha> to main', then the clone entry. The old code named main as the start branch; the fix skips a first move from a full commit id to the default branch when the next move leaves that branch.",
@@ -39,7 +39,29 @@
     "agentId": "workflow:wf_8d37293a-ce7/assignment-0mw9gt9t0-iiy4",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T16:18:00.036Z"
+    "startedAt": "2026-11-09T16:18:00.036Z",
+    "finishedAt": "2026-11-09T16:20:13.533Z"
+  },
+  "result": "result: HEAD f56c8ec3 is correct for the platform reflog and passes all checks. Two non-blocking edge cases remain.\nchanged: none (read-only; the baseline run used a scratchpad copy)\nchecks:\n`bun test packages/runtime/tests/cloud-checkout.test.ts` on HEAD -> exit 0, 11 pass.\nSame test with `status.ts` reverted to HEAD~1, in a scratchpad `git archive` copy -> 1 fail (the new test, at the first `not.toHaveProperty(\"notice\")`, because the old code names `main`), 10 pass.\n`bunx --no-install mise run check`, `lint` and `fmt:check` -> all exit 0.\nFull `mise run test` and `verify` not run; the `build` output was not regenerated.\n\nblockers: none\n\nnotes:\nBuilt-in `/code-review` (medium, `HEAD~1...HEAD`) returned 6 findings, all rejected. They cite `packages/runtime/src/instructions/...` (design.md, web-design, core.md, requirements.md), which this commit does not touch (`git diff --stat HEAD~1 HEAD -- packages/runtime/src/instructions` is empty). The skill most likely ran against the shared tree, not this worktree. Treat it as a mis-targeted run, not a review of this change.\nNon-blocking, `packages/runtime/src/cli/status.ts` ~L36-41: the skip rule tests only that the first move leaves a full commit id and that the second move leaves that move's destination. It never checks that the destination is the default branch, although the doc comment says so.\n  - A cloud session that starts detached, goes to some branch `B`, then to branch `C` would now report `C`; the old code reported `B`.\n  - It is indistinguishable from the platform flow, so I would not block. Checking `origin/HEAD` would tighten it.\nCases that behave as before: a clone with no moves, a clone followed by user switches (first source is a branch name), a short reflog (one move, so no skip), and a platform session already on `main`.\nExpired reflog: the clone and detach entries are the oldest, so they expire first. The assigned-branch move survives and still resolves correctly.\nIf the assigned branch was later deleted, the loop falls back to the source `main`, which is the old behavior.\nThe `safeBranch` allowlist, `check-ref-format` and the `show-ref` existence check still apply to the chosen name through `returnBranch` (unchanged).\nThe dist bundles match the source change (Claude bundle diff inspected; Pi not read). Reading only: I did not run the real claude.ai flow.\n\nevidence:\nThe start branch is correct for the platform's reflog and unchanged for other clones (behavior): `status.ts` L36-41 and the doc comment; the new test asserts the platform reflog shape and passes on HEAD; the other cases were reasoned from the code, as listed above.\nThe new test fails without the fix and the existing tests still hold (tests): HEAD -> 11 pass; `status.ts` reverted -> the new test fails and the other 10 pass; `check`, `lint` and `fmt:check` exit 0.\nfindings: no blockers, 1 non-blocking (default-branch check missing in the skip rule), 6 rejected built-in findings (out of range).\n",
+  "acceptance": {
+    "revision": 18,
+    "rationale": "no blockers; reviewer reproduced the fail-without-fix on a copy and checked the edge cases",
+    "criteria": [
+      {
+        "criterion": "The start branch is correct for the platform's reflog and unchanged for other clones",
+        "support": "`status.ts` L36-41 and the doc comment; the new test asserts the platform reflog shape and passes on HEAD; the other cases were reasoned from the code, as listed above."
+      },
+      {
+        "criterion": "The new test fails without the fix and the existing tests still hold",
+        "support": "HEAD -> 11 pass; `status.ts` reverted -> the new test fails and the other 10 pass; `check`, `lint` and `fmt:check` exit 0."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "no blockers, 1 non-blocking (default-branch check missing in the skip rule), 6 rejected built-in findings (out of range)."
+      }
+    ]
   },
   "createdAt": "2026-11-09T16:18:00.036Z"
 }
