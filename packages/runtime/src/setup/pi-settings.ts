@@ -2,7 +2,11 @@ import { join, resolve } from "node:path"
 
 import { Effect, Equal } from "effect"
 
-import type { CapabilityForm } from "../config/capabilities.ts"
+import {
+  CAPABILITIES,
+  type CapabilityDefinition,
+  type CapabilityForm,
+} from "../config/capabilities.ts"
 import type { Config } from "../config/schema.ts"
 import { PROVIDERS, ROOT_MODEL_PAIR, rootModelSettings } from "../pi/provider.ts"
 import {
@@ -23,7 +27,7 @@ import {
 } from "./json-file.ts"
 import { type CapabilityChoices, loadPiConfig, piAgentDirectory, piInUse } from "./pi-check.ts"
 import type { PiInstallOptions } from "./pi-install.ts"
-import { addRecorded, clearRecorded, readRecorded } from "./record.ts"
+import { addRecorded, clearRecorded, readRecorded, removeRecorded } from "./record.ts"
 import { hint, pass, show, skipped } from "./report.ts"
 import { refuseLinks, type Scope } from "./scope.ts"
 import { take } from "./settings.ts"
@@ -250,6 +254,13 @@ const planAt = (
     Effect.orElseSucceed(() => undefined),
   )
 
+/** Whether the config of the scope loads and turns `pi.enable` off, which plans no setting at all. */
+const piDisabledAt = (env: Env, cwd: string, scope: Scope, choices?: CapabilityChoices) =>
+  loadPiConfig(env, cwd, scope, choices).pipe(
+    Effect.map((config) => !config.pi.enable),
+    Effect.orElseSucceed(() => false),
+  )
+
 const label = "tool settings"
 
 /** Merges one target into its file and returns its report line. */
@@ -314,6 +325,99 @@ const mergeTarget = Effect.fn("mergeToolSettingsFile")(function* (
   return `${mark} ${label} ${file}: ${parts.join("; ")}${added.length > 0 && dryRun ? " (dry run, nothing written)" : ""}`
 })
 
+/** The keys that setup takes back out when their patch is no longer planned (`revertWhenOff`). */
+const REVERTABLE: ReadonlyArray<{ readonly file: string; readonly leaf: Default }> = (
+  CAPABILITIES as ReadonlyArray<CapabilityDefinition>
+)
+  .flatMap((capability) => capability.settings)
+  .filter((patch) => patch.revertWhenOff === true)
+  .flatMap((patch) => leaves(patch.content).map((leaf) => ({ file: patch.file, leaf })))
+
+/**
+ * Takes the revertable keys of one file back out: each key that the setup record names with the
+ * value it holds now. A key the record does not name (the user's own, or set before setup) is never
+ * touched, and one whose value changed since stays and is named. The record forgets all of them.
+ */
+const revertFile = Effect.fn("revertToolSettingsFile")(function* (
+  env: Env,
+  options: PiInstallOptions,
+  file: string,
+  wanted: ReadonlyArray<Default>,
+) {
+  const recorded = yield* readRecorded(env, file)
+  const mine = wanted.filter((leaf) =>
+    recorded.some(
+      (item) => item.path.join(".") === keyName(leaf) && Equal.equals(item.value, leaf.value),
+    ),
+  )
+  if (mine.length === 0) return []
+  yield* refuseLinks(options.cwd, options.scope, file, "edit")
+  let result = yield* readJsonObject(file)
+  const removed: Array<string> = []
+  const kept: Array<string> = []
+  for (const { path, value } of mine) {
+    const [next, removal] = take(result, path, 0, value)
+    result = next
+    if (removal.status === "removed") removed.push(`${removal.path} ${show(removal.value)}`)
+    if (removal.status === "kept")
+      kept.push(`${removal.path} ${show(removal.value)} (setup wrote ${show(removal.wanted)})`)
+  }
+  if (!options.dryRun) {
+    if (removed.length > 0) yield* writeJsonObject(file, result)
+    yield* removeRecorded(
+      env,
+      file,
+      mine.map(({ path }) => path),
+    )
+  }
+  const parts = [
+    ...(removed.length === 0
+      ? []
+      : [`${options.dryRun ? "would remove" : "removed"} ${removed.join(", ")}`]),
+    ...(kept.length === 0 ? [] : [`kept ${kept.join(", ")}`]),
+  ]
+  const mark = removed.length > 0 ? "-" : kept.length > 0 ? "~" : "="
+  return [
+    `${mark} ${label} ${file}: ${parts.length === 0 ? "nothing of setup's left to remove" : parts.join("; ")}${removed.length > 0 && options.dryRun ? " (dry run, nothing written)" : ""}`,
+  ]
+})
+
+/**
+ * The lines for the keys of a setting that must not outlive its capability: those of
+ * {@link REVERTABLE} that the plan no longer asks for and that setup recorded writing are taken back
+ * out of their file at the scope, so turning the capability off restores what it changed. With no
+ * plan (`pi.enable` off) every revertable key is unplanned.
+ */
+const revertUnplanned = Effect.fn("revertUnplannedToolSettings")(function* (
+  env: Env,
+  options: PiInstallOptions,
+  plan: Plan | undefined,
+) {
+  const byFile = new Map<string, Array<Default>>()
+  for (const { file: logical, leaf } of REVERTABLE) {
+    const file = locate(env, options.cwd, options.scope, logical)
+    if (file === undefined) continue
+    const planned = (plan?.targets ?? []).some(
+      (target) =>
+        target.file === file &&
+        target.all.some(
+          (key) => keyName(key) === keyName(leaf) && Equal.equals(key.value, leaf.value),
+        ),
+    )
+    if (!planned) byFile.set(file, [...(byFile.get(file) ?? []), leaf])
+  }
+  const lines: Array<string> = []
+  for (const [file, wanted] of byFile)
+    lines.push(
+      ...(yield* revertFile(env, options, file, wanted).pipe(
+        Effect.catchTag("SetupFailure", (error) =>
+          Effect.succeed([`! ${label}: ${error.message}`]),
+        ),
+      )),
+    )
+  return lines
+})
+
 /**
  * The tool settings step of `holyagent setup`: writes the settings {@link toolSettings} returns for
  * the HolyAgent config of the scope into the files the Pi packages read them from, one report line
@@ -329,14 +433,18 @@ const mergeTarget = Effect.fn("mergeToolSettingsFile")(function* (
  * Context's file, which has no project location, is skipped with a `-` line). A file that is not a
  * JSON object is a `!` line and stays as it is, and the other files are still written. Each write
  * goes through a temporary file renamed over the target. With `dryRun` nothing is written or
- * recorded. With `pi.enable` off, or a config that cannot be loaded, there are no lines.
+ * recorded. With `pi.enable` off nothing is written, but the keys of a revertable setting that
+ * setup recorded are still taken back out; a config that cannot be loaded gives no lines.
  */
 export const installPiToolSettings = Effect.fn("installPiToolSettings")(function* (
   env: Env,
   options: PiInstallOptions,
 ) {
   const plan = yield* planAt(env, options.cwd, options.scope, options.form, options.choices)
-  if (plan === undefined) return []
+  if (plan === undefined)
+    return (yield* piDisabledAt(env, options.cwd, options.scope, options.choices))
+      ? yield* revertUnplanned(env, options, undefined)
+      : []
   const lines: Array<string> = []
   for (const target of plan.targets) {
     lines.push(
@@ -352,6 +460,7 @@ export const installPiToolSettings = Effect.fn("installPiToolSettings")(function
       ),
     )
   }
+  lines.push(...(yield* revertUnplanned(env, options, plan)))
   return lines
 })
 

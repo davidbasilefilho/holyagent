@@ -26,3 +26,4 @@ HolyAgent installs as a plugin with two `claude plugin` commands and nothing els
 | [attributions.md](attributions.md)               | Third-party software HolyAgent uses and the attribution it owes                                       |
 | [pi/README.md](pi/README.md)                     | The Pi integration: what ships in 0.3.0 and what is planned, the decisions and the research           |
 | [pi/t3-code.md](pi/t3-code.md)                   | T3 Code as the primary interface of the Pi integration: how it runs Pi, its tools, settings and setup |
+| [pi/shell.md](pi/shell.md)                       | The bash tool on just-bash: which commands run in the shell and which on the machine, state, limits   |

@@ -65,6 +65,7 @@ const CAPABILITY_LINES_OK = [
   "ok   pi capability processes: normal form, root, 1 package listed at its pin",
   "ok   pi capability mcp: normal form, both, nothing to install",
   "ok   pi capability computer-use: normal form, specialists, 1 package listed at its pin",
+  "ok   pi capability just-bash: normal form, both, nothing to install",
 ]
 const PI_LINES_OK = [BASE_OK, FORM_OK, ...CAPABILITY_LINES_OK]
 const IN_USE = { HOLYAGENT_HOST: "pi" }
@@ -139,8 +140,9 @@ describe("holyagent doctor, Pi checks", () => {
         FORM_OK,
         // The default provider is Kimi, so a capability of the Codex provider is not listed.
         ...CAPABILITIES.filter((capability) => !("provider" in capability)).map((capability) => {
-          if (capability.name === "mcp")
-            return "ok   pi capability mcp: normal form, both, nothing to install"
+          // A capability with no package of its own has nothing to list.
+          if (capability.name === "mcp" || capability.name === "just-bash")
+            return `ok   pi capability ${capability.name}: normal form, both, nothing to install`
           const source = piPackageSource(
             FEATURE_PACKAGES[capability.feature as keyof typeof FEATURE_PACKAGES],
           )
@@ -437,10 +439,11 @@ describe("holyagent doctor, capabilities", () => {
     expect(piLines(report).slice(3)).toEqual([
       BASE_OK,
       "ok   pi form: headless (set by --form headless)",
-      ...CAPABILITY_LINES_OK.slice(0, -1).map((line) =>
-        line.replace("normal form", "headless form"),
+      ...CAPABILITY_LINES_OK.map((line) =>
+        line.includes("computer-use")
+          ? "~ pi capability computer-use: not offered in the headless form (it drives a graphical session and this machine has none); nothing is expected of it"
+          : line.replace("normal form", "headless form"),
       ),
-      "~ pi capability computer-use: not offered in the headless form (it drives a graphical session and this machine has none); nothing is expected of it",
     ])
   })
 
@@ -459,6 +462,7 @@ describe("holyagent doctor, capabilities", () => {
       "FAIL pi capability processes",
       "ok   pi capability mcp",
       "ok   pi capability computer-use",
+      "ok   pi capability just-bash",
     ])
     expect(report.ok).toBe(false)
   })
@@ -509,6 +513,17 @@ describe("holyagent doctor, capabilities", () => {
     test("a missing command and a missing package are named together, with the way to fix each", async () => {
       expect(await probe(ENTRY, "normal", [], [])).toBe(
         "FAIL pi capability made-up: needs madeup on PATH; install madeup with your package manager; npm:pi-web-kit@0.5.0 is not listed in the packages of /pi/settings.json; install it with `pi install npm:pi-web-kit@0.5.0`, or re-run `holyagent setup`",
+      )
+    })
+
+    test("the just-bash capability needs Bun, whatever the form, and names where to get it", async () => {
+      const entry = CAPABILITIES.find((capability) => capability.name === "just-bash")
+      if (entry === undefined) throw new Error("no just-bash capability")
+      expect(await probe(entry, "normal", [], [])).toBe(
+        "FAIL pi capability just-bash: needs bun on PATH; install Bun from https://bun.sh, since the shell runs on it",
+      )
+      expect(await probe(entry, "headless", [], ["bun"])).toBe(
+        "ok   pi capability just-bash: headless form, both, nothing to install",
       )
     })
 

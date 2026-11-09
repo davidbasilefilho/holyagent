@@ -76,8 +76,9 @@ describe("the setup interface, capability rows", () => {
       t3: false,
       capabilities: capabilityOffers(HEADLESS),
     })
-    // The focus wraps up from the first row to the last (context-management), then back through
-    // luna-reserve to computer-use.
+    // The focus wraps up from the first row to the last (just-bash), then back through
+    // context-management and luna-reserve to computer-use.
+    await screen.keys("k")
     await screen.keys("k")
     await screen.keys("k")
     await screen.keys("k")
@@ -113,6 +114,7 @@ describe("the capability helpers of the setup session", () => {
       subagents: true,
       lunaReserve: true,
       contextManagement: true,
+      justBash: true,
     })
     expect(initial["computerUse"]).toBe(false)
     expect(changedSwitches(initial, initial)).toEqual({})

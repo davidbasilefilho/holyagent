@@ -10637,6 +10637,13 @@ var init_routes = __esm(() => {
   };
 });
 
+var BILLION_CONTEXT_GUARDRAILS_FILE;
+var init_guardrails = __esm(() => {
+  BILLION_CONTEXT_GUARDRAILS_FILE = {
+    guardrails: { bashTimeout: 0, maxOutputBytes: 0, repetition: false }
+  };
+});
+
 var CAPABILITY_FORMS, BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json", PI_SETTINGS_FILE = "~/.pi/agent/settings.json", SUBAGENTS_SETTINGS_FILE = "~/.pi/agent/subagents.json", SUBAGENTS_ONLY_SPECIALISTS, T3_PREFIX = "mcp__t3*code__", T3_VISUAL_TOOLS, COMPUTER_USE_TOOLS, sameForm = (packages) => ({
   headless: { packages, mcpServers: [] },
   normal: { packages, mcpServers: [] }
@@ -10650,6 +10657,7 @@ var CAPABILITY_FORMS, BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-
   ...new Set(definitions.flatMap((capability) => CAPABILITY_FORMS.flatMap((form) => formContent(capability, form)?.packages ?? [])))
 ];
 var init_capabilities = __esm(() => {
+  init_guardrails();
   CAPABILITY_FORMS = ["headless", "normal"];
   SUBAGENTS_ONLY_SPECIALISTS = {
     disableDefaultAgents: true,
@@ -10789,6 +10797,32 @@ var init_capabilities = __esm(() => {
       forms: sameForm([]),
       tools: { rootExclude: [], visual: [] },
       settings: [],
+      health: ["needs"]
+    },
+    {
+      name: "just-bash",
+      feature: "justBash",
+      description: "Runs the bash tool on just-bash, with the host's programs, TypeScript first and JavaScript as the fallback; turns Billion Context's bash guardrails off",
+      skills: [],
+      applicability: "both",
+      defaultOn: true,
+      needs: [
+        {
+          kind: "command",
+          command: "bun",
+          fix: "install Bun from https://bun.sh, since the shell runs on it"
+        }
+      ],
+      forms: sameForm([]),
+      tools: { rootExclude: [], visual: [] },
+      settings: [
+        {
+          file: BILLION_CONTEXT_FILE,
+          content: BILLION_CONTEXT_GUARDRAILS_FILE,
+          whileOn: "contextCompression",
+          revertWhenOff: true
+        }
+      ],
       health: ["needs"]
     }
   ];
@@ -15968,7 +16002,7 @@ var RecordedKey, RecordFile, recordPath = (env) => join10(userFiles(env).claudeD
     ]))
   };
   return writeJsonObject(recordPath(env), body, { mode: 384 });
-}, readRecorded, addRecorded, clearRecorded;
+}, readRecorded, addRecorded, clearRecorded, removeRecorded;
 var init_record2 = __esm(() => {
   init_dist();
   init_environment();
@@ -15999,6 +16033,18 @@ var init_record2 = __esm(() => {
     if (!(key in files))
       return;
     yield* save(env, Object.fromEntries(Object.entries(files).filter(([name]) => name !== key)));
+  });
+  removeRecorded = fn2("removeRecorded")(function* (env, file, removed) {
+    if (removed.length === 0)
+      return;
+    const files = yield* load(env);
+    const key = keyOf(file);
+    const names = new Set(removed.map((path) => path.join("\x00")));
+    const left = (files[key] ?? []).filter((item) => !names.has(item.path.join("\x00")));
+    if (left.length === (files[key] ?? []).length)
+      return;
+    const others = Object.entries(files).filter(([name]) => name !== key);
+    yield* save(env, Object.fromEntries(left.length === 0 ? others : [...others, [key, left]]));
   });
 });
 
@@ -25128,6 +25174,10 @@ var init_pi_check = __esm(() => {
   GIT_LEAD = /^(?:git:|[a-z][a-z0-9+.-]*:\/\/)(?:[^/@]*@)?|^[^/@:\s]+@[^/@:\s]+:/i;
 });
 
+var init_settings3 = __esm(() => {
+  init_guardrails();
+});
+
 var escapeRegExp = (text) => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&"), patternRegExp = (pattern) => new RegExp(`^${pattern.split("*").map(escapeRegExp).join(".*")}$`), T3_TOOL, T3_VISUAL, toolSettings = (config, profile = providerProfile(config), form = "normal") => {
   const { enable, features } = config.pi;
   if (!enable)
@@ -25143,12 +25193,13 @@ var escapeRegExp = (text) => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&"), pattern
         }
       }
     ] : [],
-    ...enabledCapabilities(features, { form, provider: config.pi.provider }).flatMap((capability) => capability.settings)
+    ...enabledCapabilities(features, { form, provider: config.pi.provider }).flatMap((capability) => capability.settings).filter((patch) => patch.whileOn === undefined || features[patch.whileOn] === true)
   ];
 };
 var init_tools = __esm(() => {
   init_capabilities();
   init_route();
+  init_settings3();
   init_provider();
   T3_TOOL = patternRegExp(`${T3_PREFIX}*`);
   T3_VISUAL = T3_VISUAL_TOOLS.map(patternRegExp);
@@ -25202,7 +25253,7 @@ var PACKAGE_DEFAULTS, valueAt3 = (node, path) => path.reduce((current, key) => i
   return { targets, unplaced };
 }, resolveTarget, planAt = (env, cwd, scope, form, choices) => loadPiConfig(env, cwd, scope, choices).pipe(map5((config) => config.pi.enable ? planFor(env, cwd, scope, config, form) : undefined), orElseSucceed2(() => {
   return;
-})), label = "tool settings", mergeTarget, installPiToolSettings, undoPiToolSettings, fixFor = (scope) => scope === "user" ? "run `holyagent setup`" : `run \`holyagent setup --scope ${scope}\``, routeLine, checkPiToolSettings = (env, cwd, scope, form) => gen2(function* () {
+})), piDisabledAt = (env, cwd, scope, choices) => loadPiConfig(env, cwd, scope, choices).pipe(map5((config) => !config.pi.enable), orElseSucceed2(() => false)), label = "tool settings", mergeTarget, REVERTABLE, revertFile, revertUnplanned, installPiToolSettings, undoPiToolSettings, fixFor = (scope) => scope === "user" ? "run `holyagent setup`" : `run \`holyagent setup --scope ${scope}\``, routeLine, checkPiToolSettings = (env, cwd, scope, form) => gen2(function* () {
   if (!(yield* piInUse(env)))
     return [];
   const plan = yield* planAt(env, cwd, scope, form);
@@ -25226,6 +25277,7 @@ var PACKAGE_DEFAULTS, valueAt3 = (node, path) => path.reduce((current, key) => i
 });
 var init_pi_settings = __esm(() => {
   init_dist();
+  init_capabilities();
   init_provider();
   init_tools();
   init_environment();
@@ -25310,10 +25362,57 @@ var init_pi_settings = __esm(() => {
     const mark = added.length > 0 ? "+" : kept.length > 0 ? "~" : "=";
     return `${mark} ${label} ${file}: ${parts.join("; ")}${added.length > 0 && dryRun ? " (dry run, nothing written)" : ""}`;
   });
+  REVERTABLE = CAPABILITIES.flatMap((capability) => capability.settings).filter((patch) => patch.revertWhenOff === true).flatMap((patch) => leaves(patch.content).map((leaf) => ({ file: patch.file, leaf })));
+  revertFile = fn2("revertToolSettingsFile")(function* (env, options, file, wanted) {
+    const recorded = yield* readRecorded(env, file);
+    const mine = wanted.filter((leaf) => recorded.some((item) => item.path.join(".") === keyName(leaf) && equals(item.value, leaf.value)));
+    if (mine.length === 0)
+      return [];
+    yield* refuseLinks(options.cwd, options.scope, file, "edit");
+    let result = yield* readJsonObject(file);
+    const removed = [];
+    const kept = [];
+    for (const { path, value } of mine) {
+      const [next, removal] = take(result, path, 0, value);
+      result = next;
+      if (removal.status === "removed")
+        removed.push(`${removal.path} ${show(removal.value)}`);
+      if (removal.status === "kept")
+        kept.push(`${removal.path} ${show(removal.value)} (setup wrote ${show(removal.wanted)})`);
+    }
+    if (!options.dryRun) {
+      if (removed.length > 0)
+        yield* writeJsonObject(file, result);
+      yield* removeRecorded(env, file, mine.map(({ path }) => path));
+    }
+    const parts = [
+      ...removed.length === 0 ? [] : [`${options.dryRun ? "would remove" : "removed"} ${removed.join(", ")}`],
+      ...kept.length === 0 ? [] : [`kept ${kept.join(", ")}`]
+    ];
+    const mark = removed.length > 0 ? "-" : kept.length > 0 ? "~" : "=";
+    return [
+      `${mark} ${label} ${file}: ${parts.length === 0 ? "nothing of setup's left to remove" : parts.join("; ")}${removed.length > 0 && options.dryRun ? " (dry run, nothing written)" : ""}`
+    ];
+  });
+  revertUnplanned = fn2("revertUnplannedToolSettings")(function* (env, options, plan) {
+    const byFile = new Map;
+    for (const { file: logical, leaf } of REVERTABLE) {
+      const file = locate2(env, options.cwd, options.scope, logical);
+      if (file === undefined)
+        continue;
+      const planned = (plan?.targets ?? []).some((target) => target.file === file && target.all.some((key) => keyName(key) === keyName(leaf) && equals(key.value, leaf.value)));
+      if (!planned)
+        byFile.set(file, [...byFile.get(file) ?? [], leaf]);
+    }
+    const lines = [];
+    for (const [file, wanted] of byFile)
+      lines.push(...yield* revertFile(env, options, file, wanted).pipe(catchTag2("SetupFailure", (error) => succeed6([`! ${label}: ${error.message}`]))));
+    return lines;
+  });
   installPiToolSettings = fn2("installPiToolSettings")(function* (env, options) {
     const plan = yield* planAt(env, options.cwd, options.scope, options.form, options.choices);
     if (plan === undefined)
-      return [];
+      return (yield* piDisabledAt(env, options.cwd, options.scope, options.choices)) ? yield* revertUnplanned(env, options, undefined) : [];
     const lines = [];
     for (const target of plan.targets) {
       lines.push(yield* mergeTarget(env, options, target).pipe(catchTag2("SetupFailure", (error) => succeed6(`! ${label}: ${error.message}`))));
@@ -25321,6 +25420,7 @@ var init_pi_settings = __esm(() => {
     for (const logical of plan.unplaced) {
       lines.push(skipped(`${label} ${logical}: has no file at ${options.scope} scope; run \`holyagent setup\` at user scope`));
     }
+    lines.push(...yield* revertUnplanned(env, options, plan));
     return lines;
   });
   undoPiToolSettings = fn2("undoPiToolSettings")(function* (env, options) {

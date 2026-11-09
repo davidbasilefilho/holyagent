@@ -13,6 +13,7 @@
   "dependencies": {
     "@toon-format/toon": "^4.0.0",
     "acorn": "^8.0.0",
-    "effect": "^4.0.0"
+    "effect": "^4.0.0",
+    "just-bash": "3.6.0"
   }
 }

@@ -3384,6 +3384,10 @@ var wrapItems = (items, width, separator) => {
   return line === "" ? lines : [...lines, line];
 };
 
+var BILLION_CONTEXT_GUARDRAILS_FILE = {
+  guardrails: { bashTimeout: 0, maxOutputBytes: 0, repetition: false }
+};
+
 var BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json";
 var PI_SETTINGS_FILE = "~/.pi/agent/settings.json";
 var SUBAGENTS_SETTINGS_FILE = "~/.pi/agent/subagents.json";
@@ -3530,6 +3534,32 @@ var CAPABILITIES = [
     forms: sameForm([]),
     tools: { rootExclude: [], visual: [] },
     settings: [],
+    health: ["needs"]
+  },
+  {
+    name: "just-bash",
+    feature: "justBash",
+    description: "Runs the bash tool on just-bash, with the host's programs, TypeScript first and JavaScript as the fallback; turns Billion Context's bash guardrails off",
+    skills: [],
+    applicability: "both",
+    defaultOn: true,
+    needs: [
+      {
+        kind: "command",
+        command: "bun",
+        fix: "install Bun from https://bun.sh, since the shell runs on it"
+      }
+    ],
+    forms: sameForm([]),
+    tools: { rootExclude: [], visual: [] },
+    settings: [
+      {
+        file: BILLION_CONTEXT_FILE,
+        content: BILLION_CONTEXT_GUARDRAILS_FILE,
+        whileOn: "contextCompression",
+        revertWhenOff: true
+      }
+    ],
     health: ["needs"]
   }
 ];

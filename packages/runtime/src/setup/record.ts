@@ -101,3 +101,23 @@ export const clearRecorded = Effect.fn("clearRecorded")(function* (env: Env, fil
   if (!(key in files)) return
   yield* save(env, Object.fromEntries(Object.entries(files).filter(([name]) => name !== key)))
 })
+
+/**
+ * Forgets some keys of the record of `file`, after a revert handled them, and keeps the others; the
+ * file's entry goes when none is left. Fails with SetupFailure when the record cannot be decoded or
+ * written.
+ */
+export const removeRecorded = Effect.fn("removeRecorded")(function* (
+  env: Env,
+  file: string,
+  removed: ReadonlyArray<Recorded["path"]>,
+) {
+  if (removed.length === 0) return
+  const files = yield* load(env)
+  const key = keyOf(file)
+  const names = new Set(removed.map((path) => path.join("\0")))
+  const left = (files[key] ?? []).filter((item) => !names.has(item.path.join("\0")))
+  if (left.length === (files[key] ?? []).length) return
+  const others = Object.entries(files).filter(([name]) => name !== key)
+  yield* save(env, Object.fromEntries(left.length === 0 ? others : [...others, [key, left]]))
+})

@@ -25,6 +25,7 @@ import {
   PI_SESSION_REMINDER,
 } from "../../../runtime/src/hooks/pi-context.ts"
 import { PI_PROJECT_FLAG } from "../../../runtime/src/hooks/pi-project.ts"
+import { cmdExeArguments } from "../../../runtime/src/pi/bash/cmd.ts"
 import { providerEnv, routedModels } from "../../../runtime/src/pi/provider.ts"
 import { PI_ROOT_PROMPT, PI_ROOT_PROMPTS } from "../../../runtime/src/pi/root-prompt.ts"
 import { toolArgs } from "../../../runtime/src/pi/tools.ts"
@@ -36,7 +37,6 @@ import {
   CACHE_RETENTION_ENV,
   childAgent,
   CMD_NOT_FOUND,
-  cmdExeArguments,
   COMMAND_TIMEOUT_MS,
   CONTEXT_MESSAGE,
   createExtension,
@@ -2005,7 +2005,7 @@ describe("telling a child from the root", () => {
 
 describe("the host and process variables", () => {
   const TOOLS = ["read", "bash", "SubagentWorkflow", "codemode"]
-  const maxWorkers = toolArgs(DEFAULTS, "root").env
+  const rootEnv = toolArgs(DEFAULTS, "root").env
 
   test("the names are the ones the holyagent CLI reads", () => {
     expect(HOST_ENV).toBe(HOST_VARIABLE)
@@ -2031,11 +2031,17 @@ describe("the host and process variables", () => {
     expect(env).toEqual({
       HOLYAGENT_HOST: "pi",
       HOLYAGENT_WORKFLOWS: "1",
-      ...maxWorkers,
+      ...rootEnv,
       ...providerEnv(DEFAULTS),
       PI_CACHE_RETENTION: "long",
     })
-    expect(Object.keys(maxWorkers)).toEqual(["PI_CODEMODE_MAX_WORKERS"])
+    // The worker cap, and Billion Context's guardrails off while the bash tool runs on just-bash.
+    expect(Object.keys(rootEnv)).toEqual([
+      "PI_CODEMODE_MAX_WORKERS",
+      "BILI_GUARDRAIL_BASH_TIMEOUT",
+      "BILI_GUARDRAIL_MAX_OUTPUT_BYTES",
+      "BILI_GUARDRAIL_REPETITION",
+    ])
     expect(CACHE_RETENTION_ENV).toBe("PI_CACHE_RETENTION")
   })
 
@@ -3717,5 +3723,53 @@ describe("under the Codex provider", () => {
       })
       expect(other.delivered?.message?.content ?? "").not.toContain("apply_patch could not")
     }
+  })
+})
+
+describe("the bash tool on just-bash", () => {
+  const configWith = (justBash: boolean, directory = "/missing") =>
+    healthy(directory, {
+      config: {
+        stdout: `${JSON.stringify({
+          ...DEFAULTS,
+          pi: { ...DEFAULTS.pi, features: { ...DEFAULTS.pi.features, justBash } },
+        })}\n`,
+      },
+    })
+  const GUARDRAILS = [
+    "BILI_GUARDRAIL_BASH_TIMEOUT",
+    "BILI_GUARDRAIL_MAX_OUTPUT_BYTES",
+    "BILI_GUARDRAIL_REPETITION",
+  ]
+
+  test("is registered under the name bash once the config says the capability is on", async () => {
+    const { api } = await run(healthy("/missing"), { startOnly: true })
+    const bash = api.tools.filter((tool) => tool.name === "bash")
+    expect(bash).toHaveLength(1)
+  })
+
+  test("a session whose config turns the capability off keeps Pi's own bash tool and Billion Context's guardrails", async () => {
+    const { api } = await run(configWith(false), { startOnly: true })
+    expect(api.tools.map((tool) => tool.name)).toEqual(["apply_patch"])
+    const { env } = await run(configWith(false))
+    for (const name of GUARDRAILS) expect(env[name]).toBeUndefined()
+    // The rest of the config's variables are still set.
+    expect(env["PI_CODEMODE_MAX_WORKERS"]).toBe("4")
+  })
+
+  test("turns Billion Context's bash guardrails off through its environment, unless the user set them", async () => {
+    const { env } = await run(healthy("/missing"))
+    for (const name of GUARDRAILS) expect(env[name]).toBe("0")
+    const kept = await run(healthy("/missing"), { env: { BILI_GUARDRAIL_BASH_TIMEOUT: "90" } })
+    expect(kept.env["BILI_GUARDRAIL_BASH_TIMEOUT"]).toBe("90")
+    expect(kept.env["BILI_GUARDRAIL_REPETITION"]).toBe("0")
+  })
+
+  test("a specialist gets the tool too, and leaves the process environment to the root", async () => {
+    const { api, env } = await run(healthy("/missing"), {
+      sessionName: "worker-implementation#a1b2c3d4",
+    })
+    expect(api.tools.some((tool) => tool.name === "bash")).toBe(true)
+    for (const name of GUARDRAILS) expect(env[name]).toBeUndefined()
   })
 })

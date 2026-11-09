@@ -244,9 +244,11 @@ describe("the setup interface, look", () => {
   })
 
   test("NO_COLOR draws in the terminal's own colour and keeps bold", async () => {
+    // One row taller than a plain terminal: the review lists one line per capability, and the Pi
+    // provider line has to stay inside the page after the tenth.
     const screen = await shown({
       width: 80,
-      height: 24,
+      height: 25,
       env: { TERM: "xterm-256color", NO_COLOR: "1" },
     })
     await screen.keys("down", " ")

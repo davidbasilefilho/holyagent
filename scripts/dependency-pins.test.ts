@@ -2,9 +2,12 @@ import { describe, expect, test } from "bun:test"
 
 import {
   caretRange,
+  EXACT_PACKAGES,
+  isExactPin,
   newestAllowedRelease,
   newestRelease,
   newestTag,
+  nextPackageRange,
   nextPiVersion,
   nextRange,
   packageDependencies,
@@ -106,6 +109,23 @@ describe("nextRange", () => {
 
   test("sets a range that is not a caret range", () => {
     expect(nextRange("latest", "2.1.0")).toBe("^2.0.0")
+  })
+})
+
+describe("exact package pins", () => {
+  test("just-bash is the one exact pin, and only a stable exact version counts", () => {
+    expect(EXACT_PACKAGES).toEqual(["just-bash"])
+    expect(isExactPin("just-bash", "3.6.0")).toBe(true)
+    expect(isExactPin("just-bash", "^3.0.0")).toBe(false)
+    expect(isExactPin("just-bash", "3.6.0-rc.1")).toBe(false)
+    expect(isExactPin("effect", "4.0.1")).toBe(false)
+  })
+
+  test("an exact pin moves to the exact release, never down, and the rest to a caret range", () => {
+    expect(nextPackageRange("just-bash", "3.6.0", "3.7.1")).toBe("3.7.1")
+    expect(nextPackageRange("just-bash", "3.6.0", "3.5.0")).toBe("3.6.0")
+    expect(nextPackageRange("just-bash", "^3.0.0", "3.6.0")).toBe("3.6.0")
+    expect(nextPackageRange("effect", "^4.0.0", "4.2.0")).toBe("^4.0.0")
   })
 })
 

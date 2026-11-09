@@ -7,6 +7,7 @@ import { Effect } from "effect"
 import { version } from "../../../package.json" with { type: "json" }
 import { piPackages } from "../src/config/packages.ts"
 import { defaultConfig } from "../src/config/schema.ts"
+import { BILLION_CONTEXT_GUARDRAILS_FILE } from "../src/pi/bash/guardrails.ts"
 import { doctor } from "../src/setup/doctor.ts"
 import { PI_HOST_VERSION } from "../src/setup/pi-check.ts"
 import { recordPath } from "../src/setup/record.ts"
@@ -116,7 +117,9 @@ const COMPUTER_USE = {
 }
 const KIMI = { tools: { moonshot_search: { enabled: true }, moonshot_fetch: { enabled: true } } }
 const SUBAGENTS = { disableDefaultAgents: true, fallbackSubagent: "none" }
-const BILLION = { pi: { subagents: false } }
+const BILLION_SUBAGENTS = { pi: { subagents: false } }
+/** What setup writes into Billion Context's file: the subagents setting and the guardrails off. */
+const BILLION = { ...BILLION_SUBAGENTS, ...BILLION_CONTEXT_GUARDRAILS_FILE }
 
 describe("holyagent setup, Pi tool settings", () => {
   test("writes every key toolSettings returns into Pi's global files, beside what the files hold", async () => {
@@ -186,9 +189,13 @@ describe("holyagent setup, Pi tool settings", () => {
       tools: { moonshot_search: { enabled: false }, moonshot_fetch: { enabled: true } },
       region: "global",
     })
-    expect(await read(billion())).toEqual({ pi: { subagents: { enabled: true } }, port: 1 })
-    expect(toolLines(report)).toContain(
-      `~ tool settings ${billion()}: kept pi.subagents {"enabled":true} (HolyAgent sets false; yours wins)`,
+    expect(await read(billion())).toEqual({
+      pi: { subagents: { enabled: true } },
+      port: 1,
+      ...BILLION_CONTEXT_GUARDRAILS_FILE,
+    })
+    expect(toolLines(report).join("\n")).toContain(
+      'kept pi.subagents {"enabled":true} (HolyAgent sets false; yours wins)',
     )
     expect(toolLines(report).join("\n")).toContain(
       'kept codemode.mode "on" (HolyAgent sets "only"; yours wins)',
@@ -369,6 +376,96 @@ describe("holyagent setup, Pi tool settings", () => {
     expect(await exists(globalSubagents())).toBe(false)
     expect(await exists(billion())).toBe(false)
     expect(await read(globalKimi())).toEqual(KIMI)
+  })
+
+  describe("turning just-bash off", () => {
+    const GUARDRAILS =
+      "guardrails.bashTimeout 0, guardrails.maxOutputBytes 0, guardrails.repetition false"
+    const off = { pi: { features: { justBash: false } } }
+
+    test("takes the guardrails setup wrote back out, by its record, and keeps the other keys", async () => {
+      await installed()
+      await runSetup(withPi())
+      expect(await read(billion())).toEqual(BILLION)
+      await setConfig(off)
+      const report = await runSetup(withPi())
+      expect(report.ok).toBe(true)
+      expect(await read(billion())).toEqual(BILLION_SUBAGENTS)
+      expect(toolLines(report)).toContain(`- tool settings ${billion()}: removed ${GUARDRAILS}`)
+      // The record forgot them: another run has nothing to revert, and turning it on writes them again.
+      expect(toolLines(await runSetup(withPi())).join("\n")).not.toContain("removed guardrails")
+      await setConfig({})
+      await runSetup(withPi())
+      expect(await read(billion())).toEqual(BILLION)
+    })
+
+    test("also takes them out when pi.enable is off, by the same record", async () => {
+      await installed()
+      await runSetup(withPi())
+      expect(await read(billion())).toEqual(BILLION)
+      await setConfig({ pi: { enable: false, features: { justBash: false } } })
+      const report = await runSetup(withPi())
+      expect(report.ok).toBe(true)
+      expect(await read(billion())).toEqual(BILLION_SUBAGENTS)
+      expect(toolLines(report)).toEqual([`- tool settings ${billion()}: removed ${GUARDRAILS}`])
+      // Nothing else is written or touched with Pi off, and a second run has nothing to revert.
+      expect(toolLines(await runSetup(withPi()))).toEqual([])
+    })
+
+    test("leaves a guardrail key the user set before setup, and one the user changed since", async () => {
+      await installed()
+      await write(billion(), { guardrails: { bashTimeout: 30 } })
+      await runSetup(withPi())
+      expect(await read(billion())).toEqual({
+        ...BILLION_SUBAGENTS,
+        guardrails: { bashTimeout: 30, maxOutputBytes: 0, repetition: false },
+      })
+      await write(billion(), {
+        ...BILLION_SUBAGENTS,
+        guardrails: { bashTimeout: 30, maxOutputBytes: 1000, repetition: false },
+      })
+      await setConfig(off)
+      const report = await runSetup(withPi())
+      expect(await read(billion())).toEqual({
+        ...BILLION_SUBAGENTS,
+        guardrails: { bashTimeout: 30, maxOutputBytes: 1000 },
+      })
+      expect(toolLines(report).join("\n")).toContain(
+        "removed guardrails.repetition false; kept guardrails.maxOutputBytes 1000 (setup wrote 0)",
+      )
+    })
+
+    test("touches nothing setup did not write, whatever the file holds", async () => {
+      await installed()
+      // The user's own file already has every key at setup's value, so setup records none of them.
+      await write(billion(), BILLION)
+      await runSetup(withPi())
+      await setConfig(off)
+      const report = await runSetup(withPi())
+      expect(await read(billion())).toEqual(BILLION)
+      expect(toolLines(report).join("\n")).not.toContain("guardrails")
+    })
+
+    test("a dry run says what it would remove and changes neither the file nor the record", async () => {
+      await installed()
+      await runSetup(withPi())
+      await setConfig(off)
+      const report = await runSetup(withPi(), { dryRun: true })
+      expect(await read(billion())).toEqual(BILLION)
+      expect(toolLines(report)).toContain(
+        `- tool settings ${billion()}: would remove ${GUARDRAILS} (dry run, nothing written)`,
+      )
+      await runSetup(withPi())
+      expect(await read(billion())).toEqual(BILLION_SUBAGENTS)
+    })
+
+    test("also takes them out while Billion Context itself is off, which the guardrails are written for", async () => {
+      await installed()
+      await runSetup(withPi())
+      await setConfig({ pi: { features: { contextCompression: false } } })
+      await runSetup(withPi())
+      expect(await read(billion())).toEqual(BILLION_SUBAGENTS)
+    })
   })
 
   test("PI_CODING_AGENT_DIR moves Pi's agent files, and BILI_CONFIG_FILE or XDG_CONFIG_HOME Billion Context's", async () => {
@@ -556,7 +653,10 @@ describe("holyagent doctor, Pi tool settings", () => {
       ),
       lacking(globalKimi(), "tools.moonshot_search.enabled, tools.moonshot_fetch.enabled"),
       lacking(globalSubagents(), "disableDefaultAgents, fallbackSubagent"),
-      lacking(billion(), "pi.subagents"),
+      lacking(
+        billion(),
+        "pi.subagents, guardrails.bashTimeout, guardrails.maxOutputBytes, guardrails.repetition",
+      ),
     ])
   })
 
@@ -803,7 +903,7 @@ describe("holyagent setup --undo, Pi tool settings", () => {
 
   test("keeps a value the user changed since, and a key the user already had before setup", async () => {
     await write(globalSettings(), { ...FULL(), codemode: { mode: "only" } })
-    await write(billion(), BILLION)
+    await write(billion(), BILLION_SUBAGENTS)
     await runSetup(withPi())
     await write(globalSubagents(), { disableDefaultAgents: true, fallbackSubagent: "Plan" })
     await write(globalKimi(), { tools: { moonshot_search: { enabled: false } } })
@@ -811,7 +911,7 @@ describe("holyagent setup --undo, Pi tool settings", () => {
     const report = await runSetup(withPi(), { undo: true })
     // codemode.mode was the user's before setup, so it was never recorded and stays.
     expect(await read(globalSettings())).toEqual({ ...FULL(), codemode: { mode: "only" } })
-    expect(await read(billion())).toEqual(BILLION)
+    expect(await read(billion())).toEqual(BILLION_SUBAGENTS)
     expect(await read(globalSubagents())).toEqual({ fallbackSubagent: "Plan" })
     expect(await read(globalKimi())).toEqual({ tools: { moonshot_search: { enabled: false } } })
     expect(toolLines(report).join("\n")).toContain(

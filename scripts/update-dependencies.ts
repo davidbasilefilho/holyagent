@@ -15,8 +15,8 @@ import {
   type Hashes,
   newestAllowedRelease,
   newestTag,
+  nextPackageRange,
   nextPiVersion,
-  nextRange,
   packageDependencies,
   type PackageDependency,
   parseActionUses,
@@ -408,7 +408,11 @@ const surveyPackages = (root: string) =>
     const ranges = new Map<string, Array<PackageDependency>>()
     for (const { file, dependencies } of manifests)
       for (const dependency of dependencies) {
-        const next = nextRange(dependency.range, releases.get(dependency.name) ?? "0.0.0")
+        const next = nextPackageRange(
+          dependency.name,
+          dependency.range,
+          releases.get(dependency.name) ?? "0.0.0",
+        )
         pins.push({
           kind: "package",
           name: `${dependency.name} (${dependency.field})`,

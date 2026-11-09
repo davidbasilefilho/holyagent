@@ -31,6 +31,9 @@ import {
 } from "../../../runtime/src/hooks/pi-context.ts"
 import { PI_PROJECT_FLAG } from "../../../runtime/src/hooks/pi-project.ts"
 import { hasStateFolder } from "../../../runtime/src/hooks/state-folder.ts"
+import { cmdExeArguments, type CmdLaunch } from "../../../runtime/src/pi/bash/cmd.ts"
+import { SHELL_BUNDLE } from "../../../runtime/src/pi/bash/protocol.ts"
+import { justBashOn } from "../../../runtime/src/pi/bash/settings.ts"
 import { validateModelCatalog } from "../../../runtime/src/pi/catalog.ts"
 import { APPLY_PATCH_TOOL } from "../../../runtime/src/pi/codex/apply-patch.ts"
 import { providerEnv } from "../../../runtime/src/pi/provider.ts"
@@ -45,6 +48,7 @@ import {
   toolMatches,
 } from "../../../runtime/src/pi/tools.ts"
 import { STATE_DIRECTORY } from "../../../runtime/src/state/layout.ts"
+import { createBash, type ShellLaunch } from "./bash.ts"
 import { bunFlags } from "./bun-flags.ts"
 import { type CodexSettings, codexSettings, registerCodex } from "./codex.ts"
 import { familyAgentPrompt, familySkillPaths } from "./families.ts"
@@ -435,6 +439,11 @@ interface Collected {
    * session reads them, since the root and the specialists both run on its models.
    */
   readonly codex?: CodexSettings
+  /**
+   * True when the config runs the bash tool on just-bash (`pi.features.justBash`), present with
+   * `environment`; every session reads it, since the root and the specialists both have `bash`.
+   */
+  readonly justBash?: true
   /** True for the root once the config is read and `pi.enable` is on: it gets the root prompt. */
   readonly rootPrompt?: true
   /** The root's tool selection, present for the root once the config is read and `pi.enable` is on. */
@@ -475,6 +484,8 @@ interface Held {
   started: boolean
   /** The Codex provider's settings once the config is read, or undefined for another provider. */
   codex: CodexSettings | undefined
+  /** True once the config is read and runs the bash tool on just-bash. */
+  justBash: boolean
   /** Stops the provider checks of the session. */
   probe: AbortController | undefined
   /** True when the session runs under T3 Code (see {@link isT3Session}). */
@@ -530,6 +541,7 @@ const settingsFor = (
     environment: rootArgs.env,
     providerEnvironment: providerEnv(config),
     ...(codex === undefined ? {} : { codex }),
+    ...(justBashOn(config) ? { justBash: true as const } : {}),
     ...(role === "root"
       ? {
           rootPrompt: true,
@@ -707,9 +719,20 @@ export const findBun = (
 export const runtimeArgs = (
   packageRoot: string,
   platformPath: Pick<typeof nodePath, "join"> = nodePath,
+): ReadonlyArray<string> => scriptArgs(packageRoot, "holyagent.js", platformPath)
+
+/**
+ * The Bun arguments that run one of the package's bundles from its `scripts` folder, with the same
+ * flags as {@link runtimeArgs}: no env file and the empty Bun config. The shell process of the bash
+ * tool is `just-bash.js`.
+ */
+export const scriptArgs = (
+  packageRoot: string,
+  script: string,
+  platformPath: Pick<typeof nodePath, "join"> = nodePath,
 ): ReadonlyArray<string> => [
   ...bunFlags(platformPath.join(packageRoot, "scripts", "empty-bunfig.toml")),
-  platformPath.join(packageRoot, "scripts", "holyagent.js"),
+  platformPath.join(packageRoot, "scripts", script),
 ]
 
 /**
@@ -718,45 +741,6 @@ export const runtimeArgs = (
  * `pi` runs through `cmd.exe /c`.
  */
 export const CMD_NOT_FOUND = 9009
-
-/** The argv of a `cmd.exe` launch, or why `cmd.exe` cannot be trusted to read it as separate words. */
-export type CmdLaunch =
-  | { readonly ok: true; readonly args: ReadonlyArray<string> }
-  | { readonly ok: false; readonly reason: string }
-
-// What no quoting can make safe: `cmd.exe` expands `%` and `^` and `!` inside quotes, Node's quoting
-// escapes a `"` as `\"`, which `cmd.exe` does not know, and a control character ends or splits the line.
-const UNQUOTABLE = /["%^!]|\p{Cc}/u
-// Metacharacters that only a quote makes literal. Node quotes an argument only when it holds a space,
-// a tab or a quote, so in any other argument these would be read as syntax.
-const BARE_SYNTAX = /[&|<>()]/
-
-/**
- * The arguments that start `command args...` through `cmd.exe`, which only a shell can run for a
- * `.cmd` shim. Pi's `exec` spawns without a shell and without `windowsVerbatimArguments`, so Node
- * quotes each argument itself (in quotes when it holds a space, a tab or a quote, otherwise bare)
- * and joins them with spaces; `cmd.exe` receives that line unchanged. One extra pair of quotes
- * around the whole line cannot be passed through that quoting, which would escape the inner quotes
- * as `\"`. The line instead starts with `call`, so it does not begin with a quote and `cmd.exe`
- * strips none: `cmd.exe /d /s /c call "C:\a b\bun.cmd" --flag "C:\c d\x"`. Every word stays a
- * separate argument. A word with a character that no quoting protects (see {@link UNQUOTABLE}), or
- * with a `cmd.exe` operator while Node would leave it unquoted, is refused instead of started.
- */
-export const cmdExeArguments = (command: string, args: ReadonlyArray<string>): CmdLaunch => {
-  for (const word of [command, ...args]) {
-    if (UNQUOTABLE.test(word))
-      return {
-        ok: false,
-        reason: `cmd.exe would read part of ${JSON.stringify(word)} as syntax (a quote, %, ^, ! or control character)`,
-      }
-    if (BARE_SYNTAX.test(word) && !/[ \t]/.test(word))
-      return {
-        ok: false,
-        reason: `cmd.exe would read part of ${JSON.stringify(word)} as an operator (& | < > or a parenthesis), since it holds no space to be quoted for`,
-      }
-  }
-  return { ok: true, args: ["/d", "/s", "/c", "call", command, ...args] }
-}
 
 // A notice is built from text a project or Pi printed, so it loses its control characters.
 const oneLine = (text: string): string => printable(text).replace(/\s+/g, " ").trim()
@@ -891,6 +875,24 @@ export const createExtension =
             )
     }
 
+    // The Bun that starts `argv`: the one found before while cmd.exe can still start it with these
+    // arguments, else the next one on the search path, or why there is none.
+    const bunFor = (
+      argv: ReadonlyArray<string>,
+    ):
+      | { readonly ok: true; readonly program: string }
+      | { readonly ok: false; readonly reason: string } => {
+      if (bun === undefined || !launchOf(bun, argv).ok) {
+        const lookup = findBun(platform, platformPath, bunSearch, (candidate) => {
+          const launch = launchOf(candidate, argv)
+          return launch.ok ? undefined : launch.reason
+        })
+        if (!lookup.found) return { ok: false, reason: lookup.looked }
+        bun = lookup.program
+      }
+      return { ok: true, program: bun }
+    }
+
     // Bun runs the package's bundled runtime, which enters the project first; its stdout is the
     // command's output. A Bun that cmd.exe cannot start with these arguments (a shim, and a project
     // path with a character no quoting protects) is passed over for the next one. A Bun that is gone
@@ -899,18 +901,10 @@ export const createExtension =
       const argv = [...bundled, PI_PROJECT_FLAG, project, ...args]
       const attempt = (looked: boolean): Effect.Effect<ExecResult, CommandFailed> =>
         Effect.suspend(() => {
-          if (bun === undefined || !launchOf(bun, argv).ok) {
-            const lookup = findBun(platform, platformPath, bunSearch, (candidate) => {
-              const launch = launchOf(candidate, argv)
-              return launch.ok ? undefined : launch.reason
-            })
-            if (!lookup.found)
-              return Effect.fail(
-                new CommandFailed({ command: args.join(" "), reason: lookup.looked }),
-              )
-            bun = lookup.program
-          }
-          const program = bun
+          const found = bunFor(argv)
+          if (!found.ok)
+            return Effect.fail(new CommandFailed({ command: args.join(" "), reason: found.reason }))
+          const program = found.program
           const gone = () => !looked && !signal.aborted && !(bunSearch.exists ?? isFile)(program)
           const again = Effect.suspend(() => {
             bun = undefined
@@ -932,6 +926,29 @@ export const createExtension =
         ),
       )
     }
+
+    // The bash tool's shell: Bun on the package's `scripts/just-bash.js`, started in the package's
+    // folder like every other program, and found the same way as for the CLI. It is registered
+    // once a collection finds the capability on, and runs Pi's own bash while it is off.
+    const shellLaunch = (): ShellLaunch => {
+      const argv = scriptArgs(packageRoot, SHELL_BUNDLE, platformPath)
+      const found = bunFor(argv)
+      if (!found.ok) return found
+      const launch = launchOf(found.program, argv)
+      return launch.ok
+        ? {
+            ok: true,
+            program: isShim(found.program) ? "cmd.exe" : found.program,
+            args: launch.args,
+            cwd: packageRoot,
+          }
+        : { ok: false, reason: launch.reason }
+    }
+    const bash = createBash(pi, {
+      active: () => held?.justBash === true,
+      launch: shellLaunch,
+      platform,
+    })
 
     // The top of the work tree holds the project's config; outside git the project folder does, and
     // so does its state. Only git's own answer that the folder is not in a repository means "not
@@ -1326,6 +1343,8 @@ export const createExtension =
         if (result?.providerEnvironment !== undefined)
           applyEnvironment(env, result.providerEnvironment, true)
         if (result !== undefined) taken.codex = result.codex
+        if (result !== undefined) taken.justBash = result.justBash === true
+        if (result?.justBash === true) bash.enable(ctx.cwd)
         if (!taken.started && result?.enabled !== false) {
           taken.started = true
           if (result?.codex !== undefined) taken.applyPatchNotice = activateApplyPatch(result.codex)
@@ -1365,6 +1384,7 @@ export const createExtension =
         t3Gate: false,
         t3Root: false,
         codex: undefined,
+        justBash: false,
         probe: undefined,
         readiness: undefined,
         setupNotice: undefined,
