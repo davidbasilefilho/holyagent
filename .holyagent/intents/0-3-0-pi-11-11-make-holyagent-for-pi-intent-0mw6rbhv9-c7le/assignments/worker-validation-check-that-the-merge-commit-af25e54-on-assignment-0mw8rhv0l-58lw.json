@@ -5,7 +5,7 @@
   "roleTask": "Worker.validation",
   "slug": "check-that-the-merge-commit-af25e54-on",
   "objective": "Check that the merge commit af25e54 on release/0.3.0/feat/t3-settings (which brings the Pi contract-test branch into the T3 settings branch) builds and passes the gates, and that it changed nothing but the merged files.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-t3set at HEAD af25e54. Run `bunx --no-install mise run build` and then `git status --short` (it must list nothing), then `bunx --no-install mise run verify`.",
     "Run `git diff --stat af25e54^1 af25e54` and confirm it lists only docs/development.md, packages/integrations/pi/tests/contract.test.ts and files under packages/integrations/pi/tests/fixtures/ (the contract branch's own files)."
@@ -42,7 +42,33 @@
     "agentId": "workflow:wf_8054ecea-c6f/assignment-0mw8rhv0l-58lw",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-09T04:29:17.253Z"
+    "startedAt": "2026-11-09T04:29:17.253Z",
+    "finishedAt": "2026-11-09T04:32:08.479Z"
+  },
+  "result": "result: All three blocking criteria pass on af25e54: build leaves the tree clean, verify exits 0 with 2410 tests passing, and the merge changes only the contract branch's files.\nchanged: none (build and verify made no tracked-file changes; `git status --short` empty before and after)\nchecks:\n- `bunx --no-install mise run build` -> exit 0; vendored 21 files, built 38 Claude and 36 Pi package files\n- `git status --short` after build -> empty, exit 0\n- `bunx --no-install mise run verify` -> exit 0; type-check \"No type errors in 214 files\"; tests 2410 pass, 0 fail, 15113 expect() calls across 79 files\n- `git status --short` after verify -> empty\n- `git diff --stat af25e54^1 af25e54` -> 11 files, 1053 insertions, 1 deletion: docs/development.md, pi/tests/contract.test.ts, and pi/tests/fixtures/ (extension-events, json-run-aborted/empty/error/length/ok, json-tool-events, record.ts, rpc-extension-ui)\nblockers: none\nquestions: none\nnotes: Lint and format are covered by verify's exit 0; I did not inspect their individual output lines. Logs: /tmp/claude-0/build.log and /tmp/claude-0/verify.log.\nevidence:\nmise run build leaves git status empty: build exit 0, then `git status --short` empty (repo-standards)\nmise run verify exits 0: exit 0, 2410 pass, 0 fail, 79 files (regressions)\nThe merge changes only the contract branch's files: diff-stat lists only docs/development.md, contract.test.ts and pi/tests/fixtures/* (scope)\nchecks-run: build, status, verify and diff-stat as above\n",
+  "acceptance": {
+    "revision": 11,
+    "rationale": "Merged head builds clean and verify exits 0 (2410 tests); merge touches only the contract files",
+    "criteria": [
+      {
+        "criterion": "mise run build leaves git status empty",
+        "support": "build exit 0, then `git status --short` empty (repo-standards)"
+      },
+      {
+        "criterion": "mise run verify exits 0",
+        "support": "exit 0, 2410 pass, 0 fail, 79 files (regressions)"
+      },
+      {
+        "criterion": "The merge changes only the contract branch's files",
+        "support": "diff-stat lists only docs/development.md, contract.test.ts and pi/tests/fixtures/* (scope)"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "build, status, verify and diff-stat as above"
+      }
+    ]
   },
   "createdAt": "2026-11-09T04:29:17.253Z"
 }
