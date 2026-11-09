@@ -27,3 +27,4 @@ HolyAgent installs as a plugin with two `claude plugin` commands and nothing els
 | [pi/README.md](pi/README.md)                     | The Pi integration: what ships in 0.3.0 and what is planned, the decisions and the research           |
 | [pi/t3-code.md](pi/t3-code.md)                   | T3 Code as the primary interface of the Pi integration: how it runs Pi, its tools, settings and setup |
 | [pi/shell.md](pi/shell.md)                       | The bash tool on just-bash: which commands run in the shell and which on the machine, state, limits   |
+| [pi/search.md](pi/search.md)                     | The find and grep tools on fff: override mode, the switch, the platforms and the fallback             |

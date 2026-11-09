@@ -2845,7 +2845,17 @@ describe("the root's excluded tools", () => {
     "web_search",
     "web_fetch",
   ]
-  const EXCLUDED = ["write", "edit", "computer_use_click", "moonshot_search", "moonshot_fetch"]
+  // fff's tools under both name sets: override mode's, and the default mode's, which the package also
+  // registers under `--fff-mode`, `PI_FFF_MODE` and a working directory it does not index.
+  const FFF = ["grep", "find", "multi_grep", "ffgrep", "fffind", "fff-multi-grep"]
+  const EXCLUDED = [
+    "write",
+    "edit",
+    "computer_use_click",
+    "moonshot_search",
+    "moonshot_fetch",
+    ...FFF,
+  ]
   const webKit = JSON.stringify({
     ...DEFAULTS,
     pi: { ...DEFAULTS.pi, features: { ...DEFAULTS.pi.features, web: "pi-web-kit" } },

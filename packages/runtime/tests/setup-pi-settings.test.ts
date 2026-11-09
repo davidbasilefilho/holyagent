@@ -41,6 +41,7 @@ const exists = (file: string) => Bun.file(file).exists()
 
 const globalSettings = () => join(home, ".pi", "agent", "settings.json")
 const globalSubagents = () => join(home, ".pi", "agent", "subagents.json")
+const piFff = () => join(home, ".pi", "agent", "pi-fff.json")
 const globalKimi = () => join(home, ".pi", "providers", "kimi-coding", "config.json")
 const billion = () => join(home, ".config", "billion-context", "billion-context.json")
 const projectPi = (...parts: Array<string>) => join(project, ".pi", ...parts)
@@ -117,6 +118,11 @@ const COMPUTER_USE = {
 }
 const KIMI = { tools: { moonshot_search: { enabled: true }, moonshot_fetch: { enabled: true } } }
 const SUBAGENTS = { disableDefaultAgents: true, fallbackSubagent: "none" }
+/**
+ * `@ff-labs/pi-fff`'s file with the override mode that puts its tools in place of Pi's, and the
+ * directory links left unfollowed, which Pi's own `rg` and `fd` do not follow either.
+ */
+const PI_FFF = { mode: "override", followSymlinks: false }
 const BILLION_SUBAGENTS = { pi: { subagents: false } }
 /** What setup writes into Billion Context's file: the subagents setting and the guardrails off. */
 const BILLION = { ...BILLION_SUBAGENTS, ...BILLION_CONTEXT_GUARDRAILS_FILE }
@@ -136,8 +142,9 @@ describe("holyagent setup, Pi tool settings", () => {
     expect(await read(globalSubagents())).toEqual(SUBAGENTS)
     expect(await read(globalKimi())).toEqual(KIMI)
     expect(await read(billion())).toEqual(BILLION)
+    expect(await read(piFff())).toEqual(PI_FFF)
     // One line per file, none of which is a process.
-    expect(toolLines(report)).toHaveLength(4)
+    expect(toolLines(report)).toHaveLength(5)
     expect(toolLines(report)).toContain(
       `+ tool settings ${globalSubagents()}: added disableDefaultAgents true, fallbackSubagent "none"`,
     )
@@ -148,16 +155,16 @@ describe("holyagent setup, Pi tool settings", () => {
     await installed()
     await runSetup(withPi())
     const before = await Promise.all(
-      [globalSettings(), globalSubagents(), globalKimi(), billion()].map((file) =>
+      [globalSettings(), globalSubagents(), globalKimi(), billion(), piFff()].map((file) =>
         Bun.file(file).text(),
       ),
     )
     const report = await runSetup(withPi())
     expect(toolLines(report).every((line) => line.startsWith("= tool settings "))).toBe(true)
-    expect(toolLines(report)).toHaveLength(4)
+    expect(toolLines(report)).toHaveLength(5)
     expect(
       await Promise.all(
-        [globalSettings(), globalSubagents(), globalKimi(), billion()].map((file) =>
+        [globalSettings(), globalSubagents(), globalKimi(), billion(), piFff()].map((file) =>
           Bun.file(file).text(),
         ),
       ),
@@ -329,6 +336,7 @@ describe("holyagent setup, Pi tool settings", () => {
     await chmod(globalSettings(), 0o640)
     await runSetup(withPi())
     expect((await readdir(dirname(globalSettings()))).sort()).toEqual([
+      "pi-fff.json",
       "settings.json",
       "subagents.json",
     ])
@@ -341,13 +349,13 @@ describe("holyagent setup, Pi tool settings", () => {
     await installed()
     const before = await Bun.file(globalSettings()).text()
     const report = await runSetup(withPi(), { dryRun: true })
-    expect(toolLines(report)).toHaveLength(4)
+    expect(toolLines(report)).toHaveLength(5)
     expect(toolLines(report).every((line) => line.includes("would add"))).toBe(true)
     expect(toolLines(report).every((line) => line.endsWith("(dry run, nothing written)"))).toBe(
       true,
     )
     expect(await Bun.file(globalSettings()).text()).toBe(before)
-    for (const file of [globalSubagents(), globalKimi(), billion()]) {
+    for (const file of [globalSubagents(), globalKimi(), billion(), piFff()]) {
       expect(await exists(file)).toBe(false)
     }
     expect(await exists(recordPath({ HOME: home }))).toBe(false)
@@ -376,6 +384,109 @@ describe("holyagent setup, Pi tool settings", () => {
     expect(await exists(globalSubagents())).toBe(false)
     expect(await exists(billion())).toBe(false)
     expect(await read(globalKimi())).toEqual(KIMI)
+  })
+
+  describe("fff", () => {
+    const off = { pi: { features: { fff: false } } }
+    const ADDED = () => `+ tool settings ${piFff()}: added mode "override", followSymlinks false`
+    const REMOVED = () =>
+      `- tool settings ${piFff()}: removed mode "override", followSymlinks false`
+
+    test("puts pi-fff in override mode with directory links unfollowed in Pi's agent folder, beside what the file holds", async () => {
+      await installed()
+      await write(piFff(), { enableHomeDirScanning: false })
+      const report = await runSetup(withPi())
+      expect(await read(piFff())).toEqual({ enableHomeDirScanning: false, ...PI_FFF })
+      expect(toolLines(report)).toContain(ADDED())
+    })
+
+    test("follows PI_CODING_AGENT_DIR, which is where the package reads the file", async () => {
+      const agent = join(home, "agent-dir")
+      await write(join(agent, "settings.json"), FULL())
+      await runSetup(withPi(), { env: { PI_CODING_AGENT_DIR: agent } })
+      expect(await read(join(agent, "pi-fff.json"))).toEqual(PI_FFF)
+      expect(await exists(piFff())).toBe(false)
+    })
+
+    test("keeps a mode the user chose, and says so", async () => {
+      await installed()
+      await write(piFff(), { mode: "tools-only" })
+      const report = await runSetup(withPi())
+      expect(await read(piFff())).toEqual({ mode: "tools-only", followSymlinks: false })
+      expect(toolLines(report)).toContain(
+        `+ tool settings ${piFff()}: added followSymlinks false; kept mode "tools-only" (HolyAgent sets "override"; yours wins)`,
+      )
+    })
+
+    test("writes nothing while it is off, and turning it off takes the mode setup wrote back out", async () => {
+      await setConfig(off)
+      await installed()
+      await runSetup(withPi())
+      expect(await exists(piFff())).toBe(false)
+      await setConfig({})
+      await write(piFff(), { enableHomeDirScanning: false })
+      await runSetup(withPi())
+      expect(await read(piFff())).toEqual({ enableHomeDirScanning: false, ...PI_FFF })
+      await setConfig(off)
+      const report = await runSetup(withPi())
+      expect(await read(piFff())).toEqual({ enableHomeDirScanning: false })
+      expect(toolLines(report)).toContain(REMOVED())
+    })
+
+    test("keeps a followSymlinks the user chose, and takes out only the keys it wrote", async () => {
+      await installed()
+      await write(piFff(), { followSymlinks: true })
+      const report = await runSetup(withPi())
+      expect(await read(piFff())).toEqual({ followSymlinks: true, mode: "override" })
+      expect(toolLines(report)).toContain(
+        `+ tool settings ${piFff()}: added mode "override"; kept followSymlinks true (HolyAgent sets false; yours wins)`,
+      )
+      await setConfig(off)
+      const reverted = await runSetup(withPi())
+      expect(await read(piFff())).toEqual({ followSymlinks: true })
+      expect(toolLines(reverted)).toContain(`- tool settings ${piFff()}: removed mode "override"`)
+    })
+
+    test("leaves a value the user changed after setup, and removes the one still at what setup wrote", async () => {
+      await installed()
+      await runSetup(withPi())
+      await write(piFff(), { mode: "override", followSymlinks: true })
+      await setConfig(off)
+      const report = await runSetup(withPi())
+      expect(await read(piFff())).toEqual({ followSymlinks: true })
+      expect(toolLines(report)).toContain(
+        `- tool settings ${piFff()}: removed mode "override"; kept followSymlinks true (setup wrote false)`,
+      )
+    })
+
+    test("leaves an override the user had before setup, whatever the capability does", async () => {
+      await installed()
+      await write(piFff(), PI_FFF)
+      await runSetup(withPi())
+      await setConfig(off)
+      await runSetup(withPi())
+      expect(await read(piFff())).toEqual(PI_FFF)
+    })
+
+    test("has no file at project and local scope, since the package reads Pi's agent folder only", async () => {
+      await installed()
+      for (const scope of ["project", "local"] as const) {
+        const report = await runSetup(withPi(), { scope })
+        expect(toolLines(report)).toContain(
+          `- tool settings ~/.pi/agent/pi-fff.json: has no file at ${scope} scope; run \`holyagent setup\` at user scope`,
+        )
+        expect(await exists(projectPi("pi-fff.json"))).toBe(false)
+      }
+      expect(await exists(piFff())).toBe(false)
+    })
+
+    test("--undo takes the override out by its record", async () => {
+      await installed()
+      await runSetup(withPi())
+      const real = await runSetup(withPi(), { undo: true })
+      expect((await exists(piFff())) && (await read(piFff()))).toEqual({})
+      expect(toolLines(real)).toContain(REMOVED())
+    })
   })
 
   describe("turning just-bash off", () => {
@@ -407,7 +518,10 @@ describe("holyagent setup, Pi tool settings", () => {
       const report = await runSetup(withPi())
       expect(report.ok).toBe(true)
       expect(await read(billion())).toEqual(BILLION_SUBAGENTS)
-      expect(toolLines(report)).toEqual([`- tool settings ${billion()}: removed ${GUARDRAILS}`])
+      expect(toolLines(report)).toEqual([
+        `- tool settings ${billion()}: removed ${GUARDRAILS}`,
+        `- tool settings ${piFff()}: removed mode "override", followSymlinks false`,
+      ])
       // Nothing else is written or touched with Pi off, and a second run has nothing to revert.
       expect(toolLines(await runSetup(withPi()))).toEqual([])
     })
@@ -657,6 +771,7 @@ describe("holyagent doctor, Pi tool settings", () => {
         billion(),
         "pi.subagents, guardrails.bashTimeout, guardrails.maxOutputBytes, guardrails.repetition",
       ),
+      lacking(piFff(), "mode, followSymlinks"),
     ])
   })
 
@@ -957,7 +1072,7 @@ describe("holyagent setup --undo, Pi tool settings", () => {
     const claudeOnly = fakeShell({ commands: ["bun"] })
     const report = await runSetup(claudeOnly, { undo: true })
     expect(await read(globalSubagents())).toEqual({})
-    expect(toolLines(report).length).toBe(4)
+    expect(toolLines(report).length).toBe(5)
     expect(claudeOnly.calls).toEqual([])
   })
 

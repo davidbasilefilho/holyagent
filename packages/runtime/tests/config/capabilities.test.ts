@@ -101,12 +101,13 @@ describe("the capability registry", () => {
     expect(file).toEqual(written)
     const config = await Effect.runPromise(Schema.decodeUnknownEffect(Config)(written))
     // Only the keys a later release added (the Codex provider's Luna Reserve and context_management,
-    // and the just-bash shell) take their default.
+    // the just-bash shell and fff) take their default.
     expect(config.pi.features).toEqual({
       ...written.pi.features,
       lunaReserve: true,
       contextManagement: true,
       justBash: true,
+      fff: true,
     })
     const unknown = Schema.decodeUnknownEffect(ConfigFile, { onExcessProperty: "error" })({
       pi: { features: { notACapability: true } },
@@ -118,7 +119,15 @@ describe("the capability registry", () => {
     expect(piPackages(DEFAULT_CONFIG)).toEqual([
       piPackageSource("pi-provider-kimi-code"),
       ...(
-        ["subagents", "contextCompression", "todo", "ask", "processes", "computerUse"] as const
+        [
+          "subagents",
+          "contextCompression",
+          "todo",
+          "ask",
+          "processes",
+          "computerUse",
+          "fff",
+        ] as const
       ).map((feature) => piPackageSource(FEATURE_PACKAGES[feature])),
     ])
   })
@@ -179,9 +188,67 @@ describe("registry-driven selection", () => {
       "@juicesharp/rpiv-ask-user-question",
       "@aliou/pi-processes",
       "@amaster.ai/pi-computer-use",
+      "@ff-labs/pi-fff",
       "pi-web-kit",
     ])
     expect(managedCapabilityPackages()).toContain("@amaster.ai/pi-computer-use")
+  })
+})
+
+describe("the fff capability", () => {
+  const fff = CAPABILITIES.find((capability) => capability.name === "fff")
+  const source = piPackageSource("@ff-labs/pi-fff")
+
+  test("loads @ff-labs/pi-fff at its exact pin in both forms, behind the pi.features.fff switch, on by default", () => {
+    expect(source).toBe("npm:@ff-labs/pi-fff@0.11.0")
+    expect(fff?.feature).toBe("fff")
+    expect(fff?.defaultOn).toBe(true)
+    expect(piPackages(DEFAULT_CONFIG, undefined, "normal")).toContain(source)
+    expect(piPackages(DEFAULT_CONFIG, undefined, "headless")).toContain(source)
+    expect(piPackages(withFeatures({ fff: false }))).not.toContain(source)
+  })
+
+  test("is offered on every platform its native library covers: macOS, Linux and Windows on x64 and arm64", () => {
+    for (const host of [
+      "darwin-x64",
+      "darwin-arm64",
+      "linux-x64",
+      "linux-arm64",
+      "win32-x64",
+      "win32-arm64",
+    ])
+      for (const form of ["headless", "normal"] as const) {
+        expect(fff && unavailableIn(fff, form, host)).toBeUndefined()
+        expect(piPackages(DEFAULT_CONFIG, undefined, form, CAPABILITIES, host)).toContain(source)
+      }
+  })
+
+  test("is unavailable where the native library has no build, and then loads no package and writes no setting", () => {
+    for (const host of ["freebsd-x64", "linux-ia32", "linux-riscv64", "win32-ia32", "sunos-x64"]) {
+      expect(fff && unavailableIn(fff, "normal", host)).toContain(host)
+      expect(capabilityPackages({ fff: true }, "normal", CAPABILITIES, host)).toEqual([])
+      expect(piPackages(DEFAULT_CONFIG, undefined, "normal", CAPABILITIES, host)).not.toContain(
+        source,
+      )
+      expect(
+        enabledCapabilities({ fff: true }, { form: "normal", platform: host }).map(
+          (capability) => capability.name,
+        ),
+      ).toEqual([])
+      expect(
+        toolSettings(DEFAULT_CONFIG, undefined, "normal", host).filter((patch) =>
+          patch.file.endsWith("pi-fff.json"),
+        ),
+      ).toEqual([])
+    }
+    // Setup still manages the package everywhere, so it can remove one a host no longer offers.
+    expect(managedCapabilityPackages()).toContain("@ff-labs/pi-fff")
+  })
+
+  test("another capability is not held back by the host", () => {
+    expect(
+      capabilityPackages({ todo: true, fff: true }, "normal", CAPABILITIES, "freebsd-x64"),
+    ).toEqual(["@juicesharp/rpiv-todo"])
   })
 })
 

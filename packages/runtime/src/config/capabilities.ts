@@ -1,4 +1,5 @@
 import { BILLION_CONTEXT_GUARDRAILS_FILE } from "../pi/bash/guardrails.ts"
+import { FFF_NATIVE_HOSTS, FFF_OVERRIDE_SETTINGS, FFF_TOOLS } from "../pi/fff/settings.ts"
 import type { PiPackageName } from "./pi-packages.ts"
 import type { PiProvider } from "./schema.ts"
 
@@ -109,6 +110,12 @@ export interface CapabilityDefinition {
   readonly provider?: PiProvider
   /** What it needs of the system. */
   readonly needs: ReadonlyArray<SystemNeed>
+  /**
+   * The hosts (`<process.platform>-<process.arch>`) its native library covers; absent for a
+   * capability with none. On any other host it is not offered, in either form, and Pi keeps its own
+   * tools.
+   */
+  readonly nativeHosts?: ReadonlyArray<string>
   /** What it installs on a headless machine, or why it is not offered there. */
   readonly forms: {
     readonly headless: FormContent | FormUnavailable
@@ -151,6 +158,12 @@ export const SUBAGENTS_ONLY_SPECIALISTS = {
   disableDefaultAgents: true,
   fallbackSubagent: "none",
 } as const
+
+/**
+ * The settings file of `@ff-labs/pi-fff`: the package reads `pi-fff.json` from Pi's agent directory
+ * and from there only, so setup writes it at user scope alone.
+ */
+export const PI_FFF_FILE = "~/.pi/agent/pi-fff.json"
 
 /**
  * The prefix of T3 Code's tools as a pattern. Pi names an MCP tool `mcp__<server>__<tool>` with
@@ -366,6 +379,27 @@ export const CAPABILITIES = [
     ],
     health: ["needs"],
   },
+  {
+    // `@ff-labs/pi-fff` in override mode: its `grep` and `find` take the place of Pi's. Its native
+    // library covers `FFF_NATIVE_HOSTS` only; elsewhere the capability is not offered and Pi keeps its
+    // own tools. The root does not use the tools (`FFF_TOOLS`); the specialists' `grep` and
+    // `find` are the package's. The override is a key of the package's own file, which setup takes
+    // back out when the capability goes off so that a package the user installs later is not
+    // switched into override mode.
+    name: "fff",
+    feature: "fff",
+    description:
+      "Replaces Pi's find and grep with fff, a fast indexed file and content search (@ff-labs/pi-fff)",
+    skills: [],
+    applicability: "specialists",
+    defaultOn: true,
+    needs: [],
+    nativeHosts: FFF_NATIVE_HOSTS,
+    forms: sameForm(["@ff-labs/pi-fff"]),
+    tools: { rootExclude: FFF_TOOLS, visual: [] },
+    settings: [{ file: PI_FFF_FILE, content: FFF_OVERRIDE_SETTINGS, revertWhenOff: true }],
+    health: ["needs", "packages"],
+  },
 ] as const satisfies ReadonlyArray<CapabilityDefinition>
 
 /** One registry entry as written. */
@@ -410,24 +444,36 @@ export const FEATURE_PACKAGES = Object.fromEntries(
   ]: NormalPackage<D>
 }
 
-/** Why a capability is not offered in a form, or `undefined` when it is. */
+/** The host this process runs on, as {@link CapabilityDefinition.nativeHosts} spells it. */
+export const hostPlatform = (): string => `${process.platform}-${process.arch}`
+
+/**
+ * Why a capability is not offered in a form on a host, or `undefined` when it is: the form leaves
+ * it out, or its native library does not cover the host (`platform`, the machine's by default).
+ */
 export const unavailableIn = (
   capability: CapabilityDefinition,
   form: CapabilityForm,
+  platform: string = hostPlatform(),
 ): string | undefined => {
   const entry = capability.forms[form]
-  return "unavailable" in entry ? entry.unavailable : undefined
+  if ("unavailable" in entry) return entry.unavailable
+  return capability.nativeHosts === undefined || capability.nativeHosts.includes(platform)
+    ? undefined
+    : `its native library does not cover ${platform}, only ${capability.nativeHosts.join(", ")}`
 }
 
 /**
  * The capabilities a `pi.features` object switches on, in registry order. With a `form`, only those
- * the form offers; with a `provider`, only those that apply to it (one with no `provider` of its
- * own applies to every provider); without either, all that are on.
+ * the form offers on the `platform` (the machine's by default, see {@link unavailableIn}); with a
+ * `provider`, only those that apply to it (one with no `provider` of its own applies to every
+ * provider); without either, all that are on.
  */
 export const enabledCapabilities = (
   features: Readonly<Record<string, unknown>>,
   options: {
     readonly form?: CapabilityForm
+    readonly platform?: string | undefined
     readonly provider?: PiProvider
     readonly definitions?: ReadonlyArray<CapabilityDefinition>
   } = {},
@@ -435,19 +481,24 @@ export const enabledCapabilities = (
   (options.definitions ?? (CAPABILITIES as ReadonlyArray<CapabilityDefinition>)).filter(
     (capability) =>
       features[capability.feature] === true &&
-      (options.form === undefined || unavailableIn(capability, options.form) === undefined) &&
+      (options.form === undefined ||
+        unavailableIn(capability, options.form, options.platform) === undefined) &&
       (options.provider === undefined ||
         capability.provider === undefined ||
         capability.provider === options.provider),
   )
 
-/** The package names of the capabilities `features` switches on and `form` offers, in order. */
+/**
+ * The package names of the capabilities `features` switches on and `form` offers on the `platform`
+ * (the machine's by default), in order.
+ */
 export const capabilityPackages = (
   features: Readonly<Record<string, unknown>>,
   form: CapabilityForm,
   definitions: ReadonlyArray<CapabilityDefinition> = CAPABILITIES,
+  platform?: string,
 ): ReadonlyArray<PiPackageName> =>
-  enabledCapabilities(features, { form, definitions }).flatMap(
+  enabledCapabilities(features, { form, platform, definitions }).flatMap(
     (capability) => formContent(capability, form)?.packages ?? [],
   )
 

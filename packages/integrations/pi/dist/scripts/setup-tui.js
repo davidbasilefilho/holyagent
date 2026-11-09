@@ -3388,6 +3388,25 @@ var BILLION_CONTEXT_GUARDRAILS_FILE = {
   guardrails: { bashTimeout: 0, maxOutputBytes: 0, repetition: false }
 };
 
+var FFF_OVERRIDE_SETTINGS = { mode: "override", followSymlinks: false };
+var FFF_TOOLS = [
+  "grep",
+  "find",
+  "multi_grep",
+  "ffgrep",
+  "fffind",
+  "fff-multi-grep"
+];
+var FFF_NATIVE_HOSTS = [
+  "darwin-arm64",
+  "darwin-x64",
+  "linux-arm64",
+  "linux-x64",
+  "win32-arm64",
+  "win32-x64",
+  "android-arm64"
+];
+
 var BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json";
 var PI_SETTINGS_FILE = "~/.pi/agent/settings.json";
 var SUBAGENTS_SETTINGS_FILE = "~/.pi/agent/subagents.json";
@@ -3395,6 +3414,7 @@ var SUBAGENTS_ONLY_SPECIALISTS = {
   disableDefaultAgents: true,
   fallbackSubagent: "none"
 };
+var PI_FFF_FILE = "~/.pi/agent/pi-fff.json";
 var T3_PREFIX = "mcp__t3*code__";
 var T3_VISUAL_TOOLS = [
   `${T3_PREFIX}preview_*`,
@@ -3561,6 +3581,20 @@ var CAPABILITIES = [
       }
     ],
     health: ["needs"]
+  },
+  {
+    name: "fff",
+    feature: "fff",
+    description: "Replaces Pi's find and grep with fff, a fast indexed file and content search (@ff-labs/pi-fff)",
+    skills: [],
+    applicability: "specialists",
+    defaultOn: true,
+    needs: [],
+    nativeHosts: FFF_NATIVE_HOSTS,
+    forms: sameForm(["@ff-labs/pi-fff"]),
+    tools: { rootExclude: FFF_TOOLS, visual: [] },
+    settings: [{ file: PI_FFF_FILE, content: FFF_OVERRIDE_SETTINGS, revertWhenOff: true }],
+    health: ["needs", "packages"]
   }
 ];
 var FEATURE_DEFAULTS = Object.fromEntries(CAPABILITIES.map((capability) => [capability.feature, capability.defaultOn]));

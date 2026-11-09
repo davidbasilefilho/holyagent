@@ -15,6 +15,7 @@ import {
   COMPUTER_USE_TOOLS,
   deactivatedT3Tools,
   isDeactivatedT3Tool,
+  PI_FFF_FILE,
   PI_SETTINGS_FILE,
   POWERSHELL_ENTRY,
   rootActiveTools,
@@ -36,6 +37,9 @@ const NO_WEB_PROVIDER: ProviderProfile = { ...PROVIDERS["kimi-coding-global"], w
 
 const READ = ["read", "grep", "find", "ls"]
 const MOONSHOT = ["moonshot_search", "moonshot_fetch"]
+// What @ff-labs/pi-fff registers, under Pi's own names in override mode and under its own otherwise
+// (the default mode, --fff-mode, PI_FFF_MODE, a working directory it does not index); the root has none.
+const FFF_TOOLS = ["grep", "find", "multi_grep", "ffgrep", "fffind", "fff-multi-grep"]
 const WEB_KIT = ["web_search", "web_fetch"]
 // Pi offers `powershell` beside `bash` on Windows; a role has both or neither.
 const SHELLS = ["bash", "powershell"]
@@ -134,28 +138,28 @@ describe("toolArgs for the root", () => {
   test("adds codemode to the default selection and takes write, edit, computer use and web away", () => {
     expect(toolArgs(DEFAULT_CONFIG, "root")).toEqual({
       tools: ["+codemode"],
-      excludeTools: ["write", "edit", ...COMPUTER_USE_TOOLS, ...MOONSHOT],
+      excludeTools: ["write", "edit", ...COMPUTER_USE_TOOLS, ...FFF_TOOLS, ...MOONSHOT],
       noMcp: false,
       env: { PI_CODEMODE_MAX_WORKERS: "4", ...BILLION_CONTEXT_GUARDRAILS_OFF },
       argv: [
         "--tools",
         "+codemode",
         "--exclude-tools",
-        "write,edit,computer_use_*,moonshot_search,moonshot_fetch",
+        "write,edit,computer_use_*,grep,find,multi_grep,ffgrep,fffind,fff-multi-grep,moonshot_search,moonshot_fetch",
       ],
     })
   })
 
   test("excludes the computer-use tools only while pi.features.computerUse is on", () => {
-    const on = toolArgs(withFeatures({ computerUse: true, web: "off" }), "root")
-    const off = toolArgs(withFeatures({ computerUse: false, web: "off" }), "root")
+    const on = toolArgs(withFeatures({ computerUse: true, fff: false, web: "off" }), "root")
+    const off = toolArgs(withFeatures({ computerUse: false, fff: false, web: "off" }), "root")
     expect(on.excludeTools).toEqual(["write", "edit", ...COMPUTER_USE_TOOLS])
     expect(off.excludeTools).toEqual(["write", "edit"])
   })
 
   test("excludes the tools of the web choice: pi-web-kit, the provider's, or none", () => {
     const exclusions = (web: Config["pi"]["features"]["web"], profile?: ProviderProfile) =>
-      toolArgs(withFeatures({ computerUse: false, web }), "root", profile).excludeTools
+      toolArgs(withFeatures({ computerUse: false, fff: false, web }), "root", profile).excludeTools
     expect(exclusions("pi-web-kit")).toEqual(["write", "edit", ...WEB_KIT])
     expect(exclusions("provider", PROVIDERS["kimi-coding-global"])).toEqual([
       "write",
@@ -164,6 +168,17 @@ describe("toolArgs for the root", () => {
     ])
     expect(exclusions("provider", NO_WEB_PROVIDER)).toEqual(["write", "edit", ...WEB_KIT])
     expect(exclusions("off")).toEqual(["write", "edit"])
+  })
+
+  test("excludes the tools fff's override mode registers only while pi.features.fff is on, and never from a specialist", () => {
+    const on = toolArgs(withFeatures({ fff: true, computerUse: false, web: "off" }), "root")
+    const off = toolArgs(withFeatures({ fff: false, computerUse: false, web: "off" }), "root")
+    expect(on.excludeTools).toEqual(["write", "edit", ...FFF_TOOLS])
+    expect(off.excludeTools).toEqual(["write", "edit"])
+    for (const role of RoleTask.literals)
+      expect(toolArgs(DEFAULT_CONFIG, role).tools).toEqual(
+        toolArgs(withFeatures({ fff: false }), role).tools,
+      )
   })
 
   test("the worker cap follows pi.codemode.maxWorkers for the root and every specialist", () => {
@@ -336,7 +351,27 @@ describe("toolSettings", () => {
         whileOn: "contextCompression",
         revertWhenOff: true,
       },
+      {
+        file: PI_FFF_FILE,
+        content: { mode: "override", followSymlinks: false },
+        revertWhenOff: true,
+      },
     ])
+  })
+
+  test("fff puts pi-fff in override mode, without directory links followed, while it is on and its native library covers the host", () => {
+    const patches = (config: Config, platform?: string) =>
+      toolSettings(config, undefined, "normal", platform).filter((p) => p.file === PI_FFF_FILE)
+    expect(patches(DEFAULT_CONFIG, "linux-x64")).toEqual([
+      {
+        file: PI_FFF_FILE,
+        content: { mode: "override", followSymlinks: false },
+        revertWhenOff: true,
+      },
+    ])
+    expect(patches(withFeatures({ fff: false }), "linux-x64")).toEqual([])
+    expect(patches(DEFAULT_CONFIG, "freebsd-x64")).toEqual([])
+    expect(patches(DEFAULT_CONFIG, "linux-riscv64")).toEqual([])
   })
 
   test("Billion Context gets exactly the README's setting for subagents off, compression on", () => {
