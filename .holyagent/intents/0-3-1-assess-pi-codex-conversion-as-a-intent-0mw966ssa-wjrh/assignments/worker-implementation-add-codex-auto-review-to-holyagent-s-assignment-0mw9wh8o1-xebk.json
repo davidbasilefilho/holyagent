@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "add-codex-auto-review-to-holyagent-s",
   "objective": "Add Codex auto-review to HolyAgent's Codex provider for Pi, reproducing Codex's guardian behaviour, as its own capability that can be turned off.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.1-autoreview, branch release/0.3.1/feat/auto-review cut from release/0.3.1/feat/screen at 91d9eb07. The Codex provider lives in packages/integrations/pi/src/codex.ts (registerCodex, CodexSettings) and packages/runtime/src/pi/codex/ (routes.ts, apply-patch.ts); the capability registry is packages/runtime/src/config/capabilities.ts (an auto-review entry may already exist as a planned capability, Codex provider only, default on); the tool_call gate is in packages/integrations/pi/src/extension.ts.",
     "The design research is in /home/user/holyagent/.git/holyagent/reports/assignment-0mw96z5n3-mw6f.md: read it first; it cites Codex's own guardian sources.",
@@ -71,7 +71,53 @@
     "agentId": "workflow:wf_74043abc-17e/assignment-0mw9wh8o1-xebk",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T23:36:32.545Z"
+    "startedAt": "2026-11-09T23:36:32.545Z",
+    "finishedAt": "2026-11-09T23:55:58.616Z"
+  },
+  "result": "result: Codex auto-review is built as its own capability, `auto-review`, with its own `pi.features.autoReview` switch (default on, Codex only). `mise run build` is idempotent and leaves only the explained dist changes. `mise run verify` exits 0.\n\nchanged (worktree `/home/user/holyagent-0.3.1-autoreview`):\n- New runtime module, `packages/runtime/src/pi/codex/auto-review/`:\n  - `classify.ts`, `assessment.ts`, `transcript.ts`, `policy.ts`, `review.ts`, `session.ts`, `gate.ts`, `client.ts`\n  - `policy-template.md` and `policy.md`, Codex's own texts fetched from openai/codex\n- New Pi integration module, `packages/integrations/pi/src/auto-review.ts`.\n- Edited: `integrations/pi/src/codex.ts` (`CodexSettings.autoReview`), `integrations/pi/src/extension.ts` (registers the module last), `runtime/src/config/capabilities.ts` and `schema.ts` (new `pi.autoReview.policy` and `extraPolicy`).\n- Generated dist: `integrations/claude/dist/scripts/{holyagent,setup-tui}.js` and `integrations/pi/dist/{extensions/holyagent.js,scripts/holyagent.js,scripts/setup-tui.js}`.\n- Docs: `docs/pi/providers.md`, `docs/pi/configuration.md`, `docs/pi/README.md`, `docs/usage.md`, `docs/attributions.md` (Apache-2.0 credit).\n- New test files:\n  - `runtime/tests/pi/codex-auto-review-{classify,request,gate,client,capability}.test.ts`\n  - `integrations/pi/tests/auto-review.test.ts`\n- Existing tests adjusted for the new capability, stubs and handlers:\n  - `codex.test.ts`, `extension.test.ts`, `pi.test.ts`, `t3-rpc.test.ts`, `contract.test.ts`\n  - `config/capabilities.test.ts`, `config/schema.test.ts`\n  - `setup-tui.test.ts`, `setup-tui-capabilities.test.ts`\n\nchecks (all run after the final edit):\n- `bunx --no-install mise run build` -> exit 0. A second run left `git diff` identical (same sha256).\n- `bunx --no-install mise run verify` -> exit 0. Type-check, lint and format are clean; 3336 pass, 0 fail across 112 files.\n- Logs: `.../scratchpad/build.log` and `.../scratchpad/verify.log`, under `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/`.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- The brief said an `auto-review` capability might already exist as a planned entry. It did not, so I added it, placed after `context-management`.\n- `bun fmt` added blank lines after the headings in Codex's markdown texts. The wording is verbatim.\n- The `/approve` retry is reviewed again. A second timeout of the same action gets a \"do not retry again\" message, which is not in Codex.\n- Differences from Codex, documented in `providers.md`:\n  - The assessment is strict. All four fields are required; Codex fills missing ones in.\n  - The reviewer has no tools or reused session.\n  - The classifier is deliberately broad, since Pi has no sandbox.\n- Not verified: the live Codex backend request shape. It follows Pi's own Codex request and was only tested with stubs, as the brief requires. If the backend rejects `codex-auto-review` or the strict schema, every review fails closed.\n- Possible later improvements:\n  - A symlink-aware root check.\n  - A per-turn denial notice of counts.\n  - A config key for the timeout.\n\nevidence:\n- The classifier sends bash commands outside a read-only safe set, writes outside the project root, network use and tools whose annotations need approval to review, and lets everything else run, with tests for each class: `packages/runtime/tests/pi/codex-auto-review-classify.test.ts` (14 tests) and `classify.ts`; verify exit 0.\n- The review request uses model codex-auto-review, the Codex policy template plus policy text that config can replace or extend, a transcript budgeted to Codex's caps and labelled untrusted, the action as JSON, and decodes a strict GuardianAssessment with Effect Schema, with tests: `codex-auto-review-request.test.ts` (16 tests) and `codex-auto-review-client.test.ts`; verify exit 0.\n- Allow runs the tool; deny blocks it with Codex's rejection text; a 90 s timeout is not a denial and allows one retry; any other failure or an invalid assessment denies closed; the breaker stops the turn after 3 consecutive or 10 total denials; a one-retry /approve override exists; each with tests: `codex-auto-review-gate.test.ts` (18 tests) and `integrations/pi/tests/auto-review.test.ts`; verify exit 0.\n- Auto-review is its own capability, active only with the Codex provider, default on, and turning it off removes the gate entirely, with a test: `codex-auto-review-capability.test.ts`, plus the \"without the capability there is no gate at all\" and \"turning the capability off between calls\" tests in `integrations/pi/tests/auto-review.test.ts`; verify exit 0.\n- docs/pi describes auto-review: triggers, what the reviewer sees, decisions, the breaker, the override and how to turn it off: `docs/pi/providers.md` (the \"Auto-review\" section), `docs/pi/configuration.md`, `docs/pi/README.md`.\n- mise run build leaves the tree unchanged and mise run verify passes: build exit 0, diff sha256 identical on re-run; verify exit 0, 3336 pass, 0 fail.\n- checks-run: `bunx --no-install mise run build` exit 0; `bunx --no-install mise run verify` exit 0, 3336 pass, 0 fail.\n- changed-paths: listed under `changed` above (31 status entries; the new files are the module directory, the integration file and the six test files).\n- diff-file: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/auto-review.diff`\n",
+  "acceptance": {
+    "revision": 21,
+    "rationale": "Build idempotent, verify 3336 pass; each criterion has named tests",
+    "criteria": [
+      {
+        "criterion": "The classifier sends bash commands outside a read-only safe set, writes outside the project root, network use and tools whose annotations need approval to review, and lets everything else run, with tests for each class",
+        "support": "`packages/runtime/tests/pi/codex-auto-review-classify.test.ts` (14 tests) and `classify.ts`; verify exit 0."
+      },
+      {
+        "criterion": "The review request uses model codex-auto-review, the Codex policy template plus policy text that config can replace or extend, a transcript budgeted to Codex's caps and labelled untrusted, the action as JSON, and decodes a strict GuardianAssessment with Effect Schema, with tests",
+        "support": "`codex-auto-review-request.test.ts` (16 tests) and `codex-auto-review-client.test.ts`; verify exit 0."
+      },
+      {
+        "criterion": "Allow runs the tool; deny blocks it with Codex's rejection text; a 90 s timeout is not a denial and allows one retry; any other failure or an invalid assessment denies closed; the breaker stops the turn after 3 consecutive or 10 total denials; a one-retry /approve override exists; each with tests",
+        "support": "`codex-auto-review-gate.test.ts` (18 tests) and `integrations/pi/tests/auto-review.test.ts`; verify exit 0."
+      },
+      {
+        "criterion": "Auto-review is its own capability, active only with the Codex provider, default on, and turning it off removes the gate entirely, with a test",
+        "support": "`codex-auto-review-capability.test.ts`, plus the \"without the capability there is no gate at all\" and \"turning the capability off between calls\" tests in `integrations/pi/tests/auto-review.test.ts`; verify exit 0."
+      },
+      {
+        "criterion": "docs/pi describes auto-review: triggers, what the reviewer sees, decisions, the breaker, the override and how to turn it off",
+        "support": "`docs/pi/providers.md` (the \"Auto-review\" section), `docs/pi/configuration.md`, `docs/pi/README.md`."
+      },
+      {
+        "criterion": "mise run build leaves the tree unchanged and mise run verify passes",
+        "support": "build exit 0, diff sha256 identical on re-run; verify exit 0, 3336 pass, 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bunx --no-install mise run build` exit 0; `bunx --no-install mise run verify` exit 0, 3336 pass, 0 fail."
+      },
+      {
+        "label": "changed-paths",
+        "support": "listed under `changed` above (31 status entries; the new files are the module directory, the integration file and the six test files)."
+      },
+      {
+        "label": "diff-file",
+        "support": "`/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/auto-review.diff`"
+      }
+    ]
   },
   "createdAt": "2026-11-09T23:36:32.545Z"
 }
