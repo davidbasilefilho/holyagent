@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mw9svy8g-lb52",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 20,
+  "roleTask": "Reviewer.security",
+  "slug": "confirm-the-real-path-dev-null-guard",
+  "objective": "Confirm the real-path /dev/null guard closes the alias gap without opening a new one.",
+  "state": "Running",
+  "scope": [
+    "Commit 4e042337 in /home/user/holyagent-0.3.1-bash; diff without dist at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/devices-commit.diff",
+    "Previous finding: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9roekg-jryb.md finding 1; writer report /home/user/holyagent/.git/holyagent/reports/assignment-0mw9s9fxs-z71a.md"
+  ],
+  "constraints": [
+    "Read-only: no edits, no git writes.",
+    "Report in under 300 words; start each evidence line with the exact criterion text, a colon and the support inline."
+  ],
+  "criteria": [
+    {
+      "text": "Aliases of /dev/null through symlinked parents, /proc/self/root and moving or removing /dev are refused or handled in memory",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The guard's realpath calls cannot be used to probe or alter files outside what the shell already reaches, and a failing realpath does not let an operation through to the device",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9s9fxs-z71a"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T21:56:00.401Z"
+  },
+  "createdAt": "2026-11-09T21:56:00.401Z"
+}
