@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mw9jxcqi-jwe1",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Reviewer.artifact",
+  "slug": "re-review-the-last-gpt-6-spacing-repair",
+  "objective": "Re-review the last GPT-6 spacing repair: the visual reviewer's source of measurements and the terminal fix for a line starting with a dash.",
+  "state": "Running",
+  "scope": [
+    "Diff: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/diff-0mw9jrl2w.diff (files /home/user/holyagent-0.3.1-gpt6/packages/runtime/src/instructions/gpt-6/roles/reviewer-visual/captures.md and design-core/core.md). It answers non-blocking notes 1 and 3 of /home/user/holyagent/.git/holyagent/reports/assignment-0mw9jjliv-rezg.md.",
+    "Check both notes are closed and the wording stays consistent with worker-visual/method.md and skills/visual-judging/SKILL.md."
+  ],
+  "constraints": [
+    "Do not check out other commits in any checkout and make no edits.",
+    "Report in under 150 words; mark findings blocking or non-blocking with file and line."
+  ],
+  "criteria": [
+    {
+      "text": "Both notes are closed without new defects",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9jrl2w-g2er"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T17:45:09.306Z"
+  },
+  "createdAt": "2026-11-09T17:45:09.306Z"
+}
