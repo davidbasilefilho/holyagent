@@ -1,0 +1,81 @@
+{
+  "id": "assignment-0mw8tiqva-3j37",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 11,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-holyagent-pi-extension",
+  "objective": "Make the HolyAgent Pi extension recognise a T3 Code session, keep only the T3 tools HolyAgent uses, and warn when the thread runs below Full access.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-t3host, branch release/0.3.0/feat/pi-t3-host. Research to rely on (read both before starting): /home/user/holyagent/.git/holyagent/reports/assignment-0mw8td52p-27ab.md (Pi 1.5.0 extension API: ctx.mode, hasUI, RPC ui methods, session_tree, setActiveTools, trust, setModel) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw8tdgpq-hfsl.md (T3 Code pi driver: T3_PI_RUNTIME_MODE, T3_MCP_URL, the mcp__t3-code__ tool names and mcp__t3_code__ hidden aliases, which ui requests T3 renders, the bridge extension re-adding tools in reconcileDiscovery).",
+    "T3 detection: a session runs under T3 when ctx.mode is rpc and the environment carries T3_PI_RUNTIME_MODE or T3_MCP_URL (T3 sets these when it injects its bridge). Put the detection in one small exported function so the docs and later work share it.",
+    "Tool filter (T3 Intent requirements 8, 9 and 13): under T3, the root keeps the T3 tools html_render, html_preview, preview_*, t3_preview_* and device_* and deactivates every other tool named mcp__t3-code__<name> or its hidden alias mcp__t3_code__<name> (orchestrator_capabilities, delegate_task, task_status, task_cancel, create_threads, t3_thread_*, schedule_task, list_scheduled_tasks, delete_scheduled_task, t3_pending_request and anything else outside the kept families). Compute the active set from pi.getAllTools() with the root tool selection the extension already applies (applyRootTools, rootActiveTools in packages/runtime/src/pi/tools.ts, T3_PREFIX), apply it once at session_start before the first request, and reapply the same set on before_agent_start and session_tree only when the active set has drifted (T3s bridge re-adds tools in its own handlers), so the provider tool list stays byte-stable for prompt caching. Add a tool_call block as backstop that refuses any deactivated T3 tool with a reason naming it, so a deferred tool reached through tool_search is refused too.",
+    "Full access: under T3, when T3_PI_RUNTIME_MODE is anything but full-access (approval-required or auto-accept-edits), deliver one warning that HolyAgent threads need T3 Full access because every extension tool call prompts and background specialists can stall, and how to switch. T3 drops notify outside an active turn, so deliver it through the notice path the extension already uses for its status message (delivered once on the next run) and also with ctx.ui.setStatus, which T3 shows near the composer.",
+    "RPC UI: under ctx.mode rpc the extension itself must call no ctx.ui.custom, setWidget, setFooter, setHeader, setTitle or theme methods; if it calls none today, add a test that pins this. Do not touch the rpiv packages here.",
+    "Plain pi terminal: none of this changes behaviour outside T3 (no T3 env): the filter is a no-op and no warning is shown."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Report in under 400 words; put long logs in a file in the scratchpad above and give its path.",
+    "Keep the tests deterministic with synthesized events and stubbed env; never start pi or T3."
+  ],
+  "criteria": [
+    {
+      "text": "Under T3 the root active tools exclude every non-kept mcp__t3-code__ and mcp__t3_code__ tool and keep html_render, html_preview, preview_*, t3_preview_* and device_*, set at session_start and restored on before_agent_start and session_tree only after drift, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A tool_call for a deactivated T3 tool is blocked with a reason naming it, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Below Full access a single warning is delivered through the notice path and setStatus, and none at full-access or outside T3, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Outside T3 the tools and messages are unchanged, with a test",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "mise run build leaves no unexplained changes and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The change stays inside the Assignment scope and ownership paths",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi/src/extension.ts",
+    "packages/integrations/pi/src/t3.ts",
+    "packages/runtime/src/pi/tools.ts",
+    "packages/integrations/pi/tests/extension.test.ts",
+    "packages/integrations/pi/tests/t3.test.ts",
+    "packages/runtime/tests/pi/tools.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T05:25:57.766Z"
+  },
+  "createdAt": "2026-11-09T05:25:57.766Z"
+}
