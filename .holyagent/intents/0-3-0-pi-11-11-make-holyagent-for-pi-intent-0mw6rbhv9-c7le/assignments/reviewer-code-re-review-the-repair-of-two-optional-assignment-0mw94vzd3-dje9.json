@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mw94vzd3-dje9",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 12,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-repair-of-two-optional",
+  "objective": "Re-review the repair of two optional findings on the T3 tool filter (t3Root set only after a successful apply; T3 patterns compiled once).",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-t3host, newest commit; diff in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/t3host-nits.diff. Previous review: /home/user/holyagent/.git/holyagent/reports/assignment-0mw8u28kl-48kw.md findings 1 and 2."
+  ],
+  "constraints": [
+    "Read-only; you may run bun test in that worktree, writing any log to a file name of your own in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad (not build.log or verify.log, which other workers share).",
+    "Mark a finding blocking only when behaviour is wrong, incomplete, untested on an error path, or breaks existing behaviour; give path:line and a failure scenario.",
+    "Report in under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "The review states whether findings 1 and 2 are closed and whether the repair broke anything, with path:line",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "verdict"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw94ibfp-qqxr"
+  ],
+  "followUpOf": "assignment-0mw8u28kl-48kw",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T10:44:11.079Z"
+  },
+  "createdAt": "2026-11-09T10:44:11.079Z"
+}
