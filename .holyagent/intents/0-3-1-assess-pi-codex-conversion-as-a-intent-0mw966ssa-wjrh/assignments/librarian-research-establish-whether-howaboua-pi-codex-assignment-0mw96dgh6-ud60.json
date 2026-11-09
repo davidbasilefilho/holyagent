@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mw96dgh6-ud60",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 1,
+  "roleTask": "Librarian.research",
+  "slug": "establish-whether-howaboua-pi-codex",
+  "objective": "Establish whether @howaboua/pi-codex-conversion 4.0.9 can run with its apply_patch tool while keeping Pi's own bash (and read, edit, write) instead of its exec_command/write_stdin shell, and what each way of doing that keeps or loses.",
+  "state": "Running",
+  "scope": [
+    "Maintainer question (verbatim): \"for the codex provider, can we replace the shell tool as well? because apply_patch is fine\". Read it as: keep apply_patch, but use Pi's shell tool (bash) rather than the package's exec_command and write_stdin.",
+    "Previous source reports: /home/user/holyagent/.git/holyagent/reports/assignment-0mw969b0u-kquh.md and assignment-0mw9679bz-h35s.md (read both). They found `mergeAdapterTools` drops read, bash, edit and write in normal mode, and config options `tools.applyPatchOnly`, `tools.viewImageOnly`, `voiceFeaturesOnly` and `scope`, without confirming what each keeps.",
+    "Answer from the 4.0.9 source (cdn.jsdelivr.net/npm/@howaboua/pi-codex-conversion@4.0.9/src/..., or the monorepo at the matching commit), with file and symbol: (1) what `tools.applyPatchOnly` does exactly: which Pi tools stay active (bash, read, edit, write), whether exec_command and write_stdin are dropped, and whether its Codex request body, native V2 compaction, gpt-reserve and the Codex prompt or instructions still apply in that mode; (2) whether any other config (a tool allowlist, a per-tool switch, a custom-tool TOML) can swap exec_command for Pi's bash while keeping the rest of normal mode; (3) whether the package's system prompt or tool instructions tell the model to use exec_command, which would conflict with bash being the shell; (4) whether the apply_patch tool is self-contained (a Rust binary or TypeScript) so HolyAgent could alternatively keep Pi's provider and register only an apply_patch tool, and its license terms for that.",
+    "Also state whether Pi's own built-in tool set (the pinned host in /home/user/holyagent-0.3.0-t3host/node_modules/.bun, @earendil-works+pi-coding-agent@1.5.0) has an apply_patch tool or a setting for one."
+  ],
+  "constraints": [
+    "Read-only: change no files in any worktree, make no git writes, write nothing under .git/ or .holyagent/.",
+    "Never run pi, install or execute the package, or make a live model or OpenAI request.",
+    "Separate facts from source (file and symbol, version) from inference.",
+    "Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "Questions 1-4 are answered from package source with file and symbol",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Whether Pi itself has an apply_patch tool is stated from the pinned source",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "source-answers",
+    "pi-builtin"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw969b0u-kquh",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-09T11:25:46.026Z"
+  },
+  "createdAt": "2026-11-09T11:25:46.026Z"
+}
