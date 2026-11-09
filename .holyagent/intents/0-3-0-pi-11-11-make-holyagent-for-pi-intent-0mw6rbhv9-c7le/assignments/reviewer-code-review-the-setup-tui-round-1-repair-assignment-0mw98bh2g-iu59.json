@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-the-setup-tui-round-1-repair",
   "objective": "Review the setup TUI round-1 repair commit for correctness and regressions.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Review git diff df6a410c..0130a8b2 in /home/user/holyagent-0.3.0-tui (also as a file without generated output: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-r1.diff). The earlier findings it addressed (code items a-e) are in /home/user/holyagent/.git/holyagent/briefs/assignment-0mw96v3mr-d6nb.md.",
     "Also check two items the writer noted and left: the setup process spins at about 45% CPU after its pty hangs up, and a temporary folder left by a killed install is not cleaned on the next run. Say whether each is a real defect, with the code path.",
@@ -45,7 +45,37 @@
     "agentId": "workflow:wf_0449f5a1-d1b/assignment-0mw98bh2g-iu59",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T12:20:12.712Z"
+    "startedAt": "2026-11-09T12:20:12.712Z",
+    "finishedAt": "2026-11-09T12:34:46.302Z"
+  },
+  "result": "result: Round 1 repairs a-e are closed and I found no regression. Both writer notes are real defects, but neither blocks. The setup-tui tests pass (101 pass, 0 fail).\n\n**Built-in `/code-review` (high)** ran on `df6a410c...0130a8b2` and returned 7 findings, which I classified as follows:\nCache folder refused when group-writable (`load.ts:305`): rejected. `~/.cache/holyagent` is used only by this unreleased feature, so no shipped folder is affected.\nTemporary folder never swept (`load.ts:356`): confirmed, covered below.\n`wrap()` drops blank lines and indentation (`text.ts`): rejected. Report lines in `report.ts` are single-line and marker-prefixed, so none is blank or indented.\nReview-failure layout is fixed-height (`model.ts:862`): optional. At very small sizes the recovery hint and actions can clip.\nHand-rolled lock pruning (`lock.ts`): rejected. I generated the lock and ran `bun install --frozen-lockfile --ignore-scripts` on it. It passed, and `s-js` and `@opentui/core-linux-x64` resolved.\n`plain()` leaves bidi and zero-width characters: optional. The earlier finding was about ANSI and C0/C1 controls, which are stripped.\n`promote()` removes a folder that has no marker (`load.ts:332`): optional. The race window is narrow.\n`tuiDirectory` falls back to `\"\"` (`load.ts:107`): optional, as it can never happen today.\n\nThe skill's own report says it checked out the target commit detached and then switched back. The worktree is clean and on `release/0.3.0/feat/setup-tui` at `0130a8b2`.\n\n**Earlier code findings**\n(a) Atomic install: closed. `installAtomically` installs into a `mkdtemp` folder, writes the marker last, then `promote` renames it into place. A folder without the marker counts as absent. Tests cover a killed install, an unmarked folder, a marker for other packages, and two first runs at once.\n(b) Cache folder checks: closed. `privateFolder` (`load.ts:~292`) creates folders with mode 0700 and refuses symlinks, other owners and group- or other-writable folders. `writeFresh` writes with `wx` and then renames. Tests cover chmod, uid, symlinked folder, and symlinked bundle path.\n(c) Frozen lockfile subset: closed. `lockedFile` runs at build time, `bunInstall` passes `--frozen-lockfile`, and a test asserts it.\n(d) Escape stripping: closed. `plain()` is applied in `unavailable`, `failureLine` and `session.ts` `fallback`, with tests.\n(e) Tests: present for each item.\n\n**Regressions:** none found. The fallback path (`TuiUnavailable` to the line-based setup) is intact, and `app.tsx` and `model.ts` changes stay inside the existing keys and screens.\n\n**Writer notes**\nCPU spin: real defect, and larger than described. It predates this commit, since `entry.tsx` is unchanged. I reproduced it with a pty running the built `dist/scripts/setup-tui.js`: CPU is 0% before the signal. After SIGHUP (pty master closed) or SIGTERM, the process stays alive at about 100% CPU. OpenTUI's default `exitSignals` include SIGHUP and SIGTERM and destroy the renderer. The `Effect.callback` in `entry.tsx:14-22` resumes only on `done` from `SetupApp`, so the outcome never settles and the process never exits. A fix would resume with `Interrupted` on the renderer's destroy. It is non-blocking for this repair but should be fixed.\nLeftover temporary folder: real but minor. `mkdtemp(\".<name>-\")` in `installAtomically` (`load.ts:~356`) is removed only by the release step. A SIGKILL, power loss or terminal close during `bun install` skips it. Nothing sweeps old `.<name>-*` siblings, so stale folders of tens of MB accumulate. Correctness is unaffected, because the final folder is never half-installed.\n\nevidence:\nEach earlier code finding (atomic install, cache folder checks, frozen lockfile subset, escape stripping, tests) is confirmed closed or reported open with file and line: `load.ts` `installAtomically`, `promote`, `privateFolder`, `writeFresh`, `bunInstall`, `plain`; `lock.ts` `lockedFile`; tests in `setup-tui-load.test.ts` lines 345-620; the pruned lock installs with `--frozen-lockfile`.\nThe repair introduces no regression in the setup flow, flags or line-based fallback: `bun test packages/runtime/tests/setup-tui*` gives 101 pass, 0 fail; read-through of the `session.ts`, `app.tsx` and `model.ts` diffs.\nThe CPU spin after hangup and the leftover temporary folder are each judged real or not with the code path: the spin is real (`entry.tsx:14-22`; pty repro under `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/pty2.py`); the leftover folder is real and minor (`load.ts` `installAtomically`).\nfindings: see the classification above.\ntests: `bun test packages/runtime/tests/setup-tui*` exit 0, 101 pass, 0 fail, 3 files.\n",
+  "acceptance": {
+    "revision": 13,
+    "rationale": "Review evidence cites captures, file lines and test runs on 0130a8b2",
+    "criteria": [
+      {
+        "criterion": "Each earlier code finding (atomic install, cache folder checks, frozen lockfile subset, escape stripping, tests) is confirmed closed or reported open with file and line",
+        "support": "`load.ts` `installAtomically`, `promote`, `privateFolder`, `writeFresh`, `bunInstall`, `plain`; `lock.ts` `lockedFile`; tests in `setup-tui-load.test.ts` lines 345-620; the pruned lock installs with `--frozen-lockfile`."
+      },
+      {
+        "criterion": "The repair introduces no regression in the setup flow, flags or line-based fallback",
+        "support": "`bun test packages/runtime/tests/setup-tui*` gives 101 pass, 0 fail; read-through of the `session.ts`, `app.tsx` and `model.ts` diffs."
+      },
+      {
+        "criterion": "The CPU spin after hangup and the leftover temporary folder are each judged real or not with the code path",
+        "support": "the spin is real (`entry.tsx:14-22`; pty repro under `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/pty2.py`); the leftover folder is real and minor (`load.ts` `installAtomically`)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "see the classification above."
+      },
+      {
+        "label": "tests",
+        "support": "`bun test packages/runtime/tests/setup-tui*` exit 0, 101 pass, 0 fail, 3 files."
+      }
+    ]
   },
   "createdAt": "2026-11-09T12:20:12.712Z"
 }
