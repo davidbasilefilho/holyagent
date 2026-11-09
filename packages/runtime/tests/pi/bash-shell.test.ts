@@ -941,7 +941,12 @@ describe("redirects to /dev/null", () => {
         name,
         (...args: Array<unknown>) => {
           seen.push(`${name} ${String(args[0])}`)
-          return Effect.runPromise(Effect.succeed(undefined))
+          // The guard asks for real paths and for what a copy reads; neither changes the disk.
+          return Effect.runPromise(
+            Effect.succeed(
+              name === "realpath" ? args[0] : name === "stat" ? { isDirectory: false } : undefined,
+            ),
+          )
         },
       ]),
     )
@@ -976,7 +981,9 @@ describe("redirects to /dev/null", () => {
       await settled("link", "/tmp/target", device)
     }
     // A copy from the device makes an empty file at the destination, which is the only call through.
-    expect([...new Set(seen)]).toEqual(["writeFile /tmp/copy"])
+    expect([...new Set(seen)].filter((call) => !/^(realpath|stat) /.test(call))).toEqual([
+      "writeFile /tmp/copy",
+    ])
   })
 
   test("rm, mv, mkdir, ln and the other calls that would change the device are refused, copies to it vanish, and chmod does nothing", async () => {

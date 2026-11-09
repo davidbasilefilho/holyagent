@@ -89842,10 +89842,19 @@ var NULL_STAT = {
   mtime: new Date(0),
   identity: "holyagent:null-device"
 };
-var isDevice = (path) => typeof path === "string" && posix3.normalize(path).replace(/\/+$/, "") === NULL_DEVICE;
+var real = (fs, path) => tryPromise2({ try: () => fs.realpath(path), catch: (error) => error }).pipe(map4((resolved) => posix3.resolve("/", resolved)), orElseSucceed2(() => posix3.normalize(path)));
+var resolve5 = (fs, path) => {
+  const trailing = path.length > 1 && path.endsWith("/");
+  const bare = trailing ? path.replace(/\/+$/, "") : path;
+  const name = posix3.basename(bare);
+  return trailing || name === "" || name === "." || name === ".." ? real(fs, bare) : map4(real(fs, posix3.dirname(bare)), (parent) => posix3.join(parent, name));
+};
+var holdsDevice = (path) => path === "/" || path === posix3.dirname(NULL_DEVICE);
+var classify = (fs, path) => typeof path !== "string" || !path.startsWith("/") ? succeed5("elsewhere") : map4(resolve5(fs, path), (resolved) => resolved === NULL_DEVICE ? path.length > 1 && path.endsWith("/") ? "notdir" : "device" : holdsDevice(resolved) ? "ancestor" : "elsewhere");
 var answer = (value) => runPromise2(succeed5(value));
 var refuse = (code, reason, call, path) => runPromise2(fail5(new NullDeviceRefused({ message: `${code}: ${reason}, ${call} '${path}'` })));
 var denied = (call, path) => refuse("EPERM", "operation not permitted", call, path);
+var notDirectory = (call, path) => refuse("ENOTDIR", "not a directory", call, path);
 var ON_PATH = new Map(Object.entries({
   writeFile: () => answer(undefined),
   appendFile: () => answer(undefined),
@@ -89864,28 +89873,27 @@ var ON_PATH = new Map(Object.entries({
   readlink: (path) => refuse("EINVAL", "invalid argument", "readlink", path)
 }));
 var ON_PAIR = new Map(Object.entries({
-  mv: (_fs, source, destination) => isDevice(source) ? denied("mv", source) : isDevice(destination) ? denied("mv", destination) : undefined,
-  cp: (fs, source, destination) => isDevice(destination) ? answer(undefined) : isDevice(source) && typeof destination === "string" ? fs.writeFile(destination, "") : undefined,
-  link: (_fs, existing, created) => isDevice(existing) ? denied("link", existing) : isDevice(created) ? denied("link", created) : undefined,
-  symlink: (_fs, target, created) => isDevice(target) ? denied("symlink", target) : isDevice(created) ? refuse("EEXIST", "file already exists", "symlink", created) : undefined
+  mv: (_fs, { first, second, from, to }) => from === "device" || from === "ancestor" ? () => denied("mv", String(first)) : to === "device" ? () => denied("mv", String(second)) : undefined,
+  cp: (fs, { first, second, to, from }) => to === "device" && typeof first === "string" ? () => fs.stat(first).then((source) => source.isDirectory ? refuse("EISDIR", "illegal operation on a directory", "cp", first) : undefined) : from === "device" && typeof second === "string" ? () => fs.writeFile(second, "") : undefined,
+  link: (_fs, { first, second, from, to }) => from === "device" ? () => denied("link", String(first)) : to === "device" ? () => denied("link", String(second)) : undefined,
+  symlink: (_fs, { first, second, from, to }) => from === "device" ? () => denied("symlink", String(first)) : to === "device" ? () => refuse("EEXIST", "file already exists", "symlink", String(second)) : undefined
 }));
+var decide = (fs, name, args) => {
+  const [first, second] = args;
+  const onPair = ON_PAIR.get(name);
+  if (onPair !== undefined)
+    return map4(all2([classify(fs, first), classify(fs, second)]), ([from, to]) => from === "notdir" || to === "notdir" ? () => notDirectory(name, String(from === "notdir" ? first : second)) : onPair(fs, { first, second, from, to }));
+  const onPath = ON_PATH.get(name);
+  return map4(classify(fs, first), (spot) => spot === "notdir" ? () => notDirectory(name, String(first)) : spot === "ancestor" && name === "rm" ? () => denied("rm", String(first)) : spot === "device" && onPath !== undefined ? () => onPath(String(first)) : undefined);
+};
 var withNullDevice = (fs) => new Proxy(fs, {
   get: (target, name) => {
     const member = Reflect.get(target, name, target);
     if (typeof member !== "function" || typeof name !== "string")
       return member;
-    const onPath = ON_PATH.get(name);
-    const onPair = ON_PAIR.get(name);
-    if (onPath === undefined && onPair === undefined)
+    if (!ON_PATH.has(name) && !ON_PAIR.has(name))
       return member;
-    return (...args) => {
-      const [first, second] = args;
-      const handled = onPair !== undefined ? onPair(target, first, second) : isDevice(first) ? onPath?.(first) : undefined;
-      if (handled !== undefined)
-        return handled;
-      const result = Reflect.apply(member, target, args);
-      return result;
-    };
+    return (...args) => runPromise2(decide(target, name, args)).then((step) => step === undefined ? Reflect.apply(member, target, args) : step());
   }
 });
 
@@ -90452,7 +90460,7 @@ var runShell = (request, options) => gen2(function* () {
     filesystem: new gt7(stubs)
   }));
   const hostFs = (root) => new ei({ root, allowSymlinks: true });
-  const fs = withNullDevice(withProgramLaunch(windows ? new Kt4({
+  const fs = withProgramLaunch(withNullDevice(windows ? new Kt4({
     base: new gt7,
     mounts: [
       ...stubMounts,
@@ -90461,7 +90469,7 @@ var runShell = (request, options) => gen2(function* () {
         filesystem: hostFs(`${letter.toUpperCase()}:\\`)
       }))
     ]
-  }) : new Kt4({ base: hostFs("/"), mounts: stubMounts }), { toHost: (path) => toHostPath(path, drives, platform), platform, extensions }));
+  }) : new Kt4({ base: hostFs("/"), mounts: stubMounts })), { toHost: (path) => toHostPath(path, drives, platform), platform, extensions });
   const hostCommands = [...plan.passthrough, ...plan.aliases].map(([name, path]) => id(name, (args, ctx) => runPromise2(runHost(path, args, ctx, run))));
   const runner = id(RUNNER, (args, ctx) => runPromise2(runHost(args[0] ?? "", args.slice(1), ctx, run)));
   const jsExec = id("js-exec", (args, ctx) => runPromise2(runJsExec(args, ctx)));

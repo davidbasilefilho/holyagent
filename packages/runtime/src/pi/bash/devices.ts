@@ -22,9 +22,50 @@ const NULL_STAT: FsStat = {
   identity: "holyagent:null-device",
 }
 
-// Whether `path` names the device, however it is spelled (`/dev//null`, `/dev/../dev/null/`).
-const isDevice = (path: unknown): path is string =>
-  typeof path === "string" && posix.normalize(path).replace(/\/+$/, "") === NULL_DEVICE
+// Where a path leads once the inner file system has resolved it: to the device, to a folder that is
+// or contains the device, to the device used as a folder (`/dev/null/`), or somewhere else.
+type Spot = "device" | "notdir" | "ancestor" | "elsewhere"
+
+// The final step of a call that this file system answers itself or passes on.
+type Step = () => Promise<unknown>
+
+// The inner file system's real path as an absolute one (`ReadWriteFs` answers `dev/null` without
+// the root's slash), or the lexical path where it cannot say (a missing parent).
+const real = (fs: IFileSystem, path: string): Effect.Effect<string> =>
+  Effect.tryPromise({ try: () => fs.realpath(path), catch: (error) => error }).pipe(
+    Effect.map((resolved) => posix.resolve("/", resolved)),
+    Effect.orElseSucceed(() => posix.normalize(path)),
+  )
+
+// The real path of `path`. A link at its end is not followed, as the kernel does not follow it for
+// `rm` and `mv`, so the real parent plus the name stands for it, which also resolves a missing leaf
+// and the device itself alike; a trailing slash makes the kernel follow the link.
+const resolve = (fs: IFileSystem, path: string): Effect.Effect<string> => {
+  const trailing = path.length > 1 && path.endsWith("/")
+  const bare = trailing ? path.replace(/\/+$/, "") : path
+  const name = posix.basename(bare)
+  return trailing || name === "" || name === "." || name === ".."
+    ? real(fs, bare)
+    : Effect.map(real(fs, posix.dirname(bare)), (parent) => posix.join(parent, name))
+}
+
+// Whether the real path is the device or a folder that holds it, which removing or moving takes along.
+const holdsDevice = (path: string): boolean => path === "/" || path === posix.dirname(NULL_DEVICE)
+
+// Where `path` leads, however it is spelled or reached: `/dev//null`, a link to `/dev` and
+// `/proc/self/root/dev/null` all end at the device. A relative path is the inner file system's.
+const classify = (fs: IFileSystem, path: unknown): Effect.Effect<Spot> =>
+  typeof path !== "string" || !path.startsWith("/")
+    ? Effect.succeed("elsewhere")
+    : Effect.map(resolve(fs, path), (resolved): Spot =>
+        resolved === NULL_DEVICE
+          ? path.length > 1 && path.endsWith("/")
+            ? "notdir"
+            : "device"
+          : holdsDevice(resolved)
+            ? "ancestor"
+            : "elsewhere",
+      )
 
 const answer = (value: unknown): Promise<unknown> => Effect.runPromise(Effect.succeed(value))
 
@@ -35,6 +76,9 @@ const refuse = (code: string, reason: string, call: string, path: string): Promi
 
 const denied = (call: string, path: string) =>
   refuse("EPERM", "operation not permitted", call, path)
+
+const notDirectory = (call: string, path: string) =>
+  refuse("ENOTDIR", "not a directory", call, path)
 
 // What each call that names the device alone gives: writes vanish, reads are empty, and the device
 // stays what it is (it cannot be removed, made again, listed or read as a link).
@@ -58,71 +102,107 @@ const ON_PATH: ReadonlyMap<string, (path: string) => Promise<unknown>> = new Map
   }),
 )
 
-// The calls that name two paths: an answer, or `undefined` to pass the call through.
-const ON_PAIR: ReadonlyMap<
-  string,
-  (fs: IFileSystem, first: unknown, second: unknown) => Promise<unknown> | undefined
-> = new Map(
+// The two paths of a call and where each leads.
+interface Pair {
+  readonly first: unknown
+  readonly second: unknown
+  readonly from: Spot
+  readonly to: Spot
+}
+
+// A step for the calls that name two paths, or `undefined` to pass the call through.
+const ON_PAIR: ReadonlyMap<string, (fs: IFileSystem, pair: Pair) => Step | undefined> = new Map(
   Object.entries({
-    // Moving the device away, or another file over it, would replace it.
-    mv: (_fs, source, destination) =>
-      isDevice(source)
-        ? denied("mv", source)
-        : isDevice(destination)
-          ? denied("mv", destination)
+    // Moving the device or its folder away, or another file over the device, would replace it.
+    mv: (_fs, { first, second, from, to }) =>
+      from === "device" || from === "ancestor"
+        ? () => denied("mv", String(first))
+        : to === "device"
+          ? () => denied("mv", String(second))
           : undefined,
-    // A copy to the device is dropped; a copy from it is an empty file.
-    cp: (fs, source, destination) =>
-      isDevice(destination)
-        ? answer(undefined)
-        : isDevice(source) && typeof destination === "string"
-          ? fs.writeFile(destination, "")
+    // A copy to the device is dropped, unless the source is missing or a folder, which fail as they
+    // do for a copy to any file; a copy from it is an empty file.
+    cp: (fs, { first, second, to, from }) =>
+      to === "device" && typeof first === "string"
+        ? () =>
+            fs
+              .stat(first)
+              .then((source) =>
+                source.isDirectory
+                  ? refuse("EISDIR", "illegal operation on a directory", "cp", first)
+                  : undefined,
+              )
+        : from === "device" && typeof second === "string"
+          ? () => fs.writeFile(second, "")
           : undefined,
     // A link to the device would reach the device itself for every later call through the link.
-    link: (_fs, existing, created) =>
-      isDevice(existing)
-        ? denied("link", existing)
-        : isDevice(created)
-          ? denied("link", created)
+    link: (_fs, { first, second, from, to }) =>
+      from === "device"
+        ? () => denied("link", String(first))
+        : to === "device"
+          ? () => denied("link", String(second))
           : undefined,
-    symlink: (_fs, target, created) =>
-      isDevice(target)
-        ? denied("symlink", target)
-        : isDevice(created)
-          ? refuse("EEXIST", "file already exists", "symlink", created)
+    symlink: (_fs, { first, second, from, to }) =>
+      from === "device"
+        ? () => denied("symlink", String(first))
+        : to === "device"
+          ? () => refuse("EEXIST", "file already exists", "symlink", String(second))
           : undefined,
   }),
 )
+
+// The step for one call, or `undefined` to pass it to the inner file system. A path that is the
+// device used as a folder (`/dev/null/`) gives ENOTDIR whatever the call, as it does on disk.
+const decide = (
+  fs: IFileSystem,
+  name: string,
+  args: ReadonlyArray<unknown>,
+): Effect.Effect<Step | undefined> => {
+  const [first, second] = args
+  const onPair = ON_PAIR.get(name)
+  if (onPair !== undefined)
+    return Effect.map(
+      Effect.all([classify(fs, first), classify(fs, second)]),
+      ([from, to]): Step | undefined =>
+        from === "notdir" || to === "notdir"
+          ? () => notDirectory(name, String(from === "notdir" ? first : second))
+          : onPair(fs, { first, second, from, to }),
+    )
+  const onPath = ON_PATH.get(name)
+  return Effect.map(classify(fs, first), (spot): Step | undefined =>
+    spot === "notdir"
+      ? () => notDirectory(name, String(first))
+      : spot === "ancestor" && name === "rm"
+        ? () => denied("rm", String(first))
+        : spot === "device" && onPath !== undefined
+          ? () => onPath(String(first))
+          : undefined,
+  )
+}
 
 /**
  * The file system with {@link NULL_DEVICE} made a real null device. just-bash writes a redirect to
  * `/dev/null` (`>/dev/null`, `&>/dev/null`) as a file, which the disk refuses as a special file and
  * which an in-memory `/dev` would keep; so every call on that path is answered here and none
  * reaches the host's device: a write, `chmod` and `utimes` are dropped, a read is empty, it exists
- * as an empty file, a copy to it is dropped and a copy from it is an empty file. A call that would
- * remove, replace, list or link the device (`rm`, `mv` to or from it, `mkdir`, `readdir`,
- * `readlink`, `ln` of it) is refused with the error the disk would give. Other paths pass through,
- * a link to the device that something else made included.
+ * as an empty file, a copy to it is dropped (a missing or folder source fails) and a copy from it
+ * is an empty file. A call that would remove, replace, list or link the device (`rm`, `mv` to or
+ * from it, `mkdir`, `readdir`, `readlink`, `ln` of it) is refused with the error the disk would
+ * give, and so is removing or moving `/dev` or a folder that holds it; `/dev/null/` gives
+ * `ENOTDIR`. A path counts as the device by its real path in the inner file system (the real parent
+ * plus the name, so a link in the path, `/proc/self/root/dev/null` and a missing leaf resolve
+ * alike), not by its spelling. Other paths pass through, a link to the device that something else
+ * made included.
  */
 export const withNullDevice = (fs: IFileSystem): IFileSystem =>
   new Proxy(fs, {
     get: (target, name) => {
       const member: unknown = Reflect.get(target, name, target)
       if (typeof member !== "function" || typeof name !== "string") return member
-      const onPath = ON_PATH.get(name)
-      const onPair = ON_PAIR.get(name)
-      if (onPath === undefined && onPair === undefined) return member
-      return (...args: Array<unknown>): unknown => {
-        const [first, second] = args
-        const handled =
-          onPair !== undefined
-            ? onPair(target, first, second)
-            : isDevice(first)
-              ? onPath?.(first)
-              : undefined
-        if (handled !== undefined) return handled
-        const result: unknown = Reflect.apply(member, target, args)
-        return result
-      }
+      if (!ON_PATH.has(name) && !ON_PAIR.has(name)) return member
+      return (...args: Array<unknown>): Promise<unknown> =>
+        Effect.runPromise(decide(target, name, args)).then((step): unknown =>
+          step === undefined ? Reflect.apply(member, target, args) : step(),
+        )
     },
   })
