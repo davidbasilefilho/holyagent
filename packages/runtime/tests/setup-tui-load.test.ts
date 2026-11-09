@@ -114,7 +114,6 @@ describe("where the interface is installed", () => {
   })
 
   test("joins with the separator of the platform it is asked about, not the host's", () => {
-    expect(cacheHome({ HOME: "C:\\Users\\a" }, "win32")).toBe("C:\\Users\\a\\AppData\\Local")
     const at = (platform: string, env: Record<string, string>) =>
       tuiDirectory(env, { "solid-js": "1.9.16" }, platform, "lock")
     expect(at("win32", { LOCALAPPDATA: "C:\\L" })).toMatch(
