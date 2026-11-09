@@ -1,0 +1,63 @@
+{
+  "id": "assignment-0mw9m7rhx-8sde",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Worker.debugging",
+  "slug": "find-why-the-windows-ci-test-starting",
+  "objective": "Find why the Windows CI test 'starting the state in a large tree > six commands that start at once all succeed while the state worktree is still being checked out' fails at about 30 s, and make it reliable on Windows without weakening what it proves.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.1-statefix, branch release/0.3.1/test/state-start-timeout (cut from release/0.3.1/integration at bb412cc).",
+    "Observed: on the Windows runner (push run of release/0.3.1/integration at bb412cc, job log /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/winint.log around line 1753) the test failed after 29865 ms with no assertion output. The file sets setDefaultTimeout(60_000) on win32, so a ~30 s cutoff comes from somewhere else: an inner deadline in the test or its helpers, a child-process timeout, or a lock or wait timeout in the state-branch code (packages/runtime/tests/state-branch.test.ts:1323; packages/runtime/tests/fixtures.ts has PROCESS_TIMEOUT_MS, 120 s on win32). The same test passed on the previous push (dc53c48). Six cold CLI starts at once on Windows are slow (each unbundled start loads ~660 files).",
+    "Find the 30 s source by reading the test, its helpers and the code it drives. If it is a test-side deadline sized for Linux, size it from PROCESS_TIMEOUT_MS. If it is a product timeout (for example how long a command waits for the state worktree checkout or a lock), decide whether the product limit is too short for a slow Windows machine and say so with evidence before changing it; a product change needs a test of its own. Make the failure report what timed out if it happens again."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Do not check out other commits in any checkout.",
+    "Do not skip, quarantine or weaken the test's assertions.",
+    "Report in under 350 words; give the root cause with file and line."
+  ],
+  "criteria": [
+    {
+      "text": "The root cause of the ~30 s failure is identified with file and line",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The fix keeps the test's assertions and makes a timeout name what it waited for",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "mise run build and mise run verify exit 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/tests/state-branch.test.ts",
+    "packages/runtime/tests/fixtures.ts",
+    "packages/runtime/src/state",
+    "packages/integrations/claude/dist/scripts",
+    "packages/integrations/pi/dist/scripts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T18:49:14.229Z"
+  },
+  "createdAt": "2026-11-09T18:49:14.229Z"
+}
