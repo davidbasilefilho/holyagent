@@ -298,6 +298,7 @@ const drive = async (
     registerFlag: () => undefined,
     getFlag: () => undefined,
     registerToolRenderer: () => undefined,
+    registerTool: () => undefined,
     getSessionName: () => undefined,
     getActiveTools: () => [...active],
     getAllTools: () => active.map((name) => ({ name })),

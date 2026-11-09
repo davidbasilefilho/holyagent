@@ -3503,6 +3503,34 @@ var CAPABILITIES = [
     ],
     tools: { rootExclude: COMPUTER_USE_TOOLS, visual: COMPUTER_USE_TOOLS },
     health: ["needs", "packages"]
+  },
+  {
+    name: "luna-reserve",
+    feature: "lunaReserve",
+    description: "Falls back to Codex's Luna Reserve allowance when the usage limit is reached (Codex provider only)",
+    provider: "openai-codex",
+    skills: [],
+    applicability: "both",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm([]),
+    tools: { rootExclude: [], visual: [] },
+    settings: [],
+    health: ["needs"]
+  },
+  {
+    name: "context-management",
+    feature: "contextManagement",
+    description: "Lets the server compact the history with context_management while Billion Context is off (Codex provider only)",
+    provider: "openai-codex",
+    skills: [],
+    applicability: "both",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm([]),
+    tools: { rootExclude: [], visual: [] },
+    settings: [],
+    health: ["needs"]
   }
 ];
 var FEATURE_DEFAULTS = Object.fromEntries(CAPABILITIES.map((capability) => [capability.feature, capability.defaultOn]));

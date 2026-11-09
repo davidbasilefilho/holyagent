@@ -6,7 +6,7 @@ import { type Config, defaultConfig } from "../../../runtime/src/config/schema.t
 import type { Route } from "../../../runtime/src/domain/route.ts"
 import type { Family } from "../../../runtime/src/instructions/families.ts"
 import { instructionsDirectory } from "../../../runtime/src/instructions/skills.ts"
-import { providerProfile, webChoice } from "../../../runtime/src/pi/provider.ts"
+import { providerProfile, PROVIDERS, webChoice } from "../../../runtime/src/pi/provider.ts"
 import {
   CODEMODE_TOOL,
   COMPUTER_USE_TOOLS,
@@ -30,26 +30,46 @@ const extensionName = (npmName: string): string =>
 
 const BUILTINS: ReadonlySet<string> = new Set([...READ_TOOLS, ...WRITE_TOOLS, ...SHELL_TOOLS])
 
+// The package reads one agent file per specialist, whichever provider the session runs, and the
+// tools of a role live only there. A web tool is therefore listed through the web source of every
+// provider (Kimi's own extension, `pi-web-kit` for a provider with no web tools), so the file is
+// right under each. An entry for an extension the session did not load matches nothing.
+const webEntries = (mode: Config["pi"]["features"]["web"]): ReadonlyArray<string> =>
+  Object.values(PROVIDERS).flatMap((profile) => {
+    const web = webChoice(profile, mode)
+    const extension = extensionName(
+      web.source === "provider" && profile.package !== undefined
+        ? profile.package
+        : WEB_KIT_PACKAGE,
+    )
+    return web.tools.map((tool) => `ext:${extension}/${tool}`)
+  })
+
 /**
  * The `tools:` entries of a specialist's agent file, from the tool arguments that decide its tools
  * (`toolArgs`). The package reads three kinds of entry: Pi's built-in tools by name;
  * `ext:<extension>` or `ext:<extension>/<tool>` for an extension's tools, where the extension is
  * named by its npm package without the scope (`ext:builtin:codemode` for Pi's own); and
- * `mcp__<server>__<tool>` patterns, which it matches itself. Any `ext:` entry turns extension tools
- * into an explicit allowlist, so a specialist has none of the root's tools (`todo`,
+ * `mcp__<server>__<tool>` patterns, which it matches itself. A web tool becomes the entries of
+ * every provider's web source (`webEntries`), since all providers read the same file, and a
+ * provider's own write tool gets none (the extension activates it). Any `ext:` entry turns
+ * extension tools into an explicit allowlist, so a specialist has none of the root's tools (`todo`,
  * `ask_user_question`, the process tools). A tool no entry covers fails the build: dropping it
  * would leave the role under-tooled in silence.
  */
 export const agentTools = (config: Config, route: Route): ReadonlyArray<string> => {
   const profile = providerProfile(config)
   const web = webChoice(profile, config.pi.features.web)
-  const webExtension = extensionName(web.source === "provider" ? profile.package : WEB_KIT_PACKAGE)
-  const entries = toolArgs(config, route.roleTask, profile).tools.map((tool) => {
-    if (BUILTINS.has(tool) || tool.startsWith("mcp__")) return tool
-    if (tool === CODEMODE_TOOL) return "ext:builtin:codemode"
+  const entries = toolArgs(config, route.roleTask, profile).tools.flatMap((tool) => {
+    if (BUILTINS.has(tool) || tool.startsWith("mcp__")) return [tool]
+    // The provider's own write tool (Codex's `apply_patch`) is HolyAgent's, registered inactive:
+    // the extension adds it to the specialist's active tools at its start (`activateApplyPatch`).
+    if (profile.writeTools.includes(tool)) return []
+    if (tool === CODEMODE_TOOL) return ["ext:builtin:codemode"]
     if (COMPUTER_USE_TOOLS.includes(tool))
-      return `ext:${extensionName(FEATURE_PACKAGES.computerUse)}`
-    if ((web.tools as ReadonlyArray<string>).includes(tool)) return `ext:${webExtension}/${tool}`
+      return [`ext:${extensionName(FEATURE_PACKAGES.computerUse)}`]
+    if ((web.tools as ReadonlyArray<string>).includes(tool))
+      return webEntries(config.pi.features.web)
     throw new Error(`${route.agent}: no package tools entry for ${tool}`)
   })
   return [...new Set(entries)]
@@ -61,15 +81,19 @@ export const agentTools = (config: Config, route: Route): ReadonlyArray<string> 
  * by the Claude generator's `specialistFiles` (the role sections, the shared conduct and the
  * conditional sections the role needs, with the maintainers' notes stripped). The tools come from
  * the default config (see {@link agentTools}), the same ones the root passes the specialist's route.
+ * The files go to `folder` of the package, `agents/` by default; the other families' copies go
+ * below `families/` (see `familyAgents`), where the extension finds the prompt of the family a
+ * provider runs.
  */
 export const agentFiles = async (
   family: Family = PI_FAMILY,
   config?: Config,
+  folder: string = AGENTS_FOLDER,
 ): Promise<ReadonlyArray<GeneratedFile>> => {
   const resolved = config ?? (await Effect.runPromise(defaultConfig))
   return specialistFiles({
     instructions: instructionsDirectory(family),
-    path: (route) => `${DIST_DIRECTORY}/${AGENTS_FOLDER}/${route.agent}.md`,
+    path: (route) => `${DIST_DIRECTORY}/${folder}/${route.agent}.md`,
     // No `model:` or `thinking:`: the package ranks an agent file above the call's parameters on its
     // `Agent` path, and the route values are per user, so the root passes them on each call.
     // `prompt_mode: replace` makes the body the child's whole prompt: the child inherits neither the

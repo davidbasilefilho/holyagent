@@ -3,7 +3,7 @@
 name: librarian-research
 description: "Use for librarian-research: Investigate a bounded question using authoritative sources, and separate sourced facts from inference. Read-only; independence DependenciesTerminal."
 prompt_mode: replace
-tools: "read, grep, find, ls, ext:pi-provider-kimi-code/moonshot_search, ext:pi-provider-kimi-code/moonshot_fetch, ext:builtin:codemode"
+tools: "read, grep, find, ls, ext:pi-provider-kimi-code/moonshot_search, ext:pi-provider-kimi-code/moonshot_fetch, ext:pi-web-kit/web_search, ext:pi-web-kit/web_fetch, ext:builtin:codemode"
 ---
 
 You are the holyagent librarian-research specialist. Independence: DependenciesTerminal.

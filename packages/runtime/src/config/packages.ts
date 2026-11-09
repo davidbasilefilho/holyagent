@@ -14,13 +14,14 @@ export const WEB_KIT_PACKAGE = "pi-web-kit" as const satisfies PiPackageName
 /**
  * The Pi package sources that must be loaded for a config, each `npm:<name>@<version>` at its
  * pinned release ({@link piPackageSource}), in a stable order: the provider extension (the package
- * of the `pi.provider` profile, always loaded while `pi.enable` is on), the packages of each
- * enabled capability in the order of the registry (`CAPABILITIES`) that the `form` offers, then the
- * web kit when the web choice is `pi-web-kit` ({@link webChoice}: asked for, or the provider offers
- * no web tools). A disabled capability is neither loaded nor required, and neither is one the form
- * does not offer (computer use in the headless form); the web tools of a provider that offers them
- * load no package, and with `pi.enable` off nothing is loaded. The profile defaults to the selected
- * provider's, and the form to `normal`; a test passes another of either, or its own `definitions`.
+ * of the `pi.provider` profile, always loaded while `pi.enable` is on; Codex has none), the
+ * packages of each enabled capability in the order of the registry (`CAPABILITIES`) that the `form`
+ * offers, then the web kit when the web choice is `pi-web-kit` ({@link webChoice}: asked for, or
+ * the provider offers no web tools). A disabled capability is neither loaded nor required, and
+ * neither is one the form does not offer (computer use in the headless form); the web tools of a
+ * provider that offers them load no package, and with `pi.enable` off nothing is loaded. The
+ * profile defaults to the selected provider's, and the form to `normal`; a test passes another of
+ * either, or its own `definitions`.
  */
 export const piPackages = (
   config: Config,
@@ -31,7 +32,7 @@ export const piPackages = (
   const { enable, features } = config.pi
   if (!enable) return []
   const names: ReadonlyArray<PiPackageName> = [
-    profile.package,
+    ...(profile.package === undefined ? [] : [profile.package]),
     ...capabilityPackages(features, form, definitions),
     ...(webChoice(profile, features.web).source === "pi-web-kit" ? [WEB_KIT_PACKAGE] : []),
   ]

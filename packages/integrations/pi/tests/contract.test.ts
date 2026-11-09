@@ -158,6 +158,7 @@ const start = (directory: string, sessionName?: string) => {
     registerFlag: () => undefined,
     getFlag: () => undefined,
     registerToolRenderer: () => undefined,
+    registerTool: () => undefined,
     getSessionName: () => sessionName,
     getActiveTools: () => [],
     getAllTools: () => [],

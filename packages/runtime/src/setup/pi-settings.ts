@@ -57,12 +57,17 @@ const PACKAGE_DEFAULTS: ReadonlyMap<string, JsonObject> = new Map<string, JsonOb
     },
   ],
   [SUBAGENTS_SETTINGS_FILE, { disableDefaultAgents: false }],
-  ...Object.values(PROVIDERS).map(
-    (profile) =>
-      [
-        profile.toolsFile,
-        { tools: Object.fromEntries(profile.webTools.map((tool) => [tool, { enabled: false }])) },
-      ] as const,
+  ...Object.values(PROVIDERS).flatMap((profile) =>
+    profile.toolsFile === undefined
+      ? []
+      : [
+          [
+            profile.toolsFile,
+            {
+              tools: Object.fromEntries(profile.webTools.map((tool) => [tool, { enabled: false }])),
+            },
+          ] as const,
+        ],
   ),
 ])
 
@@ -83,7 +88,9 @@ const KNOWN_FILES: ReadonlyArray<string> = [
   PI_SETTINGS_FILE,
   SUBAGENTS_SETTINGS_FILE,
   BILLION_CONTEXT_FILE,
-  ...Object.values(PROVIDERS).map((profile) => profile.toolsFile),
+  ...Object.values(PROVIDERS).flatMap((profile) =>
+    profile.toolsFile === undefined ? [] : [profile.toolsFile],
+  ),
 ]
 
 const AGENT_PREFIX = "~/.pi/agent/"

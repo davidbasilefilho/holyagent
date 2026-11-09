@@ -144,13 +144,14 @@ export const toolArgs = (
   profile: ProviderProfile = providerProfile(config),
 ): ToolArgs => {
   const { features } = config.pi
-  const enabled = enabledCapabilities(features)
+  const enabled = enabledCapabilities(features, { provider: config.pi.provider })
   const noMcp = !features.mcp
   const { maxWorkers } = config.pi.codemode
   if (key === "root") {
     const excluded = [
       "write",
       "edit",
+      ...profile.writeTools,
       ...enabled.flatMap((capability) => capability.tools.rootExclude),
       ...webChoice(profile, features.web).tools,
     ]
@@ -159,7 +160,7 @@ export const toolArgs = (
   const { capabilities, roleTask } = routeFor(key)
   const tools = [
     ...READ_TOOLS,
-    ...(has(capabilities, "Write") ? WRITE_TOOLS : []),
+    ...(has(capabilities, "Write") ? [...WRITE_TOOLS, ...profile.writeTools] : []),
     ...(has(capabilities, "Shell") || roleTask === "Reviewer.code" ? SHELL_TOOLS : []),
     ...(has(capabilities, "Search") ? webChoice(profile, features.web).tools : []),
     ...(has(capabilities, "VisualInspection")
@@ -169,7 +170,7 @@ export const toolArgs = (
   const unique = [...new Set(tools)]
   return build(
     [...unique, CODEMODE_TOOL],
-    WRITE_TOOLS.filter((tool) => !unique.includes(tool)),
+    [...WRITE_TOOLS, ...profile.writeTools].filter((tool) => !unique.includes(tool)),
     noMcp,
     maxWorkers,
   )
@@ -253,7 +254,7 @@ export const toolSettings = (
   const web = webChoice(profile, features.web)
   return [
     { file: PI_SETTINGS_FILE, content: { codemode: { mode: config.pi.codemode.mode } } },
-    ...(web.source === "provider"
+    ...(web.source === "provider" && profile.toolsFile !== undefined
       ? [
           {
             file: profile.toolsFile,
@@ -263,6 +264,8 @@ export const toolSettings = (
           },
         ]
       : []),
-    ...enabledCapabilities(features, { form }).flatMap((capability) => capability.settings),
+    ...enabledCapabilities(features, { form, provider: config.pi.provider }).flatMap(
+      (capability) => capability.settings,
+    ),
   ]
 }

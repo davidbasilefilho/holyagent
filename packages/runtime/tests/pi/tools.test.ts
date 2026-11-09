@@ -381,7 +381,7 @@ describe("toolSettings", () => {
   })
 
   test("the provider's web tools are enabled only in provider mode with a provider that has some", () => {
-    const providerFile = PROVIDERS["kimi-coding-global"].toolsFile
+    const providerFile = PROVIDERS["kimi-coding-global"].toolsFile ?? ""
     const files = (config: Config, profile?: ProviderProfile) =>
       toolSettings(config, profile).map((patch) => patch.file)
     expect(files(DEFAULT_CONFIG)).toContain(providerFile)

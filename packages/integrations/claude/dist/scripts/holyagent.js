@@ -7313,6 +7313,9 @@ var optional2 = /* @__PURE__ */ lambda((self) => {
     schema
   });
 });
+var toType2 = /* @__PURE__ */ lambda((schema) => make7(toType(schema.ast), {
+  schema
+}));
 var toEncoded2 = /* @__PURE__ */ lambda((schema) => make7(toEncoded(schema.ast), {
   schema
 }));
@@ -12503,6 +12506,33 @@ class ConfigInvalid extends TaggedError2("ConfigInvalid") {
   }
 }
 
+var CODEX_PROVIDER_ID = "openai-codex";
+var SOL = "gpt-6.1-sol";
+var TERRA = "gpt-6.1-terra";
+var LUNA = "gpt-6-luna";
+var choice = (model, thinking) => ({ model, thinking });
+var CODEX_ROUTES = {
+  root: choice(SOL, "high"),
+  "Explorer.map": choice(LUNA, "low"),
+  "Explorer.lookup": choice(LUNA, "low"),
+  "Explorer.trace": choice(TERRA, "medium"),
+  "Librarian.lookup": choice(LUNA, "low"),
+  "Librarian.research": choice(TERRA, "medium"),
+  "Worker.mechanical": choice(LUNA, "medium"),
+  "Worker.implementation": choice(TERRA, "high"),
+  "Worker.integration": choice(TERRA, "medium"),
+  "Worker.operations": choice(LUNA, "medium"),
+  "Worker.validation": choice(LUNA, "low"),
+  "Worker.debugging": choice(TERRA, "xhigh"),
+  "Worker.visual": choice(TERRA, "high"),
+  "Reviewer.visual": choice(TERRA, "high"),
+  "Reviewer.code": choice(TERRA, "high"),
+  "Reviewer.testing": choice(TERRA, "medium"),
+  "Reviewer.audit": choice(LUNA, "high"),
+  "Reviewer.security": choice(TERRA, "xhigh"),
+  "Reviewer.artifact": choice(TERRA, "medium")
+};
+
 var CAPABILITY_FORMS = ["headless", "normal"];
 var BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json";
 var PI_SETTINGS_FILE = "~/.pi/agent/settings.json";
@@ -12623,6 +12653,34 @@ var CAPABILITIES = [
     ],
     tools: { rootExclude: COMPUTER_USE_TOOLS, visual: COMPUTER_USE_TOOLS },
     health: ["needs", "packages"]
+  },
+  {
+    name: "luna-reserve",
+    feature: "lunaReserve",
+    description: "Falls back to Codex's Luna Reserve allowance when the usage limit is reached (Codex provider only)",
+    provider: "openai-codex",
+    skills: [],
+    applicability: "both",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm([]),
+    tools: { rootExclude: [], visual: [] },
+    settings: [],
+    health: ["needs"]
+  },
+  {
+    name: "context-management",
+    feature: "contextManagement",
+    description: "Lets the server compact the history with context_management while Billion Context is off (Codex provider only)",
+    provider: "openai-codex",
+    skills: [],
+    applicability: "both",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm([]),
+    tools: { rootExclude: [], visual: [] },
+    settings: [],
+    health: ["needs"]
   }
 ];
 var FEATURE_DEFAULTS = Object.fromEntries(CAPABILITIES.map((capability) => [capability.feature, capability.defaultOn]));
@@ -12638,7 +12696,7 @@ var unavailableIn = (capability, form) => {
   const entry = capability.forms[form];
   return "unavailable" in entry ? entry.unavailable : undefined;
 };
-var enabledCapabilities = (features, options = {}) => (options.definitions ?? CAPABILITIES).filter((capability) => features[capability.feature] === true && (options.form === undefined || unavailableIn(capability, options.form) === undefined));
+var enabledCapabilities = (features, options = {}) => (options.definitions ?? CAPABILITIES).filter((capability) => features[capability.feature] === true && (options.form === undefined || unavailableIn(capability, options.form) === undefined) && (options.provider === undefined || capability.provider === undefined || capability.provider === options.provider));
 var capabilityPackages = (features, form, definitions = CAPABILITIES) => enabledCapabilities(features, { form, definitions }).flatMap((capability) => formContent(capability, form)?.packages ?? []);
 var managedCapabilityPackages = (definitions = CAPABILITIES) => [
   ...new Set(definitions.flatMap((capability) => CAPABILITY_FORMS.flatMap((form) => formContent(capability, form)?.packages ?? [])))
@@ -12650,7 +12708,7 @@ var VcsSettings = Struct({
   allowWords: optionalKey2(ArraySchema(String4)),
   stateBranch: optionalKey2(String4)
 });
-var PiProvider = Literals(["kimi-coding-global"]);
+var PiProvider = Literals(["kimi-coding-global", "openai-codex"]);
 var Thinking = Literals(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
 var ModelId = String4.check(isPattern2(/^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$/));
 var KIMI_ROOT = "k3.1-pro";
@@ -12677,18 +12735,22 @@ var KIMI_ROUTES = {
   "Reviewer.security": kimi(KIMI_SPECIALIST, "max"),
   "Reviewer.artifact": kimi(KIMI_SPECIALIST, "max")
 };
-var route = (key) => defaulted(Struct({
-  model: defaulted(ModelId, KIMI_ROUTES[key].model),
-  thinking: defaulted(Thinking, KIMI_ROUTES[key].thinking)
+var PROVIDER_ROUTES = {
+  "kimi-coding-global": KIMI_ROUTES,
+  "openai-codex": CODEX_ROUTES
+};
+var route = () => defaulted(Struct({
+  model: optionalKey2(ModelId),
+  thinking: optionalKey2(Thinking)
 }), {});
-var ROUTE_FIELDS = Object.fromEntries(Object.keys(KIMI_ROUTES).map((key) => [key, route(key)]));
+var ROUTE_FIELDS = Object.fromEntries(Object.keys(KIMI_ROUTES).map((key) => [key, route()]));
 var WebMode = Literals(["provider", "pi-web-kit", "off"]);
 var CodemodeMode = Literals(["on", "only"]);
 var T3Scope = Literals(["global", "project"]);
 var Enabled = Boolean3;
 var capabilitySwitch = (on) => defaulted(Enabled, on);
 var CAPABILITY_FIELDS = Object.fromEntries(CAPABILITIES.map((capability) => [capability.feature, capabilitySwitch(capability.defaultOn)]));
-var PiSection = defaulted(Struct({
+var PI_FIELDS = {
   enable: defaulted(Enabled, true),
   provider: defaulted(PiProvider, "kimi-coding-global"),
   routes: defaulted(Struct(ROUTE_FIELDS), {}),
@@ -12705,7 +12767,30 @@ var PiSection = defaulted(Struct({
     worktrees: defaulted(Enabled, true),
     deviceAccess: defaulted(Enabled, true)
   }), {})
-}), {});
+};
+var PiAsWritten = Struct(PI_FIELDS);
+var PiResolved = toType2(Struct({
+  ...PI_FIELDS,
+  routes: Struct(Object.fromEntries(Object.keys(KIMI_ROUTES).map((key) => [
+    key,
+    Struct({ model: String4, thinking: Thinking })
+  ])))
+}));
+var withProviderRoutes = (pi) => {
+  const defaults = PROVIDER_ROUTES[pi.provider];
+  const routes = Object.fromEntries(Object.keys(defaults).map((key) => [
+    key,
+    {
+      model: pi.routes[key].model ?? defaults[key].model,
+      thinking: pi.routes[key].thinking ?? defaults[key].thinking
+    }
+  ]));
+  return { ...pi, routes };
+};
+var PiSection = defaulted(PiAsWritten.pipe(decodeTo2(PiResolved, {
+  decode: transform(withProviderRoutes),
+  encode: transform((pi) => pi)
+})), {});
 var ClaudeSection = defaulted(Record(String4, Never2), {});
 var Config = Struct({
   vcs: defaulted(VcsSettings, {}),
@@ -13096,14 +13181,49 @@ var pi_packages_default = {
 var PI_PACKAGE_VERSIONS = pi_packages_default;
 var piPackageSource = (name) => `npm:${name}@${PI_PACKAGE_VERSIONS[name]}`;
 
+var APPLY_PATCH_TOOL = "apply_patch";
+class PatchSyntaxError extends TaggedError2("PatchSyntaxError") {
+  get message() {
+    return this.line === undefined ? `Invalid patch: ${this.reason}` : `Invalid patch at line ${this.line}: ${this.reason}`;
+  }
+}
+
+class PatchPathError extends TaggedError2("PatchPathError") {
+  get message() {
+    return `Invalid patch: ${this.path} is not a path below the working directory; file references must be relative`;
+  }
+}
+
+class PatchContextError extends TaggedError2("PatchContextError") {
+  get message() {
+    return `${this.reason} in ${this.path}`;
+  }
+}
+
+class PatchFileError extends TaggedError2("PatchFileError") {
+  get message() {
+    return `${this.path}: ${this.reason}`;
+  }
+}
+
 var PROVIDERS = {
   "kimi-coding-global": {
     id: "kimi-coding",
     package: "pi-provider-kimi-code",
+    family: "kimi-k3.1",
+    writeTools: [],
     env: { KIMI_CODE_REGION: "global" },
     loginFix: "Run /login kimi-coding in Pi, or set KIMI_API_KEY",
     webTools: ["moonshot_search", "moonshot_fetch"],
     toolsFile: "~/.pi/providers/kimi-coding/config.json"
+  },
+  "openai-codex": {
+    id: CODEX_PROVIDER_ID,
+    family: "gpt-6",
+    writeTools: [APPLY_PATCH_TOOL],
+    env: {},
+    loginFix: "Run /login openai-codex in Pi and sign in with the ChatGPT account that has Codex",
+    webTools: []
   }
 };
 var providerProfile = (config) => PROVIDERS[config.pi.provider];
@@ -22718,7 +22838,7 @@ var piPackages = (config, profile = providerProfile(config), form = "normal", de
   if (!enable)
     return [];
   const names = [
-    profile.package,
+    ...profile.package === undefined ? [] : [profile.package],
     ...capabilityPackages(features, form, definitions),
     ...webChoice(profile, features.web).source === "pi-web-kit" ? [WEB_KIT_PACKAGE] : []
   ];
@@ -22893,7 +23013,7 @@ var checkCapability = (env, scope, capability, form, listed, files) => gen2(func
 });
 var checkCapabilities = (env, cwd, scope, config, choice, listed) => gen2(function* () {
   const files = piPresenceFiles(env, cwd, scope);
-  const lines = yield* forEach2(enabledCapabilities(config.pi.features), (capability) => checkCapability(env, scope, capability, choice.form, listed, files));
+  const lines = yield* forEach2(enabledCapabilities(config.pi.features, { provider: config.pi.provider }), (capability) => checkCapability(env, scope, capability, choice.form, listed, files));
   return [pass("pi form", describeForm(choice)), ...lines];
 });
 var piChecks = (env, cwd, scope, choice = DEFAULT_FORM_CHOICE) => gen2(function* () {
@@ -22935,7 +23055,7 @@ var toolSettings = (config, profile = providerProfile(config), form = "normal") 
   const web = webChoice(profile, features.web);
   return [
     { file: PI_SETTINGS_FILE, content: { codemode: { mode: config.pi.codemode.mode } } },
-    ...web.source === "provider" ? [
+    ...web.source === "provider" && profile.toolsFile !== undefined ? [
       {
         file: profile.toolsFile,
         content: {
@@ -22943,7 +23063,7 @@ var toolSettings = (config, profile = providerProfile(config), form = "normal") 
         }
       }
     ] : [],
-    ...enabledCapabilities(features, { form }).flatMap((capability) => capability.settings)
+    ...enabledCapabilities(features, { form, provider: config.pi.provider }).flatMap((capability) => capability.settings)
   ];
 };
 
@@ -22957,9 +23077,13 @@ var PACKAGE_DEFAULTS = new Map([
     }
   ],
   [SUBAGENTS_SETTINGS_FILE, { disableDefaultAgents: false }],
-  ...Object.values(PROVIDERS).map((profile) => [
-    profile.toolsFile,
-    { tools: Object.fromEntries(profile.webTools.map((tool) => [tool, { enabled: false }])) }
+  ...Object.values(PROVIDERS).flatMap((profile) => profile.toolsFile === undefined ? [] : [
+    [
+      profile.toolsFile,
+      {
+        tools: Object.fromEntries(profile.webTools.map((tool) => [tool, { enabled: false }]))
+      }
+    ]
   ])
 ]);
 var valueAt3 = (node, path) => path.reduce((current, key) => isJsonObject2(current) ? current[key] : undefined, node);
@@ -22968,7 +23092,7 @@ var KNOWN_FILES = [
   PI_SETTINGS_FILE,
   SUBAGENTS_SETTINGS_FILE,
   BILLION_CONTEXT_FILE,
-  ...Object.values(PROVIDERS).map((profile) => profile.toolsFile)
+  ...Object.values(PROVIDERS).flatMap((profile) => profile.toolsFile === undefined ? [] : [profile.toolsFile])
 ];
 var AGENT_PREFIX = "~/.pi/agent/";
 var PI_PREFIX = "~/.pi/";
@@ -23255,7 +23379,7 @@ var applyCapabilityChoices = fn2("applyCapabilityChoices")(function* (env, optio
 var MANAGED_NAMES = new Set([
   ...managedCapabilityPackages(),
   WEB_KIT_PACKAGE,
-  ...Object.values(PROVIDERS).map((profile) => profile.package)
+  ...Object.values(PROVIDERS).flatMap((profile) => profile.package === undefined ? [] : [profile.package])
 ]);
 var staleManagedNames = (listed, wanted, managed = MANAGED_NAMES) => {
   const wantedNames = new Set(wanted.map((source) => parseNpmSource(source)?.name));

@@ -6,10 +6,10 @@ import { join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
 
 import { $ } from "bun"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 
 import { PI_HOST_PACKAGES } from "../../../../scripts/dependency-pins.ts"
-import { defaultConfig } from "../../../runtime/src/config/schema.ts"
+import { Config, defaultConfig } from "../../../runtime/src/config/schema.ts"
 import { toPosix } from "../../../runtime/src/domain/paths.ts"
 import { type Route, ROUTES } from "../../../runtime/src/domain/route.ts"
 import { PI_ROOT_PLACEHOLDER } from "../../../runtime/src/hooks/pi-context.ts"
@@ -22,6 +22,14 @@ import { build } from "../build.ts"
 import packageJson from "../package.json" with { type: "json" }
 import { agentTools } from "../src/agents.ts"
 import { runtimeArgs } from "../src/extension.ts"
+import {
+  DEFAULT_PI_FAMILY,
+  EXTRA_PI_FAMILIES,
+  FAMILIES_FOLDER,
+  familyAgents,
+  familySkills,
+  promptBody,
+} from "../src/families.ts"
 import { DIST_DIRECTORY, PACKAGE_DIRECTORY, REPOSITORY } from "../src/files.ts"
 import {
   bundleExtension,
@@ -295,6 +303,45 @@ describe("the skills", () => {
   })
 })
 
+describe("the other families the package carries", () => {
+  const folder = (path: string) =>
+    generated.filter((file) => file.path.startsWith(`${DIST_DIRECTORY}/${path}/`))
+  const names = (files: ReadonlyArray<{ readonly path: string }>) =>
+    files.map((file) => file.path.split("/").at(-1) ?? "").toSorted()
+  const expectedAgents = SPECIALIST_NAMES.map((name) => `${name}.md`).toSorted()
+
+  test("the package's own agents and skills stay the default family's; the others sit below families/", () => {
+    expect(EXTRA_PI_FAMILIES).toEqual(["gpt-6"])
+    expect(PI_FAMILY).toBe(DEFAULT_PI_FAMILY)
+    expect(PACKAGE_FILES).toContain(FAMILIES_FOLDER)
+    expect(names(folder("agents"))).toEqual(expectedAgents)
+  })
+
+  test("each extra family has one prompt per specialist and the family's skills, one for one", async () => {
+    for (const family of EXTRA_PI_FAMILIES) {
+      expect(names(folder(familyAgents(family)))).toEqual(expectedAgents)
+      const source = `${instructionsDirectory(family)}/skills/`
+      expect(
+        folder(familySkills(family)).map((file) =>
+          file.path.slice(`${DIST_DIRECTORY}/${familySkills(family)}/`.length),
+        ),
+      ).toEqual((await filesBelow(source)).map((path) => path.slice(source.length)))
+    }
+  })
+
+  test("a family's prompt is written from that family's sources, not copied from the default's", () => {
+    for (const name of SPECIALIST_NAMES) {
+      const own = generated.find((file) => file.path === `${DIST_DIRECTORY}/agents/${name}.md`)
+      const gpt = generated.find(
+        (file) => file.path === `${DIST_DIRECTORY}/${familyAgents("gpt-6")}/${name}.md`,
+      )
+      expect(gpt?.content, name).toContain(`instructions/gpt-6/roles/${name}`)
+      expect(own?.content, name).toContain(`instructions/kimi-k3.1/roles/${name}`)
+      expect(promptBody(gpt?.content ?? ""), name).not.toBe(promptBody(own?.content ?? ""))
+    }
+  })
+})
+
 describe("the specialists", () => {
   const files = generated.filter((file) => file.path.startsWith(`${DIST_DIRECTORY}/agents/`))
   const parsed = (file: { readonly content: string }) => {
@@ -335,14 +382,20 @@ describe("the specialists", () => {
       // Each tool of toolArgs is covered: built-ins and mcp__ patterns by name, codemode, the
       // computer-use and web tools through the extension that serves them.
       const decided = toolArgs(config, route.roleTask).tools
-      const covered = decided.map((tool) =>
+      // A web tool is listed through every provider's web source: the file is shared by them all.
+      const covered = decided.flatMap((tool) =>
         tool === "codemode"
-          ? "ext:builtin:codemode"
+          ? ["ext:builtin:codemode"]
           : tool.startsWith("computer_use_")
-            ? "ext:pi-computer-use"
+            ? ["ext:pi-computer-use"]
             : tool.startsWith("moonshot_")
-              ? `ext:pi-provider-kimi-code/${tool}`
-              : tool,
+              ? [
+                  "ext:pi-provider-kimi-code/moonshot_search",
+                  "ext:pi-provider-kimi-code/moonshot_fetch",
+                  "ext:pi-web-kit/web_search",
+                  "ext:pi-web-kit/web_fetch",
+                ]
+              : [tool],
       )
       expect(tools).toEqual([...new Set(covered)])
     }
@@ -384,6 +437,38 @@ describe("the specialists", () => {
     expect(agentTools(withFeatures({ computerUse: false }), visual).join()).not.toContain(
       "computer",
     )
+  })
+
+  test("every web-using specialist lists the web tools of every provider, so a Codex session has pi-web-kit's", async () => {
+    const codex = await Effect.runPromise(
+      Schema.decodeUnknownEffect(Config)({ pi: { provider: "openai-codex" } }),
+    )
+    const web = [
+      "ext:pi-provider-kimi-code/moonshot_search",
+      "ext:pi-provider-kimi-code/moonshot_fetch",
+      "ext:pi-web-kit/web_search",
+      "ext:pi-web-kit/web_fetch",
+    ]
+    const searchers = ["librarian-lookup", "librarian-research"]
+    for (const route of ROUTES) {
+      const searches = searchers.includes(route.agent)
+      // Under either provider's config and in every family's file, the tools line is the same.
+      for (const from of [config, codex])
+        expect(
+          agentTools(from, route).filter((tool) => web.includes(tool)),
+          route.agent,
+        ).toEqual(searches ? web : [])
+      for (const folder of ["agents", familyAgents("gpt-6")]) {
+        const file = generated.find(
+          (entry) => entry.path === `${DIST_DIRECTORY}/${folder}/${route.agent}.md`,
+        )
+        const tools = String(parsed(file ?? { content: "" }).frontmatter["tools"]).split(", ")
+        expect(
+          tools.filter((tool) => web.includes(tool)),
+          `${folder}/${route.agent}`,
+        ).toEqual(searches ? web : [])
+      }
+    }
   })
 
   test("have the Kimi specialist prompt as the body, without the maintainers' notes", () => {
@@ -431,6 +516,7 @@ describe("the extension", () => {
         registerFlag: (name: string) => void used.push(`registerFlag ${name}`),
         on: (event: string) => void used.push(`on ${event}`),
         registerToolRenderer: () => void used.push("registerToolRenderer"),
+        registerTool: (tool: { name: string }) => void used.push(`registerTool ${tool.name}`),
       }
       expect(typeof loaded.default).toBe("function")
       expect(loaded.default(api)).toBeUndefined()
@@ -439,13 +525,22 @@ describe("the extension", () => {
         "on before_agent_start",
         "on before_agent_start",
         "on before_agent_start",
+        "on before_agent_start",
+        "on before_agent_start",
+        "on before_provider_request",
         "on message_end",
+        "on message_end",
+        "on provider_stream_event",
+        "on session_compact",
         "on session_compact",
         "on session_shutdown",
         "on session_start",
+        "on session_start",
+        "on session_tree",
         "on session_tree",
         "on tool_call",
         "registerFlag holyagent-role",
+        "registerTool apply_patch",
         "registerToolRenderer",
       ])
     } finally {

@@ -14,6 +14,7 @@ import { frontmatter } from "../../claude/src/agents.ts"
 import packageJson from "../package.json" with { type: "json" }
 import { agentFiles } from "./agents.ts"
 import { bunFlags } from "./bun-flags.ts"
+import { EXTRA_PI_FAMILIES, FAMILIES_FOLDER, familyAgents, familySkills } from "./families.ts"
 import {
   DIST_DIRECTORY,
   type GeneratedFile,
@@ -52,6 +53,7 @@ export const RUNTIME_SOURCE = "packages/runtime/src/hooks/pi-entry.ts"
 export const PACKAGE_FILES: ReadonlyArray<string> = [
   "agents",
   "extensions",
+  FAMILIES_FOLDER,
   "prompts",
   "scripts",
   "skills",
@@ -199,11 +201,26 @@ const promptFiles = (): ReadonlyArray<GeneratedFile> =>
     content: `${frontmatter(generatedNote(`${PROMPTS_SOURCE}/${name}.md`), head)}\n${body}\n`,
   }))
 
-const skills = async (family: Family): Promise<ReadonlyArray<GeneratedFile>> =>
+const skills = async (family: Family, folder = "skills"): Promise<ReadonlyArray<GeneratedFile>> =>
   (await Effect.runPromise(skillFiles(family, generatedNote))).map(({ path, content }) => ({
-    path: inPackage(`skills/${path}`),
+    path: inPackage(`${folder}/${path}`),
     content,
   }))
+
+/**
+ * The specialist prompts and skills of the families a provider can run besides the package's own,
+ * below `families/<family>/`: the extension swaps a session onto them when the config selects a
+ * provider with that family.
+ */
+const otherFamilies = async (family: Family): Promise<ReadonlyArray<GeneratedFile>> =>
+  (
+    await Promise.all(
+      EXTRA_PI_FAMILIES.filter((extra) => extra !== family).map(async (extra) => [
+        ...(await agentFiles(extra, undefined, familyAgents(extra))),
+        ...(await skills(extra, familySkills(extra))),
+      ]),
+    )
+  ).flat()
 
 /** Every generated file of the package for a model family, in path order. */
 export const generate = async (family: Family = PI_FAMILY): Promise<ReadonlyArray<GeneratedFile>> =>
@@ -214,4 +231,5 @@ export const generate = async (family: Family = PI_FAMILY): Promise<ReadonlyArra
     ...promptFiles(),
     ...(await scripts()),
     ...(await skills(family)),
+    ...(await otherFamilies(family)),
   ].toSorted((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
