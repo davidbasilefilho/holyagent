@@ -1,0 +1,46 @@
+{
+  "id": "assignment-0mw9roekg-jryb",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Reviewer.security",
+  "slug": "confirm-the-dev-null-device-handling-and",
+  "objective": "Confirm the /dev/null device handling and Windows path mapping add no path, injection or host-damage defect.",
+  "state": "Running",
+  "scope": [
+    "Range d149c9cd..e6f334c7 on release/0.3.1/feat/just-bash in /home/user/holyagent-0.3.1-bash (PR davidbasilefilho/holyagent#106, now targeting release/0.3.1/integration): the /dev/null and exit repair, a merge of the Codex branch's Windows test fix, the Windows path-rules fix, and a content-free merge of the integration branch. Source diff without dist at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/jb-r3.diff",
+    "Findings these commits address: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9qmod2-hygi.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9qmonh-9wkm.md (optional items) and the Windows CI failures in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/win-106.txt; writer reports /home/user/holyagent/.git/holyagent/reports/assignment-0mw9qugeg-vovd.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9rc4gj-gk3c.md",
+    "The Windows writer changed four cwd tests and one PATH test to expect the shell's own /c/... spelling instead of C:\\..., claiming the end-of-call mapping already returns Windows paths to Pi. Verify that claim from the code."
+  ],
+  "constraints": [
+    "Read-only: no edits, no git writes. Run commands only in /home/user/holyagent-0.3.1-bash and pass the explicit range d149c9cd..e6f334c7 to any review command.",
+    "Testing is unit tests and fixtures only: never start pi or make live model requests.",
+    "Report in under 400 words; start each evidence line with the exact criterion text, a colon and the support inline."
+  ],
+  "criteria": [
+    {
+      "text": "No operation in the shell can remove, replace or write the host /dev/null",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The Windows path and PATH mapping cannot make a host program or a later call resolve a different folder or program than the shell named",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9qugeg-vovd",
+    "assignment-0mw9rc4gj-gk3c"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T21:22:08.704Z"
+  },
+  "createdAt": "2026-11-09T21:22:08.704Z"
+}
