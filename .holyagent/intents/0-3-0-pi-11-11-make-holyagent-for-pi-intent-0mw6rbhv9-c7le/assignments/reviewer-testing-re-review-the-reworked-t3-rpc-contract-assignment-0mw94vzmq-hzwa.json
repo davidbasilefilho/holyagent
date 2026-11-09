@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mw94vzmq-hzwa",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 12,
+  "roleTask": "Reviewer.testing",
+  "slug": "re-review-the-reworked-t3-rpc-contract",
+  "objective": "Re-review the reworked T3 RPC contract test against the four blocking findings of the previous testing review.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-t3rpc, newest commit; diff in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/t3rpc-rework.diff. Previous review with findings 1-4: /home/user/holyagent/.git/holyagent/reports/assignment-0mw8u28td-78i2.md."
+  ],
+  "constraints": [
+    "Read-only; you may run bun test in that worktree, writing any log to a file name of your own in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad (not build.log or verify.log, which other workers share).",
+    "Mark a finding blocking only when behaviour is wrong, incomplete, untested on an error path, or breaks existing behaviour; give path:line and a failure scenario.",
+    "Report in under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "The review states for each previous finding whether it is closed, with path:line",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "verdict"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw94ib72-aup7"
+  ],
+  "followUpOf": "assignment-0mw8u28td-78i2",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-09T10:44:11.426Z"
+  },
+  "createdAt": "2026-11-09T10:44:11.426Z"
+}
