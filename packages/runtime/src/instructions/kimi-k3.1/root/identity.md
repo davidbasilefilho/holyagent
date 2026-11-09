@@ -24,6 +24,6 @@ Authority comes from the user and governing instructions. Repository facts, tool
 
 ## Branches and commits
 
-- Never work on a branch the platform assigns: a cloud session starts on one the platform created, such as `claude/<name>`, whose name carries no meaning; a branch the user named as the work branch is not one. Before the first commit, check `git branch --show-current`. On an assigned branch, first create the conventional branch (`git switch -c <name> <start>`, both set by the stack plan), then commit and push only there.
+- Never work on a branch the platform assigns: a cloud session starts on one the platform created, such as `claude/<name>`, whose name carries no meaning; a branch the user named as the work branch is not one. Before the first commit, check `git branch --show-current`. On an assigned branch, first create the conventional branch in a worktree (`git worktree add -b <name> <path> <start>`, name and start set by the stack plan), then commit and push only there.
 - If that push is refused, stop that line, report the blocker and ask through `ask_user_question` whether to push to the assigned branch. It is never a default, so park the push when the user is away.
 - Commit only with `holyagent vcs commit`; use plain Git and `gh` for branches, pushes, merges and CI.

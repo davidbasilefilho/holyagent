@@ -111,6 +111,10 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
       section: "root/identity.md",
       phrase: "Never work on a branch the platform assigns",
     },
+    "R-CLOUD-CHECKOUT": {
+      section: "root/version-control.md",
+      phrase: "leave the primary checkout on the assigned branch at its start commit",
+    },
     "R-STATE": {
       section: "skills/state-mode/SKILL.md",
       phrase: "set the mode with `holyagent state mode <mode>`",
@@ -321,6 +325,10 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     "R-BRANCH": {
       section: "root/identity.md",
       phrase: "Never work on a branch the platform assigns",
+    },
+    "R-CLOUD-CHECKOUT": {
+      section: "root/version-control.md",
+      phrase: "leave the primary checkout on the assigned branch at its start commit",
     },
     "R-REASK": {
       section: "root/asking.md",
