@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "add-a-capability-registry-to-the-pi",
   "objective": "Add a capability registry to the Pi integration: each optional capability is one declarative entry that drives pi.features, the packages it installs, setup flags and TUI toggles, and doctor health, in a headless and a normal form.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.1-cap, branch release/0.3.1/feat/capabilities (cut from release/0.3.1/integration at 0.3.1).",
     "Maintainer requirements (verbatim): \"everything should be modular and easily upgradeable btw\" and \"btw we shall support both headless use and normal use, that's the point of capabilities, to modularly support systems\". The model is holycodex v0.16.12's capability registry, mostly default-on; setup and doctor detect the system (display, OS, installed tools) to pick the form.",
@@ -94,7 +94,57 @@
     "agentId": "workflow:wf_b9a53b77-5d3/assignment-0mw9hx5gc-m6us",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T16:49:00.636Z"
+    "startedAt": "2026-11-09T16:49:00.636Z",
+    "finishedAt": "2026-11-09T17:13:13.279Z"
+  },
+  "result": "result: Capability registry added and wired through `pi.features`, packages, tool settings, setup flags, the setup screen and doctor. `mise run build` and `mise run verify` both exit 0.\n\nchanged: `packages/runtime/src/config/` (new `capabilities.ts`; `schema.ts`, `packages.ts`, `index.ts`). `packages/runtime/src/setup/` (new `form.ts`, `capabilities.ts`; `pi-check.ts`, `pi-install.ts`, `pi-settings.ts`, `steps.ts`, `doctor.ts`, `tui/{model,session,types}.ts`). `packages/runtime/src/pi/tools.ts`, `packages/runtime/src/cli/setup.ts`, `packages/integrations/pi/src/agents.ts`, the regenerated `dist` files in the claude and pi integrations, and `docs/{components,usage}.md` and `docs/pi/{README,configuration,extensions,installation}.md`. New and updated tests are under `packages/runtime/tests`.\n\nchecks:\n`mise run build` -> 0.\n`mise run verify` -> 0 (type-check, lint with 0 warnings, format check; 2757 pass, 0 fail, 91 files).\nAfter the build, only the expected `dist` files changed.\n\n**Registry entries (all default on):** subagents, context-compression, todo, ask, processes, mcp, computer-use. Only computer-use differs by form: the headless form does not offer it. Each entry has its package names (not versions), MCP servers, skills, applicability, needs, forms, tool patterns, settings and health probes. Pins stay in `pi-packages.json`, and a test asserts the registry holds no version.\n\n**New flags:** `--<capability> on|off` for each entry (for example `--computer-use off`), and `--form headless|normal` on setup and doctor. A capability flag is refused with `--undo`. Choices are written as `pi.features.<key>` to the scope's config, only where the value differs. The setup screen has one row per capability. Doctor prints `pi form` and one `pi capability <name>` line per enabled capability.\n\n**Behavior changes:**\nOn a headless machine (CI, a cloud session, or no display on Linux), setup no longer installs the computer-use package or its settings, and removes a listed package.\nThe doctor `pi features` and `pi feature <name>` lines became `pi base packages`, `pi form` and per-capability lines.\nThe setup screen now opens whenever Pi is in use and the config loads with `pi.enable` on, not only when T3 has work. It is skipped for `--undo`, in cloud sessions, and when a capability flag is passed.\nCode that calls `setup()`, `doctor()` or `piPackages` without a form still gets the normal form, as before.\n\nquestions: none\nblockers: none\n\nnotes:\n`pi.features.web` stays a three-way choice outside the registry.\n`toolArgs` and the generated specialist files ignore the form, so the generated agents are unchanged.\nCapability choices are written at the scope's config level; a user-level `computerUse: false` still wins over a project-level on.\n`docs/pi/t3-code.md` (setup screen section) may need a note on the capability rows.\n`holyagent setup --undo` leaves capability choices in the config.\n\nevidence:\nA capability registry data module defines every existing optional capability with the listed fields, and pi.features, package selection, tool settings, setup and doctor read from it: `/home/user/holyagent-0.3.1-cap/packages/runtime/src/config/capabilities.ts`; `tests/config/capabilities.test.ts` (11 pass).\nHeadless and normal forms are detected by setup and doctor, with an override flag, and each capability's form is applied: `setup/form.ts`; `tests/setup-form.test.ts` (12 pass); `tests/setup-capabilities.test.ts` form tests; doctor form tests in `tests/setup-pi.test.ts`.\nSetup has a flag and a TUI toggle per capability; doctor reports each enabled capability's health and form: `tests/setup-capabilities.test.ts` (flags), `tests/setup-tui-capabilities.test.ts` and `tests/setup-tui-cli.test.ts` (rows, apply), `tests/setup-pi.test.ts` (doctor lines).\nExisting defaults and 0.3.0 config files behave unchanged: `tests/config/capabilities.test.ts` (the 0.3.0 config decodes strictly, and package order matches the 0.3.0 table); the existing `packages`, `tools` and `config` tests pass unchanged apart from import moves.\nTests cover registry-driven selection, form detection, setup flags and doctor output, each failing without the change: the new test files above; they import modules that do not exist on the base. I did not run them against the base tree.\nNo new 0.3.1 capability entries and no version duplicated outside config/pi-packages.json: seven entries only; the registry source holds no version number (asserted in `tests/config/capabilities.test.ts`).\nmise run build and mise run verify exit 0: both exit 0; verify shows 2757 pass, 0 fail.\nchecks-run: `bunx --no-install mise run build` -> 0; `bunx --no-install mise run verify` -> 0 (log: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`).\nchanged-paths: listed under `changed:` above.\ndiff-file: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/capabilities.diff`\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "Registry of seven existing capabilities drives features, packages, tool settings, setup flags, TUI rows and doctor; headless/normal form with override; 0.3.0 config decodes; build and verify exit 0 (2757 pass).",
+    "criteria": [
+      {
+        "criterion": "A capability registry data module defines every existing optional capability with the listed fields, and pi.features, package selection, tool settings, setup and doctor read from it",
+        "support": "`/home/user/holyagent-0.3.1-cap/packages/runtime/src/config/capabilities.ts`; `tests/config/capabilities.test.ts` (11 pass)."
+      },
+      {
+        "criterion": "Headless and normal forms are detected by setup and doctor, with an override flag, and each capability's form is applied",
+        "support": "`setup/form.ts`; `tests/setup-form.test.ts` (12 pass); `tests/setup-capabilities.test.ts` form tests; doctor form tests in `tests/setup-pi.test.ts`."
+      },
+      {
+        "criterion": "Setup has a flag and a TUI toggle per capability; doctor reports each enabled capability's health and form",
+        "support": "`tests/setup-capabilities.test.ts` (flags), `tests/setup-tui-capabilities.test.ts` and `tests/setup-tui-cli.test.ts` (rows, apply), `tests/setup-pi.test.ts` (doctor lines)."
+      },
+      {
+        "criterion": "Existing defaults and 0.3.0 config files behave unchanged",
+        "support": "`tests/config/capabilities.test.ts` (the 0.3.0 config decodes strictly, and package order matches the 0.3.0 table); the existing `packages`, `tools` and `config` tests pass unchanged apart from import moves."
+      },
+      {
+        "criterion": "Tests cover registry-driven selection, form detection, setup flags and doctor output, each failing without the change",
+        "support": "the new test files above; they import modules that do not exist on the base. I did not run them against the base tree."
+      },
+      {
+        "criterion": "No new 0.3.1 capability entries and no version duplicated outside config/pi-packages.json",
+        "support": "seven entries only; the registry source holds no version number (asserted in `tests/config/capabilities.test.ts`)."
+      },
+      {
+        "criterion": "mise run build and mise run verify exit 0",
+        "support": "both exit 0; verify shows 2757 pass, 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bunx --no-install mise run build` -> 0; `bunx --no-install mise run verify` -> 0 (log: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`)."
+      },
+      {
+        "label": "changed-paths",
+        "support": "listed under `changed:` above."
+      },
+      {
+        "label": "diff-file",
+        "support": "`/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/capabilities.diff`"
+      }
+    ]
   },
   "createdAt": "2026-11-09T16:49:00.636Z"
 }
