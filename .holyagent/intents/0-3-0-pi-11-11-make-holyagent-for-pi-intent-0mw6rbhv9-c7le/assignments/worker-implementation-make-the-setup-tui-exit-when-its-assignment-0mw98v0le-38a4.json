@@ -1,0 +1,87 @@
+{
+  "id": "assignment-0mw98v0le-38a4",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 13,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-setup-tui-exit-when-its",
+  "objective": "Make the setup TUI exit when its terminal hangs up or it is signalled, fix the dry-run failure fixture, and close the remaining review items.",
+  "state": "Running",
+  "scope": [
+    "Work only in /home/user/holyagent-0.3.0-tui (branch release/0.3.0/feat/setup-tui, head 0130a8b2). The reviews of the last repair are /home/user/holyagent/.git/holyagent/reports/assignment-0mw98bh2g-iu59.md (code), /home/user/holyagent/.git/holyagent/reports/assignment-0mw98bhbo-gj8f.md (security) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw98bgsf-onrz.md (visual); read them for the file and line of each item.",
+    "Blocking 1: after SIGHUP (pty closed) or SIGTERM the setup process stays alive at about 100% CPU, because OpenTUI destroys the renderer on its default exit signals while the Effect.callback in packages/runtime/src/setup/tui/entry.tsx:14-22 resumes only on done from SetupApp. Resume with an interrupted outcome when the renderer is destroyed, so the process exits and the parent setup reports a cancel. Add a test that fails without the fix (a pty or a fake renderer destroy).",
+    "Blocking 2: scripts/capture-setup-tui.ts renders apply-failure-dry-run with past-tense lines ('added 10') and a non-dry-run next step; use the would-change wording the real pipeline prints, then re-run the capture script so the captures in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-captures/ are current. Also make review-dry-run-end-40x20 actually reach the end.",
+    "Final-round items, fix each: sweep stale .<name>-* temporary install folders older than the current run before installing (load.ts installAtomically); keep the review-failure screen's recovery hint and actions visible at small sizes (model.ts around 862); strip Unicode bidi and format characters (Cf, e.g. U+202A-U+202E, U+2066-U+2069, U+200B-U+200F) in plain(); check the cache home itself (refuse a cache home that is a symlink, owned by another user, or group/other-writable without the sticky bit, falling back as for the other folders); bind the completion marker to the lock hash. Each gets a test.",
+    "Leave unchanged: the wordy dry-run review heading and its repeated suffix (preference), the 16-colour tier, marker legend and ?/q keys."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Report in under 400 words; long logs go to a file in the scratchpad above. List the re-saved captures by name."
+  ],
+  "criteria": [
+    {
+      "text": "The setup TUI process exits after SIGHUP and SIGTERM, reporting a cancel, with a test that fails without the fix",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The apply-failure-dry-run captures use would-change wording and a dry-run next step, and review-dry-run-end-40x20 reaches the end",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Stale temporary install folders are swept, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The review-failure recovery hint and actions stay visible at 40x20 and smaller",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "plain() strips bidi and format characters, the cache home is checked, and the marker binds the lock hash, each with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build leaves no unexplained changes and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "diff-file",
+    "gates",
+    "tests",
+    "captures"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/setup/tui",
+    "packages/runtime/tests/setup-tui.test.ts",
+    "packages/runtime/tests/setup-tui-load.test.ts",
+    "packages/runtime/tests/setup-tui-cli.test.ts",
+    "packages/runtime/tests/setup-tui-harness.ts",
+    "packages/runtime/tests/setup-tui-entry.test.ts",
+    "scripts/capture-setup-tui.ts",
+    "packages/integrations/claude/dist/scripts/setup-tui.js",
+    "packages/integrations/pi/dist/scripts/setup-tui.js",
+    "packages/integrations/claude/dist/scripts/holyagent.js",
+    "packages/integrations/pi/dist/scripts/holyagent.js",
+    "docs/pi/t3-code.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw96v3mr-d6nb",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T12:35:24.482Z"
+  },
+  "createdAt": "2026-11-09T12:35:24.482Z"
+}
