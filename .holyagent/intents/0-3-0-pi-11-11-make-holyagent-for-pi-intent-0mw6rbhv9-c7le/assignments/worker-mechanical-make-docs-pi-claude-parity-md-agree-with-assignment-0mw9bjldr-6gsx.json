@@ -1,0 +1,53 @@
+{
+  "id": "assignment-0mw9bjldr-6gsx",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 13,
+  "roleTask": "Worker.mechanical",
+  "slug": "make-docs-pi-claude-parity-md-agree-with",
+  "objective": "Make docs/pi/claude-parity.md agree with itself about how the root text reaches Pi's system prompt.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-docs, branch release/0.3.0/docs/t3-first-pi-docs (head f19116d).",
+    "docs/pi/claude-parity.md:72 still says the extension adds the root text through --append-system-prompt or APPEND_SYSTEM.md, 'to be settled', while 'Still open' point 1 of the same page now says it is settled: the extension's before_agent_start handler (packages/integrations/pi/src/extension.ts:1343) puts it in the system prompt. Rewrite line 72 to state the handler, and rewrite the section 1 row 'Root instructions survive compression' (around line 107) so it says the before_agent_start handler is what ships instead of offering --append-system-prompt or APPEND_SYSTEM.md.",
+    "Check extension.ts:1343 yourself before writing, so the sentence matches the code."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Do not check out other commits in any checkout.",
+    "Change only docs/pi/claude-parity.md.",
+    "Report in under 150 words."
+  ],
+  "criteria": [
+    {
+      "text": "claude-parity.md names one carrier for the root text, the before_agent_start handler, everywhere it mentions one",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Only docs/pi/claude-parity.md changes and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "docs/pi/claude-parity.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-09T13:50:30.399Z"
+  },
+  "createdAt": "2026-11-09T13:50:30.399Z"
+}
