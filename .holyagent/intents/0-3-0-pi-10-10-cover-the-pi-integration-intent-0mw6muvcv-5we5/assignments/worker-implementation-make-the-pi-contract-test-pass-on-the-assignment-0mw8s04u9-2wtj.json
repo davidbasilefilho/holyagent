@@ -1,0 +1,58 @@
+{
+  "id": "assignment-0mw8s04u9-2wtj",
+  "intentId": "intent-0mw6muvcv-5we5",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-pi-contract-test-pass-on-the",
+  "objective": "Make the Pi contract test pass on the Windows launch branch after the merge 7f387aa, where it still stubs the old sh wrapper launch.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-win, branch release/0.3.0/fix/pi-windows-launch, head 7f387aa (a merge of the T3 settings branch, which carries packages/integrations/pi/tests/contract.test.ts, into the Windows launch branch; committed).",
+    "bunx --no-install mise run verify fails 3 tests in packages/integrations/pi/tests/contract.test.ts (lines 216, 231, 254, the extension-events block): Expected to contain: status / Received: [] and Expected: holyagent-context / Received: holyagent-notice. The contract test was written before this branch changed the extension to find Bun (PATH, BUN_INSTALL, ~/.bun/bin) and run it on scripts/holyagent.js with the shared Bun flags instead of sh scripts/holyagent, so its stub Pi exec and environment most likely no longer match the launch. Confirm the cause from the failure, then update the contract test stub the way packages/integrations/pi/tests/extension.test.ts stubs the new launch (its BUN_SEARCH or machine helpers, or the exported helpers), so the fixtures again exercise the same handlers and assertions. Keep every assertion; change only how the test stands up the extension.",
+    "If the cause is a real behavior change in the extension rather than the stub, stop and report it instead of changing the extension."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Report in under 400 words; put long logs in a file in the scratchpad above and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "The three contract tests pass with their assertions unchanged",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Only the test harness of contract.test.ts changes",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "mise run build leaves no unexplained changes and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi/tests/contract.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw8rgon1-o7q2",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T04:43:29.794Z"
+  },
+  "createdAt": "2026-11-09T04:43:29.794Z"
+}
