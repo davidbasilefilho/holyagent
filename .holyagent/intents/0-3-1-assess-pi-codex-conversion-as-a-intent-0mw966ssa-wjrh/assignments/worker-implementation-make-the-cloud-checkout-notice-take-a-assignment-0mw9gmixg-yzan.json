@@ -1,0 +1,62 @@
+{
+  "id": "assignment-0mw9gmixg-yzan",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 18,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-cloud-checkout-notice-take-a",
+  "objective": "Make the cloud-checkout notice take a claude.ai session's start branch from the branch the platform switched to after cloning, not from the branch the clone began on.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.1-cloudstart, branch release/0.3.1/fix/cloud-start-branch (cut from release/0.3.1/chore/bump-version).",
+    "Bug seen in this cloud session with HolyAgent 0.3.0: session start said the primary checkout moved off the branch it started on and told the user to run `git switch main`, while the checkout was correctly on its assigned branch claude/charming-brown-rksw3f. The oldest entries of the primary checkout's HEAD reflog are, oldest last: 'checkout: moving from main to claude/charming-brown-rksw3f' and before it the clone onto main (see /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/reflog-tail.txt). The platform clones the default branch, then checks out the assigned branch; startBranch in packages/runtime/src/cli/status.ts takes the clone's branch.",
+    "Fix startBranch so that the start branch is the branch the platform's first setup checkout moved to when that checkout follows the clone (for example the target of the earliest 'checkout: moving from X to Y' entry when it comes right after the clone entry), keeping the existing safeBranch allowlist and git check-ref-format validation and the silence when the checkout is already on that branch. Keep behavior unchanged for a clone with no such checkout.",
+    "Add regression tests in packages/runtime/tests/cloud-checkout.test.ts that build a repository whose reflog is clone onto main, then checkout to claude/x, and assert: no notice while on claude/x; a notice naming claude/x (not main) after switching to another branch or a detached HEAD. Each test must fail without the fix."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Do not check out other commits in any checkout, including the primary checkout /home/user/holyagent.",
+    "Report in under 350 words."
+  ],
+  "criteria": [
+    {
+      "text": "The start branch is the branch the platform switched to after the clone, and a clone with no such checkout behaves as before",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "New tests cover the clone-then-switch reflog and fail without the fix",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "mise run build and mise run verify exit 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli/status.ts",
+    "packages/runtime/tests/cloud-checkout.test.ts",
+    "packages/integrations/claude/dist",
+    "packages/integrations/pi/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T16:12:45.268Z"
+  },
+  "createdAt": "2026-11-09T16:12:45.268Z"
+}
