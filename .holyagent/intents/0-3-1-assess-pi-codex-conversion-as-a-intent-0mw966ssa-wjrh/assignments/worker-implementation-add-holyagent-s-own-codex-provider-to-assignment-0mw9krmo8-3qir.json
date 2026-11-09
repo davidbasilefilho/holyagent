@@ -1,0 +1,105 @@
+{
+  "id": "assignment-0mw9krmo8-3qir",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Worker.implementation",
+  "slug": "add-holyagent-s-own-codex-provider-to",
+  "objective": "Add HolyAgent's own Codex provider to the Pi integration: GPT-6.1 Sol, GPT-6.1 Terra and GPT-6 Luna models through the approved route table, the GPT-6 instruction family, apply_patch alongside Pi's read, edit, write and bash, Luna Reserve, and Codex context_management only while Billion Context is off.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.1-codex, branch release/0.3.1/feat/codex-provider (cut from release/0.3.1/integration at bb412cc, which has the capability registry and the gpt-6 family).",
+    "Binding requirements, verbatim from the Intent:",
+    "  Codex provider finding: @howaboua/pi-codex-conversion tools.applyPatchOnly keeps Pi read, bash, edit and write plus apply_patch, but turns off its native V2 compaction and Codex prompt while its own Codex provider stays registered (assignment-0mw96dgh6-ud60).",
+    "  Maintainer (verbatim, 2026-11-09): \"btw the new codex provider should have auto review and context_management\". The Codex provider HolyAgent ships has Codex auto-review (tool calls reviewed by the codex-auto-review reviewer) and context_management (Codex server-side compaction) while keeping apply_patch plus the just-bash bash and Pi read, edit and write; pi-codex-conversion applyPatchOnly mode turns native compaction off, so the plan must provide both another way.",
+    "  Conflict found (assignment-0mw96qjlf-o4zi): Billion Context cancels Pi compaction and rewrites outgoing requests, openai-codex-responses included, so it clashes with Codex context_management (server-side compaction with an encrypted item replayed); its bash guardrails (60 s default timeout, 50 KB output cap) also apply to the just-bash bash tool by name.",
+    "  Decided (maintainer, verbatim, 2026-11-09): \"btw billion context probably conflicts with context management, if they don't work similarly prefer billion, if they do prefer context management\". They work differently: Billion Context compresses the history client-side through its proxy and keeps it retrievable (compress, decompress, search_context tools), while Codex context_management replaces the history with an opaque encrypted server-side compaction item that cannot be searched or expanded. So Billion Context is preferred: while it is on (pi.features.contextCompression, the default) the Codex provider sends no context_management, and context_management is used only when Billion Context is off.",
+    "  Maintainer (verbatim, 2026-11-09): \"also come up with the model routing: use gpt 6.1 sol high for root and come up with the specialist routing using gpt 6.1 terra low->xhigh and gpt 6 luna low-high (xhigh is not good here)\", \"prefer gpt 6.1 terra for visual stuff and computer use\". The Codex route table runs the root on GPT-6.1 Sol at high effort; specialists use GPT-6.1 Terra (low to xhigh) or GPT-6 Luna (low to high, never xhigh); visual work and computer use run on Terra.",
+    "  Approved (maintainer, verbatim, 2026-11-09: \"everything is okay except for this last doubt I had\"): Codex route table. Root GPT-6.1 Sol high. GPT-6 Luna: Explorer.map, Explorer.lookup, Librarian.lookup, Worker.validation low; Worker.mechanical, Worker.operations medium; Reviewer.audit high. GPT-6.1 Terra: Explorer.trace, Librarian.research, Worker.integration, Reviewer.testing, Reviewer.artifact medium; Worker.implementation, Reviewer.code, Worker.visual, Reviewer.visual high; Worker.debugging, Reviewer.security xhigh. An Assignment that uses the screen capability runs on Terra at least medium. The auto-review reviewer uses codex-auto-review. Approved too: the auto-review design, the just-bash plan and the Codex provider plan as stated.",
+    "  Maintainer (verbatim, 2026-11-09): \"everything should be modular and easily upgradeable btw\". Each 0.3.1 piece (just-bash backend, host passthrough, TS/JS execution, Codex provider, auto-review, context_management, fff, opencode browse, the screen capability and the capability system) is its own module behind a narrow interface, can be turned off on its own, and every third-party package or binary it uses sits at an exact pin moved only through mise run deps:update, so upgrading one never requires editing the others.",
+    "Read these research reports in full before designing; they hold the Codex API shapes, auth, model ids, Luna Reserve (the gpt-reserve finding) and the pi-codex-conversion comparison: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9679bz-h35s.md, /home/user/holyagent/.git/holyagent/reports/assignment-0mw96dgh6-ud60.md, /home/user/holyagent/.git/holyagent/reports/assignment-0mw96qjlf-o4zi.md. Where they disagree with the current repository, the repository wins; say so in the report.",
+    "Seams (from a map of the tree before the registry landed; re-check): config/schema.ts PiProvider and KIMI_ROUTES (pattern for a CODEX_ROUTES table), pi/provider.ts ProviderProfile, PROVIDERS, routeModel, providerEnv, providerSource; config/pi-packages.json and scripts/update-dependencies.ts PI_PACKAGE_PINS for any package pin; integrations/pi/src/files.ts PI_FAMILY so the Codex provider selects the gpt-6 family for the root and specialists; the capability registry in config/capabilities.ts (add Luna Reserve as a capability entry applicable only with the Codex provider, default on; auto-review is a later PR, so do not add it).",
+    "context_management: the provider sends it only when pi.features.contextCompression (Billion Context) is off; with Billion Context on it sends none. Test both.",
+    "apply_patch: Codex's patch format and semantics; it sits alongside Pi's read, edit, write and bash (do not remove those).",
+    "Every third-party package at an exact pin moved by mise run deps:update; if the provider needs none, say so. The provider is its own module behind a narrow interface and can be turned off by choosing another pi.provider.",
+    "Update docs/pi (configuration and a provider page) for selecting Codex, its auth, the route table, Luna Reserve and the context_management rule."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Do not check out other commits in any checkout.",
+    "Tests use recorded or synthesized fixtures only: no live Codex or OpenAI request, no pi process.",
+    "Do not implement auto-review, just-bash, fff, browse or the screen capability; later PRs do. Name in the report anything they will need from this PR.",
+    "Report in under 450 words; list the route table as implemented and every new config key and flag."
+  ],
+  "criteria": [
+    {
+      "text": "Selecting the Codex provider routes the root and every specialist role to the approved model and effort, and the gpt-6 family is used",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "apply_patch works per Codex's format with Pi read, edit, write and bash still present",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "context_management is sent only while Billion Context is off",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Luna Reserve is a Codex-only capability entry, default on, and behaves per the research",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The Kimi provider and existing defaults behave unchanged",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Tests cover routing, apply_patch, context_management gating, Luna Reserve and auth handling from fixtures, each failing without the change",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "mise run build and mise run verify exit 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Docs describe selecting and using the Codex provider",
+      "blocking": false,
+      "dimension": "style"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src",
+    "packages/runtime/tests",
+    "packages/integrations/pi",
+    "packages/integrations/claude/dist",
+    "scripts/update-dependencies.ts",
+    "docs/pi",
+    "docs/usage.md",
+    "bun.lock",
+    "package.json"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T18:08:41.864Z"
+  },
+  "createdAt": "2026-11-09T18:08:41.864Z"
+}
