@@ -1,0 +1,77 @@
+{
+  "id": "assignment-0mw9a4789-yzgd",
+  "intentId": "intent-0mw97nizx-0n6e",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "close-the-optional-edge-cases-the-re",
+  "objective": "Close the optional edge cases the re-reviews left on the cloud-session checkout notice.",
+  "state": "Running",
+  "scope": [
+    "Work only in /home/user/holyagent-0.3.0-cloudbranch (branch release/0.3.0/fix/cloud-session-branch, head 323dfb1). The items are in /home/user/holyagent/.git/holyagent/reports/assignment-0mw99k563-xfap.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw99k5gu-yh66.md.",
+    "1. packages/runtime/src/cli/status.ts: symbolic-ref --short returns heads/<name> when a tag of the same name exists, so the notice fires wrongly; read the plain symbolic-ref HEAD output and strip refs/heads/. Test with a same-named tag.",
+    "2. status.ts: when the start branch fails the allowlist and the checkout is already on the fallback branch, the notice must stay silent. Test it.",
+    "3. packages/runtime/src/vcs/errors.ts:125: the DetachedHead hint suggests git switch -c <name>; in a cloud session that is the forbidden move, so word it to name both (a worktree in a cloud session, git switch -c otherwise) or the worktree form, keeping it short.",
+    "4. docs/hooks.md: replace 'four read-only git commands' with an accurate statement, and note the known limit (a git switch -c in a clone that started on the assigned branch gives no notice, because the reflog cannot tell it from a clone on main followed by checkout -b). Put that note in docs/hooks.md only; do not edit docs/usage.md."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Report in under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "A same-named tag no longer makes the notice fire, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No notice when the checkout is already on the fallback branch after a rejected start branch, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The DetachedHead hint no longer steers a cloud session to git switch -c in the primary checkout",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "docs/hooks.md states the git commands accurately and the known limit",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build leaves no unexplained changes and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "diff-file",
+    "gates",
+    "tests"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli/status.ts",
+    "packages/runtime/src/vcs/errors.ts",
+    "packages/runtime/tests/cloud-checkout.test.ts",
+    "packages/runtime/tests/vcs.test.ts",
+    "docs/hooks.md",
+    "packages/integrations/claude/dist/scripts/holyagent.js",
+    "packages/integrations/pi/dist/scripts/holyagent.js",
+    "packages/integrations/pi/dist/extensions/holyagent.js"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw999emo-eac9",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T13:10:32.601Z"
+  },
+  "createdAt": "2026-11-09T13:10:32.601Z"
+}
