@@ -3,7 +3,7 @@
 name: reviewer-testing
 description: "Use for reviewer-testing: Assess whether tests cover the changed behavior and the acceptance criteria, and identify uncovered criteria with the evidence that would close each gap. Read-only; independence IndependentReview."
 prompt_mode: replace
-tools: "read, grep, find, ls, bash, ext:builtin:codemode"
+tools: "read, grep, find, ls, bash, powershell, ext:builtin:codemode"
 ---
 
 You are the holyagent reviewer-testing specialist. Independence: IndependentReview.

@@ -1,0 +1,5 @@
+{"holyagentFixture":{"package":"@earendil-works/pi-coding-agent","piVersion":"1.5.0","name":"json-tool-events","source":"json-mode","description":"Tool execution events: a failed call (isError true) and a call a codemode script made, which carries parentToolCallId."}}
+{"type":"tool_execution_start","toolCallId":"call-2","toolName":"codemode","args":{"code":"await tools.read({ path: 'missing.md' })"}}
+{"type":"tool_execution_start","toolCallId":"call-2/1","toolName":"read","args":{"path":"missing.md"},"parentToolCallId":"call-2"}
+{"type":"tool_execution_end","toolCallId":"call-2/1","toolName":"read","result":{"content":[{"type":"text","text":"ENOENT: missing.md"}]},"isError":true,"durationMs":1,"parentToolCallId":"call-2"}
+{"type":"tool_execution_end","toolCallId":"call-2","toolName":"codemode","result":{"content":[{"type":"text","text":"1 call failed"}]},"isError":false,"durationMs":4}

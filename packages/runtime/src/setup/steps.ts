@@ -13,6 +13,7 @@ import { added, failed, hint, present, type Report, skipped } from "./report.ts"
 import { type Scope, settingsFile } from "./scope.ts"
 import { type CacheTtl, mergeUserSettings, undoUserSettings } from "./settings.ts"
 import { EMPTY_BUNFIG, Shell } from "./shell.ts"
+import { installT3Settings, undoT3Settings } from "./t3-settings.ts"
 
 /** Why ctx7 is left out of a claude.ai cloud session. */
 const CLOUD_SKIP =
@@ -127,16 +128,17 @@ export interface SetupOptions {
 }
 
 /**
- * Sets up HolyAgent for the current user: ctx7, the Pi packages the config enables and the Pi tool
- * settings ({@link installPiPackages} and {@link installPiToolSettings}; both only when Pi is in
- * use, never in a cloud session), and the recommended keys of the settings of the chosen scope
- * (`user` unless set). Every step checks its own result first, and a step that fails does not stop
- * the next one. On a dry run nothing is installed or written, and the lines say what would be. In a
- * claude.ai cloud session ctx7 is skipped, and the settings are still merged. With `undo` only
- * settings change: the values setup recorded adding are removed from the chosen scope's file and
- * from the Pi tool settings files ({@link undoPiToolSettings}); ctx7 and the Pi packages stay
- * installed. A `project` or `local` target that is a symlink is refused with a `!` line and nothing
- * is written to the settings.
+ * Sets up HolyAgent for the current user: ctx7, the Pi packages the config enables, the Pi tool
+ * settings and, at scope `user`, T3 Code's server settings ({@link installPiPackages},
+ * {@link installPiToolSettings} and {@link installT3Settings}; all only when Pi is in use, never in a
+ * cloud session), and the recommended keys of the settings of the chosen scope (`user` unless set).
+ * Every step checks its own result first, and a step that fails does not stop the next one. On a
+ * dry run nothing is installed or written, and the lines say what would be. In a claude.ai cloud
+ * session ctx7 is skipped, and the settings are still merged. With `undo` only settings change: the
+ * values setup recorded adding are removed from the chosen scope's file and from the Pi tool
+ * settings files ({@link undoPiToolSettings}) and T3's ({@link undoT3Settings}); ctx7 and the Pi
+ * packages stay installed. A `project` or `local` target that is a symlink is refused with a `!`
+ * line and nothing is written to the settings.
  */
 export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptions) {
   const scope = options.scope ?? "user"
@@ -160,6 +162,10 @@ export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptio
       ...(yield* onSettings((file) => undoUserSettings({ env, file, dryRun: options.dryRun }))),
       // Only files with a setup record get a line, so a machine that never ran the step prints none.
       ...(yield* asStep("tool settings", undoPiToolSettings(env, piOptions))),
+      // T3 Code's settings are the user's, whatever scope was asked for; the step undoes at scope user.
+      ...(scope === "user"
+        ? yield* asStep("t3 settings", undoT3Settings(env, { dryRun: options.dryRun }))
+        : []),
     ]
     return { lines, ok: !lines.some((line) => line.startsWith("! ")) } satisfies Report
   }
@@ -173,6 +179,13 @@ export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptio
         : yield* asStep("ctx7", installCtx7(env, options.dryRun))),
     ...(piUsed ? yield* asStep("pi packages", installPiPackages(env, piOptions)) : []),
     ...(piUsed ? yield* asStep("tool settings", installPiToolSettings(env, piOptions)) : []),
+    // T3 Code's server settings are the user's own, so the step runs at scope user only.
+    ...(piUsed && scope === "user"
+      ? yield* asStep(
+          "t3 settings",
+          installT3Settings(env, piOptions.cwd, { dryRun: options.dryRun }),
+        )
+      : []),
     ...(yield* onSettings((file) =>
       mergeUserSettings({
         env,

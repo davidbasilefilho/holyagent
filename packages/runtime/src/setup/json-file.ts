@@ -54,17 +54,44 @@ export interface JsonSnapshot {
  */
 export const readJsonObjectSnapshot = (path: string) =>
   Effect.gen(function* () {
-    if (!(yield* fileOperation(path, "read", () => Bun.file(path).exists()))) {
-      return { value: empty, text: undefined } satisfies JsonSnapshot
-    }
-    const text = yield* fileOperation(path, "read", () => Bun.file(path).text())
-    if (text.trim() === "") return { value: empty, text } satisfies JsonSnapshot
-    const value = yield* Schema.decodeUnknownEffect(JsonObjectText)(text, strict).pipe(
-      Effect.mapError(
-        (error) => new SetupFailure({ message: `${path} is not a JSON object: ${error.message}` }),
-      ),
-    )
-    return { value, text } satisfies JsonSnapshot
+    const text = yield* readJsonText(path)
+    if (text === undefined) return { value: empty, text } satisfies JsonSnapshot
+    return { value: yield* decodeJsonObject(path, text), text } satisfies JsonSnapshot
+  })
+
+/** Reads a file's text, or `undefined` when it does not exist. */
+export const readJsonText = (path: string) =>
+  Effect.gen(function* () {
+    if (!(yield* fileOperation(path, "read", () => Bun.file(path).exists()))) return undefined
+    return yield* fileOperation(path, "read", () => Bun.file(path).text())
+  })
+
+/**
+ * Decodes the text of a JSON object file: empty or whitespace is an empty object; anything that is
+ * not a JSON object fails with a message naming `path`.
+ */
+export const decodeJsonObject = (path: string, text: string) =>
+  text.trim() === ""
+    ? Effect.succeed(empty)
+    : Schema.decodeUnknownEffect(JsonObjectText)(text, strict).pipe(
+        Effect.mapError(
+          (error) =>
+            new SetupFailure({ message: `${path} is not a JSON object: ${error.message}` }),
+        ),
+      )
+
+/**
+ * Removes a file only while it still has the text `unchangedSince` (`undefined` for a file read as
+ * missing), and returns whether the file is now gone by this call or was gone already. The text is
+ * compared just before the removal.
+ */
+export const removeFileIfUnchanged = (path: string, unchangedSince: string | undefined) =>
+  Effect.gen(function* () {
+    const text = yield* readJsonText(path)
+    if (text === undefined) return unchangedSince === undefined
+    if (text !== unchangedSince) return false
+    yield* fileOperation(path, "remove", () => rm(path, { force: true }))
+    return true
   })
 
 /**

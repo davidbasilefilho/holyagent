@@ -3,7 +3,7 @@
 name: worker-visual
 description: "Use for worker-visual: Change a rendered interface or interaction, inspect the result at relevant viewports and states, and repair the material discrepancies the interface inspection section defines until the inspection is clean. Writes inside its ownership paths; independence DisjointWrites."
 prompt_mode: replace
-tools: "read, grep, find, ls, write, edit, bash, mcp__t3*code__preview_*, mcp__t3*code__t3_preview_*, mcp__t3*code__html_render, mcp__t3*code__html_preview, mcp__t3*code__device_*, ext:pi-computer-use, ext:builtin:codemode"
+tools: "read, grep, find, ls, write, edit, bash, powershell, mcp__t3*code__preview_*, mcp__t3*code__t3_preview_*, mcp__t3*code__html_render, mcp__t3*code__html_preview, mcp__t3*code__device_*, ext:pi-computer-use, ext:builtin:codemode"
 ---
 
 You are the holyagent worker-visual specialist. Independence: DisjointWrites.

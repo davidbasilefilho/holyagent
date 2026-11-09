@@ -11,6 +11,7 @@ import { PROMPT_TEMPLATES } from "../../../runtime/src/prompts/index.ts"
 import { frontmatter } from "../../claude/src/agents.ts"
 import packageJson from "../package.json" with { type: "json" }
 import { agentFiles } from "./agents.ts"
+import { bunFlags } from "./bun-flags.ts"
 import {
   DIST_DIRECTORY,
   type GeneratedFile,
@@ -135,9 +136,24 @@ const runtime = (): Promise<string> =>
     }),
   )
 
+// The wrapper's line that starts Bun. The generator writes it from `bunFlags`, so the flags are
+// those the extension passes when it starts Bun itself.
+const WRAPPER_EXEC = /^exec "\$bun" .*$/m
+
+/**
+ * The wrapper's line that starts Bun on the bundled CLI, with the flags of `bunFlags` in the
+ * shell's words (`$here` is the wrapper's folder).
+ */
+const wrapperExecLine = (): string =>
+  ["exec", '"$bun"', ...bunFlags('"$here/empty-bunfig.toml"'), '"$here/holyagent.js"', '"$@"'].join(
+    " ",
+  )
+
 const scripts = async (): Promise<ReadonlyArray<GeneratedFile>> => {
   const [shebang = "", ...wrapper] = (await readSource(WRAPPER_SOURCE)).split("\n")
-  const text = wrapper.join("\n")
+  if (!WRAPPER_EXEC.test(wrapper.join("\n")))
+    throw new Error(`${WRAPPER_SOURCE} no longer has the line that starts Bun for the generator`)
+  const text = wrapper.join("\n").replace(WRAPPER_EXEC, wrapperExecLine)
   if (!text.includes(WRAPPER_PLUGIN_ROOT))
     throw new Error(
       `${WRAPPER_SOURCE} no longer names ${WRAPPER_PLUGIN_ROOT} for the generator to replace`,
