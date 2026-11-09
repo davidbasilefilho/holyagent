@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "confirm-the-browse-mcp-server-the-screen",
   "objective": "Confirm the browse MCP server, the screen tool grant and the setup checks add no privilege, supply-chain or data-exposure defect.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Commit ec15538d on release/0.3.1/feat/screen in /home/user/holyagent-0.3.1-screen (range 3f1c135b..ec15538d), plus merges of the fff branch and the integration branch up to c6a2ac71; source diff without dist at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/screen-commit.diff; writer report /home/user/holyagent/.git/holyagent/reports/assignment-0mw9trshx-cnhq.md",
     "Requirements: opencode browse is @opencode/browse (MIT, 0.0.15, stdio MCP server plus a paired Chromium extension driving the user's real browser), registered for Pi at an exact pin moved by deps:update; setup reports when the extension is not installed or paired. Computer use is not a role but a screen capability an Assignment can carry; it grants computer-use tools (pi-computer-use), browser use (opencode browse) and the T3 in-app browser (T3 preview tools where T3 hosts the session), and routes that Assignment to GPT-6.1 Terra whatever its role, at least medium. The screen capabilities are granted per Assignment to keep specialist tool lists small. Capabilities have headless and normal forms: the screen capability uses a headless Playwright Chromium in a cloud or CI session and the paired real browser and desktop computer use on a desktop; setup and doctor detect the system and pick the form, and a capability whose needs are missing is reported, not silently dropped. Everything is modular, can be turned off on its own, with exact pins moved by deps:update.",
@@ -46,7 +46,33 @@
     "agentId": "workflow:wf_b07570cb-735/assignment-0mw9v0k14-hk7i",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T22:55:34.504Z"
+    "startedAt": "2026-11-09T22:55:34.504Z",
+    "finishedAt": "2026-11-09T23:02:27.799Z"
+  },
+  "result": "result: no blocker found; the three criteria hold as written. I raised two non-blocking suspicions, one of them a repo-controlled `.npmrc` that could change which package `npx` fetches. I could not run the built-in `/security-review`, and I read the code without running any tests.\n\nCoverage limits:\n- **Built-in `/security-review`:** it failed with `fatal: ambiguous argument 'origin/HEAD...'` because `origin/HEAD` does not exist in `/home/user/holyagent`. I had no shell to fix that, so it covered nothing. I reviewed the diff file and the worktree sources instead.\n- **No tests run:** I had no Bash tool.\n- **npm package read:** I read only the registry metadata and `package.json` of 0.0.15, not its `dist` code. The metadata shows MIT, SLSA provenance, a GitHub trusted publisher, exact-pinned dependencies and no shrinkwrap.\n\nblockers: none\n\nnotes (suspicions, not validated):\n1. **`.npmrc` redirect (PLAUSIBLE).**\n   - The server is `npx -y @opencode/browse@0.0.15 mcp`, registered with no cwd and no registry argument (`packages/runtime/src/config/capabilities.ts`).\n   - npm reads `.npmrc` from the project directory, so a hostile repository's `.npmrc` could point the registry at its own host. It could also supply a local `node_modules` copy.\n   - The attacker needs a repository the user opens and a screen specialist launched there. The impact is code execution as the user in a session that also holds browser and desktop control.\n   - The exact version does not help, because npm only checks integrity against whatever registry it was pointed at. Suggested fix: pass `--registry=https://registry.npmjs.org/`.\n   - I could not confirm that Pi starts the server in the project cwd, since I did not start Pi.\n2. **Soft gate on Pi.**\n   - The screen tools reach a specialist only through the `<agent>-screen` file. `refuseNonSpecialist` and the workflow check accept any `-screen` name without tying it to an Assignment.\n   - Pi's `assignment record` passes no `launchedAs`, so an agent/Assignment mismatch is checked only in the Claude hook, which is bookkeeping.\n   - The only fix is the root's instructions, and root-model steering (a prompt injected through a repository or report) could still launch a `-screen` agent directly.\n   - This was already true for computer use on visual roles. It now covers all 18 roles, including reviewers.\n3. **Confirmations off.** `confirmAppLaunch` and `confirmDangerousActions` are false (pre-existing), so a screen specialist drives the user's logged-in browser and desktop unprompted.\n4. **Repo agent files.** The project's `.pi/agents` outranks the package's agent files. A repository `-screen.md` could replace the tool list or prompt, as it already could for the 18 base names, so this adds no new privilege.\n\nevidence:\n- Only Assignments the root marks as screen get browser and computer control, and nothing in a repository or report can grant it: holds, with note 2 as the caveat.\n  - `screen` exists only in `AssignmentDraft`, which is strictly decoded and comes from the root, so a report cannot set it.\n  - Browse tools are `screen`-only and excluded from the root (`tools.rootExclude`) and from non-screen roles (`visual: []`).\n  - The Claude host refuses screen dispatch (`packages/runtime/src/cli/assignment.ts`).\n- The browse server is pinned exactly and started only for screen specialists, with no token or pairing secret written or logged: holds, with note 1 as the caveat.\n  - The pin is `\"0.0.15\"` in `pi-packages.json`.\n  - `registerScreenServers` returns early unless `isScreenAgent(childAgent(sessionName))`, and the headless form and `browserUse: false` register none.\n  - No `mcp.json` is written. The pairing token is validated but never copied into `PairedBrowser`.\n  - Errors carry only the path and the OS message.\n- Setup and doctor checks run no untrusted command and write nothing outside recorded settings: holds.\n  - `reportBrowserUse` and `checkPairing` call `which` and read `browser-tokens.json` read-only.\n  - They never run `npx` or browse. I read the diff and `pi-check.ts` for this and did not run the tests.\n- findings: notes 1 to 4 above; no validated vulnerability.\n",
+  "acceptance": {
+    "revision": 20,
+    "rationale": "Review evidence holds; findings go to the repair",
+    "criteria": [
+      {
+        "criterion": "Only Assignments the root marks as screen get browser and computer control, and nothing in a repository or report can grant it",
+        "support": "holds, with note 2 as the caveat.; `screen` exists only in `AssignmentDraft`, which is strictly decoded and comes from the root, so a report cannot set it.; Browse tools are `screen`-only and excluded from the root (`tools.rootExclude`) and from non-screen roles (`visual: []`).; The Claude host refuses screen dispatch (`packages/runtime/src/cli/assignment.ts`)."
+      },
+      {
+        "criterion": "The browse server is pinned exactly and started only for screen specialists, with no token or pairing secret written or logged",
+        "support": "holds, with note 1 as the caveat.; The pin is `\"0.0.15\"` in `pi-packages.json`.; `registerScreenServers` returns early unless `isScreenAgent(childAgent(sessionName))`, and the headless form and `browserUse: false` register none.; No `mcp.json` is written. The pairing token is validated but never copied into `PairedBrowser`.; Errors carry only the path and the OS message."
+      },
+      {
+        "criterion": "Setup and doctor checks run no untrusted command and write nothing outside recorded settings",
+        "support": "holds.; `reportBrowserUse` and `checkPairing` call `which` and read `browser-tokens.json` read-only.; They never run `npx` or browse. I read the diff and `pi-check.ts` for this and did not run the tests."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "notes 1 to 4 above; no validated vulnerability."
+      }
+    ]
   },
   "createdAt": "2026-11-09T22:55:34.504Z"
 }
