@@ -1,0 +1,50 @@
+{
+  "id": "assignment-0mw98bh2g-iu59",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 13,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-setup-tui-round-1-repair",
+  "objective": "Review the setup TUI round-1 repair commit for correctness and regressions.",
+  "state": "Running",
+  "scope": [
+    "Review git diff df6a410c..0130a8b2 in /home/user/holyagent-0.3.0-tui (also as a file without generated output: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-r1.diff). The earlier findings it addressed (code items a-e) are in /home/user/holyagent/.git/holyagent/briefs/assignment-0mw96v3mr-d6nb.md.",
+    "Also check two items the writer noted and left: the setup process spins at about 45% CPU after its pty hangs up, and a temporary folder left by a killed install is not cleaned on the next run. Say whether each is a real defect, with the code path.",
+    "Do not run mise run verify in full; run the setup-tui test files only (bun test packages/runtime/tests/setup-tui*), because the full suite times out under the load of parallel work."
+  ],
+  "constraints": [
+    "Read-only: no edits and no git writes.",
+    "Report in under 400 words; long notes go to no file (read-only) or to a scratchpad file if you have a shell."
+  ],
+  "criteria": [
+    {
+      "text": "Each earlier code finding (atomic install, cache folder checks, frozen lockfile subset, escape stripping, tests) is confirmed closed or reported open with file and line",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The repair introduces no regression in the setup flow, flags or line-based fallback",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The CPU spin after hangup and the leftover temporary folder are each judged real or not with the code path",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "tests"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw96v3mr-d6nb"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T12:20:12.712Z"
+  },
+  "createdAt": "2026-11-09T12:20:12.712Z"
+}
