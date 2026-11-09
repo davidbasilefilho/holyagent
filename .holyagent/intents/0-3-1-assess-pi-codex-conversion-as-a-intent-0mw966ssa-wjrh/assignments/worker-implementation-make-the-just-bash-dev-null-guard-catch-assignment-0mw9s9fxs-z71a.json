@@ -1,0 +1,71 @@
+{
+  "id": "assignment-0mw9s9fxs-z71a",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-just-bash-dev-null-guard-catch",
+  "objective": "Make the just-bash /dev/null guard catch aliases of the device, not only its literal spellings, and make the docs state its real limits.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.1-bash at e6f334c7 (PR davidbasilefilho/holyagent#106)",
+    "Security finding 1 in /home/user/holyagent/.git/holyagent/reports/assignment-0mw9roekg-jryb.md: isDevice in packages/runtime/src/pi/bash/devices.ts compares the normalized string only, so `ln -s /dev /tmp/d; rm /tmp/d/null`, `mv x /tmp/d/null`, `/proc/self/root/dev/null`, `rm -rf /dev` and `mv /dev x` reach the host device through ReadWriteFs.",
+    "Optional code findings in /home/user/holyagent/.git/holyagent/reports/assignment-0mw9roe9z-xm39.md: `cp missing /dev/null` and `cp -r dir /dev/null` return 0 (devices.ts:74); `/dev/null/` counts as the device where the kernel gives ENOTDIR (devices.ts:30)."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Resolve the path through the inner file system's realpath (parent real path plus name for a missing leaf, so rm of the device itself is caught) before deciding it is the device; refuse removing or moving /dev itself or any folder whose real path is /dev or contains it.",
+    "Host programs run by name or path (unlink, dd, /usr/bin/rm) bypass the shell file system by design; say so plainly in docs/pi/shell.md instead of claiming no spelling reaches the device.",
+    "Leave packages/integrations/pi/src/codex.ts and packages/runtime/src/pi/codex/ untouched.",
+    "Never run a test that could delete or replace the real /dev/null on this machine: test the guard against an in-memory or fake inner file system.",
+    "Report in under 300 words; start each evidence line with the exact criterion text, a colon and the support inline."
+  ],
+  "criteria": [
+    {
+      "text": "Aliases of /dev/null through a symlinked parent, /proc/self/root, or removing or moving /dev are handled like the literal device, with tests on a fake file system that fail without the change",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "cp from a missing source or a folder to /dev/null fails like bash, and /dev/null/ gives ENOTDIR, with tests",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "docs/pi/shell.md states that host programs bypass the guard",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Gates: mise run build leaves no unexplained changes and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/pi/bash",
+    "packages/runtime/tests/pi/bash-shell.test.ts",
+    "packages/runtime/tests/pi/devices.test.ts",
+    "packages/integrations/pi/dist/scripts/just-bash.js",
+    "docs/pi/shell.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw9qugeg-vovd",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T21:38:30.256Z"
+  },
+  "createdAt": "2026-11-09T21:38:30.256Z"
+}
