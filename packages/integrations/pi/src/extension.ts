@@ -31,6 +31,8 @@ import {
 } from "../../../runtime/src/hooks/pi-context.ts"
 import { PI_PROJECT_FLAG } from "../../../runtime/src/hooks/pi-project.ts"
 import { hasStateFolder } from "../../../runtime/src/hooks/state-folder.ts"
+import { SHELL_BUNDLE } from "../../../runtime/src/pi/bash/protocol.ts"
+import { justBashOn } from "../../../runtime/src/pi/bash/settings.ts"
 import { validateModelCatalog } from "../../../runtime/src/pi/catalog.ts"
 import { APPLY_PATCH_TOOL } from "../../../runtime/src/pi/codex/apply-patch.ts"
 import { providerEnv } from "../../../runtime/src/pi/provider.ts"
@@ -45,6 +47,7 @@ import {
   toolMatches,
 } from "../../../runtime/src/pi/tools.ts"
 import { STATE_DIRECTORY } from "../../../runtime/src/state/layout.ts"
+import { createBash, type ShellLaunch } from "./bash.ts"
 import { bunFlags } from "./bun-flags.ts"
 import { type CodexSettings, codexSettings, registerCodex } from "./codex.ts"
 import { familyAgentPrompt, familySkillPaths } from "./families.ts"
@@ -435,6 +438,11 @@ interface Collected {
    * session reads them, since the root and the specialists both run on its models.
    */
   readonly codex?: CodexSettings
+  /**
+   * True when the config runs the bash tool on just-bash (`pi.features.justBash`), present with
+   * `environment`; every session reads it, since the root and the specialists both have `bash`.
+   */
+  readonly justBash?: true
   /** True for the root once the config is read and `pi.enable` is on: it gets the root prompt. */
   readonly rootPrompt?: true
   /** The root's tool selection, present for the root once the config is read and `pi.enable` is on. */
@@ -475,6 +483,8 @@ interface Held {
   started: boolean
   /** The Codex provider's settings once the config is read, or undefined for another provider. */
   codex: CodexSettings | undefined
+  /** True once the config is read and runs the bash tool on just-bash. */
+  justBash: boolean
   /** Stops the provider checks of the session. */
   probe: AbortController | undefined
   /** True when the session runs under T3 Code (see {@link isT3Session}). */
@@ -530,6 +540,7 @@ const settingsFor = (
     environment: rootArgs.env,
     providerEnvironment: providerEnv(config),
     ...(codex === undefined ? {} : { codex }),
+    ...(justBashOn(config) ? { justBash: true as const } : {}),
     ...(role === "root"
       ? {
           rootPrompt: true,
@@ -707,9 +718,20 @@ export const findBun = (
 export const runtimeArgs = (
   packageRoot: string,
   platformPath: Pick<typeof nodePath, "join"> = nodePath,
+): ReadonlyArray<string> => scriptArgs(packageRoot, "holyagent.js", platformPath)
+
+/**
+ * The Bun arguments that run one of the package's bundles from its `scripts` folder, with the same
+ * flags as {@link runtimeArgs}: no env file and the empty Bun config. The shell process of the bash
+ * tool is `just-bash.js`.
+ */
+export const scriptArgs = (
+  packageRoot: string,
+  script: string,
+  platformPath: Pick<typeof nodePath, "join"> = nodePath,
 ): ReadonlyArray<string> => [
   ...bunFlags(platformPath.join(packageRoot, "scripts", "empty-bunfig.toml")),
-  platformPath.join(packageRoot, "scripts", "holyagent.js"),
+  platformPath.join(packageRoot, "scripts", script),
 ]
 
 /**
@@ -891,6 +913,24 @@ export const createExtension =
             )
     }
 
+    // The Bun that starts `argv`: the one found before while cmd.exe can still start it with these
+    // arguments, else the next one on the search path, or why there is none.
+    const bunFor = (
+      argv: ReadonlyArray<string>,
+    ):
+      | { readonly ok: true; readonly program: string }
+      | { readonly ok: false; readonly reason: string } => {
+      if (bun === undefined || !launchOf(bun, argv).ok) {
+        const lookup = findBun(platform, platformPath, bunSearch, (candidate) => {
+          const launch = launchOf(candidate, argv)
+          return launch.ok ? undefined : launch.reason
+        })
+        if (!lookup.found) return { ok: false, reason: lookup.looked }
+        bun = lookup.program
+      }
+      return { ok: true, program: bun }
+    }
+
     // Bun runs the package's bundled runtime, which enters the project first; its stdout is the
     // command's output. A Bun that cmd.exe cannot start with these arguments (a shim, and a project
     // path with a character no quoting protects) is passed over for the next one. A Bun that is gone
@@ -899,18 +939,10 @@ export const createExtension =
       const argv = [...bundled, PI_PROJECT_FLAG, project, ...args]
       const attempt = (looked: boolean): Effect.Effect<ExecResult, CommandFailed> =>
         Effect.suspend(() => {
-          if (bun === undefined || !launchOf(bun, argv).ok) {
-            const lookup = findBun(platform, platformPath, bunSearch, (candidate) => {
-              const launch = launchOf(candidate, argv)
-              return launch.ok ? undefined : launch.reason
-            })
-            if (!lookup.found)
-              return Effect.fail(
-                new CommandFailed({ command: args.join(" "), reason: lookup.looked }),
-              )
-            bun = lookup.program
-          }
-          const program = bun
+          const found = bunFor(argv)
+          if (!found.ok)
+            return Effect.fail(new CommandFailed({ command: args.join(" "), reason: found.reason }))
+          const program = found.program
           const gone = () => !looked && !signal.aborted && !(bunSearch.exists ?? isFile)(program)
           const again = Effect.suspend(() => {
             bun = undefined
@@ -932,6 +964,29 @@ export const createExtension =
         ),
       )
     }
+
+    // The bash tool's shell: Bun on the package's `scripts/just-bash.js`, started in the package's
+    // folder like every other program, and found the same way as for the CLI. It is registered
+    // once a collection finds the capability on, and runs Pi's own bash while it is off.
+    const shellLaunch = (): ShellLaunch => {
+      const argv = scriptArgs(packageRoot, SHELL_BUNDLE, platformPath)
+      const found = bunFor(argv)
+      if (!found.ok) return found
+      const launch = launchOf(found.program, argv)
+      return launch.ok
+        ? {
+            ok: true,
+            program: isShim(found.program) ? "cmd.exe" : found.program,
+            args: launch.args,
+            cwd: packageRoot,
+          }
+        : { ok: false, reason: launch.reason }
+    }
+    const bash = createBash(pi, {
+      active: () => held?.justBash === true,
+      launch: shellLaunch,
+      platform,
+    })
 
     // The top of the work tree holds the project's config; outside git the project folder does, and
     // so does its state. Only git's own answer that the folder is not in a repository means "not
@@ -1326,6 +1381,8 @@ export const createExtension =
         if (result?.providerEnvironment !== undefined)
           applyEnvironment(env, result.providerEnvironment, true)
         if (result !== undefined) taken.codex = result.codex
+        if (result !== undefined) taken.justBash = result.justBash === true
+        if (result?.justBash === true) bash.enable(ctx.cwd)
         if (!taken.started && result?.enabled !== false) {
           taken.started = true
           if (result?.codex !== undefined) taken.applyPatchNotice = activateApplyPatch(result.codex)
@@ -1365,6 +1422,7 @@ export const createExtension =
         t3Gate: false,
         t3Root: false,
         codex: undefined,
+        justBash: false,
         probe: undefined,
         readiness: undefined,
         setupNotice: undefined,

@@ -1,3 +1,4 @@
+import { BILLION_CONTEXT_GUARDRAILS_FILE } from "../pi/bash/guardrails.ts"
 import type { PiPackageName } from "./pi-packages.ts"
 import type { PiProvider } from "./schema.ts"
 
@@ -68,6 +69,12 @@ export interface SettingsPatch {
   readonly file: string
   /** The keys to merge into it, deeply. */
   readonly content: Readonly<Record<string, unknown>>
+  /**
+   * The key of `pi.features` of another capability that must be on for the patch to be written, for
+   * a setting of that capability's package made on behalf of this one: absent when the patch
+   * belongs to this capability alone.
+   */
+  readonly whileOn?: string
 }
 
 /** One optional capability: a switch of `pi.features` with everything that follows from it. */
@@ -317,6 +324,37 @@ export const CAPABILITIES = [
     forms: sameForm([]),
     tools: { rootExclude: [], visual: [] },
     settings: [],
+    health: ["needs"],
+  },
+  {
+    // The bash tool on just-bash (`pi/bash/`, run by the extension's `bash.ts`): no package and no
+    // tool of its own, so off leaves Pi's own bash tool. Bun runs the shell, since Pi runs on Node.
+    // The shell needs no display, so both forms are the same. Billion Context's bash guardrails go
+    // off with it (the environment, see `justBashEnvironment`, and its file, written here so the
+    // setting holds whatever the load order of the two extensions is).
+    name: "just-bash",
+    feature: "justBash",
+    description:
+      "Runs the bash tool on just-bash, with the host's programs, TypeScript first and JavaScript as the fallback; turns Billion Context's bash guardrails off",
+    skills: [],
+    applicability: "both",
+    defaultOn: true,
+    needs: [
+      {
+        kind: "command",
+        command: "bun",
+        fix: "install Bun from https://bun.sh, since the shell runs on it",
+      },
+    ],
+    forms: sameForm([]),
+    tools: { rootExclude: [], visual: [] },
+    settings: [
+      {
+        file: BILLION_CONTEXT_FILE,
+        content: BILLION_CONTEXT_GUARDRAILS_FILE,
+        whileOn: "contextCompression",
+      },
+    ],
     health: ["needs"],
   },
 ] as const satisfies ReadonlyArray<CapabilityDefinition>

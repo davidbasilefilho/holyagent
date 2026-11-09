@@ -66,6 +66,7 @@ describe("default config", () => {
       subagents: true,
       lunaReserve: true,
       contextManagement: true,
+      justBash: true,
     })
     expect(DEFAULT_CONFIG.pi.codemode).toEqual({ mode: "only", maxWorkers: 4 })
     expect(DEFAULT_CONFIG.pi.t3).toEqual({

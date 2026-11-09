@@ -3,6 +3,10 @@ import { describe, expect, test } from "bun:test"
 import { piPackages } from "../../src/config/packages.ts"
 import type { Config } from "../../src/config/schema.ts"
 import { RoleTask, routeFor } from "../../src/domain/route.ts"
+import {
+  BILLION_CONTEXT_GUARDRAILS_FILE,
+  BILLION_CONTEXT_GUARDRAILS_OFF,
+} from "../../src/pi/bash/guardrails.ts"
 import { type ProviderProfile, PROVIDERS, webChoice } from "../../src/pi/provider.ts"
 import {
   allToolArgs,
@@ -101,7 +105,7 @@ describe("toolArgs for the specialists", () => {
     const { tools, env, argv } = toolArgs(DEFAULT_CONFIG, role)
     expect(tools.at(-1)).toBe("codemode")
     expect(tools).not.toContain("+codemode")
-    expect(env).toEqual({ [CODEMODE_MAX_WORKERS_ENV]: "4" })
+    expect(env).toEqual({ [CODEMODE_MAX_WORKERS_ENV]: "4", ...BILLION_CONTEXT_GUARDRAILS_OFF })
     expect(argv[1]).toBe(tools.join(","))
   })
 
@@ -132,7 +136,7 @@ describe("toolArgs for the root", () => {
       tools: ["+codemode"],
       excludeTools: ["write", "edit", ...COMPUTER_USE_TOOLS, ...MOONSHOT],
       noMcp: false,
-      env: { PI_CODEMODE_MAX_WORKERS: "4" },
+      env: { PI_CODEMODE_MAX_WORKERS: "4", ...BILLION_CONTEXT_GUARDRAILS_OFF },
       argv: [
         "--tools",
         "+codemode",
@@ -168,7 +172,7 @@ describe("toolArgs for the root", () => {
       pi: { ...DEFAULT_CONFIG.pi, codemode: { ...DEFAULT_CONFIG.pi.codemode, maxWorkers: 7 } },
     }
     for (const args of Object.values(allToolArgs(config))) {
-      expect(args.env).toEqual({ PI_CODEMODE_MAX_WORKERS: "7" })
+      expect(args.env[CODEMODE_MAX_WORKERS_ENV]).toBe("7")
     }
   })
 
@@ -326,13 +330,21 @@ describe("toolSettings", () => {
         file: PI_SETTINGS_FILE,
         content: { "pi-computer-use": { confirmAppLaunch: false, confirmDangerousActions: false } },
       },
+      {
+        file: BILLION_CONTEXT_FILE,
+        content: BILLION_CONTEXT_GUARDRAILS_FILE,
+        whileOn: "contextCompression",
+      },
     ])
   })
 
   test("Billion Context gets exactly the README's setting for subagents off, compression on", () => {
     const files = toolSettings(DEFAULT_CONFIG).map((patch) => patch.file)
     expect(files).not.toContain("~/.pi/acp.json")
-    expect(toolSettings(DEFAULT_CONFIG).filter((p) => p.file.includes("billion-context"))).toEqual([
+    const subagents = toolSettings(DEFAULT_CONFIG).filter(
+      (p) => p.file.includes("billion-context") && "pi" in p.content,
+    )
+    expect(subagents).toEqual([
       {
         file: "~/.config/billion-context/billion-context.json",
         content: { pi: { subagents: false } },

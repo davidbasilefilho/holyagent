@@ -10637,6 +10637,13 @@ var init_routes = __esm(() => {
   };
 });
 
+var BILLION_CONTEXT_GUARDRAILS_FILE;
+var init_guardrails = __esm(() => {
+  BILLION_CONTEXT_GUARDRAILS_FILE = {
+    guardrails: { bashTimeout: 0, maxOutputBytes: 0, repetition: false }
+  };
+});
+
 var CAPABILITY_FORMS, BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json", PI_SETTINGS_FILE = "~/.pi/agent/settings.json", SUBAGENTS_SETTINGS_FILE = "~/.pi/agent/subagents.json", SUBAGENTS_ONLY_SPECIALISTS, T3_PREFIX = "mcp__t3*code__", T3_VISUAL_TOOLS, COMPUTER_USE_TOOLS, sameForm = (packages) => ({
   headless: { packages, mcpServers: [] },
   normal: { packages, mcpServers: [] }
@@ -10650,6 +10657,7 @@ var CAPABILITY_FORMS, BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-
   ...new Set(definitions.flatMap((capability) => CAPABILITY_FORMS.flatMap((form) => formContent(capability, form)?.packages ?? [])))
 ];
 var init_capabilities = __esm(() => {
+  init_guardrails();
   CAPABILITY_FORMS = ["headless", "normal"];
   SUBAGENTS_ONLY_SPECIALISTS = {
     disableDefaultAgents: true,
@@ -10789,6 +10797,31 @@ var init_capabilities = __esm(() => {
       forms: sameForm([]),
       tools: { rootExclude: [], visual: [] },
       settings: [],
+      health: ["needs"]
+    },
+    {
+      name: "just-bash",
+      feature: "justBash",
+      description: "Runs the bash tool on just-bash, with the host's programs, TypeScript first and JavaScript as the fallback; turns Billion Context's bash guardrails off",
+      skills: [],
+      applicability: "both",
+      defaultOn: true,
+      needs: [
+        {
+          kind: "command",
+          command: "bun",
+          fix: "install Bun from https://bun.sh, since the shell runs on it"
+        }
+      ],
+      forms: sameForm([]),
+      tools: { rootExclude: [], visual: [] },
+      settings: [
+        {
+          file: BILLION_CONTEXT_FILE,
+          content: BILLION_CONTEXT_GUARDRAILS_FILE,
+          whileOn: "contextCompression"
+        }
+      ],
       health: ["needs"]
     }
   ];
@@ -25128,6 +25161,10 @@ var init_pi_check = __esm(() => {
   GIT_LEAD = /^(?:git:|[a-z][a-z0-9+.-]*:\/\/)(?:[^/@]*@)?|^[^/@:\s]+@[^/@:\s]+:/i;
 });
 
+var init_settings3 = __esm(() => {
+  init_guardrails();
+});
+
 var escapeRegExp = (text) => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&"), patternRegExp = (pattern) => new RegExp(`^${pattern.split("*").map(escapeRegExp).join(".*")}$`), T3_TOOL, T3_VISUAL, toolSettings = (config, profile = providerProfile(config), form = "normal") => {
   const { enable, features } = config.pi;
   if (!enable)
@@ -25143,12 +25180,13 @@ var escapeRegExp = (text) => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&"), pattern
         }
       }
     ] : [],
-    ...enabledCapabilities(features, { form, provider: config.pi.provider }).flatMap((capability) => capability.settings)
+    ...enabledCapabilities(features, { form, provider: config.pi.provider }).flatMap((capability) => capability.settings).filter((patch) => patch.whileOn === undefined || features[patch.whileOn] === true)
   ];
 };
 var init_tools = __esm(() => {
   init_capabilities();
   init_route();
+  init_settings3();
   init_provider();
   T3_TOOL = patternRegExp(`${T3_PREFIX}*`);
   T3_VISUAL = T3_VISUAL_TOOLS.map(patternRegExp);

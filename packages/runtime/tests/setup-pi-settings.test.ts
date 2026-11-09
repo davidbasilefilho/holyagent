@@ -7,6 +7,7 @@ import { Effect } from "effect"
 import { version } from "../../../package.json" with { type: "json" }
 import { piPackages } from "../src/config/packages.ts"
 import { defaultConfig } from "../src/config/schema.ts"
+import { BILLION_CONTEXT_GUARDRAILS_FILE } from "../src/pi/bash/guardrails.ts"
 import { doctor } from "../src/setup/doctor.ts"
 import { PI_HOST_VERSION } from "../src/setup/pi-check.ts"
 import { recordPath } from "../src/setup/record.ts"
@@ -116,7 +117,9 @@ const COMPUTER_USE = {
 }
 const KIMI = { tools: { moonshot_search: { enabled: true }, moonshot_fetch: { enabled: true } } }
 const SUBAGENTS = { disableDefaultAgents: true, fallbackSubagent: "none" }
-const BILLION = { pi: { subagents: false } }
+const BILLION_SUBAGENTS = { pi: { subagents: false } }
+/** What setup writes into Billion Context's file: the subagents setting and the guardrails off. */
+const BILLION = { ...BILLION_SUBAGENTS, ...BILLION_CONTEXT_GUARDRAILS_FILE }
 
 describe("holyagent setup, Pi tool settings", () => {
   test("writes every key toolSettings returns into Pi's global files, beside what the files hold", async () => {
@@ -186,9 +189,13 @@ describe("holyagent setup, Pi tool settings", () => {
       tools: { moonshot_search: { enabled: false }, moonshot_fetch: { enabled: true } },
       region: "global",
     })
-    expect(await read(billion())).toEqual({ pi: { subagents: { enabled: true } }, port: 1 })
-    expect(toolLines(report)).toContain(
-      `~ tool settings ${billion()}: kept pi.subagents {"enabled":true} (HolyAgent sets false; yours wins)`,
+    expect(await read(billion())).toEqual({
+      pi: { subagents: { enabled: true } },
+      port: 1,
+      ...BILLION_CONTEXT_GUARDRAILS_FILE,
+    })
+    expect(toolLines(report).join("\n")).toContain(
+      'kept pi.subagents {"enabled":true} (HolyAgent sets false; yours wins)',
     )
     expect(toolLines(report).join("\n")).toContain(
       'kept codemode.mode "on" (HolyAgent sets "only"; yours wins)',
@@ -556,7 +563,10 @@ describe("holyagent doctor, Pi tool settings", () => {
       ),
       lacking(globalKimi(), "tools.moonshot_search.enabled, tools.moonshot_fetch.enabled"),
       lacking(globalSubagents(), "disableDefaultAgents, fallbackSubagent"),
-      lacking(billion(), "pi.subagents"),
+      lacking(
+        billion(),
+        "pi.subagents, guardrails.bashTimeout, guardrails.maxOutputBytes, guardrails.repetition",
+      ),
     ])
   })
 
@@ -803,7 +813,7 @@ describe("holyagent setup --undo, Pi tool settings", () => {
 
   test("keeps a value the user changed since, and a key the user already had before setup", async () => {
     await write(globalSettings(), { ...FULL(), codemode: { mode: "only" } })
-    await write(billion(), BILLION)
+    await write(billion(), BILLION_SUBAGENTS)
     await runSetup(withPi())
     await write(globalSubagents(), { disableDefaultAgents: true, fallbackSubagent: "Plan" })
     await write(globalKimi(), { tools: { moonshot_search: { enabled: false } } })
@@ -811,7 +821,7 @@ describe("holyagent setup --undo, Pi tool settings", () => {
     const report = await runSetup(withPi(), { undo: true })
     // codemode.mode was the user's before setup, so it was never recorded and stays.
     expect(await read(globalSettings())).toEqual({ ...FULL(), codemode: { mode: "only" } })
-    expect(await read(billion())).toEqual(BILLION)
+    expect(await read(billion())).toEqual(BILLION_SUBAGENTS)
     expect(await read(globalSubagents())).toEqual({ fallbackSubagent: "Plan" })
     expect(await read(globalKimi())).toEqual({ tools: { moonshot_search: { enabled: false } } })
     expect(toolLines(report).join("\n")).toContain(

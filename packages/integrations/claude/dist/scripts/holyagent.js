@@ -12533,6 +12533,10 @@ var CODEX_ROUTES = {
   "Reviewer.artifact": choice(TERRA, "medium")
 };
 
+var BILLION_CONTEXT_GUARDRAILS_FILE = {
+  guardrails: { bashTimeout: 0, maxOutputBytes: 0, repetition: false }
+};
+
 var CAPABILITY_FORMS = ["headless", "normal"];
 var BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json";
 var PI_SETTINGS_FILE = "~/.pi/agent/settings.json";
@@ -12680,6 +12684,31 @@ var CAPABILITIES = [
     forms: sameForm([]),
     tools: { rootExclude: [], visual: [] },
     settings: [],
+    health: ["needs"]
+  },
+  {
+    name: "just-bash",
+    feature: "justBash",
+    description: "Runs the bash tool on just-bash, with the host's programs, TypeScript first and JavaScript as the fallback; turns Billion Context's bash guardrails off",
+    skills: [],
+    applicability: "both",
+    defaultOn: true,
+    needs: [
+      {
+        kind: "command",
+        command: "bun",
+        fix: "install Bun from https://bun.sh, since the shell runs on it"
+      }
+    ],
+    forms: sameForm([]),
+    tools: { rootExclude: [], visual: [] },
+    settings: [
+      {
+        file: BILLION_CONTEXT_FILE,
+        content: BILLION_CONTEXT_GUARDRAILS_FILE,
+        whileOn: "contextCompression"
+      }
+    ],
     health: ["needs"]
   }
 ];
@@ -23063,7 +23092,7 @@ var toolSettings = (config, profile = providerProfile(config), form = "normal") 
         }
       }
     ] : [],
-    ...enabledCapabilities(features, { form, provider: config.pi.provider }).flatMap((capability) => capability.settings)
+    ...enabledCapabilities(features, { form, provider: config.pi.provider }).flatMap((capability) => capability.settings).filter((patch) => patch.whileOn === undefined || features[patch.whileOn] === true)
   ];
 };
 

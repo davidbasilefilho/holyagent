@@ -12,6 +12,7 @@ import {
 } from "../config/capabilities.ts"
 import type { Config, RouteKey } from "../config/schema.ts"
 import { type Capability, routeFor } from "../domain/route.ts"
+import { justBashEnvironment } from "./bash/settings.ts"
 import { type ProviderProfile, providerProfile, webChoice } from "./provider.ts"
 
 /** Pi's built-in tools that read: they replace `Read`, `Grep` and `Glob` for every role. */
@@ -86,7 +87,10 @@ export interface ToolArgs {
   readonly excludeTools: ReadonlyArray<string>
   /** True when `pi.features.mcp` is off and the process starts with `--no-mcp`. */
   readonly noMcp: boolean
-  /** The environment variables the launcher sets on the process: `PI_CODEMODE_MAX_WORKERS`. */
+  /**
+   * The environment variables the launcher sets on the process: `PI_CODEMODE_MAX_WORKERS`, and
+   * Billion Context's `BILI_GUARDRAIL_*` while the bash tool runs on just-bash.
+   */
   readonly env: Readonly<Record<string, string>>
   /** The arguments in the order the launcher passes them to Pi. */
   readonly argv: ReadonlyArray<string>
@@ -96,12 +100,12 @@ const build = (
   tools: ReadonlyArray<string>,
   excludeTools: ReadonlyArray<string>,
   noMcp: boolean,
-  maxWorkers: number,
+  env: Readonly<Record<string, string>>,
 ): ToolArgs => ({
   tools,
   excludeTools,
   noMcp,
-  env: { [CODEMODE_MAX_WORKERS_ENV]: String(maxWorkers) },
+  env,
   argv: [
     "--tools",
     tools.join(","),
@@ -146,7 +150,10 @@ export const toolArgs = (
   const { features } = config.pi
   const enabled = enabledCapabilities(features, { provider: config.pi.provider })
   const noMcp = !features.mcp
-  const { maxWorkers } = config.pi.codemode
+  const env = {
+    [CODEMODE_MAX_WORKERS_ENV]: String(config.pi.codemode.maxWorkers),
+    ...justBashEnvironment(config),
+  }
   if (key === "root") {
     const excluded = [
       "write",
@@ -155,7 +162,7 @@ export const toolArgs = (
       ...enabled.flatMap((capability) => capability.tools.rootExclude),
       ...webChoice(profile, features.web).tools,
     ]
-    return build([CODEMODE_ENTRY], excluded, noMcp, maxWorkers)
+    return build([CODEMODE_ENTRY], excluded, noMcp, env)
   }
   const { capabilities, roleTask } = routeFor(key)
   const tools = [
@@ -172,7 +179,7 @@ export const toolArgs = (
     [...unique, CODEMODE_TOOL],
     [...WRITE_TOOLS, ...profile.writeTools].filter((tool) => !unique.includes(tool)),
     noMcp,
-    maxWorkers,
+    env,
   )
 }
 
@@ -240,7 +247,8 @@ export {
  *   subagents package's `subagents.json` ({@link SUBAGENTS_ONLY_SPECIALISTS}), so only the 18
  *   specialists the package ships can launch; Billion Context's own `acp_delegate` subagents off
  *   while context compression stays on; the computer-use confirmations off, the decided "full
- *   access, no prompts".
+ *   access, no prompts"; Billion Context's bash guardrails off while the bash tool runs on
+ *   just-bash, and only while Billion Context itself is on (a patch's `whileOn`).
  *
  * The form defaults to `normal`.
  */
@@ -264,8 +272,12 @@ export const toolSettings = (
           },
         ]
       : []),
-    ...enabledCapabilities(features, { form, provider: config.pi.provider }).flatMap(
-      (capability) => capability.settings,
-    ),
+    ...enabledCapabilities(features, { form, provider: config.pi.provider })
+      .flatMap((capability) => capability.settings)
+      .filter(
+        (patch) =>
+          patch.whileOn === undefined ||
+          (features as Readonly<Record<string, unknown>>)[patch.whileOn] === true,
+      ),
   ]
 }

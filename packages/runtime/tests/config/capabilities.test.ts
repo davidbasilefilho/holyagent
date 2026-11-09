@@ -100,11 +100,13 @@ describe("the capability registry", () => {
     )
     expect(file).toEqual(written)
     const config = await Effect.runPromise(Schema.decodeUnknownEffect(Config)(written))
-    // Only the keys a later release added (the Codex provider's Luna Reserve and context_management) take their default.
+    // Only the keys a later release added (the Codex provider's Luna Reserve and context_management,
+    // and the just-bash shell) take their default.
     expect(config.pi.features).toEqual({
       ...written.pi.features,
       lunaReserve: true,
       contextManagement: true,
+      justBash: true,
     })
     const unknown = Schema.decodeUnknownEffect(ConfigFile, { onExcessProperty: "error" })({
       pi: { features: { notACapability: true } },
@@ -189,7 +191,24 @@ describe("registry-driven tool settings", () => {
 
   test("each enabled capability contributes its settings, in registry order", () => {
     const settingsOf = (capability: CapabilityDefinition) => capability.settings
-    expect(toolSettings(DEFAULT_CONFIG).slice(-3)).toEqual(CAPABILITIES.flatMap(settingsOf))
+    const all = CAPABILITIES.flatMap(settingsOf)
+    expect(toolSettings(DEFAULT_CONFIG).slice(-all.length)).toEqual(all)
+  })
+
+  test("a patch that names `whileOn` is written only while that capability is on", () => {
+    const features = new Set<string>(CAPABILITIES.map((capability) => capability.feature))
+    const patches = (CAPABILITIES as ReadonlyArray<CapabilityDefinition>).flatMap(
+      (capability) => capability.settings,
+    )
+    const dependent = patches.filter((patch) => patch.whileOn !== undefined)
+    expect(dependent.length).toBeGreaterThan(0)
+    for (const patch of dependent) {
+      expect(features.has(patch.whileOn ?? "")).toBe(true)
+      expect(toolSettings(DEFAULT_CONFIG)).toContainEqual(patch)
+    }
+    const off = toolSettings(withFeatures({ contextCompression: false }))
+    for (const patch of dependent.filter((entry) => entry.whileOn === "contextCompression"))
+      expect(off).not.toContainEqual(patch)
   })
 
   test("a capability that is off or not offered in the form writes no settings", () => {
